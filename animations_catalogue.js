@@ -3861,8 +3861,14 @@
                 for (let i = 0; i < n; i++) {
                     const k = i - (n - 1) / 2, base = v.angle + k * 0.42, ang = deg(base);
                     const pos = { x: a.x + Math.cos(base) * R, y: a.y + Math.sin(base) * R };
+                    // MANQUÉS, ils frôlent la cible et se brisent au sol juste
+                    // à côté d'elle (Nico, v252 : « l'attaque magique de glace
+                    // au CàC, l'animation va un hexagone plus loin que sa
+                    // cible ») : ils filaient 1,3 pion au-delà, soit presque une
+                    // case entière quand on frappe au contact.
+                    const cote = 0.5 + i * 0.12;   // tous du même côté, en éventail
                     const vise = touchee ? { x: b.x - v.uy * k * b.t * 0.1, y: b.y + v.ux * k * b.t * 0.1 }
-                                         : { x: b.x + v.ux * b.t * 1.3 - v.uy * k * b.t * 0.25, y: b.y + v.uy * b.t * 1.3 + v.ux * k * b.t * 0.25 };
+                                         : { x: b.x + v.ux * b.t * 0.35 - v.uy * cote * b.t, y: b.y + v.uy * b.t * 0.35 + v.ux * cote * b.t };
                     const u = axe(pos, vise);
                     const fin = { x: vise.x - u.ux * L * 0.3, y: vise.y - u.uy * L * 0.3 };
                     const vers = ang + ((deg(u.angle) - ang + 540) % 360) - 180;

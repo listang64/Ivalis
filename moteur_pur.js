@@ -639,11 +639,27 @@ export function tirerCritique(etat, idLanceur, des) {
 // posé comme un réglage provisoire ; s'il change, ce tableau est le seul
 // endroit à toucher. (Revu par Nico : 0 / 1 / 2 / 3, au lieu de 3 / 4 / 5 / 6 ;
 // puis +1 partout : 1 / 2 / 3 / 4 ; puis -1 partout : 0 / 1 / 2 / 3.)
-const TABLE_BONUS_MONSTRE = { "Petit": 0, "Normal": 1, "Élite": 2, "Boss": 3 };
+//
+// RÉGLABLE À LA VOLÉE (Nico, v252 : « mets dans Paramètres > Monstres, en
+// haut du tableau, la valeur de dégâts qu'on pourra modifier à la volée ») :
+// le tableau des monstres (monstres.js) la règle ici, sur chaque poste, dès
+// qu'elle change. Ces chiffres sont ceux d'origine.
+export const BONUS_MONSTRE_DEFAUT = Object.freeze({ "Petit": 0, "Normal": 1, "Élite": 2, "Boss": 3 });
+const TABLE_BONUS_MONSTRE = { ...BONUS_MONSTRE_DEFAUT };
+
+export function reglerBonusMonstres(table) {
+    Object.keys(BONUS_MONSTRE_DEFAUT).forEach(palier => {
+        const brut = table ? table[palier] : undefined;
+        const v = brut === undefined || brut === null || brut === "" ? NaN : Number(brut);
+        TABLE_BONUS_MONSTRE[palier] = Number.isFinite(v) ? Math.round(v) : BONUS_MONSTRE_DEFAUT[palier];
+    });
+    return { ...TABLE_BONUS_MONSTRE };
+}
+export const bonusMonstresActuels = () => ({ ...TABLE_BONUS_MONSTRE });
 
 export function bonusMonstreDe(c) {
     if (!c || !c.estMonstre) return 0;
-    return TABLE_BONUS_MONSTRE[c.palier] || 0;
+    return TABLE_BONUS_MONSTRE[c.palier === "Elite" ? "Élite" : c.palier] || 0;
 }
 
 // =========================================================================
@@ -2519,6 +2535,8 @@ if (typeof window !== "undefined") {
     window.moteurPur = {
         jouer, resoudreCarte, chaineDeDegats, tirerDesCarte, tirerCritique,
         esquiveDe, paradeDe, defPhysiqueDe, defMagiqueDe, critiqueDe, distanceHex,
-        casesDansLeNoir, estDansLeNoir, ETAT_AVEUGLE
+        casesDansLeNoir, estDansLeNoir, ETAT_AVEUGLE,
+        // La triche des créatures, réglée depuis le tableau des monstres (v252).
+        bonusMonstreDe, reglerBonusMonstres, bonusMonstresActuels, BONUS_MONSTRE_DEFAUT
     };
 }

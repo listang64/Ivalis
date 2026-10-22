@@ -118,9 +118,17 @@ function caseLibre(q, r, idIgnore) {
 
 // LE DÉPLACEMENT D'UNE CRÉATURE SELON SON PALIER (Nico : « petits 6, normal 5,
 // élite 4, boss 4 ») — le même barème que le cerveau (ia_pure.js, pasMaxDe).
+// Réglable dans Paramètres > Outils > Monstres (window.REGLAGES_MONSTRES,
+// monstres.js, v252) ; ces chiffres sont ceux d'origine.
 const PAS_PAR_PALIER_MONSTRE = { "Petit": 6, "Normal": 5, "Élite": 4, "Elite": 4, "Boss": 4 };
 const PAS_MAX_MONSTRE = 5;
-window.pasMaxMonstre = (m) => PAS_PAR_PALIER_MONSTRE[(m && (m.Palier || m.palier)) || ""] || PAS_MAX_MONSTRE;
+window.pasMaxMonstre = (m) => {
+    let palier = (m && (m.Palier || m.palier)) || "";
+    if (palier === "Elite") palier = "Élite";
+    const regles = (window.REGLAGES_MONSTRES && window.REGLAGES_MONSTRES.deplacement) || PAS_PAR_PALIER_MONSTRE;
+    const n = regles[palier];
+    return n !== undefined && n !== null ? n : PAS_MAX_MONSTRE;
+};
 
 // Les cases atteignables en quelques pas (selon le palier), avec la longueur
 // réelle du trajet (murs, cases supprimées et combattants contournés par l'A*).

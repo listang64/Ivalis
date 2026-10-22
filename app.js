@@ -2270,8 +2270,19 @@ async function supprimerPersonnageBDD(idPersonnage) {
 
   // 4. Sa sous-collection "Competences" : Firestore ne l'emporte PAS avec le
   //    document parent, elle survivrait en orpheline.
+  //    LEURS ILLUSTRATIONS PARTENT AVEC ELLES (Nico, v252 : « les images des
+  //    compétences des personnages doivent s'effacer de Cloudinary si on
+  //    détruit le personnage ») : on relève chaque URL_Image avant d'effacer,
+  //    et une illustration encore en file ou en train de se dessiner est
+  //    annulée — elle arriverait sinon sur une compétence qui n'existe plus.
+  const illustrations = [];
   try {
       const snapComp = await getDocs(query(collection(db, COL.PERSONNAGES, idPersonnage, "Competences")));
+      snapComp.forEach(docComp => {
+          const url = (docComp.data() || {}).URL_Image;
+          if (url) illustrations.push(url);
+          if (typeof window.annulerIllustration === "function") window.annulerIllustration(idPersonnage, docComp.id);
+      });
       if (!snapComp.empty) {
           const lot = writeBatch(db);
           snapComp.forEach(docComp => lot.delete(doc(db, COL.PERSONNAGES, idPersonnage, "Competences", docComp.id)));
@@ -2310,10 +2321,14 @@ async function supprimerPersonnageBDD(idPersonnage) {
   //    encore utilisé ailleurs : un objet ne peut pas être porté par deux héros
   //    à la fois, mais une arme à deux mains occupe DEUX emplacements avec la
   //    même image, et rien ne dit qu'un jour un dessin ne sera pas partagé.
+  //
+  //    Puis (v252) les illustrations de ses compétences, relevées à l'étape 4,
+  //    et le portrait et le pion de son compagnon (Pisteur).
   if (data && typeof window.oublierImages === "function") {
       const objets = [data.Equip_Armure, data.Equip_Main_Droite, data.Equip_Main_Gauche]
           .filter(o => o && o.image).map(o => o.image);
-      const images = [data.URL_Cloudinary, data.URL_Avatar_Equipe, data.URL_Token, ...objets]
+      const images = [data.URL_Cloudinary, data.URL_Avatar_Equipe, data.URL_Token, ...objets,
+                      data.Compagnon_Image, data.Compagnon_Token, ...illustrations]
           .filter(Boolean);
       // LE HÉROS EST ENCORE DANS LA LISTE EN MÉMOIRE à cet instant : elle n'est
       // nettoyée qu'à l'étape suivante. Sans `saufPersonnage`, ses propres

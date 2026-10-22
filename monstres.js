@@ -137,7 +137,9 @@ window.chargerGabaritsMonstres = async function() {
     let existants = {};
 
     const snap = await getDocs(collection(db, COLLECTION_GABARITS));
-    snap.forEach(d => { existants[d.id] = d.data(); });
+    // Les documents en « _ » ne sont pas des gabarits (les réglages de triche
+    // et de marche, plus bas).
+    snap.forEach(d => { if (!String(d.id).startsWith("_")) existants[d.id] = d.data(); });
 
     const manquants = parDefaut.filter(g => !existants[g.Cle]);
     if (manquants.length > 0) {
@@ -380,6 +382,127 @@ window.creerMonstreDepuisGabarit = async function(idMonstre, gabarit, donneesSup
 };
 
 // =========================================================================
+//  LA TRICHE ET LA MARCHE DES CRÉATURES, RÉGLABLES À LA VOLÉE (v252)
+// =========================================================================
+//  Nico : « Dis-moi combien de dégâts on a rajouté en triche aux monstres ?
+//  Mets dans Paramètres > Monstres, en haut du tableau, la valeur de dégâts
+//  qu'on pourra modifier à la volée, et mets aussi leur nombre de
+//  déplacements. »
+//
+//  Trois réglages, valables pour toutes les créatures (pas par gabarit) :
+//    · les dégâts (et soins) EN PLUS par stature — ajoutés au brut, avant les
+//      résistances (bonusMonstreDe, moteur_pur.js) ;
+//    · le bonus des SORTS, en % — dégâts, soins, boucliers et chances d'état
+//      de leurs cartes (multiplicateurSortsMonstre, app.js) ;
+//    · les cases de MARCHE par stature (pasMaxDe, ia_pure.js ; pasMaxMonstre,
+//      monstres_ia.js).
+//  Ils vivent dans un document à part du bestiaire (Monstres_Modeles/_REGLAGES),
+//  que CHAQUE poste écoute : un chiffre changé vaut tout de suite, combat en
+//  cours compris — c'est le poste qui tient le cerveau qui calcule.
+const DOC_REGLAGES = "_REGLAGES";
+const PALIERS_REGLES = ["Petit", "Normal", "Élite", "Boss"];
+// Le noyau du combat (moteur_pur.js, ia_pure.js) porte les chiffres d'origine
+// et se règle par window.moteurPur / window.iaPure — le même module que celui
+// du cerveau, par la table d'import de la page. Sans lui (un banc qui isole ce
+// fichier), les mêmes chiffres, écrits ici.
+const noyauMoteur = () => (typeof window !== "undefined" && window.moteurPur) || {};
+const noyauIA = () => (typeof window !== "undefined" && window.iaPure) || {};
+window.REGLAGES_MONSTRES_DEFAUT = Object.freeze({
+    bonusDegats: { ...(noyauMoteur().BONUS_MONSTRE_DEFAUT || { "Petit": 0, "Normal": 1, "Élite": 2, "Boss": 3 }) },
+    bonusSortsPct: 20,
+    deplacement: { ...(noyauIA().PAS_PAR_PALIER_DEFAUT || { "Petit": 6, "Normal": 5, "Élite": 4, "Boss": 4 }) }
+});
+const BORNES_REGLAGES = { bonusDegats: [-20, 50], bonusSortsPct: [-50, 200], deplacement: [0, 15] };
+const borner = (famille, v, defaut) => {
+    // Une case vidée (ou un champ absent) garde la valeur d'avant.
+    if (v === undefined || v === null || String(v).trim() === "") return defaut;
+    const n = Math.round(Number(v));
+    if (!Number.isFinite(n)) return defaut;
+    const [min, max] = BORNES_REGLAGES[famille];
+    return Math.max(min, Math.min(max, n));
+};
+// Des réglages lus en base (ou rien) → des réglages complets et bornés.
+window.normaliserReglagesMonstres = function(brut) {
+    const d = window.REGLAGES_MONSTRES_DEFAUT;
+    const src = brut || {};
+    const parPalier = (famille, champ) => {
+        const t = {};
+        PALIERS_REGLES.forEach(p => { t[p] = borner(famille, ((src[champ] || {})[p]), d[famille][p]); });
+        return t;
+    };
+    return {
+        bonusDegats: parPalier("bonusDegats", "Bonus_Degats"),
+        bonusSortsPct: borner("bonusSortsPct", src.Bonus_Sorts_Pct, d.bonusSortsPct),
+        deplacement: parPalier("deplacement", "Deplacement")
+    };
+};
+// Les poser partout où le jeu les lit.
+window.appliquerReglagesMonstres = function(brut) {
+    const r = window.normaliserReglagesMonstres(brut);
+    window.REGLAGES_MONSTRES = r;
+    if (typeof noyauMoteur().reglerBonusMonstres === "function") noyauMoteur().reglerBonusMonstres(r.bonusDegats);
+    if (typeof noyauIA().reglerPasMonstres === "function") noyauIA().reglerPasMonstres(r.deplacement);
+    window.MULTIPLICATEUR_SORTS_MONSTRE = 1 + r.bonusSortsPct / 100;
+    if (typeof window.dessinerReglagesMonstres === "function") window.dessinerReglagesMonstres();
+    return r;
+};
+window.appliquerReglagesMonstres(null);
+
+let arretReglagesMonstres = null;
+window.ecouterReglagesMonstres = function() {
+    if (arretReglagesMonstres) return;
+    try {
+        arretReglagesMonstres = onSnapshot(doc(db, COLLECTION_GABARITS, DOC_REGLAGES),
+            (snap) => window.appliquerReglagesMonstres(snap && snap.exists() ? snap.data() : null),
+            (err) => console.error("Réglages des monstres :", err));
+    } catch (e) { console.error("Réglages des monstres :", e); }
+};
+window.ecouterReglagesMonstres();
+
+// Le haut du tableau : deux lignes par stature, et le % des sorts.
+window.dessinerReglagesMonstres = function() {
+    const corps = document.getElementById("tbody-reglages-monstres");
+    const sorts = document.getElementById("reglage-bonus-sorts");
+    const r = window.REGLAGES_MONSTRES;
+    if (!corps || !r) return;
+    // Pas pendant qu'on tape : la valeur reviendrait sous les doigts.
+    const actif = document.activeElement;
+    if (actif && actif.closest && actif.closest("#reglages-monstres")) return;
+    const ligne = (titre, famille, aide) => `<tr><td class="reglage-monstres-titre" title="${aide}">${titre}</td>`
+        + PALIERS_REGLES.map(p => `<td><input type="number" inputmode="numeric" class="reglage-monstres-valeur"
+              data-famille="${famille}" data-palier="${p}" value="${r[famille][p]}"
+              min="${BORNES_REGLAGES[famille][0]}" max="${BORNES_REGLAGES[famille][1]}"
+              onchange="window.modifierReglageMonstre('${famille}', '${p}', this)"></td>`).join("") + `</tr>`;
+    corps.innerHTML = ligne("Dégâts et soins en plus", "bonusDegats", "Ajoutés au brut de chaque attaque et de chaque soin, avant les résistances")
+                    + ligne("Déplacement (cases)", "deplacement", "Cases que la créature peut marcher à son tour");
+    if (sorts) sorts.value = r.bonusSortsPct;
+};
+
+window.modifierReglageMonstre = async function(famille, palier, input) {
+    const actuels = window.REGLAGES_MONSTRES || window.normaliserReglagesMonstres(null);
+    const valeur = famille === "bonusSortsPct"
+        ? borner(famille, input && input.value, actuels.bonusSortsPct)
+        : borner(famille, input && input.value, actuels[famille][palier]);
+    if (input) input.value = valeur;
+    const etat = document.getElementById("reglages-monstres-etat");
+    const maj = famille === "bonusSortsPct" ? { Bonus_Sorts_Pct: valeur }
+        : { [famille === "bonusDegats" ? "Bonus_Degats" : "Deplacement"]:
+            { ...actuels[famille], [palier]: valeur } };
+    // Tout de suite sur ce poste ; la base le porte aux autres.
+    const brut = {
+        Bonus_Degats: actuels.bonusDegats, Bonus_Sorts_Pct: actuels.bonusSortsPct, Deplacement: actuels.deplacement, ...maj
+    };
+    window.appliquerReglagesMonstres(brut);
+    try {
+        await setDoc(doc(db, COLLECTION_GABARITS, DOC_REGLAGES), maj, { merge: true });
+        if (etat) { etat.textContent = "✔️ Enregistré — en jeu tout de suite"; setTimeout(() => { etat.textContent = ""; }, 1800); }
+    } catch (e) {
+        console.error("Enregistrement des réglages des monstres :", e);
+        if (etat) etat.textContent = "⚠️ Non enregistré (connexion ?)";
+    }
+};
+
+// =========================================================================
 //  4. L'OUTIL D'ÉQUILIBRAGE (menu Paramètres > Outils > Monstres)
 // =========================================================================
 
@@ -399,6 +522,7 @@ window.ouvrirGestionMonstres = async function() {
 
     modificationsEnAttente = {};
 
+    window.dessinerReglagesMonstres();
     try {
         await window.chargerGabaritsMonstres();
         window.dessinerTableauMonstres();

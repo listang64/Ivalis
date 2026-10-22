@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=84">
+  <link rel="stylesheet" href="style.css?v=85">
 
  
   <!-- ===================================================================== -->
@@ -441,15 +441,6 @@
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/personnages_qhidpu.png" class="icone-menu" alt="Personnages" onclick="jouerSonClic(); ouvrirMenuPersonnages()">
       </div>
 
-      <div class="conteneur-bouton-lateral" onmouseenter="jouerSonSurvolParchemin()">
-        <div class="masque-banniere">
-          <div class="banniere-glissante">
-            <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/banniere_okbe27.png" alt="Bannière">
-            <span class="texte-banniere">Paramètres</span>
-          </div>
-        </div>
-        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/param%C3%A8tres_gttwna.png" class="icone-menu" alt="Paramètres" onclick="jouerSonClic(); ouvrirParametres()">
-      </div>
 
       <!-- BOUTON COMBAT : RENCONTRE -->
       <div class="conteneur-bouton-lateral" onmouseenter="jouerSonSurvolParchemin()">
@@ -471,6 +462,17 @@
           </div>
         </div>
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/missions_wo5tws.png" class="icone-menu" alt="Missions" onclick="jouerSonClic()">
+      </div>
+
+      <!-- Paramètres : en bas, sous Combat et Mission (Nico, v252). -->
+      <div class="conteneur-bouton-lateral" onmouseenter="jouerSonSurvolParchemin()">
+        <div class="masque-banniere">
+          <div class="banniere-glissante">
+            <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/banniere_okbe27.png" alt="Bannière">
+            <span class="texte-banniere">Paramètres</span>
+          </div>
+        </div>
+        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/param%C3%A8tres_gttwna.png" class="icone-menu" alt="Paramètres" onclick="jouerSonClic(); ouvrirParametres()">
       </div>
 
     </div>
@@ -1520,6 +1522,25 @@
         Les plafonds (Rés. 70 %, Parade/Esquive 50 %) sont appliqués automatiquement à la saisie.
       </p>
 
+      <!-- LA TRICHE ET LA MARCHE DES CRÉATURES (v252) : pour toutes, par stature ;
+           appliquées tout de suite, combat en cours compris (monstres.js). -->
+      <div id="reglages-monstres" class="reglages-monstres">
+        <div class="reglages-monstres-entete">
+          <span class="reglages-monstres-nom">Triche et déplacement des créatures</span>
+          <span class="reglages-monstres-aide">s'appliquent tout de suite, en jeu</span>
+        </div>
+        <table class="table-reglages-monstres">
+          <thead><tr><th></th><th>Petit</th><th>Normal</th><th>Élite</th><th>Boss</th></tr></thead>
+          <tbody id="tbody-reglages-monstres"></tbody>
+        </table>
+        <div class="reglages-monstres-sorts">
+          Effets de leurs sorts (dégâts, soins, boucliers, chances d'état) :
+          <input id="reglage-bonus-sorts" type="number" inputmode="numeric" class="reglage-monstres-valeur" min="-50" max="200"
+                 onchange="window.modifierReglageMonstre('bonusSortsPct', '', this)"> % en plus
+          <span id="reglages-monstres-etat" class="reglages-monstres-etat"></span>
+        </div>
+      </div>
+
       <div id="chargement-monstres" style="font-style: italic;">Réveil du bestiaire...</div>
 
       <div id="conteneur-table-monstres" style="display: none; max-height: 70vh; overflow: auto;">
@@ -2026,7 +2047,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=162"></script>
+<script src="trace_combat.js?v=163"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2040,9 +2061,9 @@
 <script type="importmap">
 { "imports": {
     "./combat_etat.js": "./combat_etat.js?v=37",
-    "./moteur_pur.js": "./moteur_pur.js?v=61",
+    "./moteur_pur.js": "./moteur_pur.js?v=62",
     "./mouvement_pur.js": "./mouvement_pur.js?v=22",
-    "./ia_pure.js": "./ia_pure.js?v=14",
+    "./ia_pure.js": "./ia_pure.js?v=15",
     "./cerveau_combat.js": "./cerveau_combat.js?v=56",
     "./spectateur_combat.js": "./spectateur_combat.js?v=7",
     "./depot_firestore.js": "./depot_firestore.js?v=11",
@@ -2062,9 +2083,9 @@
 <script type="module" src="combat_etat.js?v=37"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=61"></script>
+<script type="module" src="moteur_pur.js?v=62"></script>
 <script type="module" src="mouvement_pur.js?v=22"></script>
-<script type="module" src="ia_pure.js?v=14"></script>
+<script type="module" src="ia_pure.js?v=15"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
 <script type="module" src="cerveau_combat.js?v=56"></script>
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
@@ -2079,12 +2100,12 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=49"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=111"></script>
+<script type="module" src="app.js?v=112"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=15"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->
 <script src="animations_combat.js?v=11"></script>
-<script src="animations_catalogue.js?v=18"></script>
+<script src="animations_catalogue.js?v=19"></script>
 <!-- …et leur branchement sur le vrai combat (les animations validées dans le Studio). -->
 <script src="animations_jeu.js?v=9"></script>
 <script src="experience.js?v=1"></script>
@@ -2116,9 +2137,9 @@
 <script type="module" src="mouvement.js?v=39"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
 <script type="module" src="moteur_effets.js?v=97"></script>
-<script type="module" src="monstres.js?v=30"></script>
+<script type="module" src="monstres.js?v=31"></script>
 <script type="module" src="monstres_competences.js?v=27"></script>
-<script type="module" src="monstres_ia.js?v=40"></script>
+<script type="module" src="monstres_ia.js?v=41"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=18"></script>
 <script src="variations_tenues.js?v=2"></script>

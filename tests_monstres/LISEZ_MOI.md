@@ -6946,3 +6946,62 @@ panneau qui passe au héros debout ; l'XP de la défaite (140, une fois,
 annoncée) ; le tableau des monstres (Repos_Long, Nombre_Actions, la seconde
 compétence) ; l'éclair après un redessin ; l'arc et les sorts. Il mord sur
 l'ancien code (32 échecs).
+
+## v252 — La triche et la marche des créatures, réglables ; Paramètres en bas ; Cloudinary ; glace au contact
+
+Nico : « Dis-moi combien de dégâts on a rajouté en triche aux monstres ? Tu
+peux mettre dans Paramètres > Monstres, en haut du tableau, la valeur de
+dégâts qu'on pourra modifier à la volée comme on veut, et mets aussi leur
+nombre de déplacements qu'on puisse modifier aussi » ; « le bouton
+Paramètres sur la page principale, mets-le en bas, en dessous de Combat et
+Mission » ; « les images des compétences des personnages doivent s'effacer
+de Cloudinary si on détruit le personnage ; vérifie que les images de leurs
+objets sont aussi bien effacées » ; « pour les Vargens, vérifie que leur
+déplacement divisé par deux retire bien la fatigue divisée par deux » ;
+« l'animation d'une attaque magique de glace au CàC va un hexagone plus loin
+que sa cible ».
+
+- LA TRICHE DES CRÉATURES, telle qu'elle était : +0 / +1 / +2 / +3 (Petit /
+  Normal / Élite / Boss) ajoutés au brut de chaque attaque et de chaque soin,
+  avant les résistances (bonusMonstreDe, moteur_pur.js) ; +20 % sur tous les
+  effets de leurs sorts — dégâts, soins, boucliers, chances d'état
+  (multiplicateurSortsMonstre, app.js) ; et +8 de chance de poser la Peur et
+  l'Étourdi (BONUS_CHANCE_ETAT_MONSTRE, inchangé, non réglable).
+- RÉGLABLE À LA VOLÉE (Paramètres > Outils > Monstres, en haut, au-dessus des
+  gabarits) : les dégâts et soins en plus par stature, la marche par stature
+  (6 / 5 / 4 / 4 cases), et le bonus des sorts (20 %). Chaque case s'écrit dès
+  qu'on la quitte (Monstres_Modeles/_REGLAGES, fusionné) ; chaque poste écoute
+  ce document (ecouterReglagesMonstres) et l'applique aussitôt — combat en
+  cours compris, c'est le poste qui tient le cerveau qui calcule.
+  - Le moteur : reglerBonusMonstres (moteur_pur.js), reglerPasMonstres
+    (ia_pure.js — zéro permis, une créature qui ne bouge plus), la préparation
+    (pasMaxMonstre, monstres_ia.js) et le % des sorts
+    (MULTIPLICATEUR_SORTS_MONSTRE). Bornes : dégâts −20 à +50, sorts −50 à
+    +200 %, marche 0 à 15 ; une case vidée garde sa valeur.
+  - Le document « _REGLAGES » n'est pas un gabarit : chargerGabaritsMonstres
+    ignore les documents en « _ ».
+- LE BOUTON PARAMÈTRES (index.html) : en bas du menu, sous Rencontre (combat)
+  et Journal (missions).
+- CLOUDINARY, UN PERSONNAGE DÉTRUIT (supprimerPersonnageBDD, app.js) : les
+  illustrations de ses compétences (URL_Image, relevées avant d'effacer la
+  sous-collection) partent avec lui, et une illustration encore en file est
+  annulée ; le portrait et le pion de son compagnon (Pisteur) aussi. Les
+  objets : un héros n'a que ses trois emplacements (armure, deux mains) —
+  leurs dessins partaient déjà (vérifié).
+- LE VARGEN (vérifié, rien à changer) : le coût de chaque case est divisé par
+  deux après le terrain difficile et le Glacé, à l'écran (mouvement.js) comme
+  dans le cerveau (coutDuPas, mouvement_pur.js) : 8 cases, 15 ⚡ au lieu de 30.
+- LA GLACE AU CONTACT (animations_catalogue.js, jeu-attaque-glace) : touchés,
+  les pics se plantaient bien dans la cible ; RATÉS, ils filaient 1,3 pion
+  au-delà — presque une case entière au contact. Ils frôlent maintenant la
+  cible et se brisent au sol juste à côté d'elle, tous du même côté.
+
+corrections_v252.mjs : la triche et la marche réglées dans le moteur (la
+frappe, la marche, zéro, le retour aux chiffres d'origine) ; un personnage
+détruit (le vrai supprimerPersonnageBDD, le vrai ménage : dix images, ses
+illustrations annulées) ; le bloc du tableau (au-dessus, les chiffres
+d'aujourd'hui, une case changée qui vaut tout de suite pour le cerveau et la
+préparation, la borne, l'écriture fusionnée, un autre poste suivi, le
+document ignoré comme gabarit) ; l'ordre du menu ; le Vargen avec les vraies
+formules du jeu ; les pics ratés au contact et à distance, touchés. Il mord
+sur l'ancien code (24 échecs).

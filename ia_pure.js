@@ -251,9 +251,26 @@ const PLAINE = { etatCase: () => ({ bloquee: false, supprimee: false, difficile:
 // Elles marchaient toutes trois cases au plus. Un palier inconnu (une créature
 // d'avant les paliers) marche comme une normale. Le même barème guide le choix
 // de carte en préparation (monstres_ia.js, pasMaxMonstre).
-export const PAS_PAR_PALIER = { "Petit": 6, "Normal": 5, "Élite": 4, "Elite": 4, "Boss": 4 };
+//
+// RÉGLABLE À LA VOLÉE (Nico, v252 : « mets aussi leur nombre de déplacements,
+// qu'on puisse le modifier ») : le tableau des monstres (monstres.js) le règle
+// ici, sur chaque poste. Zéro est permis — une créature qui ne bouge plus.
+export const PAS_PAR_PALIER_DEFAUT = Object.freeze({ "Petit": 6, "Normal": 5, "Élite": 4, "Boss": 4 });
+export const PAS_PAR_PALIER = { ...PAS_PAR_PALIER_DEFAUT, "Elite": PAS_PAR_PALIER_DEFAUT["Élite"] };
 export const PAS_MAX_CREATURE = 5;
-export const pasMaxDe = (c) => (c && PAS_PAR_PALIER[c.palier]) || PAS_MAX_CREATURE;
+export const pasMaxDe = (c) => {
+    const n = c ? PAS_PAR_PALIER[c.palier] : undefined;
+    return n !== undefined ? n : PAS_MAX_CREATURE;
+};
+export function reglerPasMonstres(table) {
+    Object.keys(PAS_PAR_PALIER_DEFAUT).forEach(palier => {
+        const brut = table ? table[palier] : undefined;
+        const v = brut === undefined || brut === null || brut === "" ? NaN : Number(brut);
+        PAS_PAR_PALIER[palier] = Number.isFinite(v) && v >= 0 ? Math.round(v) : PAS_PAR_PALIER_DEFAUT[palier];
+    });
+    PAS_PAR_PALIER["Elite"] = PAS_PAR_PALIER["Élite"];
+    return { ...PAS_PAR_PALIER };
+}
 
 // LES ATTAQUES D'OPPORTUNITÉ QU'UN CHEMIN DÉCLENCHE, comptées EXACTEMENT comme
 // le moteur les déclenche (resoudreMouvement, mouvement_pur.js) : à chaque pas,
@@ -699,7 +716,9 @@ if (typeof window !== "undefined") {
     window.iaPure = {
         PERSONNALITES, traitsDe, dangerDeLaCase, ennemisAuContactDepuis, alliesAdjacents,
         ennemiLePlusProche, ennemiAtteignable, casesAccessibles, choisirCible, choisirPosition, choisirZone,
-        deciderTourCreature
+        deciderTourCreature,
+        // La marche des créatures, réglée depuis le tableau des monstres (v252).
+        pasMaxDe, reglerPasMonstres, PAS_PAR_PALIER_DEFAUT
     };
 }
 

@@ -5100,3 +5100,19 @@ textarea.input-texte-parchemin {
    refait à chaque image laissait des traits sur la carte (combat.js,
    cameraEnMouvement). Ils reviennent en fondu dès que la caméra s'arrête. */
 #conteneur-plateau-vtt.camera-en-mouvement .zone-proc-voiles { visibility: hidden; }
+
+/* PARAMÈTRES > OUTILS > MONSTRES : la triche et la marche des créatures, en
+   haut du tableau (v252, monstres.js). */
+.reglages-monstres { margin: 0 0 12px 0; padding: 10px 12px; border: 2px solid #8b5a2b; border-radius: 8px;
+  background: rgba(139, 90, 43, 0.12); font-family: 'Almendra', serif; color: #2c1e16; }
+.reglages-monstres-entete { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.reglages-monstres-nom { font-family: 'Cinzel', serif; font-weight: bold; font-size: 15px; color: #5c3a21; }
+.reglages-monstres-aide { font-size: 13px; font-style: italic; color: #7a5230; }
+.table-reglages-monstres { border-collapse: collapse; width: 100%; max-width: 560px; }
+.table-reglages-monstres th { font-family: 'Cinzel', serif; font-size: 13px; color: #5c3a21; padding: 2px 6px; }
+.table-reglages-monstres td { padding: 3px 6px; text-align: center; }
+.table-reglages-monstres td.reglage-monstres-titre { text-align: left; font-size: 14px; white-space: nowrap; }
+.reglage-monstres-valeur { width: 56px; padding: 3px 4px; text-align: center; font-size: 14px; border: 1px solid #8b5a2b;
+  border-radius: 4px; background: #fdf6e3; color: #2c1e16; }
+.reglages-monstres-sorts { margin-top: 8px; font-size: 14px; }
+.reglages-monstres-etat { margin-left: 8px; font-size: 13px; color: #1b6e3a; }
