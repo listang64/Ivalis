@@ -7005,3 +7005,86 @@ préparation, la borne, l'écriture fusionnée, un autre poste suivi, le
 document ignoré comme gabarit) ; l'ordre du menu ; le Vargen avec les vraies
 formules du jeu ; les pics ratés au contact et à distance, touchés. Il mord
 sur l'ancien code (24 échecs).
+
+## v253 — Trois Tractions, trois cibles ; les zones de dégâts se superposent et mordent ceux qui restent ; le tableau des rencontres ; la blessure à la défaite ; la triche des sorts sur les états seulement
+
+Nico : « j'ai un sort avec trois fois Traction magique ; au moment de la
+sélection de cible, j'ai sélectionné ma première cible et ça a lancé direct la
+traction sans avoir pu faire les deux autres — on devrait pouvoir sélectionner
+les trois cibles une à une et ensuite ça tracte les trois en même temps » ;
+« fais en sorte que les zones persistantes de dégâts puissent se mettre avec
+les autres zones persistantes » ; « les ennemis n'ont toujours pas reçu les
+dégâts des zones persistantes, en tout cas ceux qui sont en statique dans la
+zone d'un tour à l'autre » ; « dans Paramètres > Outils, crée-moi un bouton
+avec dedans le tableau des possibilités de rencontre des monstres par
+difficulté, que je puisse modifier comme bon me semble » ; « le jet de
+blessure : qu'il ne se fasse que quand le combat est perdu ; si le perso tombe
+KO mais que le combat est gagné, il n'aura aucune blessure » ; « la triche des
+monstres : 20 % uniquement sur leurs effets d'état ».
+
+- LES TRACTIONS EN LOTS (moteur_effets.js). La carte en cause, lue en base
+  (lecture seule) : « Traction de masse » de Yasmina, TROIS lignes Traction
+  magique (×4, ×1, ×1 : 60, 15 et 15 %). Le ciblage fondait leurs crans en un
+  seul tas de six crans à 15 % — le premier toucher posait 15 % sur la cible,
+  « 5 à poser » — et la bulle ✔ apparaissait aussitôt sous elle : la toucher
+  (ou la frôler en visant la cible d'à côté) lançait tout. Désormais, une
+  carte à plusieurs lignes Traction en pose UNE par cible, dans l'ordre de la
+  carte (tractionEnLots, poserLotTraction) : 1re cible 60 %, 2e 15 %, 3e 15 %.
+  Retoucher une cible la retire, les suivantes remontent d'un lot ; une 4e est
+  refusée. À l'envoi, chaque Traction part sur SA cible avec SA chance, toutes
+  en tête de carte (eclaterTractionRepartie).
+  - LA BULLE ✔ ATTEND QUE TOUT SOIT POSÉ (tractionRestanteCiblage) — lots ou
+    crans d'une même ligne ×3. RÉSOUDRE, dans la barre du bas, part plus tôt
+    si l'on veut moins de cibles.
+  - ENSEMBLE À L'ÉCRAN (spectateur_combat.js, groupeDeTractions) : les tirées
+    qui se suivent, une par cible (jets ratés compris), s'animent d'un coup,
+    comme la régénération de fin de manche.
+- LES ZONES DE DÉGÂTS SE SUPERPOSENT (poserZone, moteur_pur.js). Les
+  chausse-trappes (type « neutre ») et les nappes d'un élément (feu, glace,
+  poison, foudre) ne s'effacent plus l'une l'autre : sur une même case, chacune
+  frappe, avec son propre jet d'esquive. Deux zones de la même famille se
+  remplacent toujours (familleDeZone).
+- QUI RESTE DANS UNE ZONE LA SUBIT (zonesDeFinDeManche, appelée par
+  cloturerTour à chaque fin de manche, cerveau_combat.js). Une zone ne frappait
+  qu'au pas qu'on y posait : la créature restée dedans n'en sentait plus rien.
+  Désormais, à chaque fin de manche, chaque combattant debout sur une de ses
+  cases la subit — une fois par manche et par zone : celui qui y est entré
+  pendant la manche l'a déjà subie (zone.subies, remis à zéro quand la zone
+  vieillit). Après le vieillissement des états (un état posé garde toute sa
+  durée), avant celui des zones (une nappe à sa dernière manche mord encore).
+  Les Pointes de glace ne frappent, en jaillissant, que par leur propre zone.
+- LE TABLEAU DES RENCONTRES (Paramètres > Outils > Rencontres par
+  difficulté, monstres.js). Normale, Difficile, Très difficile : chaque ligne
+  est une rencontre possible (Petit / Normal / Élite / Boss), toutes aussi
+  probables ; « + Ajouter une possibilité », ✖ pour en retirer une,
+  « Rétablir l'origine ». À l'origine : les cinq répartitions de Nico, plus une
+  Élite (Difficile) ou un Boss (Très difficile). Chaque case s'écrit dès qu'on
+  la quitte (Monstres_Modeles/_RENCONTRES, fusionné), chaque poste l'écoute
+  (ecouterTableRencontres) ; le bouton 💀 tire dans cette table
+  (tirerCompositionRencontre) — Boss et Élites devant, puis Petits et Normaux.
+  Une ligne sans créature ne se tire jamais (« jamais » dans la colonne).
+- LA TRICHE DES SORTS DES CRÉATURES : LES ÉTATS SEULEMENT (Nico : « tu as
+  mis 20 % sur tous leurs effets, alors que ça doit être uniquement sur leurs
+  effets d'état, style Glacé, Peur… pas les dégâts ni les soins » ;
+  demarrerCiblage, moteur_effets.js). Le +20 % ne touche plus que les
+  chances d'état de leurs cartes (jamais au-delà de 100) ; dégâts, soins et
+  boucliers restent ceux de la carte — la triche fixe par stature (+0 à +3,
+  bonusMonstreDe) s'y ajoute toujours. Le réglage de Paramètres > Outils >
+  Monstres le dit : « Chances d'état de leurs sorts ». corrections_v241.mjs
+  (section 5) et surpuissance.mjs (la créature frappe à 12) suivent la règle.
+- LA BLESSURE À LA DÉFAITE SEULEMENT (cloturerCombat, blessures_ui.js). Une
+  victoire ne tire plus aucun jet, même pour un héros à terre ; ses vieilles
+  blessures « combats » se décomptent quand même. blessures.mjs (sections 8 et
+  9) joue désormais un combat perdu.
+
+corrections_v253.mjs : le cerveau qui tire chaque cible de son lot et le
+spectateur qui les joue ensemble ; les zones superposées (pièges sur feu,
+glace sur feu, pièges sur pièges, les deux qui frappent) ; la fin de manche
+(l'immobile brûle, l'entré pendant la manche pas deux fois, la manche d'après,
+la dernière manche, pas en pleine manche, le KO) ; le vrai ciblage de la vraie
+carte au doigt (60 / 15 / 15, pas de ✔ avant la 3e, la 4e refusée, le retrait,
+l'envoi) et la ligne ×3 ; le tableau des rencontres (bouton, origine, case
+écrite et fusionnée, tirage, ajout et retrait, ligne vide, autre poste,
+rétablir) ; la victoire sans blessure et la défaite avec ; la créature qui
+frappe et soigne comme sa carte, sa Confusion à +20 %, le libellé du réglage.
+Il mord sur l'ancien code (37 échecs).

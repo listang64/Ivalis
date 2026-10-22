@@ -2455,17 +2455,14 @@ window.demarrerCiblage = async function(idCarte, options) {
     }
 
     // LA TRICHE DES SORTS DES CRÉATURES (app.js, v241) : une fois la carte
-    // lue, ses effets valent 20 % de plus — dégâts, soins, boucliers, chances
-    // d'état (au-delà du plafond du grimoire, jamais au-delà de 100). Sa
-    // fatigue, elle, reste celle de sa création.
+    // lue, ses chances d'ÉTAT valent 20 % de plus (au-delà du plafond du
+    // grimoire, jamais au-delà de 100). Ses dégâts, ses soins et ses boucliers
+    // restent ceux de la carte (Nico, v253 : « 20 % uniquement sur leurs effets
+    // d'état, style Glacé, Peur… pas les dégâts ni les soins »). Sa fatigue,
+    // elle, reste celle de sa création.
     const tricheSorts = typeof window.multiplicateurSortsMonstre === "function"
         ? window.multiplicateurSortsMonstre(persoLanceur) : 1;
     if (tricheSorts !== 1) {
-        attaquesExtraites.forEach(a => {
-            if ((Number(a.valeurBrute) || 0) > 0) a.valeurBrute = Math.round(a.valeurBrute * tricheSorts);
-            if ((Number(a.pourcentPV) || 0) > 0) a.pourcentPV = Math.round(a.pourcentPV * tricheSorts * 10) / 10;
-            a.tricheSorts = tricheSorts;
-        });
         alterationsExtraites.forEach(alt => {
             if ((Number(alt.chance) || 0) > 0) alt.chance = Math.min(100, Math.round(alt.chance * tricheSorts));
         });
@@ -3144,6 +3141,7 @@ window.dessinerAnneauxCiblage = function() {
         const repTraction = window.ETAT_CIBLAGE.phaseCiblage === "soutien" ? 0
             : ((window.ETAT_CIBLAGE.repartitionTraction || {})[idToken] || 0);
         const estSelectionne = window.ETAT_CIBLAGE.cibleUnique === idToken || repTraction > 0;
+        const tractionRestante = window.tractionRestanteCiblage(window.ETAT_CIBLAGE, phase);
         const divToken = document.getElementById("token-" + idToken);
         
         if (divToken) {
@@ -3197,9 +3195,8 @@ window.dessinerAnneauxCiblage = function() {
                     badgeTraction.className = "badge-traction";
                     anneau.appendChild(badgeTraction);
                 }
-                const modeleTraction = phase.alterations.find(a => a.estTraction);
                 const porteAttaque = phase.attaques.length > 0 && window.ETAT_CIBLAGE.cibleUnique === idToken;
-                badgeTraction.textContent = `${porteAttaque ? "⚔️ " : ""}🧲 ${window.chanceTractionRepartie(modeleTraction, repTraction)} %`;
+                badgeTraction.textContent = `${porteAttaque ? "⚔️ " : ""}🧲 ${window.chanceTractionPosee(window.ETAT_CIBLAGE, phase, idToken)} %`;
             } else if (badgeTraction) {
                 badgeTraction.remove();
             }
@@ -3214,7 +3211,12 @@ window.dessinerAnneauxCiblage = function() {
                 // (combat.js, porteurAuDessus) : elle seule s'y clique.
                 const porteur = window.porteurAuDessus ? window.porteurAuDessus(divToken) : divToken;
                 let bulle = porteur.querySelector(".bulle-validation-cible");
-                if (!bulle) {
+                // DES TRACTIONS RESTENT À POSER (v253) : pas encore de ✔ — il
+                // se touchait en visant la cible d'à côté et lançait tout avec
+                // une seule cible. RÉSOUDRE, en bas, part plus tôt si l'on veut.
+                if (tractionRestante > 0) {
+                    if (bulle) bulle.remove();
+                } else if (!bulle) {
                     bulle = document.createElement("div");
                     bulle.className = "bulle-validation-cible";
                     bulle.style.position = "absolute";
@@ -3384,10 +3386,45 @@ window.ajouterCibleCiblage = function(idCible) {
 //  toucher pose un cran ; toucher une cible déjà tirée lui en ajoute un tant
 //  qu'il en reste, puis la retire. L'attaque de la carte frappe la PREMIÈRE
 //  cible choisie ; les autres ne sont que tirées. Une zone ne répartit rien.
+//
+//  LES TRACTIONS EN LOTS (Nico, v253 : « j'ai un sort avec trois fois
+//  Traction magique ; on devrait pouvoir sélectionner les trois cibles une à
+//  une et ensuite ça tracte les trois en même temps »). Une carte qui porte
+//  PLUSIEURS lignes « Traction » à la Forge ne fond plus leurs crans en un
+//  seul tas : chaque ligne est un lot, posé entier sur une cible, dans l'ordre
+//  de la carte — la 1re cible prend la 1re Traction (60 %), la 2e la suivante
+//  (15 %)… Retoucher une cible la retire ; les suivantes remontent d'un lot.
+//  La bulle ✔ n'apparaît qu'une fois tout posé (RÉSOUDRE part plus tôt).
+window.tractionsDeLaPhase = function(phase) {
+    return ((phase && phase.alterations) || []).filter(a => a.estTraction);
+};
+window.tractionEnLots = function(state, phase) {
+    return !!state && !state.isZone && window.tractionsDeLaPhase(phase).length > 1;
+};
 window.cransTractionCiblage = function(state, phase) {
     if (!state || state.isZone) return 0;
-    const tractions = ((phase && phase.alterations) || []).filter(a => a.estTraction);
+    const tractions = window.tractionsDeLaPhase(phase);
+    if (window.tractionEnLots(state, phase)) return tractions.length;
     return tractions.reduce((n, a) => n + Math.max(1, parseInt(a.crans) || 1), 0);
+};
+// Ce qu'il reste à poser (crans ou lots) : tant qu'il en reste, pas de ✔.
+window.tractionRestanteCiblage = function(state, phase) {
+    const total = window.cransTractionCiblage(state, phase);
+    if (total <= 1 || (state && state.phaseCiblage === "soutien")) return 0;
+    if (window.tractionEnLots(state, phase)) return Math.max(0, total - ((state.ordreTraction || []).length));
+    const poses = Object.values(state.repartitionTraction || {}).reduce((a, b) => a + b, 0);
+    return Math.max(0, total - poses);
+};
+// La chance de Traction posée sur une cible (0 si elle n'en porte pas).
+window.chanceTractionPosee = function(state, phase, id) {
+    const rep = (state && state.repartitionTraction) || {};
+    if (!rep[id]) return 0;
+    const tractions = window.tractionsDeLaPhase(phase);
+    if (window.tractionEnLots(state, phase)) {
+        const lot = tractions[(state.ordreTraction || []).indexOf(id)];
+        return lot ? (Number(lot.chance) || 0) : 0;
+    }
+    return window.chanceTractionRepartie(tractions[0], rep[id]);
 };
 window.chanceTractionRepartie = function(alt, crans) {
     const parCran = Number(alt && alt.chanceParCran) || 0;
@@ -3399,6 +3436,7 @@ window.repartirTractionCiblage = function(state, phase, idCible, tkCible) {
     const total = window.cransTractionCiblage(state, phase);
     const rep = state.repartitionTraction || (state.repartitionTraction = {});
     const ordre = state.ordreTraction || (state.ordreTraction = []);
+    if (window.tractionEnLots(state, phase)) return window.poserLotTraction(state, phase, idCible, tkCible);
     const poses = Object.values(rep).reduce((a, b) => a + b, 0);
     if (rep[idCible]) {
         if (poses < total) rep[idCible]++;
@@ -3422,6 +3460,32 @@ window.repartirTractionCiblage = function(state, phase, idCible, tkCible) {
             `🧲 ${window.chanceTractionRepartie(modele, rep[idCible])} %${restants > 0 ? ` · ${restants} à poser` : ""}`, "#b39ddb");
     }
 };
+// UN LOT PAR CIBLE (tractionEnLots) : la cible touchée prend le lot suivant ;
+// retouchée, elle le rend, et les cibles d'après remontent d'un lot.
+window.poserLotTraction = function(state, phase, idCible, tkCible) {
+    const lots = window.tractionsDeLaPhase(phase);
+    const ordre = state.ordreTraction;
+    const i = ordre.indexOf(idCible);
+    if (i >= 0) ordre.splice(i, 1);
+    else if (ordre.length >= lots.length) {
+        window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Plus de traction à poser", "#aaaaaa");
+        return;
+    } else ordre.push(idCible);
+    // Chaque cible porte les crans de SON lot (les anneaux, les badges).
+    state.repartitionTraction = Object.fromEntries(ordre.map((id, k) => [id, Math.max(1, parseInt(lots[k].crans) || 1)]));
+    const premier = ordre[0] || null;
+    state.cibleUnique = premier;
+    phase.attaques.forEach(a => a.cibles = premier ? [premier] : []);
+    phase.alterations.forEach(alt => {
+        const k = lots.indexOf(alt);
+        alt.cibles = k >= 0 ? (ordre[k] ? [ordre[k]] : []) : (premier ? [premier] : []);
+    });
+    if (i < 0) {
+        const restants = lots.length - ordre.length;
+        window.afficherMessageFlottantHex(tkCible.q, tkCible.r,
+            `🧲 ${Number(lots[ordre.length - 1].chance) || 0} %${restants > 0 ? ` · ${restants} à poser` : ""}`, "#b39ddb");
+    }
+};
 // À l'envoi : une Traction par cible, avec la chance de ses crans.
 window.eclaterTractionRepartie = function(state) {
     const rep = state && state.repartitionTraction;
@@ -3430,6 +3494,24 @@ window.eclaterTractionRepartie = function(state) {
     const alterations = state.alterations || [];
     const modele = alterations.find(a => a.estTraction);
     if (!modele) return;
+    // EN LOTS : chaque Traction de la carte garde sa chance et part sur SA
+    // cible ; celles restées sans cible tombent. Toutes se jouent ensemble,
+    // au rang de la première (avant l'attaque si elle l'est) ; seule la
+    // première cible porte l'attaque, donc le coup « à portée ».
+    if (alterations.filter(a => a.estTraction).length > 1 && !state.isZone) {
+        const lots = alterations.filter(a => a.estTraction);
+        const parLot = new Map(lots.map((alt, k) => [alt, ordre[k]]));
+        const enLots = [];
+        alterations.forEach(alt => {
+            if (!alt.estTraction) { enLots.push(alt); return; }
+            const k = lots.indexOf(alt), id = parLot.get(alt);
+            if (!id) return;
+            enLots.push({ ...alt, cibles: [id], avantAttaque: !!modele.avantAttaque,
+                          coupAPortee: k === 0 ? !!modele.coupAPortee : false });
+        });
+        state.alterations = enLots;
+        return;
+    }
     const eclatees = ordre.map((id, i) => ({
         ...modele, crans: rep[id], chance: window.chanceTractionRepartie(modele, rep[id]), cibles: [id],
         // Seule la première cible porte l'attaque : le coup « à portée » ne vaut que pour elle.

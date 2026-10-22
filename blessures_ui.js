@@ -76,10 +76,15 @@ window.cloturerCombat = async function (issue) {
     // LES JETS, AVANT LA TRANSACTION. Un héros encore à terre est blessé ; un
     // héros relevé, ou le Profanateur debout grâce à son sursis, ne l'est pas
     // (estCombattantMort les dit debout).
+    // SEULEMENT SI LE COMBAT EST PERDU (Nico, v253 : « le jet de blessure, fais
+    // en sorte qu'il ne se fasse que quand le combat est perdu ; si le perso
+    // tombe KO mais que le combat est gagné, il n'aura aucune blessure »). Une
+    // victoire ne blesse personne — ses anciennes blessures « combats » se
+    // décomptent quand même, plus bas.
     const tirages = {};
     const blessures = {};
     heros.forEach(p => {
-        if (!estKO(p.idPersonnage)) return;
+        if (issue !== "defaite" || !estKO(p.idPersonnage)) return;
         const t = window.tirerBlessures(p, Math.random);
         tirages[p.idPersonnage] = t;
         blessures[p.idPersonnage] = {

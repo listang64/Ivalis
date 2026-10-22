@@ -43,7 +43,7 @@ import { clonerEtat, combattant, creerDes, combattantIllusion,
          placerCompagnons, MUR_TERRE, murEn, plateauDeCombat, franchissablePour, frapperMurs,
          cleGravats, APPLICATEURS, ETAT_PLAIE_ROUVERTE, gainReposLong } from './combat_etat.js';
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
-         traverserZones, creerZonePure, poserZone, vieillirZones,
+         traverserZones, creerZonePure, poserZone, vieillirZones, zonesDeFinDeManche,
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
          partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE, ETAT_SAIGNEMENT, SAIGNEMENT,
          resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, appliquerCharme,
@@ -456,7 +456,7 @@ function fabriquerPas(etatAvant, etatApres, etapes, cause, acteur, des) {
 // Le geste lui-même, appliqué SUR PLACE à un état déjà cloné. Il sert aux deux
 // chemins : la fin de tour demandée par un joueur, et celle qui clôt d'office le
 // tour d'une créature. Une seule écriture de cette règle, donc une seule vérité.
-export function cloturerTour(etat) {
+export function cloturerTour(etat, des) {
     const partie = (etat.file || [])[0];
     if (!partie) return null;
 
@@ -518,6 +518,10 @@ export function cloturerTour(etat) {
         etapes.push(...regenererPvFinDeManche(etat));
         etapes.push(...ticsDeFinDeManche(etat));
         etapes.push(...vieillirLesEtats(etat));
+        // QUI SE TIENT DANS UNE ZONE LA SUBIT (v253), une fois par manche —
+        // après le vieillissement des états, pour qu'un état qu'elle pose
+        // garde toute sa durée ; avant celui des zones.
+        etapes.push(...zonesDeFinDeManche(etat, des || creerDes(etat.graine)));
         // Les nappes au sol vieillissent comme les états. Ce décompte vivait
         // dans combat.js, sur le poste qui avait vidé la file — donc nulle part
         // sous ce régime, où plus personne ne « finit » le round de son côté :
@@ -882,7 +886,7 @@ export function avancerFile(etat, des) {
     // calcul vivait dans l'ancien finDeTourCombat, un chemin que le nouveau
     // régime ne traverse plus.
     const etapes = reposLongDuTour(suivant);
-    const clot = cloturerTour(suivant);
+    const clot = cloturerTour(suivant, des);
     if (!clot) return null;
     etapes.push(...clot.etapes);
     return fabriquerPas(etat, suivant, etapes, `fin|${clot.fini}`, clot.fini, des);
@@ -983,7 +987,7 @@ export function appliquerIntention(etat, intention, plateau) {
     if (intention.type === "classe" && intention.idCarte === TECHNIQUE_MUR_TERRE) {
         const suivant = clonerEtat(etat);
         const etapes = leverMursDeTerre(suivant, intention.acteur, intention.murs || [], des, plateau);
-        const clot = cloturerTour(suivant);
+        const clot = cloturerTour(suivant, des);
         if (clot) etapes.push(...clot.etapes);
         return fabriquerPas(etat, suivant, etapes, intention.id, intention.acteur, des);
     }
@@ -1047,7 +1051,7 @@ export function appliquerIntention(etat, intention, plateau) {
             suivant = clonerEtat(rc.etat);
             etapes.push(...rc.etapes);
         }
-        const clot = cloturerTour(suivant);
+        const clot = cloturerTour(suivant, des);
         if (clot) etapes.push(...clot.etapes);
         return fabriquerPas(etat, suivant, etapes, intention.id, intention.acteur, des);
     }
@@ -1185,7 +1189,7 @@ export function appliquerIntention(etat, intention, plateau) {
         // La clôture règle les deux d'un coup : le lanceur quitte la tête de
         // file, donc une seconde carte est refusée d'elle-même (« c'est au tour
         // de X »). Il n'y a pas de compteur à tenir, juste une règle à dire.
-        const clot = cloturerTour(suivant);
+        const clot = cloturerTour(suivant, des);
         if (clot) etapes.push(...clot.etapes);
 
         return fabriquerPas(etat, suivant, etapes, intention.id, intention.acteur, des);
@@ -1251,7 +1255,7 @@ export function jouerCreature(etat, id, carte, plateau, carte2) {
     // d'un pouce. C'est le même symptôme que « le tour d'un ennemi complètement
     // passé », par l'autre bout.
     courant = clonerEtat(courant);
-    const clot = cloturerTour(courant);
+    const clot = cloturerTour(courant, des);
     if (clot) etapes.push(...clot.etapes);
 
     return fabriquerPas(etat, courant, etapes, `ia|${id}|${etat.manche}`, id, des);
@@ -1601,7 +1605,7 @@ function jouerServiteur(etat, id, plateau, regle) {
                       raison: proie ? `${regle.quoi} : hors de portée` : `${regle.quoi} : plus d'ennemi` });
     }
     courant = clonerEtat(courant);
-    const clot = cloturerTour(courant);
+    const clot = cloturerTour(courant, des);
     if (clot) etapes.push(...clot.etapes);
     return fabriquerPas(etat, courant, etapes, `${regle.quoi}|${id}|${etat.manche}`, id, des);
 }

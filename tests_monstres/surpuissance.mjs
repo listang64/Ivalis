@@ -135,9 +135,10 @@ const extraire = (effetId, count, fatigue, lanceur = "H1") => p.evaluate(async (
   verifier("pas un bouclier (même valeur, même pourcentage)", bouclier.v === bouclier100.v && bouclier.pct === bouclier100.pct
            && bouclier100.s === 1, `${JSON.stringify(bouclier)} / ${JSON.stringify(bouclier100)}`);
   const monstre = (await extraire(idAttaque, 4, 100, "M1"))[0];
-  // (v241 : sa carte vaut 20 % de plus — la triche des sorts des créatures —,
-  // mais jamais la surpuissance : 12 × 1,2 = 14,4 → 14.)
-  verifier("une créature n'en profite pas (ses techniques ne sont pas forgées)", monstre && monstre.v === 14 && monstre.s === 1,
+  // (v253 : la triche des sorts des créatures ne touche plus que leurs
+  // chances d'état — ses dégâts restent ceux de la carte, 12 — et jamais la
+  // surpuissance.)
+  verifier("une créature n'en profite pas (ses techniques ne sont pas forgées)", monstre && monstre.v === 12 && monstre.s === 1,
            JSON.stringify(monstre));
 }
 

@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=85">
+  <link rel="stylesheet" href="style.css?v=86">
 
  
   <!-- ===================================================================== -->
@@ -1381,6 +1381,12 @@
       </button>
       <br><br>
 
+      <!-- LES RENCONTRES PAR DIFFICULTÉ (v253) : la table des possibilités, modifiable -->
+      <button id="btn-table-rencontres" class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.ouvrirTableRencontres()">
+        Rencontres par difficulté
+      </button>
+      <br><br>
+
       <!-- NOUVEAU : BOUTON ARCHIVAGE -->
       <button class="btn-parametres btn-supprimer" style="width: 80%; padding: 15px; border-color: #ff4c4c;" onclick="jouerSonClic(); window.archiverSessionEtViderChat()">
         Clôturer & Vider le Chat
@@ -1534,7 +1540,7 @@
           <tbody id="tbody-reglages-monstres"></tbody>
         </table>
         <div class="reglages-monstres-sorts">
-          Effets de leurs sorts (dégâts, soins, boucliers, chances d'état) :
+          Chances d'état de leurs sorts (Glacé, Peur, Étourdi…) :
           <input id="reglage-bonus-sorts" type="number" inputmode="numeric" class="reglage-monstres-valeur" min="-50" max="200"
                  onchange="window.modifierReglageMonstre('bonusSortsPct', '', this)"> % en plus
           <span id="reglages-monstres-etat" class="reglages-monstres-etat"></span>
@@ -1562,6 +1568,26 @@
           <tbody id="tbody-monstres"></tbody>
         </table>
       </div>
+    </div>
+
+    <!-- ======================================================= -->
+    <!--  RENCONTRES : les possibilités par difficulté (v253)     -->
+    <!-- ======================================================= -->
+    <div id="etape-rencontres-monstres" class="fenetre-volante-parchemin-large fondu-interne" style="display: none; opacity: 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #5c3a21; margin-bottom: 10px; padding-bottom: 10px;">
+        <h2 style="margin: 0; border: none; padding: 0;">Rencontres — possibilités par difficulté</h2>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <span id="rencontres-monstres-etat" class="reglages-monstres-etat"></span>
+          <button class="btn-parametres" onclick="jouerSonClic(); window.retablirTableRencontres()">Rétablir l'origine</button>
+          <button class="btn-parametres" onclick="jouerSonClic(); window.fermerTableRencontres()">Retour</button>
+        </div>
+      </div>
+      <p style="font-size: 13px; color: #5c3a21; margin: 0 0 10px 0; font-style: italic;">
+        Chaque ligne est une rencontre possible : le bouton 💀 en tire une au hasard dans la difficulté choisie.
+        Les Boss et les Élites entrent les premiers ; au-delà de la place sur le terrain, le reste attend en renfort.
+        Chaque case s'enregistre dès qu'on la quitte.
+      </p>
+      <div id="corps-rencontres-monstres" class="corps-rencontres-monstres"></div>
     </div>
 
   </div>
@@ -2047,7 +2073,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=163"></script>
+<script src="trace_combat.js?v=164"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2061,11 +2087,11 @@
 <script type="importmap">
 { "imports": {
     "./combat_etat.js": "./combat_etat.js?v=37",
-    "./moteur_pur.js": "./moteur_pur.js?v=62",
+    "./moteur_pur.js": "./moteur_pur.js?v=63",
     "./mouvement_pur.js": "./mouvement_pur.js?v=22",
     "./ia_pure.js": "./ia_pure.js?v=15",
-    "./cerveau_combat.js": "./cerveau_combat.js?v=56",
-    "./spectateur_combat.js": "./spectateur_combat.js?v=7",
+    "./cerveau_combat.js": "./cerveau_combat.js?v=57",
+    "./spectateur_combat.js": "./spectateur_combat.js?v=8",
     "./depot_firestore.js": "./depot_firestore.js?v=11",
     "./pont_combat.js": "./pont_combat.js?v=40",
     "./playlist.js": "./playlist.js?v=1"
@@ -2083,14 +2109,14 @@
 <script type="module" src="combat_etat.js?v=37"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=62"></script>
+<script type="module" src="moteur_pur.js?v=63"></script>
 <script type="module" src="mouvement_pur.js?v=22"></script>
 <script type="module" src="ia_pure.js?v=15"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
-<script type="module" src="cerveau_combat.js?v=56"></script>
+<script type="module" src="cerveau_combat.js?v=57"></script>
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
      la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
-<script type="module" src="spectateur_combat.js?v=7"></script>
+<script type="module" src="spectateur_combat.js?v=8"></script>
 <!-- LE DÉPÔT : la seule chose qui écrive pendant un combat. Un pas = un lot,
      et le lot porte l'état, l'entrée de journal et la fermeture de l'intention. -->
 <script type="module" src="depot_firestore.js?v=11"></script>
@@ -2100,7 +2126,7 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=49"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=112"></script>
+<script type="module" src="app.js?v=113"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=15"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->
@@ -2118,7 +2144,7 @@
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=65"></script>
 <script type="module" src="talents_ui.js?v=1"></script>
-<script type="module" src="blessures_ui.js?v=2"></script>
+<script type="module" src="blessures_ui.js?v=3"></script>
 <!-- Les zones procédurales : le givre (v243), le brasier (v244), le poison et la foudre (v245), au Studio puis en jeu (v246) ; les gravats (v247) et les chausse-trappes (v248), au Studio puis en jeu (v249) ; la lumière du soin (v250), au Studio. -->
 <script src="zones_procedurales.js?v=6"></script>
 <script type="module" src="studio_animation.js?v=13"></script>
@@ -2136,8 +2162,8 @@
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=39"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=97"></script>
-<script type="module" src="monstres.js?v=31"></script>
+<script type="module" src="moteur_effets.js?v=98"></script>
+<script type="module" src="monstres.js?v=32"></script>
 <script type="module" src="monstres_competences.js?v=27"></script>
 <script type="module" src="monstres_ia.js?v=41"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->

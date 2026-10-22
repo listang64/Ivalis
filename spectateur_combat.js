@@ -57,6 +57,20 @@ export function groupeDeRegeneration(etapes, i) {
     return groupe;
 }
 
+// LES TRACTIONS D'UNE MÊME CARTE, TOUTES ENSEMBLE (Nico, v253 : « ensuite ça
+// tracte les trois cibles en même temps ») : les tirées qui se suivent, une
+// par cible — et les jets ratés d'entre elles —, s'animent d'un coup. Il faut
+// au moins deux vraies tirées ; sinon rien ne change. Pur, donc vérifiable.
+export function groupeDeTractions(etapes, i) {
+    const enEst = (e) => !!e && (e.type === "traction" || (e.type === "etatRate" && e.nom === "Traction"));
+    const groupe = [], vus = new Set();
+    for (let j = i; j < (etapes || []).length && enEst(etapes[j]) && !vus.has(etapes[j].cible); j++) {
+        vus.add(etapes[j].cible);
+        groupe.push(etapes[j]);
+    }
+    return groupe.filter(e => e.type === "traction").length > 1 ? groupe : [];
+}
+
 // =========================================================================
 //  1. QUE FAIRE MAINTENANT ?
 // =========================================================================
@@ -297,7 +311,8 @@ export function creerSpectateur(contexte) {
                     // regagne sa fatigue, fais-les tous jouer en même temps ») :
                     // les étapes qui se suivent, chacune sur un combattant
                     // différent, s'animent d'un coup, puis s'appliquent.
-                    const groupe = groupeDeRegeneration(etapes, i);
+                    const regens = groupeDeRegeneration(etapes, i);
+                    const groupe = regens.length > 1 ? regens : groupeDeTractions(etapes, i);
                     if (groupe.length > 1) {
                         await Promise.all(groupe.map(e => animer(e, moi.etat)));
                         groupe.forEach(e => { moi.etat = appliquerEtape(moi.etat, e); });

@@ -368,7 +368,10 @@ console.log("\n4. LA SURPUISSANCE D'UNE COMPÉTENCE EN DOT");
   verifier("enregistrée : Fatigue 61, Fatigue_Surpuissance 80", f.ecrit && f.ecrit.Fatigue === 61 && f.ecrit.Fatigue_Surpuissance === 80, JSON.stringify(f.ecrit));
 }
 
-console.log("\n5. LA TRICHE DES SORTS DES CRÉATURES : +20 %, FATIGUE INCHANGÉE");
+// (v253 : la triche ne vaut plus que pour les chances d'état — Nico : « 20 %
+// uniquement sur leurs effets d'état, style Glacé, Peur… pas les dégâts ni les
+// soins ». Les dégâts et le soin de la créature restent ceux de sa carte.)
+console.log("\n5. LA TRICHE DES SORTS DES CRÉATURES : +20 % AUX ÉTATS, FATIGUE INCHANGÉE");
 {
   const r = await p.evaluate(async () => {
     window.PERSOS_PARTIE = [{ idPersonnage: "M1", camp: "Ennemi", prenom: "Gnoll", estMonstre: true, Palier: "Normal",
@@ -394,9 +397,9 @@ console.log("\n5. LA TRICHE DES SORTS DES CRÉATURES : +20 %, FATIGUE INCHANGÉE
              compagnon: window.multiplicateurSortsMonstre({ estMonstre: true, compagnonDe: "P" }),
              monstre: window.multiplicateurSortsMonstre({ estMonstre: true }) };
   });
-  verifier("une créature : 4 × 3 = 12 dégâts → 14 (×1,2)", r.coup.v === 14, JSON.stringify(r.coup));
+  verifier("une créature : 4 × 3 = 12 dégâts, pas un de plus", r.coup.v === 12, JSON.stringify(r.coup));
   verifier("…et sa Confusion : 12 % → 14 %", r.coup.alt.includes("Confusion:14"), JSON.stringify(r.coup.alt));
-  verifier("son soin : 6 → 7", r.soin.v === 7, JSON.stringify(r.soin));
+  verifier("son soin : 6, pas un de plus", r.soin.v === 6, JSON.stringify(r.soin));
   verifier("la même carte chez un héros : 12 et 12 % (pas de triche)", r.heros.v === 12 && r.heros.alt.includes("Confusion:12"), JSON.stringify(r.heros));
   verifier("la fatigue de la carte ne bouge pas (35)", r.fatigue === 35);
   verifier("×1,2 pour une créature ; ni le zombie ni le compagnon", r.monstre === 1.2 && r.zombie === 1 && r.compagnon === 1,

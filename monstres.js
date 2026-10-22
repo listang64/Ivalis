@@ -392,8 +392,8 @@ window.creerMonstreDepuisGabarit = async function(idMonstre, gabarit, donneesSup
 //  Trois réglages, valables pour toutes les créatures (pas par gabarit) :
 //    · les dégâts (et soins) EN PLUS par stature — ajoutés au brut, avant les
 //      résistances (bonusMonstreDe, moteur_pur.js) ;
-//    · le bonus des SORTS, en % — dégâts, soins, boucliers et chances d'état
-//      de leurs cartes (multiplicateurSortsMonstre, app.js) ;
+//    · le bonus des SORTS, en % — sur les seules chances d'état de leurs
+//      cartes, ni les dégâts ni les soins (multiplicateurSortsMonstre, app.js) ;
 //    · les cases de MARCHE par stature (pasMaxDe, ia_pure.js ; pasMaxMonstre,
 //      monstres_ia.js).
 //  Ils vivent dans un document à part du bestiaire (Monstres_Modeles/_REGLAGES),
@@ -682,6 +682,13 @@ window.sauvegarderGabaritsMonstres = async function() {
 //    - une rencontre TRÈS DIFFICILE ajoute 1 Boss à ce tirage.
 //  Le terrain n'accueille que 4 ennemis à la fois : le surplus attend en
 //  réserve et entre en renfort dès qu'une place se libère (mort d'un monstre).
+//
+//  LE TABLEAU SE MODIFIE (Nico, v253 : « dans Paramètres > Outils, un bouton
+//  avec dedans le tableau des possibilités de rencontre des monstres par
+//  difficulté, que je puisse modifier comme bon me semble »). Ces chiffres-ci
+//  ne sont plus que l'origine : la table jouée est TABLE_RENCONTRES, lue dans
+//  Monstres_Modeles/_RENCONTRES et écoutée sur chaque poste. Chaque ligne d'une
+//  difficulté est une possibilité, toutes aussi probables.
 // =========================================================================
 
 const REPARTITIONS_NORMALES = [
@@ -698,6 +705,63 @@ const RENFORT_DIFFICULTE = {
     "Difficile":      "Élite",
     "Très difficile": "Boss"
 };
+
+// LA TABLE DES RENCONTRES, modifiable (v253). Ses trois difficultés, et le nom
+// de leur champ en base (sans espace ni accent : plus sûr pour Firestore).
+const DIFFICULTES_RENCONTRE = [
+    { nom: "Normale", champ: "Normale" },
+    { nom: "Difficile", champ: "Difficile" },
+    { nom: "Très difficile", champ: "Tres_Difficile" }
+];
+const PALIERS_RENCONTRE = ["Petit", "Normal", "Élite", "Boss"];
+const DOC_RENCONTRES = "_RENCONTRES";
+const BORNES_RENCONTRE = { parPalier: [0, 10], lignes: 12 };
+window.TABLE_RENCONTRES_DEFAUT = Object.freeze(Object.fromEntries(DIFFICULTES_RENCONTRE.map(d => [d.nom,
+    REPARTITIONS_NORMALES.map(r => {
+        const ligne = { Petit: r.Petit || 0, Normal: r.Normal || 0, "Élite": 0, Boss: 0 };
+        if (RENFORT_DIFFICULTE[d.nom]) ligne[RENFORT_DIFFICULTE[d.nom]] += 1;
+        return ligne;
+    })])));
+const copieTable = (t) => JSON.parse(JSON.stringify(t));
+// Une ligne lue (ou tapée) → quatre entiers bornés ; une ligne sans aucune
+// créature n'est pas une rencontre : elle ne se tire jamais.
+const ligneRencontre = (brute) => {
+    const l = {};
+    PALIERS_RENCONTRE.forEach(p => {
+        const src = brute || {};
+        const v = Math.round(Number(p === "Élite" && src["Élite"] === undefined ? src.Elite : src[p]));
+        l[p] = Number.isFinite(v) ? Math.max(BORNES_RENCONTRE.parPalier[0], Math.min(BORNES_RENCONTRE.parPalier[1], v)) : 0;
+    });
+    return l;
+};
+const totalRencontre = (l) => PALIERS_RENCONTRE.reduce((n, p) => n + (l[p] || 0), 0);
+// Le document lu en base (ou rien) → une table complète : une difficulté
+// absente, ou vidée, revient à ses possibilités d'origine.
+window.normaliserTableRencontres = function(brut) {
+    const t = {};
+    DIFFICULTES_RENCONTRE.forEach(d => {
+        const lignes = Array.isArray((brut || {})[d.champ]) ? brut[d.champ] : null;
+        const propres = lignes ? lignes.slice(0, BORNES_RENCONTRE.lignes).map(ligneRencontre) : null;
+        t[d.nom] = propres && propres.length > 0 ? propres : copieTable(window.TABLE_RENCONTRES_DEFAUT[d.nom]);
+    });
+    return t;
+};
+window.appliquerTableRencontres = function(brut) {
+    window.TABLE_RENCONTRES = window.normaliserTableRencontres(brut);
+    if (typeof window.dessinerTableRencontres === "function") window.dessinerTableRencontres();
+    return window.TABLE_RENCONTRES;
+};
+window.appliquerTableRencontres(null);
+let arretRencontres = null;
+window.ecouterTableRencontres = function() {
+    if (arretRencontres) return;
+    try {
+        arretRencontres = onSnapshot(doc(db, COLLECTION_GABARITS, DOC_RENCONTRES),
+            (snap) => window.appliquerTableRencontres(snap && snap.exists() ? snap.data() : null),
+            (err) => console.error("Table des rencontres :", err));
+    } catch (e) { console.error("Table des rencontres :", e); }
+};
+window.ecouterTableRencontres();
 
 // Le terrain accueille autant d'ennemis qu'il y a de joueurs, plus un. Les illusions
 // sont des leurres posés par les héros, pas des joueurs : les compter ferait grossir
@@ -746,28 +810,113 @@ function archetypesPourPalier(palier) {
 // Tire au sort la composition complète d'une rencontre : une liste
 // [{ archetype, palier }], dans l'ordre où les monstres entreront en jeu.
 window.tirerCompositionRencontre = function(difficulte) {
-    const repartition = hasard(REPARTITIONS_NORMALES);
+    // Une ligne de la table de cette difficulté (TABLE_RENCONTRES, modifiable),
+    // au hasard parmi celles qui comptent au moins une créature.
+    const table = window.TABLE_RENCONTRES || window.normaliserTableRencontres(null);
+    const possibles = (table[difficulte] || table["Normale"] || []).filter(l => totalRencontre(l) > 0);
+    const repartition = possibles.length > 0 ? hasard(possibles)
+        : hasard(window.TABLE_RENCONTRES_DEFAUT[difficulte] || window.TABLE_RENCONTRES_DEFAUT["Normale"]);
     const composition = [];
 
-    ["Petit", "Normal"].forEach(palier => {
+    // Les Boss, puis les Élites passent DEVANT : ce sont les pièces maîtresses
+    // de la rencontre, sur le terrain dès le début et non coincées en réserve
+    // derrière quatre bestioles. Puis les Petits et les Normaux.
+    ["Boss", "Élite", "Petit", "Normal"].forEach(palier => {
         for (let i = 0; i < (repartition[palier] || 0); i++) {
             const archetypes = archetypesPourPalier(palier);
             if (archetypes.length > 0) composition.push({ archetype: hasard(archetypes), palier });
         }
     });
 
-    // Le renfort de difficulté passe DEVANT : un Élite ou un Boss est la pièce
-    // maîtresse de la rencontre, il doit être sur le terrain dès le début et non
-    // coincé en réserve derrière quatre bestioles.
-    const palierRenfort = RENFORT_DIFFICULTE[difficulte];
-    if (palierRenfort) {
-        const archetypes = archetypesPourPalier(palierRenfort);
-        if (archetypes.length > 0) {
-            composition.unshift({ archetype: hasard(archetypes), palier: palierRenfort });
-        }
-    }
-
     return composition;
+};
+
+// -------------------------------------------------------------------------
+//  LA FENÊTRE DU TABLEAU (Paramètres > Outils > Rencontres)
+// -------------------------------------------------------------------------
+window.ouvrirTableRencontres = function() {
+    const menuLat = document.getElementById("menu-lateral");
+    if (menuLat) menuLat.style.display = "none";
+    window.naviguerFenetre("etape-menu-outils", "etape-rencontres-monstres");
+    window.dessinerTableRencontres(true);
+};
+window.fermerTableRencontres = function() {
+    const menuLat = document.getElementById("menu-lateral");
+    if (menuLat) menuLat.style.display = "flex";
+    window.naviguerFenetre("etape-rencontres-monstres", "etape-menu-outils");
+};
+window.dessinerTableRencontres = function(force) {
+    const hote = document.getElementById("corps-rencontres-monstres");
+    const t = window.TABLE_RENCONTRES;
+    if (!hote || !t) return;
+    // Pas pendant qu'on tape : la valeur reviendrait sous les doigts.
+    const actif = document.activeElement;
+    if (!force && actif && actif.closest && actif.closest("#corps-rencontres-monstres") && actif.tagName === "INPUT") return;
+    hote.innerHTML = DIFFICULTES_RENCONTRE.map(d => {
+        const lignes = t[d.nom] || [];
+        const comptees = lignes.filter(l => totalRencontre(l) > 0).length;
+        const corps = lignes.map((l, i) => {
+            const total = totalRencontre(l);
+            const chance = total > 0 && comptees > 0 ? Math.round(100 / comptees) + " %" : "jamais";
+            return `<tr class="${total > 0 ? "" : "rencontre-vide"}">`
+                + PALIERS_RENCONTRE.map(p => `<td><input type="number" inputmode="numeric" class="reglage-monstres-valeur"
+                    min="${BORNES_RENCONTRE.parPalier[0]}" max="${BORNES_RENCONTRE.parPalier[1]}" value="${l[p]}"
+                    data-difficulte="${d.nom}" data-ligne="${i}" data-palier="${p}"
+                    onchange="window.modifierCaseRencontre('${d.nom}', ${i}, '${p}', this)"></td>`).join("")
+                + `<td class="rencontre-total">${total}</td><td class="rencontre-chance">${chance}</td>`
+                + `<td><button class="btn-retirer-rencontre" title="Retirer cette possibilité"
+                    onclick="window.retirerLigneRencontre('${d.nom}', ${i})" ${lignes.length <= 1 ? "disabled" : ""}>✖</button></td></tr>`;
+        }).join("");
+        return `<div class="bloc-rencontre" data-difficulte="${d.nom}">
+            <div class="reglages-monstres-entete"><span class="reglages-monstres-nom">${d.nom}</span>
+              <span class="reglages-monstres-aide">${comptees} possibilité${comptees > 1 ? "s" : ""}, tirée${comptees > 1 ? "s" : ""} au hasard</span></div>
+            <table class="table-reglages-monstres table-rencontres">
+              <thead><tr>${PALIERS_RENCONTRE.map(p => `<th>${p}</th>`).join("")}<th>Total</th><th>Chance</th><th></th></tr></thead>
+              <tbody>${corps}</tbody>
+            </table>
+            <button class="btn-parametres btn-ajouter-rencontre" onclick="window.ajouterLigneRencontre('${d.nom}')"
+              ${lignes.length >= BORNES_RENCONTRE.lignes ? "disabled" : ""}>+ Ajouter une possibilité</button>
+          </div>`;
+    }).join("");
+};
+// Toute modification part tout de suite : sur ce poste, puis en base.
+window.enregistrerTableRencontres = async function(table) {
+    const champs = Object.fromEntries(DIFFICULTES_RENCONTRE.map(d => [d.champ, (table[d.nom] || []).map(ligneRencontre)]));
+    window.appliquerTableRencontres(champs);
+    window.dessinerTableRencontres(true);
+    const etat = document.getElementById("rencontres-monstres-etat");
+    try {
+        await setDoc(doc(db, COLLECTION_GABARITS, DOC_RENCONTRES), champs, { merge: true });
+        if (etat) { etat.textContent = "✔️ Enregistré"; setTimeout(() => { etat.textContent = ""; }, 1800); }
+    } catch (e) {
+        console.error("Enregistrement de la table des rencontres :", e);
+        if (etat) etat.textContent = "⚠️ Non enregistré (connexion ?)";
+    }
+};
+window.modifierCaseRencontre = function(difficulte, i, palier, input) {
+    const table = copieTable(window.TABLE_RENCONTRES || window.normaliserTableRencontres(null));
+    const ligne = (table[difficulte] || [])[i];
+    if (!ligne) return;
+    ligne[palier] = (ligneRencontre({ [palier]: input ? input.value : 0 }))[palier];
+    return window.enregistrerTableRencontres(table);
+};
+window.ajouterLigneRencontre = function(difficulte) {
+    const table = copieTable(window.TABLE_RENCONTRES || window.normaliserTableRencontres(null));
+    const lignes = table[difficulte] || (table[difficulte] = []);
+    if (lignes.length >= BORNES_RENCONTRE.lignes) return;
+    lignes.push({ ...(lignes[lignes.length - 1] || { Petit: 1, Normal: 1, "Élite": 0, Boss: 0 }) });
+    return window.enregistrerTableRencontres(table);
+};
+window.retirerLigneRencontre = function(difficulte, i) {
+    const table = copieTable(window.TABLE_RENCONTRES || window.normaliserTableRencontres(null));
+    const lignes = table[difficulte] || [];
+    if (lignes.length <= 1 || !lignes[i]) return;
+    lignes.splice(i, 1);
+    return window.enregistrerTableRencontres(table);
+};
+window.retablirTableRencontres = function() {
+    if (!confirm("Revenir aux possibilités de rencontre d'origine ?")) return;
+    return window.enregistrerTableRencontres(copieTable(window.TABLE_RENCONTRES_DEFAUT));
 };
 
 // -------------------------------------------------------------------------

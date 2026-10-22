@@ -333,6 +333,10 @@ console.log("\n7. LES CARTES ET L'ÉQUIPEMENT");
   verifier("Choc crânien : la compétence oubliée est bloquée, les autres non", /oublié/.test(r.oubli || "") && r.pasOubli === null);
 }
 
+// (v253 : le jet de blessure n'a plus lieu qu'à la DÉFAITE — Nico : « si le
+// perso tombe KO mais que le combat est gagné, il n'aura aucune blessure ».
+// Ce combat-ci est donc perdu ; la victoire sans blessure est dans
+// corrections_v253.mjs.)
 console.log("\n8. LA FIN DU COMBAT : UNE SEULE ÉCRITURE");
 await p.evaluate(() => {
   localStorage.setItem("ID_JOUEUR_COURANT", "J1");
@@ -367,13 +371,14 @@ await p.evaluate(() => {
 });
 {
   const r = await p.evaluate(async () => {
-    const fin = await window.cloturerCombat("victoire");
-    const encore = await window.cloturerCombat("victoire");
+    const fin = await window.cloturerCombat("defaite");
+    const encore = await window.cloturerCombat("defaite");
     Math.random = window.__random;
-    return { fin, encore, partie: window.__partie, majs: window.__majs };
+    // (L'XP de la défaite s'écrit à part, en incrément : on ne regarde ici que les fiches.)
+    return { fin, encore, partie: window.__partie, majs: window.__majs.filter(m => !(m.data && "XP" in m.data)) };
   });
   const fin = r.partie.Fin_Combat || {};
-  verifier("Fin_Combat posée : victoire, rencontre R1, les quatre héros du combat", fin.issue === "victoire" && fin.idRencontre === "R1"
+  verifier("Fin_Combat posée : défaite, rencontre R1, les quatre héros du combat", fin.issue === "defaite" && fin.idRencontre === "R1"
            && (fin.participants || []).join() === "P1,P2,P3,P4");
   verifier("seuls les héros à terre sont blessés (le Profanateur en sursis ne l'est pas)", JSON.stringify(Object.keys(fin.blessures || {})) === '["P1","P4"]'
            && fin.blessures.P1.idJoueur === "J1" && fin.blessures.P1.tirages[0].id === "BLE_DECHIRURE_MUSCULAIRE"
@@ -387,7 +392,7 @@ await p.evaluate(() => {
   verifier("Choc cardiaque : l'énergie de la fiche est ramenée au nouveau maximum (100 → 50)", m4 && m4.data.Fatigue_Actuelle === 50, JSON.stringify(m4 && m4.data));
 }
 
-console.log("\n9. LES POPUPS : VICTOIRE, PUIS LA BLESSURE DE SON SEUL JOUEUR");
+console.log("\n9. LES POPUPS : DÉFAITE, PUIS LA BLESSURE DE SON SEUL JOUEUR");
 {
   // Les instants où le nom, puis le descriptif, deviennent visibles : mesurés
   // dans la page, pour ne pas dépendre de la charge de la machine.
@@ -408,7 +413,7 @@ console.log("\n9. LES POPUPS : VICTOIRE, PUIS LA BLESSURE DE SON SEUL JOUEUR");
     visible: getComputedStyle(document.getElementById("fin-combat-voile")).display === "flex"
   }));
   await p.screenshot({ path: "/tmp/claude-0/blessures_victoire.png" });
-  verifier("le grand « Victoire » s'affiche, par-dessus le butin (z 21000 > 20000)", bandeau.visible && bandeau.mot === "Victoire" && Number(bandeau.z) > 20000);
+  verifier("le grand « Défaite » s'affiche, par-dessus le butin (z 21000 > 20000)", bandeau.visible && bandeau.mot === "Défaite" && Number(bandeau.z) > 20000);
   await p.waitForFunction(() => window.__instants && window.__instants.nom, null, { timeout: 15000 });
   await p.waitForTimeout(400);
   const t1 = await p.evaluate(() => ({
@@ -418,7 +423,7 @@ console.log("\n9. LES POPUPS : VICTOIRE, PUIS LA BLESSURE DE SON SEUL JOUEUR");
     couleur: getComputedStyle(document.querySelector(".blessure-revelation-nom")).color,
     texteVisible: document.querySelector(".blessure-revelation-texte").classList.contains("visible")
   }));
-  verifier("« Victoire douloureuse », puis le nom en rouge foncé, en fondu", t1.titre === "Victoire douloureuse" && t1.nom === "Déchirure musculaire"
+  verifier("« Défaite », puis le nom en rouge foncé, en fondu", t1.titre === "Défaite" && t1.nom === "Déchirure musculaire"
            && t1.couleur === "rgb(139, 0, 0)" && Number(t1.nomOpacite) > 0, JSON.stringify(t1));
   await p.waitForFunction(() => window.__instants && window.__instants.texte, null, { timeout: 15000 });
   await p.waitForTimeout(700);

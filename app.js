@@ -1717,10 +1717,12 @@ window.multiplicateurSurpuissance = function(fatigue) {
 //  les effets des sorts des monstres après leur création (donc ne rentre pas
 //  en compte dans la fatigue). » La carte d'une créature est créée et chiffrée
 //  comme avant (sa fatigue ne bouge pas) ; c'est en la LISANT pour le combat
-//  (demarrerCiblage, moteur_effets.js) que ses effets valent 20 % de plus :
-//  dégâts, soins, boucliers et chances d'état. La triche fixe par stature
-//  (bonusMonstreDe, moteur_pur.js) s'y ajoute ensuite, comme avant. Ni le
-//  zombie du Profanateur ni le compagnon du Pisteur : ils n'ont pas de sorts.
+//  (demarrerCiblage, moteur_effets.js) que ses chances d'ÉTAT valent 20 % de
+//  plus — et elles seules (v253 : « 20 % uniquement sur leurs effets d'état,
+//  style Glacé, Peur… pas les dégâts ni les soins »). La triche fixe par
+//  stature (bonusMonstreDe, moteur_pur.js) s'ajoute aux dégâts et aux soins,
+//  comme avant. Ni le zombie du Profanateur ni le compagnon du Pisteur : ils
+//  n'ont pas de sorts.
 window.MULTIPLICATEUR_SORTS_MONSTRE = 1.2;
 window.multiplicateurSortsMonstre = function(c) {
     if (!c || !c.estMonstre || c.zombie || c.compagnonDe || c.compagnon) return 1;

@@ -1012,13 +1012,16 @@ export function chaineDeDegats(cible, attaque, options) {
 //  les étapes à jouer. Elle est appelée au milieu d'une marche déjà en cours
 //  (resoudreMouvement travaille sur sa copie) : lui faire cloner l'état à
 //  chaque case ferait perdre les pas déjà écrits.
-export function traverserZones(etat, id, hex, des) {
+export function traverserZones(etat, id, hex, des, options = {}) {
     const etapes = [];
     const cible = combattant(etat, id);
     if (!cible || cible.aTerre || !hex) return etapes;
 
     const zones = Object.values((etat && etat.zones) || {})
         .filter(z => z && (z.hexes || []).some(h => h && h.q === hex.q && h.r === hex.r))
+        // Seulement certaines nappes (la fin de manche : celles qu'on n'a pas
+        // encore subies ; les Pointes de glace : la leur, pas celles d'en dessous).
+        .filter(z => !options.seulement || options.seulement(z))
         // L'ordre des clés d'un objet n'est pas une garantie : on le fixe, sans
         // quoi deux postes pourraient résoudre deux zones superposées dans un
         // ordre différent — et consommer les dés dans un ordre différent.
@@ -1027,6 +1030,9 @@ export function traverserZones(etat, id, hex, des) {
         .filter(z => !(cible.atouts && cible.atouts.zonesInoffensives && z.idLanceur === id));
 
     zones.forEach(zone => {
+        // UNE FOIS PAR MANCHE (v253) : qui l'a subie en y entrant ne la
+        // resubit pas à la fin de la manche (zonesDeFinDeManche).
+        if (!(zone.subies || []).includes(id)) zone.subies = [...(zone.subies || []), id];
         // Le jet de défense d'abord, comme pour une attaque d'opportunité :
         // une seule chance de passer au travers, quel que soit le contenu.
         const esquive = esquiveDe(cible), parade = paradeDe(cible);
@@ -1164,17 +1170,26 @@ export function creerZonePure(etat, action, hexes, idLanceur) {
 // qu'elle recouvre. Une ancienne qui garde des cases ailleurs survit, amputée ;
 // celle qui se fait entièrement recouvrir disparaît.
 //
+// SAUF UNE ZONE DE DÉGÂTS (Nico, v253 : « fais en sorte que les zones
+// persistantes de dégâts puissent se mettre avec les autres zones
+// persistantes »). Les chausse-trappes (type « neutre ») et les nappes d'un
+// élément (feu, glace, poison, foudre) ne s'effacent plus l'une l'autre : sur
+// une même case, chacune frappe, avec son propre jet d'esquive. Deux zones de
+// la même famille, elles, se remplacent toujours.
+//
 // CHAQUE ZONE TOUCHÉE PORTE SON ÉTAPE, y compris celles qu'on ampute et celles
 // qu'on efface. N'annoncer que la nouvelle suffirait à l'affichage mais pas au
 // rejeu : un poste qui rejoue le journal poserait la nouvelle zone SANS retirer
 // ce qu'elle recouvre, et se retrouverait avec deux nappes superposées là où le
 // cerveau n'en a qu'une. Une divergence silencieuse, celle qui coûte le plus
 // cher à retrouver.
+export const familleDeZone = (z) => (z && z.type === "neutre") ? "degats" : "element";
 export function poserZone(etat, zone) {
     const etapes = [];
     const prises = new Set((zone.hexes || []).map(h => h.q + "," + h.r));
     const restantes = {};
     Object.values(etat.zones || {}).forEach(z => {
+        if (familleDeZone(z) !== familleDeZone(zone)) { restantes[z.id] = z; return; }
         const garde = (z.hexes || []).filter(h => !prises.has(h.q + "," + h.r));
         if (garde.length > 0) {
             restantes[z.id] = { ...z, hexes: garde };
@@ -1191,6 +1206,29 @@ export function poserZone(etat, zone) {
     return etapes;
 }
 
+// QUI RESTE DANS UNE ZONE LA SUBIT À LA FIN DE LA MANCHE (Nico, v253 : « les
+// ennemis n'ont toujours pas reçu les dégâts des zones persistantes, en tout
+// cas ceux qui sont en statique dans la zone d'un tour à l'autre »). Une zone
+// ne frappait qu'au pas qu'on y posait : qui s'y tenait sans bouger n'en
+// sentait plus rien. Désormais, à chaque fin de manche, chaque combattant
+// debout sur une de ses cases la subit — une fois par manche et par zone :
+// celui qui y est entré pendant la manche l'a déjà subie (traverserZones,
+// zone.subies). Juste avant que les zones vieillissent : une nappe dans sa
+// dernière manche mord encore.
+export function zonesDeFinDeManche(etat, des) {
+    const etapes = [];
+    if (!des || Object.keys(etat.zones || {}).length === 0) return etapes;
+    const ordre = (etat.ordre || []).filter(id => (etat.combattants || {})[id]);
+    const ids = [...ordre, ...Object.keys(etat.combattants || {}).sort().filter(id => !ordre.includes(id))];
+    ids.forEach(id => {
+        const c = combattant(etat, id);
+        if (!c || c.aTerre || c.q === null || c.q === undefined) return;
+        const hex = { q: nombre(c.q), r: nombre(c.r) };
+        etapes.push(...traverserZones(etat, id, hex, des, { seulement: z => !(z.subies || []).includes(id) }));
+    });
+    return etapes;
+}
+
 // Un tour de moins à vivre, à chaque fin de manche. Celles qui tombent à zéro
 // s'effacent. Ce décompte vivait dans combat.js, sur le poste qui avait vidé la
 // file — donc nulle part sous le nouveau régime, où plus personne ne « finit »
@@ -1200,7 +1238,10 @@ export function vieillirZones(etat) {
     Object.values(etat.zones || {}).forEach(z => {
         const reste = nombre(z.dureeRestante) - 1;
         if (reste > 0) {
-            etat.zones[z.id] = { ...z, dureeRestante: reste };
+            // Une manche neuve : tout le monde pourra la subir de nouveau.
+            const { subies, ...sansSubies } = z;
+            void subies;
+            etat.zones[z.id] = { ...sansSubies, dureeRestante: reste };
             etapes.push({ type: "zone", id: z.id, zone: etat.zones[z.id] });
         } else {
             delete etat.zones[z.id];
@@ -1286,7 +1327,7 @@ export function pointesDeGlace(etat, idLanceur, cases, des, plateau) {
         const c = etat.combattants[id];
         if (!c || c.aTerre || c.q === null || c.q === undefined) return;
         const hex = emprise.find(h => h.q === nombre(c.q) && h.r === nombre(c.r));
-        if (hex) etapes.push(...traverserZones(etat, id, hex, des));
+        if (hex) etapes.push(...traverserZones(etat, id, hex, des, { seulement: z => z.id === zone.id }));
     });
     return etapes;
 }
