@@ -182,10 +182,23 @@ window.afficherFlashDegatToken = function(idCible, ancienneValeur, nouvelleValeu
     const oldPct = Math.max(0, Math.min(100, (ancienneValeur / valeurMax) * 100));
     const newPct = Math.max(0, Math.min(100, (nouvelleValeur / valeurMax) * 100));
 
+    // CHAQUE BARRE A SA LIGNE (Nico, v251 : « j'ai vu la jauge réaugmenter
+    // pour appliquer les dégâts »). L'énergie prenait la place de la vie : en
+    // fin de manche, le poison vidait d'abord l'énergie (une barre à 90 %),
+    // puis la vie repartait d'une barre pleine posée juste par-dessus — la
+    // jauge semblait remonter avant de descendre. L'énergie a maintenant sa
+    // ligne, sous celle de la vie (comme les jauges du pion sélectionné), et
+    // une barre neuve REMPLACE celle de sa ligne au lieu de s'empiler dessus :
+    // elle repart de la valeur où l'autre s'arrêtait.
+    const voie = (options && options.voie) || (couleur === "#e2c46a" ? "energie" : "vie");
+    let relaie = false;
+    tokenDiv.querySelectorAll(".jauge-flash-token").forEach(j => { if (j.dataset.voie === voie) { j.remove(); relaie = true; } });
+
     const jaugeContainer = document.createElement("div");
 jaugeContainer.className = "jauge-flash-token";
+    jaugeContainer.dataset.voie = voie;
     jaugeContainer.style.position = "absolute";
-    jaugeContainer.style.bottom = "-12px";
+    jaugeContainer.style.bottom = voie === "energie" ? "-21px" : "-12px";
     jaugeContainer.style.left = "50%";
     jaugeContainer.style.transform = "translateX(-50%)";
     jaugeContainer.style.width = "75%";
@@ -194,7 +207,9 @@ jaugeContainer.className = "jauge-flash-token";
     jaugeContainer.style.border = `1px solid ${bordure}`;
     jaugeContainer.style.borderRadius = "3px";
     jaugeContainer.style.zIndex = "5";
-    jaugeContainer.style.opacity = "0";
+    // Une barre qui en relaie une autre est déjà là : pas de fondu d'entrée,
+    // sinon la ligne clignote entre deux tics.
+    jaugeContainer.style.opacity = relaie ? "1" : "0";
     jaugeContainer.style.transition = "opacity 0.3s ease";
     jaugeContainer.style.boxShadow = "0 2px 4px rgba(0,0,0,0.8)";
 

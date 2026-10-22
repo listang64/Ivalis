@@ -4888,6 +4888,8 @@ textarea.input-texte-parchemin {
 .fin-combat-bandeau.defaite .fin-combat-mot { color: #8b0000; text-shadow: 0 0 28px rgba(139,0,0,0.75), 0 4px 3px #000; }
 .fin-combat-bandeau.defaite .fin-combat-ornement { color: #7a1a12; }
 .fin-combat-sous { font-family: 'Cinzel', serif; font-size: clamp(15px, 2.6vw, 22px); color: #e8d5a5; letter-spacing: .12em; }
+/* L'XP des créatures abattues, même dans la défaite (v251). */
+.fin-combat-xp { margin-top: 14px; font-family: 'Cinzel', serif; font-size: clamp(14px, 2.2vw, 19px); color: #ffe08a; letter-spacing: .08em; text-shadow: 0 0 10px rgba(255, 200, 80, 0.45); }
 @keyframes fin-combat-entree { 0% { opacity: 0; transform: scale(1.35); letter-spacing: .4em; } 100% { opacity: 1; transform: scale(1); } }
 
 .blessure-revelation {
@@ -5092,3 +5094,9 @@ textarea.input-texte-parchemin {
 .piste-choix.pret.neuf { animation: piste-coche 0.35s ease-out; }
 @keyframes piste-sablier { 0%, 40% { transform: rotate(0deg); } 55%, 100% { transform: rotate(180deg); } }
 @keyframes piste-coche { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* LA CAMÉRA BOUGE : les voiles des zones procédurales (brume, fumée, flammes,
+   poussière) s'effacent le temps du mouvement — sur iPad Air, leur masque
+   refait à chaque image laissait des traits sur la carte (combat.js,
+   cameraEnMouvement). Ils reviennent en fondu dès que la caméra s'arrête. */
+#conteneur-plateau-vtt.camera-en-mouvement .zone-proc-voiles { visibility: hidden; }

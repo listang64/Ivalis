@@ -44,6 +44,19 @@ const nombre = (v, defaut = 0) => {
 export const cleDuTour = (entree) => entree
     ? `${entree.acteur || "?"}|${entree.manche === undefined ? "" : entree.manche}` : null;
 
+// LES RÉGÉNÉRATIONS DE FIN DE MANCHE qui se suivent à partir de l'étape `i`,
+// une par combattant (v251) : elles se jouent ensemble. Une seule (ou aucune) :
+// la liste n'en garde qu'une, ou rien. Pur, donc vérifiable.
+export function groupeDeRegeneration(etapes, i) {
+    const estRegen = (e) => !!e && e.type === "fatigue" && nombre(e.regeneration) > 0 && !e.repos;
+    const groupe = [], vus = new Set();
+    for (let j = i; j < (etapes || []).length && estRegen(etapes[j]) && !vus.has(etapes[j].cible); j++) {
+        vus.add(etapes[j].cible);
+        groupe.push(etapes[j]);
+    }
+    return groupe;
+}
+
 // =========================================================================
 //  1. QUE FAIRE MAINTENANT ?
 // =========================================================================
@@ -277,11 +290,26 @@ export function creerSpectateur(contexte) {
                        `(${(entree.etapes || []).length} étapes)`);
                 surRejeu(entree);
 
-                for (const etape of (entree.etapes || [])) {
+                const etapes = entree.etapes || [];
+                for (let i = 0; i < etapes.length; i++) {
+                    // LA RÉGÉNÉRATION DE FIN DE MANCHE, TOUS ENSEMBLE (Nico,
+                    // v251 : « l'animation de fin de tour où tout le monde
+                    // regagne sa fatigue, fais-les tous jouer en même temps ») :
+                    // les étapes qui se suivent, chacune sur un combattant
+                    // différent, s'animent d'un coup, puis s'appliquent.
+                    const groupe = groupeDeRegeneration(etapes, i);
+                    if (groupe.length > 1) {
+                        await Promise.all(groupe.map(e => animer(e, moi.etat)));
+                        groupe.forEach(e => { moi.etat = appliquerEtape(moi.etat, e); });
+                        surEtat(moi.etat);
+                        i += groupe.length - 1;
+                        continue;
+                    }
                     // Animer D'ABORD, appliquer ENSUITE : l'écran ne doit jamais
                     // montrer le résultat avant le geste. C'est très exactement
                     // ce qui donnait « le jeu joue pendant l'écran noir, je vois
                     // la vie qui se retire ».
+                    const etape = etapes[i];
                     await animer(etape, moi.etat);
                     moi.etat = appliquerEtape(moi.etat, etape);
                     surEtat(moi.etat);

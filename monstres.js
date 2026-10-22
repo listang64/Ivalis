@@ -303,8 +303,15 @@ window.ecouterMonstresPartie = function(idPartie) {
             objet.Palier        = brut.Palier || "";
             objet.Gabarit       = brut.Gabarit || "";
             objet.Personnalite  = brut.Personnalite || "brutal";
-            objet.Nombre_Actions = brut.Nombre_Actions || 1;
+            // LE TABLEAU DES MONSTRES JUSQU'AU COMBAT (Nico, v251 : « assure-toi
+            // que Paramètres > Outils > Monstres soit bien relié aux stats
+            // réelles des monstres en jeu »). Le nombre d'actions décide d'une
+            // seconde compétence (une créature d'avant ce champ : le palier) ;
+            // le repos long (en % de la jauge) n'arrivait pas jusqu'au combat,
+            // qui reprenait 35 % pour tout le monde.
+            objet.Nombre_Actions = parseInt(brut.Nombre_Actions) || (brut.Palier === "Boss" ? 2 : 1);
             objet.XP_Groupe     = brut.XP_Groupe || 0;
+            if (brut.Repos_Long !== undefined) objet.Repos_Long = brut.Repos_Long;
             // Le compagnon du Pisteur : l'identifiant de son maître.
             objet.compagnonDe   = brut.Compagnon_De || "";
             objet.nomAttaque    = brut.Nom_Attaque || "";

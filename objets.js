@@ -927,9 +927,19 @@ window.objetsPourLaCarte = function(perso, armeDeLaCarte) {
 // apportent quand la carte ne s'en sert pas. On soustrait plutôt que de
 // recalculer : bonusEquip additionne AUSSI les bonus portés par les états, et
 // ceux-là ne doivent jamais être perdus en chemin.
+//
+// LA MAGIE NE TIRE PAS À L'ARC (Nico, v251 : « la distance en plus accordée
+// par l'arc ne devrait pas se mettre sur les compétences magie du
+// personnage »). Un sort part des mains du mage, pas de l'arme qu'il porte :
+// la portée d'un arc ou d'une fronde, l'allonge d'une lance ne s'y ajoutent
+// pas. Le sort garde ses propres portées (Distance de la Forge, atout de
+// portée des sorts).
+const PORTEES_D_ARME = ["portee", "allonge"];
 window.bonusEquipPourCarte = function(perso, cle, armeDeLaCarte) {
     const total = typeof window.bonusEquip === "function" ? window.bonusEquip(perso, cle) : 0;
-    if (!perso || armeDeLaCarte !== window.CARTE_SANS_ARME) return total;
+    const sansArme = armeDeLaCarte === window.CARTE_SANS_ARME;
+    const sortSansPorteeDArme = armeDeLaCarte === "Magie" && PORTEES_D_ARME.includes(cle);
+    if (!perso || !(sansArme || sortSansPorteeDArme)) return total;
     let desArmes = 0;
     window.armesEnMain(perso).forEach(o => {
         desArmes += parseInt((o.bonus || {})[cle]) || 0;

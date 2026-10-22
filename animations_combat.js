@@ -50,9 +50,21 @@
     const COULEURS = { degats: "#ff4c4c", bouclier: "#00ffff", soin: "#1b6e3a", neutre: "#cccccc",
                        attention: "#ffaa00", critique: "#ff2d2d", etat: "#9333ea" };
 
+    // UN PION REDESSINÉ PENDANT LA LECTURE (Nico, v251 : « l'animation
+    // d'éclair à distance bug et ne se dirige pas tout le temps vers sa
+    // cible »). redessinerPions remplace chaque pion par un neuf, du même id —
+    // il suffit qu'une notification arrive pendant le geste. Une lecture qui
+    // avait retenu l'ancien mesurait un élément retiré de la page : un
+    // rectangle nul, en haut à gauche de l'écran, et l'éclair partait là. On
+    // reprend le pion vivant qui porte le même id.
+    function vivant(el) {
+        if (!el || el.isConnected !== false || !el.id) return el;
+        return document.getElementById(el.id) || el;
+    }
+
     // Le centre d'un pion dans le repère du calque, et sa taille à l'écran.
     function centre(el, calque) {
-        const r = el.getBoundingClientRect(), c = calque.getBoundingClientRect();
+        const r = vivant(el).getBoundingClientRect(), c = calque.getBoundingClientRect();
         return { x: r.left - c.left + r.width / 2, y: r.top - c.top + r.height / 2, t: r.width || 60 };
     }
     // L'axe lanceur → cible : la direction (unitaire) et la distance.
@@ -97,10 +109,12 @@
             return fini(an);
         };
         o.bouger = (el, images, options) => {
+            el = vivant(el);
             if (!el || typeof el.animate !== "function" || jeton.annule) return Promise.resolve();
             return lancer(el, images.map(f => ({ ...f, transform: BASE + " " + (f.transform || "") })), options);
         };
         o.teinter = (el, images, options) => {
+            el = vivant(el);
             if (!el || typeof el.animate !== "function" || jeton.annule) return Promise.resolve();
             return lancer(el, images, options);
         };
@@ -774,7 +788,8 @@
             return d;
         };
         // L'énergie (la jauge de fatigue) : le chiffre jaune et la barre.
-        o.energie = (calque, pion, de, vers, max, texte) => o.jauge(calque, pion, de, vers, max, texte, COULEURS.attention, "#e2c46a");
+        // Sa ligne à elle, sous celle de la vie (afficherFlashDegatToken).
+        o.energie = (calque, pion, de, vers, max, texte) => o.jauge(calque, pion, de, vers, max, texte, COULEURS.attention, "#e2c46a", { voie: "energie" });
     }
 
     // =====================================================================

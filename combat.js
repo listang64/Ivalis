@@ -131,7 +131,33 @@ window.reparerPionsAPlat = async function(data) {
 //    Ont_Joue_Ce_Round     — ceux qui ont déjà posé leur carte
 window.combattantsAttendus = function(data) {
     const horsJeu = new Set((data && data.Combattants_Hors_Jeu) || []);
+    // Avec sa garde : plusieurs bancs extraient cette fonction seule, par son nom.
+    if (typeof window.tombesSelonLeCerveau === "function") window.tombesSelonLeCerveau(data).forEach(id => horsJeu.add(id));
     return ((data && data.Ordre_Initiative) || []).filter(id => !horsJeu.has(id));
+};
+
+// CEUX QUE L'ÉTAT DU CERVEAU DIT À TERRE, POUR CETTE MANCHE-CI (Nico, v251 :
+// « j'ai plus qu'un seul perso debout, j'ai choisi ma compétence, et pourtant
+// il me met en attente des joueurs ; le perso mort a disparu de la piste
+// d'init. Au tour d'après, c'était réglé »).
+//
+// Combattants_Hors_Jeu n'est tenue à jour que par le poste du cerveau, quand
+// SON écran rejoue la chute (rafraichir, regime_cerveau.js). Un écran retenu
+// derrière la fenêtre sombre — le OK pas encore donné — ne la rejoue qu'après :
+// la manche suivante attendait donc la carte d'un mort, jusqu'au OK.
+//
+// L'état publié, lui, le sait dès la fin de la manche, et c'est le même sur
+// tous les postes. On ne le croit que pour la manche qu'il prépare (même
+// rencontre, même numéro, en préparation) : un état d'une manche passée
+// pourrait dire à terre un héros que le Médicus a relevé depuis.
+window.tombesSelonLeCerveau = function(data) {
+    const regime = typeof window.regimeDuJeu === "function" ? window.regimeDuJeu() : null;
+    const etat = regime && typeof regime.etatPublie === "function" ? regime.etatPublie() : null;
+    if (!etat || !etat.combattants || !data) return [];
+    if ((etat.phase || "") !== "Preparation") return [];
+    if ((parseInt(etat.manche) || 1) !== (parseInt(data.Tour_Combat) || 1)) return [];
+    if (etat.combat && data.ID_Rencontre && etat.combat !== data.ID_Rencontre) return [];
+    return Object.keys(etat.combattants).filter(id => etat.combattants[id] && etat.combattants[id].aTerre);
 };
 
 // La file passée en argument est celle de la transaction en cours, qui contient
@@ -1107,6 +1133,16 @@ window.rafraichirAffichageCombat = function() {
             const i = miens.findIndex(p => affiche && p.idPersonnage === affiche.idPersonnage);
             window.COMBAT_INDEX_PERSO = i >= 0 ? i : 0;
         }
+        // LE HÉROS MONTRÉ EST TOMBÉ, UN AUTRE DES MIENS TIENT DEBOUT : c'est
+        // lui qui choisit sa carte désormais.
+        const montre = (window.COMBAT_PERSOS_JOUEUR || [])[window.COMBAT_INDEX_PERSO];
+        if (montre && typeof window.herosATerre === "function" && window.herosATerre(montre.idPersonnage)) {
+            const debout = (window.COMBAT_PERSOS_JOUEUR || []).findIndex(p => !window.herosATerre(p.idPersonnage));
+            if (debout >= 0 && debout !== window.COMBAT_INDEX_PERSO) {
+                window.COMBAT_INDEX_PERSO = debout;
+                if (typeof window.afficherPersoCombatActuel === "function") window.afficherPersoCombatActuel();
+            }
+        }
     }
 
     // Chaque redessin est isolé : une bulle d'initiative qui casse ne doit pas
@@ -1771,7 +1807,31 @@ window.appliquerZoomVTT = function(facteurDemande, ancreX, ancreY) {
 
 let frameTransformVTT = null;
 
+// LES TRAITS DE L'IPAD AIR (Nico, v251 : « quand je déplace la caméra, j'ai
+// des sortes de traits, que je n'ai pas sur iPad Pro et PC »). Sur la photo,
+// ils restent DANS des cases : ce sont les voiles des zones procédurales
+// (brume, fumée, flammes, poussière des gravats) — une texture qui dérive au
+// vent, découpée par un masque, sous un plateau zoomé. Pendant que la caméra
+// bouge, le compositeur d'un iPad moins puissant doit refaire ce masque à
+// chaque image, et laisse des lignes. Les voiles s'effacent donc le temps du
+// mouvement et reviennent en fondu dès qu'il s'arrête : le sol de la zone,
+// ses éclats et ses lueurs, eux, restent.
+let minuteurCameraVTT = null;
+function cameraEnMouvement() {
+    const plateau = document.getElementById("conteneur-plateau-vtt");
+    if (!plateau) return;
+    plateau.classList.add("camera-en-mouvement");
+    clearTimeout(minuteurCameraVTT);
+    minuteurCameraVTT = setTimeout(() => {
+        plateau.classList.remove("camera-en-mouvement");
+        plateau.querySelectorAll(".zone-proc-voiles").forEach(v => {
+            if (typeof v.animate === "function") v.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 350, easing: "ease-out" });
+        });
+    }, 450);
+}
+
 window.appliquerTransformPlateau = function() {
+    cameraEnMouvement();
     const conteneur = document.getElementById("transform-plateau");
     const transformation = `translate(${window.VTT_POS_X}px, ${window.VTT_POS_Y}px) scale(${window.VTT_SCALE})`;
     if (conteneur) conteneur.style.transform = transformation;
@@ -4381,6 +4441,14 @@ window.proprietaireDeLaCarte = function(idCarte) {
 
 // Les héros de CE poste — ceux que je commande. Une seule liste désormais : la
 // mise de côté qu'imposait le panneau latéral n'a plus lieu d'être.
+// À TERRE, selon la fiche projetée OU selon l'état qui ouvre la manche (voir
+// tombesSelonLeCerveau) : l'un ou l'autre suffit.
+window.herosATerre = function(id) {
+    if (!id) return false;
+    if (typeof window.estCombattantMort === "function" && window.estCombattantMort(id)) return true;
+    return typeof window.tombesSelonLeCerveau === "function" && window.tombesSelonLeCerveau(window.PARTIE_DATA || {}).includes(id);
+};
+
 window.mesHerosDeCombat = function() {
     return window.COMBAT_PERSOS_JOUEUR || [];
 };
@@ -4442,6 +4510,11 @@ window.jouerCarteCombat = async function(idCarte) {
                                      `(index ${window.COMBAT_INDEX_PERSO})`);
     if (persoActuel.estMonstre) return refuser("cette carte est celle d'une créature",
                                                persoActuel.idPersonnage);
+    // Un héros à terre n'a plus de carte à jouer (Nico, v251 : « il a disparu
+    // de la piste d'init mais je peux encore lui sélectionner les compétences »).
+    if (typeof window.herosATerre === "function" && window.herosATerre(persoActuel.idPersonnage)) {
+        return refuser("ce héros est à terre", persoActuel.idPersonnage);
+    }
 
     const dataCarte = window.COMPETENCES_CACHE[idCarte]
         || (typeof window.carteTechniqueClasse === "function" ? window.carteTechniqueClasse(idCarte) : null);
@@ -4979,7 +5052,8 @@ window.actualiserTitrePreparation = function(queueParam, phaseParam) {
 
     // Mes héros encore en jeu : un combattant à terre n'a plus de carte à
     // choisir, il ne doit jamais retenir ce titre affiché.
-    const horsJeu = new Set(partie.Combattants_Hors_Jeu || []);
+    const horsJeu = new Set([...(partie.Combattants_Hors_Jeu || []),
+                             ...(typeof window.tombesSelonLeCerveau === "function" ? window.tombesSelonLeCerveau(partie) : [])]);
     const mesHeros = (window.COMBAT_PERSOS_JOUEUR || []).filter(p => !horsJeu.has(p.idPersonnage));
 
     const aJoue = new Set(partie.Ont_Joue_Ce_Round || []);
@@ -6138,8 +6212,10 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
         // round se déroule normalement.
         const aDejaJoue = !persoActuel
             || ((window.PARTIE_DATA || {}).Ont_Joue_Ce_Round || []).includes(persoActuel.idPersonnage);
+        // À terre : son deck s'éteint, comme celui d'un héros qui a joué.
+        const aTerre = typeof window.herosATerre === "function" && window.herosATerre(persoActuel.idPersonnage);
         if (deckEl) {
-            if (phase === "Resolution" && aDejaJoue) {
+            if ((phase === "Resolution" && aDejaJoue) || aTerre) {
                 deckEl.style.opacity = "0.4";
                 deckEl.style.pointerEvents = "none";
                 deckEl.style.filter = "grayscale(100%)";

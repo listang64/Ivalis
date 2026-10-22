@@ -1211,8 +1211,17 @@ function contexteDuJeu() {
                         }
                     }
                 }
+                // LA DÉFAITE SE CONSTATE AUSSI ICI (Nico, v251 : « le combat est
+                // terminé, pourtant ça ne met pas combat perdu »). Elle n'était
+                // cherchée qu'à une notification des fiches (recomposerCombattants,
+                // monstres.js) — et plus aucune écriture ne touche la vie d'un
+                // héros sous ce régime : le dernier héros tombait sans que rien
+                // ne s'en aperçoive. La victoire, elle, passe par la fiche de la
+                // créature marquée morte (marquerMonstreMort). Chaque poste
+                // demande ; la transaction de cloturerCombat n'en retient qu'un.
                 [["rafraichirAffichageCombat", () => window.rafraichirAffichageCombat()],
-                 ["redessinerPions", () => window.redessinerPions()]]
+                 ["redessinerPions", () => window.redessinerPions()],
+                 ["verifierDefaiteCombat", () => window.verifierDefaiteCombat()]]
                     .forEach(([nom, appel]) => {
                         if (typeof window[nom] !== "function") return;
                         try { appel(); } catch (e) { signalerPanne(nom, e); }
@@ -1590,6 +1599,16 @@ if (typeof window !== "undefined") {
     // préparation, pas une notification qui n'arrivera jamais.
     rendreLaMainAuxJoueurs = () => rendreLaPreparation();
 
+    // Les tombés de l'état entrent ; ceux qu'il dit debout (un allié relevé par
+    // le Médicus) sortent ; le reste de la liste ne bouge pas.
+    function horsJeuSelonLEtat(etat, data) {
+        const ordre = data.Ordre_Initiative || [];
+        const table = (etat && etat.combattants) || {};
+        const liste = new Set((data.Combattants_Hors_Jeu || []).filter(id => !(table[id] && !table[id].aTerre)));
+        Object.keys(table).forEach(id => { if (table[id] && table[id].aTerre && ordre.includes(id)) liste.add(id); });
+        return [...liste];
+    }
+
     function rendreLaPreparation() {
         // ON NE SE FIE PLUS À LA PHASE LUE LOCALEMENT. window.PARTIE_DATA est
         // écrasée par la projection : elle dit la phase de l'ÉTAT, pas celle du
@@ -1618,7 +1637,13 @@ if (typeof window !== "undefined") {
                 Phase_Combat: "Preparation",
                 Tour_Combat: nombre(etat.manche, 1),
                 // Nouvelle manche : tout le monde doit rejouer.
-                Ont_Joue_Ce_Round: []
+                Ont_Joue_Ce_Round: [],
+                // QUI NE JOUERA PLUS, DIT PAR L'ÉTAT QUI OUVRE LA MANCHE (Nico,
+                // v251 : un héros tombé était encore attendu, « en attente des
+                // joueurs », jusqu'à la manche suivante). La liste ne suivait
+                // que l'écran de ce poste, qui rejoue la chute après le OK de
+                // la fenêtre sombre : la manche s'ouvrait avant.
+                Combattants_Hors_Jeu: horsJeuSelonLEtat(etat, data)
             } };
         })).catch(e => {
             // L'écriture a raté : on retire le repère pour que la prochaine

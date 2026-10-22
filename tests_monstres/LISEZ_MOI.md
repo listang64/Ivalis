@@ -6841,3 +6841,108 @@ pièges), le combat inchangé. Il mord sur l'ancien code (18 échecs). Mis à
 jour : corrections_v243, v244, v245, v247, v248, studio_animation et
 studio_catalogue_1 (145 animations ; huit en section 7), studio_terrain
 (douze animations qui se ciblent).
+
+## v251 — Corrections après une partie (jauges, mort, défaite, monstres, éclair, arc)
+
+Nico, après une partie : « animation de contre, enlève les émoticônes » ;
+« l'animation de fin de tour où tout le monde regagne sa fatigue, fais-les
+tous jouer en même temps » ; « un ennemi brûlé, empoisonné et qui saignait :
+j'ai vu la jauge réaugmenter pour appliquer les dégâts » ; « quand on fait un
+critique, l'étalement de dégâts prend le critique en compte » ; « sur iPad
+Air, quand je déplace la caméra, j'ai des sortes de traits » ; « je n'ai plus
+qu'un seul perso debout, j'ai choisi ma compétence, et pourtant il me met en
+attente des joueurs ; le perso mort (un Profanateur niveau 1) a disparu de
+la piste d'init mais je peux encore lui sélectionner les compétences » ; « le
+combat est terminé, pourtant ça ne met pas combat perdu » ; « l'animation
+d'éclair à distance ne se dirige pas tout le temps vers sa cible » ; puis
+« en cas de défaite, gain d'XP des monstres vaincus », « assure-toi que
+Paramètres > Outils > Monstres soit bien relié aux stats réelles des
+monstres en jeu » et « la distance en plus accordée par l'arc ne devrait pas
+se mettre sur les compétences magie ».
+
+- LE CONTRE (pont_combat.js) : le coup rendu s'écrit « -4 », sans « ↩️ ».
+- LE REGAIN DE FIN DE MANCHE (spectateur_combat.js, groupeDeRegeneration) :
+  les étapes de régénération qui se suivent, chacune sur un combattant
+  différent, s'animent ensemble, puis s'appliquent. Le repos long garde son
+  geste à lui.
+- LES TICS DE FIN DE MANCHE (moteur_effets.js, afficherFlashDegatToken) : le
+  calcul était juste (100 → 92 → 84 → 76). C'est l'écran qui trompait : le
+  poison vide d'abord l'ÉNERGIE, sa barre (dorée) se posait à la place de la
+  vie, et la barre de vie repartait PLEINE juste par-dessus. On voyait la
+  jauge remonter avant de descendre. Chaque barre a maintenant sa ligne
+  (`data-voie`) : la vie sous le pion, l'énergie juste en dessous (comme les
+  jauges du pion sélectionné). Une barre neuve REMPLACE celle de sa ligne
+  (elle repart d'où l'autre s'arrêtait, sans fondu d'entrée) au lieu de
+  s'empiler dessus.
+- LE CRITIQUE ET L'ÉTALEMENT : le calcul le faisait déjà (le brut est doublé
+  AVANT d'être partagé : 10 étalés sur 2 tours → 5 et 5, sur un critique →
+  10 et 10). Mais au lancement, l'écran disait « -0 ! », comme si le
+  critique n'avait servi à rien. Le coup étalé porte maintenant `etale` (ce
+  qui est rangé) : on lit « ⏳ -20 ! » (« ⏳ -10 » sans critique), avec le
+  geste du coup reçu. L'état Étalement (et Soin étalé, Ténèbres étalées)
+  retient `critique` : chaque part le redit (« -10 ! », « +10 ! »).
+- LES TRAITS SUR iPad Air : sur la photo, ils restent DANS des cases — les
+  voiles des zones procédurales (brume, fumée, flammes, poussière : une
+  texture qui dérive au vent, découpée par un masque, sous un plateau zoomé).
+  Pendant que la caméra bouge (appliquerTransformPlateau, combat.js), le
+  plateau porte `camera-en-mouvement` et les voiles sont cachés (style.css) ;
+  ils reviennent en fondu 450 ms après le dernier mouvement. Le sol des
+  zones, leurs éclats et leurs lueurs restent. Non vérifiable ici : à
+  confirmer sur l'iPad Air.
+- LE HÉROS TOMBÉ ENCORE ATTENDU : Combattants_Hors_Jeu n'était tenue que par
+  l'écran du poste qui tient le cerveau, quand il REJOUE la chute — retenu
+  derrière la fenêtre sombre, il ne la rejouait qu'après le OK, et la manche
+  suivante attendait la carte d'un mort.
+  - rendreLaPreparation (regime_cerveau.js) écrit la liste avec la manche
+    qui s'ouvre, depuis l'état publié (horsJeuSelonLEtat : les tombés
+    entrent, un allié relevé sort).
+  - combattantsAttendus (combat.js) écarte aussi les tombés de l'état publié
+    (tombesSelonLeCerveau), seulement pour la manche qu'il prépare (même
+    rencontre, même numéro, en préparation).
+  - Un héros à terre (herosATerre) : sa carte est refusée (« ce héros est à
+    terre »), son deck s'éteint, et le panneau passe au héros encore debout.
+- LA DÉFAITE NON DÉCLARÉE : verifierDefaiteCombat n'était appelée qu'à une
+  notification des fiches (recomposerCombattants) — et plus aucune écriture
+  ne touche la vie d'un héros sous le régime du cerveau. Elle est maintenant
+  cherchée à chaque projection (rafraichir, regime_cerveau.js), sur chaque
+  poste ; la transaction de cloturerCombat n'en retient qu'une.
+- L'XP DE LA DÉFAITE (blessures_ui.js, cloturerCombat) : la somme « XP pour
+  le groupe » des créatures tombées (xpDeLaVictoire), à chaque héros du
+  combat, distribuée une fois par le poste qui écrit la fin ; le bandeau
+  « Défaite » l'annonce (« ✨ +140 XP pour chaque héros »).
+- LE TABLEAU DES MONSTRES : deux colonnes n'arrivaient pas jusqu'au combat.
+  - « Repos long » : la fiche d'une créature ne le recopiait pas
+    (ecouterMonstresPartie, monstres.js) : le combat reprenait 35 % pour
+    tout le monde.
+  - « Nombre d'action » : seul le palier Boss donnait une seconde
+    compétence. C'est maintenant ce chiffre (jouerCreature, cerveau_combat.js ;
+    secondeCarteBoss, monstres_ia.js) ; une créature d'avant ce champ garde la
+    règle du palier.
+  - Les autres colonnes (PV, résistances, parade/esquive, fatigue, regen,
+    XP) étaient déjà branchées. Le tableau vaut pour les créatures générées
+    ENSUITE : celles déjà sur le plateau gardent leurs chiffres.
+- L'ÉCLAIR (animations_combat.js) : redessinerPions remplace chaque pion par
+  un neuf (même id) — une notification pendant le geste suffit. La lecture
+  mesurait l'ancien, retiré de la page : un rectangle nul, en haut à gauche,
+  et l'éclair partait là. centre(), o.bouger et o.teinter reprennent le pion
+  vivant du même id (vivant). Vaut pour tous les gestes du catalogue.
+- L'ARC ET LA MAGIE (objets.js, bonusEquipPourCarte) : une carte « Magie »
+  ne prend ni la portée d'un arc ou d'une fronde, ni l'allonge d'une lance.
+  Elle garde ses propres portées (Distance de la Forge, atout de portée des
+  sorts).
+- LA ZONE PERSISTANTE DE DÉGÂTS : vérifiée, une créature qui la traverse
+  prend ses dégâts à chaque case franchie (3 cases → 3 × 6). Elle ne mord
+  pas qui y reste sans bouger : c'est la règle actuelle (question posée à
+  Nico).
+
+corrections_v251.mjs : le Contre sans émoticône ; les regains groupés (et
+lancés ensemble par le vrai spectateur) ; les trois tics (la barre de vie ne
+remonte jamais, l'énergie sur sa ligne) ; le critique étalé (« ⏳ -20 ! »,
+« -10 ! », « +10 ! ») ; la caméra (voiles cachés, puis rendus) ; le vrai
+regime_cerveau.js sur un Firestore en mémoire (le tombé dans
+Combattants_Hors_Jeu à l'ouverture de la manche, la défaite cherchée à chaque
+projection) ; combattantsAttendus, le deck éteint, la carte refusée, le
+panneau qui passe au héros debout ; l'XP de la défaite (140, une fois,
+annoncée) ; le tableau des monstres (Repos_Long, Nombre_Actions, la seconde
+compétence) ; l'éclair après un redessin ; l'arc et les sorts. Il mord sur
+l'ancien code (32 échecs).

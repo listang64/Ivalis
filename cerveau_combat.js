@@ -651,7 +651,7 @@ export function ticsDeFinDeManche(etat) {
                 montant = nombre(etalement.degatsDifferes !== undefined
                                  ? etalement.degatsDifferes : etalement.degatsRestants);
             }
-            if (montant > 0) etapes.push(...infligerTic(c, id, montant, "Étalement", etat, etalement.idSource));
+            if (montant > 0) etapes.push(...parCritique(infligerTic(c, id, montant, "Étalement", etat, etalement.idSource), etalement));
         }
 
         // --- TÉNÈBRES ÉTALÉES : la même part, selon la règle de Ténèbres -----
@@ -668,7 +668,7 @@ export function ticsDeFinDeManche(etat) {
                                   tenebres: true, montant: partage.surEnergie,
                                   tic: ETAT_TENEBRES_ETALEES });
                 }
-                if (partage.surplus > 0) etapes.push(...infligerTic(c, id, partage.surplus, ETAT_TENEBRES_ETALEES, etat, tenebres.idSource));
+                if (partage.surplus > 0) etapes.push(...parCritique(infligerTic(c, id, partage.surplus, ETAT_TENEBRES_ETALEES, etat, tenebres.idSource), tenebres));
             }
         }
 
@@ -684,11 +684,19 @@ export function ticsDeFinDeManche(etat) {
             if (pvApres > nombre(c.pv)) {
                 const montant = pvApres - nombre(c.pv);
                 c.pv = pvApres;
-                etapes.push({ type: "soin", cible: id, montant, pvApres, tic: "Soin étalé" });
+                etapes.push({ type: "soin", cible: id, montant, pvApres, tic: "Soin étalé",
+                              ...(soinEtale.critique ? { critique: true } : {}) });
             }
         }
     });
 
+    return etapes;
+}
+
+// Les parts d'un étalement CRITIQUE le restent jusqu'au bout : chaque tic le
+// dit (le « ! » de l'écran), comme le coup qui les a rangées.
+function parCritique(etapes, etatEtale) {
+    if (etatEtale && etatEtale.critique) etapes.forEach(e => { if (e.type === "degats") e.critique = true; });
     return etapes;
 }
 
@@ -1201,8 +1209,16 @@ export function appliquerIntention(etat, intention, plateau) {
 //  tout le tour) et d'énergie. Mort ou à court, il s'en tient là.
 export function jouerCreature(etat, id, carte, plateau, carte2) {
     const des = creerDes(etat.graine);
-    const estBoss = (c) => !!(c && c.palier === "Boss");
-    const avecSeconde = !!(carte2 && carte2.idCarte && estBoss(combattant(etat, id)));
+    // DEUX COMPÉTENCES : c'est le « Nombre d'action » du tableau des monstres
+    // (Paramètres > Outils > Monstres) qui le dit, plus le seul palier Boss
+    // (Nico, v251 : « assure-toi que ce soit bien relié aux stats réelles des
+    // monstres en jeu »). Une créature sans ce chiffre garde la règle du palier.
+    const deuxActions = (c) => {
+        if (!c) return false;
+        const n = nombre(c.stats && c.stats.Nombre_Actions);
+        return n > 0 ? n >= 2 : c.palier === "Boss";
+    };
+    const avecSeconde = !!(carte2 && carte2.idCarte && deuxActions(combattant(etat, id)));
     // Sa première marche garde de quoi payer les DEUX cartes, pas seulement la
     // première : sinon elle vidait son énergie en chemin et la seconde partait
     // à crédit.

@@ -764,7 +764,10 @@ export function partsEtalees(montant, tours) {
 // l'écrase pas, et il ne le repousse pas non plus au bout de la file.
 // `idSource` retient qui l'a posé : un KO au tic de fin de manche lui revient
 // (l'Instinct du tueur de l'Assassin, combat_etat.js).
-function empilerEtalement(cible, nomEtat, tics, idSource) {
+// `critique` : les parts viennent d'un coup critique (déjà doublées par
+// chaineDeDegats) — l'écran le redit à chaque tic, d'un « ! » (Nico, v251 :
+// « quand on fait un critique, l'étalement prend le critique en compte »).
+function empilerEtalement(cible, nomEtat, tics, idSource, critique) {
     const dejaLa = cible.etats.find(e => e && e.nom === nomEtat);
     if (dejaLa) {
         const file = [...(dejaLa.tics || [])];
@@ -772,9 +775,10 @@ function empilerEtalement(cible, nomEtat, tics, idSource) {
         dejaLa.tics = file;
         dejaLa.duree = Math.max(nombre(dejaLa.duree), file.length);
         if (idSource) dejaLa.idSource = idSource;
+        if (critique) dejaLa.critique = true;
     } else {
         cible.etats = [...cible.etats, { nom: nomEtat, duree: tics.length, tics: [...tics],
-                                         ...(idSource ? { idSource } : {}) }];
+                                         ...(idSource ? { idSource } : {}), ...(critique ? { critique: true } : {}) }];
     }
 }
 
@@ -1930,7 +1934,7 @@ export function resoudreCarte(etat, action, plateau) {
                 // le nombre de tours, une part à chaque fin de manche, comme
                 // les dégâts étalés.
                 if (attaque.estEtalement && soin > 0) {
-                    empilerEtalement(cible, "Soin étalé", partsEtalees(soin, attaque.toursEtalement));
+                    empilerEtalement(cible, "Soin étalé", partsEtalees(soin, attaque.toursEtalement), undefined, critique);
                     etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
                     return;
                 }
@@ -2025,6 +2029,9 @@ export function resoudreCarte(etat, action, plateau) {
                     // LA NATURE DU COUP : l'écran montre le coup reçu qui va avec
                     // (physique, magique, brut — animations_jeu.js).
                     nature: attaqueFrappe.brut === true ? "brut" : attaqueFrappe.typeRes === "Magique" ? "magique" : "physique",
+                    // UN COUP ÉTALÉ ne retire rien tout de suite : ce qu'il
+                    // rangera, critique compris, se dit à la place d'un « -0 ».
+                    ...((compte.tics || []).length > 0 ? { etale: compte.tics.reduce((a, b) => a + nombre(b), 0) } : {}),
                     ...(compte.tenebres ? { tenebres: true } : {})
                 });
 
@@ -2048,7 +2055,7 @@ export function resoudreCarte(etat, action, plateau) {
                 // (compte.degats vaut zéro) ; tout est rangé dans l'état, une part
                 // par fin de manche, autant de parts que de tours.
                 if ((compte.tics || []).length > 0) {
-                    empilerEtalement(cible, attaque.versEnergie ? ETAT_TENEBRES_ETALEES : "Étalement", compte.tics, idLanceur);
+                    empilerEtalement(cible, attaque.versEnergie ? ETAT_TENEBRES_ETALEES : "Étalement", compte.tics, idLanceur, critique);
                     etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
                 }
 

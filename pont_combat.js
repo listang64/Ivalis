@@ -314,6 +314,17 @@ const SCENES = {
                      reaction: { sorte: "bouclier-cree", pion: e.cible, depuis: e.acteur !== e.cible ? (e.acteur || null) : null } };
         }
 
+        // UN COUP ÉTALÉ ne retire rien au lancement : ses parts attendent la fin
+        // des manches. On disait « -0 ! » sur un critique, comme si le critique
+        // n'avait servi à rien (Nico, v251) ; on dit ce qui est rangé — doublé
+        // par le critique —, sans barre qui ne bougerait pas.
+        if (nombre(e.etale) > 0 && nombre(e.montant) === 0) {
+            return { geste: "message", pion: e.cible,
+                     texte: `⏳ -${nombre(e.etale)}${e.critique ? " !" : ""}`,
+                     couleur: e.critique ? COULEURS.critique : COULEURS.attention,
+                     duree: RYTHME.message, ...reactionAuCoup(e, "pv") };
+        }
+
         // Un coup encaissé PAR LE BOUCLIER se montre sur le bouclier — sinon on
         // voit un gros chiffre rouge et une barre de vie qui ne bouge pas, et
         // le joueur croit à un bug.
@@ -321,8 +332,10 @@ const SCENES = {
         const champ = (surBouclier && nombre(e.pvApres, nombre(c.pv)) === nombre(c.pv)) ? "bouclier" : "pv";
 
         const montant = nombre(e.montant);
+        // Le Contre rend le coup : son chiffre, sans émoticône (Nico, v251 :
+        // « animation de contre, enlève les émoticônes »).
         const texte = e.opportunite ? `-${montant} ⚔️`
-                    : e.renvoi ? `-${montant} ↩️`     // le Contre rend le coup
+                    : e.renvoi ? `-${montant}`
                     : e.critique ? `-${montant} !`
                     : e.tenebres ? `-${montant} 🌑`   // le surplus de Ténèbres, ×1,5
                     : `-${montant}`;
@@ -356,7 +369,7 @@ const SCENES = {
         const sorte = e.absorption ? "absorption" : e.tic === "Soin étalé" ? "soin-tic" : e.drain ? null : "soin";
         return { geste: "jauge", pion: e.cible, champ: "pv",
                  de: nombre(c.pv), vers: nombre(e.pvApres, c.pv), max: nombre(c.pvMax),
-                 texte: `+${Math.max(0, montant)}${e.drain ? " 🩸" : ""}`,
+                 texte: `+${Math.max(0, montant)}${e.drain ? " 🩸" : ""}${e.critique ? " !" : ""}`,
                  couleurTexte: COULEURS.soin, couleurBarre: COULEURS.soin,
                  duree: RYTHME.jauge,
                  ...(sorte ? { reaction: { sorte, pion: e.cible, depuis: e.acteur && e.acteur !== e.cible ? e.acteur : null } } : {}) };

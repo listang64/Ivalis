@@ -467,11 +467,14 @@ window.choisirCarteMonstre = function(monstre, exclure) {
     return meilleure;
 };
 
-// LA SECONDE COMPÉTENCE D'UN BOSS : null pour tout autre palier, pour une
-// première carte qui est un repos, ou quand il ne lui reste pas de quoi payer
-// une autre carte que la première.
+// LA SECONDE COMPÉTENCE D'UNE CRÉATURE À DEUX ACTIONS (le « Nombre d'action »
+// du tableau des monstres — un Boss, par défaut) : null pour les autres, pour
+// une première carte qui est un repos, ou quand il ne lui reste pas de quoi
+// payer une autre carte que la première.
 window.secondeCarteBoss = function(monstre, premiere) {
-    if (!monstre || (monstre.Palier || monstre.palier) !== "Boss") return null;
+    if (!monstre) return null;
+    const actions = parseInt(monstre.Nombre_Actions) || 0;
+    if (!(actions > 0 ? actions >= 2 : (monstre.Palier || monstre.palier) === "Boss")) return null;
     if (!premiere || premiere.repos || !premiere.data) return null;
     const fatigue = parseInt(monstre.fatigueActuelle);
     const reste = (isNaN(fatigue) ? 0 : fatigue) - (parseInt(premiere.data.Fatigue) || 0);

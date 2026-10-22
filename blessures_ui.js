@@ -93,13 +93,22 @@ window.cloturerCombat = async function (issue) {
         };
     });
 
+    // LA DÉFAITE RAPPORTE L'XP DES CRÉATURES ABATTUES (Nico, v251 : « en cas
+    // de défaite, gain d'XP des monstres vaincus »). La victoire la donne avec
+    // le butin (demarrerButin, loot.js) ; une défaite n'a pas de butin, elle la
+    // donne ici — la même somme, celle des créatures tombées (xpDeLaVictoire),
+    // une fois, par le poste qui écrit la fin du combat.
+    const xpDefaite = issue === "defaite" && typeof window.xpDeLaVictoire === "function"
+        ? Math.max(0, Math.round(Number(window.xpDeLaVictoire()) || 0)) : 0;
+
     const fin = {
         id: "fin_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
         idRencontre,
         issue: issue === "defaite" ? "defaite" : "victoire",
         ts: Date.now(),
         participants: heros.map(p => p.idPersonnage),
-        blessures
+        blessures,
+        ...(xpDefaite > 0 ? { xp: xpDefaite } : {})
     };
 
     const gagne = await window.modifierPartie((data) => {
@@ -111,6 +120,13 @@ window.cloturerCombat = async function (issue) {
     });
     if (!gagne) { CLOTURES.delete(idRencontre); return null; }
     if (window.PARTIE_DATA) window.PARTIE_DATA.Fin_Combat = fin;
+
+    // L'XP de la défaite, à chaque héros du combat (tombés compris : ils ont
+    // combattu). Un incrément : rien ne s'écrase (distribuerXP, loot.js).
+    if (fin.xp > 0 && typeof window.distribuerXP === "function") {
+        try { await window.distribuerXP(fin.participants, fin.xp); }
+        catch (e) { console.error("XP de la défaite :", e); }
+    }
 
     // LE GAGNANT ÉCRIT LES FICHES. Chaque héros du combat : ses anciennes
     // blessures « combats » décomptées, puis les nouvelles s'il est tombé.
@@ -325,6 +341,7 @@ async function derouler(fin) {
         <div class="fin-combat-ornement">✦ ✦ ✦</div>
         <div class="fin-combat-mot">${victoire ? "Victoire" : "Défaite"}</div>
         <div class="fin-combat-sous">${victoire ? "Les ennemis sont tombés" : "Vos héros sont tombés"}</div>
+        ${!victoire && Number(fin.xp) > 0 ? `<div class="fin-combat-xp">✨ +${Number(fin.xp).toLocaleString("fr-FR")} XP pour chaque héros</div>` : ""}
     </div>`;
     if (typeof window.jouerSonEvenement === "function") window.jouerSonEvenement(victoire ? "victoire" : "defaite");
 
