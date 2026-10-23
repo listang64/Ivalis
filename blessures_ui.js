@@ -50,6 +50,7 @@ function appliquerLocalement(id, maj) {
         }
         if (maj.PV_Actuels !== undefined) p.PV_Actuels = maj.PV_Actuels;
         if (maj.Fatigue_Actuelle !== undefined) p.fatigueActuelle = maj.Fatigue_Actuelle;
+        if (maj.Signes_Distinctif !== undefined) p.signes = maj.Signes_Distinctif;
     }));
     const fiche = window.BLESSURES_FICHE;
     if (fiche && fiche.idPersonnage === id) {
@@ -158,11 +159,32 @@ window.cloturerCombat = async function (issue) {
         const fatigueMax = typeof window.fatigueMaxCombattant === "function" ? window.fatigueMaxCombattant(apres) : 0;
         const fatigue = p.fatigueActuelle !== undefined ? p.fatigueActuelle : p.Fatigue_Actuelle;
         if (fatigueMax > 0 && fatigue !== undefined && (parseInt(fatigue) || 0) > fatigueMax) maj.Fatigue_Actuelle = fatigueMax;
+        // UNE BLESSURE QUI SE VOIT POUR TOUJOURS (v256) : elle rejoint la
+        // description du héros (Signes_Distinctif), dans la même écriture, et
+        // son portrait est redessiné avec elle (dessinerBlessuresSurAvatar,
+        // objets_ia.js) — seulement pour une blessure qu'il n'avait pas déjà.
+        const visibles = nouvellesBlessuresVisibles(p, t);
+        if (visibles.length > 0 && typeof window.signesAvecBlessures === "function") {
+            maj.Signes_Distinctif = window.signesAvecBlessures(p.signes, visibles);
+        }
         try { await ecrireFiche(p.idPersonnage, maj); }
-        catch (e) { console.error(`Blessures de ${p.idPersonnage} :`, e); }
+        catch (e) { console.error(`Blessures de ${p.idPersonnage} :`, e); continue; }
+        if (visibles.length > 0 && !maj.Mort_Definitive && typeof window.dessinerBlessuresSurAvatar === "function") {
+            Promise.resolve(window.dessinerBlessuresSurAvatar(p.idPersonnage, visibles))
+                .catch(e => console.error(`Portrait blessé de ${p.idPersonnage} :`, e));
+        }
     }
     return fin;
 };
+
+// Les blessures VISIBLES que ce tirage vient de donner, et que le héros ne
+// portait pas encore (une seconde Coupure fine ne redessine rien).
+function nouvellesBlessuresVisibles(p, tirage) {
+    if (!tirage || !Array.isArray(tirage.tirages) || typeof window.estBlessureVisible !== "function") return [];
+    const deja = new Set(window.blessuresDuPerso(p).map(b => b.id));
+    return [...new Set(tirage.tirages.map(x => x.id))].filter(id => window.estBlessureVisible(id) && !deja.has(id));
+}
+window.nouvellesBlessuresVisibles = nouvellesBlessuresVisibles;
 
 // =========================================================================
 //  2. LA DÉFAITE : TOUS LES HÉROS À TERRE
@@ -262,7 +284,12 @@ window.retirerBlessureDev = async function (uid) {
     if (!inst) return false;
     const b = window.blessureParId(inst.id) || {};
     if (!confirm(`Retirer « ${b.nom || inst.id} » de ${nomHeros(fiche)} ?`)) return false;
-    return ecrireBlessuresDev(fiche, { Blessures: liste.filter(x => x.uid !== uid) }, "Blessure retirée");
+    const maj = { Blessures: liste.filter(x => x.uid !== uid) };
+    // Sa marque quitte aussi la description (v256), si plus rien ne la porte.
+    if (b.visible && !maj.Blessures.some(x => x.id === inst.id) && typeof window.signesSansBlessure === "function") {
+        maj.Signes_Distinctif = window.signesSansBlessure(fiche.signes, inst.id);
+    }
+    return ecrireBlessuresDev(fiche, maj, "Blessure retirée");
 };
 // Toutes d'un coup — et un héros mort de ses blessures se relève avec.
 window.retirerToutesBlessuresDev = async function () {
@@ -275,6 +302,10 @@ window.retirerToutesBlessuresDev = async function () {
     if (!confirm(`Retirer ${liste.length ? `les ${quoi}` : "la mort"} de ${nomHeros(fiche)}${mort && liste.length ? " et le relever" : ""} ?`)) return false;
     const maj = { Blessures: [] };
     if (mort) { maj.Mort_Definitive = false; maj.Statut = "Vivant"; }
+    if (typeof window.signesSansBlessure === "function") {
+        const signes = liste.reduce((txt, x) => window.signesSansBlessure(txt, x.id), fiche.signes || "");
+        if (signes !== (fiche.signes || "")) maj.Signes_Distinctif = signes;
+    }
     return ecrireBlessuresDev(fiche, maj, mort ? "Blessures retirées — le héros se relève" : "Blessures retirées");
 };
 

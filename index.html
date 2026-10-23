@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=88">
+  <link rel="stylesheet" href="style.css?v=89">
 
  
   <!-- ===================================================================== -->
@@ -475,7 +475,27 @@
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/param%C3%A8tres_gttwna.png" class="icone-menu" alt="Paramètres" onclick="jouerSonClic(); ouvrirParametres()">
       </div>
 
+      <!-- LA FLÈCHE QUI RANGE LE MENU (v256) : les boutons remontent hors de
+           l'écran, le petit bouton du coin haut droit les fait redescendre
+           (replierMenuLateral / deplierMenuLateral, app.js). -->
+      <div class="conteneur-fleche-menu">
+        <button type="button" id="btn-replier-menu" class="btn-replier-menu" title="Ranger le menu"
+                aria-label="Ranger le menu" onclick="window.replierMenuLateral()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15.5 L12 8.5 L19 15.5"/></svg>
+        </button>
+      </div>
+
     </div>
+
+    <!-- Le menu rangé : le même bouton que dans la page de narration, en plus
+         petit, dans le coin haut droit. Il ne se montre que menu rangé. -->
+    <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783264616/A39F53B8-528E-4052-92AD-E9EDC3F700EB_lbr2mo.png"
+         id="btn-rouvrir-menu"
+         class="btn-rouvrir-menu"
+         alt="Afficher le menu"
+         title="Afficher le menu"
+         style="display: none;"
+         onclick="window.deplierMenuLateral()">
 
     <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783264616/A39F53B8-528E-4052-92AD-E9EDC3F700EB_lbr2mo.png"
          id="btn-fermer-chat-nouveau"
@@ -2083,7 +2103,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=166"></script>
+<script src="trace_combat.js?v=167"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2136,25 +2156,27 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=50"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=115"></script>
+<script type="module" src="app.js?v=116"></script>
 <script src="jet_d20.js?v=2"></script>
-<script src="fabrique_sons.js?v=15"></script>
+<script src="fabrique_sons.js?v=16"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->
 <script src="animations_combat.js?v=11"></script>
 <script src="animations_catalogue.js?v=19"></script>
 <!-- …et leur branchement sur le vrai combat (les animations validées dans le Studio). -->
 <script src="animations_jeu.js?v=9"></script>
 <script src="experience.js?v=1"></script>
+<!-- La montée de niveau (v256) : la popup du héros qui prend un niveau. -->
+<script src="montee_niveau.js?v=1"></script>
 <!-- Les talents : les règles (script simple), puis leur fenêtre. -->
 <script src="talents.js?v=4"></script>
 <!-- Les blessures : la table et ses règles (script simple), puis l'écran. -->
-<script src="blessures.js?v=1"></script>
+<script src="blessures.js?v=2"></script>
 <script type="module" src="creation_personnage.js?v=25"></script>
 <script type="module" src="classes.js?v=25"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=65"></script>
 <script type="module" src="talents_ui.js?v=1"></script>
-<script type="module" src="blessures_ui.js?v=4"></script>
+<script type="module" src="blessures_ui.js?v=5"></script>
 <!-- Les zones procédurales : le givre (v243), le brasier (v244), le poison et la foudre (v245), au Studio puis en jeu (v246) ; les gravats (v247) et les chausse-trappes (v248), au Studio puis en jeu (v249) ; la lumière du soin (v250), au Studio. -->
 <script src="zones_procedurales.js?v=6"></script>
 <script type="module" src="studio_animation.js?v=13"></script>
@@ -2179,7 +2201,7 @@
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=18"></script>
 <script src="variations_tenues.js?v=2"></script>
-<script type="module" src="objets_ia.js?v=15"></script>
+<script type="module" src="objets_ia.js?v=16"></script>
 <script type="module" src="loot.js?v=28"></script>
 
 <!-- ============================================================= -->

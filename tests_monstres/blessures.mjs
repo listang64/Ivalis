@@ -561,7 +561,8 @@ console.log("\n12. LE GONG");
     return { debut: rms(0, 0.5), tard: rms(2.5, 3), tout: Object.keys(window.SONS_EVENEMENTS).join(), dix: window.SONS_FABRIQUE.length };
   });
   verifier("un gong qui résonne : fort au départ, encore audible à 2,5 s", r.debut > 0.02 && r.tard > 0.002 && r.tard < r.debut, `${r.debut.toFixed(3)} → ${r.tard.toFixed(4)}`);
-  verifier("à part des dix clics de la Fabrique (victoire, défaite, gong)", r.tout === "gong-blessure,victoire,defaite" && r.dix === 10);
+  // (v256 : la trompette de la montée de niveau rejoint les sons d'événement.)
+  verifier("à part des dix clics de la Fabrique (victoire, défaite, gong, trompette)", r.tout === "gong-blessure,victoire,trompette-niveau,defaite" && r.dix === 10, r.tout);
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

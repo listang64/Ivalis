@@ -563,11 +563,34 @@ body {
   justify-content: flex-end;
 }
 
+/* LA FLÈCHE QUI RANGE LE MENU (v256) : centrée sous les icônes, beige comme
+   les bannières ; le menu rangé reste dans la page mais ne se voit ni ne se
+   touche plus. Le petit bouton du coin haut droit le fait revenir. */
+#menu-lateral.menu-replie { visibility: hidden; pointer-events: none; }
+.conteneur-fleche-menu { width: 20vw; max-width: 160px; display: flex; justify-content: center; margin-top: -6px; }
+.btn-replier-menu {
+  width: 40px; height: 40px; padding: 0; border: none; border-radius: 50%; background: transparent; cursor: pointer;
+  filter: drop-shadow(-3px 4px 4px rgba(0, 0, 0, 0.75));
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+.btn-replier-menu svg { display: block; width: 100%; height: 100%; fill: none; stroke: #e8d5a5; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
+.btn-replier-menu:hover { transform: translateY(-3px); filter: drop-shadow(-3px 4px 4px rgba(0, 0, 0, 0.75)) brightness(1.15); }
+.btn-replier-menu:focus-visible { outline: 2px solid #e8d5a5; outline-offset: 2px; }
+.btn-rouvrir-menu {
+  position: fixed; top: calc(env(safe-area-inset-top, 0px) + 2vh); right: calc(env(safe-area-inset-right, 0px) + 1.2vw);
+  width: 2.8vw; min-width: 34px; max-width: 54px; height: auto; z-index: 10004; cursor: pointer;
+  filter: drop-shadow(-4px 4px 6px rgba(0, 0, 0, 0.7));
+  transition: transform 0.2s ease;
+}
+.btn-rouvrir-menu:hover { transform: scale(1.08); }
+
 /* =========================================
    ADAPTATION SPECIALE IPAD / TACTILE (Taille encore augmentée !)
    ========================================= */
 @media (hover: none) and (pointer: coarse) {
   #menu-lateral { gap: 25px; right: 30px; top: 30px; }
+  .conteneur-fleche-menu { width: 25vw; max-width: 160px; min-width: 110px; }
+  .btn-replier-menu { width: 46px; height: 46px; }
   
   .icone-menu { 
      width: 25vw; /* Encore plus gros (+0.5x) */
@@ -5148,3 +5171,48 @@ textarea.input-texte-parchemin {
 .btn-hud-lecture-auto .lecture-auto-signe { color: #e8c766; font-size: 13px; line-height: 1; }
 .btn-hud-lecture-auto.active { border-color: #ff4c4c; box-shadow: 0 0 8px rgba(255, 76, 76, 0.55); }
 
+
+/* =========================================
+   LA MONTÉE DE NIVEAU (v256, montee_niveau.js) : l'avatar dans son cadre
+   d'or, la jauge d'XP qui va au bout, le chiffre romain qui grossit.
+   ========================================= */
+.voile-niveau {
+  position: fixed; inset: 0; z-index: 21500; display: none; align-items: center; justify-content: center; padding: 16px;
+  box-sizing: border-box; background: radial-gradient(ellipse at center, rgba(52, 36, 12, 0.8), rgba(6, 4, 1, 0.94));
+  animation: fin-combat-voile .45s ease both;
+}
+.voile-niveau.se-ferme { animation: fin-combat-voile-sort .35s ease both; }
+.carte-niveau {
+  width: min(420px, 100%); max-height: 100%; overflow-y: auto; box-sizing: border-box; text-align: center;
+  padding: 22px 24px 20px; border-radius: 14px; color: #e8d5a5;
+  background: linear-gradient(180deg, #23170c, #140c06); border: 2px solid #8a6a2a;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85), inset 0 0 0 1px #c9a24a, inset 0 0 70px rgba(201, 162, 74, 0.12);
+  opacity: 0; transform: translateY(16px) scale(.97); transition: opacity .5s ease, transform .5s ease;
+}
+.carte-niveau.visible { opacity: 1; transform: none; }
+.niveau-titre { font-family: 'Cinzel', serif; font-weight: bold; font-size: clamp(20px, 4.6vw, 26px); letter-spacing: .12em; text-transform: uppercase;
+  background: linear-gradient(180deg, #fff1c4, #e2b84f 55%, #a8741e); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.7)); }
+.niveau-portrait { width: 168px; height: 210px; margin: 14px auto 8px; border-radius: 10px; overflow: hidden;
+  border: 2px solid #c9a24a; box-shadow: 0 0 0 4px rgba(201, 162, 74, 0.18), 0 10px 24px rgba(0, 0, 0, 0.7);
+  background: radial-gradient(ellipse at 50% 30%, #4a3418, #1a1008); }
+.niveau-portrait img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; display: block; }
+.niveau-nom { font-family: 'Cinzel', serif; font-size: 19px; color: #f3dfa6; letter-spacing: .05em; }
+.niveau-medaillon { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin: 10px 0 12px; }
+.niveau-mot { font-family: 'Cinzel', serif; font-size: 15px; color: #b8a27a; letter-spacing: .1em; text-transform: uppercase; }
+.niveau-romain { display: inline-block; min-width: 1.4em; font-family: 'Cinzel', serif; font-weight: bold; font-size: 40px; line-height: 1;
+  color: #f3d27a; text-shadow: 0 0 16px rgba(226, 184, 79, 0.55), 0 3px 2px #000; transform-origin: 50% 60%; }
+.carte-niveau.plein .niveau-romain { text-shadow: 0 0 28px rgba(255, 220, 120, 0.95), 0 3px 2px #000; }
+.niveau-jauge { position: relative; height: 16px; border-radius: 9px; overflow: hidden; background: #0d0804;
+  border: 1px solid #8a6a2a; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8); }
+.niveau-jauge-remplie { height: 100%; width: 0; border-radius: 9px;
+  background: linear-gradient(180deg, #ffe7a3, #e2b84f 45%, #a8741e); box-shadow: 0 0 12px rgba(226, 184, 79, 0.6); }
+.carte-niveau.plein .niveau-jauge-remplie { box-shadow: 0 0 22px rgba(255, 225, 140, 0.95); }
+.niveau-xp { margin-top: 6px; font-size: 13px; color: #b8a27a; font-variant-numeric: tabular-nums; }
+.niveau-gains { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 4px; font-size: 15px; color: #f3dfa6; }
+.niveau-gains li { animation: niveau-gain .5s ease both; }
+@keyframes niveau-gain { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.niveau-continuer { margin-top: 16px; padding: 10px 26px; border-radius: 8px; cursor: pointer; font-family: 'Cinzel', serif; font-size: 15px;
+  color: #1d120b; background: linear-gradient(180deg, #f3dfa6, #c9a24a); border: 1px solid #8a6a2a; opacity: 0; transition: opacity .4s ease; }
+.niveau-continuer.visible { opacity: 1; }
+.niveau-continuer:focus-visible { outline: 2px solid #f3dfa6; outline-offset: 3px; }

@@ -608,10 +608,14 @@ window.PROMPT_AVATAR_ARMURE =
 // (`casquePorte`, loot.js) qui dit s'il le porte. S'il a choisi de ne pas le
 // porter (ou pour l'armure de départ), le prompt exige un portrait SANS
 // couvre-chef — même si l'image de l'armure en montre un.
-window.promptAvatarArmure = function(armure) {
+// LES BLESSURES QUI SE VOIENT (v256) : le portrait de référence est d'avant
+// elles ; le prompt les rappelle à chaque rhabillage, sinon elles
+// disparaîtraient avec l'armure d'avant (promptBlessuresVisibles, blessures.js).
+window.promptAvatarArmure = function(armure, perso) {
     const avec = !!(armure && armure.casquePorte === true);
     const nom = avec && armure.casque && armure.casque.nom ? ` (${armure.casque.nom})` : "";
-    return window.PROMPT_AVATAR_ARMURE + "\n\n" + (avec
+    const blessures = (perso && typeof window.promptBlessuresVisibles === "function") ? window.promptBlessuresVisibles(perso) : "";
+    return window.PROMPT_AVATAR_ARMURE + (blessures ? "\n\n" + blessures : "") + "\n\n" + (avec
         ? `COUVRE-CHEF : le personnage PORTE sur la tête le couvre-chef posé avec l'armure dans la seconde image${nom} `
           + "(casque, chapeau, bandeau ou coiffe). S'il couvre le visage, il est relevé sur le front : le visage reste "
           + "entièrement visible et reconnaissable."
@@ -639,7 +643,7 @@ async function dessinerAvatarHabille(blobPersonnage, blobArmure, cles, prompt) {
             // L'ordre compte : le personnage EN PREMIER. C'est sur lui que
             // portent les retouches, l'armure n'est qu'une référence de style.
             form.append("image[]", blobPersonnage, "personnage.png");
-            form.append("image[]", blobArmure, "armure.png");
+            if (blobArmure) form.append("image[]", blobArmure, "armure.png");
             form.append("n", "1");
             form.append("size", "1024x1536");
             form.append("quality", "medium");
@@ -764,7 +768,7 @@ window.rhabillerAvatar = async function(idPersonnage, armure, urlReference) {
             return "";
         }
 
-        const dessin = await dessinerAvatarHabille(blobPerso, blobArmure, cles, window.promptAvatarArmure(armure));
+        const dessin = await dessinerAvatarHabille(blobPerso, blobArmure, cles, window.promptAvatarArmure(armure, perso));
         if (!dessin) return "";
 
         const url = await hebergerAvatarDetoure(dessin, cles);
@@ -775,6 +779,71 @@ window.rhabillerAvatar = async function(idPersonnage, armure, urlReference) {
         return url;
     } catch (e) {
         console.error("[Avatar] Rhabillage interrompu :", e);
+        return "";
+    } finally {
+        delete window.AVATARS_EN_COURS[idPersonnage];
+    }
+};
+
+// =========================================================================
+//  LE PORTRAIT QUI GARDE SES BLESSURES (v256)
+// =========================================================================
+//  Une blessure qui marque le corps pour toujours (œil crevé, main perdue,
+//  visage défiguré…) : on redessine l'image ACTUELLE du héros — son armure du
+//  moment comprise — avec cette marque en plus, et rien d'autre. Le résultat
+//  devient son avatar affiché (URL_Avatar_Equipe) ; le portrait de référence
+//  ne bouge pas, et c'est le prompt du prochain rhabillage qui redira les
+//  blessures (promptAvatarArmure). Lancé par le poste qui écrit la fin du
+//  combat (cloturerCombat, blessures_ui.js), une fois.
+window.PROMPT_AVATAR_BLESSURE =
+    "Une image de référence t'est fournie : c'est le personnage. Redessine-le À L'IDENTIQUE : même visage, même "
+  + "silhouette, même race, même couleur de peau, même coiffure, même tenue et même armure, même pose, même cadrage. "
+  + "C'est la même personne, au même instant, avec UNE SEULE différence : les marques décrites ci-dessous, désormais "
+  + "gravées dans sa chair. Elles sont anciennes et cicatrisées — aucune plaie ouverte, aucun sang frais.\n\n"
+  + "Contexte de l'univers : Antique Fantastique (Antiquité magique, mythologie méditerranéenne).\n"
+  + "🛑 RÈGLE TECHNIQUE DÉFINITIVE (PRIORITAIRE SUR TOUT LE RESTE) : "
+  + "Le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). "
+  + "Il est STRICTEMENT INTERDIT de dessiner un décor, un paysage, un intérieur, une ombre au sol ou "
+  + "un dégradé. Remplis tout l'espace autour et derrière le personnage avec du magenta fluo pur. "
+  + "💡 LUMIÈRE : le personnage est éclairé par la lumière naturelle d'un soleil, chaude et franche. "
+  + "Le fond magenta n'est qu'un cache technique, il n'éclaire RIEN : aucun reflet, liseré ou halo violacé, rose ou "
+  + "magenta sur le personnage. Ne dessine aucun texte.";
+
+window.promptAvatarBlessure = function(idsBlessures) {
+    const marques = typeof window.promptBlessuresVisibles === "function" ? window.promptBlessuresVisibles(idsBlessures || []) : "";
+    return marques ? window.PROMPT_AVATAR_BLESSURE + "\n\n" + marques : "";
+};
+
+window.dessinerBlessuresSurAvatar = async function(idPersonnage, idsBlessures) {
+    const ids = (idsBlessures || []).filter(id => typeof window.estBlessureVisible === "function" && window.estBlessureVisible(id));
+    if (!idPersonnage || ids.length === 0) return "";
+    if (window.AVATARS_EN_COURS[idPersonnage]) return "";
+    if (!window.peutIllustrerLesObjets()) {
+        console.warn("[Avatar] Clés d'API absentes : la blessure s'écrit dans la description, sans nouveau portrait.");
+        return "";
+    }
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage)
+        || (window.PERSOS_JOUEURS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    const actuelle = perso && (perso.urlCloudinary || perso.urlAvatarEquipe || perso.urlPortraitReference);
+    const prompt = window.promptAvatarBlessure(ids);
+    if (!actuelle || !prompt) return "";
+
+    window.AVATARS_EN_COURS[idPersonnage] = "blessure";
+    const cles = window.clesApiObjets();
+    const nom = (perso && perso.prenom) || idPersonnage;
+    console.log(`🩸 [Avatar] ${nom} garde la marque de ses blessures...`);
+    try {
+        const blob = await window.imageVersBlobPng(actuelle);
+        if (!blob) { console.error("[Avatar] Portrait actuel illisible."); return ""; }
+        const dessin = await dessinerAvatarHabille(blob, null, cles, prompt);
+        if (!dessin) return "";
+        const url = await hebergerAvatarDetoure(dessin, cles);
+        if (!url) return "";
+        await window.poserAvatarEquipe(idPersonnage, url);
+        console.log(`✅ [Avatar] ${nom} porte désormais ses cicatrices.`);
+        return url;
+    } catch (e) {
+        console.error("[Avatar] Portrait blessé interrompu :", e);
         return "";
     } finally {
         delete window.AVATARS_EN_COURS[idPersonnage];

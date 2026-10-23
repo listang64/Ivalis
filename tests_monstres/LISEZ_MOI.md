@@ -7183,3 +7183,81 @@ libre ; la barre qui monte, le redessin en route, l'arrivée, le nom et son
 ombre, celui du monstre ; le ciblage du Contre (un anneau, l'allié refusé, soi,
 Soin + Contre) ; le tableau des réglages en %. Il mord sur l'ancien code
 (24 échecs).
+
+## v256 — Le menu qui se range ; la montée de niveau ; les blessures qui se voient
+
+Nico : « sous les boutons du menu, fais une petite flèche beige pour remonter en
+animation tous les boutons vers le haut ; s'affiche alors le même bouton que
+dans la page chatbox, en plus petit, dans le coin haut droit ; si on clique
+dessus, ça rouvre le menu » ; « quand un personnage monte de niveau, fais une
+popup avec l'avatar, et en dessous l'animation de la jauge d'XP qui arrive au
+bout avec un bruit de trompette, et le niveau I qui change en grossissant pour
+le niveau II, etc. » ; « blessures visibles : quand une blessure peut se voir
+sur le long terme et reste dans la chair, refais une image du personnage actuel
+avec cette blessure, et rajoute-la dans sa description, car l'IA se base sur le
+perso de référence : la blessure va disparaître si on change d'armure ; ne le
+fais que pour les blessures qui restent ».
+
+- LE MENU QUI SE RANGE (index.html, app.js, style.css). Sous Paramètres, une
+  petite flèche beige (#btn-replier-menu, centrée sous les icônes). Touchée,
+  les boutons s'envolent un à un hors de l'écran, ceux du bas d'abord
+  (replierMenuLateral) ; le menu rangé reste dans la page, invisible et
+  intouchable (classe menu-replie). Dans le coin haut droit apparaît alors le
+  bouton de la page de narration, en plus petit (#btn-rouvrir-menu) : touché,
+  les boutons redescendent, le premier en tête (deplierMenuLateral). Les
+  fenêtres qui cachent ou montrent le menu (narration, combat, monstres…)
+  n'ont rien à savoir : un observateur sur le menu tient le petit bouton à jour
+  (affiché seulement menu rangé ET menu affiché). « Afficher l'interface » de
+  la narration ramène un menu rangé. Le choix reste sur le poste
+  (localStorage, ivalis_MENU_REPLIE) ; mouvement réduit : sans animation.
+- LA MONTÉE DE NIVEAU (montee_niveau.js, nouveau ; fabrique_sons.js). Chaque
+  lecture des fiches (ecouterPersonnagesDeLaPartie) passe par
+  surveillerMonteesDeNiveau : un héros de CE joueur qui a pris un niveau depuis
+  la dernière fois (niveau retenu sur le poste, ivalis_NIVEAU_VU_<id>) ouvre
+  sa popup — l'XP arrive par la base, quel que soit le poste qui l'a écrite
+  (butin, défaite, ▲ du DEV). Au premier passage, le niveau est retenu sans
+  fête ; un niveau perdu (DEV ▼) se retient en silence ; jamais deux fois.
+  La popup : l'avatar dans un cadre d'or, le nom, « Niveau I » ; la jauge part
+  de l'XP déjà gagnée et glisse jusqu'au bout ; la trompette sonne
+  (« trompette-niveau » : trois brèves qui montent puis la tenue, en cuivre) ;
+  le chiffre romain change en grossissant ; ce que le niveau apporte s'inscrit
+  dessous. Deux niveaux d'un coup : deux fois. Puis la jauge prend l'XP du
+  nouveau niveau, et « Continuer ». Si la fin d'un combat ou le butin occupe
+  l'écran, la popup attend qu'ils se ferment.
+- LES BLESSURES QUI SE VOIENT (blessures.js, blessures_ui.js, objets_ia.js).
+  Huit blessures définitives marquent le corps et portent `visible`, la phrase
+  du dessinateur : Coupure fine, Mâchoire fracassée, Amputation de doigt(s),
+  Œil borgne, Défiguration, Amputation d'une main, Amputation du bras entier,
+  Mutilation multiple. Pas ce qui guérit (lèvre fendue, coup au visage,
+  brûlures soignées), pas ce qui reste sous la peau (tympan, poumon, organe,
+  colonne), pas le pied amputé (le portrait est coupé aux genoux).
+  - À LA FIN D'UN COMBAT PERDU (cloturerCombat), une blessure visible que le
+    héros n'avait pas rejoint sa description (Signes_Distinctif,
+    signesAvecBlessures : « Œil borgne : un œil crevé, laiteux et aveugle… »),
+    dans la même écriture que la blessure, une seule fois.
+  - SON PORTRAIT EST REDESSINÉ (dessinerBlessuresSurAvatar) : une seule image
+    envoyée, le héros tel qu'il est (armure comprise), avec un prompt « à
+    l'identique, une seule différence : ces marques, anciennes et
+    cicatrisées », fond magenta détouré comme les autres. Le résultat devient
+    l'avatar affiché (URL_Avatar_Equipe) ; le portrait de référence ne bouge
+    pas. Lancé par le poste qui écrit la fin du combat ; sans clés d'API, la
+    description est quand même écrite.
+  - LE RHABILLAGE S'EN SOUVIENT (promptAvatarArmure) : le portrait de
+    référence est d'avant la blessure ; le prompt de chaque changement
+    d'armure redit les marques du héros (promptBlessuresVisibles).
+  - Retirée par le DEV, une blessure retire aussi sa phrase de la description
+    (signesSansBlessure) ; le portrait, lui, reste tel quel.
+
+corrections_v256.mjs : la table (les huit, toutes définitives, aucune autre),
+la description (ajout, une seule fois, retrait, deux phrases), le passage du
+prompt ; sur le vrai menu, au doigt : la flèche (place, couleur), l'envol, le
+menu rangé, le petit bouton (même image, plus petit, coin haut droit), la
+mémoire, le menu caché par une fenêtre, la redescente, la narration ; la
+popup (premier passage muet, I → III d'un coup, l'avatar, la jauge, le
+chiffre qui grossit, deux trompettes, les gains, la jauge finale, Continuer,
+l'autre joueur, le DEV, l'attente derrière la fin du combat, le son, le
+branchement) ; la fin de combat perdue (description, écran, portrait ; déjà
+borgne ; tympan), le prompt du rhabillage, le retrait DEV ; le portrait blessé
+avec un dessinateur simulé (une image, le prompt, l'avatar posé, rien pour
+une blessure invisible). Il mord sur l'ancien code (39 échecs).
+blessures.mjs (section 12) compte la trompette parmi les sons d'événement.

@@ -293,6 +293,20 @@
                 ding(ctx, s, { freq: f, debut: d, duree: i === 3 ? 1.4 : 0.5, force: 1.1, type: "triangle",
                                partiels: [[1, 1, 1], [2, 0.25, 0.6], [3, 0.1, 0.4]] }));
         },
+        // La montée de niveau (v256) : une sonnerie de trompette — trois brèves
+        // qui montent, puis la tenue, sur l'accord. Deux scies désaccordées
+        // passées dans un filtre : le cuivre plutôt que l'orgue.
+        "trompette-niveau"(ctx, s) {
+            const cuivre = (freq, debut, duree, gain) => {
+                note(ctx, s, { freq, debut, duree, gain, type: "sawtooth", attaque: 0.035, passeBas: 2300, desaccord: -6 });
+                note(ctx, s, { freq, debut, duree, gain: gain * 0.7, type: "sawtooth", attaque: 0.04, passeBas: 2300, desaccord: 7 });
+                note(ctx, s, { freq: freq / 2, debut, duree, gain: gain * 0.35, type: "triangle", attaque: 0.03 });
+            };
+            [[392, 0, 0.17], [523.25, 0.15, 0.17], [659.25, 0.3, 0.2]].forEach(([f, d, du]) => cuivre(f, d, du, 0.11));
+            cuivre(784, 0.48, 1.35, 0.13);
+            cuivre(523.25, 0.5, 1.3, 0.06);
+            cuivre(659.25, 0.5, 1.3, 0.05);
+        },
         // La défaite : deux notes graves qui descendent, étouffées.
         "defaite"(ctx, s) {
             ding(ctx, s, { freq: 220, duree: 1.2, force: 1.3, clic: false, passeBas: 900, type: "triangle" });

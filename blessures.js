@@ -42,6 +42,7 @@
         { min: 1, max: 5, id: "BLE_EGRATIGNURE", nom: "Égratignure", texte: "Une simple éraflure cutanée. Aucun effet mécanique.",
           duree: { instant: true } },
         { min: 6, max: 6, id: "BLE_COUPURE_FINE", nom: "Coupure fine", texte: "Saigne légèrement mais se résorbe vite. Laisse une petite cicatrice sur le visage.",
+          visible: "une fine cicatrice pâle en travers d'une joue",
           duree: { definitif: true }, cosmetique: true },
         { min: 7, max: 7, id: "BLE_LEVRE_FENDUE", nom: "Lèvre fendue", texte: "Articulation douloureuse. Léger malus lors des interactions sociales verbales : −2 aux jets de Charisme pendant 3 jours.",
           duree: { jours: 3 }, effet: () => ({ testsCarac: { cha: -2 } }) },
@@ -97,20 +98,26 @@
         { min: 31, max: 31, id: "BLE_VEINARD", nom: "Veinard", texte: "Tu as eu de la chance : −7 sur ton prochain jet de blessure.",
           duree: { prochainJet: true } },
         { min: 32, max: 32, id: "BLE_MACHOIRE_FRACASSEE", nom: "Mâchoire fracassée", texte: "−5 aux jets de Charisme, définitivement.",
+          visible: "une mâchoire ressoudée de travers, barrée d'une cicatrice",
           duree: { definitif: true }, effet: () => ({ testsCarac: { cha: -5 } }) },
         { min: 33, max: 33, id: "BLE_AMPUTATION_DOIGTS", nom: "Amputation de doigt(s)", texte: "−1 de portée aux attaques à distance, définitivement.",
+          visible: "une main à laquelle il manque deux doigts, moignons cicatrisés",
           duree: { definitif: true }, effet: () => ({ porteeDistance: -1 }) },
         { min: 34, max: 34, id: "BLE_OEIL_BORGNE", nom: "Œil borgne", texte: "Baisse l'esquive de 20 %, définitivement.",
+          visible: "un œil crevé, laiteux et aveugle, traversé d'une cicatrice verticale",
           duree: { definitif: true }, effet: () => ({ esquive: -20 }) },
         { min: 35, max: 35, id: "BLE_DEFIGURATION", nom: "Défiguration", texte: "Cicatrices terrifiantes sur le visage : −7 aux jets de Charisme, définitivement.",
+          visible: "un visage défiguré par de larges cicatrices boursouflées",
           duree: { definitif: true }, effet: () => ({ testsCarac: { cha: -7 } }) },
         { min: 36, max: 36, id: "BLE_LESION_ORGANE", nom: "Lésion d'un organe vital", texte: "Le métabolisme tourne au ralenti : le repos long en combat ne restaure plus que 15 % de fatigue.",
           duree: { definitif: true }, effet: () => ({ reposLongTaux: 15 }) },
         { min: 37, max: 37, id: "BLE_AMPUTATION_MAIN", nom: "Amputation d'une main", texte: "La main est perdue : le port d'équipements à deux mains devient impossible.",
+          visible: "un avant-bras qui s'arrête au poignet, le moignon serré dans un bandage de cuir",
           duree: { definitif: true }, effet: () => ({ interditDeuxMains: true }) },
         { min: 38, max: 38, id: "BLE_AMPUTATION_PIED", nom: "Amputation d'une partie du pied", texte: "Le personnage ne peut plus se déplacer de plus de 3 hexagones par tour, à vie.",
           duree: { definitif: true }, effet: () => ({ maxCasesParTour: 3 }) },
         { min: 39, max: 39, id: "BLE_AMPUTATION_BRAS", nom: "Amputation du bras entier", texte: "Impossible de tenir de l'équipement nécessitant deux mains.",
+          visible: "un bras amputé à l'épaule, la manche vide nouée ou le moignon bandé",
           duree: { definitif: true }, effet: () => ({ interditDeuxMains: true }) },
         { min: 40, max: 40, id: "BLE_CHOC_CARDIAQUE", nom: "Choc cardiaque (Fragilité)", texte: "Le personnage survit par miracle, mais sa jauge de fatigue est réduite de 50 % définitivement, et sa régénération est fixée à 30 de fatigue.",
           duree: { definitif: true }, effet: () => ({ fatigueMaxPct: -50, regenFixe: 30 }) },
@@ -121,6 +128,7 @@
         { min: 43, max: 43, id: "BLE_ESTROPIE_TOTAL", nom: "Estropié total", texte: "Combinaison de plusieurs fractures graves : 5 mois de convalescence absolue, incapable de combattre. Relance un jet de blessure.",
           duree: { jours: 150 }, indisponible: true, relance: 0 },
         { min: 44, max: 44, id: "BLE_MUTILATION_MULTIPLE", nom: "Mutilation multiple", texte: "Son maximum de PV est réduit de 40 % à vie.",
+          visible: "de nombreuses cicatrices profondes et mal refermées sur les bras, le cou et le visage",
           duree: { definitif: true }, effet: () => ({ pvMaxPct: -40 }) },
         { min: 45, max: 45, id: "BLE_AGONIE_SURMONTEE", nom: "Agonie surmontée (Miraculé)", texte: "Le personnage frôle la mort de si près qu'il s'en sort avec une cicatrice interne : toutes ses caractéristiques de base perdent 3 points.",
           duree: { definitif: true }, effet: () => ({ caracs: { force: -3, dex: -3, con: -3, int: -3, sag: -3, cha: -3 } }) },
@@ -280,4 +288,44 @@
         return morceaux.join(" · ");
     };
     window.blessurePermanente = (inst) => !!(inst && inst.definitif);
+
+    // --- CE QUI SE VOIT (v256) ----------------------------------------------
+    //  Nico : « quand une blessure peut se voir sur le long terme et reste dans
+    //  la chair, refais une image du personnage avec cette blessure, et
+    //  rajoute-la dans sa description : l'IA se base sur le perso de référence,
+    //  la blessure disparaîtrait au changement d'armure ». Seules les blessures
+    //  définitives qui marquent le corps portent `visible`, la phrase que lit
+    //  le dessinateur. Pas le pied amputé (le portrait est coupé aux genoux),
+    //  ni ce qui guérit (lèvre fendue, coup au visage, brûlures soignées), ni
+    //  ce qui reste sous la peau (poumon, tympan, organe, colonne).
+    window.estBlessureVisible = (id) => !!((window.blessureParId(id) || {}).visible);
+    const visiblesUniques = (ids) => [...new Set((ids || []).filter(window.estBlessureVisible))].map(window.blessureParId);
+    window.blessuresVisiblesDuPerso = (perso) => visiblesUniques(lireListe(perso).map(e => e.id));
+    // La phrase d'une blessure dans la description du héros.
+    window.signeDeBlessure = (b) => (b && b.visible) ? `${b.nom} : ${b.visible}` : "";
+    // La description (Signes_Distinctif) avec ces blessures en plus — une
+    // seule fois chacune, quoi qu'on rappelle.
+    window.signesAvecBlessures = function (signes, ids) {
+        let texte = String(signes || "").trim();
+        visiblesUniques(ids).forEach(b => {
+            if (texte.includes(b.visible)) return;
+            const phrase = window.signeDeBlessure(b);
+            texte = texte ? `${texte.replace(/[\s.;]+$/, "")}. ${phrase}` : phrase;
+        });
+        return texte;
+    };
+    // …et sans celle-ci (une blessure retirée par le mode DEV).
+    window.signesSansBlessure = function (signes, id) {
+        const b = window.blessureParId(id);
+        const phrase = window.signeDeBlessure(b);
+        if (!phrase) return String(signes || "");
+        return String(signes || "").split(phrase).join("").replace(/\.\s*\.\s*/g, ". ").replace(/^[\s.;]+|[\s.;]+$/g, "").trim();
+    };
+    // Le passage des prompts de l'avatar : les marques à dessiner, cicatrisées.
+    window.promptBlessuresVisibles = function (persoOuIds) {
+        const bs = Array.isArray(persoOuIds) ? visiblesUniques(persoOuIds) : window.blessuresVisiblesDuPerso(persoOuIds);
+        if (bs.length === 0) return "";
+        return "BLESSURES QUI ONT MARQUÉ SON CORPS POUR TOUJOURS (à dessiner, anciennes et cicatrisées, sans sang frais ni "
+            + "bandage ensanglanté) : " + bs.map(b => b.visible).join(" ; ") + ".";
+    };
 })();
