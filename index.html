@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=89">
+  <link rel="stylesheet" href="style.css?v=90">
 
  
   <!-- ===================================================================== -->
@@ -1178,6 +1178,28 @@
     </div>
 
     <div id="menu-navigation-bas">
+      <!-- LES RÉGIONS DE LA CARTE (v257, DEV seulement) : le bouton rouge ouvre
+           la popup d'édition des boîtes cliquables (regions_carte.js). -->
+      <div id="conteneur-regions-dev" class="conteneur-regions-dev" style="display: none;">
+        <button type="button" id="btn-regions-dev" class="btn-regions-dev" title="Régions de la carte (DEV)"
+                aria-label="Régions de la carte (DEV)" onclick="window.basculerPopupRegions()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7 L13.5 4 L19.5 10.5 L15 19.5 L5 17 Z"/>
+            <rect x="2.6" y="5.1" width="3.8" height="3.8"/><rect x="11.6" y="2.1" width="3.8" height="3.8"/>
+            <rect x="17.6" y="8.6" width="3.8" height="3.8"/><rect x="13.1" y="17.6" width="3.8" height="3.8"/><rect x="3.1" y="15.1" width="3.8" height="3.8"/></svg>
+        </button>
+        <div id="popup-regions-dev" class="popup-regions-dev" style="display: none;">
+          <div class="popup-regions-tete">
+            <span>Régions de la carte</span>
+            <button type="button" class="popup-regions-fermer" title="Fermer" aria-label="Fermer" onclick="window.basculerPopupRegions(false)">✕</button>
+          </div>
+          <label class="popup-regions-case"><input type="checkbox" id="case-regions-visibles" onchange="window.afficherRegionsDev(this.checked)"> Afficher les boîtes</label>
+          <button type="button" id="btn-regions-nouvelle" class="popup-regions-bouton" onclick="jouerSonClic(); window.creerRegion()">+ Nouvelle boîte</button>
+          <div id="regions-dev-selection" class="popup-regions-info">Aucune boîte sélectionnée</div>
+          <button type="button" id="btn-regions-supprimer" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.supprimerRegion()" disabled>Supprimer cette boîte</button>
+          <div id="regions-dev-total" class="popup-regions-total"></div>
+          <p class="popup-regions-aide">Boîtes affichées, un clic ne déclenche rien : on édite. Clic maintenu sur une boîte : la déplacer. Carré d'un coin : l'étirer. Clic sur un bord : un nouveau point, à étirer. Double-clic sur un point : le retirer.</p>
+        </div>
+      </div>
       <div class="conteneur-volume-nav">
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/volume_c53qqq.png" class="icone-nav" alt="Volume" onclick="jouerSonClic(); toggleBulleVolume(event)">
         <div id="bulle-volume">
@@ -2103,7 +2125,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=167"></script>
+<script src="trace_combat.js?v=168"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2156,7 +2178,9 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=50"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=116"></script>
+<script type="module" src="app.js?v=117"></script>
+<!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
+<script type="module" src="regions_carte.js?v=1"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=16"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->

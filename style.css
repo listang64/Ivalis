@@ -5216,3 +5216,48 @@ textarea.input-texte-parchemin {
   color: #1d120b; background: linear-gradient(180deg, #f3dfa6, #c9a24a); border: 1px solid #8a6a2a; opacity: 0; transition: opacity .4s ease; }
 .niveau-continuer.visible { opacity: 1; }
 .niveau-continuer:focus-visible { outline: 2px solid #f3dfa6; outline-offset: 3px; }
+
+/* =========================================
+   LES RÉGIONS DE LA CARTE (v257, regions_carte.js) : des polygones en
+   coordonnées de la carte (le calque suit son glissement). En jeu, invisibles,
+   et transparents au doigt sauf ceux qui ont une action ; en édition (DEV +
+   « Afficher les boîtes »), rouges, numérotés, avec leurs poignées.
+   ========================================= */
+#calque-regions { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; overflow: visible; }
+#calque-regions.edition { z-index: 60; }
+.region-forme { fill: transparent; stroke: none; pointer-events: none; }
+.region.active .region-forme { pointer-events: fill; cursor: pointer; }
+#calque-regions.edition .region-forme { fill: rgba(196, 28, 28, 0.2); stroke: #c41c1c; stroke-width: 2px; vector-effect: non-scaling-stroke;
+  pointer-events: fill; cursor: move; }
+#calque-regions.edition .region.selectionnee .region-forme { fill: rgba(232, 180, 40, 0.24); stroke: #f3d27a; stroke-width: 3px; }
+.region-bord { stroke: transparent; stroke-width: 18px; vector-effect: non-scaling-stroke; pointer-events: stroke; cursor: copy; }
+.region-bord:hover { stroke: rgba(255, 255, 255, 0.35); }
+.region-poignee { fill: #fff; stroke: #c41c1c; stroke-width: 2px; vector-effect: non-scaling-stroke; pointer-events: all; cursor: crosshair; }
+.region.selectionnee .region-poignee { stroke: #a8741e; }
+.region-numero { fill: #fff; stroke: #3a0d08; paint-order: stroke; font-family: 'Cinzel', serif; font-weight: bold; pointer-events: none; }
+
+/* Le bouton rouge (DEV), avec les boutons du bas à droite, et sa popup. */
+.conteneur-regions-dev { display: flex; align-items: center; }
+.btn-regions-dev { width: 40px; height: 40px; padding: 7px; border-radius: 50%; cursor: pointer; border: 2px solid #f3d27a;
+  background: radial-gradient(circle at 35% 30%, #e0473c, #a01212 60%, #6d0808); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+  transition: transform 0.15s ease, filter 0.15s ease; }
+.btn-regions-dev:hover { transform: scale(1.06); filter: brightness(1.12); }
+.btn-regions-dev:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.btn-regions-dev svg { display: block; width: 100%; height: 100%; }
+.btn-regions-dev svg path { fill: rgba(255, 255, 255, 0.18); stroke: #fff; stroke-width: 1.6; stroke-linejoin: round; }
+.btn-regions-dev svg rect { fill: #fff; }
+.popup-regions-dev { position: absolute; right: 0; bottom: calc(100% + 12px); width: 270px; box-sizing: border-box; padding: 12px 14px 12px;
+  border-radius: 10px; color: #2a1a0f; background: #f3e2b8; border: 2px solid #8a6a2a; box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
+  font-family: Georgia, serif; font-size: 14px; z-index: 10; }
+.popup-regions-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px;
+  font-family: 'Cinzel', serif; font-weight: bold; font-size: 15px; color: #7a0d0d; }
+.popup-regions-fermer { border: none; background: transparent; font-size: 16px; color: #5c3a21; cursor: pointer; padding: 2px 6px; }
+.popup-regions-case { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; cursor: pointer; }
+.popup-regions-case input { width: 18px; height: 18px; accent-color: #a01212; }
+.popup-regions-bouton { display: block; width: 100%; padding: 8px 10px; margin-bottom: 8px; border-radius: 6px; cursor: pointer;
+  font-family: 'Cinzel', serif; font-weight: bold; font-size: 13px; color: #fff; background: #a01212; border: 1px solid #6d0808; }
+.popup-regions-bouton.secondaire { color: #7a0d0d; background: transparent; border-color: #a01212; }
+.popup-regions-bouton:disabled { opacity: 0.4; cursor: not-allowed; }
+.popup-regions-info { font-weight: bold; margin: 2px 0 6px; color: #5c3a21; }
+.popup-regions-total { font-size: 12.5px; color: #7d5f40; margin-bottom: 6px; }
+.popup-regions-aide { margin: 6px 0 0; font-size: 12px; line-height: 1.4; color: #5c3a21; font-style: italic; }

@@ -7261,3 +7261,73 @@ borgne ; tympan), le prompt du rhabillage, le retrait DEV ; le portrait blessé
 avec un dessinateur simulé (une image, le prompt, l'avatar posé, rien pour
 une blessure invisible). Il mord sur l'ancien code (39 échecs).
 blessures.mjs (section 12) compte la trompette parmi les sons d'événement.
+
+## v257 — Les régions de la carte du monde (éditeur DEV)
+
+Nico : « sur la page principale de jeu, une fois la partie chargée, un bouton
+rouge qui n'apparaît que quand DEV est activé, avec les boutons en bas à droite.
+Il ouvre une petite popup au-dessus, qui reste à l'écran tant qu'on ne la ferme
+pas. Dedans, une case pour afficher ou masquer les boîtes, un bouton pour créer
+une nouvelle boîte. Ces boîtes sont des zones cliquables attachées à la map en
+fond d'écran, avec chacune un numéro unique, que je puisse te dire quoi faire
+quand on clique sur telle ou telle boîte. En mode DEV, boîtes apparentes, le
+clic ne se fait pas : on est en mode édition. Clic maintenu et on bouge : la
+boîte se déplace. Un petit carré dans chaque coin qu'on peut étirer ou
+rétracter. Un clic sur un bord crée un nouveau point qu'on peut étirer, pour
+une forme sur mesure. Le numéro affiché dans la boîte. Ce seront les régions
+du jeu. »
+
+- LE BOUTON ROUGE (index.html, #btn-regions-dev ; regions_carte.js, nouveau).
+  Rond, rouge, une petite forme à poignées blanche dessus, le premier des
+  boutons du bas à droite (#menu-navigation-bas). Il n'existe qu'en mode DEV
+  (actualiserDevMode, app.js, appelle actualiserRegionsDev). Il ouvre la popup
+  juste au-dessus, alignée à droite ; elle reste ouverte jusqu'à son ✕ (ou un
+  second appui sur le bouton). Dedans : « Afficher les boîtes », « + Nouvelle
+  boîte », la boîte sélectionnée (numéro, nombre de points), « Supprimer cette
+  boîte » (avec confirmation), le nombre de boîtes, et un rappel des gestes.
+- LES BOÎTES. Des polygones dessinés en SVG DANS la carte (#calque-regions,
+  dans #carte-fond-jeu), en coordonnées de la carte (3840 × 2160, comme la
+  grille hexagonale) : elles glissent avec elle et ne dépendent pas de l'écran.
+  Une nouvelle boîte naît rectangle (360 × 240), au milieu de ce qu'on voit, et
+  coche « Afficher les boîtes ».
+- LE NUMÉRO, UNIQUE ET DÉFINITIF. Tiré dans une transaction (Prochain_Numero) :
+  deux postes qui créent en même temps n'ont jamais le même, et une boîte
+  supprimée ne rend pas le sien. Il s'écrit au centre de gravité de la boîte,
+  en blanc liseré, à la même taille à l'écran quel que soit le zoom.
+- L'ÉDITION (mode DEV + case cochée). Rouges, numérotées, avec leurs poignées :
+  - clic maintenu sur la boîte et on bouge : elle se déplace toute entière,
+    sans sortir de la carte — et la carte, elle, ne glisse pas ;
+  - le petit carré d'un point, tiré : ce point seul s'étire ou se rétracte ;
+  - un clic sur un bord : un nouveau point, posé là, aussitôt saisi — on le
+    tire pour faire une forme sur mesure (un simple clic le pose aussi) ;
+  - double-clic sur un point : il s'en va (trois points au moins restent) ;
+  - un clic sur une boîte ne déclenche rien ; la carte glisse toujours depuis
+    un endroit sans boîte.
+  La boîte touchée est sélectionnée (dorée). Chaque geste fini s'écrit dans la
+  base, une fois le doigt levé.
+- LE JEU (case décochée, ou hors DEV). Les boîtes sont invisibles. Une boîte
+  qui a une action la joue au clic : ACTIONS_REGIONS[numéro] = (numero) => …
+  (surClicRegion) — c'est là qu'on branchera ce que fait chaque région. Une
+  boîte sans action laisse passer le clic à la carte, au fanion, aux icônes.
+- LA BASE : un seul document, Carte_Monde/Regions — { Prochain_Numero,
+  Regions: { "<n>": { Numero, Points: [{ x, y }, …] } } } — écouté par tous les
+  postes. Une écriture d'un autre poste qui arrive pendant un glissé attend
+  qu'il finisse. Le choix « Afficher les boîtes » reste sur le poste
+  (localStorage, ivalis_REGIONS_VISIBLES).
+
+corrections_v257.mjs, au vrai pointeur sur le vrai écran de jeu : le bouton
+(absent hors DEV, en bas à droite, rouge), la popup (au-dessus, dans l'écran,
+qui reste ouverte, son ✕) ; la création (n° 1, rectangle, ses quatre coins, le
+numéro, au milieu de la vue, la case cochée), le numéro jamais réutilisé, la
+suppression écrite, la boîte d'un autre poste et la numérotation qui suit ;
+le déplacement (exact, la carte immobile, l'écriture), le coin étiré seul, le
+point né d'un bord et tiré, le numéro dans la boîte, le point posé d'un simple
+clic, le double-clic qui retire ; l'édition sans clic, le jeu sans numéros ni
+poignées, l'action jouée, le clic qui traverse ; la boîte qui glisse avec la
+carte, la carte qui glisse encore en édition ; le ✕, la sortie du mode DEV. Il
+mord sur l'ancien code (24 échecs).
+
+La suite complète passe. Seul bémol, déjà là avant : le contrôle de fondu de
+corrections_v246 (l'opacité lue 200 ms après le début d'un fondu de 450 ms) est
+sensible à la charge de la machine ; il échoue parfois, sur l'ancien code comme
+sur le nouveau, et passe relancé seul.

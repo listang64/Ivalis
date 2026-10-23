@@ -6310,6 +6310,8 @@ window.actualiserDevMode = function() {
 
     // La case de lecture automatique des tours, à côté de l'œil (sequence_tour.js).
     if (typeof window.actualiserLectureAutoDev === "function") window.actualiserLectureAutoDev();
+    // Le bouton rouge des régions de la carte, en bas à droite (regions_carte.js).
+    if (typeof window.actualiserRegionsDev === "function") window.actualiserRegionsDev();
 
     if (isDev) { console.log("🛠️ Mode Développeur : ACTIVÉ"); } 
     else { console.log("🛠️ Mode Développeur : DÉSACTIVÉ"); }
