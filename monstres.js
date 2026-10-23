@@ -1351,9 +1351,12 @@ window.entrerRenfortsDeReleve = async function() {
 window.enregistrerReleveLeader = async function(idMonstre, c) {
     if (!idMonstre || !window.estMonstre(idMonstre)) return;
     const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-    const maj = { Leader: true, Releve_En_Leader: false };
-    if (c && n(c.pvMax) > 0) maj.PV_Max = n(c.pvMax);
-    if (c && c.def) { maj.Def_Physique = n(c.def.physique); maj.Def_Magique = n(c.def.magique); }
+    // Les valeurs du cerveau, telles quelles : une créature n'a pas de retouche DEV.
+    const maj = {
+        Leader: true, Releve_En_Leader: false,
+        ...(c && n(c.pvMax) > 0 ? { PV_Max: n(c.pvMax) } : {}),
+        ...(c && c.def ? { Def_Physique: n(c.def.physique), Def_Magique: n(c.def.magique) } : {})
+    };
     await updateDoc(doc(db, COLLECTION_MONSTRES, idMonstre), maj)
         .catch(e => console.error("Relève du leader :", e));
 };
