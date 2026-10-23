@@ -157,7 +157,8 @@ console.log("\n3. SANS COMPTE, LA PAGE NE LIT RIEN DANS LA BASE");
   const apres = await acces(p);
   const attendus = { "la date en jeu": /Date_En_Jeu\/actuelle/, "les parties en cours": /Systeme_Parties/, "les effets": /Combat_Effets/,
                      "les lieux de la carte": /Monde_Lieux/, "les factions": /Monde_Factions/, "les réglages des monstres": /_REGLAGES/,
-                     "la table des rencontres": /_RENCONTRES/, "les régions de la carte": /Carte_Monde\/Regions/ };
+                     // (La table des rencontres par difficulté n'est plus écoutée depuis la v262.)
+                     "les régions de la carte": /Carte_Monde\/Regions/ };
   const manquent = Object.entries(attendus).filter(([, re]) => !apres.some(x => re.test(x))).map(([n]) => n);
   verifier("LA PORTE OUVERTE : tout ce que le démarrage lisait part alors", manquent.length === 0, manquent.length ? "manquent : " + manquent.join(", ") : `${apres.length} accès`);
   await p.close();

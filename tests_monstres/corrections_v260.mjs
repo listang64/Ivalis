@@ -351,9 +351,12 @@ console.log("\n8. LES VERSIONS");
     const vTrace = Number((lire('trace_combat.js').match(/VERSION_IVALIS = (\d+);/) || [])[1] || 0);
     const vJson = Number((lire('version.json').match(/"version": (\d+)/) || [])[1] || 0);
     verifier("version 260 ou plus (trace_combat.js, version.json)", vTrace >= 260 && vJson === vTrace, `${vTrace} / ${vJson}`);
-    verifier("moteur_pur v65, combat_etat v40, cerveau v59, pont v42 (importmap et balises)",
-             (html.match(/moteur_pur\.js\?v=65/g) || []).length === 2 && (html.match(/combat_etat\.js\?v=40/g) || []).length === 2
-             && (html.match(/cerveau_combat\.js\?v=59/g) || []).length === 2 && (html.match(/pont_combat\.js\?v=42/g) || []).length === 2);
+    // Au moins ces numéros, la carte d'import et la balise d'accord.
+    const v = (m) => (html.match(new RegExp(`${m}\\.js\\?v=(\\d+)`, "g")) || []).map(x => Number(x.split("=")[1]));
+    const auMoins = (m, n) => v(m).length === 2 && v(m)[0] === v(m)[1] && v(m)[0] >= n;
+    verifier("moteur_pur v65+, combat_etat v40+, cerveau v59+, pont v42+ (importmap et balises)",
+             auMoins("moteur_pur", 65) && auMoins("combat_etat", 40) && auMoins("cerveau_combat", 59) && auMoins("pont_combat", 42),
+             ["moteur_pur", "combat_etat", "cerveau_combat", "pont_combat"].map(m => `${m} ${v(m).join("/")}`).join(", "));
 }
 
 console.log(`\n${echecs === 0 ? "✅ TOUT EST BON" : `❌ ${echecs} ÉCHEC(S)`}`);
