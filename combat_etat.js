@@ -348,7 +348,7 @@ function combattantBrut(fiche, position, bornes) {
         // elle contourne, ou si elle refuse d'entrer dans les flammes.
         personnalite: fiche.Personnalite || "",
         // Sa stature (Petit/Normal/Élite/Boss) : le noyau pur en tire un bonus
-        // fixe de dégâts et de soin (voir bonusMonstreDe, moteur_pur.js). Vide
+        // de dégâts et de soin, en % (voir bonusMonstreDe, moteur_pur.js). Vide
         // pour un héros — il n'a pas de palier, et n'y a donc jamais droit.
         palier: fiche.Palier || fiche.palier || "",
 

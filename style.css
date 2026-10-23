@@ -4006,6 +4006,13 @@ textarea.input-texte-parchemin {
 .jauge-selection-remplie { height: 100%; width: 0; transition: width 0.5s ease-out; }
 .jauge-selection-vie .jauge-selection-remplie { background: #ff2b2b; }
 .jauge-selection-fatigue .jauge-selection-remplie { background: #ffd400; }
+/* Le nom du combattant, en tout petit sous les jauges (v255), en relief. */
+.jauges-selection-nom {
+    position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 2px;
+    white-space: nowrap; font-family: 'Cinzel', serif; font-weight: bold; line-height: 1;
+    color: #f3e2b8; letter-spacing: 0.03em;
+    text-shadow: 0 1px 0 #1a0f08, 0 2px 1px rgba(0, 0, 0, 0.85), 0 3px 5px rgba(0, 0, 0, 0.6);
+}
 
 /* Une classe que le peuple choisi ne peut pas prendre (le Vampire pour un
    Vargen) : grisée, et un message dit pourquoi au clic. */

@@ -82,8 +82,17 @@ window.positionCiblage = function(idCombattant) {
 // alliés qu'elle couvre. La seconde vise le soutien restant : soi-même ou un
 // allié. Une carte qui ne fait que l'un ou l'autre n'a qu'une phase, comme avant.
 const estEffetDeSoutien = (e) => !!(e && e.isHeal);
+// LE CONTRE NE SE POSE QUE SUR SOI (Nico, v255) : il ne se vise pas — ni
+// seconde phase de soutien, ni cible à choisir ; il part sur le lanceur.
+const surSoiSeulement = (e) => !!(e && e.soiSeulement);
 const effetDeLaPhaseSoutien = (state, e) =>
-    estEffetDeSoutien(e) && !(state.isZone && e.enZone);
+    estEffetDeSoutien(e) && !surSoiSeulement(e) && !(state.isZone && e.enZone);
+// La phase ne porte QUE des effets sur soi (une carte de Contre seul) : seul le
+// lanceur se vise.
+window.phaseSurSoiSeulement = function(phase) {
+    const tous = [...((phase && phase.attaques) || []), ...((phase && phase.alterations) || [])];
+    return tous.length > 0 && tous.every(surSoiSeulement);
+};
 
 window.effetsDeLaPhase = function(state) {
     state = state || window.ETAT_CIBLAGE;
@@ -2379,7 +2388,10 @@ window.demarrerCiblage = async function(idCarte, options) {
                     valeurContre: contreValeur,
                     isRanged: isRanged,
                     rangeMax: rangeMax,
-                    isHeal: true, // se pose sur soi ou un allié, comme l'Absorption
+                    isHeal: true,
+                    // Sur soi seulement (v255 : « l'effet Contre ne peut être mis
+                    // que pour soi-même ») — plus jamais sur un allié.
+                    soiSeulement: true,
                     cibles: []
                 });
             }
@@ -3100,6 +3112,7 @@ window.dessinerAnneauxCiblage = function() {
     const cartePousseeOuTraction = phase.attaques.length === 0
         && phase.alterations.some(a => a.estPoussee || a.estTraction || a.toutCamp);
     const sansVue = phase.alterations.some(a => a.sansVue);
+    const soiSeulement = window.phaseSurSoiSeulement(phase);
     // Le Sorcier ne perd rien au contact (sortsSansMalusContact) : pas d'étiquette « -30% ».
     const sansMalusContact = !!(typeof window.atoutRace === "function" && (window.atoutRace(lanceurData) || {}).sortsSansMalusContact);
 
@@ -3113,7 +3126,9 @@ window.dessinerAnneauxCiblage = function() {
         // Pas d'anneau dans le noir d'un aveuglé : il ne peut pas y viser.
         if (window.cibleDansLeNoir(lanceurData, tkLanceur, window.positionCiblage(idToken))) continue;
 
-        if (configSort.isHeal) {
+        if (soiSeulement) {
+            if (idToken !== idLanceur) continue;
+        } else if (configSort.isHeal) {
             if (cibleData.camp !== lanceurData.camp) continue;
         } else if (cartePousseeOuTraction) {
             if (idToken === idLanceur) continue;
@@ -3316,6 +3331,11 @@ window.ajouterCibleCiblage = function(idCible) {
     const cartePousseeOuTraction = phase.attaques.length === 0
         && phase.alterations.some(a => a.estPoussee || a.estTraction || a.toutCamp);
     const sansVue = phase.alterations.some(a => a.sansVue);
+
+    if (window.phaseSurSoiSeulement(phase) && idCible !== idLanceur) {
+        window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Sur soi seulement", "#aaaaaa");
+        return;
+    }
 
     if (configSort.isHeal) {
         if (cibleData.camp !== lanceurData.camp) {
@@ -4055,6 +4075,9 @@ window.declencherResolution = async function() {
         console.error("Résolution sans lanceur : le ciblage ne dit pas qui joue.");
         return;
     }
+    // Ce qui ne se pose que sur soi (le Contre) part sur le lanceur, quelle
+    // que soit la cible retenue pour le reste de la carte.
+    (state.alterations || []).forEach(a => { if (a && a.soiSeulement) a.cibles = [idLanceur]; });
 
     // 🔻 COUP CRITIQUE — un jet invisible par carte jouée, réservé aux héros 🔻
     // Tiré ICI, une seule fois, puis embarqué dans l'action : chaque navigateur

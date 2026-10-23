@@ -465,7 +465,19 @@ export function dissiperConfusion(etat, idLanceur) {
 //  elles consomment les dés dans le même ordre : attaques d'abord, altérations
 //  ensuite, chacune dans l'ordre où la carte les porte. Ne pas réordonner.
 
+// LE CONTRE NE SE POSE QUE SUR SOI (v255) : quelle que soit la cible qu'on lui
+// a donnée — un allié choisi par une créature, la cible du reste de la carte —,
+// il part sur le lanceur. Appliqué avant les dés ET avant la résolution, pour
+// que les deux lisent les mêmes cibles. Pur.
+export const estSurSoiSeulement = (alt) => !!alt && (!!alt.soiSeulement || alt.nom === "Contre");
+export function ciblesSurSoi(action, idLanceur) {
+    const alterations = (action && action.alterations) || [];
+    if (!idLanceur || !alterations.some(estSurSoiSeulement)) return action;
+    return { ...action, alterations: alterations.map(alt => estSurSoiSeulement(alt) ? { ...alt, cibles: [idLanceur] } : alt) };
+}
+
 export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
+    plan = ciblesSurSoi(plan, idLanceur);
     const jets = { attaqueRatee: false, parCible: {} };
     const lanceur = combattant(etat, idLanceur);
 
@@ -644,7 +656,13 @@ export function tirerCritique(etat, idLanceur, des) {
 // haut du tableau, la valeur de dégâts qu'on pourra modifier à la volée ») :
 // le tableau des monstres (monstres.js) la règle ici, sur chaque poste, dès
 // qu'elle change. Ces chiffres sont ceux d'origine.
-export const BONUS_MONSTRE_DEFAUT = Object.freeze({ "Petit": 0, "Normal": 1, "Élite": 2, "Boss": 3 });
+//
+// EN POURCENTAGE (Nico, v255 : « les dégâts triche aux monstres, mets plutôt
+// en % sur tous leurs dégâts et soins existants ; change le tableau et mets 10 %
+// à chaque »). Le bonus n'est plus un point fixe ajouté au brut, mais une part
+// de ce brut : +10 % pour chaque stature, à l'origine. bonusMonstreDe rend ce
+// pourcentage ; appliquerBonusMonstre l'applique à une valeur.
+export const BONUS_MONSTRE_DEFAUT = Object.freeze({ "Petit": 10, "Normal": 10, "Élite": 10, "Boss": 10 });
 const TABLE_BONUS_MONSTRE = { ...BONUS_MONSTRE_DEFAUT };
 
 export function reglerBonusMonstres(table) {
@@ -657,9 +675,17 @@ export function reglerBonusMonstres(table) {
 }
 export const bonusMonstresActuels = () => ({ ...TABLE_BONUS_MONSTRE });
 
+// Le pourcentage de triche d'un combattant (0 pour un héros).
 export function bonusMonstreDe(c) {
     if (!c || !c.estMonstre) return 0;
     return TABLE_BONUS_MONSTRE[c.palier === "Elite" ? "Élite" : c.palier] || 0;
+}
+// Une valeur de dégâts ou de soin, triche comprise (au centième près : le
+// demi-point se garde jusqu'à l'arrondi de la chaîne, comme partout).
+export function appliquerBonusMonstre(valeur, pct) {
+    const v = decimal(valeur);
+    if (!pct) return v;
+    return Math.max(0, Math.round(v * (1 + nombre(pct) / 100) * 100) / 100);
 }
 
 // =========================================================================
@@ -1711,6 +1737,7 @@ export function resoudreCarte(etat, action, plateau) {
     const suivant = clonerEtat(etat);
     const etapes = [];
     const idLanceur = action.idLanceur;
+    action = ciblesSurSoi(action, idLanceur);
     const lanceur = combattant(suivant, idLanceur);
     if (!lanceur) return { etat: suivant, etapes };
 
@@ -1977,7 +2004,7 @@ export function resoudreCarte(etat, action, plateau) {
             //  dégât ni un soin.
             if (attaque.isHeal) {
                 const avant = cible.pv;
-                let soin = Math.max(0, decimal(attaque.valeurBrute) + bonusMonstre) * (critique ? 2 : 1);
+                let soin = Math.max(0, appliquerBonusMonstre(attaque.valeurBrute, bonusMonstre)) * (critique ? 2 : 1);
                 // CE QUE LA CIBLE FAIT DU SOIN QU'ELLE REÇOIT. L'Éthéré en tire
                 // trente pour cent de plus ; une plaie qui brûle en perd la
                 // moitié. Ces deux règles ne vivaient que dans l'ancien moteur :
@@ -2009,11 +2036,12 @@ export function resoudreCarte(etat, action, plateau) {
                         // Lumière : ce sort passe outre sa défense magique.
                         || (des.lumiere === true && attaque.typeRes === "Magique");
 
-            // La triche des créatures s'ajoute AU BRUT, avant la chaîne : elle
-            // traverse donc le malus à bout portant et les résistances comme
-            // un dégât normal, plutôt que de passer en douce derrière l'armure.
+            // La triche des créatures (un % du brut) s'applique AU BRUT, avant
+            // la chaîne : elle traverse donc le malus à bout portant et les
+            // résistances comme un dégât normal, plutôt que de passer en douce
+            // derrière l'armure.
             const attaqueAvecBonus = bonusMonstre
-                ? { ...attaque, valeurBrute: decimal(attaque.valeurBrute) + bonusMonstre }
+                ? { ...attaque, valeurBrute: appliquerBonusMonstre(attaque.valeurBrute, bonusMonstre) }
                 : attaque;
 
             // UNE CIBLE FRAPPÉE : la chaîne de dégâts, puis tout ce qu'elle
@@ -2578,6 +2606,6 @@ if (typeof window !== "undefined") {
         esquiveDe, paradeDe, defPhysiqueDe, defMagiqueDe, critiqueDe, distanceHex,
         casesDansLeNoir, estDansLeNoir, ETAT_AVEUGLE,
         // La triche des créatures, réglée depuis le tableau des monstres (v252).
-        bonusMonstreDe, reglerBonusMonstres, bonusMonstresActuels, BONUS_MONSTRE_DEFAUT
+        bonusMonstreDe, appliquerBonusMonstre, reglerBonusMonstres, bonusMonstresActuels, BONUS_MONSTRE_DEFAUT
     };
 }

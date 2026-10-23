@@ -1719,10 +1719,10 @@ window.multiplicateurSurpuissance = function(fatigue) {
 //  comme avant (sa fatigue ne bouge pas) ; c'est en la LISANT pour le combat
 //  (demarrerCiblage, moteur_effets.js) que ses chances d'ÉTAT valent 20 % de
 //  plus — et elles seules (v253 : « 20 % uniquement sur leurs effets d'état,
-//  style Glacé, Peur… pas les dégâts ni les soins »). La triche fixe par
-//  stature (bonusMonstreDe, moteur_pur.js) s'ajoute aux dégâts et aux soins,
-//  comme avant. Ni le zombie du Profanateur ni le compagnon du Pisteur : ils
-//  n'ont pas de sorts.
+//  style Glacé, Peur… pas les dégâts ni les soins »). La triche par stature
+//  (un % du brut depuis la v255, bonusMonstreDe, moteur_pur.js) s'applique aux
+//  dégâts et aux soins. Ni le zombie du Profanateur ni le compagnon du
+//  Pisteur : ils n'ont pas de sorts.
 window.MULTIPLICATEUR_SORTS_MONSTRE = 1.2;
 window.multiplicateurSortsMonstre = function(c) {
     if (!c || !c.estMonstre || c.zombie || c.compagnonDe || c.compagnon) return 1;

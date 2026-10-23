@@ -390,8 +390,9 @@ window.creerMonstreDepuisGabarit = async function(idMonstre, gabarit, donneesSup
 //  déplacements. »
 //
 //  Trois réglages, valables pour toutes les créatures (pas par gabarit) :
-//    · les dégâts (et soins) EN PLUS par stature — ajoutés au brut, avant les
-//      résistances (bonusMonstreDe, moteur_pur.js) ;
+//    · les dégâts (et soins) EN PLUS par stature — en % du brut depuis la
+//      v255 (10 % chacune), avant les résistances (bonusMonstreDe,
+//      appliquerBonusMonstre, moteur_pur.js) ;
 //    · le bonus des SORTS, en % — sur les seules chances d'état de leurs
 //      cartes, ni les dégâts ni les soins (multiplicateurSortsMonstre, app.js) ;
 //    · les cases de MARCHE par stature (pasMaxDe, ia_pure.js ; pasMaxMonstre,
@@ -408,11 +409,12 @@ const PALIERS_REGLES = ["Petit", "Normal", "Élite", "Boss"];
 const noyauMoteur = () => (typeof window !== "undefined" && window.moteurPur) || {};
 const noyauIA = () => (typeof window !== "undefined" && window.iaPure) || {};
 window.REGLAGES_MONSTRES_DEFAUT = Object.freeze({
-    bonusDegats: { ...(noyauMoteur().BONUS_MONSTRE_DEFAUT || { "Petit": 0, "Normal": 1, "Élite": 2, "Boss": 3 }) },
+    // En % de leurs dégâts et soins (v255), 10 % pour chaque stature.
+    bonusDegats: { ...(noyauMoteur().BONUS_MONSTRE_DEFAUT || { "Petit": 10, "Normal": 10, "Élite": 10, "Boss": 10 }) },
     bonusSortsPct: 20,
     deplacement: { ...(noyauIA().PAS_PAR_PALIER_DEFAUT || { "Petit": 6, "Normal": 5, "Élite": 4, "Boss": 4 }) }
 });
-const BORNES_REGLAGES = { bonusDegats: [-20, 50], bonusSortsPct: [-50, 200], deplacement: [0, 15] };
+const BORNES_REGLAGES = { bonusDegats: [-50, 200], bonusSortsPct: [-50, 200], deplacement: [0, 15] };
 const borner = (famille, v, defaut) => {
     // Une case vidée (ou un champ absent) garde la valeur d'avant.
     if (v === undefined || v === null || String(v).trim() === "") return defaut;
@@ -431,7 +433,9 @@ window.normaliserReglagesMonstres = function(brut) {
         return t;
     };
     return {
-        bonusDegats: parPalier("bonusDegats", "Bonus_Degats"),
+        // Un champ neuf : l'ancien (Bonus_Degats) comptait des POINTS (+1, +2…),
+        // qu'on ne doit pas relire comme des pour cent.
+        bonusDegats: parPalier("bonusDegats", "Bonus_Degats_Pct"),
         bonusSortsPct: borner("bonusSortsPct", src.Bonus_Sorts_Pct, d.bonusSortsPct),
         deplacement: parPalier("deplacement", "Deplacement")
     };
@@ -473,7 +477,7 @@ window.dessinerReglagesMonstres = function() {
               data-famille="${famille}" data-palier="${p}" value="${r[famille][p]}"
               min="${BORNES_REGLAGES[famille][0]}" max="${BORNES_REGLAGES[famille][1]}"
               onchange="window.modifierReglageMonstre('${famille}', '${p}', this)"></td>`).join("") + `</tr>`;
-    corps.innerHTML = ligne("Dégâts et soins en plus", "bonusDegats", "Ajoutés au brut de chaque attaque et de chaque soin, avant les résistances")
+    corps.innerHTML = ligne("Dégâts et soins en plus (%)", "bonusDegats", "En pour cent du brut de chaque attaque et de chaque soin, avant les résistances")
                     + ligne("Déplacement (cases)", "deplacement", "Cases que la créature peut marcher à son tour");
     if (sorts) sorts.value = r.bonusSortsPct;
 };
@@ -486,11 +490,11 @@ window.modifierReglageMonstre = async function(famille, palier, input) {
     if (input) input.value = valeur;
     const etat = document.getElementById("reglages-monstres-etat");
     const maj = famille === "bonusSortsPct" ? { Bonus_Sorts_Pct: valeur }
-        : { [famille === "bonusDegats" ? "Bonus_Degats" : "Deplacement"]:
+        : { [famille === "bonusDegats" ? "Bonus_Degats_Pct" : "Deplacement"]:
             { ...actuels[famille], [palier]: valeur } };
     // Tout de suite sur ce poste ; la base le porte aux autres.
     const brut = {
-        Bonus_Degats: actuels.bonusDegats, Bonus_Sorts_Pct: actuels.bonusSortsPct, Deplacement: actuels.deplacement, ...maj
+        Bonus_Degats_Pct: actuels.bonusDegats, Bonus_Sorts_Pct: actuels.bonusSortsPct, Deplacement: actuels.deplacement, ...maj
     };
     window.appliquerReglagesMonstres(brut);
     try {

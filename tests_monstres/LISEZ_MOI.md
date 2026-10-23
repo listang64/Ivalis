@@ -7126,3 +7126,60 @@ régime la déclenche ; le panneau DEV (toutes les blessures, Soigner/Retirer,
 retirer une définitive, tout retirer et relever, sans fiche) ; puis un vrai
 combat complet à trois postes où Adrien ne touche jamais l'écran. Il mord sur
 l'ancien code (18 échecs).
+
+## v255 — Plus de marche après la compétence ; la jauge qui monte ; le Contre sur soi ; la triche des créatures en % ; le nom sous les jauges
+
+Nico : « une fois la compétence jouée, on ne doit plus pouvoir sélectionner de
+déplacement avec son perso pour le tour en cours » ; « je viens de me faire un
+soin et la jauge affichée en dessous a monté direct, sans animation de
+transition » ; « l'effet Contre ne peut être mis que sur soi-même » ; « les
+dégâts triche des monstres, mets plutôt en % sur tous leurs dégâts et soins
+existants, change le tableau et mets 10 % à chaque » ; « quand on clique sur un
+token, des jauges apparaissent en dessous ; fais apparaître en plus, en
+dessous des jauges, en tout petit, le nom du personnage ou monstre, avec une
+ombre portée pour donner un effet de relief ».
+
+- PLUS DE MARCHE APRÈS LA COMPÉTENCE (combat.js, mouvement.js). Entre l'envoi
+  de la carte et le tour rejoué, toucher le plateau traçait encore un chemin.
+  competenceDejaJouee(id) lit le régime (regimeDemande.enVol : la demande de ce
+  combattant est partie) ; tant qu'elle l'est, un toucher sur une case ne trace
+  plus rien et le pion dit « Compétence jouée : plus de déplacement ». Un
+  chemin tracé avant et validé après est annulé (validerMouvement) : rien n'est
+  envoyé. Seul le combattant qui a joué est bloqué ; au tour suivant, tout
+  repart.
+- LA JAUGE QUI MONTE (poserJaugesSelection, combat.js). Le redessin du pion
+  remplaçait les jauges sous lui : la nouvelle barre naissait à sa largeur
+  finale. Avant de l'ôter, on lit la largeur AFFICHÉE de chaque barre
+  (offsetWidth sur la largeur du cadre — sans la bordure ni le zoom du
+  plateau), et la nouvelle glisse de là jusqu'à sa valeur en 600 ms. Un
+  redessin pendant le glissement repart d'où la barre en est : ni saut au
+  bout, ni recul.
+- LE NOM SOUS LES JAUGES (même fonction, style.css .jauges-selection-nom). En
+  tout petit (16 % de la largeur du pion, 7 px au moins), en Cinzel, beige,
+  avec trois ombres empilées dessous pour le relief : le prénom du héros, le
+  nom du monstre.
+- LE CONTRE SUR SOI SEULEMENT (moteur_effets.js, moteur_pur.js). L'altération
+  Contre porte soiSeulement : un seul anneau, sur le lanceur ; toucher un allié
+  est refusé (« Sur soi seulement ») ; sur une carte Soin + Contre, le Contre
+  n'a plus sa phase de ciblage, il part sur le lanceur pendant que le soin
+  garde sa cible. Le moteur le garantit aussi (ciblesSurSoi, en tête de
+  tirerDesCarte et de resoudreCarte) : une ancienne demande qui viserait un
+  allié se pose sur le lanceur, dés compris.
+- LA TRICHE DES CRÉATURES EN POURCENTAGE (appliquerBonusMonstre, moteur_pur.js ;
+  Paramètres > Outils > Monstres, monstres.js). Le bonus fixe par stature
+  (+0 à +3) devient un pourcentage de TOUS leurs dégâts et soins : 10 % pour
+  chaque stature à l'origine (20 → 22, 40 → 44, un soin de 10 → 11 ; arrondi
+  au centième, jamais sous zéro). La ligne s'appelle « Dégâts et soins en plus
+  (%) », bornée de −50 à 200, écrite en Bonus_Degats_Pct ; l'ancien champ en
+  points (Bonus_Degats) n'est plus relu. La chance d'état de leurs sorts
+  (+20 %) ne change pas. moteur_pur.mjs (sections 14 et 17) et
+  corrections_v252.mjs (1a, 1b) suivent la nouvelle règle.
+
+corrections_v255.mjs : la triche en % (l'origine à 10 %, le coup, le soin, le
+héros intact, un réglage à 50 %, le retour sans réglage) ; le Contre ramené au
+lanceur par le moteur ; sur le vrai plateau, au doigt : le chemin avant la
+compétence, plus rien après, le chemin validé trop tard, l'autre combattant
+libre ; la barre qui monte, le redessin en route, l'arrivée, le nom et son
+ombre, celui du monstre ; le ciblage du Contre (un anneau, l'allié refusé, soi,
+Soin + Contre) ; le tableau des réglages en %. Il mord sur l'ancien code
+(24 échecs).

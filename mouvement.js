@@ -554,6 +554,15 @@ window.validerMouvement = async function() {
     const finalStep = window.CHEMIN_MOUVEMENT[window.CHEMIN_MOUVEMENT.length - 1];
     if (!finalStep) return;
 
+    // Un chemin tracé avant la compétence ne part plus une fois qu'elle est
+    // lancée : le tour est fini (combat.js, competenceDejaJouee).
+    if (typeof window.competenceDejaJouee === "function" && window.competenceDejaJouee(idPerso)) {
+        window.annulerMouvement();
+        const tk = (window.TOKENS_VTT_DATA || {})[idPerso];
+        if (tk) window.afficherMessageFlottantHex(tk.q, tk.r, "Compétence jouée : plus de déplacement", "#aaaaaa");
+        return;
+    }
+
     // ON ENVOIE LE CHEMIN, ET RIEN D'AUTRE.
     //
     // Les attaques d'opportunité, les zones persistantes franchies, le coût,

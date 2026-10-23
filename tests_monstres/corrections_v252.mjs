@@ -45,11 +45,12 @@ console.log("\n1a. LA TRICHE ET LA MARCHE DES CRÉATURES, RÉGLÉES DANS LE MOTE
             jets: { attaqueRatee: false, parCible: { H1: { esquive: false, etats: {} } } } });
         return 100 - r.etat.combattants.H1.pv;
     };
-    verifier("à l'origine : une créature Normale tape 10 + 1", coup() === 11, `${coup()}`);
-    if (regleBonus) regleBonus({ Petit: 0, Normal: 5, "Élite": 2, Boss: 3 });
-    verifier("réglée à +5 : la même frappe fait 15", coup() === 15, `${coup()}`);
-    if (regleBonus) regleBonus({ Petit: 0, Normal: -1, "Élite": 2, Boss: 3 });
-    verifier("réglée à −1 : 9 (la triche peut aussi adoucir)", coup() === 9, `${coup()}`);
+    // (v255 : la triche est un % du brut, 10 % à l'origine.)
+    verifier("à l'origine : une créature Normale tape 10 + 10 %", coup() === 11, `${coup()}`);
+    if (regleBonus) regleBonus({ Petit: 10, Normal: 50, "Élite": 10, Boss: 10 });
+    verifier("réglée à +50 % : la même frappe fait 15", coup() === 15, `${coup()}`);
+    if (regleBonus) regleBonus({ Petit: 10, Normal: -10, "Élite": 10, Boss: 10 });
+    verifier("réglée à −10 % : 9 (la triche peut aussi adoucir)", coup() === 9, `${coup()}`);
     if (regleBonus) regleBonus(null);
     verifier("un réglage vide revient aux chiffres d'origine", coup() === 11, `${coup()}`);
 
@@ -272,7 +273,7 @@ console.log("\n1b. EN HAUT DU TABLEAU DES MONSTRES : LA TRICHE ET LA MARCHE, À 
       sorts: window.__ou(() => window.multiplicateurSortsMonstre({ estMonstre: true }), null),
       ecrit: (window.__setDocs || []).filter(d => d.chemin === "Monstres_Modeles/_REGLAGES").map(d => JSON.stringify(d.data) + (d.opt && d.opt.merge ? "+merge" : "")) };
     // Un autre poste change un chiffre : la base le porte ici.
-    window.__ou(() => window.appliquerReglagesMonstres({ Bonus_Degats: { Petit: 1, Normal: 2, "Élite": 3, Boss: 4 }, Bonus_Sorts_Pct: 10,
+    window.__ou(() => window.appliquerReglagesMonstres({ Bonus_Degats_Pct: { Petit: 1, Normal: 2, "Élite": 3, Boss: 4 }, Bonus_Sorts_Pct: 10,
                                                            Deplacement: { Petit: 3, Normal: 3, "Élite": 3, Boss: 3 } }), null);
     const ailleurs = { degats: lire("bonusDegats"), marche: lire("deplacement"), boss: MP.bonusMonstreDe({ estMonstre: true, palier: "Boss" }),
                        pas: IA.pasMaxDe({ palier: "Normal" }), sorts: window.__ou(() => window.multiplicateurSortsMonstre({ estMonstre: true }), null) };
@@ -283,10 +284,11 @@ console.log("\n1b. EN HAUT DU TABLEAU DES MONSTRES : LA TRICHE ET LA MARCHE, À 
   });
   verifier("le bloc est en haut, au-dessus du tableau des gabarits", r.auDessus === true);
   verifier("huit cases : les dégâts en plus et la marche, par stature", r.n === 8, `${r.n}`);
-  verifier("on y lit la triche d'aujourd'hui : +0 / +1 / +2 / +3", r.avant.degats === "0/1/2/3", r.avant.degats);
+  // (v255 : la triche est en % du brut, 10 % pour chaque stature.)
+  verifier("on y lit la triche d'aujourd'hui : +10 % partout", r.avant.degats === "10/10/10/10", r.avant.degats);
   verifier("la marche d'aujourd'hui : 6 / 5 / 4 / 4", r.avant.marche === "6/5/4/4", r.avant.marche);
   verifier("et le bonus des sorts : 20 %", r.avant.sorts === "20", String(r.avant.sorts));
-  verifier("Normale à +4 : le moteur frappe à +4 tout de suite", r.apres.bonusNormal === 4, `${r.apres.bonusNormal}`);
+  verifier("Normale à +4 % : le moteur frappe à +4 % tout de suite", r.apres.bonusNormal === 4, `${r.apres.bonusNormal}`);
   verifier("Boss à 7 cases : le cerveau ET la préparation le savent", r.apres.pasBossCerveau === 7 && r.apres.pasBossPreparation === 7,
            `${r.apres.pasBossCerveau} / ${r.apres.pasBossPreparation}`);
   verifier("une saisie folle est bornée (999 → 15 cases)", r.apres.pasPetit === 15 && r.apres.champPetit === "15", `${r.apres.pasPetit} « ${r.apres.champPetit} »`);
@@ -295,7 +297,7 @@ console.log("\n1b. EN HAUT DU TABLEAU DES MONSTRES : LA TRICHE ET LA MARCHE, À 
            r.apres.ecrit.join(" | "));
   verifier("un autre poste change les chiffres : ce poste les suit", r.ailleurs.degats === "1/2/3/4" && r.ailleurs.marche === "3/3/3/3"
            && r.ailleurs.boss === 4 && r.ailleurs.pas === 3 && Math.abs(r.ailleurs.sorts - 1.1) < 1e-9, JSON.stringify(r.ailleurs));
-  verifier("sans réglage en base : les chiffres d'origine", r.retour.bonus === 1 && r.retour.pas === 4 && Math.abs(r.retour.sorts - 1.2) < 1e-9,
+  verifier("sans réglage en base : les chiffres d'origine", r.retour.bonus === 10 && r.retour.pas === 4 && Math.abs(r.retour.sorts - 1.2) < 1e-9,
            JSON.stringify(r.retour));
   const src = fs.readFileSync('/home/user/Ivalis/monstres.js', 'utf-8');
   verifier("le document des réglages n'est pas lu comme un gabarit", /startsWith\("_"\)/.test(src));

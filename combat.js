@@ -2425,6 +2425,20 @@ document.addEventListener("click", async function(event) {
         const estImmobilise = persoSelectionne && persoSelectionne.Etats_Alteres
             && persoSelectionne.Etats_Alteres.some(e => e.nom === "Immobilisation");
 
+        // LA COMPÉTENCE EST PARTIE, LE TOUR EST FINI (Nico, v255 : « une fois la
+        // compétence jouée, on ne peut plus sélectionner de déplacement avec son
+        // perso pour le tour en cours »). La carte clôt le tour, mais l'écran ne
+        // le sait qu'une fois le pas du cerveau rejoué : entre les deux — l'aller-
+        // retour, puis l'animation de la carte —, ce clic traçait encore un
+        // chemin. La demande en vol (regime_cerveau.js) le dit dès l'envoi.
+        if (estMonTour && !window.VTT_MODE_DEPLACEMENT && window.competenceDejaJouee(window.TOKEN_SELECTIONNE)) {
+            const tk = window.TOKENS_VTT_DATA[window.TOKEN_SELECTIONNE];
+            if (tk && typeof window.afficherMessageFlottantHex === "function") {
+                window.afficherMessageFlottantHex(tk.q, tk.r, "Compétence jouée : plus de déplacement", "#aaaaaa");
+            }
+            return;
+        }
+
         if (estMonTour && estImmobilise && !window.VTT_MODE_DEPLACEMENT) {
             const tk = window.TOKENS_VTT_DATA[window.TOKEN_SELECTIONNE];
 
@@ -2661,14 +2675,37 @@ window.poserJaugesSelection = function(divToken, perso, existantes) {
         bloc = document.createElement("div");
         bloc.className = "jauges-selection-token";
         bloc.innerHTML = `<div class="jauge-selection jauge-selection-vie"><div class="jauge-selection-remplie"></div></div>`
-                       + `<div class="jauge-selection jauge-selection-fatigue"><div class="jauge-selection-remplie"></div></div>`;
+                       + `<div class="jauge-selection jauge-selection-fatigue"><div class="jauge-selection-remplie"></div></div>`
+                       + `<div class="jauges-selection-nom"></div>`;
     }
-    bloc.querySelector(".jauge-selection-vie .jauge-selection-remplie").style.width = m.vie + "%";
-    bloc.querySelector(".jauge-selection-fatigue .jauge-selection-remplie").style.width = m.fatigue + "%";
+    // LE NOM, EN TOUT PETIT, SOUS LES JAUGES (Nico, v255), une ombre portée
+    // dessous pour le relief. Sa taille suit celle du pion.
+    let nom = bloc.querySelector(".jauges-selection-nom");
+    if (!nom) { nom = document.createElement("div"); nom.className = "jauges-selection-nom"; bloc.appendChild(nom); }
+    nom.textContent = perso.prenom || perso.nom || "";
+    const largeurPion = divToken.offsetWidth || parseFloat(divToken.style.width) || 55;
+    nom.style.fontSize = Math.max(7, Math.round(largeurPion * 0.16)) + "px";
+
+    const barres = [[".jauge-selection-vie .jauge-selection-remplie", m.vie],
+                    [".jauge-selection-fatigue .jauge-selection-remplie", m.fatigue]]
+        .map(([sel, cible]) => ({ barre: bloc.querySelector(sel), cible }));
+    barres.forEach(({ barre, cible }) => { barre.style.width = cible + "%"; });
     bloc.title = `Vie ${m.pv}/${m.pvMax} · Fatigue ${m.energie}/${m.energieMax}`;
     bloc.classList.toggle("repliee", !!window.JAUGES_REPLIEES[perso.idPersonnage]);
     // Au-dessus des murs, à la place du pion (voir porteurAuDessus).
     (window.porteurAuDessus ? window.porteurAuDessus(divToken) : divToken).appendChild(bloc);
+    // LA BARRE GLISSE, ELLE NE SAUTE PAS (Nico, v255 : « je viens de me faire
+    // un soin et la jauge en dessous a monté direct, sans animation »). Le bloc
+    // revient d'un redessin, détaché : sa transition CSS ne part pas. On rejoue
+    // le glissement depuis ce qu'elle montrait (dataset.affiche, relevé avant
+    // le redessin) jusqu'à la nouvelle valeur — un soin monte, un coup descend.
+    if (existantes) barres.forEach(({ barre, cible }) => {
+        const depuis = parseFloat(barre.dataset.affiche);
+        delete barre.dataset.affiche;
+        if (!Number.isFinite(depuis) || Math.abs(depuis - cible) < 0.5 || typeof barre.animate !== "function") return;
+        barre.getAnimations().forEach(a => a.cancel());
+        barre.animate([{ width: depuis + "%" }, { width: cible + "%" }], { duration: 600, easing: "ease-out" });
+    });
     return bloc;
 };
 
@@ -3401,6 +3438,15 @@ window.appliquerTokensVTT = function(tokensMap) {
         const parent = bloc.parentElement;
         const id = parent ? (parent.dataset.pion || parent.id.replace("token-", "")) : "";
         if (id) jaugesSelection[id] = bloc;
+        // CE QUE LA BARRE MONTRE À CET INSTANT, glissement en cours compris
+        // (v255) : détachée, elle perd son animation — poserJaugesSelection la
+        // relance d'ici, au lieu de sauter d'un coup à la nouvelle valeur.
+        // (En pixels de mise en page, bordure du cadre exclue : ni le zoom du
+        // plateau ni le liseré ne faussent le pourcentage.)
+        bloc.querySelectorAll(".jauge-selection-remplie").forEach(barre => {
+            const cadre = barre.parentElement ? barre.parentElement.clientWidth : 0;
+            if (cadre > 0) barre.dataset.affiche = String(barre.offsetWidth / cadre * 100);
+        });
         bloc.remove();
     });
     document.querySelectorAll("#calque-ciblage-haut .croix-annuler-ciblage, #calque-ciblage-haut .croix-annuler-deplacement")
@@ -3814,6 +3860,15 @@ window.toggleModeTerrainDifficileHex = function() {
         else { btn.classList.remove("actif"); window.sauvegarderTerrainDifficile(); }
     }
     if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
+};
+
+// Ce combattant a-t-il déjà lancé sa compétence (ou fini son tour) ? La
+// demande reste « en vol » jusqu'à ce que l'écran ait rejoué la fin de son
+// tour (regimeOublierDemande) : c'est exactement la fenêtre à fermer.
+window.competenceDejaJouee = function(idPersonnage) {
+    const demande = window.regimeDemande;
+    return !!(idPersonnage && demande && typeof demande.actif === "function" && demande.actif()
+              && typeof demande.enVol === "function" && demande.enVol(idPersonnage));
 };
 
 // =========================================================================
