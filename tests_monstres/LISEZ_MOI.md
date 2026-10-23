@@ -7656,7 +7656,8 @@ la réserve d'avant, la victoire ; la fenêtre 💀 et celle des apparitions ; l
 versions. Il mord sur l'ancien code (96 échecs).
 
 Les anciens bancs remis aux règles v262 : corrections_v252, v253 (la table par
-difficulté a cédé la place aux apparitions), v255, v261 (versions au moins),
+difficulté a cédé la place aux apparitions), v255, v259 (la table des
+rencontres n'est plus écoutée), v260 et v261 (versions au moins),
 piste_initiative (les couleurs), renforts (il monte une réserve d'avant pour
 garder vivante l'entrée à la place d'un mort), campagne_complete (trois
 apparitions, la ligne Normale du butin, les renforts appelés comme le ferait
