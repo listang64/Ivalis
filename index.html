@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=92">
+  <link rel="stylesheet" href="style.css?v=93">
 
  
   <!-- ===================================================================== -->
@@ -812,8 +812,9 @@
                 </div>
             </div>
 
-            <!-- Outils (Gomme, Murs, Terrain) -->
-            <div style="display: flex; align-items: center; gap: 15px; padding-right: 15px;">
+            <!-- Outils (Gomme, Murs, Terrain, Apparition des ennemis) : quatre losanges
+                 serrés, pour que la barre tienne encore sur la largeur d'un iPad -->
+            <div style="display: flex; align-items: center; gap: 6px; padding-right: 8px;">
                 <div style="display: flex; flex-direction: column; align-items: center;">
                     <div style="color: #c2a878; font-family: 'Cinzel', serif; font-size: 11px; margin-bottom: 2px;">GOMME</div>
                     <div id="btn-gomme-vtt" class="btn-losange-efface" style="margin: 0; width: 25px; height: 25px;" onclick="window.toggleModeEffacementHex()" title="Gomme">
@@ -830,6 +831,13 @@
                     <div style="color: #c2a878; font-family: 'Cinzel', serif; font-size: 11px; margin-bottom: 2px;">DIFFICILE</div>
                     <div id="btn-difficile-vtt" class="btn-losange-difficile" style="margin: 0; width: 25px; height: 25px;" onclick="window.toggleModeTerrainDifficileHex()" title="Terrain Difficile">
                         <span style="font-size: 14px;">🟪</span>
+                    </div>
+                </div>
+                <!-- Les cases d'apparition des ennemis (v261) : la rencontre et ses renforts entrent par là -->
+                <div style="display: flex; flex-direction: column; align-items: center;">
+                    <div style="color: #c2a878; font-family: 'Cinzel', serif; font-size: 11px; margin-bottom: 2px;">SPAWN</div>
+                    <div id="btn-spawn-vtt" class="btn-losange-spawn" style="margin: 0; width: 25px; height: 25px;" onclick="window.toggleModeSpawnEnnemisHex()" title="Cases d'apparition des ennemis">
+                        <span style="font-size: 15px;">☠</span>
                     </div>
                 </div>
             </div>
@@ -2161,7 +2169,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=171"></script>
+<script src="trace_combat.js?v=172"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2252,16 +2260,16 @@
 <script type="module" src="illustration_competence.js?v=10"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
      gardait l'ancien dessin en cache après une livraison (l'œil d'or en dépend). -->
-<script src="Plateau.js?v=3"></script>
+<script src="Plateau.js?v=4"></script>
 <script type="module" src="sequence_tour.js?v=25"></script>
 <script src="zombie_token.js?v=1"></script>
 <script src="murs_terre.js?v=10"></script>
-<script type="module" src="combat.js?v=145"></script>
+<script type="module" src="combat.js?v=146"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=40"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
 <script type="module" src="moteur_effets.js?v=100"></script>
-<script type="module" src="monstres.js?v=35"></script>
+<script type="module" src="monstres.js?v=36"></script>
 <script type="module" src="monstres_competences.js?v=28"></script>
 <script type="module" src="monstres_ia.js?v=41"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->

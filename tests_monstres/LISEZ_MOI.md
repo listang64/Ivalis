@@ -7533,3 +7533,47 @@ v239, v240, v251, v258, cout_et_tir, deux_attaques_magiques,
 elements_magiques, etat_combat, hoplite, moteur_pur, necromancien, pisteur,
 profanateur, sorcier, tenebres_brut, tir_monstre_contact, traction_repartie,
 vampire, zones_cerveau.
+
+## v261 — Les cases d'apparition des ennemis (pinceau SPAWN)
+
+Nico : « dans les paramètres de combat, à côté des dessins de murs etc., fais
+moi un bouton pour générer des hexagones de spawn ennemis. »
+
+- LE BOUTON (index.html, style.css) : un quatrième losange, « SPAWN ☠ », juste
+  après GOMME, MURS et DIFFICILE dans la barre des paramètres de combat.
+  Allumé, il rougeoie. Les quatre losanges ont été un peu resserrés : la
+  barre tient toujours sur la largeur d'un iPad (1194 px), « Fermer » compris.
+- LE PINCEAU (combat.js) : il se manie comme les murs — un appui sur une case
+  vide peint toutes les cases que le geste traverse (souris ou doigt), un
+  appui sur une case déjà peinte les efface. Un seul pinceau en main à la
+  fois : prendre SPAWN repose les autres, et chacun enregistre sa couche en
+  se reposant (basculerPinceauVTT, partagé par les quatre). Reposé, SPAWN
+  écrit Tuiles_Spawn_Ennemis dans Combat_VTT (en fusion, comme les murs) ;
+  tous les postes la reçoivent par l'écoute du terrain — le cerveau, qui fait
+  entrer les renforts, compris. Fermer le combat sans reposer le pinceau
+  revient à la couche enregistrée. Les cases peintes survivent à
+  « Réinitialiser le Combat », comme les murs : elles font partie de la carte.
+- À L'ÉCRAN (Plateau.js) : pinceau SPAWN en main seulement, chaque case est
+  rouge sang avec une tête de mort ☠ au centre. Au repos, et sous l'œil d'or
+  des joueurs, elles restent invisibles : c'est une affaire de MJ.
+- OÙ ENTRENT LES CRÉATURES (combat.js caseApparitionEnnemi, monstres.js) :
+  une créature de la rencontre, un renfort, un ennemi déployé par le bouton
+  PIONS entre sur une case peinte LIBRE, tirée au sort. Toutes prises, elle
+  déborde sur une case libre voisine de l'une d'elles. Un mur ou une gomme
+  peints par-dessus retirent la case. Sans aucune case peinte, rien ne
+  change : autour du repère des ennemis, comme avant.
+- LA DEMANDE DES REPÈRES : avec des cases peintes, le repère des ennemis est
+  déjà connu (le cœur des cases) — la demande du début de combat ne réclame
+  plus que celui des héros, en un seul clic, et seul Spawn_Allies s'écrit.
+  Sans case peinte, elle demande les deux, comme avant.
+
+corrections_v261.mjs (dans la suite), sur la vraie page : le bouton et sa
+place ; un seul pinceau en main (et les couches reposées qui s'enregistrent) ;
+peindre et effacer à la souris ; l'écriture dans Combat_VTT ; le rouge et la
+tête de mort, pinceau en main seulement (ni au repos, ni sous l'œil d'or, ni
+avec le pinceau des murs) ; l'écoute d'un autre poste, le pinceau en main
+qui n'est pas écrasé, la fermeture sans valider ; les créatures sur les cases
+(300 tirages, la dernière libre, le débordement, le mur par-dessus, le cœur
+des cases, l'ancien comportement sans case), la vraie pose de monstres.js,
+un vrai renfort, le bouton PIONS ; la demande des repères avec et sans
+cases ; les versions. Il mord sur l'ancien code (35 échecs).

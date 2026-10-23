@@ -156,6 +156,7 @@ class Plateau {
         const isGommeMode = window.VTT_MODE_EFFACEMENT === true;
         const isMursMode = window.VTT_MODE_MURS === true;
         const isDifficileMode = window.VTT_MODE_DIFFICILE === true;
+        const isSpawnMode = window.VTT_MODE_SPAWN === true;
         // L'œil d'or ne fait QUE révéler — il n'arme jamais le pinceau, donc
         // il n'entre pas dans isEditingMode ci-dessous, seulement dans les
         // deux conditions d'affichage plus bas.
@@ -171,7 +172,7 @@ class Plateau {
         // PAR-DESSUS une case gommée restait invisible à l'œil, alors que
         // l'outil de peinture, lui, le montrait. C'étaient les cases que l'œil
         // « oubliait ».
-        const isEditingMode = isGommeMode || isMursMode || isDifficileMode;
+        const isEditingMode = isGommeMode || isMursMode || isDifficileMode || isSpawnMode;
         if (state.isDeleted && !isEditingMode && !isRevealMode) return;
         const infranchissableRevele = isRevealMode && !isEditingMode && state.isDeleted;
 
@@ -207,6 +208,24 @@ class Plateau {
             this.ctx.fillStyle = `rgba(155, 89, 182, ${OPACITE_REVELATION})`; 
             this.ctx.fill();
             this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        } else if (state.isSpawnEnnemi && isSpawnMode) {
+            // LES CASES D'APPARITION DES ENNEMIS (v261) : rouge sang, une tête
+            // de mort au centre, seulement pinceau SPAWN en main — c'est une
+            // affaire de MJ, l'œil d'or des joueurs ne les montre pas.
+            this.ctx.fillStyle = 'rgba(196, 28, 28, 0.42)';
+            this.ctx.fill();
+            this.ctx.strokeStyle = 'rgba(255, 120, 120, 0.9)';
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+            this.ctx.lineWidth = 1;
+            this.ctx.save();
+            this.ctx.fillStyle = 'rgba(255, 225, 225, 0.92)';
+            this.ctx.font = `${Math.round(this.hexSize * 0.8)}px serif`;
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText('☠', x, y + this.hexSize * 0.04);
+            this.ctx.restore();
+            return;
         } else {
             // Cas standard
             this.ctx.strokeStyle = `rgba(0, 0, 0, ${this.gridOpacity})`;

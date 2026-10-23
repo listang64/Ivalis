@@ -1064,13 +1064,12 @@ window.poserMonstreSurTerrain = async function(monstre, tokensData) {
         URL_Token: ""
     });
 
-    // Autour du repère d'apparition des ennemis, au hasard des cases libres —
+    // Sur une case d'apparition peinte par le MJ (pinceau SPAWN, v261), libre,
+    // au hasard ; sans case peinte, autour du repère d'apparition des ennemis —
     // et à défaut de repère (ou de module de combat chargé), au plus près du
     // centre comme autrefois.
-    const repereEnnemi = typeof window.pointApparition === "function"
-        ? window.pointApparition("Ennemi") : null;
-    const hexLibre = typeof window.trouverHexLibreAutour === "function"
-        ? window.trouverHexLibreAutour(tokensData, repereEnnemi, 2)
+    const hexLibre = typeof window.caseApparitionEnnemi === "function"
+        ? window.caseApparitionEnnemi(tokensData)
         : window.trouverHexLibreVTT(tokensData);
     tokensData[idMonstre] = { q: hexLibre.q, r: hexLibre.r, url: "", taille: 55 };
 

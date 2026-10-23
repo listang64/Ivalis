@@ -347,7 +347,10 @@ console.log("\n7. L'ENGAGEMENT");
 console.log("\n8. LES VERSIONS");
 {
     const html = lire('index.html');
-    verifier("version 260 (trace_combat.js, version.json)", /VERSION_IVALIS = 260;/.test(lire('trace_combat.js')) && /"version": 260/.test(lire('version.json')));
+    // Au moins 260 : les versions suivantes montent encore le numéro.
+    const vTrace = Number((lire('trace_combat.js').match(/VERSION_IVALIS = (\d+);/) || [])[1] || 0);
+    const vJson = Number((lire('version.json').match(/"version": (\d+)/) || [])[1] || 0);
+    verifier("version 260 ou plus (trace_combat.js, version.json)", vTrace >= 260 && vJson === vTrace, `${vTrace} / ${vJson}`);
     verifier("moteur_pur v65, combat_etat v40, cerveau v59, pont v42 (importmap et balises)",
              (html.match(/moteur_pur\.js\?v=65/g) || []).length === 2 && (html.match(/combat_etat\.js\?v=40/g) || []).length === 2
              && (html.match(/cerveau_combat\.js\?v=59/g) || []).length === 2 && (html.match(/pont_combat\.js\?v=42/g) || []).length === 2);

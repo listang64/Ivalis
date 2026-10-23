@@ -2441,6 +2441,37 @@ textarea.input-texte-parchemin {
 }
 
 /* ========================================================================= */
+/* BOUTON CASES D'APPARITION DES ENNEMIS (LOSANGE VTT, v261)                 */
+/* ========================================================================= */
+.btn-losange-spawn {
+    width: 35px;
+    height: 35px;
+    background-color: rgba(20, 15, 10, 0.8);
+    border: 2px solid #5c3a21;
+    transform: rotate(45deg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin: 10px auto 15px auto;
+}
+
+.btn-losange-spawn.actif {
+    border-color: #e53935;
+    background-color: rgba(196, 28, 28, 0.3);
+    box-shadow: 0 0 15px rgba(229, 57, 53, 0.55);
+}
+
+.btn-losange-spawn span {
+    transform: rotate(-45deg);
+    font-size: 18px;
+    color: #ff6b6b;
+    user-select: none;
+    text-shadow: 1px 1px 2px black;
+}
+
+/* ========================================================================= */
 /* HUD FIN DE TOUR : OMBRE PORTÉE SUR LES PIXELS VISIBLES                    */
 /* ========================================================================= */
 #combat-hud-bas-droite img {

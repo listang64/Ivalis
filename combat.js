@@ -505,7 +505,7 @@ window.fermerCombat = function() {
     // avait, que l'œil d'or des joueurs ne pouvait pas montrer, et qui
     // bloquaient pourtant leurs déplacements. On revient donc au terrain
     // enregistré : ce qui n'a pas été validé n'existe nulle part.
-    const enregistre = window.TERRAIN_VTT_ENREGISTRE || { supprimees: [], murs: [], difficiles: [] };
+    const enregistre = window.TERRAIN_VTT_ENREGISTRE || { supprimees: [], murs: [], difficiles: [], spawns: [] };
     if (window.VTT_MODE_EFFACEMENT) {
         window.VTT_MODE_EFFACEMENT = false;
         isPaintingVTT = false;
@@ -526,6 +526,13 @@ window.fermerCombat = function() {
         const btnDifficile = document.getElementById("btn-difficile-vtt");
         if (btnDifficile) btnDifficile.classList.remove("actif");
         if (window.PLATEAU_VTT) window.appliquerTerrainDifficile(enregistre.difficiles);
+    }
+    if (window.VTT_MODE_SPAWN) {
+        window.VTT_MODE_SPAWN = false;
+        isPaintingVTT = false;
+        const btnSpawn = document.getElementById("btn-spawn-vtt");
+        if (btnSpawn) btnSpawn.classList.remove("actif");
+        if (window.PLATEAU_VTT) window.appliquerSpawnEnnemis(enregistre.spawns || []);
     }
     if (typeof window.fermerToutesLesFenetres === "function") {
         window.fermerToutesLesFenetres();
@@ -1854,8 +1861,25 @@ window.appliquerTransformPlateau = function() {
 window.VTT_MODE_EFFACEMENT = false;
 window.VTT_MODE_MURS = false;
 window.VTT_MODE_DIFFICILE = false;
+// Le pinceau des cases d'apparition des ennemis (v261) : là où les créatures
+// d'une rencontre, et leurs renforts, entrent sur le plateau.
+window.VTT_MODE_SPAWN = false;
 let isPaintingVTT = false;
-let currentPaintAction = null; // 'delete', 'restore', 'block', 'unblock', 'difficult', 'undifficult'
+let currentPaintAction = null; // 'delete', 'restore', 'block', 'unblock', 'difficult', 'undifficult', 'spawn', 'unspawn'
+
+// Un pinceau en main (gomme, murs, difficile ou apparition des ennemis) ?
+const pinceauVTTEnMain = () => !!(window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS
+                                  || window.VTT_MODE_DIFFICILE || window.VTT_MODE_SPAWN);
+
+// Ce que fera tout le geste qui commence sur cette case : poser la couche si
+// elle n'y est pas, l'enlever si elle y est.
+function actionDuPinceauVTT(state) {
+    if (window.VTT_MODE_EFFACEMENT) return state.isDeleted ? 'restore' : 'delete';
+    if (window.VTT_MODE_MURS) return state.isBlocked ? 'unblock' : 'block';
+    if (window.VTT_MODE_DIFFICILE) return state.isDifficult ? 'undifficult' : 'difficult';
+    if (window.VTT_MODE_SPAWN) return state.isSpawnEnnemi ? 'unspawn' : 'spawn';
+    return null;
+}
 let dernierHexPeint = null;
 let framePeintureVTT = null;
 
@@ -1883,6 +1907,8 @@ function peindreHexVTT(hex, forcer) {
         window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isBlocked: currentPaintAction === 'block' });
     } else if (window.VTT_MODE_DIFFICILE) {
         window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isDifficult: currentPaintAction === 'difficult' });
+    } else if (window.VTT_MODE_SPAWN) {
+        window.PLATEAU_VTT.setCaseState(hex.q, hex.r, { isSpawnEnnemi: currentPaintAction === 'spawn' });
     }
     demanderRenderPeintureVTT();
 }
@@ -1911,15 +1937,12 @@ window.activerPanZoom = function() {
     // --- SOURIS (Pan & Peinture PC) ---
     conteneur.addEventListener("mousedown", (e) => {
         if (conteneur.contains(e.target)) {
-            if (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS || window.VTT_MODE_DIFFICILE) {
+            if (pinceauVTTEnMain()) {
                 isPaintingVTT = true;
                 dernierHexPeint = null;
                 const hex = getHexFromMouse(e.clientX, e.clientY);
                 if (hex) {
-                    const state = window.PLATEAU_VTT.getCaseState(hex.q, hex.r);
-                    if (window.VTT_MODE_EFFACEMENT) currentPaintAction = state.isDeleted ? 'restore' : 'delete';
-                    else if (window.VTT_MODE_MURS) currentPaintAction = state.isBlocked ? 'unblock' : 'block';
-                    else if (window.VTT_MODE_DIFFICILE) currentPaintAction = state.isDifficult ? 'undifficult' : 'difficult';
+                    currentPaintAction = actionDuPinceauVTT(window.PLATEAU_VTT.getCaseState(hex.q, hex.r));
                     peindreHexVTT(hex, true);
                 }
             } else {
@@ -1932,7 +1955,7 @@ window.activerPanZoom = function() {
     });
 
     window.addEventListener("mousemove", (e) => {
-        if (isPaintingVTT && (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS || window.VTT_MODE_DIFFICILE)) {
+        if (isPaintingVTT && pinceauVTTEnMain()) {
             peindreHexVTT(getHexFromMouse(e.clientX, e.clientY), false);
             return;
         }
@@ -1956,7 +1979,7 @@ window.activerPanZoom = function() {
     conteneur.addEventListener("touchstart", (e) => {
         if (conteneur.contains(e.target)) {
             if (e.touches.length === 1) {
-                if (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS || window.VTT_MODE_DIFFICILE) {
+                if (pinceauVTTEnMain()) {
                     isPaintingVTT = true;
                     dernierHexPeint = null;
 
@@ -1965,10 +1988,7 @@ window.activerPanZoom = function() {
                         if (isPaintingVTT && window.PLATEAU_VTT) {
                             const hex = getHexFromMouse(e.touches[0].clientX, e.touches[0].clientY);
                             if (hex) {
-                                const state = window.PLATEAU_VTT.getCaseState(hex.q, hex.r);
-                                if (window.VTT_MODE_EFFACEMENT) currentPaintAction = state.isDeleted ? 'restore' : 'delete';
-                                else if (window.VTT_MODE_MURS) currentPaintAction = state.isBlocked ? 'unblock' : 'block';
-                                else if (window.VTT_MODE_DIFFICILE) currentPaintAction = state.isDifficult ? 'undifficult' : 'difficult';
+                                currentPaintAction = actionDuPinceauVTT(window.PLATEAU_VTT.getCaseState(hex.q, hex.r));
                                 peindreHexVTT(hex, true);
                             }
                         }
@@ -1997,7 +2017,7 @@ window.activerPanZoom = function() {
         }
 
         if (e.touches.length === 1) {
-            if (isPaintingVTT && (window.VTT_MODE_EFFACEMENT || window.VTT_MODE_MURS || window.VTT_MODE_DIFFICILE)) {
+            if (isPaintingVTT && pinceauVTTEnMain()) {
                 peindreHexVTT(getHexFromMouse(e.touches[0].clientX, e.touches[0].clientY), false);
                 return;
             }
@@ -2030,7 +2050,7 @@ window.activerPanZoom = function() {
         
         if (e.touches.length === 1) {
             lastPinchDist = 0;
-            if (!window.VTT_MODE_EFFACEMENT && !window.VTT_MODE_MURS && !window.VTT_MODE_DIFFICILE) {
+            if (!pinceauVTTEnMain()) {
                 isDraggingVTT = true;
                 startDragX = e.touches[0].clientX - window.VTT_POS_X;
                 startDragY = e.touches[0].clientY - window.VTT_POS_Y;
@@ -2116,7 +2136,8 @@ window.ecouterTerrainVTT = function() {
             window.TERRAIN_VTT_ENREGISTRE = {
                 supprimees: data.Tuiles_Supprimees || [],
                 murs: data.Tuiles_Murs || [],
-                difficiles: data.Tuiles_Difficiles || []
+                difficiles: data.Tuiles_Difficiles || [],
+                spawns: data.Tuiles_Spawn_Ennemis || []
             };
 
             // UNE COUCHE EN COURS DE PEINTURE N'EST PAS ÉCRASÉE. Chaque
@@ -2141,6 +2162,13 @@ window.ecouterTerrainVTT = function() {
             // NOUVEAU : Application du terrain difficile
             if (data.Tuiles_Difficiles !== undefined && !window.VTT_MODE_DIFFICILE) {
                 window.appliquerTerrainDifficile(data.Tuiles_Difficiles);
+            }
+
+            // Les cases d'apparition des ennemis (v261) : sur tous les postes,
+            // puisque le cerveau — qui fait entrer les renforts — peut être
+            // un autre appareil que celui du MJ.
+            if (data.Tuiles_Spawn_Ennemis !== undefined && !window.VTT_MODE_SPAWN) {
+                window.appliquerSpawnEnnemis(data.Tuiles_Spawn_Ennemis);
             }
 
             // ...puis on gère la grille en elle-même !
@@ -2824,8 +2852,9 @@ window.genererTokensCombat = async function() {
         if (!imgToUse) return;
 
         if (!tokensData[perso.idPersonnage]) {
-            const hexLibre = window.trouverHexLibreAutour(
-                tokensData, window.pointApparition(perso.camp), 2);
+            const hexLibre = perso.camp === "Ennemi" && typeof window.caseApparitionEnnemi === "function"
+                ? window.caseApparitionEnnemi(tokensData)
+                : window.trouverHexLibreAutour(tokensData, window.pointApparition(perso.camp), 2);
             tokensData[perso.idPersonnage] = {
                 q: hexLibre.q,
                 r: hexLibre.r,
@@ -3923,50 +3952,42 @@ window.changerTailleHexa = function(delta) {
 //  GESTION DES PINCEAUX VTT (MURS, GOMME, DIFFICILE) ET EXCLUSIVITÉ
 // =========================================================================
 
-window.toggleModeEffacementHex = function() {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    
-    if (window.VTT_MODE_MURS) { window.VTT_MODE_MURS = false; document.getElementById("btn-murs-vtt")?.classList.remove("actif"); window.sauvegarderMurs(); }
-    if (window.VTT_MODE_DIFFICILE) { window.VTT_MODE_DIFFICILE = false; document.getElementById("btn-difficile-vtt")?.classList.remove("actif"); window.sauvegarderTerrainDifficile(); }
+// Un seul pinceau en main à la fois : prendre l'un repose les autres, chacun
+// enregistrant sa couche ; reposer celui qu'on tient enregistre la sienne.
+const PINCEAUX_VTT = [
+    { mode: "VTT_MODE_EFFACEMENT", bouton: "btn-gomme-vtt",     sauver: () => window.sauvegarderTuilesSupprimees() },
+    { mode: "VTT_MODE_MURS",       bouton: "btn-murs-vtt",      sauver: () => window.sauvegarderMurs() },
+    { mode: "VTT_MODE_DIFFICILE",  bouton: "btn-difficile-vtt", sauver: () => window.sauvegarderTerrainDifficile() },
+    { mode: "VTT_MODE_SPAWN",      bouton: "btn-spawn-vtt",     sauver: () => window.sauvegarderSpawnEnnemis() }
+];
 
-    window.VTT_MODE_EFFACEMENT = !window.VTT_MODE_EFFACEMENT;
-    const btn = document.getElementById("btn-gomme-vtt");
+function basculerPinceauVTT(mode) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+
+    PINCEAUX_VTT.forEach(autre => {
+        if (autre.mode === mode || !window[autre.mode]) return;
+        window[autre.mode] = false;
+        document.getElementById(autre.bouton)?.classList.remove("actif");
+        autre.sauver();
+    });
+
+    const pinceau = PINCEAUX_VTT.find(x => x.mode === mode);
+    window[mode] = !window[mode];
+    const btn = document.getElementById(pinceau.bouton);
     if (btn) {
-        if (window.VTT_MODE_EFFACEMENT) btn.classList.add("actif");
-        else { btn.classList.remove("actif"); window.sauvegarderTuilesSupprimees(); }
+        if (window[mode]) btn.classList.add("actif");
+        else { btn.classList.remove("actif"); pinceau.sauver(); }
     }
     if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
-};
+}
 
-window.toggleModeMursHex = function() {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    
-    if (window.VTT_MODE_EFFACEMENT) { window.VTT_MODE_EFFACEMENT = false; document.getElementById("btn-gomme-vtt")?.classList.remove("actif"); window.sauvegarderTuilesSupprimees(); }
-    if (window.VTT_MODE_DIFFICILE) { window.VTT_MODE_DIFFICILE = false; document.getElementById("btn-difficile-vtt")?.classList.remove("actif"); window.sauvegarderTerrainDifficile(); }
-
-    window.VTT_MODE_MURS = !window.VTT_MODE_MURS;
-    const btn = document.getElementById("btn-murs-vtt");
-    if (btn) {
-        if (window.VTT_MODE_MURS) btn.classList.add("actif");
-        else { btn.classList.remove("actif"); window.sauvegarderMurs(); }
-    }
-    if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
-};
-
-window.toggleModeTerrainDifficileHex = function() {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    
-    if (window.VTT_MODE_EFFACEMENT) { window.VTT_MODE_EFFACEMENT = false; document.getElementById("btn-gomme-vtt")?.classList.remove("actif"); window.sauvegarderTuilesSupprimees(); }
-    if (window.VTT_MODE_MURS) { window.VTT_MODE_MURS = false; document.getElementById("btn-murs-vtt")?.classList.remove("actif"); window.sauvegarderMurs(); }
-
-    window.VTT_MODE_DIFFICILE = !window.VTT_MODE_DIFFICILE;
-    const btn = document.getElementById("btn-difficile-vtt");
-    if (btn) {
-        if (window.VTT_MODE_DIFFICILE) btn.classList.add("actif");
-        else { btn.classList.remove("actif"); window.sauvegarderTerrainDifficile(); }
-    }
-    if (window.PLATEAU_VTT) window.PLATEAU_VTT.renderMap();
-};
+window.toggleModeEffacementHex = () => basculerPinceauVTT("VTT_MODE_EFFACEMENT");
+window.toggleModeMursHex = () => basculerPinceauVTT("VTT_MODE_MURS");
+window.toggleModeTerrainDifficileHex = () => basculerPinceauVTT("VTT_MODE_DIFFICILE");
+// Le pinceau SPAWN (v261, Nico : « à côté des dessins de murs, un bouton pour
+// générer des hexagones de spawn ennemis ») : on peint les cases où entrent
+// les créatures — la rencontre comme les renforts (caseApparitionEnnemi).
+window.toggleModeSpawnEnnemisHex = () => basculerPinceauVTT("VTT_MODE_SPAWN");
 
 // Ce combattant a-t-il déjà lancé sa compétence (ou fini son tour) ? La
 // demande reste « en vol » jusqu'à ce que l'écran ait rejoué la fin de son
@@ -4032,6 +4053,12 @@ window.sauvegarderTerrainDifficile = async function() {
     try { await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Tuiles_Difficiles: diffHexes }, { merge: true }); } catch(e) {}
 };
 
+window.sauvegarderSpawnEnnemis = async function() {
+    if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return;
+    const spawnHexes = Object.keys(window.PLATEAU_VTT.gridState).filter(key => window.PLATEAU_VTT.gridState[key].isSpawnEnnemi);
+    try { await setDoc(doc(db, "Combat_VTT", window.ID_PARTIE_COURANTE), { Tuiles_Spawn_Ennemis: spawnHexes }, { merge: true }); } catch(e) {}
+};
+
 window.appliquerTuilesSupprimees = function(tuilesList) {
     if (!window.PLATEAU_VTT) return;
     for (const key in window.PLATEAU_VTT.gridState) window.PLATEAU_VTT.gridState[key].isDeleted = false;
@@ -4050,6 +4077,13 @@ window.appliquerTerrainDifficile = function(tuilesList) {
     if (!window.PLATEAU_VTT) return;
     for (const key in window.PLATEAU_VTT.gridState) window.PLATEAU_VTT.gridState[key].isDifficult = false;
     if (Array.isArray(tuilesList)) tuilesList.forEach(key => { if (!window.PLATEAU_VTT.gridState[key]) window.PLATEAU_VTT.gridState[key] = {}; window.PLATEAU_VTT.gridState[key].isDifficult = true; });
+    window.PLATEAU_VTT.renderMap();
+};
+
+window.appliquerSpawnEnnemis = function(tuilesList) {
+    if (!window.PLATEAU_VTT) return;
+    for (const key in window.PLATEAU_VTT.gridState) window.PLATEAU_VTT.gridState[key].isSpawnEnnemi = false;
+    if (Array.isArray(tuilesList)) tuilesList.forEach(key => { if (!window.PLATEAU_VTT.gridState[key]) window.PLATEAU_VTT.gridState[key] = {}; window.PLATEAU_VTT.gridState[key].isSpawnEnnemi = true; });
     window.PLATEAU_VTT.renderMap();
 };
 
@@ -6884,11 +6918,58 @@ window.trouverHexLibreAutour = function(tokensData, centre, rayon) {
 };
 
 // Le point d'apparition d'un camp, tel qu'il est enregistré pour cette partie.
+// Celui des ennemis, s'il n'a pas été posé, est le cœur des cases d'apparition
+// peintes (v261) : la demande du début de combat n'a alors plus à le réclamer.
 window.pointApparition = function(camp) {
     const partie = window.PARTIE_DATA || {};
     const point = camp === "Ennemi" ? partie.Spawn_Ennemis : partie.Spawn_Allies;
-    if (!point || point.q === undefined || point.r === undefined) return null;
+    if (!point || point.q === undefined || point.r === undefined) {
+        return camp === "Ennemi" ? coeurDesCasesSpawn() : null;
+    }
     return { q: point.q, r: point.r };
+};
+
+// =========================================================================
+//  LES CASES D'APPARITION DES ENNEMIS (le pinceau SPAWN, v261)
+// =========================================================================
+//  Le MJ les peint sur la carte comme des murs : les créatures d'une
+//  rencontre, puis leurs renforts, entrent sur l'une d'elles, libre, au
+//  hasard. Toutes prises, elles débordent sur la case libre la plus proche
+//  de l'une d'elles. Sans case peinte, rien ne change : autour du repère.
+//  Une case gommée ou murée par-dessus ne compte plus.
+window.casesSpawnEnnemis = function() {
+    const grille = (window.PLATEAU_VTT && window.PLATEAU_VTT.gridState) || {};
+    return Object.keys(grille)
+        .filter(cle => grille[cle].isSpawnEnnemi && !grille[cle].isDeleted && !grille[cle].isBlocked)
+        .map(cle => { const [q, r] = cle.split(",").map(Number); return { q, r }; });
+};
+
+// La case peinte la plus proche du centre de toutes les autres.
+function coeurDesCasesSpawn() {
+    const cases = window.casesSpawnEnnemis();
+    if (cases.length === 0) return null;
+    const mq = cases.reduce((t, c) => t + c.q, 0) / cases.length;
+    const mr = cases.reduce((t, c) => t + c.r, 0) / cases.length;
+    const centre = { q: Math.round(mq), r: Math.round(mr) };
+    return cases.reduce((meilleure, c) => distanceHexVTT(c, centre) < distanceHexVTT(meilleure, centre) ? c : meilleure);
+}
+
+// Une case d'apparition libre, tirée au sort — ou null s'il n'y en a aucune
+// de peinte.
+window.trouverHexSpawnEnnemi = function(tokensData) {
+    const cases = window.casesSpawnEnnemis();
+    if (cases.length === 0) return null;
+    const pions = Object.values(tokensData || {});
+    const libres = cases.filter(c => !pions.some(t => t && t.q === c.q && t.r === c.r));
+    if (libres.length > 0) return libres[Math.floor(Math.random() * libres.length)];
+    return window.trouverHexLibreAutour(tokensData, cases[Math.floor(Math.random() * cases.length)], 1);
+};
+
+// Où entre une créature : sur une case peinte, sinon autour du repère des
+// ennemis (et sans repère, au plus près du centre).
+window.caseApparitionEnnemi = function(tokensData) {
+    return window.trouverHexSpawnEnnemi(tokensData)
+        || window.trouverHexLibreAutour(tokensData, window.pointApparition("Ennemi"), 2);
 };
 
 // Un clic franc : ni un glissement de carte, ni un appui prolongé, ni un
@@ -7014,7 +7095,14 @@ window.demarrerPlacementApparition = function() {
     const titre = document.getElementById("placement-apparition-titre");
     if (!calque || !titre) return;
 
+    // On ne demande que ce qui manque : avec des cases d'apparition peintes,
+    // le repère des ennemis est déjà là (pointApparition).
     const points = {};
+    const etapeSuivante = (apres) => {
+        if (!apres && !window.pointApparition("Allié")) return "Allié";
+        if (!window.pointApparition("Ennemi")) return "Ennemi";
+        return null;
+    };
 
     const annoncer = (camp) => {
         titre.innerText = camp === "Ennemi"
@@ -7037,20 +7125,23 @@ window.demarrerPlacementApparition = function() {
         if (typeof window.jouerSonClic === "function") window.jouerSonClic();
 
         const etape = window.PLACEMENT_APPARITION.etape;
-        if (etape === "Allié") {
-            points.allies = hex;
-            window.PLACEMENT_APPARITION.etape = "Ennemi";
-            annoncer("Ennemi");
+        if (etape === "Allié") points.allies = hex;
+        else points.ennemis = hex;
+
+        const suivante = etape === "Allié" ? etapeSuivante(true) : null;
+        if (suivante) {
+            window.PLACEMENT_APPARITION.etape = suivante;
+            annoncer(suivante);
             return;
         }
-
-        points.ennemis = hex;
         window.arreterPlacementApparition();
         window.enregistrerPointsApparition(points.allies, points.ennemis);
     };
 
-    window.PLACEMENT_APPARITION = { etape: "Allié", nettoyer: armerClicFrancPlateau(poser) };
-    annoncer("Allié");
+    const premiere = etapeSuivante(false);
+    if (!premiere) return;
+    window.PLACEMENT_APPARITION = { etape: premiere, nettoyer: armerClicFrancPlateau(poser) };
+    annoncer(premiere);
     window.positionnerBandeauApparition();
     calque.style.display = "flex";
 };
@@ -7059,15 +7150,16 @@ window.enregistrerPointsApparition = async function(allies, ennemis) {
     if (!window.ID_PARTIE_COURANTE) return;
     // Écriture immédiate en mémoire : la génération des pions qui suit ne doit
     // pas attendre l'aller-retour réseau pour connaître les deux repères.
-    if (window.PARTIE_DATA) {
-        window.PARTIE_DATA.Spawn_Allies = allies;
-        window.PARTIE_DATA.Spawn_Ennemis = ennemis;
-    }
+    // Seuls les repères posés s'écrivent : celui des ennemis manque quand des
+    // cases d'apparition sont peintes (v261).
+    const reperes = {};
+    if (allies) reperes.Spawn_Allies = allies;
+    if (ennemis) reperes.Spawn_Ennemis = ennemis;
+    if (window.PARTIE_DATA) Object.assign(window.PARTIE_DATA, reperes);
     try {
-        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
-            Spawn_Allies: allies,
-            Spawn_Ennemis: ennemis
-        });
+        if (Object.keys(reperes).length > 0) {
+            await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), reperes);
+        }
         console.log("Points d'apparition enregistrés :", allies, ennemis);
     } catch (e) {
         console.error("Erreur d'enregistrement des points d'apparition :", e);
