@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=93">
+  <link rel="stylesheet" href="style.css?v=94">
 
  
   <!-- ===================================================================== -->
@@ -1476,9 +1476,9 @@
       </button>
       <br><br>
 
-      <!-- LES RENCONTRES PAR DIFFICULTÉ (v253) : la table des possibilités, modifiable -->
+      <!-- LES APPARITIONS (v262) : ce que chacune fait entrer (plus de difficulté) -->
       <button id="btn-table-rencontres" class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.ouvrirTableRencontres()">
-        Rencontres par difficulté
+        Apparitions
       </button>
       <br><br>
 
@@ -1631,7 +1631,7 @@
           <span class="reglages-monstres-aide">s'appliquent tout de suite, en jeu</span>
         </div>
         <table class="table-reglages-monstres">
-          <thead><tr><th></th><th>Petit</th><th>Normal</th><th>Élite</th><th>Boss</th></tr></thead>
+          <thead><tr><th></th><th>Petit</th><th>Normal</th><th>Boss</th></tr></thead>
           <tbody id="tbody-reglages-monstres"></tbody>
         </table>
         <div class="reglages-monstres-sorts">
@@ -1639,6 +1639,14 @@
           <input id="reglage-bonus-sorts" type="number" inputmode="numeric" class="reglage-monstres-valeur" min="-50" max="200"
                  onchange="window.modifierReglageMonstre('bonusSortsPct', '', this)"> % en plus
           <span id="reglages-monstres-etat" class="reglages-monstres-etat"></span>
+        </div>
+        <!-- LE LEADER (v262) : ce qu'un leader gagne en plus (monstres.js). -->
+        <div id="reglages-leader" class="reglages-leader">
+          <div class="reglages-monstres-entete">
+            <span class="reglages-monstres-nom">👑 Leader</span>
+            <span class="reglages-monstres-aide">en plus de sa stature — PV et défenses au prochain leader posé</span>
+          </div>
+          <div id="corps-reglages-leader" class="corps-reglages-leader"></div>
         </div>
       </div>
 
@@ -1666,21 +1674,19 @@
     </div>
 
     <!-- ======================================================= -->
-    <!--  RENCONTRES : les possibilités par difficulté (v253)     -->
+    <!--  APPARITIONS : ce que chacune fait entrer (v262)         -->
     <!-- ======================================================= -->
     <div id="etape-rencontres-monstres" class="fenetre-volante-parchemin-large fondu-interne" style="display: none; opacity: 0;">
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #5c3a21; margin-bottom: 10px; padding-bottom: 10px;">
-        <h2 style="margin: 0; border: none; padding: 0;">Rencontres — possibilités par difficulté</h2>
+        <h2 style="margin: 0; border: none; padding: 0;">Apparitions — qui entre, qui mène, qui suit</h2>
         <div style="display: flex; gap: 10px; align-items: center;">
-          <span id="rencontres-monstres-etat" class="reglages-monstres-etat"></span>
-          <button class="btn-parametres" onclick="jouerSonClic(); window.retablirTableRencontres()">Rétablir l'origine</button>
           <button class="btn-parametres" onclick="jouerSonClic(); window.fermerTableRencontres()">Retour</button>
         </div>
       </div>
       <p style="font-size: 13px; color: #5c3a21; margin: 0 0 10px 0; font-style: italic;">
-        Chaque ligne est une rencontre possible : le bouton 💀 en tire une au hasard dans la difficulté choisie.
-        Les Boss et les Élites entrent les premiers ; au-delà de la place sur le terrain, le reste attend en renfort.
-        Chaque case s'enregistre dès qu'on la quitte.
+        Le bouton 💀 demande l'apparition : le nombre d'ennemis engagés dans le récit. Chaque « ou » se tire au hasard.
+        Les créatures entrent sur les cases d'apparition (pinceau SPAWN) ; un renfort entre au début de la manche prévue,
+        ou dès la suivante si plus aucune créature ne tient debout.
       </p>
       <div id="corps-rencontres-monstres" class="corps-rencontres-monstres"></div>
     </div>
@@ -2169,7 +2175,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=172"></script>
+<script src="trace_combat.js?v=173"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2186,14 +2192,14 @@
      vérifie qu'ils sont identiques. Elle doit précéder tout module. -->
 <script type="importmap">
 { "imports": {
-    "./combat_etat.js": "./combat_etat.js?v=40",
-    "./moteur_pur.js": "./moteur_pur.js?v=65",
+    "./combat_etat.js": "./combat_etat.js?v=41",
+    "./moteur_pur.js": "./moteur_pur.js?v=66",
     "./mouvement_pur.js": "./mouvement_pur.js?v=22",
     "./ia_pure.js": "./ia_pure.js?v=15",
     "./cerveau_combat.js": "./cerveau_combat.js?v=59",
     "./spectateur_combat.js": "./spectateur_combat.js?v=8",
     "./depot_firestore.js": "./depot_firestore.js?v=11",
-    "./pont_combat.js": "./pont_combat.js?v=42",
+    "./pont_combat.js": "./pont_combat.js?v=43",
     "./playlist.js": "./playlist.js?v=1"
 } }
 </script>
@@ -2206,10 +2212,10 @@
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
-<script type="module" src="combat_etat.js?v=40"></script>
+<script type="module" src="combat_etat.js?v=41"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=65"></script>
+<script type="module" src="moteur_pur.js?v=66"></script>
 <script type="module" src="mouvement_pur.js?v=22"></script>
 <script type="module" src="ia_pure.js?v=15"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
@@ -2222,9 +2228,9 @@
 <script type="module" src="depot_firestore.js?v=11"></script>
 <!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
      vers les animations existantes — il ne recalcule jamais rien. -->
-<script type="module" src="pont_combat.js?v=42"></script>
+<script type="module" src="pont_combat.js?v=43"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
-<script type="module" src="regime_cerveau.js?v=50"></script>
+<script type="module" src="regime_cerveau.js?v=51"></script>
 <script type="module" src="ia_master.js?v=7"></script>
 <script type="module" src="app.js?v=120"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
@@ -2264,12 +2270,12 @@
 <script type="module" src="sequence_tour.js?v=25"></script>
 <script src="zombie_token.js?v=1"></script>
 <script src="murs_terre.js?v=10"></script>
-<script type="module" src="combat.js?v=146"></script>
+<script type="module" src="combat.js?v=147"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=40"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
 <script type="module" src="moteur_effets.js?v=100"></script>
-<script type="module" src="monstres.js?v=36"></script>
+<script type="module" src="monstres.js?v=37"></script>
 <script type="module" src="monstres_competences.js?v=28"></script>
 <script type="module" src="monstres_ia.js?v=41"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
@@ -2288,30 +2294,31 @@
     <div style="font-family: 'Cinzel', serif; font-size: 26px; font-weight: bold; color: #ff6b6b; text-align: center; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 14px rgba(255,76,76,0.5); margin-bottom: 6px;">
       Invoquer une rencontre
     </div>
-    <p style="text-align: center; font-family: 'Almendra', serif; font-size: 14px; color: #c2a878; margin: 0 0 22px 0; font-style: italic;">
-      La composition est tirée au sort. Quatre ennemis au maximum sont posés sur le terrain, les suivants arrivent en renfort.
+    <p style="text-align: center; font-family: 'Almendra', serif; font-size: 14px; color: #c2a878; margin: 0 0 18px 0; font-style: italic;">
+      Combien d'ennemis sont engagés dans le récit ? La composition est tirée au sort ; les créatures entrent sur les cases d'apparition.
     </p>
 
-    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px;">
-      <div class="choix-difficulte-rencontre" data-difficulte="Normale"
-           onclick="window.choisirDifficulteRencontre('Normale')"
-           style="cursor: pointer; border: 2px solid #5c3a21; border-radius: 10px; padding: 12px 16px; background: rgba(0,0,0,0.25); transition: all 0.2s ease;">
-        <div style="font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; color: #e8d5a5;">Normale</div>
-        <div style="font-family: 'Almendra', serif; font-size: 13px; color: #a89f91;">Un groupe de créatures Petites et Normales.</div>
+    <!-- LES APPARITIONS (v262) : plus de difficulté (monstres.js, APPARITIONS). -->
+    <div class="choix-apparitions">
+      <div class="choix-apparition-rencontre" data-apparition="1" onclick="window.choisirApparitionRencontre(1)">
+        <div class="choix-apparition-titre">Apparition 1</div>
+        <div class="choix-apparition-aide">Un chef, sa meute au tour suivant — ou une créature qui se relève en leader, avec des renforts.</div>
       </div>
-
-      <div class="choix-difficulte-rencontre" data-difficulte="Difficile"
-           onclick="window.choisirDifficulteRencontre('Difficile')"
-           style="cursor: pointer; border: 2px solid #5c3a21; border-radius: 10px; padding: 12px 16px; background: rgba(0,0,0,0.25); transition: all 0.2s ease;">
-        <div style="font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; color: #e8d5a5;">Difficile</div>
-        <div style="font-family: 'Almendra', serif; font-size: 13px; color: #a89f91;">Le même groupe, mené par un champion Élite.</div>
+      <div class="choix-apparition-rencontre" data-apparition="2" onclick="window.choisirApparitionRencontre(2)">
+        <div class="choix-apparition-titre">Apparition 2</div>
+        <div class="choix-apparition-aide">Deux ennemis dont un tank ; un renfort au bout de 2 tours ; un leader parmi tous.</div>
       </div>
-
-      <div class="choix-difficulte-rencontre" data-difficulte="Très difficile"
-           onclick="window.choisirDifficulteRencontre('Très difficile')"
-           style="cursor: pointer; border: 2px solid #5c3a21; border-radius: 10px; padding: 12px 16px; background: rgba(0,0,0,0.25); transition: all 0.2s ease;">
-        <div style="font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; color: #e8d5a5;">Très difficile</div>
-        <div style="font-family: 'Almendra', serif; font-size: 13px; color: #a89f91;">Le même groupe, mené par un Boss.</div>
+      <div class="choix-apparition-rencontre" data-apparition="3" onclick="window.choisirApparitionRencontre(3)">
+        <div class="choix-apparition-titre">Apparition 3</div>
+        <div class="choix-apparition-aide">Trois ou quatre ennemis dont un leader ; un renfort au bout de 4 tours.</div>
+      </div>
+      <div class="choix-apparition-rencontre" data-apparition="4" onclick="window.choisirApparitionRencontre(4)">
+        <div class="choix-apparition-titre">Apparition 4 et plus</div>
+        <div class="choix-apparition-aide">Quatre ou cinq ennemis dont un leader ; pas de renfort.</div>
+      </div>
+      <div class="choix-apparition-rencontre choix-aleatoire" data-apparition="aleatoire" onclick="window.choisirApparitionRencontre('aleatoire')">
+        <div class="choix-apparition-titre">Aléatoire</div>
+        <div class="choix-apparition-aide">L'une des quatre, au hasard.</div>
       </div>
     </div>
 

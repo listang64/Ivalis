@@ -7577,3 +7577,87 @@ qui n'est pas écrasé, la fermeture sans valider ; les créatures sur les cases
 des cases, l'ancien comportement sans case), la vraie pose de monstres.js,
 un vrai renfort, le bouton PIONS ; la demande des repères avec et sans
 cases ; les versions. Il mord sur l'ancien code (35 échecs).
+
+## v262 — Petits, Normaux, Boss ; le Leader ; les apparitions
+
+Nico : « On va refondre les types de monstres : Petits, normaux, boss » ; le
+statut « Leader » ; « dans le bouton qui réinitialise et demande le type de
+difficulté de rencontre, il n'y a plus de difficulté : demande apparition 1,
+2, 3, 4 ou aléatoire » ; les règles de chaque apparition et de leurs
+archetypes ; « mets à jour le tableau dans Paramètres > Monstres et enlève les
+lignes Élite » ; les bonus du leader, réglables.
+
+- LES STATURES (monstres.js) : Petit, Normal, Boss. Le bestiaire ne s'amorce
+  plus en Élite, et les anciennes lignes Élite restées en base ne s'affichent
+  ni ne se tirent plus. La triche et la marche par stature n'ont plus que trois
+  colonnes (le noyau garde le chiffre Élite pour une créature d'avant).
+- LA PISTE D'INITIATIVE (combat.js) : le rond d'un Petit est blanc, celui d'un
+  Normal or, celui d'un Boss rouge. Un leader porte en plus un liseré rouge
+  autour de sa couleur (un anneau d'ombre : le rond garde sa taille).
+- LE LEADER : un Petit ou un Normal, jamais un Boss. Son pion porte une aura
+  rouge qui respire et dont les éclats scintillent en tournant (style.css,
+  .aura-leader), sous son image. Au combat : +15 % de dégâts et de soins (en
+  plus de la triche de sa stature, bonusMonstreDe), +15 points de chance à
+  chaque état que sa carte peut poser (chanceEtatDe — 30 % deviennent 45 %),
+  +15 points de défense physique et magique (20 % deviennent 35 %) et +15 PV,
+  posés sur sa fiche à sa création (champsLeader). Les quatre chiffres se
+  règlent dans Paramètres > Monstres, encart « 👑 Leader », sous la triche :
+  ils s'écrivent dans Monstres_Modeles/_REGLAGES (champ Leader) et valent tout
+  de suite sur chaque poste — les PV et défenses pour le prochain leader posé.
+- LES APPARITIONS (monstres.js, APPARITIONS ; la fenêtre 💀) : Apparition 1, 2,
+  3, 4 et plus, ou Aléatoire (choisi d'office). Le nombre est celui des
+  ennemis engagés au départ, dans le récit.
+  · 1 — 40 % : un Normal leader, et au bout de 1 tour (manche 2) quatre Petits,
+    dont un soutien. 60 % : un Normal qui, mis KO, se relève en leader (tous
+    ses PV et toute son énergie, +15 PV et +15 de défenses, ses états effacés)
+    et appelle 1 Normal + 2 Petits, ou 3 Petits, ou 2 Normaux + 1 Petit (un
+    soutien au plus). Le premier est toujours un tank, un combattant (DPS CAC)
+    ou un mage au contact (DPS MAGE CAC).
+  · 2 — 2 Normaux ou 1 Normal + 1 Petit : un tank et une créature au hasard,
+    pas un soutien. Au bout de 2 tours (manche 3) : 1N + 2P, 3P ou 2N + 1P, un
+    soutien au plus. Un leader parmi toutes, renforts compris.
+  · 3 — 3N, 1N + 2P, 2N + 1P ou 4P, un soutien au plus, un leader parmi elles.
+    Au bout de 4 tours (manche 5) : 1N + 1P, 3P ou 2N, un soutien au plus.
+  · 4 et plus — 4N, 3N + 1P, 2N + 2P ou 5P, un soutien au plus, un leader.
+  Tout le départ entre (plus de limite « joueurs + 1 »), sur les cases
+  d'apparition peintes, au hasard ; toutes prises, sur une case libre au
+  contact de l'une d'elles. Toute la rencontre est nommée d'un seul appel,
+  renforts compris. La partie retient Apparition_Rencontre (effacée à la
+  réinitialisation) ; plus de difficulté : le butin tire sur la ligne Normale.
+- LES RENFORTS À LEUR HEURE : chaque renfort de la réserve sait quand il entre
+  (entreeManche) ou ce qui l'appelle (surReleve). Le poste qui tient le
+  cerveau les fait entrer au début de leur manche (apparitionsDuTour,
+  pont_combat.js ; regime_cerveau.js ; entrerRenfortsPrevus) — et si plus
+  aucune créature ne tient debout avant, la vague suivante n'attend pas : elle
+  entre à la manche qui vient. La relève en leader (combat_etat.js, tomber →
+  releveLeader) n'est jamais une chute : la créature ne passe pas « à terre »
+  entre le coup et la relève, son tueur reçoit ce qu'un KO rapporte, elle passe
+  avant le zombie du Profanateur, et ne se relève qu'une fois. Le cerveau
+  l'inscrit dans son document (enregistrerReleveLeader) et fait entrer ses
+  renforts (entrerRenfortsDeReleve) — au début de la manche suivante, comme
+  tout renfort. Une réserve d'avant la v262 (sans heure) entre toujours à la
+  place d'un mort. La victoire attend la réserve ; la coupe de victoire de test
+  la vide.
+- PARAMÈTRES > OUTILS : le bouton « Rencontres par difficulté » devient
+  « Apparitions » : la fenêtre montre, sans rien à remplir, ce que chaque
+  apparition fait entrer, lu dans la même table que le tirage.
+
+corrections_v262.mjs (dans la suite), en deux parties. Dans le noyau : le
+leader au combat (dégâts, soins, chances, réglages) ; la relève pas à pas (le
+rejeu jamais à terre, une seule fois, avant le zombie, sa mise en scène, sa
+fiche) ; apparitionsDuTour ; LE VRAI CERVEAU sur un Firestore en mémoire (la
+relève n'est pas une mort, elle s'inscrit et appelle ses renforts ; chaque
+manche appelle les renforts prévus ; le terrain vidé le dit). Sur la vraie
+page : les statures (bestiaire, tableau, réglages) ; l'encart du leader ; la
+piste et l'aura ; 400 tirages par apparition, règle par règle ; la génération
+(tout le départ, les cases peintes, le leader et ses bonus, la réserve et ses
+heures, les noms) ; les renforts à leur heure, le terrain vidé, la relève,
+la réserve d'avant, la victoire ; la fenêtre 💀 et celle des apparitions ; les
+versions. Il mord sur l'ancien code (96 échecs).
+
+Les anciens bancs remis aux règles v262 : corrections_v252, v253 (la table par
+difficulté a cédé la place aux apparitions), v255, v261 (versions au moins),
+piste_initiative (les couleurs), renforts (il monte une réserve d'avant pour
+garder vivante l'entrée à la place d'un mort), campagne_complete (trois
+apparitions, la ligne Normale du butin, les renforts appelés comme le ferait
+le cerveau).

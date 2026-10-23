@@ -268,90 +268,32 @@ await p.evaluate((EFFETS) => {
            r.crans.c1 === 0 && r.crans.c2 === 0 && r.crans.c3 > 0 && /45 %/.test(r.crans.badge || ""), JSON.stringify(r.crans));
 }
 
-console.log("\n4. PARAMÈTRES > OUTILS : LES RENCONTRES PAR DIFFICULTÉ, MODIFIABLES");
+// La table des rencontres par difficulté (v253) n'a plus lieu d'être depuis la
+// v262 (Nico : « il n'y a plus de difficulté de rencontre ») : le même bouton
+// de Paramètres > Outils ouvre maintenant les apparitions, lues dans la table
+// du tirage. Le détail des apparitions est dans corrections_v262.mjs.
+console.log("\n4. PARAMÈTRES > OUTILS : LA TABLE PAR DIFFICULTÉ A CÉDÉ LA PLACE AUX APPARITIONS (v262)");
 {
   const r = await p.evaluate(async () => {
     const out = {};
     const bouton = document.getElementById("btn-table-rencontres");
     const outils = document.getElementById("etape-menu-outils");
     out.bouton = !!bouton && !!outils && outils.contains(bouton);
+    out.libelle = bouton ? bouton.textContent.trim() : "";
     window.__ou(() => window.ouvrirTableRencontres(), null);
     await new Promise(res => setTimeout(res, 400));
     const fen = document.getElementById("etape-rencontres-monstres");
     out.ouverte = !!fen && getComputedStyle(fen).display !== "none";
-    const lire = (diff) => [...document.querySelectorAll(`.bloc-rencontre[data-difficulte="${diff}"] tbody tr`)]
-      .map(tr => [...tr.querySelectorAll("input")].map(i => i.value).join("/"));
-    out.normale = lire("Normale"); out.difficile = lire("Difficile"); out.tres = lire("Très difficile");
-    // On change une case : Normale, 1re ligne → 2 Petits au lieu d'1.
-    window.__setDocs = [];
-    const caseP = document.querySelector('.bloc-rencontre[data-difficulte="Normale"] input[data-ligne="0"][data-palier="Petit"]');
-    if (caseP) { caseP.value = "2"; caseP.dispatchEvent(new Event("change")); }
-    await new Promise(res => setTimeout(res, 50));
-    out.apresCase = lire("Normale")[0];
-    out.ecrit = (window.__setDocs || []).filter(d => d.chemin === "Monstres_Modeles/_RENCONTRES")
-      .map(d => JSON.stringify(d.data.Normale && d.data.Normale[0]) + (d.opt && d.opt.merge ? "+merge" : ""));
-    // Très difficile : une seule possibilité, 1 Boss et 2 Élites.
-    const T = window.__ou(() => JSON.parse(JSON.stringify(window.TABLE_RENCONTRES)), null);
-    if (T) {
-      T["Très difficile"] = [{ Petit: 1, Normal: 0, "Élite": 2, Boss: 1 }];
-      await window.__ou(() => window.enregistrerTableRencontres(T), null);
-    }
-    // Le bestiaire (un archetype par stature suffit à tirer une rencontre).
-    const vraiGabarit = window.gabaritMonstre;
-    window.gabaritMonstre = (a, pal) => (a === "DPS CAC" ? { Archetype: a, Palier: pal } : null);
-    const tirages = [];
-    for (let k = 0; k < 6; k++) tirages.push((window.tirerCompositionRencontre("Très difficile") || []).map(m => m.palier).join(","));
-    out.tirages = [...new Set(tirages)];
-    out.tresLignes = lire("Très difficile");
-    // Ajouter, retirer une possibilité.
-    const ajout = document.querySelector('.bloc-rencontre[data-difficulte="Difficile"] .btn-ajouter-rencontre');
-    if (ajout) ajout.click();
-    await new Promise(res => setTimeout(res, 50));
-    out.apresAjout = lire("Difficile").length;
-    const retrait = document.querySelectorAll('.bloc-rencontre[data-difficulte="Difficile"] .btn-retirer-rencontre')[0];
-    if (retrait) retrait.click();
-    await new Promise(res => setTimeout(res, 50));
-    out.apresRetrait = lire("Difficile").length;
-    // Une ligne sans créature ne se tire jamais.
-    const T2 = window.__ou(() => JSON.parse(JSON.stringify(window.TABLE_RENCONTRES)), null);
-    if (T2) {
-      T2["Normale"] = [{ Petit: 0, Normal: 0, "Élite": 0, Boss: 0 }, { Petit: 0, Normal: 3, "Élite": 0, Boss: 0 }];
-      await window.__ou(() => window.enregistrerTableRencontres(T2), null);
-    }
-    const vides = [];
-    for (let k = 0; k < 8; k++) vides.push((window.tirerCompositionRencontre("Normale") || []).length);
-    out.vides = [...new Set(vides)];
-    out.chances = [...document.querySelectorAll('.bloc-rencontre[data-difficulte="Normale"] .rencontre-chance')].map(x => x.textContent);
-    // Un autre poste l'a changée : la base l'apporte ici.
-    window.__ou(() => window.appliquerTableRencontres({ Normale: [{ Petit: 4, Normal: 0, "Élite": 0, Boss: 0 }] }), null);
-    out.ailleurs = (window.tirerCompositionRencontre("Normale") || []).map(m => m.palier).join(",");
-    out.ailleursDifficile = (window.__ou(() => window.TABLE_RENCONTRES["Difficile"].length, 0));
-    window.gabaritMonstre = vraiGabarit;
-    // Rétablir l'origine.
-    window.confirm = () => true;
-    await window.__ou(() => window.retablirTableRencontres(), null);
-    out.retabli = lire("Normale").length + "|" + lire("Difficile").length + "|" + lire("Très difficile").length;
+    out.blocs = [...document.querySelectorAll(".bloc-apparition")].map(b => b.dataset.apparition).join(",");
+    out.saisies = document.querySelectorAll("#corps-rencontres-monstres input").length;
+    out.plusDeTable = window.TABLE_RENCONTRES === undefined && typeof window.tirerCompositionRencontre !== "function";
     window.__ou(() => window.fermerTableRencontres(), null);
     return out;
   });
-  verifier("un bouton « Rencontres par difficulté » dans Paramètres > Outils", r.bouton === true);
-  verifier("il ouvre le tableau", r.ouverte === true);
-  verifier("Normale : les cinq possibilités d'origine (Petit/Normal)",
-           JSON.stringify(r.normale) === '["1/3/0/0","2/2/0/0","3/1/0/0","5/0/0/0","0/4/0/0"]', JSON.stringify(r.normale));
-  verifier("Difficile : les mêmes, plus une Élite", JSON.stringify(r.difficile) === '["1/3/1/0","2/2/1/0","3/1/1/0","5/0/1/0","0/4/1/0"]', JSON.stringify(r.difficile));
-  verifier("Très difficile : les mêmes, plus un Boss", JSON.stringify(r.tres) === '["1/3/0/1","2/2/0/1","3/1/0/1","5/0/0/1","0/4/0/1"]', JSON.stringify(r.tres));
-  verifier("une case changée : le tableau la garde", r.apresCase === "2/3/0/0", r.apresCase);
-  verifier("…et s'écrit tout de suite (Monstres_Modeles/_RENCONTRES, fusionné)",
-           r.ecrit.length === 1 && r.ecrit[0] === '{"Petit":2,"Normal":3,"Élite":0,"Boss":0}+merge', r.ecrit.join(" | "));
-  verifier("la rencontre tirée suit le tableau : Boss et Élites devant, puis le Petit",
-           JSON.stringify(r.tirages) === '["Boss,Élite,Élite,Petit"]' && JSON.stringify(r.tresLignes) === '["1/0/2/1"]', JSON.stringify(r.tirages));
-  verifier("+ Ajouter : une possibilité de plus ; ✖ : une de moins", r.apresAjout === 6 && r.apresRetrait === 5, `${r.apresAjout} → ${r.apresRetrait}`);
-  verifier("une ligne sans créature ne se tire jamais (et le dit)", JSON.stringify(r.vides) === "[3]" && r.chances[0] === "jamais" && r.chances[1] === "100 %",
-           JSON.stringify({ vides: r.vides, chances: r.chances }));
-  verifier("un autre poste change la table : ce poste tire la sienne", r.ailleurs === "Petit,Petit,Petit,Petit" && r.ailleursDifficile === 5, r.ailleurs);
-  verifier("Rétablir l'origine : cinq possibilités partout", r.retabli === "5|5|5", r.retabli);
-  const src = fs.readFileSync('/home/user/Ivalis/monstres.js', 'utf-8');
-  verifier("le document des rencontres n'est pas lu comme un gabarit", /startsWith\("_"\)/.test(src) && /_RENCONTRES/.test(src));
+  verifier("le bouton de Paramètres > Outils est toujours là, il dit « Apparitions »", r.bouton === true && r.libelle === "Apparitions", r.libelle);
+  verifier("il ouvre les quatre apparitions, à lire (aucune case à remplir)", r.ouverte && r.blocs === "1,2,3,4" && r.saisies === 0,
+           JSON.stringify(r));
+  verifier("plus de table par difficulté, plus de tirage par difficulté", r.plusDeTable === true);
 }
 
 console.log("\n5. LA BLESSURE : SEULEMENT QUAND LE COMBAT EST PERDU");

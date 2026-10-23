@@ -5,7 +5,8 @@
 //  du reste du code :
 //
 //   1. Les GABARITS (collection "Monstres_Modeles") : le tableau d'équilibrage
-//      par archetype et par palier (Petit / Normal / Élite / Boss). Ce sont des
+//      par archetype et par palier (Petit / Normal / Boss — plus d'Élite
+//      depuis la v262). Ce sont des
 //      modèles de stats, pas des monstres jouables : plus tard, un monstre nommé
 //      pointera vers un gabarit pour en hériter.
 //
@@ -51,46 +52,42 @@ export const COLONNES_GABARIT = [
 ];
 
 // [PV, RésPhys, RésMag, Parade/Esquive, FatigueMax, Regen, ReposLong, NbActions, XP]
+// Plus de ligne Élite (Nico, v262 : « les types de monstres, maintenant :
+// Petits, Normaux, Boss — enlève les lignes Élite du tableau »).
 const VALEURS_DEFAUT = {
     "DPS CAC": {
         "Petit":  [40, 15, 10,  5,  80, 50, 100, 1,  40],
         "Normal": [70, 20, 15, 15, 120, 30,  90, 1, 100],
-        "Élite":  [110, 35, 20, 15, 165, 30,  80, 1, 240],
         "Boss":   [240, 40, 25, 15, 220, 40,  70, 2, 800]
     },
     "TANK CAC": {
         "Petit":  [50, 25,  0, 20,  60, 50, 100, 1,  40],
         "Normal": [90, 30, 20, 20,  90, 30,  90, 1, 100],
-        "Élite":  [115, 40, 25, 30, 130, 30,  80, 1, 240],
         "Boss":   [250, 50, 30, 35, 170, 40,  70, 2, 800]
     },
     // Le tableau d'origine ne prévoit pas de Boss pour le Soutien.
     "SOUTIEN": {
         "Petit":  [45, 10, 10, 10,  75, 50, 100, 1,  40],
-        "Normal": [70, 20, 20, 10, 120, 30,  90, 1, 100],
-        "Élite":  [110, 30, 30, 15, 160, 30,  80, 1, 240]
+        "Normal": [70, 20, 20, 10, 120, 30,  90, 1, 100]
     },
     "DPS MAGE CAC": {
         "Petit":  [40, 10, 15,  5,  80, 50, 100, 1,  40],
         "Normal": [70, 15, 20, 15, 120, 30,  90, 1, 100],
-        "Élite":  [110, 20, 35, 15, 165, 30,  80, 1, 240],
         "Boss":   [240, 25, 40, 15, 220, 40,  70, 2, 800]
     },
     "DPS DISTANCE": {
         "Petit":  [35, 10,  5, 10,  90, 50, 100, 1,  40],
         "Normal": [65, 15, 10, 15, 145, 30,  90, 1, 100],
-        "Élite":  [110, 25, 20, 20, 170, 30,  80, 1, 240],
         "Boss":   [225, 25, 25, 20, 240, 40,  70, 2, 800]
     },
     "DPS MAGE DISTANCE": {
         "Petit":  [35,  5, 10, 10,  90, 50, 100, 1,  40],
         "Normal": [65, 10, 15, 15, 145, 30,  90, 1, 100],
-        "Élite":  [110, 20, 25, 20, 170, 30,  80, 1, 240],
         "Boss":   [225, 25, 25, 20, 240, 40,  70, 2, 800]
     }
 };
 
-// Identifiant de document stable et lisible : "dps_cac__elite".
+// Identifiant de document stable et lisible : "dps_cac__boss".
 function cleGabarit(archetype, palier) {
     const nettoyer = (s) => (s || "")
         .toLowerCase()
@@ -150,14 +147,18 @@ window.chargerGabaritsMonstres = async function() {
         console.log(`🐲 ${manquants.length} gabarit(s) de monstre amorcé(s) en base.`);
     }
 
-    // On garde l'ordre du tableau de référence, quoi qu'il arrive en base.
-    window.GABARITS_MONSTRES = Object.values(existants).sort((a, b) => {
+    // On garde l'ordre du tableau de référence, quoi qu'il arrive en base. Les
+    // anciennes lignes Élite restent en base, sans plus servir : elles ne
+    // s'affichent plus et ne se tirent plus (v262).
+    window.GABARITS_MONSTRES = Object.values(existants).filter(g => !estPalierElite(g.Palier)).sort((a, b) => {
         if (a.Ordre_Archetype !== b.Ordre_Archetype) return (a.Ordre_Archetype || 0) - (b.Ordre_Archetype || 0);
         return (a.Ordre_Palier || 0) - (b.Ordre_Palier || 0);
     });
 
     return window.GABARITS_MONSTRES;
 };
+
+function estPalierElite(palier) { return palier === "Élite" || palier === "Elite"; }
 
 // Renvoie le gabarit correspondant à un archetype + palier (utile aux chapitres
 // suivants : créer un monstre nommé qui hérite de ces stats).
@@ -305,6 +306,11 @@ window.ecouterMonstresPartie = function(idPartie) {
             objet.Palier        = brut.Palier || "";
             objet.Gabarit       = brut.Gabarit || "";
             objet.Personnalite  = brut.Personnalite || "brutal";
+            // Le leader (v262) : son aura sur le plateau, son liseré rouge sur
+            // la piste, ses bonus au combat ; et celle qui se relèvera en leader
+            // à son premier KO (Apparition 1).
+            objet.leader        = !!brut.Leader;
+            objet.releveEnLeader = !!brut.Releve_En_Leader && !brut.Leader;
             // LE TABLEAU DES MONSTRES JUSQU'AU COMBAT (Nico, v251 : « assure-toi
             // que Paramètres > Outils > Monstres soit bien relié aux stats
             // réelles des monstres en jeu »). Le nombre d'actions décide d'une
@@ -404,8 +410,17 @@ window.creerMonstreDepuisGabarit = async function(idMonstre, gabarit, donneesSup
 //  Ils vivent dans un document à part du bestiaire (Monstres_Modeles/_REGLAGES),
 //  que CHAQUE poste écoute : un chiffre changé vaut tout de suite, combat en
 //  cours compris — c'est le poste qui tient le cerveau qui calcule.
+//
+//  Plus de colonne Élite depuis la v262 (le noyau garde son chiffre, pour une
+//  créature d'avant). Et l'encart du LEADER (v262) : ce qu'un leader gagne en
+//  plus — dégâts et soins (%), défenses physique et magique (points), PV,
+//  chance de poser un état (points). Les dégâts et la chance d'état valent tout
+//  de suite ; les PV et les défenses, au prochain leader posé.
 const DOC_REGLAGES = "_REGLAGES";
-const PALIERS_REGLES = ["Petit", "Normal", "Élite", "Boss"];
+const PALIERS_REGLES = ["Petit", "Normal", "Boss"];
+// Les chiffres tenus, eux, gardent l'Élite : une créature d'avant marche et
+// frappe pareil dans la préparation et dans le cerveau.
+const PALIERS_TENUS = ["Petit", "Normal", "Élite", "Boss"];
 // Le noyau du combat (moteur_pur.js, ia_pure.js) porte les chiffres d'origine
 // et se règle par window.moteurPur / window.iaPure — le même module que celui
 // du cerveau, par la table d'import de la page. Sans lui (un banc qui isole ce
@@ -416,9 +431,22 @@ window.REGLAGES_MONSTRES_DEFAUT = Object.freeze({
     // En % de leurs dégâts et soins (v255), 10 % pour chaque stature.
     bonusDegats: { ...(noyauMoteur().BONUS_MONSTRE_DEFAUT || { "Petit": 10, "Normal": 10, "Élite": 10, "Boss": 10 }) },
     bonusSortsPct: 20,
-    deplacement: { ...(noyauIA().PAS_PAR_PALIER_DEFAUT || { "Petit": 6, "Normal": 5, "Élite": 4, "Boss": 4 }) }
+    deplacement: { ...(noyauIA().PAS_PAR_PALIER_DEFAUT || { "Petit": 6, "Normal": 5, "Élite": 4, "Boss": 4 }) },
+    leader: { ...(noyauMoteur().LEADER_DEFAUT || { degats: 15, resistances: 15, pv: 15, chanceEtat: 15 }) }
 });
-const BORNES_REGLAGES = { bonusDegats: [-50, 200], bonusSortsPct: [-50, 200], deplacement: [0, 15] };
+const BORNES_REGLAGES = { bonusDegats: [-50, 200], bonusSortsPct: [-50, 200], deplacement: [0, 15],
+                          leaderDegats: [-50, 200], leaderResistances: [-50, 70], leaderPv: [0, 300], leaderChanceEtat: [-50, 100] };
+// Les quatre chiffres du leader : leur nom en base, leur borne, leur libellé.
+const CHAMPS_LEADER = [
+    { cle: "degats", champ: "Degats_Soins_Pct", borne: "leaderDegats", titre: "Dégâts et soins en plus", unite: "%",
+      aide: "En pour cent du brut de chaque attaque et de chaque soin, en plus de la triche de sa stature" },
+    { cle: "resistances", champ: "Resistances", borne: "leaderResistances", titre: "Défenses physique et magique", unite: "pts",
+      aide: "Points ajoutés à ses résistances physique et magique (20 % deviennent 35 %)" },
+    { cle: "pv", champ: "PV", borne: "leaderPv", titre: "Points de vie en plus", unite: "PV",
+      aide: "Ajoutés à son maximum de vie" },
+    { cle: "chanceEtat", champ: "Chance_Etat_Pct", borne: "leaderChanceEtat", titre: "Chance de poser un état", unite: "pts",
+      aide: "Points ajoutés à chaque chance d'état de ses compétences (30 % deviennent 45 %)" }
+];
 const borner = (famille, v, defaut) => {
     // Une case vidée (ou un champ absent) garde la valeur d'avant.
     if (v === undefined || v === null || String(v).trim() === "") return defaut;
@@ -433,23 +461,29 @@ window.normaliserReglagesMonstres = function(brut) {
     const src = brut || {};
     const parPalier = (famille, champ) => {
         const t = {};
-        PALIERS_REGLES.forEach(p => { t[p] = borner(famille, ((src[champ] || {})[p]), d[famille][p]); });
+        PALIERS_TENUS.forEach(p => { t[p] = borner(famille, ((src[champ] || {})[p]), d[famille][p]); });
         return t;
     };
+    const leader = {};
+    CHAMPS_LEADER.forEach(c => { leader[c.cle] = borner(c.borne, (src.Leader || {})[c.champ], d.leader[c.cle]); });
     return {
         // Un champ neuf : l'ancien (Bonus_Degats) comptait des POINTS (+1, +2…),
         // qu'on ne doit pas relire comme des pour cent.
         bonusDegats: parPalier("bonusDegats", "Bonus_Degats_Pct"),
         bonusSortsPct: borner("bonusSortsPct", src.Bonus_Sorts_Pct, d.bonusSortsPct),
-        deplacement: parPalier("deplacement", "Deplacement")
+        deplacement: parPalier("deplacement", "Deplacement"),
+        leader
     };
 };
+// Le leader tel qu'on l'écrit en base.
+const leaderVersBase = (leader) => Object.fromEntries(CHAMPS_LEADER.map(c => [c.champ, leader[c.cle]]));
 // Les poser partout où le jeu les lit.
 window.appliquerReglagesMonstres = function(brut) {
     const r = window.normaliserReglagesMonstres(brut);
     window.REGLAGES_MONSTRES = r;
     if (typeof noyauMoteur().reglerBonusMonstres === "function") noyauMoteur().reglerBonusMonstres(r.bonusDegats);
     if (typeof noyauIA().reglerPasMonstres === "function") noyauIA().reglerPasMonstres(r.deplacement);
+    if (typeof noyauMoteur().reglerLeader === "function") noyauMoteur().reglerLeader(r.leader);
     window.MULTIPLICATEUR_SORTS_MONSTRE = 1 + r.bonusSortsPct / 100;
     if (typeof window.dessinerReglagesMonstres === "function") window.dessinerReglagesMonstres();
     return r;
@@ -487,21 +521,35 @@ window.dessinerReglagesMonstres = function() {
     corps.innerHTML = ligne("Dégâts et soins en plus (%)", "bonusDegats", "En pour cent du brut de chaque attaque et de chaque soin, avant les résistances")
                     + ligne("Déplacement (cases)", "deplacement", "Cases que la créature peut marcher à son tour");
     if (sorts) sorts.value = r.bonusSortsPct;
+    const leader = document.getElementById("corps-reglages-leader");
+    if (leader) leader.innerHTML = CHAMPS_LEADER.map(c => `<label class="reglage-leader" title="${c.aide}">
+          <span class="reglage-leader-titre">${c.titre}</span>
+          <span class="reglage-leader-saisie"><span class="reglage-leader-plus">+</span><input type="number" inputmode="numeric" class="reglage-monstres-valeur"
+              data-famille="leader" data-cle="${c.cle}" value="${r.leader[c.cle]}"
+              min="${BORNES_REGLAGES[c.borne][0]}" max="${BORNES_REGLAGES[c.borne][1]}"
+              onchange="window.modifierReglageMonstre('leader', '${c.cle}', this)"><span class="reglage-leader-unite">${c.unite}</span></span>
+        </label>`).join("");
 };
 
+// `palier` : la stature réglée — ou, pour le leader, lequel de ses chiffres.
 window.modifierReglageMonstre = async function(famille, palier, input) {
     const actuels = window.REGLAGES_MONSTRES || window.normaliserReglagesMonstres(null);
+    const champLeader = famille === "leader" ? CHAMPS_LEADER.find(c => c.cle === palier) : null;
+    if (famille === "leader" && !champLeader) return;
     const valeur = famille === "bonusSortsPct"
         ? borner(famille, input && input.value, actuels.bonusSortsPct)
+        : champLeader ? borner(champLeader.borne, input && input.value, actuels.leader[palier])
         : borner(famille, input && input.value, actuels[famille][palier]);
     if (input) input.value = valeur;
     const etat = document.getElementById("reglages-monstres-etat");
     const maj = famille === "bonusSortsPct" ? { Bonus_Sorts_Pct: valeur }
+        : champLeader ? { Leader: leaderVersBase({ ...actuels.leader, [palier]: valeur }) }
         : { [famille === "bonusDegats" ? "Bonus_Degats_Pct" : "Deplacement"]:
             { ...actuels[famille], [palier]: valeur } };
     // Tout de suite sur ce poste ; la base le porte aux autres.
     const brut = {
-        Bonus_Degats_Pct: actuels.bonusDegats, Bonus_Sorts_Pct: actuels.bonusSortsPct, Deplacement: actuels.deplacement, ...maj
+        Bonus_Degats_Pct: actuels.bonusDegats, Bonus_Sorts_Pct: actuels.bonusSortsPct, Deplacement: actuels.deplacement,
+        Leader: leaderVersBase(actuels.leader), ...maj
     };
     window.appliquerReglagesMonstres(brut);
     try {
@@ -685,94 +733,66 @@ window.sauvegarderGabaritsMonstres = async function() {
 };
 
 // =========================================================================
-//  5. GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)
+//  5. LES APPARITIONS (bouton 💀 des options de combat) — v262
 // =========================================================================
-//  Reprend le tableau "Rencontres" de Nico :
-//    - une rencontre NORMALE tire au sort l'une des 5 répartitions Petit/Normal ;
-//    - une rencontre DIFFICILE ajoute 1 Élite à ce tirage ;
-//    - une rencontre TRÈS DIFFICILE ajoute 1 Boss à ce tirage.
-//  Le terrain n'accueille que 4 ennemis à la fois : le surplus attend en
-//  réserve et entre en renfort dès qu'une place se libère (mort d'un monstre).
+//  Nico : « Il n'y a plus de difficulté de rencontre. À la place, demande
+//  Apparition 1, 2, 3, 4 ou aléatoire parmi celles-là » — le nombre d'ennemis
+//  engagés dans le combat dans le récit (Apparition 4 : quatre ou plus).
+//  Chaque apparition dit ce qui entre au départ, qui mène, quels renforts
+//  suivent et quand. Les créatures sont des Petits et des Normaux ; un leader
+//  peut être l'un ou l'autre (jamais un Boss).
 //
-//  LE TABLEAU SE MODIFIE (Nico, v253 : « dans Paramètres > Outils, un bouton
-//  avec dedans le tableau des possibilités de rencontre des monstres par
-//  difficulté, que je puisse modifier comme bon me semble »). Ces chiffres-ci
-//  ne sont plus que l'origine : la table jouée est TABLE_RENCONTRES, lue dans
-//  Monstres_Modeles/_RENCONTRES et écoutée sur chaque poste. Chaque ligne d'une
-//  difficulté est une possibilité, toutes aussi probables.
+//  Les règles d'archetype (« règles complémentaires ») :
+//    · Apparition 1 : la première créature est un tank, un combattant (DPS CAC)
+//      ou un mage au contact (DPS MAGE CAC) ; ses renforts au hasard, un
+//      soutien au plus — les quatre Petits du cas 1 en comptent exactement un.
+//    · Apparition 2 : au départ un tank et une créature au hasard, mais pas un
+//      soutien ; les renforts au hasard, un soutien au plus.
+//    · Apparition 3 : au hasard, un soutien au plus au départ, un au plus dans
+//      le renfort.
+//    · Apparition 4 : au hasard, un soutien au plus.
+//
+//  Les renforts entrent au début de la manche prévue (« au bout de 1 tour » :
+//  la manche 2), sur les cases d'apparition (caseApparitionEnnemi, combat.js).
+//  Si plus aucune créature ne tient debout avant, ils n'attendent pas : ils
+//  entrent dès la manche suivante (apparitionsDuTour, pont_combat.js). Le
+//  butin tire ses raretés sur la ligne « Normale » (loot.js).
 // =========================================================================
 
-const REPARTITIONS_NORMALES = [
-    { Petit: 1, Normal: 3 },
-    { Petit: 2, Normal: 2 },
-    { Petit: 3, Normal: 1 },
-    { Petit: 5, Normal: 0 },
-    { Petit: 0, Normal: 4 }
-];
+const ARCHETYPE_TANK = "TANK CAC";
+const ARCHETYPE_SOUTIEN = "SOUTIEN";
+const ARCHETYPES_PREMIER_AU_CONTACT = ["TANK CAC", "DPS CAC", "DPS MAGE CAC"];
+const RENFORT_TROIS = [{ Normal: 1, Petit: 2 }, { Petit: 3 }, { Normal: 2, Petit: 1 }];
 
-// Ce que chaque cran de difficulté ajoute à la répartition de base.
-const RENFORT_DIFFICULTE = {
-    "Normale":        null,
-    "Difficile":      "Élite",
-    "Très difficile": "Boss"
-};
-
-// LA TABLE DES RENCONTRES, modifiable (v253). Ses trois difficultés, et le nom
-// de leur champ en base (sans espace ni accent : plus sûr pour Firestore).
-const DIFFICULTES_RENCONTRE = [
-    { nom: "Normale", champ: "Normale" },
-    { nom: "Difficile", champ: "Difficile" },
-    { nom: "Très difficile", champ: "Tres_Difficile" }
-];
-const PALIERS_RENCONTRE = ["Petit", "Normal", "Élite", "Boss"];
-const DOC_RENCONTRES = "_RENCONTRES";
-const BORNES_RENCONTRE = { parPalier: [0, 10], lignes: 12 };
-window.TABLE_RENCONTRES_DEFAUT = Object.freeze(Object.fromEntries(DIFFICULTES_RENCONTRE.map(d => [d.nom,
-    REPARTITIONS_NORMALES.map(r => {
-        const ligne = { Petit: r.Petit || 0, Normal: r.Normal || 0, "Élite": 0, Boss: 0 };
-        if (RENFORT_DIFFICULTE[d.nom]) ligne[RENFORT_DIFFICULTE[d.nom]] += 1;
-        return ligne;
-    })])));
-const copieTable = (t) => JSON.parse(JSON.stringify(t));
-// Une ligne lue (ou tapée) → quatre entiers bornés ; une ligne sans aucune
-// créature n'est pas une rencontre : elle ne se tire jamais.
-const ligneRencontre = (brute) => {
-    const l = {};
-    PALIERS_RENCONTRE.forEach(p => {
-        const src = brute || {};
-        const v = Math.round(Number(p === "Élite" && src["Élite"] === undefined ? src.Elite : src[p]));
-        l[p] = Number.isFinite(v) ? Math.max(BORNES_RENCONTRE.parPalier[0], Math.min(BORNES_RENCONTRE.parPalier[1], v)) : 0;
-    });
-    return l;
-};
-const totalRencontre = (l) => PALIERS_RENCONTRE.reduce((n, p) => n + (l[p] || 0), 0);
-// Le document lu en base (ou rien) → une table complète : une difficulté
-// absente, ou vidée, revient à ses possibilités d'origine.
-window.normaliserTableRencontres = function(brut) {
-    const t = {};
-    DIFFICULTES_RENCONTRE.forEach(d => {
-        const lignes = Array.isArray((brut || {})[d.champ]) ? brut[d.champ] : null;
-        const propres = lignes ? lignes.slice(0, BORNES_RENCONTRE.lignes).map(ligneRencontre) : null;
-        t[d.nom] = propres && propres.length > 0 ? propres : copieTable(window.TABLE_RENCONTRES_DEFAUT[d.nom]);
-    });
-    return t;
-};
-window.appliquerTableRencontres = function(brut) {
-    window.TABLE_RENCONTRES = window.normaliserTableRencontres(brut);
-    if (typeof window.dessinerTableRencontres === "function") window.dessinerTableRencontres();
-    return window.TABLE_RENCONTRES;
-};
-window.appliquerTableRencontres(null);
-let arretRencontres = null;
-window.ecouterTableRencontres = function() {
-    if (arretRencontres) return;
-    try {
-        arretRencontres = onSnapshot(doc(db, COLLECTION_GABARITS, DOC_RENCONTRES),
-            (snap) => window.appliquerTableRencontres(snap && snap.exists() ? snap.data() : null),
-            (err) => console.error("Table des rencontres :", err));
-    } catch (e) { console.error("Table des rencontres :", e); }
-};
-quandJoueur(() => window.ecouterTableRencontres());
+// Une vague : ses possibilités (tirées à chances égales) et sa règle
+// d'archetype — "premierAuContact", "tankSansSoutien", "unSoutien" ou
+// "auPlusUnSoutien".
+window.APPARITIONS = Object.freeze({
+    1: { titre: "Apparition 1", cas: [
+        { chance: 40, nom: "Le chef et sa meute", leader: "depart",
+          depart: { possibilites: [{ Normal: 1 }], regle: "premierAuContact" },
+          renforts: [{ apresTours: 1, possibilites: [{ Petit: 4 }], regle: "unSoutien" }] },
+        { chance: 60, nom: "Celui qui se relève", releveEnLeader: true,
+          depart: { possibilites: [{ Normal: 1 }], regle: "premierAuContact" },
+          renforts: [{ surReleve: true, possibilites: RENFORT_TROIS, regle: "auPlusUnSoutien" }] }
+    ] },
+    2: { titre: "Apparition 2", cas: [
+        { chance: 100, leader: "tous",
+          depart: { possibilites: [{ Normal: 2 }, { Normal: 1, Petit: 1 }], regle: "tankSansSoutien" },
+          renforts: [{ apresTours: 2, possibilites: RENFORT_TROIS, regle: "auPlusUnSoutien" }] }
+    ] },
+    3: { titre: "Apparition 3", cas: [
+        { chance: 100, leader: "depart",
+          depart: { possibilites: [{ Normal: 3 }, { Normal: 1, Petit: 2 }, { Normal: 2, Petit: 1 }, { Petit: 4 }], regle: "auPlusUnSoutien" },
+          renforts: [{ apresTours: 4, possibilites: [{ Normal: 1, Petit: 1 }, { Petit: 3 }, { Normal: 2 }], regle: "auPlusUnSoutien" }] }
+    ] },
+    4: { titre: "Apparition 4", cas: [
+        { chance: 100, leader: "depart",
+          depart: { possibilites: [{ Normal: 4 }, { Normal: 3, Petit: 1 }, { Normal: 2, Petit: 2 }, { Petit: 5 }], regle: "auPlusUnSoutien" },
+          renforts: [] }
+    ] }
+});
+const NUMEROS_APPARITION = [1, 2, 3, 4];
 
 // Le terrain accueille autant d'ennemis qu'il y a de joueurs, plus un. Les illusions
 // sont des leurres posés par les héros, pas des joueurs : les compter ferait grossir
@@ -818,116 +838,114 @@ function archetypesPourPalier(palier) {
     return Object.keys(AMBIANCE_ARCHETYPES).filter(a => window.gabaritMonstre(a, palier));
 }
 
-// Tire au sort la composition complète d'une rencontre : une liste
-// [{ archetype, palier }], dans l'ordre où les monstres entreront en jeu.
-window.tirerCompositionRencontre = function(difficulte) {
-    // Une ligne de la table de cette difficulté (TABLE_RENCONTRES, modifiable),
-    // au hasard parmi celles qui comptent au moins une créature.
-    const table = window.TABLE_RENCONTRES || window.normaliserTableRencontres(null);
-    const possibles = (table[difficulte] || table["Normale"] || []).filter(l => totalRencontre(l) > 0);
-    const repartition = possibles.length > 0 ? hasard(possibles)
-        : hasard(window.TABLE_RENCONTRES_DEFAUT[difficulte] || window.TABLE_RENCONTRES_DEFAUT["Normale"]);
-    const composition = [];
+// Ceux d'une liste qui ont un gabarit à cette stature — la liste entière si
+// le bestiaire n'est pas encore lu (la pose le relira).
+function parmiLesGabarits(liste, palier) {
+    const dispo = liste.filter(a => window.gabaritMonstre(a, palier));
+    return dispo.length > 0 ? dispo : liste;
+}
 
-    // Les Boss, puis les Élites passent DEVANT : ce sont les pièces maîtresses
-    // de la rencontre, sur le terrain dès le début et non coincées en réserve
-    // derrière quatre bestioles. Puis les Petits et les Normaux.
-    ["Boss", "Élite", "Petit", "Normal"].forEach(palier => {
-        for (let i = 0; i < (repartition[palier] || 0); i++) {
-            const archetypes = archetypesPourPalier(palier);
-            if (archetypes.length > 0) composition.push({ archetype: hasard(archetypes), palier });
-        }
+// Les créatures d'une vague : ses statures (les Normaux d'abord), puis leurs
+// archetypes selon sa règle. Le tank ou le soutien imposé prend une place au
+// hasard dans la vague.
+function tirerVague(vague) {
+    const repartition = hasard(vague.possibilites);
+    const paliers = [];
+    for (let i = 0; i < (repartition.Normal || 0); i++) paliers.push("Normal");
+    for (let i = 0; i < (repartition.Petit || 0); i++) paliers.push("Petit");
+    if (paliers.length === 0) return [];
+    const tous = Object.keys(AMBIANCE_ARCHETYPES);
+    const sansSoutien = tous.filter(a => a !== ARCHETYPE_SOUTIEN);
+    const archetypes = new Array(paliers.length).fill(null);
+    const place = Math.floor(Math.random() * paliers.length);
+    if (vague.regle === "premierAuContact") archetypes[0] = hasard(parmiLesGabarits(ARCHETYPES_PREMIER_AU_CONTACT, paliers[0]));
+    else if (vague.regle === "tankSansSoutien") archetypes[place] = ARCHETYPE_TANK;
+    else if (vague.regle === "unSoutien") archetypes[place] = ARCHETYPE_SOUTIEN;
+    // Le reste : sans soutien quand la règle en impose un (ou n'en veut pas),
+    // sinon au hasard jusqu'au premier soutien tiré.
+    const jamaisSoutien = vague.regle === "tankSansSoutien" || vague.regle === "unSoutien";
+    let soutienPris = archetypes.includes(ARCHETYPE_SOUTIEN);
+    paliers.forEach((palier, i) => {
+        if (archetypes[i]) return;
+        archetypes[i] = hasard(parmiLesGabarits(jamaisSoutien || soutienPris ? sansSoutien : tous, palier));
+        if (archetypes[i] === ARCHETYPE_SOUTIEN) soutienPris = true;
     });
+    return paliers.map((palier, i) => ({ archetype: archetypes[i], palier }));
+}
 
-    return composition;
+// Tire une apparition : `choix` vaut 1, 2, 3 ou 4 — n'importe quoi d'autre
+// (« aleatoire ») en tire une des quatre. Rend ce qui entre au départ, et les
+// renforts avec leur heure d'entrée (`entreeManche`) ou leur déclencheur
+// (`surReleve` : la relève en leader de l'Apparition 1).
+window.tirerApparition = function(choix) {
+    const choisie = NUMEROS_APPARITION.includes(Number(choix));
+    const numero = choisie ? Number(choix) : hasard(NUMEROS_APPARITION);
+    const def = window.APPARITIONS[numero];
+    let jet = Math.random() * def.cas.reduce((t, c) => t + c.chance, 0);
+    let indexCas = def.cas.length - 1;
+    for (let i = 0; i < def.cas.length; i++) {
+        if (jet < def.cas[i].chance) { indexCas = i; break; }
+        jet -= def.cas[i].chance;
+    }
+    const cas = def.cas[indexCas];
+    const depart = tirerVague(cas.depart);
+    const renforts = [];
+    cas.renforts.forEach(vague => tirerVague(vague).forEach(m => renforts.push(
+        { ...m, ...(vague.surReleve ? { surReleve: true } : { entreeManche: 1 + vague.apresTours }) })));
+    if (cas.releveEnLeader && depart[0]) depart[0].releveEnLeader = true;
+    const candidats = cas.leader === "tous" ? [...depart, ...renforts] : cas.leader === "depart" ? depart : [];
+    if (candidats.length > 0) hasard(candidats).leader = true;
+    return { apparition: numero, aleatoire: !choisie, cas: indexCas + 1, nomCas: cas.nom || "", depart, renforts };
 };
 
 // -------------------------------------------------------------------------
-//  LA FENÊTRE DU TABLEAU (Paramètres > Outils > Rencontres)
+//  LA FENÊTRE DES APPARITIONS (Paramètres > Outils > Apparitions)
 // -------------------------------------------------------------------------
+//  Elle tenait la table des rencontres par difficulté (v253), qui n'a plus
+//  lieu d'être : elle montre maintenant ce que chaque apparition fait entrer,
+//  lu dans APPARITIONS — la même table que celle du tirage.
+const PLURIELS_PALIER = { Normal: "Normaux", Petit: "Petits" };
+const texteRepartition = (r) => ["Normal", "Petit"].filter(p => r[p] > 0)
+    .map(p => `${r[p]} ${r[p] > 1 ? PLURIELS_PALIER[p] : p}`).join(" + ");
+const TEXTES_REGLE = {
+    premierAuContact: "un tank, un combattant ou un mage au contact",
+    tankSansSoutien: "un tank et une créature au hasard, pas un soutien",
+    unSoutien: "un soutien, les autres au hasard",
+    auPlusUnSoutien: "au hasard, un soutien au plus"
+};
 window.ouvrirTableRencontres = function() {
     const menuLat = document.getElementById("menu-lateral");
     if (menuLat) menuLat.style.display = "none";
     window.naviguerFenetre("etape-menu-outils", "etape-rencontres-monstres");
-    window.dessinerTableRencontres(true);
+    window.dessinerTableRencontres();
 };
 window.fermerTableRencontres = function() {
     const menuLat = document.getElementById("menu-lateral");
     if (menuLat) menuLat.style.display = "flex";
     window.naviguerFenetre("etape-rencontres-monstres", "etape-menu-outils");
 };
-window.dessinerTableRencontres = function(force) {
+window.dessinerTableRencontres = function() {
     const hote = document.getElementById("corps-rencontres-monstres");
-    const t = window.TABLE_RENCONTRES;
-    if (!hote || !t) return;
-    // Pas pendant qu'on tape : la valeur reviendrait sous les doigts.
-    const actif = document.activeElement;
-    if (!force && actif && actif.closest && actif.closest("#corps-rencontres-monstres") && actif.tagName === "INPUT") return;
-    hote.innerHTML = DIFFICULTES_RENCONTRE.map(d => {
-        const lignes = t[d.nom] || [];
-        const comptees = lignes.filter(l => totalRencontre(l) > 0).length;
-        const corps = lignes.map((l, i) => {
-            const total = totalRencontre(l);
-            const chance = total > 0 && comptees > 0 ? Math.round(100 / comptees) + " %" : "jamais";
-            return `<tr class="${total > 0 ? "" : "rencontre-vide"}">`
-                + PALIERS_RENCONTRE.map(p => `<td><input type="number" inputmode="numeric" class="reglage-monstres-valeur"
-                    min="${BORNES_RENCONTRE.parPalier[0]}" max="${BORNES_RENCONTRE.parPalier[1]}" value="${l[p]}"
-                    data-difficulte="${d.nom}" data-ligne="${i}" data-palier="${p}"
-                    onchange="window.modifierCaseRencontre('${d.nom}', ${i}, '${p}', this)"></td>`).join("")
-                + `<td class="rencontre-total">${total}</td><td class="rencontre-chance">${chance}</td>`
-                + `<td><button class="btn-retirer-rencontre" title="Retirer cette possibilité"
-                    onclick="window.retirerLigneRencontre('${d.nom}', ${i})" ${lignes.length <= 1 ? "disabled" : ""}>✖</button></td></tr>`;
+    if (!hote) return;
+    const vague = (v) => `${v.possibilites.map(texteRepartition).join(" <em>ou</em> ")} <span class="apparition-regle">(${TEXTES_REGLE[v.regle] || ""})</span>`;
+    hote.innerHTML = NUMEROS_APPARITION.map(n => {
+        const def = window.APPARITIONS[n];
+        const lesCas = def.cas.map(cas => {
+            const leader = cas.releveEnLeader ? "Mise KO, elle se relève en <b>leader</b>, ses PV et son énergie au plein."
+                : cas.leader === "tous" ? "Un <b>leader</b> parmi toutes, renforts compris."
+                : cas.leader === "depart" ? (cas.depart.possibilites.every(r => texteRepartition(r) === "1 Normal")
+                    ? "Ce Normal est le <b>leader</b>." : "Un <b>leader</b> parmi celles du départ.") : "";
+            const renforts = cas.renforts.length === 0 ? "<li>Pas de renfort.</li>"
+                : cas.renforts.map(v => `<li>${v.surReleve ? "À sa relève" : `Au bout de ${v.apresTours} tour${v.apresTours > 1 ? "s" : ""}`} : ${vague(v)}</li>`).join("");
+            return `<div class="apparition-cas">
+                ${def.cas.length > 1 ? `<div class="apparition-cas-titre">${cas.nom} — ${cas.chance} %</div>` : ""}
+                <ul><li>Au départ : ${vague(cas.depart)}</li><li>${leader}</li>${renforts}</ul></div>`;
         }).join("");
-        return `<div class="bloc-rencontre" data-difficulte="${d.nom}">
-            <div class="reglages-monstres-entete"><span class="reglages-monstres-nom">${d.nom}</span>
-              <span class="reglages-monstres-aide">${comptees} possibilité${comptees > 1 ? "s" : ""}, tirée${comptees > 1 ? "s" : ""} au hasard</span></div>
-            <table class="table-reglages-monstres table-rencontres">
-              <thead><tr>${PALIERS_RENCONTRE.map(p => `<th>${p}</th>`).join("")}<th>Total</th><th>Chance</th><th></th></tr></thead>
-              <tbody>${corps}</tbody>
-            </table>
-            <button class="btn-parametres btn-ajouter-rencontre" onclick="window.ajouterLigneRencontre('${d.nom}')"
-              ${lignes.length >= BORNES_RENCONTRE.lignes ? "disabled" : ""}>+ Ajouter une possibilité</button>
-          </div>`;
+        return `<div class="bloc-rencontre bloc-apparition" data-apparition="${n}">
+            <div class="reglages-monstres-entete"><span class="reglages-monstres-nom">${def.titre}${n === 4 ? " et plus" : ""}</span>
+              <span class="reglages-monstres-aide">${n === 4 ? "quatre ennemis ou plus" : `${n} ennemi${n > 1 ? "s" : ""}`} au départ</span></div>
+            ${lesCas}</div>`;
     }).join("");
-};
-// Toute modification part tout de suite : sur ce poste, puis en base.
-window.enregistrerTableRencontres = async function(table) {
-    const champs = Object.fromEntries(DIFFICULTES_RENCONTRE.map(d => [d.champ, (table[d.nom] || []).map(ligneRencontre)]));
-    window.appliquerTableRencontres(champs);
-    window.dessinerTableRencontres(true);
-    const etat = document.getElementById("rencontres-monstres-etat");
-    try {
-        await setDoc(doc(db, COLLECTION_GABARITS, DOC_RENCONTRES), champs, { merge: true });
-        if (etat) { etat.textContent = "✔️ Enregistré"; setTimeout(() => { etat.textContent = ""; }, 1800); }
-    } catch (e) {
-        console.error("Enregistrement de la table des rencontres :", e);
-        if (etat) etat.textContent = "⚠️ Non enregistré (connexion ?)";
-    }
-};
-window.modifierCaseRencontre = function(difficulte, i, palier, input) {
-    const table = copieTable(window.TABLE_RENCONTRES || window.normaliserTableRencontres(null));
-    const ligne = (table[difficulte] || [])[i];
-    if (!ligne) return;
-    ligne[palier] = (ligneRencontre({ [palier]: input ? input.value : 0 }))[palier];
-    return window.enregistrerTableRencontres(table);
-};
-window.ajouterLigneRencontre = function(difficulte) {
-    const table = copieTable(window.TABLE_RENCONTRES || window.normaliserTableRencontres(null));
-    const lignes = table[difficulte] || (table[difficulte] = []);
-    if (lignes.length >= BORNES_RENCONTRE.lignes) return;
-    lignes.push({ ...(lignes[lignes.length - 1] || { Petit: 1, Normal: 1, "Élite": 0, Boss: 0 }) });
-    return window.enregistrerTableRencontres(table);
-};
-window.retirerLigneRencontre = function(difficulte, i) {
-    const table = copieTable(window.TABLE_RENCONTRES || window.normaliserTableRencontres(null));
-    const lignes = table[difficulte] || [];
-    if (lignes.length <= 1 || !lignes[i]) return;
-    lignes.splice(i, 1);
-    return window.enregistrerTableRencontres(table);
-};
-window.retablirTableRencontres = function() {
-    if (!confirm("Revenir aux possibilités de rencontre d'origine ?")) return;
-    return window.enregistrerTableRencontres(copieTable(window.TABLE_RENCONTRES_DEFAUT));
 };
 
 // -------------------------------------------------------------------------
@@ -954,7 +972,7 @@ window.nommerMonstresIA = async function(composition) {
     if (!cleGemini || composition.length === 0) return nommerParDefaut();
 
     const listePourIA = composition.map((m, i) =>
-        `${i + 1}. ${m.archetype} (palier ${m.palier}) — ${AMBIANCE_ARCHETYPES[m.archetype] || ""}`
+        `${i + 1}. ${m.archetype} (palier ${m.palier})${m.leader || m.releveEnLeader ? " — LEADER du groupe" : ""} — ${AMBIANCE_ARCHETYPES[m.archetype] || ""}`
     ).join("\n");
 
     const promptSysteme = `Tu es MIA_BESTIAIRE, l'IA qui baptise les créatures d'un jeu de rôle médiéval-fantastique sombre.
@@ -963,7 +981,8 @@ On te donne la composition d'un groupe d'ennemis. Tu dois trouver UN nom court e
 RÈGLES :
 - Le nom colle au rôle indiqué (un TANK est massif : ours, golem, troll ; un DPS MAGE DISTANCE est un lanceur de sorts : mage noir, nécromancien...).
 - 1 à 3 mots maximum, en français, sans numéro ni chiffre.
-- Le palier donne la stature : "Petit" = créature mineure, "Normal" = combattant ordinaire, "Élite" = champion redoutable, "Boss" = créature légendaire au nom marquant.
+- Le palier donne la stature : "Petit" = créature mineure, "Normal" = combattant ordinaire, "Boss" = créature légendaire au nom marquant.
+- Le LEADER du groupe porte un nom de chef (chef de meute, capitaine, grand prêtre...).
 - Tous les noms doivent être DIFFÉRENTS les uns des autres.
 - Renvoie EXACTEMENT ${composition.length} nom(s), dans le même ordre que la liste.`;
 
@@ -1053,6 +1072,10 @@ window.poserMonstreSurTerrain = async function(monstre, tokensData) {
     const idMonstre = "MONSTRE_" + Math.random().toString(36).substring(2, 9);
 
     await window.creerMonstreDepuisGabarit(idMonstre, gabarit, {
+        // Le leader (v262) : ses PV et ses défenses en plus, sur sa fiche ; ses
+        // dégâts, soins et chances d'état en plus, au combat (moteur_pur.js).
+        ...(monstre.leader ? window.champsLeader(gabarit) : {}),
+        ...(monstre.releveEnLeader && !monstre.leader ? { Releve_En_Leader: true } : {}),
         // Le moteur de combat lit Prenom/Nom_Personnage pour l'affichage : le nom
         // trouvé par l'IA tient dans le prénom, le nom reste vide.
         Prenom_Personnage: monstre.nom,
@@ -1158,10 +1181,27 @@ window.poserCompagnonSurTerrain = async function(heros, tokensData) {
     return idCompagnon;
 };
 
+// Ce qu'un leader posé reçoit sur sa fiche (v262) : ses PV et ses défenses
+// rehaussés, d'après les réglages du moment (Paramètres > Monstres).
+window.champsLeader = function(gabarit) {
+    const l = (window.REGLAGES_MONSTRES || window.normaliserReglagesMonstres(null)).leader;
+    const pv = (Number(gabarit.PV) || 0) + l.pv;
+    return {
+        Leader: true,
+        PV_Max: pv, PV_Actuels: pv,
+        Def_Physique: (Number(gabarit.Res_Physique) || 0) + l.resistances,
+        Def_Magique: (Number(gabarit.Res_Magique) || 0) + l.resistances
+    };
+};
+
 // -------------------------------------------------------------------------
 //  Génération complète, déclenchée par le bouton "Valider" de la fenêtre
 // -------------------------------------------------------------------------
-window.genererRencontreMonstres = async function(difficulte) {
+//  `choix` : 1, 2, 3, 4 — ou « aleatoire ». Toutes les créatures du départ
+//  entrent (sur les cases d'apparition peintes) ; les renforts attendent leur
+//  heure dans la réserve. Toute la rencontre est nommée d'un seul appel,
+//  renforts compris : l'IA évite ainsi les doublons.
+window.genererRencontreMonstres = async function(choix) {
     if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) {
         alert("Ouvre d'abord un combat : les monstres ont besoin d'un plateau pour apparaître.");
         return;
@@ -1178,23 +1218,19 @@ window.genererRencontreMonstres = async function(difficulte) {
         console.error("Relecture des gabarits impossible, on garde ceux en mémoire :", e);
     }
 
-    const composition = window.tirerCompositionRencontre(difficulte);
-    if (composition.length === 0) {
+    const tirage = window.tirerApparition(choix);
+    if (tirage.depart.length === 0) {
         alert("Aucun gabarit de monstre disponible : ouvre Paramètres > Outils > Monstres pour les initialiser.");
         return;
     }
 
-    const noms = await window.nommerMonstresIA(composition);
-    composition.forEach((m, i) => { m.nom = noms[i] || "Créature"; });
-
-    // Le terrain est limité : le reste attend en réserve.
-    const limite = limiteMonstresTerrain();
-    const surLeTerrain = composition.slice(0, limite);
-    const enReserve    = composition.slice(limite);
+    const tous = [...tirage.depart, ...tirage.renforts];
+    const noms = await window.nommerMonstresIA(tous);
+    tous.forEach((m, i) => { m.nom = noms[i] || "Créature"; });
 
     const tokensData = { ...window.TOKENS_VTT_DATA };
     const poses = [];
-    for (const monstre of surLeTerrain) {
+    for (const monstre of tirage.depart) {
         const idPose = await window.poserMonstreSurTerrain(monstre, tokensData);
         if (idPose) poses.push({ ...monstre, id: idPose });
     }
@@ -1203,7 +1239,7 @@ window.genererRencontreMonstres = async function(difficulte) {
     // passage les positions périmées des combattants déjà sur le plateau.
     window.TOKENS_VTT_DATA = tokensData;
     await window.enregistrerPionsVTT(...poses.map(p => p.id));
-    await window.sauvegarderReserveMonstres(enReserve);
+    await window.sauvegarderReserveMonstres(tirage.renforts);
 
     // Les techniques sont forgées EN ARRIÈRE-PLAN, sans bloquer : les pions
     // apparaissent tout de suite, et les bannières se remplissent quelques
@@ -1213,25 +1249,29 @@ window.genererRencontreMonstres = async function(difficulte) {
         window.equiperCompetencesRencontre(poses).catch(e => console.error(e));
     }
 
-    // La difficulté sert au butin de fin de combat : c'est elle qui décide des
-    // chances de rareté (tableau de loot). Elle n'existait nulle part une fois
-    // la rencontre lancée — on la garde donc sur la partie.
+    // L'apparition et l'identifiant de la rencontre restent sur la partie.
+    // L'identifiant sert au butin : il lui permet de savoir s'il appartient au
+    // combat en cours ou à un combat déjà terminé (cf. demarrerButin). Plus de
+    // difficulté : le butin tire ses raretés sur la ligne « Normale ».
     if (typeof window.modifierPartie === "function") {
-        // L'identifiant sert au butin : il lui permet de savoir s'il appartient
-        // au combat en cours ou à un combat déjà terminé (cf. demarrerButin).
         await window.modifierPartie(() => ({ maj: {
-            Difficulte_Rencontre: difficulte,
+            Apparition_Rencontre: tirage.apparition,
             ID_Rencontre: "renc_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8)
         } }));
     }
 
-    console.log(`🐲 Rencontre ${difficulte} : ${surLeTerrain.length} sur le terrain, ${enReserve.length} en réserve.`);
-    return { surLeTerrain, enReserve };
+    console.log(`🐲 Apparition ${tirage.apparition}${tirage.nomCas ? ` (${tirage.nomCas})` : ""} : `
+        + `${tirage.depart.length} sur le terrain, ${tirage.renforts.length} en renfort.`);
+    return { surLeTerrain: tirage.depart, enReserve: tirage.renforts, apparition: tirage.apparition, cas: tirage.cas };
 };
 
 // -------------------------------------------------------------------------
-//  La réserve (renforts en attente d'une place libre)
+//  La réserve (les renforts qui attendent leur heure)
 // -------------------------------------------------------------------------
+//  Depuis la v262, chaque renfort sait quand il entre : au début d'une manche
+//  (`entreeManche`), ou à la relève en leader de l'Apparition 1 (`surReleve`).
+//  Une réserve d'avant (ni l'un ni l'autre) entre comme autrefois, dès qu'une
+//  place se libère (entrerRenfortMonstre).
 //  updateDoc et non setDoc/merge : merge fusionne les tableaux au lieu de les
 //  remplacer, la réserve ne se viderait donc jamais.
 window.sauvegarderReserveMonstres = async function(reserve) {
@@ -1247,8 +1287,79 @@ window.lireReserveMonstres = async function() {
     return snap.exists() ? (snap.data().Reserve_Monstres || []) : [];
 };
 
+const estRenfortPrevu = (r) => !!(r && (r.surReleve || Number(r.entreeManche) > 0));
+
+// Fait entrer une partie de la réserve, d'un coup : leurs pions sur les cases
+// d'apparition, leur place dans l'ordre d'initiative, la réserve récrite sans
+// eux. Une pose ratée y laisse sa créature. Rend les identifiants posés.
+async function faireEntrerRenforts(reserve, entrent, pourquoi) {
+    const tokensData = { ...window.TOKENS_VTT_DATA };
+    const poses = [];
+    const restants = reserve.filter(r => !entrent.includes(r));
+    for (const renfort of entrent) {
+        const idMonstre = await window.poserMonstreSurTerrain(renfort, tokensData);
+        if (idMonstre) poses.push({ ...renfort, id: idMonstre });
+        else { console.error("Renfort impossible à poser, il reste en réserve :", renfort); restants.push(renfort); }
+    }
+    if (poses.length === 0) return [];
+    window.TOKENS_VTT_DATA = tokensData;
+    await window.enregistrerPionsVTT(...poses.map(p => p.id));
+    await window.sauvegarderReserveMonstres(restants);
+    // Leurs techniques, forgées en arrière-plan comme celles du départ.
+    if (typeof window.equiperCompetencesRencontre === "function") {
+        window.equiperCompetencesRencontre(poses).catch(e => console.error(e));
+    }
+    console.log(`🐲 Renfort (${pourquoi}) : ${poses.map(p => p.nom).join(", ")} entre${poses.length > 1 ? "nt" : ""} en jeu.`);
+    return poses.map(p => p.id);
+}
+
+// LES RENFORTS DE L'APPARITION, À LEUR MANCHE (v262). Appelé par le poste qui
+// tient le cerveau quand une manche commence (apparitionsDuTour, pont_combat.js) :
+// tous ceux dont l'heure est venue entrent. `options.terrainVide` : plus une
+// créature ennemie debout dans l'état du combat — la vague suivante n'attend
+// alors pas son heure (les fiches confirment : une créature posée mais pas
+// encore entrée dans le combat compte comme debout).
+window.entrerRenfortsPrevus = async function(manche, options) {
+    if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return [];
+    const reserve = await window.lireReserveMonstres();
+    const prevus = reserve.filter(r => r && !r.surReleve && Number(r.entreeManche) > 0);
+    if (prevus.length === 0) return [];
+    let entrent = prevus.filter(r => Number(r.entreeManche) <= Number(manche));
+    const vide = !!(options && options.terrainVide)
+        && !(typeof window.ennemisEncoreDebout === "function" && window.ennemisEncoreDebout());
+    if (entrent.length === 0 && vide) {
+        const prochaine = Math.min(...prevus.map(r => Number(r.entreeManche)));
+        entrent = prevus.filter(r => Number(r.entreeManche) === prochaine);
+    }
+    if (entrent.length === 0) return [];
+    return faireEntrerRenforts(reserve, entrent, entrent.some(r => Number(r.entreeManche) <= Number(manche))
+        ? `manche ${manche}` : "le terrain s'est vidé");
+};
+
+// LES RENFORTS DE LA RELÈVE (Apparition 1, cas 2) : la créature vient de se
+// relever en leader, ceux qu'elle appelle entrent.
+window.entrerRenfortsDeReleve = async function() {
+    if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return [];
+    const reserve = await window.lireReserveMonstres();
+    const entrent = reserve.filter(r => r && r.surReleve);
+    if (entrent.length === 0) return [];
+    return faireEntrerRenforts(reserve, entrent, "relève du leader");
+};
+
+// La relève inscrite dans le document de la créature : elle est leader pour de
+// bon (son aura, sa fiche), sa jauge et ses défenses sont les nouvelles.
+window.enregistrerReleveLeader = async function(idMonstre, c) {
+    if (!idMonstre || !window.estMonstre(idMonstre)) return;
+    const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+    const maj = { Leader: true, Releve_En_Leader: false };
+    if (c && n(c.pvMax) > 0) maj.PV_Max = n(c.pvMax);
+    if (c && c.def) { maj.Def_Physique = n(c.def.physique); maj.Def_Magique = n(c.def.magique); }
+    await updateDoc(doc(db, COLLECTION_MONSTRES, idMonstre), maj)
+        .catch(e => console.error("Relève du leader :", e));
+};
+
 // Appelé quand un monstre vient de mourir : si une place est libre et qu'il
-// reste des renforts, le suivant entre en jeu.
+// reste un renfort d'avant la v262 (sans heure), il entre en jeu.
 window.entrerRenfortMonstre = async function() {
     if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return null;
 
@@ -1275,7 +1386,11 @@ window.entrerRenfortMonstre = async function() {
     const vivants = (window.MONSTRES_PARTIE || []).filter(m => !aTerre(m) && !m.zombie && !m.compagnonDe).length;
     if (vivants >= limiteMonstresTerrain()) return null;
 
-    const renfort = reserve.shift();
+    // Seul un renfort d'avant la v262 attend une place libre : les autres ont
+    // leur heure (entrerRenfortsPrevus, entrerRenfortsDeReleve).
+    const index = reserve.findIndex(r => r && !estRenfortPrevu(r));
+    if (index < 0) return null;
+    const [renfort] = reserve.splice(index, 1);
     const tokensData = { ...window.TOKENS_VTT_DATA };
     const idMonstre = await window.poserMonstreSurTerrain(renfort, tokensData);
 
@@ -1372,7 +1487,8 @@ window.nettoyerMonstresCombat = async function() {
 //  6. LA FENÊTRE DE GÉNÉRATION (bouton 💀 des options de combat)
 // =========================================================================
 
-window.DIFFICULTE_RENCONTRE_CHOISIE = "Normale";
+// L'apparition choisie : 1, 2, 3, 4 ou « aleatoire » (v262 — plus de difficulté).
+window.APPARITION_RENCONTRE_CHOISIE = "aleatoire";
 
 window.ouvrirGenerationRencontre = function() {
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
@@ -1385,8 +1501,7 @@ window.ouvrirGenerationRencontre = function() {
     const voile = document.getElementById("etape-generation-rencontre");
     if (!voile) return;
 
-    window.DIFFICULTE_RENCONTRE_CHOISIE = "Normale";
-    window.choisirDifficulteRencontre("Normale");
+    window.choisirApparitionRencontre("aleatoire");
 
     const btn = document.getElementById("btn-valider-rencontre");
     if (btn) { btn.disabled = false; btn.innerText = "Valider"; }
@@ -1399,14 +1514,10 @@ window.fermerGenerationRencontre = function() {
     if (voile) voile.style.display = "none";
 };
 
-window.choisirDifficulteRencontre = function(difficulte) {
-    window.DIFFICULTE_RENCONTRE_CHOISIE = difficulte;
-
-    document.querySelectorAll(".choix-difficulte-rencontre").forEach(el => {
-        const actif = el.dataset.difficulte === difficulte;
-        el.style.borderColor = actif ? "#ffd700" : "#5c3a21";
-        el.style.background  = actif ? "rgba(255, 215, 0, 0.12)" : "rgba(0, 0, 0, 0.25)";
-        el.style.boxShadow   = actif ? "0 0 14px rgba(255, 215, 0, 0.45)" : "none";
+window.choisirApparitionRencontre = function(choix) {
+    window.APPARITION_RENCONTRE_CHOISIE = NUMEROS_APPARITION.includes(Number(choix)) ? Number(choix) : "aleatoire";
+    document.querySelectorAll(".choix-apparition-rencontre").forEach(el => {
+        el.classList.toggle("actif", el.dataset.apparition === String(window.APPARITION_RENCONTRE_CHOISIE));
     });
 };
 
@@ -1417,7 +1528,7 @@ window.validerGenerationRencontre = async function() {
     if (btn) { btn.disabled = true; btn.innerText = "Invocation..."; }
 
     try {
-        await window.genererRencontreMonstres(window.DIFFICULTE_RENCONTRE_CHOISIE);
+        await window.genererRencontreMonstres(window.APPARITION_RENCONTRE_CHOISIE);
         window.fermerGenerationRencontre();
     } catch (e) {
         console.error("Erreur de génération de la rencontre :", e);

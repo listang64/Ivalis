@@ -29,7 +29,7 @@ import { construireEtatCombat, verifierEtatCombat, creerDes, combattantDepuisFic
 import { creerCerveau, estLeCerveau, cerveauPerdu, suivreBattement, cerveauSilencieux,
          ouvrirManche, accueillirCombattant, BATTEMENT_MS } from './cerveau_combat.js';
 import { creerSpectateur } from './spectateur_combat.js';
-import { creerPont, creerProjection, versAnimationDeSaut, renfortsDuTour } from './pont_combat.js';
+import { creerPont, creerProjection, versAnimationDeSaut, renfortsDuTour, apparitionsDuTour } from './pont_combat.js';
 // DES NOMS QUI EXISTAIENT DÉJÀ, ET AUCUN AUTRE. Ces imports ne portent pas de
 // numéro de version : un appareil peut donc, quelques minutes après une mise à
 // jour, recevoir ce fichier-ci neuf et depot_firestore.js encore en cache. Un
@@ -853,6 +853,9 @@ const LEURRES_EFFACES = new Set();
 const TOMBES_ANNONCEES = new Set();
 // Les renforts qui attendent la manche suivante (renfortsDuTour, pont_combat.js).
 const MEMOIRE_RENFORTS = { annonces: TOMBES_ANNONCEES, attente: [], clePrecedente: null };
+// Les renforts prévus par l'apparition (v262) : la manche déjà vue, les
+// leaders déjà relevés (apparitionsDuTour, pont_combat.js).
+const MEMOIRE_APPARITIONS = { mancheVue: null, releves: new Set() };
 let RENFORTS_EN_COURS = Promise.resolve();
 
 function contexteDuJeu() {
@@ -1191,8 +1194,7 @@ function contexteDuJeu() {
                         bilan.morts.forEach(id => {
                             const c = etat.combattants[id] || {};
                             if (typeof window.tracerCombat === "function") {
-                                window.tracerCombat("☠️", `${c.nom || id} est terrassé`,
-                                                    "un renfort entrera à la manche suivante");
+                                window.tracerCombat("☠️", `${c.nom || id} est terrassé`, "sa place se libère");
                             }
                             Promise.resolve(window.marquerMonstreMort(id, { sansRenfort: true }))
                                 .catch(e => signalerPanne("marquerMonstreMort", e));
@@ -1208,6 +1210,28 @@ function contexteDuJeu() {
                             RENFORTS_EN_COURS = RENFORTS_EN_COURS
                                 .then(() => typeof window.entrerRenfortMonstre === "function" ? window.entrerRenfortMonstre() : null)
                                 .catch(e => signalerPanne("entrerRenfortMonstre", e));
+                        }
+
+                        // LES RENFORTS DE L'APPARITION (v262) : au début de la
+                        // manche prévue — plus tôt si le terrain s'est vidé —, et
+                        // ceux qu'appelle la créature relevée en leader. Même file
+                        // que les autres : chacun relit la réserve.
+                        const prevus = apparitionsDuTour(etat, MEMOIRE_APPARITIONS);
+                        prevus.releves.forEach(id => {
+                            const c = etat.combattants[id] || {};
+                            if (typeof window.tracerCombat === "function") {
+                                window.tracerCombat("👑", `${c.nom || id} se relève en leader`, "ses renforts entrent à la manche suivante");
+                            }
+                            RENFORTS_EN_COURS = RENFORTS_EN_COURS
+                                .then(() => typeof window.enregistrerReleveLeader === "function" ? window.enregistrerReleveLeader(id, c) : null)
+                                .then(() => typeof window.entrerRenfortsDeReleve === "function" ? window.entrerRenfortsDeReleve() : null)
+                                .catch(e => signalerPanne("entrerRenfortsDeReleve", e));
+                        });
+                        if (prevus.manche !== null) {
+                            RENFORTS_EN_COURS = RENFORTS_EN_COURS
+                                .then(() => typeof window.entrerRenfortsPrevus === "function"
+                                    ? window.entrerRenfortsPrevus(prevus.manche, { terrainVide: prevus.terrainVide }) : null)
+                                .catch(e => signalerPanne("entrerRenfortsPrevus", e));
                         }
                     }
                 }
@@ -1455,6 +1479,8 @@ if (typeof window !== "undefined") {
             TOMBES_ANNONCEES.clear();
             MEMOIRE_RENFORTS.attente = [];
             MEMOIRE_RENFORTS.clePrecedente = null;
+            MEMOIRE_APPARITIONS.mancheVue = null;
+            MEMOIRE_APPARITIONS.releves.clear();
             LEURRES_EFFACES.clear();
             REGIME = null;
             partieSuivie = null;

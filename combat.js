@@ -3685,6 +3685,14 @@ window.appliquerTokensVTT = function(tokensMap) {
             // création du héros) ; à défaut, l'image commune.
             const imageDuPion = (pData.compagnonDe && (pData.urlToken || pData.urlCloudinary)) || window.IMAGE_TOKEN_ENNEMI;
             if (pData.compagnonDe) divToken.classList.add("token-compagnon");
+            // LE LEADER (v262) : une aura rouge qui scintille autour du pion,
+            // sous son image.
+            if (pData.leader && !pData.zombie) {
+                divToken.classList.add("token-leader");
+                const aura = document.createElement("div");
+                aura.className = "aura-leader";
+                divToken.appendChild(aura);
+            }
             imgEnnemi.src = typeof window.redimensionnerImageCloudinary === "function"
                 ? window.redimensionnerImageCloudinary(imageDuPion, 700)
                 : imageDuPion;
@@ -5458,17 +5466,20 @@ window.afficherPisteInitiative = function(queue, phase) {
     if (typeof window.actualiserTitrePreparation === "function") window.actualiserTitrePreparation(queue, phase);
 };
 
-// LES QUATRE PALIERS, LES QUATRE COULEURS. Un Petit se repère en gris, un
-// Normal en blanc, un Élite en jaune, un Boss en rouge — les mêmes teintes
-// qu'ailleurs dans le jeu (le rouge du Boss est celui de la jauge de vie).
-// Exposée sur window : le banc de test la lit directement plutôt que de
-// deviner les couleurs depuis le CSS rendu.
+// LES TROIS STATURES, LES TROIS COULEURS (Nico, v262 : « change les couleurs
+// des ronds de monstre dans la piste d'initiative : Petit en blanc, Normal en
+// or et Boss en rouge »). Le rouge du Boss est celui de la jauge de vie. Une
+// créature Élite d'avant la v262 garde son jaune. Exposée sur window : le banc
+// de test la lit directement plutôt que de deviner les couleurs depuis le CSS
+// rendu.
 window.COULEURS_PALIER_INITIATIVE = {
-    "Petit": "#a8a8a8",
-    "Normal": "#ffffff",
+    "Petit": "#ffffff",
+    "Normal": "#d4a72c",
     "Élite": "#f4c430",
     "Boss": "#e63946"
 };
+// Le liseré du LEADER autour de sa couleur (v262).
+window.LISERE_LEADER_INITIATIVE = "#ff1f1f";
 
 // Le chiffre posé sur un fond plein : sombre sur une teinte claire, blanc sur
 // une teinte foncée (luminance relative, au sens du WCAG).
@@ -5546,8 +5557,9 @@ function contenuTuilePiste(entree, cestSonTour, choix, choixNeuf) {
 
     // LA COULEUR DE L'ENCART SUIT LE PALIER DE LA CRÉATURE : d'un coup d'œil,
     // sans lire son nom ni ouvrir sa fiche, on sait si c'est un Petit, un
-    // Normal, un Élite ou un Boss qui va jouer. Un héros n'a pas de palier
-    // (voir combat_etat.js) : il garde l'or d'origine.
+    // Normal ou un Boss qui va jouer. Un héros n'a pas de palier (voir
+    // combat_etat.js) : il garde le beige d'origine. Un LEADER (v262) porte un
+    // liseré rouge autour de sa couleur.
     //
     // LA COULEUR REMPLIT TOUT LE ROND, plus seulement son liseré : un fin
     // cercle coloré se lisait mal à la taille de la piste, un disque plein se
@@ -5557,6 +5569,9 @@ function contenuTuilePiste(entree, cestSonTour, choix, choixNeuf) {
     const couleurInitiative = (perso.estMonstre && window.COULEURS_PALIER_INITIATIVE[perso.Palier])
         || "#e8d5a5";
     const texteInitiative = window.texteSurCouleur(couleurInitiative);
+    // Le liseré : un anneau d'ombre, pas une bordure — le rond garde sa taille.
+    const estLeader = !!(perso.estMonstre && perso.leader);
+    const lisereLeader = estLeader ? `, 0 0 0 2px ${window.LISERE_LEADER_INITIATIVE}, 0 0 7px 2px rgba(255, 31, 31, 0.8)` : "";
 
     let etatsHtml = "";
     if (perso.Etats_Alteres && perso.Etats_Alteres.length > 0) {
@@ -5568,7 +5583,7 @@ function contenuTuilePiste(entree, cestSonTour, choix, choixNeuf) {
     return `
         ${cestSonTour ? '<div class="piste-scintillement"></div>' : ''}
         ${portrait}
-        <div style="position: absolute; top: -3px; left: -5px; width: 23px; height: 23px; border-radius: 50%; border: 1px solid rgba(26, 15, 8, 0.85); background: ${couleurInitiative}; box-shadow: 0 2px 5px rgba(0,0,0,0.9), inset 0 -2px 3px rgba(0,0,0,0.25), inset 0 1px 2px rgba(255,255,255,0.45); display: flex; align-items: center; justify-content: center; z-index: 3;">
+        <div class="rond-initiative${estLeader ? " rond-initiative-leader" : ""}" style="position: absolute; top: -3px; left: -5px; width: 23px; height: 23px; border-radius: 50%; border: 1px solid rgba(26, 15, 8, 0.85); background: ${couleurInitiative}; box-shadow: 0 2px 5px rgba(0,0,0,0.9), inset 0 -2px 3px rgba(0,0,0,0.25), inset 0 1px 2px rgba(255,255,255,0.45)${lisereLeader}; display: flex; align-items: center; justify-content: center; z-index: 3;">
             <span style="color: ${texteInitiative}; font-family: 'Cinzel', serif; font-size: 12px; font-weight: bold; text-shadow: ${texteInitiative === "#ffffff" ? "1px 1px 2px rgba(0,0,0,0.8)" : "0 1px 0 rgba(255,255,255,0.35)"};">${affichageInit}</span>
         </div>
 
@@ -6631,6 +6646,7 @@ window.reinitialiserCombat = async function() {
                 // La rencontre passée est close : sans cela, le prochain butin
                 // s'attribuerait l'identifiant de l'ancienne.
                 Difficulte_Rencontre: deleteField(),
+                Apparition_Rencontre: deleteField(),
                 ID_Rencontre: deleteField(),
                 // Le ménage qui suit prend plusieurs écritures (créatures,
                 // pions, soins). Tant qu'il dure, aucun poste ne doit prendre
@@ -6654,6 +6670,7 @@ window.reinitialiserCombat = async function() {
                 delete window.PARTIE_DATA.Spawn_Ennemis;
                 delete window.PARTIE_DATA.Butin;
                 delete window.PARTIE_DATA.Difficulte_Rencontre;
+                delete window.PARTIE_DATA.Apparition_Rencontre;
                 delete window.PARTIE_DATA.ID_Rencontre;
             }
         }
@@ -6955,13 +6972,33 @@ function coeurDesCasesSpawn() {
 }
 
 // Une case d'apparition libre, tirée au sort — ou null s'il n'y en a aucune
-// de peinte.
+// de peinte. Toutes prises (v262 : « ou adjacent au spawn si plus aucun spawn
+// de libre et qu'ils soient tous encombrés »), une case libre AU CONTACT de
+// l'une d'elles, au hasard ; puis à deux cases, et ainsi de suite.
 window.trouverHexSpawnEnnemi = function(tokensData) {
     const cases = window.casesSpawnEnnemis();
     if (cases.length === 0) return null;
     const pions = Object.values(tokensData || {});
-    const libres = cases.filter(c => !pions.some(t => t && t.q === c.q && t.r === c.r));
+    const occupee = (q, r) => pions.some(t => t && t.q === q && t.r === r);
+    const libres = cases.filter(c => !occupee(c.q, c.r));
     if (libres.length > 0) return libres[Math.floor(Math.random() * libres.length)];
+    const peinte = new Set(cases.map(c => `${c.q},${c.r}`));
+    for (let portee = 1; portee <= 20; portee++) {
+        const vues = new Set(), autour = [];
+        cases.forEach(c => {
+            for (let dq = -portee; dq <= portee; dq++) for (let dr = -portee; dr <= portee; dr++) {
+                const h = { q: c.q + dq, r: c.r + dr }, cle = `${h.q},${h.r}`;
+                if (vues.has(cle) || peinte.has(cle) || distanceHexVTT(c, h) !== portee) continue;
+                vues.add(cle);
+                // À cette distance de la plus proche des cases peintes, pas plus loin.
+                if (cases.some(x => distanceHexVTT(x, h) < portee)) continue;
+                const etat = window.PLATEAU_VTT ? window.PLATEAU_VTT.getCaseState(h.q, h.r) : {};
+                if (etat.isDeleted || etat.isBlocked || occupee(h.q, h.r)) continue;
+                autour.push(h);
+            }
+        });
+        if (autour.length > 0) return autour[Math.floor(Math.random() * autour.length)];
+    }
     return window.trouverHexLibreAutour(tokensData, cases[Math.floor(Math.random() * cases.length)], 1);
 };
 
@@ -7166,8 +7203,8 @@ window.enregistrerPointsApparition = async function(allies, ennemis) {
     }
 
     // Poser les repères après une réinitialisation enchaîne sur la suite
-    // logique : les héros se déploient, puis la rencontre demande sa
-    // difficulté. Le drapeau est consommé tout de suite, pour qu'un
+    // logique : les héros se déploient, puis la rencontre demande son
+    // apparition. Le drapeau est consommé tout de suite, pour qu'un
     // replacement ultérieur des repères ne relance pas tout.
     if (window.DEPLOIEMENT_APRES_REPERES) {
         window.DEPLOIEMENT_APRES_REPERES = false;
@@ -7176,7 +7213,7 @@ window.enregistrerPointsApparition = async function(allies, ennemis) {
 };
 
 // Le déploiement d'un combat neuf : les pions des héros autour de leur repère,
-// puis la fenêtre de rencontre pour choisir la difficulté des ennemis.
+// puis la fenêtre de rencontre pour choisir l'apparition des ennemis.
 window.deployerCombatApresReperes = async function() {
     try {
         if (typeof window.genererTokensCombat === "function") await window.genererTokensCombat();
@@ -7282,6 +7319,9 @@ window.declencherVictoireTest = async function() {
         });
 
         await batch.commit();
+        // Les renforts qui attendent leur heure ne viendront plus : la victoire
+        // ne les attend pas (combatGagne, loot.js).
+        if (typeof window.sauvegarderReserveMonstres === "function") await window.sauvegarderReserveMonstres([]);
         console.log("🏆 Victoire de test : tous les ennemis sont terrassés.");
     } catch (e) {
         console.error("Erreur victoire de test :", e);

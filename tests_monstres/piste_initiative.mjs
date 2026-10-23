@@ -758,8 +758,10 @@ console.log("\n14. LE CERCLE D'INITIATIVE PREND LA COULEUR DU PALIER");
   // celui qui contraste le plus avec le fond (WCAG). Sur le rouge du Boss
   // c'est encore le sombre : 4,5 contre 4,2 pour le blanc.
   const SOMBRE = rgb("#1a0f08");
-  verifier("Petit : rond rempli de gris", parId.M_PETIT.couleurFond === rgb("#a8a8a8"), parId.M_PETIT.couleurFond);
-  verifier("Normal : rond rempli de blanc", parId.M_NORMAL.couleurFond === rgb("#ffffff"), parId.M_NORMAL.couleurFond);
+  // (v262 : « Petit en blanc, Normal en or et Boss en rouge » ; une créature
+  // Élite d'avant garde son jaune.)
+  verifier("Petit : rond rempli de blanc", parId.M_PETIT.couleurFond === rgb("#ffffff"), parId.M_PETIT.couleurFond);
+  verifier("Normal : rond rempli d'or", parId.M_NORMAL.couleurFond === rgb("#d4a72c"), parId.M_NORMAL.couleurFond);
   verifier("Élite : rond rempli de jaune", parId.M_ELITE.couleurFond === rgb("#f4c430"), parId.M_ELITE.couleurFond);
   verifier("Boss : rond rempli de rouge", parId.M_BOSS.couleurFond === rgb("#e63946"), parId.M_BOSS.couleurFond);
   verifier("UN HÉROS N'A PAS DE PALIER : SON ROND EST REMPLI DE L'OR D'ORIGINE",

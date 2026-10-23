@@ -253,7 +253,8 @@ console.log("\n4b. LE TABLEAU DES MONSTRES : LA TRICHE EN %");
     window.__ou(() => window.appliquerReglagesMonstres(null), null);
     return { titre, valeurs, ecrit, normal, ancien };
   });
-  verifier("la ligne dit « Dégâts et soins en plus (%) », 10 partout", /\(%\)/.test(r.titre) && r.valeurs === "10/10/10/10", `${r.titre} ${r.valeurs}`);
+  // (v262 : plus de colonne Élite.)
+  verifier("la ligne dit « Dégâts et soins en plus (%) », 10 partout", /\(%\)/.test(r.titre) && r.valeurs === "10/10/10", `${r.titre} ${r.valeurs}`);
   verifier("Normale à 25 % : le moteur le sait, la base l'écrit (Bonus_Degats_Pct)", r.normal === 25
            && r.ecrit.some(x => /"Bonus_Degats_Pct":\{[^}]*"Normal":25/.test(x)), JSON.stringify(r.ecrit));
   verifier("l'ancien réglage en points (Bonus_Degats) n'est pas relu en %", r.ancien === 10, `${r.ancien}`);

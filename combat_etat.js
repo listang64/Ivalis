@@ -373,6 +373,12 @@ function combattantBrut(fiche, position, bornes) {
 
         bouclierMax: nombre(fiche.Bouclier_Max),
         stats,
+        // LE LEADER (v262) : ses dégâts, soins et chances d'état en plus
+        // (bonusMonstreDe, chanceEtatDe, moteur_pur.js) ; ses PV et défenses
+        // sont déjà sur sa fiche. Celle qui se relèvera en leader au premier
+        // KO (Apparition 1) le porte aussi.
+        ...(fiche.estMonstre && fiche.leader ? { leader: true } : {}),
+        ...(fiche.estMonstre && fiche.releveEnLeader && !fiche.leader ? { releveEnLeader: true } : {}),
         // LE COMPAGNON DU PISTEUR : une créature de son camp, jouée par le
         // cerveau juste après son maître (jouerCompagnon, cerveau_combat.js).
         ...(fiche.compagnonDe ? { compagnon: { idMaitre: String(fiche.compagnonDe) } } : {})
@@ -791,12 +797,63 @@ function briserIllusion(etat, illusion, idAuteur) {
             ...tomber(etat, auteur.id, illusion.idCreateur || null)];
 }
 
+// =========================================================================
+//  LE LEADER (v262)
+// =========================================================================
+//  Nico : « Les monstres leaders auront +15 % de dégâts et de soins sur leurs
+//  compétences, +15 % de résistances de défenses magique et physique, +15
+//  points de vie, +15 % de chance de faire un état — fais-moi un encart dans
+//  Paramètres > Monstres pour pouvoir changer par la suite. » Les résistances
+//  et la chance d'état s'ajoutent en POINTS, comme la résistance à un état
+//  (50 % − 25 % = 25 %) : 20 % de défense deviennent 35 %, 30 % de chance de
+//  brûler deviennent 45 %. Les dégâts et soins s'ajoutent au % de triche de
+//  sa stature (bonusMonstreDe, moteur_pur.js).
+//
+//  Réglés depuis le tableau des monstres sur chaque poste (monstres.js, via
+//  window.moteurPur.reglerLeader) ; ces chiffres sont ceux d'origine. Les PV
+//  et les défenses sont posés sur la fiche à la création du leader ; la
+//  relève de l'Apparition 1 (tomber, plus bas) les lit ici.
+export const LEADER_DEFAUT = Object.freeze({ degats: 15, resistances: 15, pv: 15, chanceEtat: 15 });
+const TABLE_LEADER = { ...LEADER_DEFAUT };
+export function reglerLeader(table) {
+    Object.keys(LEADER_DEFAUT).forEach(cle => {
+        const brut = table ? table[cle] : undefined;
+        const v = brut === undefined || brut === null || brut === "" ? NaN : Number(brut);
+        TABLE_LEADER[cle] = Number.isFinite(v) ? Math.round(v) : LEADER_DEFAUT[cle];
+    });
+    return { ...TABLE_LEADER };
+}
+export const leaderActuel = () => ({ ...TABLE_LEADER });
+
+// LA RELÈVE EN LEADER (Apparition 1, cas 2 : « quand on le met KO à terre, il
+// revient à la vie en mode leader avec tous ses PV et toute sa fatigue, et il
+// y a un spawn d'ennemis »). Pas d'étape « chute » : elle ferait croire, le
+// temps d'une étape, qu'il est tombé pour de bon — et le poste qui tient le
+// cerveau le déclarerait mort dans son document. Son tueur reçoit ce qu'un KO
+// rapporte. Le renfort, lui, part de la projection (regime_cerveau.js).
+function releverEnLeader(etat, c, acteur, options) {
+    const bonus = leaderActuel();
+    const pvMax = nombre(c.pvMax) + nombre(bonus.pv);
+    const etape = {
+        type: "releveLeader", cible: c.id, acteur: acteur || c.id,
+        pvMax, pv: pvMax, fatigue: nombre(c.fatigueMax),
+        defPhysique: nombre(c.def && c.def.physique) + nombre(bonus.resistances),
+        defMagique: nombre(c.def && c.def.magique) + nombre(bonus.resistances)
+    };
+    const recompenses = [];
+    if (acteur && acteur !== c.id) recompenses.push(...recompenserLeTueur(etat, c, acteur, !!(options && options.finDeManche)));
+    if (acteur && acteur !== c.id && !(options && options.finDeManche)) recompenses.push(...adrenalineDuBourreau(etat, c, acteur));
+    APPLICATEURS.releveLeader(etat, etape);
+    return [...recompenses, etape];
+}
+
 export function tomber(etat, id, acteur, options) {
     const c = combattant(etat, id);
     if (!c || c.aTerre) return [];
     if (!(nombre(c.pvMax) > 0 && nombre(c.pv) <= 0)) return [];
     c.pv = 0;
     if (c.sursis) return [];                      // déjà en sursis : il tient
+    if (c.estMonstre && c.releveEnLeader && !c.leader) return releverEnLeader(etat, c, acteur, options);
     const tours = nombre(c.atouts && c.atouts.sursis);
     if (tours > 0 && !c.sursisUtilise) {
         const entame = ((etat.file || [])[0] || {}).id === id;
@@ -954,7 +1011,9 @@ export const APPLICATEURS = {
         if (e.pvApres !== undefined) c.pv = Math.max(0, Math.min(c.pvMax, nombre(e.pvApres)));
         // En sursis, la vie reste bloquée à zéro et le combattant debout.
         if (c.sursis) c.pv = 0;
-        c.aTerre = c.pvMax > 0 && c.pv <= 0 && !c.sursis;
+        // La créature qui va se relever en leader ne tombe pas entre le coup
+        // et sa relève (l'étape qui suit, releveLeader).
+        c.aTerre = c.pvMax > 0 && c.pv <= 0 && !c.sursis && !c.releveEnLeader;
     },
 
     // Une technique de classe jouée : elle ne resservira plus de ce combat.
@@ -1046,6 +1105,28 @@ export const APPLICATEURS = {
             else if (e.mur) etat.murs[e.id] = JSON.parse(JSON.stringify(e.mur));
         }
         if (e.gravats) etat.gravats = { ...(etat.gravats || {}), [e.gravats]: true };
+    },
+
+    // Une créature se relève en leader (Apparition 1, v262 : releverEnLeader).
+    // Le RÉSULTAT : ses PV et son énergie pleins, son maximum de vie et ses
+    // défenses rehaussés, ses états et son bouclier effacés.
+    releveLeader(etat, e) {
+        const c = combattant(etat, e.cible);
+        if (!c) return;
+        c.aTerre = false;
+        c.sursis = null;
+        c.releveEnLeader = false;
+        c.leader = true;
+        c.leaderReleve = true;
+        c.pvMax = nombre(e.pvMax, c.pvMax);
+        c.pv = Math.max(0, Math.min(c.pvMax, nombre(e.pv, c.pvMax)));
+        c.fatigue = Math.max(0, Math.min(nombre(c.fatigueMax), nombre(e.fatigue, c.fatigueMax)));
+        c.bouclier = 0;
+        c.bouclierMax = 0;
+        c.etats = [];
+        c.def = { ...(c.def || {}),
+                  physique: nombre(e.defPhysique, nombre(c.def && c.def.physique)),
+                  magique: nombre(e.defMagique, nombre(c.def && c.def.magique)) };
     },
 
     // Un allié relevé par le Médicus (Prise en charge) : debout, ses PV, ses

@@ -283,10 +283,11 @@ console.log("\n1b. EN HAUT DU TABLEAU DES MONSTRES : LA TRICHE ET LA MARCHE, À 
     return { n: champs.length, auDessus, avant, apres, ailleurs, retour };
   });
   verifier("le bloc est en haut, au-dessus du tableau des gabarits", r.auDessus === true);
-  verifier("huit cases : les dégâts en plus et la marche, par stature", r.n === 8, `${r.n}`);
+  // (v262 : plus de colonne Élite — Petit, Normal, Boss.)
+  verifier("six cases : les dégâts en plus et la marche, par stature", r.n === 6, `${r.n}`);
   // (v255 : la triche est en % du brut, 10 % pour chaque stature.)
-  verifier("on y lit la triche d'aujourd'hui : +10 % partout", r.avant.degats === "10/10/10/10", r.avant.degats);
-  verifier("la marche d'aujourd'hui : 6 / 5 / 4 / 4", r.avant.marche === "6/5/4/4", r.avant.marche);
+  verifier("on y lit la triche d'aujourd'hui : +10 % partout", r.avant.degats === "10/10/10", r.avant.degats);
+  verifier("la marche d'aujourd'hui : 6 / 5 / 4", r.avant.marche === "6/5/4", r.avant.marche);
   verifier("et le bonus des sorts : 20 %", r.avant.sorts === "20", String(r.avant.sorts));
   verifier("Normale à +4 % : le moteur frappe à +4 % tout de suite", r.apres.bonusNormal === 4, `${r.apres.bonusNormal}`);
   verifier("Boss à 7 cases : le cerveau ET la préparation le savent", r.apres.pasBossCerveau === 7 && r.apres.pasBossPreparation === 7,
@@ -295,7 +296,7 @@ console.log("\n1b. EN HAUT DU TABLEAU DES MONSTRES : LA TRICHE ET LA MARCHE, À 
   verifier("sorts à 35 % : leurs effets valent ×1,35", Math.abs(r.apres.sorts - 1.35) < 1e-9, `${r.apres.sorts}`);
   verifier("chaque changement s'écrit (Monstres_Modeles/_REGLAGES, fusionné)", r.apres.ecrit.length === 4 && r.apres.ecrit.every(x => x.endsWith("+merge")),
            r.apres.ecrit.join(" | "));
-  verifier("un autre poste change les chiffres : ce poste les suit", r.ailleurs.degats === "1/2/3/4" && r.ailleurs.marche === "3/3/3/3"
+  verifier("un autre poste change les chiffres : ce poste les suit", r.ailleurs.degats === "1/2/4" && r.ailleurs.marche === "3/3/3"
            && r.ailleurs.boss === 4 && r.ailleurs.pas === 3 && Math.abs(r.ailleurs.sorts - 1.1) < 1e-9, JSON.stringify(r.ailleurs));
   verifier("sans réglage en base : les chiffres d'origine", r.retour.bonus === 10 && r.retour.pas === 4 && Math.abs(r.retour.sorts - 1.2) < 1e-9,
            JSON.stringify(r.retour));

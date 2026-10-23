@@ -559,6 +559,12 @@ const SCENES = {
         return { geste: "rien" };
     },
 
+    // Une créature se relève en leader (Apparition 1, v262) : elle le dit, en
+    // rouge, et son aura s'allume avec sa fiche (fichesDepuisEtat).
+    releveLeader(e) {
+        return { geste: "message", pion: e.cible, texte: "👑 Se relève en Leader !", couleur: "#ff5252", duree: RYTHME.message };
+    },
+
     // Un allié relevé par le Médicus : il le dit, sur son pion.
     reanimation(e) {
         return { geste: "message", pion: e.cible, texte: "✚ Relevé !", couleur: "#43a047", duree: RYTHME.message };
@@ -923,7 +929,10 @@ export function fichesDepuisEtat(etat, fichesActuelles) {
             // UN ZOMBIE DU PROFANATEUR change de camp, et sa jauge est la
             // sienne (15) : la victoire ne l'attend plus, son XP reste due
             // (loot.js), son pion se grignote (zombie_token.js).
-            ...(c.zombie ? { zombie: true, camp: c.camp, PV_Max: nombre(c.pvMax), statut: "Vivant" } : {})
+            ...(c.zombie ? { zombie: true, camp: c.camp, PV_Max: nombre(c.pvMax), statut: "Vivant" } : {}),
+            // UN LEADER (v262) : son aura sur le plateau, son liseré rouge sur
+            // la piste. Relevé en leader, sa jauge est la nouvelle (+15 PV).
+            ...(c.leader ? { leader: true, PV_Max: nombre(c.pvMax) } : {})
         };
     });
 }
@@ -961,6 +970,35 @@ export function renfortsDuTour(etat, memoire) {
     const renforts = memoire.attente.filter(r => r.tour !== cle).length;
     memoire.attente = memoire.attente.filter(r => r.tour === cle);
     return { morts, zombies, renforts };
+}
+
+// LES RENFORTS PRÉVUS PAR L'APPARITION (v262), ET QUAND ILS ENTRENT. Ceux-là
+// n'attendent pas une place libre : ils arrivent « au bout de 1, 2 ou 4 tours »
+// — au début de la manche prévue —, ou quand la créature de l'Apparition 1 se
+// relève en leader. Fonction pure, comme renfortsDuTour : `memoire`
+// ({ mancheVue, releves: Set }) est tenue par l'appelant. Rend la manche qui
+// vient de commencer (null si elle n'a pas changé), les créatures qui viennent
+// de se relever en leader, et si plus aucune créature ennemie ne tient debout
+// (les renforts prévus arrivent alors dès la manche suivante, sans attendre).
+export function apparitionsDuTour(etat, memoire) {
+    const cle = nombre(etat && etat.manche);
+    let manche = null;
+    if (memoire.mancheVue !== cle) {
+        memoire.mancheVue = cle;
+        manche = cle;
+    }
+    if (!memoire.releves) memoire.releves = new Set();
+    const combattants = (etat && etat.combattants) || {};
+    const releves = [];
+    Object.keys(combattants).sort().forEach(id => {
+        const c = combattants[id];
+        if (!c || !c.estMonstre || !c.leaderReleve || memoire.releves.has(id)) return;
+        memoire.releves.add(id);
+        releves.push(id);
+    });
+    const terrainVide = !Object.values(combattants).some(c => c && c.estMonstre && !c.aTerre && !c.zombie
+        && !c.compagnon && !c.estIllusion && (c.camp || "Ennemi") === "Ennemi");
+    return { manche, releves, terrainVide };
 }
 
 export function fileDepuisEtat(etat) {
@@ -1090,7 +1128,9 @@ const CHAMPS_COMBAT_PROTEGES = [
     "PV_Actuels", "Bouclier_Actuel", "Etats_Alteres", "Fatigue_Actuelle", "fatigueActuelle",
     // Le sursis du Nécromancien : sans lui, une fiche rafraîchie à zéro PV
     // le ferait passer pour tombé.
-    "sursis", "techniquesUtilisees"
+    "sursis", "techniquesUtilisees",
+    // Le leader relevé (v262) : sa fiche de base ne le sait qu'après coup.
+    "leader"
 ];
 
 export function fusionnerFichesCombat(fichesFraiches, fichesActuelles, combattantsDuCerveau) {

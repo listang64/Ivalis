@@ -320,7 +320,19 @@ async function abattreLesCreatures(poste) {
         const vivants = Object.keys(monde.docs)
             .filter(c => c.startsWith("Monstres/"))
             .filter(c => monde.docs[c].ID_Partie === "PARTIE" && monde.docs[c].Statut !== "Mort");
-        if (vivants.length === 0) break;
+        if (vivants.length === 0) {
+            // LES RENFORTS DE L'APPARITION (v262) attendent leur manche, ou la
+            // relève du leader : le cerveau les ferait entrer — ici, on les
+            // appelle, comme le ferait le poste qui le tient.
+            if ((monde.docs["Systeme_Parties/PARTIE"].Reserve_Monstres || []).length === 0) break;
+            poste.activer();
+            await poste.w.entrerRenfortsPrevus(99, { terrainVide: true });
+            await poste.w.entrerRenfortsDeReleve();
+            await monde.attendreLeReseau();
+            brancherLesMonstres();
+            await monde.attendreLeReseau();
+            continue;
+        }
 
         for (const chemin of vivants) {
             const id = chemin.slice("Monstres/".length);
@@ -372,9 +384,11 @@ async function jouerLeButinPersonnel(poste, choix) {
 // =========================================================================
 //  UN CYCLE COMPLET : DE LA RÉINITIALISATION AU PARTAGE
 // =========================================================================
-async function jouerUnCombatEntier(numero, difficulte) {
-    console.log(`\n${"═".repeat(74)}\n  COMBAT ${numero} — difficulté ${difficulte}\n${"═".repeat(74)}`);
-    const rapport = { numero, difficulte };
+// (v262 : plus de difficulté — l'apparition, 1 à 4 ; le butin tire ses
+// raretés sur la ligne « Normale ».)
+async function jouerUnCombatEntier(numero, apparition) {
+    console.log(`\n${"═".repeat(74)}\n  COMBAT ${numero} — apparition ${apparition}\n${"═".repeat(74)}`);
+    const rapport = { numero, apparition, difficulte: "Normale" };
 
     // --- 1. RÉINITIALISATION -------------------------------------------
     const equipementAvant = photoEquipement(mj);
@@ -414,7 +428,7 @@ async function jouerUnCombatEntier(numero, difficulte) {
     const pions = monde.docs["Combat_VTT/PARTIE"].Tokens || {};
     verifier("poser les repères déploie les héros tout seul",
              HEROS.every(h => !!pions[h.id]), `(${Object.keys(pions).join(",") || "aucun"})`);
-    verifier("et enchaîne sur la demande de difficulté", rencontreDemandee);
+    verifier("et enchaîne sur la demande d'apparition", rencontreDemandee);
     verifier("chaque héros est posé près de SON repère",
              HEROS.every(h => Math.max(Math.abs(pions[h.id].q - repereAllie.q),
                                        Math.abs(pions[h.id].r - repereAllie.r),
@@ -429,7 +443,7 @@ async function jouerUnCombatEntier(numero, difficulte) {
 
     // --- 3. LA RENCONTRE ------------------------------------------------
     mj.activer();
-    const rencontre = await mj.w.genererRencontreMonstres(difficulte);
+    const rencontre = await mj.w.genererRencontreMonstres(apparition);
     await monde.attendreLeReseau();
     brancherLesMonstres();
     await monde.attendreLeReseau();
@@ -439,9 +453,10 @@ async function jouerUnCombatEntier(numero, difficulte) {
     verifier("chacune a son pion sur le plateau",
              creatures.every(c => !!(monde.docs["Combat_VTT/PARTIE"].Tokens || {})[c.slice(9)]),
              `(${creatures.length} créature(s), ${Object.keys(monde.docs["Combat_VTT/PARTIE"].Tokens).length} pion(s) au total)`);
-    verifier("la difficulté est retenue pour le butin",
-             monde.docs["Systeme_Parties/PARTIE"].Difficulte_Rencontre === difficulte,
-             `(${monde.docs["Systeme_Parties/PARTIE"].Difficulte_Rencontre})`);
+    verifier("l'apparition est retenue sur la partie (plus de difficulté)",
+             monde.docs["Systeme_Parties/PARTIE"].Apparition_Rencontre === apparition
+             && monde.docs["Systeme_Parties/PARTIE"].Difficulte_Rencontre === undefined,
+             `(${monde.docs["Systeme_Parties/PARTIE"].Apparition_Rencontre})`);
     verifier("la rencontre porte un identifiant neuf",
              typeof monde.docs["Systeme_Parties/PARTIE"].ID_Rencontre === "string"
              && monde.docs["Systeme_Parties/PARTIE"].ID_Rencontre.length > 5);
@@ -483,8 +498,8 @@ async function jouerUnCombatEntier(numero, difficulte) {
                  const uids = butin ? butin.participants.flatMap(id => butin.parPersonnage[id].items.map(i => i.uid)) : [];
                  return uids.length > 0 && new Set(uids).size === uids.length;
              })());
-    verifier("la rareté suit la difficulté annoncée",
-             butin && butin.difficulte === difficulte, butin ? `(${butin.difficulte})` : "");
+    verifier("la rareté se tire sur la ligne « Normale »",
+             butin && butin.difficulte === "Normale", butin ? `(${butin.difficulte})` : "");
     rapport.butin = butin;
 
     return rapport;
@@ -650,12 +665,12 @@ function verifierLesEffetsPortes(etiquette) {
 // =========================================================================
 //  LA CAMPAGNE : TROIS COMBATS D'AFFILÉE
 // =========================================================================
-const DIFFICULTES = ["Normale", "Difficile", "Très difficile"];
+const APPARITIONS_JOUEES = [1, 2, 3];
 const historique = [];
 let butinPrecedent = null;
 
 for (let n = 1; n <= 3; n++) {
-    const rapport = await jouerUnCombatEntier(n, DIFFICULTES[n - 1]);
+    const rapport = await jouerUnCombatEntier(n, APPARITIONS_JOUEES[n - 1]);
     rapport.butinPrecedent = butinPrecedent;
     const resultat = await jouerLeButin(rapport);
     butinPrecedent = rapport.butinPrecedent;
@@ -679,16 +694,12 @@ verifier("chaque combat a eu son propre butin",
 verifier("et sa propre rencontre",
          new Set(historique.map(h => h.idRencontre)).size === 3);
 
-// Les raretés doivent suivre la difficulté : l'épique n'existe qu'en très
-// difficile (tableau de loot), et le banc doit le voir sur trois combats.
-const raretes = {};
-historique.forEach(h => {
-    raretes[h.difficulte] = h.butin.participants
-        .flatMap(id => h.butin.parPersonnage[id].items.map(i => i.rarete));
-});
+// Les raretés se tirent sur la ligne « Normale » (v262) : l'épique n'y existe
+// pas (tableau de loot), et le banc doit le voir sur trois combats.
+const raretes = historique.flatMap(h => h.butin.participants
+    .flatMap(id => h.butin.parPersonnage[id].items.map(i => i.rarete)));
 console.log("     raretés tirées :", JSON.stringify(raretes));
-verifier("aucun épique ne tombe en difficulté Normale",
-         !(raretes["Normale"] || []).includes("Épique"), `(${(raretes["Normale"] || []).join(",")})`);
+verifier("aucun épique ne tombe (ligne Normale)", !raretes.includes("Épique"), `(${raretes.join(",")})`);
 
 // L'équipement final : chaque objet porté doit venir d'un butin réellement joué.
 const poste = postes[0];
@@ -751,7 +762,7 @@ await mj.api.updateDoc(mj.api.doc(mj.db, "Systeme_Parties", "PARTIE"), {
 });
 await monde.attendreLeReseau();
 
-const rapport4 = await jouerUnCombatEntier(4, "Difficile");
+const rapport4 = await jouerUnCombatEntier(4, 4);
 verifier("le butin fantôme a bien été remplacé",
          rapport4.butin.id !== "butin_fantome", `(${rapport4.butin.id})`);
 

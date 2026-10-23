@@ -41,7 +41,8 @@
 //  venaient les dégâts comptés deux fois.
 // =========================================================================
 
-import { clonerEtat, combattant, creerDes, tomber, enSursis, reductionInertie } from './combat_etat.js';
+import { clonerEtat, combattant, creerDes, tomber, enSursis, reductionInertie,
+         leaderActuel, reglerLeader, LEADER_DEFAUT } from './combat_etat.js';
 
 const nombre = (v, defaut = 0) => {
     const n = parseInt(v);
@@ -704,10 +705,13 @@ export function reglerBonusMonstres(table) {
 }
 export const bonusMonstresActuels = () => ({ ...TABLE_BONUS_MONSTRE });
 
-// Le pourcentage de triche d'un combattant (0 pour un héros).
+// Le pourcentage de triche d'un combattant (0 pour un héros). Un LEADER
+// (v262) y ajoute le sien : +15 % de dégâts et de soins, à l'origine
+// (leaderActuel, combat_etat.js).
 export function bonusMonstreDe(c) {
     if (!c || !c.estMonstre) return 0;
-    return TABLE_BONUS_MONSTRE[c.palier === "Elite" ? "Élite" : c.palier] || 0;
+    return (TABLE_BONUS_MONSTRE[c.palier === "Elite" ? "Élite" : c.palier] || 0)
+         + (c.leader ? nombre(leaderActuel().degats) : 0);
 }
 // Une valeur de dégâts ou de soin, triche comprise (au centième près : le
 // demi-point se garde jusqu'à l'arrondi de la chaîne, comme partout).
@@ -825,11 +829,15 @@ export function prisMalgreResistance(c, nom, des) {
 // (facultatif) : ses jets de la carte — un sort de foudre d'un Chasseur de
 // mages y a noté sa Maîtrise de la lumière (l'Aveuglement prend alors la plus
 // forte des deux chances, sans les additionner).
+//
+// Un LEADER (v262) ajoute ses points de chance (+15, à l'origine) à tout état
+// que sa carte peut poser — jamais à un état que la carte ne pose pas (0 %).
 export function chanceEtatDe(lanceur, alt, cible, jetsCible) {
     const base = nombre(alt && alt.chance);
     const bonus = (lanceur && lanceur.estMonstre) ? (BONUS_CHANCE_ETAT_MONSTRE[alt && alt.nom] || 0) : 0;
     const subie = (alt && alt.nom === "Brûlé" && cible && cible.atouts) ? nombre(cible.atouts.brulureFacile) : 0;
-    let chance = base + bonus + (base > 0 ? subie : 0);
+    const chef = (lanceur && lanceur.estMonstre && lanceur.leader && base > 0) ? nombre(leaderActuel().chanceEtat) : 0;
+    let chance = base + bonus + chef + (base > 0 ? subie : 0);
     if (alt && alt.nom === ETAT_AVEUGLE && jetsCible && jetsCible.maitriseLumiere > 0) chance = Math.max(chance, jetsCible.maitriseLumiere);
     return chanceFaceA(cible, alt && alt.nom, chance);
 }
@@ -2779,6 +2787,8 @@ if (typeof window !== "undefined") {
         esquiveDe, paradeDe, defPhysiqueDe, defMagiqueDe, critiqueDe, distanceHex,
         casesDansLeNoir, estDansLeNoir, ETAT_AVEUGLE,
         // La triche des créatures, réglée depuis le tableau des monstres (v252).
-        bonusMonstreDe, appliquerBonusMonstre, reglerBonusMonstres, bonusMonstresActuels, BONUS_MONSTRE_DEFAUT
+        bonusMonstreDe, appliquerBonusMonstre, reglerBonusMonstres, bonusMonstresActuels, BONUS_MONSTRE_DEFAUT,
+        // Le leader (v262), réglé depuis le même tableau.
+        reglerLeader, leaderActuel, LEADER_DEFAUT, chanceEtatDe
     };
 }

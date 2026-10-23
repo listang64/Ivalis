@@ -94,8 +94,28 @@ function synchroniser() {
 let echecs = 0;
 const verifier = (l, c, d="") => { if (!c) echecs++; console.log(`  ${l.padEnd(52)} ${c?"OK":"ÉCHEC"} ${d}`); };
 
+// UNE RENCONTRE D'AVANT LA v262. La génération pose maintenant toute
+// l'apparition et donne une heure à chaque renfort (corrections_v262.mjs) ;
+// une réserve d'avant, SANS heure, entre toujours à la place d'un mort, sous
+// la limite du terrain (joueurs + 1). C'est elle que ce banc garde en vie : on
+// la monte comme l'ancienne génération la montait, avec les vraies fonctions
+// de pose et de réserve.
+async function rencontreDAvant() {
+  const actifs = w.PERSOS_JOUEURS_PARTIE.filter(p => p.actif !== false).length;
+  const limite = Math.max(2, actifs + 1);
+  const compo = ["Normal", "Petit", "Normal", "Petit", "Normal"]
+    .map((palier, i) => ({ archetype: "DPS CAC", palier, nom: `Créature ${i + 1}` }));
+  const tokens = { ...w.TOKENS_VTT_DATA }, poses = [];
+  for (const m of compo.slice(0, limite)) { const id = await w.poserMonstreSurTerrain(m, tokens); if (id) poses.push({ ...m, id }); }
+  w.TOKENS_VTT_DATA = tokens;
+  await w.enregistrerPionsVTT(...poses.map(p => p.id));
+  await w.sauvegarderReserveMonstres(compo.slice(limite));
+  w.equiperCompetencesRencontre(poses);
+  return { surLeTerrain: compo.slice(0, limite), enReserve: compo.slice(limite) };
+}
+
 // --- Rencontre : 2 joueurs -> limite de 3 monstres sur le terrain ---
-const res = await w.genererRencontreMonstres("Normale");
+const res = await rencontreDAvant();
 // Les techniques sont forgées en arrière-plan (volontairement : les pions
 // apparaissent tout de suite). On laisse donc le temps à cette tâche de tourner.
 await new Promise(r => setTimeout(r, 20));
@@ -103,7 +123,7 @@ synchroniser();
 const surTerrain = Object.keys(base.Monstres).length;
 const reserve = base.Systeme_Parties.P1.Reserve_Monstres.length;
 console.log(`1. RENCONTRE : ${surTerrain} sur le terrain, ${reserve} en réserve (2 joueurs -> limite 3)`);
-verifier("limite respectée (2 joueurs + 1 = 3)", surTerrain === 3, `(${surTerrain})`);
+verifier("montée sous la limite (2 joueurs + 1 = 3)", surTerrain === 3, `(${surTerrain})`);
 verifier("le surplus part en réserve", reserve === res.enReserve.length && reserve > 0, `(${reserve})`);
 verifier("chaque monstre a reçu ses techniques", Object.keys(w.CACHE_COMPETENCES_GLOBAL).length === surTerrain);
 
@@ -163,12 +183,12 @@ console.log("\n5. UN JOUEUR MIS DE CÔTÉ RÉDUIT LA LIMITE DU TERRAIN");
     { idPersonnage: "J2", camp: "Allié", actif: false }
   ];
 
-  const resReduit = await w.genererRencontreMonstres("Normale");
+  const resReduit = await rencontreDAvant();
   await new Promise(r => setTimeout(r, 20));
   synchroniser();
   const surTerrainReduit = Object.keys(base.Monstres).length;
   console.log(`     1 joueur actif -> ${surTerrainReduit} sur le terrain, ${resReduit.enReserve.length} en réserve`);
-  verifier("la limite suit le joueur mis de côté (1 + 1 = 2), pas l'ancien effectif (3)",
+  verifier("montée sous la limite du joueur mis de côté (1 + 1 = 2)",
            surTerrainReduit === 2, `(${surTerrainReduit})`);
 
   // Un monstre meurt : le renfort qui entre ne doit pas dépasser cette limite
@@ -197,16 +217,14 @@ console.log("\n5. UN JOUEUR MIS DE CÔTÉ RÉDUIT LA LIMITE DU TERRAIN");
            vivantsFinal === 2 && base.Systeme_Parties.P1.Reserve_Monstres.length === reserveAvantPlein,
            `(${vivantsFinal} vivant(s), réserve inchangée : ${base.Systeme_Parties.P1.Reserve_Monstres.length === reserveAvantPlein})`);
 
-  // Le joueur revient : la limite doit immédiatement suivre dans l'autre sens,
-  // sur une rencontre fraîche (limiteMonstresTerrain est privée à monstres.js,
-  // on la revérifie donc par son seul effet observable : genererRencontreMonstres).
+  // Le joueur revient : la limite suit dans l'autre sens (montage d'avant).
   base.Monstres = {};
   base.Combat_VTT.P1.Tokens = {};
   base.Systeme_Parties.P1.Reserve_Monstres = [];
   w.MONSTRES_PARTIE = [];
   w.PERSOS_JOUEURS_PARTIE[1].actif = true;
 
-  await w.genererRencontreMonstres("Normale");
+  await rencontreDAvant();
   await new Promise(r => setTimeout(r, 20));
   synchroniser();
   const surTerrainRetabli = Object.keys(base.Monstres).length;
@@ -235,7 +253,7 @@ console.log("\n6. LE TERRAIN SE COMPTE AVEC LES CHIFFRES DU CERVEAU, PAS CEUX DE
     { idPersonnage: "J2", camp: "Allié", actif: true }
   ];
 
-  await w.genererRencontreMonstres("Normale");
+  await rencontreDAvant();
   await new Promise(r => setTimeout(r, 20));
   synchroniser();
   const reserveAvant = base.Systeme_Parties.P1.Reserve_Monstres.length;

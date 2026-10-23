@@ -419,9 +419,13 @@ console.log("  10. LES VERSIONS");
 console.log("=========================================================");
 {
   const html = lire('index.html');
-  verifier("version 261 (trace_combat.js, version.json)", /VERSION_IVALIS = 261;/.test(lire('trace_combat.js')) && /"version": 261/.test(lire('version.json')));
-  verifier("combat.js v146, Plateau.js v4, monstres.js v36, style.css v93",
-           /combat\.js\?v=146"/.test(html) && /Plateau\.js\?v=4"/.test(html) && /monstres\.js\?v=36"/.test(html) && /style\.css\?v=93"/.test(html));
+  // Au moins 261 : les versions suivantes montent encore les numéros.
+  const n = (re, txt) => Number((txt.match(re) || [])[1] || 0);
+  const vTrace = n(/VERSION_IVALIS = (\d+);/, lire('trace_combat.js')), vJson = n(/"version": (\d+)/, lire('version.json'));
+  verifier("version 261 ou plus (trace_combat.js, version.json)", vTrace >= 261 && vJson === vTrace, `${vTrace} / ${vJson}`);
+  verifier("combat.js v146+, Plateau.js v4+, monstres.js v36+, style.css v93+",
+           n(/combat\.js\?v=(\d+)"/, html) >= 146 && n(/Plateau\.js\?v=(\d+)"/, html) >= 4
+           && n(/monstres\.js\?v=(\d+)"/, html) >= 36 && n(/style\.css\?v=(\d+)"/, html) >= 93);
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
