@@ -59,7 +59,7 @@ window.changerRaceSelection = function(race) {
     } else if (race === "Ondari") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786218901/Ondaris_i6uxhm.png";
         texteDesc = "Peuple aquatique vivant principalement sur les mers, les îles et les côtes, les Ondaris sont d'excellents navigateurs et marchands. Leur intelligence et leur charisme compensent une force physique moindre, faisant d'eux de redoutables adversaires en mer.";
-        texteGameplay = "Affinité avec les forces magiques et aquatiques, les Ondaris peuvent lancer leurs sorts à plus grande distance et ne craignent pas les brûlures.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +1 portée des sorts magiques • Immunisé à la brûlure</div>";
+        texteGameplay = "Affinité avec les forces magiques et aquatiques, les Ondaris peuvent lancer leurs sorts à plus grande distance et craignent peu les brûlures.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +1 portée des sorts magiques • Résiste à la brûlure (−25 % de chance d'être Brûlé, −15 % des sorts de feu)</div>";
     
     } else if (race === "Vargen") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786220009/Vargens_npjuoa.png";
@@ -69,7 +69,7 @@ window.changerRaceSelection = function(race) {
     } else if (race === "Ankylar") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786220393/Ankylars_tbaq8b.png";
         texteDesc = "Robustes humanoïdes reptiliens, les Ankylars sont des guerriers endurants et des maîtres de la forge. Peuple dominant de Volcanisse, ils valorisent l'honneur, la discipline et le combat martial, tout en rejetant profondément la magie.";
-        texteGameplay = "Robustes et résistants, les Ankylars encaissent particulièrement bien les dégâts physiques grâce à leur constitution naturelle, et leur carapace ne laisse aucune prise à ce qui cherche à leur faire perdre leur tour.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +12 % de résistance physique • Immunisé à l'Étourdissement</div>";
+        texteGameplay = "Robustes et résistants, les Ankylars encaissent particulièrement bien les dégâts physiques grâce à leur constitution naturelle, et leur carapace laisse peu de prise à ce qui cherche à leur faire perdre leur tour.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +12 % de résistance physique • Résiste à l'Étourdissement (−25 % de chance d'être Étourdi)</div>";
     
     } else if (race === "Ophior") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786221325/ophiors_zdmtjn.png";
@@ -84,7 +84,7 @@ window.changerRaceSelection = function(race) {
     } else if (race === "Ethéré") {
         bgImage.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786221325/%C3%89th%C3%A9r%C3%A9s_jflyo0.png";
         texteDesc = "Peuple nomade du désert d'Etheria, les Éthérés sont des êtres mystérieux privés de la vue, mais dotés de sens extrêmement développés. Silencieux, précis et remarquablement habiles, ils se déplacent à travers le désert en clans, loin des autres civilisations.";
-        texteGameplay = "Résistants et mystérieux, les Éthérés récupèrent davantage de santé grâce aux soins et leur organisme les protège naturellement du poison.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +25 % aux soins reçus • Immunisé au poison</div>";
+        texteGameplay = "Résistants et mystérieux, les Éthérés récupèrent davantage de santé grâce aux soins et leur organisme les protège naturellement du poison.<div class='atout-race'><span style='color: #c2a878; font-weight: bold;'>Atout :</span> +25 % aux soins reçus • Résiste au poison (−25 % de chance d'être Empoisonné)</div>";
     
     } else {
         bgImage.src = "";

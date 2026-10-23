@@ -65,14 +65,16 @@ console.log("\n1. LA TABLE DES ÉLÉMENTS");
 {
     const t = w.ELEMENTS_MAGIQUES.map(e => `${e.id}→${e.etat}`).join(", ");
     verifier("Feu → Brûlé, Foudre → Électrifié, Glace → Glacé", t === "Feu→Brûlé, Foudre→Électrifié, Glace→Glacé", t);
-    verifier("5 % offerts, −20 % contre qui y est insensible", w.CHANCE_ELEMENT_OFFERTE === 5 && w.REDUCTION_SORT_RESISTE === 20
-             && REDUCTION_SORT_RESISTE === 20);
+    // v260 : « résister au brûler = −25 % de chance d'être brûlé ET −15 % de
+    // dégâts des sorts de Feu ; change en −15 % aussi pour les autres ».
+    verifier("5 % offerts, −15 % contre qui y résiste", w.CHANCE_ELEMENT_OFFERTE === 5 && w.REDUCTION_SORT_RESISTE === 15
+             && REDUCTION_SORT_RESISTE === 15);
     verifier("l'Attaque Magique a un élément ; pas un Mot de pouvoir, pas une attaque physique",
              w.estAttaqueElementaire("Attaque Magique") && !w.estAttaqueElementaire("Mots de pouvoirs")
              && !w.estAttaqueElementaire("Attaque lourde"));
 }
 
-console.log("\n2. LE NOYAU : −20 % CONTRE QUI EST INSENSIBLE À L'ÉLÉMENT");
+console.log("\n2. LE NOYAU : −15 % CONTRE QUI RÉSISTE À L'ÉLÉMENT (v260)");
 {
     const cible = (immunites) => ({ pv: 100, pvMax: 100, bouclier: 0, etats: [], atouts: { immunites }, defense: {} });
     const feu = { valeurBrute: 50, typeRes: "Magique", element: "Feu", etatElement: "Brûlé" };
@@ -80,42 +82,43 @@ console.log("\n2. LE NOYAU : −20 % CONTRE QUI EST INSENSIBLE À L'ÉLÉMENT");
     const c = chaineDeDegats(cible(["Glacé"]), feu, {});
     const sansEl = chaineDeDegats(cible(["Brûlé"]), { valeurBrute: 50, typeRes: "Magique" }, {});
     const brut = chaineDeDegats(cible(["Brûlé"]), { ...feu, brut: true }, {});
-    verifier("un sort de Feu : 50 sur un humain, 40 sur un insensible au feu", a.degats === 50 && b.degats === 40 && b.resiste === "Brûlé",
+    verifier("un sort de Feu : 50 sur un humain, 43 sur qui résiste au feu", a.degats === 50 && b.degats === 43 && b.resiste === "Brûlé",
              `${a.degats} / ${b.degats}`);
-    verifier("insensible au gel : le Feu passe en entier", c.degats === 50 && !c.resiste, String(c.degats));
+    verifier("qui résiste au gel : le Feu passe en entier", c.degats === 50 && !c.resiste, String(c.degats));
     verifier("un sort sans élément (Mot de pouvoir, technique d'avant) : rien ne change", sansEl.degats === 50);
     verifier("des dégâts bruts ne connaissent pas la résistance", brut.degats === 50);
 
-    // Par la vraie résolution : l'Ondari (insensible au feu), le Vampire (au gel).
+    // Par la vraie résolution : l'Ondari (résiste au feu), le Vampire (au gel).
     const e = monde([fiche("H", { classe: "Sorcier" }), fiche("O", { race: "Ondari", camp: "Ennemi" }),
                      fiche("V", { classe: "Vampire", camp: "Ennemi" }), fiche("X", { camp: "Ennemi" })]);
     const r1 = sort(e, "O", "Feu"), r2 = sort(e, "O", "Glace"), r3 = sort(e, "V", "Glace"), r4 = sort(e, "X", "Feu");
     const pv = (r, id) => r.etat.combattants[id].pv;
     const msg = (r) => r.etapes.filter(x => x.type === "message").map(x => x.texte);
-    verifier("l'Ondari prend 20 % de moins d'un sort de Feu (et « Résiste au feu »)",
-             100 - pv(r1, "O") === 40 && msg(r1).some(t => /Résiste au feu/.test(t)), `${100 - pv(r1, "O")} ${JSON.stringify(msg(r1))}`);
+    verifier("l'Ondari prend 15 % de moins d'un sort de Feu (et « Résiste au feu »)",
+             100 - pv(r1, "O") === 43 && msg(r1).some(t => /Résiste au feu/.test(t)), `${100 - pv(r1, "O")} ${JSON.stringify(msg(r1))}`);
     verifier("…mais un sort de Glace en entier", 100 - pv(r2, "O") === 50 && !msg(r2).some(t => /Résiste/.test(t)), String(100 - pv(r2, "O")));
-    verifier("le Vampire (insensible au gel) prend 20 % de moins de la Glace", 100 - pv(r3, "V") === 40, String(100 - pv(r3, "V")));
+    verifier("le Vampire (résiste au gel) prend 15 % de moins de la Glace", 100 - pv(r3, "V") === 43, String(100 - pv(r3, "V")));
     verifier("un humain : le Feu en entier", 100 - pv(r4, "X") === 50);
 }
 
-console.log("\n2 bis. PLUSIEURS ÉLÉMENTS : −20 % × INSENSIBLES ÷ ÉLÉMENTS");
+console.log("\n2 bis. PLUSIEURS ÉLÉMENTS : −15 % × RÉSISTÉS ÷ ÉLÉMENTS");
 // Nico : « si plusieurs éléments sur une attaque : −20 % × (insensibilités ÷
-// éléments) — 1 sur 3 éléments de la technique, −6,66 % ».
+// éléments) — 1 sur 3 éléments de la technique, −6,66 % ». Le −20 % est passé
+// à −15 % en v260 : 1 sur 3, −5 %.
 {
     const cible = (immunites) => ({ pv: 100, pvMax: 100, bouclier: 0, etats: [], atouts: { immunites }, defense: {} });
     const trois = { valeurBrute: 300, typeRes: "Magique", etatElement: "Brûlé", etatsElements: ["Brûlé", "Glacé", "Électrifié"] };
     const d = (imm, att = trois) => chaineDeDegats(cible(imm), att, {});
     const un = d(["Glacé"]), deux = d(["Glacé", "Brûlé"]), tous = d(["Glacé", "Brûlé", "Électrifié"]), aucun = d(["Étourdi"]);
-    verifier("3 éléments, insensible à 1 : −6,67 % (300 → 280)", un.degats === 280 && Math.abs(un.reductionElementaire - 20 / 3) < 1e-9,
+    verifier("3 éléments, résiste à 1 : −5 % (300 → 285)", un.degats === 285 && Math.abs(un.reductionElementaire - 15 / 3) < 1e-9,
              `${un.degats} (−${un.reductionElementaire.toFixed(2)} %)`);
-    verifier("3 éléments, insensible à 2 : −13,33 % (300 → 260)", deux.degats === 260, String(deux.degats));
-    verifier("3 éléments, insensible aux 3 : −20 % (300 → 240)", tous.degats === 240, String(tous.degats));
-    verifier("insensible à aucun : en entier", aucun.degats === 300 && !aucun.resiste);
+    verifier("3 éléments, résiste à 2 : −10 % (300 → 270)", deux.degats === 270, String(deux.degats));
+    verifier("3 éléments, résiste aux 3 : −15 % (300 → 255)", tous.degats === 255, String(tous.degats));
+    verifier("ne résiste à aucun : en entier", aucun.degats === 300 && !aucun.resiste);
     const deuxEl = d(["Brûlé"], { valeurBrute: 100, typeRes: "Magique", etatElement: "Brûlé", etatsElements: ["Brûlé", "Glacé"] });
-    verifier("2 éléments, insensible à 1 : −10 % (100 → 90)", deuxEl.degats === 90, String(deuxEl.degats));
+    verifier("2 éléments, résiste à 1 : −7,5 % (100 → 93)", deuxEl.degats === 93, String(deuxEl.degats));
     const ancien = d(["Brûlé"], { valeurBrute: 100, typeRes: "Magique", etatElement: "Brûlé" });
-    verifier("un seul élément (etatElement seul) : −20 % comme avant", ancien.degats === 80, String(ancien.degats));
+    verifier("un seul élément (etatElement seul) : −15 %", ancien.degats === 85, String(ancien.degats));
 
     const e = monde([fiche("H", { classe: "Sorcier" }), fiche("O", { race: "Ondari", camp: "Ennemi" })]);
     const r = resoudreCarte(e, { type: "carte", idLanceur: "H", idCarte: "C", critique: false,
@@ -123,13 +126,14 @@ console.log("\n2 bis. PLUSIEURS ÉLÉMENTS : −20 % × INSENSIBLES ÷ ÉLÉMENT
                      element: "Feu", etatElement: "Brûlé", etatsElements: ["Brûlé", "Glacé", "Électrifié"] }],
         alterations: [], jets: { attaqueRatee: false, parCible: { O: { esquive: false, etats: {} } } } });
     const msg = r.etapes.filter(x => x.type === "message").map(x => x.texte);
-    verifier("l'Ondari, un sort Feu-Glace-Foudre : 28 au lieu de 30, « 🔥 Résiste −6,7 % »",
-             100 - r.etat.combattants.O.pv === 28 && msg.some(t => t === "🔥 Résiste −6,7 %"), `${100 - r.etat.combattants.O.pv} ${JSON.stringify(msg)}`);
+    verifier("l'Ondari, un sort Feu-Glace-Foudre : 29 au lieu de 30, « 🔥 Résiste −5 % »",
+             100 - r.etat.combattants.O.pv === 29 && msg.some(t => t === "🔥 Résiste −5 %"), `${100 - r.etat.combattants.O.pv} ${JSON.stringify(msg)}`);
 }
 
 console.log("\n3. LES RÉSISTANCES DES CRÉATURES : NORMAL 1, ÉLITE 2, BOSS 3");
 {
-    const etats = ["Brûlé", "Électrifié", "Glacé"];
+    // v260 : tirées parmi TOUS les états (ETATS_RESISTIBLES), plus seulement les trois éléments.
+    const etats = w.ETATS_RESISTIBLES;
     const n = {}, toutesValides = [];
     ["Petit", "Normal", "Élite", "Boss"].forEach(palier => {
         const tirages = Array.from({ length: 200 }, () => w.tirerResistancesElementaires(palier));
@@ -137,24 +141,26 @@ console.log("\n3. LES RÉSISTANCES DES CRÉATURES : NORMAL 1, ÉLITE 2, BOSS 3")
         toutesValides.push(tirages.every(t => new Set(t).size === t.length && t.every(x => etats.includes(x))));
     });
     verifier("Petit 0, Normal 1, Élite 2, Boss 3", JSON.stringify(n) === '{"Petit":[0],"Normal":[1],"Élite":[2],"Boss":[3]}', JSON.stringify(n));
-    verifier("des états élémentaires, jamais deux fois le même", toutesValides.every(Boolean));
-    const vues = new Set(Array.from({ length: 300 }, () => w.tirerResistancesElementaires("Normal")[0]));
-    verifier("au hasard : les trois sortent", vues.size === 3, [...vues].join(", "));
+    verifier("des états résistibles, jamais deux fois le même", toutesValides.every(Boolean));
+    const vues = new Set(Array.from({ length: 600 }, () => w.tirerResistancesEtats("Normal")[0]));
+    verifier("au hasard : les onze états sortent (Provocation, Saignement… compris)", vues.size === etats.length && etats.length === 11,
+             [...vues].join(", "));
     const d1 = w.resistancesParDefaut("MONSTRE_ABC", "Élite"), d2 = w.resistancesParDefaut("MONSTRE_ABC", "Élite");
     verifier("une créature d'avant : les siennes tirées de son identifiant, les mêmes partout",
              d1.length === 2 && JSON.stringify(d1) === JSON.stringify(d2), JSON.stringify(d1));
 
     const m = fiche("M1", { Palier: "Élite", resistancesElementaires: ["Glacé", "Brûlé"] });
     const comp = fiche("M2", { compagnonDe: "P", resistancesElementaires: ["Brûlé"] });
-    verifier("résister, c'est être insensible : ses immunités les portent", JSON.stringify(w.atoutRace(m).immunites) === '["Glacé","Brûlé"]',
+    verifier("plus d'immunité : ses résistances les portent", JSON.stringify(w.atoutRace(m).resistances) === '["Glacé","Brûlé"]'
+             && !(w.atoutRace(m).immunites || []).length,
              JSON.stringify(w.atoutRace(m)));
     verifier("le compagnon du Pisteur et les héros n'en ont pas",
-             !(w.atoutRace(comp).immunites || []).length && !(w.atoutRace(fiche("H")).immunites || []).length);
+             !(w.atoutRace(comp).resistances || []).length && !(w.atoutRace(fiche("H")).resistances || []).length);
     const e = monde([fiche("H"), m]);
-    verifier("dans l'état du combat aussi", JSON.stringify(e.combattants.M1.atouts.immunites) === '["Glacé","Brûlé"]');
+    verifier("dans l'état du combat aussi", JSON.stringify(e.combattants.M1.atouts.resistances) === '["Glacé","Brûlé"]');
     const r = sort(e, "M1", "Glace", 50, { "Glacé": true });
     const rf = sort(e, "M1", "Foudre", 50);
-    verifier("un sort de Glace : 40 au lieu de 50, et jamais Glacée", 100 - r.etat.combattants.M1.pv === 40
+    verifier("un sort de Glace : 43 au lieu de 50 (sans altération : pas Glacée)", 100 - r.etat.combattants.M1.pv === 43
              && !(r.etat.combattants.M1.etats || []).some(x => x.nom === "Glacé"), String(100 - r.etat.combattants.M1.pv));
     verifier("la Foudre, à laquelle elle ne résiste pas : en entier", 100 - rf.etat.combattants.M1.pv === 50);
 }
@@ -307,15 +313,16 @@ console.log("\n4. LA FORGE : LA POPUP DES ÉLÉMENTS");
   verifier("la pastille rouvre la popup : passé au Feu, 🔥 Brûlé offert (le Glacé reste un sous-effet)",
            feu.element === "Feu" && /🔥 Brûlé/.test(feu.offert), feu.offert.replace(/\s+/g, " ").trim());
 
-  // Une Distorsion mentale (ex-Mot de pouvoir, v240) : jamais d'élément — la
-  // popup lui propose les trois états du charisme, pas Feu/Foudre/Glace.
+  // Une Distorsion mentale (ex-Mot de pouvoir, v240) : jamais d'élément — et
+  // depuis la v260, plus d'état du charisme non plus : aucune popup, elle se
+  // pose tout de suite. On la retire ensuite, pour enregistrer le seul sort.
   await p.evaluate(() => window.ajouterComposantPrincipal("EFF_MOTS_DE_POUVOIRS"));
-  const mot = await p.evaluate(() => ({ popup: getComputedStyle(document.getElementById("modale-choix-element")).display,
-    ronds: [...document.querySelectorAll("#modale-choix-element .forge-element-rond")].map(x => x.dataset.element).join(","),
-    n: window.forgeState.actions.length }));
-  verifier("une Distorsion mentale : la popup des états du charisme, pas des éléments",
-           mot.popup === "block" && mot.ronds === "Confusion,Immobilisation,Peur" && mot.n === 1, JSON.stringify(mot));
-  await p.evaluate(() => window.fermerChoixElement());
+  const mot = await p.evaluate(() => { const a = window.forgeState.actions[1] || {};
+    return { popup: getComputedStyle(document.getElementById("modale-choix-element")).display,
+             n: window.forgeState.actions.length, element: a.element || null, etat: a.etatMental || null }; });
+  verifier("une Distorsion mentale : aucune popup, posée sans élément ni état",
+           mot.popup === "none" && mot.n === 2 && !mot.element && !mot.etat, JSON.stringify(mot));
+  await p.evaluate(() => { window.forgeState.actions.splice(1, 1); window.rafraichirForge(); });
 
   // Enregistrer : l'élément part avec la technique.
   const enr = await p.evaluate(async () => {
@@ -417,9 +424,10 @@ console.log("\n6. LES CRÉATURES : LEUR ÉLÉMENT, LEURS RÉSISTANCES À L'ÉCRA
            /estAttaqueElementaire\(effetBase\.Nom\)/.test(src) && /act\.element = els\[Math\.floor\(Math\.random\(\)/.test(src)
            && /\.\.\.\(act\.element \? \{ element: act\.element \} : \{\}\)/.test(src));
   const mon = fs.readFileSync('/home/user/Ivalis/monstres.js', 'utf-8');
-  verifier("à sa création : Resistances_Elementaires tirées selon son palier ; relues à l'écoute",
-           /Resistances_Elementaires: typeof window\.tirerResistancesElementaires === "function"\s*\?\s*window\.tirerResistancesElementaires\(gabarit\.Palier\)/.test(mon)
-           && /objet\.resistancesElementaires = Array\.isArray\(brut\.Resistances_Elementaires\)/.test(mon));
+  verifier("à sa création : Resistances_Etats tirées selon son palier ; relues à l'écoute (l'ancien champ aussi)",
+           /Resistances_Etats: typeof window\.tirerResistancesEtats === "function"\s*\?\s*window\.tirerResistancesEtats\(gabarit\.Palier\)/.test(mon)
+           && /objet\.resistancesEtats = Array\.isArray\(brut\.Resistances_Etats\)/.test(mon)
+           && /Array\.isArray\(brut\.Resistances_Elementaires\)/.test(mon));
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

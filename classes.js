@@ -162,7 +162,8 @@ window.DESCRIPTIFS_CLASSES = {
             { niveau: 1, titre: "Passif : Relève des morts · Glace funèbre",
               points: ["Un ennemi qu'il tue, ou qui tombe à côté de lui, se relève en zombie à son service",
                        "15 PV · morsure de 7 dégâts physiques · 2 cases par tour · joue en dernier",
-                       "Il ne reste sur le terrain que 4 tours, puis retombe en poussière",
+                       "Il ne reste sur le terrain que 3 tours, puis retombe en poussière",
+                       "Ses zombies se relèvent jusqu'à 2 cases autour de lui",
                        "Garde ses résistances, mais plus d'esquive ni de parade",
                        "Ses attaques magiques de glace font des dégâts physiques au lieu de magiques"] },
             { niveau: 5, titre: "Technique : Pointes de glace",
@@ -171,8 +172,7 @@ window.DESCRIPTIFS_CLASSES = {
                        "Qui s'y tient ou y entre : 75 % de chance d'être Glacé (2 manches), et 5 % de ses PV max en moins"] },
             { niveau: 10, titre: "Sursis",
               points: ["Tombé à 0 PV, il tient encore 2 tours debout avant d'être mis KO",
-                       "Les coups sont ignorés, aucun soin possible · une fois par combat",
-                       "Ses zombies se relèvent jusqu'à 2 cases autour de lui"] }
+                       "Les coups sont ignorés, aucun soin possible · une fois par combat"] }
         ]
     },
     CLASSE_SENTINELLE: {
@@ -252,7 +252,7 @@ window.DESCRIPTIFS_CLASSES = {
         paliers: [
             { niveau: 1, titre: "Sang froid",
               points: ["+10 % de résistance physique",
-                       "Insensible au Gel (jamais Glacé)",
+                       "Résiste au gel : −25 % de chance d'être Glacé, −15 % des sorts de glace",
                        "Craint le feu : +20 % de chance d'être Brûlé par les sorts qui brûlent"] },
             { niveau: 5, titre: "Technique : Baiser du vampire",
               points: ["Initiative 100 · aucune fatigue · sur un ennemi au contact",

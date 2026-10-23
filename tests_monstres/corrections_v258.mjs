@@ -1,4 +1,6 @@
 // LES CORRECTIONS DE LA v258 : LES ZOMBIES NE RESTENT QUE QUATRE TOURS.
+// (v260, Nico : « les zombies du Profanateur ont 3 tours de vie » — le banc
+// suit la règle du jour : trois tours. Le mécanisme, lui, n'a pas bougé.)
 //
 //   « Fais que les zombies ne restent sur le terrain que pendant 4 tours. »
 //
@@ -60,14 +62,14 @@ const releve = coup(depart, "P", "M1", 10);
 {
     const z = releve.etat.combattants.M1;
     const etape = releve.etapes.find(x => x.type === "zombie");
-    verifier("la règle : 4 tours (ZOMBIE.tours)", ZOMBIE.tours === 4, String(ZOMBIE.tours));
-    verifier("relevé : zombie, 15 PV, 4 tours", !z.aTerre && z.pv === 15 && z.zombie && z.zombie.tours === 4, JSON.stringify(z.zombie));
-    verifier("le journal le dit (l'étape « zombie » porte ses 4 tours)", !!etape && etape.tours === 4, JSON.stringify(etape));
+    verifier("la règle : 3 tours (ZOMBIE.tours, v260)", ZOMBIE.tours === 3, String(ZOMBIE.tours));
+    verifier("relevé : zombie, 15 PV, 3 tours", !z.aTerre && z.pv === 15 && z.zombie && z.zombie.tours === 3, JSON.stringify(z.zombie));
+    verifier("le journal le dit (l'étape « zombie » porte ses 3 tours)", !!etape && etape.tours === 3, JSON.stringify(etape));
     const rejoue = appliquerEntree(depart, { etapes: releve.etapes });
-    verifier("rejoué depuis le journal : les mêmes 4 tours", rejoue.combattants.M1.zombie && rejoue.combattants.M1.zombie.tours === 4);
-    // Un journal d'avant la v258 (étape sans tours) : il a ses quatre aussi.
+    verifier("rejoué depuis le journal : les mêmes 3 tours", rejoue.combattants.M1.zombie && rejoue.combattants.M1.zombie.tours === 3);
+    // Un journal d'avant la v258 (étape sans tours) : il a la règle du jour.
     const ancien = appliquerEntree(depart, { etapes: releve.etapes.map(x => x.type === "zombie" ? (({ tours, ...r }) => r)(x) : x) });
-    verifier("un journal d'avant (sans le nombre) : 4 tours aussi", ancien.combattants.M1.zombie && ancien.combattants.M1.zombie.tours === 4,
+    verifier("un journal d'avant (sans le nombre) : 3 tours aussi", ancien.combattants.M1.zombie && ancien.combattants.M1.zombie.tours === 3,
              JSON.stringify(ancien.combattants.M1.zombie));
 }
 
@@ -80,17 +82,17 @@ let etat = clonerEtat(releve.etat);
     const b = clonerEtat(a);
     const fin = cloturerTour(b);
     verifier("M1 n'était plus dans la file de cette manche", !etat.file.some(f => f.id === "M1"));
-    verifier("fin de manche : toujours 4 tours", b.combattants.M1.zombie.tours === 4 && !b.combattants.M1.aTerre,
+    verifier("fin de manche : toujours 3 tours", b.combattants.M1.zombie.tours === 3 && !b.combattants.M1.aTerre,
              JSON.stringify(b.combattants.M1.zombie));
     verifier("aucun décompte au journal ce jour-là", !(fin && fin.etapes || []).some(x => x.type === "zombieTours"));
     etat = b;
 }
 
-console.log("\n3. QUATRE TOURS, PUIS IL RETOMBE");
+console.log("\n3. TROIS TOURS, PUIS IL RETOMBE");
 {
     const pvM2 = [], restes = [], debout = [], scenes = [];
     let rejoue = clonerEtat(etat), dernier = null;
-    for (let n = 1; n <= 4; n++) {
+    for (let n = 1; n <= 3; n++) {
         const s = clonerEtat(etat);
         s.phase = "Resolution";
         s.file = [{ id: "M1", carte: "ZOMBIE_MORSURE", initiative: 0, pas: 0 }];
@@ -105,9 +107,9 @@ console.log("\n3. QUATRE TOURS, PUIS IL RETOMBE");
         (pas.entree.etapes || []).filter(x => x.type === "zombieTours").forEach(x => scenes.push(misEnScene(x, etat).texte));
         verifier(`tour ${n} : l'état reste cohérent`, verifierEtatCombat(etat).length === 0, verifierEtatCombat(etat).join(" | "));
     }
-    verifier("il mord à chacun de ses 4 tours (200 → 193 → 186 → 179 → 172)", JSON.stringify(pvM2) === "[193,186,179,172]", JSON.stringify(pvM2));
-    verifier("ses tours se décomptent : 3, 2, 1, 0", JSON.stringify(restes) === "[3,2,1,0]", JSON.stringify(restes));
-    verifier("debout les trois premiers, à terre après le quatrième", JSON.stringify(debout) === "[true,true,true,false]", JSON.stringify(debout));
+    verifier("il mord à chacun de ses 3 tours (200 → 193 → 186 → 179)", JSON.stringify(pvM2) === "[193,186,179]", JSON.stringify(pvM2));
+    verifier("ses tours se décomptent : 2, 1, 0", JSON.stringify(restes) === "[2,1,0]", JSON.stringify(restes));
+    verifier("debout les deux premiers, à terre après le troisième", JSON.stringify(debout) === "[true,true,false]", JSON.stringify(debout));
     const z = etat.combattants.M1;
     verifier("à la fin : 0 PV, à terre", z.aTerre && z.pv === 0, JSON.stringify({ pv: z.pv, aTerre: z.aTerre }));
     const etapes = (dernier && dernier.entree.etapes) || [];
@@ -116,8 +118,8 @@ console.log("\n3. QUATRE TOURS, PUIS IL RETOMBE");
     verifier("au journal : « 0 tour », puis sa chute", iFin >= 0 && iChute > iFin, etapes.map(x => x.type).join(","));
     verifier("rejoué depuis le journal : à terre aussi, 0 tour", rejoue.combattants.M1.aTerre && rejoue.combattants.M1.pv === 0
              && rejoue.combattants.M1.zombie.tours === 0);
-    verifier("à l'écran : « Encore 3 tours », « 2 tours », « 1 tour », puis « Retombe en poussière »",
-             JSON.stringify(scenes) === JSON.stringify(["🧟 Encore 3 tours", "🧟 Encore 2 tours", "🧟 Encore 1 tour", "🧟 Retombe en poussière"]),
+    verifier("à l'écran : « Encore 2 tours », « 1 tour », puis « Retombe en poussière »",
+             JSON.stringify(scenes) === JSON.stringify(["🧟 Encore 2 tours", "🧟 Encore 1 tour", "🧟 Retombe en poussière"]),
              JSON.stringify(scenes));
     const chute = essai(() => misEnScene(etapes[iChute], etat), {});
     verifier("sa chute se joue comme une mise à terre", chute.geste === "chute" && chute.pion === "M1", JSON.stringify(chute).slice(0, 120));
@@ -128,7 +130,7 @@ console.log("\n4. IL A QUITTÉ LE TERRAIN");
     const s = clonerEtat(etat);
     s.phase = "Resolution";
     s.file = [{ id: "M1", carte: "ZOMBIE_MORSURE", initiative: 0, pas: 0 }, { id: "M2", carte: "X", initiative: 0, pas: 0 }];
-    verifier("un 5e tour : le cerveau ne le joue plus", essai(() => jouerZombie(s, "M1"), "x") === null);
+    verifier("un 4e tour : le cerveau ne le joue plus", essai(() => jouerZombie(s, "M1"), "x") === null);
     const auto = essai(() => prochainPas(s, [], {}), null);
     verifier("ni de lui-même", !auto || auto.creature !== "M1", auto ? String(auto.creature) : "rien");
     const fiches = fichesDepuisEtat(etat, [fiche("M1", { PV_Max: 100 })]);
@@ -159,8 +161,8 @@ console.log("\n7. ÉCRIT EN CLAIR");
 {
     const classes = fs.readFileSync('/home/user/Ivalis/classes.js', 'utf-8');
     const bloc = classes.slice(classes.indexOf("CLASSE_PROFANATEUR"), classes.indexOf("CLASSE_SENTINELLE"));
-    verifier("le descriptif du Profanateur : « que 4 tours »", /ne reste sur le terrain que 4 tours/.test(bloc));
-    verifier("son atout, sur la fiche : « pour 4 tours »", /pour 4 tours/.test(essai(() => w.texteAtout("zombies", true), "")),
+    verifier("le descriptif du Profanateur : « que 3 tours »", /ne reste sur le terrain que 3 tours/.test(bloc));
+    verifier("son atout, sur la fiche : « pour 3 tours »", /pour 3 tours/.test(essai(() => w.texteAtout("zombies", true), "")),
              essai(() => w.texteAtout("zombies", true), ""));
 }
 

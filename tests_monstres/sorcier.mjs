@@ -110,13 +110,15 @@ console.log("\n3. AUCUNE RÉDUCTION AU CONTACT POUR SES ATTAQUES À DISTANCE");
     const sortTire = (lanceur, typeRes = "Magique") => {
         const e = monde(1); e.combattants.M1.q = 1; e.combattants.M1.r = 0;   // au contact
         if (lanceur === "H") { e.combattants.H.q = 2; e.combattants.H.r = -1; }
+        // v260 : le malus ne joue que sur un tireur engagé — M1 vient de le frapper.
+        e.combattants[lanceur].etats = [...(e.combattants[lanceur].etats || []), { nom: "Engagé", duree: 1, par: ["M1"] }];
         const r = resoudreCarte(e, { type: "carte", idLanceur: lanceur, idCarte: "C", critique: false,
             attaques: [{ nom: "Attaque", valeurBrute: 10, typeRes, isRanged: true, rangeMax: 3, cibles: ["M1"] }],
             alterations: [], jets: { attaqueRatee: false, parCible: { M1: { esquive: false, etats: {} } } } });
         return 100 - r.etat.combattants.M1.pv;
     };
-    verifier("le Sorcier, sort à distance tiré au contact : 10 pleins", sortTire("S") === 10, `${sortTire("S")}`);
-    verifier("un autre héros : 7 (×0,7)", sortTire("H") === 7, `${sortTire("H")}`);
+    verifier("le Sorcier engagé, sort à distance tiré au contact : 10 pleins", sortTire("S") === 10, `${sortTire("S")}`);
+    verifier("un autre héros engagé : 7 (×0,7)", sortTire("H") === 7, `${sortTire("H")}`);
     // v233 (Nico : « le Sorcier a eu le malus de -30 % au contact alors qu'il
     // n'est pas censé l'avoir ») : plus rien de ce qu'il tire ne perd au contact.
     verifier("le Sorcier, tir PHYSIQUE au contact : 10 pleins aussi", sortTire("S", "Physique") === 10, `${sortTire("S", "Physique")}`);

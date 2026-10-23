@@ -40,12 +40,18 @@ console.log("=========================================================");
   const cible = { pv: 100, pvMax: 100, bouclier: 0, etats: [], def: {}, mod: {} };
   const nu = (a) => chaineDeDegats(cible, a, { distance: 1 }).degats;
 
-  verifier("une attaque à distance perd 30 % au contact",
-           nu({ valeurBrute: 10, isRanged: true }) === 7,
-           `(${nu({ valeurBrute: 10, isRanged: true })})`);
+  // v260 : le malus ne vaut plus que pour un tireur ENGAGÉ (attaqué au
+  // contact cette manche) — −30 % au contact, −15 % de loin.
+  const engage = (a, distance) => chaineDeDegats(cible, a, { distance, engage: true }).degats;
+  verifier("une attaque à distance, engagé, perd 30 % au contact",
+           engage({ valeurBrute: 10, isRanged: true }, 1) === 7,
+           `(${engage({ valeurBrute: 10, isRanged: true }, 1)})`);
+  verifier("…et 15 % de loin (20 → 17)", engage({ valeurBrute: 20, isRanged: true }, 3) === 17);
+  verifier("pas engagé : un tir au contact ne perd rien (v260)",
+           nu({ valeurBrute: 10, isRanged: true }) === 10);
   verifier("une attaque de contact n'en perd rien",
-           nu({ valeurBrute: 10, isRanged: false }) === 10);
-  verifier("et à distance, le tir ne perd rien",
+           nu({ valeurBrute: 10, isRanged: false }) === 10 && engage({ valeurBrute: 10, isRanged: false }, 1) === 10);
+  verifier("et à distance, pas engagé, le tir ne perd rien",
            chaineDeDegats(cible, { valeurBrute: 10, isRanged: true },
                           { distance: 3 }).degats === 10);
 }

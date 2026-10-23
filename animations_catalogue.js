@@ -1148,7 +1148,7 @@
                 o.son("resiste");
                 const s = sceau(o, sc.calque, a, "#ff9a40", { duree: 1300 });
                 o.gerbe(sc.calque, a.x, a.y, { nombre: 10, dist: a.t * 0.9, couleurs: ["#ffcf5a", "#ff7a1a"], taille: 6, duree: 600 });
-                o.texte(sc.calque, sc.lanceur, "🔥 Résiste au feu : -20 %", COULEURS.attention);
+                o.texte(sc.calque, sc.lanceur, "🔥 Résiste au feu : -15 %", COULEURS.attention);
                 await o.attendre(700);
                 o.son("resiste");
                 o.icone(sc.calque, a, "⚡", { dx: -a.t * 0.5, duree: 1100, lueur: "#9fd8ff" });
@@ -1199,7 +1199,7 @@
             }
         },
         {
-            id: "etat-resiste", nom: "État raté ou résisté (immunité)", sens: "sur soi",
+            id: "etat-resiste", nom: "État raté ou résisté (résistance)", sens: "sur soi",
             description: "Une fiole de venin vole vers le héros ; un sceau doré s'allume, la fiole éclate en fumée grise sans effet.",
             async jouer(sc, o) {
                 const { a } = lieux(sc);
@@ -1207,7 +1207,7 @@
                 await sortEnnemi(o, sc, { couleur: "#7dd321", coeur: "#e8ffc0", taille: 0.28, arc: 0.7 });
                 o.son("resiste");
                 const s = sceau(o, sc.calque, a, "#ffd700", { duree: 1200 });
-                o.texte(sc.calque, sc.lanceur, "Résiste ! (immunité)", "#ffd700");
+                o.texte(sc.calque, sc.lanceur, "🛡️ Résisté ! (−25 %)", "#ffd700");
                 await Promise.all([o.gerbe(sc.calque, a.x, a.y, { nombre: 10, dist: a.t * 0.7, monte: a.t * 0.3, couleurs: ["#a0a0a0", "#d0d0d0"], taille: 10, tailleMin: 5, duree: 900 }),
                     o.eclat(sc.lanceur, OR, 600)]);
                 await o.attendre(500);
@@ -2910,8 +2910,8 @@
 
     ajouter(8, "Vampire", [
         {
-            id: "insensible-gel", nom: "Niv.1 Insensible au gel", sens: "sur soi",
-            description: "Un trait de glace frappe le Vampire : le givre se forme… puis fond aussitôt en brume rouge. « ❄️ Insensible au gel »",
+            id: "insensible-gel", nom: "Niv.1 Résiste au gel", sens: "sur soi",
+            description: "Un trait de glace frappe le Vampire : le givre se forme… puis fond aussitôt en brume rouge. « ❄️ Résiste au gel »",
             async jouer(sc, o) {
                 const { a } = lieux(sc);
                 o.son("gel-lancer");
@@ -2919,7 +2919,7 @@
                 o.son("glace-impact");
                 await Promise.all([o.onde(sc.calque, a, { couleur: "#bdf3ff", taille: 1, duree: 400, echelle: 1.3 }), o.eclat(sc.lanceur, GIVRE, 400)]);
                 o.son("resiste");
-                o.texte(sc.calque, sc.lanceur, "❄️ Insensible au gel", COULEURS.neutre);
+                o.texte(sc.calque, sc.lanceur, "❄️ Résiste au gel", COULEURS.neutre);
                 await o.gerbe(sc.calque, a.x, a.y, { nombre: 12, dist: a.t * 0.6, monte: a.t * 0.4, couleurs: ["#c01020", "#ff5060", "#600010"], taille: 8, tailleMin: 4, duree: 900 });
             }
         },

@@ -317,12 +317,15 @@ window.ecouterMonstresPartie = function(idPartie) {
             // Le compagnon du Pisteur : l'identifiant de son maître.
             objet.compagnonDe   = brut.Compagnon_De || "";
             objet.nomAttaque    = brut.Nom_Attaque || "";
-            // Ses résistances élémentaires (app.js) : tirées à sa création ; une
-            // créature plus ancienne les reçoit de son identifiant.
-            objet.resistancesElementaires = Array.isArray(brut.Resistances_Elementaires)
-                ? brut.Resistances_Elementaires
+            // Ses résistances (app.js) : tirées à sa création parmi tous les
+            // états (Resistances_Etats, v260) ; une créature d'avant garde ses
+            // résistances élémentaires (Resistances_Elementaires), une plus
+            // ancienne encore les reçoit de son identifiant.
+            objet.resistancesEtats = Array.isArray(brut.Resistances_Etats) ? brut.Resistances_Etats
+                : Array.isArray(brut.Resistances_Elementaires) ? brut.Resistances_Elementaires
                 : (brut.Compagnon_De || typeof window.resistancesParDefaut !== "function"
                     ? [] : window.resistancesParDefaut(document.id, brut.Palier));
+            objet.resistancesElementaires = objet.resistancesEtats;   // le nom d'avant
             monstres.push(objet);
 
             // Les techniques du monstre vivent dans une sous-collection : il
@@ -370,9 +373,10 @@ window.creerMonstreDepuisGabarit = async function(idMonstre, gabarit, donneesSup
         Personnalite: (typeof window.tirerPersonnaliteMonstre === "function")
             ? window.tirerPersonnaliteMonstre(gabarit.Archetype)
             : "brutal",
-        // Une résistance à partir de Normal, deux en Élite, trois en Boss.
-        Resistances_Elementaires: typeof window.tirerResistancesElementaires === "function"
-            ? window.tirerResistancesElementaires(gabarit.Palier) : [],
+        // Une résistance à partir de Normal, deux en Élite, trois en Boss —
+        // parmi tous les états (v260 : 25 % de chance en moins de l'attraper).
+        Resistances_Etats: typeof window.tirerResistancesEtats === "function"
+            ? window.tirerResistancesEtats(gabarit.Palier) : [],
         ...donneesSupplementaires
     };
 

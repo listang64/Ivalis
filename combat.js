@@ -3092,7 +3092,7 @@ window.SYMBOLES_ETATS = {
     "Élan": "💨", "Repli": "↩️", "Provocation": "😤", "Peur": "😱", "Béni": "✨",
     "Absorption": "🌀", "Contre": "⚔️", "Saignement": "🩸", "Aveuglé": "🌫️",
     "Étourdi": "💫", "Immobilisation": "⛓️", "Confusion": "❓", "Empoisonnement": "☠️",
-    "Brûlé": "🔥", "Glacé": "❄️", "Électrifié": "⚡"
+    "Brûlé": "🔥", "Glacé": "❄️", "Électrifié": "⚡", "Engagé": "⚔"
 };
 window.medaillonEtat = function(etat, taille) {
     const nom = (etat && etat.nom) || "";
@@ -3227,6 +3227,7 @@ window.COULEUR_ETAT = {
     "Rempart":        "#e8c46a",   // or — protégé par un Hoplite à ses côtés
     "Nuée de chauve-souris": "#6a1b9a",  // pourpre — le Vampire dispersé en nuée
     "Charmé":         "#ec407a",   // rose — retourné contre les siens par le Sorcier
+    "Engagé":         "#e53935",   // rouge — pris dans la mêlée (v260)
     "Bouclier anti-magie": "#90caf9"  // bleu pâle — les sorts rebondissent sur le Chasseur de mages
 };
 window.COULEUR_ETAT_DEFAUT = "#9e9e9e";
@@ -3742,6 +3743,111 @@ window.appliquerTokensVTT = function(tokensMap) {
     if (typeof window.animerNouveauxPions === "function") {
         try { window.animerNouveauxPions(dessines); } catch (e) { console.error("Entrée en scène des pions :", e); }
     }
+    // L'ENGAGEMENT DU PION SÉLECTIONNÉ (v260) : ses flèches vers qui l'engage.
+    try { window.dessinerEngagements(); } catch (e) { console.error("Flèches d'engagement :", e); }
+};
+
+// =========================================================================
+//  L'ENGAGEMENT, À L'ÉCRAN (v260)
+// =========================================================================
+//  Nico : « Quand on clique sur un token on peut voir ses zones d'engagement
+//  actuelles. Tu vas me faire de belles pointes de flèches courbées rouges
+//  semi-transparentes vers le ou les tokens qui nous engagent. »
+//
+//  La règle vit dans le noyau (engageursDe, moteur_pur.js) ; l'écran la relit
+//  sur ce qu'il affiche : l'état « Engagé » du pion (`par` : qui l'a frappé au
+//  contact cette manche), moins ceux qui sont à terre, étourdis ou confus.
+window.engageursActifs = function(idPerso) {
+    const persos = window.PERSOS_PARTIE || [];
+    const perso = persos.find(p => p.idPersonnage === idPerso);
+    const etat = ((perso && perso.Etats_Alteres) || []).find(e => e && e.nom === "Engagé");
+    if (!etat) return [];
+    return [...new Set(etat.par || [])].filter(id => {
+        const x = persos.find(p => p.idPersonnage === id);
+        if (!x) return false;
+        const tombe = typeof window.estCombattantMort === "function" ? window.estCombattantMort(id) : x.statut === "Mort";
+        if (tombe) return false;
+        return !(x.Etats_Alteres || []).some(e => e && (e.nom === "Étourdi" || e.nom === "Confusion"));
+    });
+};
+window.estEngageCombat = (idPerso) => window.engageursActifs(idPerso).length > 0;
+
+// LES FLÈCHES : un trait courbe qui part du pion sélectionné, contourne son
+// bord et vient piquer chaque pion qui l'engage, terminé par une pointe aux
+// flancs creusés. Rouges, à demi transparentes, un léger flux qui court vers
+// l'agresseur. Posées dans le calque des murs (#transform-murs : au-dessus
+// des pions, zoomé comme le plateau), elles suivent le pan et le zoom sans
+// recalcul ; elles s'effacent dès que la sélection change ou que plus
+// personne n'engage le pion.
+window.dessinerEngagements = function() {
+    const ancien = document.getElementById("svg-engagements");
+    if (ancien) ancien.remove();
+    const id = window.TOKEN_SELECTIONNE;
+    if (!id || !window.PLATEAU_VTT || typeof window.PLATEAU_VTT.hexToPixel !== "function") return;
+    // Pendant un ciblage, la sélection suit ce qu'on vise : pas de flèches.
+    if (window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.actif) return;
+    const tokens = window.TOKENS_VTT_DATA || {};
+    const moi = tokens[id];
+    if (!moi) return;
+    const engageurs = window.engageursActifs(id).filter(e => tokens[e]);
+    if (engageurs.length === 0) return;
+    const conteneur = document.getElementById("transform-murs") || document.getElementById("transform-plateau");
+    if (!conteneur) return;
+
+    const a = window.PLATEAU_VTT.hexToPixel(moi.q, moi.r);
+    const rA = (parseFloat(moi.taille) || 55) / 2;
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.id = "svg-engagements";
+    svg.setAttribute("class", "fleches-engagement");
+    svg.style.cssText = "position:absolute; top:0; left:0; width:1px; height:1px; overflow:visible; z-index:9; pointer-events:none;";
+    const f = (x) => Math.round(x * 10) / 10;
+    let contenu = `<defs><filter id="lueur-engagement" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="3.2"/></filter></defs>`;
+    engageurs.forEach((idE, i) => {
+        const tk = tokens[idE];
+        const b = window.PLATEAU_VTT.hexToPixel(tk.q, tk.r);
+        const rB = (parseFloat(tk.taille) || 55) / 2;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const d = Math.hypot(dx, dy);
+        if (d < 1) return;
+        const ux = dx / d, uy = dy / d;
+        // Le côté du renflement : à gauche du trajet (le même pour tous, la
+        // direction de chaque agresseur suffit à les séparer).
+        const nx = -uy, ny = ux;
+        const tourner = (x, y, deg) => {
+            const t = deg * Math.PI / 180;
+            return { x: x * Math.cos(t) - y * Math.sin(t), y: x * Math.sin(t) + y * Math.cos(t) };
+        };
+        // Départ sur le flanc du pion, arrivée sur le flanc de l'agresseur.
+        const sortie = tourner(ux, uy, -58);
+        const entree = tourner(-ux, -uy, 52);
+        const p0 = { x: a.x + sortie.x * rA * 0.98, y: a.y + sortie.y * rA * 0.98 };
+        const p2 = { x: b.x + entree.x * rB * 1.02, y: b.y + entree.y * rB * 1.02 };
+        const milieu = { x: (p0.x + p2.x) / 2, y: (p0.y + p2.y) / 2 };
+        const bombe = d * 0.42 + 12;
+        const c = { x: milieu.x - nx * bombe, y: milieu.y - ny * bombe };
+        // La pointe suit la tangente d'arrivée (de la poignée vers l'arrivée).
+        const tx = p2.x - c.x, ty = p2.y - c.y, tl = Math.hypot(tx, ty) || 1;
+        const angle = Math.atan2(ty / tl, tx / tl) * 180 / Math.PI;
+        const L = 15, W = 9.5;
+        const pointe = `M 0 0 L ${-L} ${-W} Q ${f(-L * 0.52)} 0 ${-L} ${W} Z`;
+        // Le trait s'arrête au creux de la pointe.
+        const fin = { x: p2.x - (tx / tl) * L * 0.6, y: p2.y - (ty / tl) * L * 0.6 };
+        const trace = `M ${f(p0.x)} ${f(p0.y)} Q ${f(c.x)} ${f(c.y)} ${f(fin.x)} ${f(fin.y)}`;
+        contenu += `<g class="fleche-engagement" data-engageur="${idE}" style="animation-delay:${i * 0.25}s">
+            <path d="${trace}" fill="none" stroke="rgba(229,57,53,0.35)" stroke-width="10" stroke-linecap="round" filter="url(#lueur-engagement)"/>
+            <path d="${trace}" fill="none" stroke="rgba(229,57,53,0.62)" stroke-width="4.2" stroke-linecap="round"/>
+            <path class="flux-engagement" d="${trace}" fill="none" stroke="rgba(255,205,210,0.75)" stroke-width="1.6"
+                  stroke-linecap="round" stroke-dasharray="5 9"/>
+            <g transform="translate(${f(p2.x)} ${f(p2.y)}) rotate(${f(angle)})">
+                <path d="${pointe}" fill="rgba(229,57,53,0.42)" filter="url(#lueur-engagement)" transform="scale(1.25)"/>
+                <path d="${pointe}" fill="rgba(229,57,53,0.68)" stroke="rgba(255,205,210,0.7)" stroke-width="1.1" stroke-linejoin="round"/>
+            </g>
+        </g>`;
+    });
+    svg.innerHTML = contenu;
+    conteneur.appendChild(svg);
 };
 
 // =========================================================================
@@ -5935,10 +6041,11 @@ window.actualiserEtatsEncart = function() {
         vus.add(e.nom);
         return true;
     });
-    // LES RÉSISTANCES D'UNE CRÉATURE (app.js) : un petit rond par élément,
-    // à la suite de ses états — on voit à quoi elle résiste quand elle joue.
+    // LES RÉSISTANCES D'UNE CRÉATURE (app.js) : un petit rond par état, à la
+    // suite de ses états — on voit à quoi elle résiste quand elle joue. Depuis
+    // la v260, tout état peut y figurer (−25 % de chance de l'attraper).
     const resistances = typeof window.atoutCreature === "function"
-        ? (window.atoutCreature(perso).immunites || []) : [];
+        ? (window.atoutCreature(perso).resistances || []) : [];
     const signature = elEtats.dataset.acteur + "#" + etats.map(e => e.nom + ":" + e.duree).join("|")
         + "#" + resistances.join(",");
     if (elEtats.dataset.signature === signature) return;
@@ -5953,8 +6060,14 @@ window.actualiserEtatsEncart = function() {
         `<div title="${etat.nom} (${etat.duree})" style="line-height: 0;">${window.imageEtat(etat, tailleEtat)}</div>`
     ).join("") + resistances.map(nomEtat => {
         const el = (window.ELEMENTS_MAGIQUES || []).find(e => e.etat === nomEtat);
-        return el ? `<div class="pastille-resistance" title="Résiste : ${el.nom} (insensible à ${el.etat}, −20 % de ses sorts)"
-                         style="--el-couleur: ${el.couleur}; --el-fond: ${el.fond}; width: ${tailleEtat}px; height: ${tailleEtat}px; font-size: ${Math.round(tailleEtat * 0.55)}px;">${el.icone}</div>` : "";
+        const pct = window.RESISTANCE_ETAT_PCT || 25;
+        const titre = el ? `Résiste : ${el.etat} (−${pct} % de chance, −${window.REDUCTION_SORT_RESISTE || 15} % des sorts de ${el.nom})`
+                         : `Résiste : ${nomEtat} (−${pct} % de chance)`;
+        const couleur = el ? el.couleur : ((window.COULEUR_ETAT || {})[nomEtat] || "#9e9e9e");
+        const fond = el ? el.fond : "#2a1a0f";
+        const symbole = el ? el.icone : ((window.SYMBOLES_ETATS || {})[nomEtat] || nomEtat.trim()[0] || "?");
+        return `<div class="pastille-resistance" title="${titre}"
+                     style="--el-couleur: ${couleur}; --el-fond: ${fond}; width: ${tailleEtat}px; height: ${tailleEtat}px; font-size: ${Math.round(tailleEtat * 0.55)}px;">${symbole}</div>`;
     }).join("");
 };
 

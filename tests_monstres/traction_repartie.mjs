@@ -60,8 +60,9 @@ console.log("\n1. LE NOYAU : DEUX TRACTIONS, DEUX CIBLES, L'ATTAQUE SUR LA PREMI
     verifier("les deux cibles sont tirées vers le lanceur", JSON.stringify(tirees) === '["M1","M2"]'
              && Math.max(Math.abs(c.M1.q), Math.abs(c.M1.r)) < 3 && Math.max(Math.abs(c.M2.q), Math.abs(c.M2.r)) < 3,
              JSON.stringify({ tirees, M1: [c.M1.q, c.M1.r], M2: [c.M2.q, c.M2.r] }));
-    // (Tirée au contact, M1 prend le tir à −30 % : 7.)
-    verifier("seule la première prend l'attaque", c.M1.pv === 93 && c.M2.pv === 100, `M1 ${c.M1.pv}, M2 ${c.M2.pv}`);
+    // (Tirée au contact, M1 prend le tir en entier : le lanceur n'est pas
+    // engagé, le −30 % ne joue plus — v260.)
+    verifier("seule la première prend l'attaque", c.M1.pv === 90 && c.M2.pv === 100, `M1 ${c.M1.pv}, M2 ${c.M2.pv}`);
     const r2 = resoudreCarte(monde(), carte({ attaqueRatee: false, parCible: {
         M1: { esquive: false, etats: { Traction: true } }, M2: { esquive: true, etats: { Traction: true } } } }));
     const esq = r2.etapes.filter(x => x.type === "esquive").map(x => x.cible);

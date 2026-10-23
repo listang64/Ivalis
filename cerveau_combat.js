@@ -48,7 +48,8 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE, ETAT_SAIGNEMENT, SAIGNEMENT,
          resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, appliquerCharme,
          pointesDeGlace, orientationCone,
-         actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle, ligneDeVue, caseLibre, aLEtat } from './moteur_pur.js';
+         actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle, ligneDeVue, caseLibre, aLEtat,
+         carteToutEtalee, resisteA, prisMalgreResistance } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles,
@@ -483,7 +484,7 @@ export function cloturerTour(etat, des) {
         }
     }
 
-    // LE ZOMBIE NE TIENT QUE QUATRE TOURS (v258). Chacun de ses tours en
+    // LE ZOMBIE NE TIENT QUE TROIS TOURS (v260 ; quatre en v258). Chacun de ses tours en
     // retire un ; au bout du dernier, il retombe et quitte le terrain. Le tour
     // de la manche où il s'est relevé ne compte pas : il n'en a pas joué.
     const etapesZombie = [];
@@ -1020,10 +1021,21 @@ export function appliquerIntention(etat, intention, plateau) {
             : undefined;
         const cibleTechnique = intention.idCarte === "CLASSE_LIEN_DE_SANG"
             ? (compagnonDe(etat, intention.acteur) || {}).id : intention.cible;
+        // LES ÉTATS « À COUP SÛR » ET LES RÉSISTANCES (v260) : l'Aveuglement
+        // de l'Appel de la lumière, le Charme fratricide, l'Immobilisation du
+        // Tir précis prennent à 75 % sur qui y résiste — un dé chez le
+        // cerveau, dans l'ordre des ids, pour ceux-là seulement.
+        const etatSur = { CLASSE_APPEL_LUMIERE: "Aveuglé", CLASSE_CHARME_FRATRICIDE: "Charmé",
+                          CLASSE_TIR_PRECIS: "Immobilisation" }[intention.idCarte];
+        const visesSurs = !etatSur ? [] : noirs ? Object.keys(noirs).sort() : [cibleTechnique].filter(Boolean);
+        const jetsSurs = Object.fromEntries(visesSurs
+            .filter(v => resisteA(combattant(etat, v), etatSur))
+            .map(v => [v, prisMalgreResistance(combattant(etat, v), etatSur, des)]));
         const r = resoudreTechniqueClasse(etat, { idLanceur: intention.acteur, idCarte: intention.idCarte,
                                                   cible: cibleTechnique, cibles,
                                                   ...(Array.isArray(intention.cases) ? { cases: intention.cases } : {}),
                                                   ...(noirs ? { noirs } : {}),
+                                                  ...(Object.keys(jetsSurs).length ? { prisMalgreResistance: jetsSurs } : {}),
                                                   ...(intention.initiative !== undefined ? { initiative: intention.initiative } : {}) }, plateau);
         let suivant = clonerEtat(r.etat);
         const etapes = [...r.etapes];
@@ -1063,6 +1075,11 @@ export function appliquerIntention(etat, intention, plateau) {
         // ennemi au contact, 5 % de ses PV max en physique, et Étourdi.
         if (intention.idCarte === "CLASSE_RESONANCE_BOUCLIER") {
             const action = actionResonanceBouclier(intention.acteur, ennemisAuContact(suivant, intention.acteur));
+            // Son Étourdi à coup sûr : à 75 % sur qui y résiste (v260).
+            Object.keys(action.jets.parCible).sort().forEach(v => {
+                const x = combattant(suivant, v);
+                if (resisteA(x, "Étourdi")) action.jets.parCible[v].etats["Étourdi"] = prisMalgreResistance(x, "Étourdi", des);
+            });
             const rc = resoudreCarte(suivant, action, plateau);
             suivant = clonerEtat(rc.etat);
             etapes.push(...rc.etapes);
@@ -1075,7 +1092,10 @@ export function appliquerIntention(etat, intention, plateau) {
     if (intention.type === "carte") {
         // Les dés se tirent ICI, chez le cerveau, une fois pour tout le monde.
         // Un client n'envoie jamais de résultat : il ne pourrait pas être cru.
-        const critique = tirerCritique(etat, intention.acteur, des);
+        // Une carte dont tous les dégâts et soins sont étalés ne critique pas
+        // (v260) — le dé est tiré quand même, la suite des dés ne bouge pas.
+        const critique = tirerCritique(etat, intention.acteur, des)
+            && !carteToutEtalee({ attaques: intention.attaques || [] });
         const brute = {
             type: "carte", idLanceur: intention.acteur, idCarte: intention.idCarte,
             attaques: intention.attaques || [], alterations: intention.alterations || [],

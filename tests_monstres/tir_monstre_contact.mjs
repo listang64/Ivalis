@@ -61,11 +61,13 @@ await pg.evaluate(({ src, effets }) => {
 const idAtt = parId("Attaque légère"), idDist = parId("Distance");
 const fiche = (id, extra = {}) => ({ idPersonnage: id, PV_Max: 200, PV_Actuels: 200, Fatigue_Max: 100,
   Fatigue_Actuelle: 100, Esquive: 0, Parade: 0, Bouclier_Actuel: 0, Etats_Alteres: [], statut: "Vivant", ...extra });
-const jouer = (attaques, distance) => {
+// v260 : le malus ne joue que si la créature est ENGAGÉE (J1 l'a frappée au contact).
+const jouer = (attaques, distance, engagee = false) => {
   const etat = construireEtatCombat({ idPartie: "G", cerveau: "P", graine: 1,
     combattants: [fiche("J1", { idJoueur: "P", camp: "Allié" }), fiche("M1", { estMonstre: true, camp: "Ennemi" })],
     positions: { J1: { q: 0, r: 0 }, M1: { q: distance, r: 0 } },
     partie: { Phase_Combat: "Resolution", Tour_Combat: 1, Ordre_Initiative: ["M1", "J1"], File_Attente_Combat: [] } });
+  if (engagee) etat.combattants.M1.etats = [...(etat.combattants.M1.etats || []), { nom: "Engagé", duree: 1, par: ["J1"] }];
   const r = resoudreCarte(etat, { type: "carte", idLanceur: "M1", idCarte: "C",
     attaques: attaques.map(a => ({ ...a, cibles: ["J1"] })), alterations: [],
     jets: { parCible: { J1: { esquive: false, etats: {} } } } });
@@ -80,8 +82,9 @@ for (const [titre, actions, arme] of [
   const x = await pg.evaluate(async ({ actions, arme }) => window.__extraire(actions, arme), { actions, arme });
   const att = (x && x.attaques || [])[0] || {};
   verifier("la carte de la créature arrive marquée « à distance »", att.isRanged === true, JSON.stringify({ r: att.isRanged, p: att.rangeMax }));
-  const loin = jouer([att], 3), pres = jouer([att], 1);
-  verifier("au contact, elle perd 30 %", pres === Math.floor(loin * 0.7) && pres < loin, `${loin} à 3 cases → ${pres} au contact`);
+  const loin = jouer([att], 3), pres = jouer([att], 1, true), libre = jouer([att], 1);
+  verifier("engagée, au contact, elle perd 30 %", pres === Math.floor(loin * 0.7) && pres < loin, `${loin} à 3 cases → ${pres} au contact`);
+  verifier("pas engagée, au contact : en entier", libre === loin, `${loin} à 3 cases → ${libre} au contact`);
 }
 {
   // L'ARC NE DONNE AUCUNE PORTÉE À UNE CRÉATURE : la portée d'arme vient de

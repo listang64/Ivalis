@@ -159,21 +159,29 @@ console.log("\n5. UNE ZONE DE SOIN SOIGNE, SANS DISTINCTION DE CAMP");
 }
 
 // =========================================================================
-console.log("\n6. UNE IMMUNITÉ DE PEUPLE TRAVERSE SANS RIEN ATTRAPER");
+console.log("\n6. UNE RÉSISTANCE DE PEUPLE RETIRE 25 % À LA ZONE (v260 : plus d'immunité)");
 // =========================================================================
+//  La nappe brûle à 100 % : qui résiste au Brûlé n'a plus que 75 %. Un dé à
+//  90 l'épargne — et c'est DIT ; un dé à 50 le brûle quand même.
 {
-    const etat = monde({ zp_feu: FEU });
-    etat.combattants.MARCHEUR.atouts = { immunites: ["Brûlé"] };
-    const { etat: apres, etapes } = resoudreMouvement(
-        etat, { idLanceur: "MARCHEUR", chemin: [{ q: 1, r: 0 }] }, creerDes(3), null);
+    const desA = (v) => ({ ...creerDes(3), d100: () => v });
+    const traverser = (v) => {
+        const etat = monde({ zp_feu: FEU });
+        etat.combattants.MARCHEUR.atouts = { resistances: ["Brûlé"] };
+        return resoudreMouvement(etat, { idLanceur: "MARCHEUR", chemin: [{ q: 1, r: 0 }] }, desA(v), null);
+    };
+    const { etat: apres, etapes } = traverser(90);
 
-    verifier("l'état n'est pas attrapé",
+    verifier("un dé à 90 (au-dessus de 75) : l'état n'est pas attrapé",
              !(apres.combattants.MARCHEUR.etats || []).some(e => e.nom === "Brûlé"));
-    verifier("et c'est DIT, pas passé sous silence",
-             etapes.some(e => e.type === "etatRate" && e.immunise),
+    verifier("et c'est DIT, pas passé sous silence (« résisté »)",
+             etapes.some(e => e.type === "etatRate" && e.resiste && !e.immunise),
              JSON.stringify(etapes.map(e => e.type)));
     verifier("les dégâts, eux, tombent quand même",
              apres.combattants.MARCHEUR.pv < 60, `${apres.combattants.MARCHEUR.pv} PV`);
+    const brule = traverser(50);
+    verifier("un dé à 50 : il brûle malgré sa résistance",
+             (brule.etat.combattants.MARCHEUR.etats || []).some(e => e.nom === "Brûlé"));
 }
 
 // =========================================================================

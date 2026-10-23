@@ -888,19 +888,20 @@ window.regenerationCombattant = function(perso) {
 // magique des Ophiors à 12 %, soins reçus des Éthérés à +25 %, 50 % de chance
 // pour le Vargen d'éviter une attaque d'opportunité, et une compétence de plus
 // pour l'Humain (comme le Gob).
+// v260 (Nico) : plus d'immunité — l'Ankylar à l'Étourdi, l'Ondari au Brûlé,
+// l'Éthéré au poison deviennent des RÉSISTANCES : 25 % de chance en moins
+// d'attraper l'état (et −15 % des sorts de l'élément, pour l'Ondari et le feu).
 window.ATOUTS_RACES = {
     "Gob":     { esquive: 5, competences: 1 },
-    // L'immunité à l'Étourdi rejoint la résistance : les Ankylars ne
-    // craignent plus qu'on leur fasse perdre leur tour, en plus d'encaisser
-    // mieux les coups.
-    "Ankylar": { defPhysique: 12, immunites: ["Étourdi"] },
-    "Ondari":  { porteeMagique: 1, immunites: ["Brûlé"] },
+    // L'Ankylar résiste à l'Étourdi, en plus d'encaisser mieux les coups.
+    "Ankylar": { defPhysique: 12, resistances: ["Étourdi"] },
+    "Ondari":  { porteeMagique: 1, resistances: ["Brûlé"] },
     "Vargen":  { diviseurDeplacement: 2, esquiveOpportunite: 50 },
     // regenPv : des points de vie repris à chaque fin de manche, comme la
     // fatigue de tout le monde (regenerationDe, cerveau_combat.js) mais sur
     // la jauge de vie — un mécanisme qui n'existait pour personne d'autre.
     "Ophior":  { defMagique: 12, regenPv: 3 },
-    "Ethéré":  { soinsRecus: 25, immunites: ["Empoisonnement"] },
+    "Ethéré":  { soinsRecus: 25, resistances: ["Empoisonnement"] },
     // L'Humain garde sa réserve plus grande (110 au lieu de 100). Son bonus de
     // repos long (+10) a été retiré à la demande de Nico : il récupère comme
     // tout le monde, 35 % de sa jauge. Il a une compétence de plus, comme le Gob.
@@ -922,7 +923,8 @@ window.atoutPeuple = function(perso) {
 //  le niveau du héros (tiré de son XP, experience.js) : un Nécromancien de
 //  niveau 4 a ceux du niveau 1, pas encore ceux du 5.
 //
-//    immunites   états qu'il n'attrape jamais (comme l'Ondari et le feu)
+//    resistances états qu'il attrape 25 % moins souvent (comme l'Ondari et le
+//                feu) — des immunités jusqu'à la v260
 //    competences une carte de plus en main ET à forger (comme le Gob)
 //    pvMax       points de vie maximum en plus
 //    effets      effets de la Forge réservés à la classe (Ténèbres)
@@ -987,13 +989,14 @@ window.ATOUTS_CLASSES = {
     // resoudreCarte). Plus de ristourne d'étalement à lui (1,3 comme tout le
     // monde), ni de compétence ou de PV en plus. Au niveau 10, le sursis de
     // l'ancien Nécromancien (2 tours debout à zéro PV, une fois par combat).
+    // (v260, Nico : « les zombies se font à deux cases de distance dès le
+    // lvl1 » : le rayon de 2 cases passe du niveau 10 au niveau 1.)
     "Profanateur": [
-        { niveau: 1,  zombies: true, glacePhysique: true },
+        { niveau: 1,  zombies: true, glacePhysique: true, rayonZombies: 2 },
         // Niveau 5 : les Pointes de glace (un cône de pics, une fois par combat).
         { niveau: 5,  techniques: ["CLASSE_POINTES_GLACE"] },
-        // Niveau 10 : le sursis, et ses zombies se relèvent dans un rayon de
-        // 2 cases autour de lui (au lieu de 1).
-        { niveau: 10, sursis: 2, rayonZombies: 2 }
+        // Niveau 10 : le sursis.
+        { niveau: 10, sursis: 2 }
     ],
     // LE PISTEUR : un compagnon animal qui combat à ses côtés (25 PV, 15 %
     // d'esquive, 6 dégâts bruts, 3 cases — un document Monstres de son camp
@@ -1039,14 +1042,15 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  techniques: ["CLASSE_ARRET_TEMPS"] },
         { niveau: 10, techniques: ["CLASSE_RETOUR_ARRIERE"] }
     ],
-    // LE VAMPIRE : +10 de résistance physique, insensible au gel (jamais
-    // Glacé), mais le feu le prend plus facilement : +20 % de chance d'être
+    // LE VAMPIRE : +10 de résistance physique, résistant au gel (25 % de
+    // chance en moins d'être Glacé, −15 % des sorts de glace ; une immunité
+    // avant la v260), mais le feu le prend plus facilement : +20 % de chance d'être
     // Brûlé par un sort qui brûle (brulureFacile, tirerDesCarte — v237, à la
     // place de l'ancienne brûlure aggravée). Le Baiser du vampire au niveau 5 (technique de classe :
     // il remplace l'effet Vampirisme de la Forge), la Nuée de chauve-souris au
     // niveau 10. Interdit aux Vargens (CLASSES_INTERDITES).
     "Vampire": [
-        { niveau: 1,  defPhysique: 10, brulureFacile: 20, immunites: ["Glacé"] },
+        { niveau: 1,  defPhysique: 10, brulureFacile: 20, resistances: ["Glacé"] },
         { niveau: 5,  techniques: ["CLASSE_BAISER_VAMPIRE"] },
         { niveau: 10, techniques: ["CLASSE_NUEE_CHAUVES_SOURIS"] }
     ]
@@ -1345,9 +1349,9 @@ window.atoutRace = function(perso) {
 //  élément » — choisi dans la Forge, à la pose de l'Attaque Magique. Chaque
 //  élément offre 5 % de chance de poser SON état (le Feu brûle, la Foudre
 //  électrifie, la Glace gèle), qu'on monte ensuite comme un sous-effet
-//  classique. Et qui est insensible à cet état (l'Ondari et le feu, le Vampire
-//  et le gel, une créature qui y résiste) encaisse 20 % de dégâts en moins
-//  d'un sort de cet élément (chaineDeDegats, moteur_pur.js).
+//  classique. Et qui résiste à cet état (l'Ondari et le feu, le Vampire et le
+//  gel, une créature) encaisse 15 % de dégâts en moins d'un sort de cet
+//  élément (20 % avant la v260 — chaineDeDegats, moteur_pur.js).
 window.ELEMENTS_MAGIQUES = [
     { id: "Feu",    nom: "Feu",    icone: "🔥", etat: "Brûlé",      effetId: "EFF_BRULE",      motCle: "brûl",
       couleur: "#e8622c", fond: "#7a1f0c" },
@@ -1357,12 +1361,12 @@ window.ELEMENTS_MAGIQUES = [
       couleur: "#6cc6f0", fond: "#0f4560" }
 ];
 window.CHANCE_ELEMENT_OFFERTE = 5;
-window.REDUCTION_SORT_RESISTE = 20;
+window.REDUCTION_SORT_RESISTE = 15;
 window.elementMagique = function(id) {
     return window.ELEMENTS_MAGIQUES.find(e => e.id === id) || null;
 };
 // L'Attaque Magique, et elle seule : la Distorsion mentale (ex-Mots de pouvoir)
-// frappe brut, sans élément — elle a son état du charisme (plus bas).
+// frappe brut, sans élément (plus bas).
 window.estAttaqueElementaire = function(nomEffet) {
     const n = String(nomEffet || "").toLowerCase();
     return n.includes("attaque magique") && !window.estDistorsionMentale(n);
@@ -1385,10 +1389,13 @@ window.estAttaqueElementaire = function(nomEffet) {
 //  estDistorsionMentale, qui lit les deux noms : rien ne casse, ni les cartes
 //  d'avant, ni les créatures, ni un grimoire pas encore mis à jour.
 //
-//  L'ÉTAT : choisi dans la Forge à la pose de la Distorsion (comme l'élément
-//  d'une Attaque Magique), il lui offre 5 % de chance de poser son état
-//  (CHANCE_ELEMENT_OFFERTE), qu'on monte ensuite comme un sous-effet
-//  classique. L'action le garde dans `etatMental`.
+//  L'ÉTAT (v240) : choisi dans la Forge, Confusion, Immobilisation ou Peur,
+//  avec 5 % de chance offerte. RETIRÉ EN v260 (Nico : « les distorsions
+//  mentales = dégâts bruts qui ne prennent pas en compte l'esquive et la
+//  parade de la cible ; enlève le choix lié à confusion/peur/immobilisation ») :
+//  la Distorsion frappe brut — ni armure, ni esquive, ni parade (moteur_pur.js,
+//  tirerDesCarte et chaineDeDegats). Un `etatMental` resté sur une carte
+//  d'avant est ignoré.
 window.NOM_DISTORSION = "Distorsion mentale";
 window.estDistorsionMentale = function(nom) {
     const n = String(nom || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -1402,58 +1409,27 @@ window.nomEffetActuel = function(nom) {
 };
 // Le grimoire, renommé au chargement (completerEffetsDeSecours).
 window.EFFETS_RENOMMES = { EFF_MOTS_DE_POUVOIRS: "Distorsion mentale" };
-// LES TROIS ÉTATS DU CHARISME, et leurs icônes : une spirale violette qui
-// égare (Confusion), deux maillons d'acier qui entravent (Immobilisation), un
-// œil exorbité et ses trois traits rouges de frayeur (Peur — ceux de son
-// animation).
-const ICONE_DISTORSION_CONFUSION = `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <defs><radialGradient id="dm-confusion" cx="50%" cy="45%" r="62%"><stop offset="0" stop-color="#f6ecff"/><stop offset="1" stop-color="#b98cff"/></radialGradient></defs>
-  <path d="M32 33c0-2.2 1.8-3.4 3.6-2.6 2.6 1.1 2.6 5 0 6.8-3.8 2.6-9.2-.2-9.6-4.8-.6-6.2 5.8-10.6 11.6-8.6 7.8 2.6 9.6 12.6 3.6 18.2-7.4 7-20.2 3.4-22.6-6.6-2.8-11.6 7.4-21.8 19-19.4"
-        fill="none" stroke="url(#dm-confusion)" stroke-width="4.4" stroke-linecap="round"/>
-  <path d="M50 8l1.7 4 4 1.7-4 1.7-1.7 4-1.7-4-4-1.7 4-1.7z" fill="#fff4c2"/>
-  <path d="M13 45l1.1 2.7 2.7 1.1-2.7 1.1L13 52.6l-1.1-2.7-2.7-1.1 2.7-1.1z" fill="#ead8ff"/>
-</svg>`;
-const ICONE_DISTORSION_IMMOBILISATION = `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <defs><linearGradient id="dm-immobilisation" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6f9fd"/><stop offset="1" stop-color="#8aa3bd"/></linearGradient></defs>
-  <g fill="none" stroke="url(#dm-immobilisation)" stroke-width="5.4" stroke-linecap="round">
-    <rect x="6" y="26" width="27" height="15" rx="7.5" transform="rotate(-35 19.5 33.5)"/>
-    <rect x="31" y="22" width="27" height="15" rx="7.5" transform="rotate(-35 44.5 29.5)"/>
-  </g>
-  <path d="M8 54l6-6M50 10l6-6" stroke="#cfe0f0" stroke-width="2.4" stroke-linecap="round" opacity="0.8"/>
-</svg>`;
-const ICONE_DISTORSION_PEUR = `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <defs><radialGradient id="dm-peur" cx="50%" cy="50%" r="58%"><stop offset="0" stop-color="#f3fff1"/><stop offset="1" stop-color="#93df8e"/></radialGradient></defs>
-  <path d="M5 35c7-11 16.5-16.5 27-16.5S52 24 59 35c-7 11-16.5 16.5-27 16.5S12 46 5 35z" fill="url(#dm-peur)" stroke="#2c6a30" stroke-width="2.4"/>
-  <circle cx="32" cy="35" r="9.5" fill="#ffffff" stroke="#2c6a30" stroke-width="2"/>
-  <circle cx="32" cy="35" r="3" fill="#10241a"/>
-  <g stroke="#ff4a3d" stroke-width="3.2" stroke-linecap="round"><path d="M44 5v10"/><path d="M50.5 3v11"/><path d="M57 5v10"/></g>
-</svg>`;
-window.ETATS_DISTORSION = [
-    { id: "Confusion", nom: "Confusion", icone: "🌀", dessin: ICONE_DISTORSION_CONFUSION, etat: "Confusion",
-      effetId: "EFF_CONFUSION", motCle: "confus", couleur: "#b98cff", fond: "#3a1766" },
-    { id: "Immobilisation", nom: "Immobilisation", icone: "⛓️", dessin: ICONE_DISTORSION_IMMOBILISATION, etat: "Immobilisation",
-      effetId: "EFF_IMMOBILISATION", motCle: "immobil", couleur: "#a3bad0", fond: "#22303d" },
-    { id: "Peur", nom: "Peur", icone: "👁️", dessin: ICONE_DISTORSION_PEUR, etat: "Peur",
-      effetId: "EFF_PEUR", motCle: "peur", couleur: "#7fd47a", fond: "#15381d" }
-];
-window.etatDistorsion = function(id) {
-    return window.ETATS_DISTORSION.find(e => e.id === id) || null;
-};
-
 // LES RÉSISTANCES DES CRÉATURES (Nico) : « une résistance aléatoire pour
 // chaque ennemi à partir de Normal : 1 résistance, les Élites 2, les Boss 3 ».
-// Résister à un élément, c'est être insensible à son état — et donc encaisser
-// 20 % de moins de ses sorts. Tirées une fois à la création de la créature
-// (Resistances_Elementaires, monstres.js) ; une créature posée avant ce
-// changement reçoit les siennes de son identifiant : le même tirage sur tous
-// les écrans, sans rien écrire en base.
+// Tirées une fois à la création de la créature (Resistances_Etats,
+// monstres.js) ; une créature posée avant ce changement reçoit les siennes de
+// son identifiant : le même tirage sur tous les écrans, sans rien écrire en base.
+// v260 (Nico : « enlève les immunités aux monstres ; à la place, des
+// résistances, −25 % comme les joueurs ; elles peuvent se faire sur tous les
+// effets d'état — brûler, provocation, saignement, empoisonnement, glacé… ») :
+// une résistance n'est plus une immunité à un ÉLÉMENT, mais 25 % de chance en
+// moins d'attraper un ÉTAT, tiré parmi tous (ETATS_RESISTIBLES) ; résister au
+// Brûlé, à l'Électrifié ou au Glacé retire en plus 15 % des sorts de l'élément.
+window.ETATS_RESISTIBLES = ["Brûlé", "Électrifié", "Glacé", "Empoisonnement", "Saignement", "Étourdi",
+                            "Confusion", "Peur", "Immobilisation", "Provocation", "Aveuglé"];
+window.RESISTANCE_ETAT_PCT = 25;
 window.NB_RESISTANCES_PALIER = { "Petit": 0, "Normal": 1, "Élite": 2, "Elite": 2, "Boss": 3 };
 window.nbResistancesPalier = function(palier) {
     return window.NB_RESISTANCES_PALIER[String(palier || "").trim()] || 0;
 };
-window.tirerResistancesElementaires = function(palier, alea) {
+window.tirerResistancesEtats = function(palier, alea) {
     const tirer = typeof alea === "function" ? alea : Math.random;
-    const etats = window.ELEMENTS_MAGIQUES.map(e => e.etat);
+    const etats = [...window.ETATS_RESISTIBLES];
     for (let i = etats.length - 1; i > 0; i--) {
         const j = Math.floor(tirer() * (i + 1));
         [etats[i], etats[j]] = [etats[j], etats[i]];
@@ -1470,14 +1446,19 @@ window.resistancesParDefaut = function(id, palier) {
         t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
-    return window.tirerResistancesElementaires(palier, alea);
+    return window.tirerResistancesEtats(palier, alea);
 };
-// Ce qu'une créature apporte en propre : ses résistances, comme une immunité.
-// Ni le compagnon du Pisteur ni un héros n'en ont.
+// L'ancien nom (v241 : les éléments seulement), gardé pour qui l'appelle encore.
+window.tirerResistancesElementaires = window.tirerResistancesEtats;
+// Ce qu'une créature apporte en propre : ses résistances (25 % de chance en
+// moins d'attraper chacun de ces états). Ni le compagnon du Pisteur ni un
+// héros n'en ont. `resistancesElementaires` : le nom d'avant la v260, que
+// monstres.js remplit encore (Resistances_Etats, ou l'ancien champ).
 window.atoutCreature = function(perso) {
     if (!perso || !perso.estMonstre || perso.compagnonDe) return {};
-    const resist = Array.isArray(perso.resistancesElementaires) ? perso.resistancesElementaires : [];
-    return resist.length > 0 ? { immunites: [...resist] } : {};
+    const resist = Array.isArray(perso.resistancesEtats) ? perso.resistancesEtats
+        : Array.isArray(perso.resistancesElementaires) ? perso.resistancesElementaires : [];
+    return resist.length > 0 ? { resistances: [...resist] } : {};
 };
 
 // =========================================================================
@@ -1513,12 +1494,14 @@ window.texteAtout = function(cle, valeur) {
         case "sortsSansMalusContact": return "Aucune réduction au contact pour ses attaques à distance";
         case "diviseurDeplacement": return n === 2 ? "Se déplace pour deux fois moins de fatigue" : `Déplacement ${n} fois moins cher`;
         case "esquiveOpportunite":  return `${n} % de chance d'esquiver une attaque d'opportunité`;
+        case "resistances":
         case "immunites": {
-            // Insensible à l'état d'un élément : ses sorts lui font 20 % de moins.
+            // v260 : plus d'immunité — 25 % de chance en moins d'attraper
+            // l'état ; l'état d'un élément retire aussi 15 % de ses sorts.
             const liste = valeur || [];
             const elementaires = liste.map(nom => (window.ELEMENTS_MAGIQUES || []).find(e => e.etat === nom)).filter(Boolean);
-            return `Insensible : ${liste.join(", ")}`
-                + (elementaires.length ? ` (−20 % des sorts de ${elementaires.map(e => e.nom).join(", ")})` : "");
+            return `Résiste (−${window.RESISTANCE_ETAT_PCT || 25} % de chance) : ${liste.join(", ")}`
+                + (elementaires.length ? ` (−${window.REDUCTION_SORT_RESISTE || 15} % des sorts de ${elementaires.map(e => e.nom).join(", ")})` : "");
         }
         case "sursis":         return `Tombé à 0 PV, tient encore ${n} tour${n > 1 ? "s" : ""} avant d'être KO (une fois par combat)`;
         case "effets":         return (valeur || []).map(id => `Effet de combat : ${nomEffet(id)}`).join(" · ");
@@ -1554,7 +1537,7 @@ window.texteAtout = function(cle, valeur) {
         case "terrainFacile":  return "Se déplace sur le terrain difficile comme sur un terrain normal";
         case "traverseSesMurs": return "Traverse ses murs de terre";
         case "zonesProlongees": return `Ses zones persistantes durent ${n === 1 ? "un" : n} tour${n > 1 ? "s" : ""} de plus`;
-        case "zombies":        return "Les ennemis qu'il tue, ou qui tombent à côté de lui, se relèvent en zombies à son service, pour 4 tours";
+        case "zombies":        return "Les ennemis qu'il tue, ou qui tombent à côté de lui, se relèvent en zombies à son service, pour 3 tours";
         case "rayonZombies":   return n > 1 ? `Ses zombies se relèvent jusqu'à ${n} cases autour de lui` : "";
         case "glacePhysique":  return "Ses attaques magiques de glace font des dégâts physiques au lieu de magiques";
         case "degatsOpportunite": return `${plus(n)} aux dégâts de ses attaques d'opportunité`;
@@ -1679,11 +1662,11 @@ window.competencesMaxCombattant = function(perso) {
     return base + (window.atoutRace(perso).competences || 0);
 };
 
-// Un peuple immunisé n'attrape jamais l'état : ni par une carte, ni par une
-// zone laissée au sol.
-window.estImmunise = function(perso, nomEtat) {
-    const immunites = window.atoutRace(perso).immunites || [];
-    return immunites.includes(nomEtat);
+// Ce combattant résiste-t-il à cet état ? (v260 : plus d'immunité — 25 % de
+// chance en moins de l'attraper, par une carte comme par une zone.)
+window.resisteAEtat = function(perso, nomEtat) {
+    const a = window.atoutRace(perso) || {};
+    return [...(a.resistances || []), ...(a.immunites || [])].includes(nomEtat);
 };
 
 // Les soins reçus, multipliés par l'atout du peuple (Éthéré : +25 %).
@@ -5260,8 +5243,8 @@ window.chargerCacheEffetsBDD = async function() {
 window.MAJ_GRIMOIRE_REGLES = [
     { id: "EFF_MOTS_DE_POUVOIRS", champs: {
         Nom: "Distorsion mentale",
-        Effet_Base: "1 dégât brut, lié à un état du charisme (Confusion, Immobilisation ou Peur) : 5 % de chance de le poser",
-        Notes: "Ex-Mots de pouvoirs (v240). Toujours liée, dans la Forge, à un état du charisme — Confusion, Immobilisation ou Peur — qui lui offre 5 % de chance de le poser (comme l'élément d'une Attaque Magique) ; on monte cette chance avec le sous-effet de l'état. Dégâts bruts : aucune armure." } },
+        Effet_Base: "1 dégât brut mental : ni armure, ni esquive, ni parade",
+        Notes: "Ex-Mots de pouvoirs (v240). Dégâts bruts mentaux (v260) : aucune armure ne les réduit, et la cible ne peut ni les esquiver ni les parer. Plus d'état du charisme lié." } },
     { id: "EFF_EMPOISONNEMENT", champs: {
         Notes: "Baisse l'énergie de la cible de 10 % de son énergie max et inflige 8 % de ses PV max en dégâts bruts (aucune défense ; le bouclier encaisse d'abord). Un seul tic, en fin de manche. Maître des poisons (Assassin niv. 10) : 18 % d'énergie et 9 % des PV max, à chaque fin de manche pendant 2 manches." } },
     { id: "EFF_BRULE", champs: {

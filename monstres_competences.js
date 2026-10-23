@@ -58,14 +58,93 @@ const ARME_PAR_ARCHETYPE = {
 // L'ordre n'a pas d'importance : les patrons sont tirés puis mélangés.
 // 🧟 Pas de patron « etalement » (règle de Nico) : les créatures ne font
 // jamais d'étalement des dégâts. Sa place revient à une frappe ou un état.
+// LE SOUTIEN (v260, Nico : « dans leur pool de compétences : 1 compétence de
+// bouclier ou de contre ou d'absorption ou un mélange, 1 attaque de DPS
+// faible, et ensuite de bons soins combinés, et des effets d'états ») :
+//   defense     — Bouclier magique, Contre ou Absorption (parfois deux d'entre eux) ;
+//   faible      — une petite attaque, posée dans la tranche la moins chère ;
+//   soutien     — un vrai soin (Soin), souvent combiné à une Purification ;
+//   soutienZone — un soin de zone ;
+//   etat        — une attaque qui pose un état.
 const PATRONS_PAR_ARCHETYPE = {
     "DPS CAC":           ["brute", "frappe", "etat", "frappe", "zone", "controle"],
     "TANK CAC":          ["brute", "frappe", "controle", "soutien", "etat", "zone"],
-    "SOUTIEN":           ["soutien", "soutien", "etat", "frappe", "zone", "brute"],
+    "SOUTIEN":           ["defense", "faible", "soutien", "soutienZone", "soutien", "etat"],
     "DPS MAGE CAC":      ["brute", "frappe", "etat", "zone", "persistance", "etat"],
     "DPS DISTANCE":      ["brute", "frappe", "etat", "zone", "frappe", "controle"],
     "DPS MAGE DISTANCE": ["brute", "frappe", "zone", "persistance", "etat", "frappe"]
 };
+// Les patrons qui soignent ou protègent (sans attaque comme socle).
+const PATRONS_DE_SOUTIEN = ["soutien", "soutienZone", "defense"];
+
+// =========================================================================
+//  LA VOIE D'UNE CRÉATURE (v260)
+// =========================================================================
+//  Nico : « Les monstres combattant, tank et tireur font seulement des dégâts
+//  physiques. » Et : « Les monstres DPS magiques à distance et au càc :
+//  plusieurs types différents, avec un pourcentage de pop — 60 % un mage
+//  d'intelligence et de dégâts magiques, 20 % un mage qui joue avec la
+//  Distorsion mentale et le charisme, 20 % un mélange des deux. »
+//    physique — ni Attaque Magique, ni Distorsion mentale, ni état magique qui
+//               ronge (Brûlé, Électrifié, Glacé) ;
+//    magie    — "intelligence" (l'Attaque Magique, jamais la Distorsion),
+//               "charisme" (la Distorsion, jamais l'Attaque Magique ; les
+//               états du charisme en tête), "mixte" (les deux, une carte sur
+//               deux).
+// Tirée une fois, à la fabrication des techniques ; elle est écrite sur la
+// créature (Voie_Magique) pour qu'on sache, après coup, quel mage on affronte.
+const ARCHETYPES_PHYSIQUES = ["DPS CAC", "TANK CAC", "DPS DISTANCE"];
+const ARCHETYPES_MAGES = ["DPS MAGE CAC", "DPS MAGE DISTANCE"];
+window.PART_VOIES_MAGES = window.PART_VOIES_MAGES || { intelligence: 60, charisme: 20, mixte: 20 };
+const ETATS_ELEMENTAIRES_MOTS = ["brûl", "brul", "glac", "électri", "electri"];
+const ETATS_CHARISME_MOTS = ["confusion", "peur", "immobilis"];
+window.tirerVoieMonstre = function(archetype, alea) {
+    const arch = String(archetype || "");
+    if (ARCHETYPES_PHYSIQUES.includes(arch)) return { physique: true, magie: null };
+    if (!ARCHETYPES_MAGES.includes(arch)) return { physique: false, magie: null };
+    const parts = window.PART_VOIES_MAGES;
+    const total = (parts.intelligence || 0) + (parts.charisme || 0) + (parts.mixte || 0) || 100;
+    const t = (typeof alea === "function" ? alea() : Math.random()) * total;
+    const magie = t < (parts.intelligence || 0) ? "intelligence"
+        : t < (parts.intelligence || 0) + (parts.charisme || 0) ? "charisme" : "mixte";
+    return { physique: false, magie };
+};
+// Cet effet est-il permis à la voie de la carte en fabrication ?
+// `preference` : pour un mage mixte, l'attaque que CETTE carte prend.
+function permisParLaVoie(chantier, effet) {
+    const v = (chantier && chantier.voie) || {};
+    const nom = (effet.Nom || "").toLowerCase();
+    const magique = nom.includes("attaque magique");
+    const distorsion = estDistorsionMonstre(nom);
+    if (v.physique) return !magique && !distorsion && !contient(nom, ETATS_ELEMENTAIRES_MOTS);
+    const voie = v.magie === "mixte" ? (chantier.preference || null) : v.magie;
+    if (voie === "intelligence" && distorsion) return false;
+    if (voie === "charisme" && magique) return false;
+    return true;
+}
+// Les affinités retouchées par la voie : un mage du charisme pense Distorsion
+// et Confusion, Peur, Immobilisation ; un mage de l'intelligence, l'Attaque
+// Magique et les états des éléments. Une créature physique n'a plus rien de
+// magique qui frappe (la règle vit dans permisParLaVoie ; ici, le goût).
+function affinitesDeLaVoie(affinites, voie) {
+    if (!voie || (!voie.physique && !voie.magie)) return affinites;
+    const r = { ...affinites };
+    Object.keys(r).forEach(nom => {
+        const n = nom.toLowerCase();
+        if (voie.physique) {
+            if (n.includes("attaque magique") || estDistorsionMonstre(n) || contient(n, ETATS_ELEMENTAIRES_MOTS)) r[nom] = 0;
+            return;
+        }
+        const cha = voie.magie === "charisme" || voie.magie === "mixte";
+        const int = voie.magie === "intelligence" || voie.magie === "mixte";
+        if (estDistorsionMonstre(n)) r[nom] = cha ? Math.max(r[nom], 9) : 0;
+        else if (n.includes("attaque magique")) r[nom] = int ? Math.max(r[nom], 9) : 0;
+        else if (contient(n, ETATS_CHARISME_MOTS)) r[nom] = cha ? Math.max(r[nom], 8) : Math.min(r[nom], 4);
+        else if (contient(n, ETATS_ELEMENTAIRES_MOTS)) r[nom] = int ? Math.max(r[nom], 8) : Math.min(r[nom], 2);
+    });
+    return r;
+}
+window.affinitesDeLaVoieMonstre = affinitesDeLaVoie;
 
 // Quelle PART de la tranche part dans le socle lui-même (l'attaque, ou le soin
 // d'une carte de soutien) plutôt que dans les modificateurs. C'est le curseur
@@ -117,7 +196,10 @@ function fatigueCoupPlein(monstre, palette) {
 window.PART_SOCLE = window.PART_SOCLE || {
     brute:       1.00,   // un coup nu : tout dans la puissance
     frappe:      0.60,
+    faible:      0.50,   // la petite attaque du soutien (v260)
     soutien:     0.55,   // un soin de 2 PV ne soigne personne non plus
+    soutienZone: 0.45,   // la zone soigne déjà plusieurs alliés
+    defense:     0.55,   // bouclier, contre, absorption
     etat:        0.40,
     controle:    0.40,
     etalement:   0.35,
@@ -524,6 +606,11 @@ function chantierAUneAttaque(chantier) {
 function effetAutorise(chantier, effet, commeMod) {
     const nom = (effet.Nom || "").toLowerCase();
 
+    // La voie de la créature (v260) : une créature physique ne frappe qu'en
+    // physique ; un mage d'intelligence n'a pas de Distorsion, un mage du
+    // charisme pas d'Attaque Magique.
+    if (!permisParLaVoie(chantier, effet)) return false;
+
     // Deux caractéristiques différentes au maximum sur une carte.
     const tag = tagDe(effet);
     if (tag && !chantier.tags.has(tag) && chantier.tags.size >= 2) return false;
@@ -684,12 +771,8 @@ function poserAction(chantier, effetBase, count) {
         const els = window.ELEMENTS_MAGIQUES || [];
         if (els.length > 0) act.element = els[Math.floor(Math.random() * els.length)].id;
     }
-    // ⚖️ règle Forge : une Distorsion mentale est toujours liée à un état du
-    // charisme (Confusion, Immobilisation, Peur) — tiré au sort lui aussi.
-    if (estDistorsionMonstre(effetBase.Nom)) {
-        const etats = window.ETATS_DISTORSION || [];
-        if (etats.length > 0) act.etatMental = etats[Math.floor(Math.random() * etats.length)].id;
-    }
+    // (⚖️ règle Forge, v260 : la Distorsion mentale n'a plus d'état du
+    // charisme lié — elle frappe brut, sans esquive ni parade.)
     chantier.actions.push(act);
     const tag = tagDe(effetBase);
     if (tag) chantier.tags.add(tag);
@@ -797,7 +880,7 @@ const fatigueDe = (chantier, palette) => Math.floor(coutPCChantier(chantier, pal
 //  Fabrication d'UNE carte : un patron impose le squelette, puis on remplit
 //  jusqu'à tomber dans la tranche de fatigue visée.
 // -------------------------------------------------------------------------
-function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang) {
+function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang, preference) {
     const arme = ARME_PAR_ARCHETYPE[monstre.archetype] || "Arme polyvalente";
     const fatigueMax = parseInt(monstre.fatigueMax) || 100;
     const fatigueMin = Math.max(1, Math.round(tranche[0] / 100 * fatigueMax));
@@ -806,6 +889,8 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang) {
 
     const note = eff => (affinites[eff.Nom] !== undefined ? affinites[eff.Nom] : 5);
     const chantier = nouveauChantier(arme, rang);
+    chantier.voie = monstre.voie || null;
+    chantier.preference = preference || null;
 
     const racines = palette.filter(e => estRacine(e));
     const mods    = palette.filter(e => estModificateur(e) && !estDureePlus(e));
@@ -815,14 +900,28 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang) {
     const maxDuree = effetDureePlus ? maxEmpilements(effetDureePlus) : 1;
 
     // --- 1. L'action de base, choisie selon le patron ---
-    const veutSoin = patron === "soutien";
+    // (v260) Le soutien d'un soutien : un VRAI soin pour « soutien » et
+    // « soutienZone » ; un bouclier, un contre ou une absorption pour
+    // « defense ». Le soutien d'un tank (patron « soutien ») garde, faute de
+    // soin à son goût, tout ce qui protège.
+    const veutSoin = PATRONS_DE_SOUTIEN.includes(patron);
+    const MOTS_DEFENSE = ["bouclier", "contre", "absorption"];
+    const estVraiSoin = (n) => contient(n, ["soin", "guérison", "guerison"]) && !contient(n, MOTS_DEFENSE);
+    const soutienDuSoutien = monstre.archetype === "SOUTIEN";
+    const socleVoulu = (e) => patron === "defense" ? contient(e.Nom, MOTS_DEFENSE)
+        : (patron === "soutien" || patron === "soutienZone") ? (soutienDuSoutien ? estVraiSoin(e.Nom) : contient(e.Nom, MOTS_CLES.soin))
+        : !contient(e.Nom, MOTS_CLES.soin);
     let candidatsBase = racines.filter(e => {
         if (!effetAutorise(chantier, e, false)) return false;
-        const estSoin = contient(e.Nom, MOTS_CLES.soin);
         const estIllusion = (e.Nom || "").toLowerCase().includes("illusion");
         if (estIllusion) return false;             // trop particulier pour une génération automatique
-        return veutSoin ? estSoin : !estSoin;
+        return socleVoulu(e);
     });
+    // Sans le socle voulu (un grimoire sans Soin ni Contre) : ce qui soigne ou protège.
+    if (veutSoin && candidatsBase.length === 0) {
+        candidatsBase = racines.filter(e => effetAutorise(chantier, e, false)
+            && !(e.Nom || "").toLowerCase().includes("illusion") && contient(e.Nom, [...MOTS_CLES.soin, "contre"]));
+    }
     // Les patrons offensifs veulent une vraie attaque comme socle.
     if (!veutSoin) {
         const attaques = candidatsBase.filter(e => estAttaqueDeBase(e.Nom));
@@ -841,6 +940,29 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang) {
 
     const effetBase = tirerPondere(candidatsBase, note) || candidatsBase[0];
     const action = poserAction(chantier, effetBase, 1);
+
+    // --- 1 ter. LES SOINS COMBINÉS ET LE MÉLANGE DE PROTECTIONS (v260) ---
+    // Un soin du soutien porte souvent une Purification ; une protection, un
+    // second rempart d'une autre sorte (bouclier et absorption, contre et
+    // bouclier…). Seulement si la tranche peut se l'offrir.
+    const secondeAction = (filtre, chance) => {
+        if (Math.random() >= chance) return;
+        const choix = racines.filter(e => filtre(e) && effetAutorise(chantier, e, false) && coutPC(e) > 0);
+        const second = tirerPondere(choix, note) || choix[0];
+        if (!second) return;
+        const tagsAvant = new Set(chantier.tags);
+        const act = poserAction(chantier, second, 1);
+        if (fatigueDe(chantier, palette) > fatiguePlafond) {
+            chantier.actions = chantier.actions.filter(a => a !== act);
+            chantier.tags = tagsAvant;
+        }
+    };
+    if (monstre.archetype === "SOUTIEN" && (patron === "soutien" || patron === "soutienZone")) {
+        secondeAction(e => contient(e.Nom, ["purification"]), patron === "soutien" ? 0.65 : 0.35);
+    }
+    if (monstre.archetype === "SOUTIEN" && patron === "defense") {
+        secondeAction(e => contient(e.Nom, MOTS_DEFENSE) && e.Nom !== effetBase.Nom, 0.45);
+    }
 
     // --- 1 bis. Le repli après la frappe ---
     // Une créature qui garde ses distances (tireur, mage à distance, soutien)
@@ -878,7 +1000,7 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang) {
         return true;
     };
 
-    if (patron === "zone" || patron === "persistance") {
+    if (patron === "zone" || patron === "persistance" || patron === "soutienZone") {
         const modZone = trouverMod(MOTS_CLES.zone);
         if (modZone) {
             // Taille TIRÉE AU SORT autour d'une valeur qui monte avec la tranche,
@@ -1133,8 +1255,7 @@ function chantierVersDocument(carte, nom, arme, palette) {
                 zoneHexes: act.zoneHexes || [],
                 baseDuree: act.baseDuree || 0,
                 modsDuree,
-                ...(act.element ? { element: act.element } : {}),
-                ...(act.etatMental ? { etatMental: act.etatMental } : {})
+                ...(act.element ? { element: act.element } : {})
             };
         })
     };
@@ -1149,15 +1270,14 @@ function chantierVersDocument(carte, nom, arme, palette) {
 
     const effetsCompiles = [];
     carte.chantier.actions.forEach(act => {
-        const el = act.element && typeof window.elementMagique === "function" ? window.elementMagique(act.element)
-            : act.etatMental && typeof window.etatDistorsion === "function" ? window.etatDistorsion(act.etatMental) : null;
+        const el = act.element && typeof window.elementMagique === "function" ? window.elementMagique(act.element) : null;
         effetsCompiles.push({
             nom: act.baseEffet.Nom,
             desc: texteEffet(act.baseEffet, act.count) + marqueurDuree(act.baseDuree || 0)
                 + (el ? ` · ${el.icone} ${el.nom}` : ""),
             isMod: false
         });
-        // ⚖️ règle Forge : l'état de l'élément (ou de la Distorsion), 5 % offerts.
+        // ⚖️ règle Forge : l'état de l'élément, 5 % offerts.
         if (el) effetsCompiles.push({ nom: el.etat, desc: `${window.CHANCE_ELEMENT_OFFERTE || 5}% de chance (offert)`, isMod: true });
         act.modsEffets.forEach(m => {
             if (m.effet.Nom === "Zone") {
@@ -1263,7 +1383,10 @@ function nomsTechniquesParDefaut(cartes) {
         zone:        ["Déferlante", "Balayage", "Onde"],
         persistance: ["Terre maudite", "Champ ardent", "Sol vicié"],
         etalement:   ["Plaie ouverte", "Poison lent", "Blessure"],
-        soutien:     ["Regain", "Carapace", "Souffle vital"],
+        soutien:     ["Regain", "Souffle vital", "Onction"],
+        soutienZone: ["Halo de vie", "Source bénie", "Ronde des soins"],
+        defense:     ["Carapace", "Égide", "Rempart d'ombre"],
+        faible:      ["Piqûre", "Pichenette", "Trait vif"],
         controle:    ["Étreinte", "Fracas", "Entrave"],
         brute:       ["Coup brutal", "Fracasse", "Estocade"]
     };
@@ -1376,7 +1499,13 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
         monstre.fatigueMax = (gabarit && gabarit.Fatigue_Max) || 100;
     }
 
-    const affinites = await window.determinerAffinitesMonstre(monstre);
+    // LA VOIE (v260) : physique pour un combattant, un tank, un tireur ; pour
+    // un mage, intelligence (60 %), charisme (20 %) ou les deux (20 %). Une
+    // créature qui a déjà la sienne (Voie_Magique) la garde.
+    monstre.voie = monstre.voieMagique
+        ? { physique: false, magie: monstre.voieMagique }
+        : window.tirerVoieMonstre(monstre.archetype);
+    const affinites = affinitesDeLaVoie(await window.determinerAffinitesMonstre(monstre), monstre.voie);
 
     // Les patrons de l'archetype, mélangés, puis appariés aux 6 tranches :
     // c'est ce qui garantit qu'un même monstre a des techniques variées et
@@ -1389,6 +1518,10 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
     // plafond de dégâts sous le plancher de sa tranche (et devrait s'habiller de
     // modificateurs pour y entrer, donc ne serait plus un coup nu), soit trop
     // cher pour ce qu'il apporte.
+    // LA PETITE ATTAQUE DU SOUTIEN (v260) va dans la tranche la moins chère.
+    const iFaible = patrons.indexOf("faible");
+    if (iFaible > 0) [patrons[0], patrons[iFaible]] = [patrons[iFaible], patrons[0]];
+
     const iBrute = patrons.indexOf("brute");
     if (iBrute >= 0) {
         const coutPlein = fatigueCoupPlein(monstre, palette);
@@ -1469,16 +1602,23 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
         // pauvres en effets distincts parce qu'on leur interdit les altérations
         // offensives — un archetype SOUTIEN finissait avec 8 % de cartes de soin
         // au lieu du tiers prévu par son plan.
+        // Un mage mixte (v260) : une carte sur deux pour l'Attaque Magique, l'autre
+        // pour la Distorsion mentale.
+        const preference = monstre.voie && monstre.voie.magie === "mixte" ? (i % 2 === 0 ? "intelligence" : "charisme") : null;
+        // Le pool du soutien (v260) tient à ses patrons : un essai raté retente
+        // le même plutôt qu'un patron au hasard, qui lui ôterait sa protection
+        // ou sa petite attaque.
+        const patronDuSoutien = monstre.archetype === "SOUTIEN" && (PATRONS_DE_SOUTIEN.includes(patrons[i]) || patrons[i] === "faible");
         for (let essai = 0; essai < 8; essai++) {
             // Le coup brut a droit à plus d'insistance que les autres : c'est la
             // carte qui garantit qu'une créature sait taper fort. Si on lâche
             // après trois essais, une créature sur huit se retrouve sans.
-            const essaisPatron = (patrons[i] === "brute") ? 6 : 3;
+            const essaisPatron = patronDuSoutien ? 8 : (patrons[i] === "brute") ? 6 : 3;
             const patronPrevu = essai < essaisPatron;
             const patron = patronPrevu
                 ? (patrons[i] || "frappe")
                 : tousLesPatrons[Math.floor(Math.random() * tousLesPatrons.length)];
-            const candidate = fabriquerCarte(monstre, affinites, patron, tranche, palette, i);
+            const candidate = fabriquerCarte(monstre, affinites, patron, tranche, palette, i, preference);
             if (!candidate) continue;
             if (terrainDejaPose && poseUnTerrain(candidate)) continue;
 
@@ -1496,10 +1636,10 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
 
         // Aucune tentative parfaite : on garde la plus proche plutôt que de
         // laisser un trou dans le jeu de cartes.
-        if (!carte) carte = meilleure || fabriquerCarte(monstre, affinites, "frappe", tranche, palette, i);
+        if (!carte) carte = meilleure || fabriquerCarte(monstre, affinites, "frappe", tranche, palette, i, preference);
         if (carte && terrainDejaPose && poseUnTerrain(carte)) {
             // Le repli lui-même portait un terrain : on lui préfère une frappe.
-            carte = fabriquerCarte(monstre, affinites, "frappe", tranche, palette, i) || null;
+            carte = fabriquerCarte(monstre, affinites, "frappe", tranche, palette, i, preference) || null;
         }
         if (carte) {
             dejaVues.add(signature(carte));
@@ -1512,7 +1652,10 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
 
     const noms = await window.nommerTechniquesIA(monstre, cartes);
     const arme = ARME_PAR_ARCHETYPE[monstre.archetype] || "Arme polyvalente";
-    return cartes.map((c, i) => chantierVersDocument(c, noms[i] || `Technique ${i + 1}`, arme, palette));
+    const documents = cartes.map((c, i) => chantierVersDocument(c, noms[i] || `Technique ${i + 1}`, arme, palette));
+    // La voie du mage, rendue à qui écrit la créature (equiperCompetencesMonstre).
+    if (monstre.voie && monstre.voie.magie) documents.voieMagique = monstre.voie.magie;
+    return documents;
 };
 
 // Écrit les techniques d'un monstre en base et les lui équipe.
@@ -1532,7 +1675,11 @@ window.equiperCompetencesMonstre = async function(idMonstre, monstre) {
 
         // Deck_Equipe : c'est ce que lit le panneau de combat pour afficher les
         // bannières, exactement comme pour un joueur.
-        await updateDoc(doc(db, COLLECTION_MONSTRES, idMonstre), { Deck_Equipe: idsCartes });
+        await updateDoc(doc(db, COLLECTION_MONSTRES, idMonstre), {
+            Deck_Equipe: idsCartes,
+            // Le mage d'intelligence, du charisme, ou les deux (v260).
+            ...(documents.voieMagique ? { Voie_Magique: documents.voieMagique } : {})
+        });
 
         console.log(`⚔️ ${documents.length} technique(s) forgée(s) pour ${monstre.nom}.`);
         return idsCartes;

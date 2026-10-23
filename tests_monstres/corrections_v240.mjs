@@ -15,6 +15,13 @@
 //      nouveau nom ;
 //   4. le combat : l'attaque reconnue sous le nouveau nom, l'état offert ;
 //   5. les créatures et LIA : un état tiré au sort, ou choisi par le récit.
+//
+// v260 (Nico : « les distorsions mentales = dégâts bruts qui ne prennent pas
+// en compte l'esquive et la parade de la cible ; enlève le choix lié à
+// confusion / peur / immobilisation ») : L'ÉTAT DU CHARISME EST RETIRÉ. Ce
+// banc garde le renommage (1, 2) et vérifie désormais qu'aucun état n'est plus
+// demandé, offert, enregistré ni tiré (3, 4, 5) — corrections_v260.mjs porte
+// le reste (brut, ni esquive ni parade).
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -126,9 +133,7 @@ console.log("\n2. app.js : LE NOM, LES DEUX NOMS, LE GRIMOIRE, LES TROIS ÉTATS"
   verifier("le grimoire renommé au chargement (sa Valeur intacte)", r.renomme === "Distorsion mentale" && Number(r.valeurGardee) === 1, `${r.renomme} / ${r.valeurGardee}`);
   verifier("la mise à jour du grimoire (bouton du MJ) porte le nouveau nom", r.maj === "Distorsion mentale", String(r.maj));
   verifier("une phrase d'avant se lit sous le nouveau nom", r.ancienTexte === "• Distorsion mentale : 3 dégâts", String(r.ancienTexte));
-  verifier("trois états du charisme : Confusion, Immobilisation, Peur",
-           r.etats === "Confusion→Confusion:EFF_CONFUSION, Immobilisation→Immobilisation:EFF_IMMOBILISATION, Peur→Peur:EFF_PEUR", r.etats);
-  verifier("chacun son icône dessinée (SVG), son emoji, ses couleurs", r.dessins.length === 3 && r.dessins.every(Boolean), JSON.stringify(r.dessins));
+  verifier("v260 : plus de table des états du charisme", r.etats === "" && r.dessins.length === 0, r.etats);
   verifier("l'aide des caracs (Charisme) et le talent disent le nouveau nom",
            r.cha === "Distorsion mentale" && /Distorsion mentale/.test(r.talent || ""), `${r.cha} | ${r.talent}`);
 }
@@ -144,67 +149,23 @@ await p.evaluate(async (EFFETS) => {
   window.rafraichirForge();
 }, EFFETS_PAR_ID);
 
-console.log("\n3. LA FORGE : LA POPUP DES ÉTATS, L'ÉTAT OFFERT");
+console.log("\n3. LA FORGE : LA DISTORSION SE POSE SANS ÉTAT (v260)");
 {
   await p.evaluate(() => window.ajouterComposantPrincipal("EFF_MOTS_DE_POUVOIRS"));
   await p.waitForTimeout(80);
-  const r = await p.evaluate(() => {
-    const m = document.getElementById("modale-choix-element");
-    const ronds = [...m.querySelectorAll(".forge-element-rond")];
-    const svgs = ronds.map(x => x.querySelector(".forge-element-icone svg"));
-    const tailles = svgs.map(s => s ? Math.round(s.getBoundingClientRect().width) : 0);
-    const ids = svgs.map(s => s && s.querySelector("[id]") ? s.querySelector("[id]").id : "");
-    return { visible: getComputedStyle(m).display === "block", actions: window.forgeState.actions.length,
-             titre: (m.querySelector("h3") || {}).textContent, texte: (m.querySelector(".forge-choix-element-texte") || {}).textContent || "",
-             noms: ronds.map(x => x.textContent.replace(/\s+/g, " ").trim()), tailles, ids,
-             dansEcran: (() => { const b = m.getBoundingClientRect(); return b.left >= 0 && b.right <= innerWidth && b.top >= 0 && b.bottom <= innerHeight; })() };
-  });
-  verifier("poser la Distorsion ouvre la popup — rien n'est encore posé", r.visible && r.actions === 0, JSON.stringify({ v: r.visible, n: r.actions }));
-  verifier("son titre et son texte : l'état de la Distorsion, 5 %",
-           r.titre === "État de la Distorsion" && /Distorsion mentale/.test(r.texte) && /5 %/.test(r.texte), `${r.titre} | ${r.texte.replace(/\s+/g, " ").trim()}`);
-  verifier("trois ronds : Confusion, Immobilisation, Peur, chacun « · 5 % »",
-           r.noms.length === 3 && /^Confusion Confusion · 5 %$/.test(r.noms[0]) && /^Immobilisation Immobilisation · 5 %$/.test(r.noms[1]) && /^Peur Peur · 5 %$/.test(r.noms[2]),
-           JSON.stringify(r.noms));
-  verifier("les icônes dessinées, à leur taille (plus de 40 px), aux dégradés uniques",
-           r.tailles.every(t => t >= 40) && new Set(r.ids).size === 3 && r.ids.every(Boolean), JSON.stringify({ t: r.tailles, ids: r.ids }));
-  verifier("la popup tient à l'écran d'un iPad", r.dansEcran);
-  await p.screenshot({ path: "/tmp/claude-0/v240_popup_etats.png" });
-
-  await p.click('#modale-choix-element .forge-element-rond[data-element="Peur"]');
-  await p.waitForTimeout(80);
   const g = await p.evaluate(() => {
+    const m = document.getElementById("modale-choix-element");
     const act = window.forgeState.actions[0];
-    const offert = document.querySelector("#forge-contenu-carte .forge-sous-effet-offert");
-    const pastille = document.querySelector("#forge-contenu-carte .forge-element-pastille");
-    return { etat: act && act.etatMental, element: act && act.element, mods: act && Object.keys(act.mods).length,
+    return { popup: !!m && getComputedStyle(m).display === "block", n: window.forgeState.actions.length,
+             etat: act && act.etatMental, element: act && act.element,
              nom: (document.querySelector("#forge-contenu-carte .forge-action .forge-nom-effet") || {}).textContent,
-             offert: offert ? offert.textContent.replace(/\s+/g, " ").trim() : null,
-             pastille: pastille ? pastille.textContent.replace(/\s+/g, " ").trim() : null,
-             pastilleSvg: !!(pastille && pastille.querySelector("svg")), pastilleGenre: pastille && pastille.dataset.genre,
+             offert: !!document.querySelector("#forge-contenu-carte .forge-sous-effet-offert"),
+             pastille: !!document.querySelector("#forge-contenu-carte .forge-element-pastille"),
              entete: document.getElementById("forge-element-affichage").textContent };
   });
-  verifier("un clic sur Peur : la Distorsion se pose, liée à la Peur, sans élément",
-           g.etat === "Peur" && !g.element && g.mods === 0, JSON.stringify({ etat: g.etat, element: g.element, mods: g.mods }));
+  verifier("poser la Distorsion : posée tout de suite, sans popup d'état", !g.popup && g.n === 1 && !g.etat && !g.element, JSON.stringify(g));
   verifier("dans la Forge, l'effet s'appelle « Distorsion mentale »", /Distorsion mentale/.test(g.nom || ""), String(g.nom));
-  verifier("le sous-effet offert : 👁️ Peur, 5 %, OFFERT, à 0 cran",
-           !!g.offert && /👁️ Peur/.test(g.offert) && /OFFERT/.test(g.offert) && /\b5%/.test(g.offert) && /- 0 \+/.test(g.offert), String(g.offert));
-  verifier("la pastille : l'icône dessinée et « Peur » ; l'en-tête dit l'état",
-           g.pastilleSvg && /Peur/.test(g.pastille || "") && g.pastilleGenre === "etatMental" && /PEUR/.test(g.entete), `${g.pastille} | ${g.entete}`);
-  await p.screenshot({ path: "/tmp/claude-0/v240_forge_peur.png" });
-
-  // Changer d'état : la pastille rouvre la popup (des états, pas des éléments).
-  await p.click("#forge-contenu-carte .forge-element-pastille");
-  const ronds = await p.evaluate(() => [...document.querySelectorAll("#modale-choix-element .forge-element-rond")].map(x => x.dataset.element + (x.classList.contains("choisi") ? "*" : "")).join(","));
-  verifier("la pastille rouvre la popup des états (la Peur marquée)", ronds === "Confusion,Immobilisation,Peur*", ronds);
-  await p.click('#modale-choix-element .forge-element-rond[data-element="Confusion"]');
-  await p.click("#forge-contenu-carte .forge-sous-effet-offert .forge-btn-plus");
-  const c = await p.evaluate(() => {
-    const act = window.forgeState.actions[0];
-    const ligne = [...document.querySelectorAll("#forge-contenu-carte .forge-sous-effet")].find(l => /Confusion/.test(l.textContent));
-    return { etat: act.etatMental, cran: act.mods.EFF_CONFUSION, ligne: ligne ? ligne.textContent.replace(/\s+/g, " ").trim() : null };
-  });
-  verifier("passée à la Confusion, puis « + » : 1 cran, 6 + 5 = 11 %, « +5 % OFFERTS »",
-           c.etat === "Confusion" && c.cran === 1 && /\b11%/.test(c.ligne || "") && /\+5 % OFFERTS/.test(c.ligne || ""), String(c.ligne));
+  verifier("ni sous-effet offert, ni pastille, ni état dans l'en-tête", !g.offert && !g.pastille && !/PEUR|CONFUSION|IMMOBILISATION/.test(g.entete), g.entete);
 
   // L'Attaque Magique garde SA popup, et son titre.
   await p.evaluate(() => window.ajouterComposantPrincipal("EFF_ATTAQUE_MAGIQUE"));
@@ -213,36 +174,21 @@ console.log("\n3. LA FORGE : LA POPUP DES ÉTATS, L'ÉTAT OFFERT");
   verifier("l'Attaque Magique, ensuite : « Élément du sort », Feu, Foudre, Glace", am.titre === "Élément du sort" && am.ronds === "Feu,Foudre,Glace", JSON.stringify(am));
   await p.evaluate(() => window.fermerChoixElement());
 
-  // Enregistrer : l'état part avec la technique.
+  // Enregistrer : aucun état ne part avec la technique, même d'une carte d'avant.
   const enr = await p.evaluate(async () => {
+    window.forgeState.actions[0].etatMental = "Confusion";   // une carte d'avant la v260
     document.getElementById("forge-nom").value = "Murmure dément";
     window.rafraichirForge();
+    const eteint = document.getElementById("btn-valider-forge").disabled;
     window.__ecrits = [];
     await window.sauvegarderCompetence();
     const e = window.__ecrits.find(x => /Competences/.test(x.chemin));
-    return e ? { Element: e.data.Element, action: e.data.Composants.actions[0], effets: e.data.Effets_Compiles } : null;
+    return e ? { eteint, Element: e.data.Element, action: e.data.Composants.actions[0], effets: e.data.Effets_Compiles } : { eteint };
   });
-  verifier("enregistrée : etatMental « Confusion » sur l'action, Element « Aucun »",
-           enr && enr.action.etatMental === "Confusion" && !enr.action.element && enr.Element === "Aucun", JSON.stringify(enr && enr.action));
-  verifier("la carte dit « Distorsion mentale · 🌀 Confusion »",
-           enr && enr.effets[0].nom === "Distorsion mentale" && /🌀 Confusion/.test(enr.effets[0].desc), JSON.stringify(enr && enr.effets[0]));
-
-  // Sans état (carte d'avant, LIA) : pas de forge.
-  const sans = await p.evaluate(async () => {
-    await window.ouvrirCreationCompetence();
-    window.forgeState.armePrincipale = "Magie";
-    window.forgeState.actions = [{ idInst: "D", baseEffet: window.forgeState.effetsBDD.find(e => e.id === "EFF_MOTS_DE_POUVOIRS"),
-                                   count: 1, mods: {}, zoneHexes: [], baseDuree: 0, modsDuree: {} }];
-    document.getElementById("forge-nom").value = "Sans";
-    window.rafraichirForge();
-    const avant = document.getElementById("btn-valider-forge").disabled;
-    const pastille = document.querySelector("#forge-contenu-carte .forge-element-pastille.manquant");
-    window.forgeState.actions[0].etatMental = "Immobilisation";
-    window.rafraichirForge();
-    return { avant, pastille: pastille && pastille.textContent, apres: document.getElementById("btn-valider-forge").disabled };
-  });
-  verifier("sans état : « Choisir un état », Forger éteint ; avec, rallumé",
-           sans.avant && /Choisir un état/.test(sans.pastille || "") && !sans.apres, JSON.stringify(sans));
+  verifier("enregistrée sans etatMental (même s'il en restait un), Element « Aucun »",
+           enr && !enr.eteint && enr.action && !enr.action.etatMental && !enr.action.element && enr.Element === "Aucun", JSON.stringify(enr && enr.action));
+  verifier("la carte dit « Distorsion mentale », sans état", enr.effets && enr.effets[0].nom === "Distorsion mentale" && !/Confusion|Peur|Immobilisation/.test(enr.effets[0].desc),
+           JSON.stringify(enr.effets && enr.effets[0]));
 
   const regles = await p.evaluate(() => {
     const O = window.outilsForge;
@@ -286,17 +232,17 @@ console.log("\n4. LE COMBAT : L'ATTAQUE RECONNUE, L'ÉTAT OFFERT");
       const r = (await window.demarrerCiblage(id, { extraire: true, idLanceur: "H1" })) || {};
       const att = (r.attaques || [])[0] || {};
       out[id] = { n: (r.attaques || []).length, nom: att.nom, typeRes: att.typeRes, valeur: att.valeurBrute, element: att.element || null,
+                  brut: att.brut === true, distorsion: att.distorsion === true,
                   alt: (r.alterations || []).map(x => `${x.nom}:${x.chance}:${x.duree}`) };
     }
     return out;
   });
-  verifier("sous son nouveau nom, la Distorsion frappe : magique, 2 crans = 2 dégâts",
-           ex.PEUR.n === 1 && ex.PEUR.nom === "Distorsion mentale" && ex.PEUR.typeRes === "Magique" && ex.PEUR.valeur === 2 && !ex.PEUR.element,
-           JSON.stringify(ex.PEUR));
-  verifier("liée à la Peur : Peur à 5 %", JSON.stringify(ex.PEUR.alt) === '["Peur:5:0"]', JSON.stringify(ex.PEUR.alt));
-  verifier("liée à la Confusion : Confusion à 5 % (2 tours)", JSON.stringify(ex.CONF.alt) === '["Confusion:5:2"]', JSON.stringify(ex.CONF.alt));
-  verifier("liée à l'Immobilisation : Immobilisation à 5 % (2 tours)", JSON.stringify(ex.IMMO.alt) === '["Immobilisation:5:2"]', JSON.stringify(ex.IMMO.alt));
-  verifier("Confusion + 1 cran : 6 + 5 = 11 %", JSON.stringify(ex.CONF1.alt) === '["Confusion:11:2"]', JSON.stringify(ex.CONF1.alt));
+  verifier("sous son nouveau nom, la Distorsion frappe : 2 crans = 2 dégâts, brute (v260)",
+           ex.PEUR.n === 1 && ex.PEUR.nom === "Distorsion mentale" && ex.PEUR.typeRes === "Magique" && ex.PEUR.valeur === 2 && !ex.PEUR.element
+           && ex.PEUR.brut === true && ex.PEUR.distorsion === true, JSON.stringify(ex.PEUR));
+  verifier("v260 : un état d'avant (Peur, Confusion, Immobilisation) n'offre plus rien",
+           ex.PEUR.alt.length === 0 && ex.CONF.alt.length === 0 && ex.IMMO.alt.length === 0, JSON.stringify([ex.PEUR.alt, ex.CONF.alt, ex.IMMO.alt]));
+  verifier("Confusion posée en sous-effet (1 cran) : 6 %, sans les 5 offerts", JSON.stringify(ex.CONF1.alt) === '["Confusion:6:2"]', JSON.stringify(ex.CONF1.alt));
   verifier("une Distorsion d'avant (sans état) : rien d'offert, elle frappe quand même", ex.ANCIENNE.alt.length === 0 && ex.ANCIENNE.n === 1, JSON.stringify(ex.ANCIENNE));
   verifier("un état du charisme sur une Attaque Magique ne compte pas (seul son élément)",
            JSON.stringify(ex.FAUX.alt) === '["Brûlé:5:2"]', JSON.stringify(ex.FAUX.alt));
@@ -305,19 +251,16 @@ console.log("\n4. LE COMBAT : L'ATTAQUE RECONNUE, L'ÉTAT OFFERT");
 console.log("\n5. LES CRÉATURES, LIA");
 {
   const mc = fs.readFileSync('/home/user/Ivalis/monstres_competences.js', 'utf-8');
-  verifier("une créature : sa Distorsion reçoit un état tiré au sort, et l'emporte",
-           /act\.etatMental = etats\[Math\.floor\(Math\.random\(\) \* etats\.length\)\]\.id/.test(mc)
-           && /\.\.\.\(act\.etatMental \? \{ etatMental: act\.etatMental \} : \{\}\)/.test(mc));
+  verifier("v260 : une créature ne tire plus d'état pour sa Distorsion", !/act\.etatMental =/.test(mc) && !/etatMental: act\.etatMental/.test(mc));
   verifier("…et la reconnaît sous ses deux noms (attaque de base, sans arme)",
            /attaque:\s+\["attaque", "distorsion"/.test(mc) && /estDistorsionMonstre\(nom\) \|\| legere/.test(mc));
   const ia = fs.readFileSync('/home/user/Ivalis/monstres_ia.js', 'utf-8');
   verifier("l'IA des créatures compte ses dégâts sous le nouveau nom", /nomBase\.includes\("distorsion"\)/.test(ia));
   const lia = fs.readFileSync('/home/user/Ivalis/lia_forge.js', 'utf-8');
-  verifier("LIA : « Distorsion mentale » dans ses attaques, son état dans le schéma",
-           /"Attaque Magique", "Distorsion mentale"/.test(lia) && /etat_mental: \{ type: "STRING", enum: \["Confusion", "Immobilisation", "Peur"\]/.test(lia));
-  verifier("LIA pose l'état (le sien, sinon celui du récit, sinon la Confusion)",
-           /act\.etatMental = etatMentalPourLIA\(pa && \(pa\.etat_mental \|\| pa\.etatMental\), recit\)/.test(lia)
-           && /return "Peur";/.test(lia) && /return "Immobilisation";/.test(lia) && /return "Confusion";/.test(lia));
+  verifier("LIA : « Distorsion mentale » dans ses attaques ; v260 : plus d'état dans le schéma",
+           /"Attaque Magique", "Distorsion mentale"/.test(lia) && !/etat_mental/.test(lia));
+  verifier("LIA ne pose plus d'état ; elle sait la Distorsion brute, sans esquive ni parade",
+           !/etatMentalPourLIA/.test(lia) && /ni élément ni état lié : ce sont des dégâts bruts mentaux/.test(lia));
 }
 
 verifier("aucune erreur de page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

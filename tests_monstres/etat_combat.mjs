@@ -515,6 +515,8 @@ console.log("\nLES IMMUNITÉS ET LE SOIN DE RACE VOYAGENT AUSSI");
 //  cerveau_combat.js). On injecte ici la VRAIE table (ATOUTS_RACES, app.js),
 //  pas une copie : c'est elle qui doit rester la seule source.
 {
+    // (Une table d'avant la v260, qui dit encore « immunites » : le
+    // combattant les porte en RÉSISTANCES — il n'y a plus d'immunité.)
     const ATOUTS = {
         Ankylar: { defPhysique: 8, immunites: ["Étourdi"] },
         Ophior: { defMagique: 8, regenPv: 3 }
@@ -538,10 +540,10 @@ console.log("\nLES IMMUNITÉS ET LE SOIN DE RACE VOYAGENT AUSSI");
                   File_Attente_Combat: [{ idPersonnage: "H1" }, { idPersonnage: "H2" }] },
         regles: reglesDuJeu
     });
-    verifier("l'immunité de l'Ankylar atterrit dans ses atouts",
-             etat.combattants.H1.atouts.immunites.includes("Étourdi"),
-             JSON.stringify(etat.combattants.H1.atouts.immunites));
-    verifier("l'Ophior, lui, n'a aucune immunité", etat.combattants.H2.atouts.immunites.length === 0);
+    verifier("la résistance de l'Ankylar atterrit dans ses atouts (resistances)",
+             (etat.combattants.H1.atouts.resistances || []).includes("Étourdi"),
+             JSON.stringify(etat.combattants.H1.atouts.resistances));
+    verifier("l'Ophior, lui, n'a aucune résistance", (etat.combattants.H2.atouts.resistances || []).length === 0);
     verifier("le soin de race de l'Ophior atterrit dans ses atouts",
              etat.combattants.H2.atouts.regenPv === 3, `(${etat.combattants.H2.atouts.regenPv})`);
     verifier("l'Ankylar, lui, n'a pas ce soin", etat.combattants.H1.atouts.regenPv === 0);
@@ -554,9 +556,9 @@ console.log("\nLES IMMUNITÉS ET LE SOIN DE RACE VOYAGENT AUSSI");
         partie: { Phase_Combat: "Resolution", Ordre_Initiative: ["H1"],
                   File_Attente_Combat: [{ idPersonnage: "H1" }] }
     });
-    verifier("sans formules du jeu, aucune immunité ne s'invente",
-             Array.isArray(sansRegles.combattants.H1.atouts.immunites)
-             && sansRegles.combattants.H1.atouts.immunites.length === 0);
+    verifier("sans formules du jeu, aucune résistance ne s'invente",
+             Array.isArray(sansRegles.combattants.H1.atouts.resistances)
+             && sansRegles.combattants.H1.atouts.resistances.length === 0);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

@@ -189,11 +189,12 @@ console.log("\n6. NIVEAU 5 : TIR PRÉCIS");
     const cache = tir(5, "M1", mur);
     verifier("derrière un mur : refusé (pas de ligne de vue)", cache.pas.refus === true && /ligne de vue/.test(cache.pas.raison), cache.pas.raison);
     verifier("niveau 4 : il ne l'a pas", tir(4, "M1").pas.refus === true);
-    const immunise = monde(5); immunise.combattants.M1.atouts.immunites = ["Immobilisation"];
+    // v260 : plus d'immunité — qui RÉSISTE à l'Immobilisation a un dé du cerveau, à 75 %.
+    const immunise = monde(5); immunise.combattants.M1.atouts.resistances = ["Immobilisation"];
     immunise.file = [{ id: "P", carte: "CLASSE_TIR_PRECIS", initiative: 100, pas: 0 }];
     const pi = prochainPas(immunise, [{ id: "i1", type: "classe", acteur: "P", idCarte: "CLASSE_TIR_PRECIS", cible: "M1" }], {});
-    verifier("une cible insensible : rien (et c'est dit)", !aLEtat(pi.etat.combattants.M1, "Immobilisation")
-             && pi.entree.etapes.some(x => x.type === "etatRate"));
+    verifier("une cible qui résiste : immobilisée à 75 % (sinon, « résisté » dit)", aLEtat(pi.etat.combattants.M1, "Immobilisation")
+             || pi.entree.etapes.some(x => x.type === "etatRate" && x.resiste));
     const deux = clonerEtat(pas.etat); deux.file = [{ id: "P", carte: "CLASSE_TIR_PRECIS", initiative: 100, pas: 0 }];
     verifier("une fois par combat", validerIntention(deux, { id: "i2", type: "classe", acteur: "P", idCarte: "CLASSE_TIR_PRECIS", cible: "M2" }).ok === false);
 }

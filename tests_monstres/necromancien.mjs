@@ -91,8 +91,9 @@ console.log("\n1. SES ATOUTS, PALIER PAR PALIER (niveau tiré de l'XP)");
     verifier("PV max : 40 sur la fiche → 40 (plus de +8)", w.pvMaxCombattant(necro(1)) === 40, `${w.pvMaxCombattant(necro(1))}`);
     // (Un Ondari : l'Humain a une compétence de plus depuis la v237.)
     verifier("6 compétences en main, comme tout le monde", w.competencesMaxCombattant(necro(1, { race: "Ondari" })) === 6);
+    // (v260 : l'Ondari résiste au Brûlé — une résistance, plus une immunité.)
     verifier("la table des races n'est pas touchée par la fusion",
-             JSON.stringify(w.ATOUTS_RACES.Ondari.immunites) === '["Brûlé"]');
+             JSON.stringify(w.ATOUTS_RACES.Ondari.resistances) === '["Brûlé"]');
 }
 
 // =========================================================================

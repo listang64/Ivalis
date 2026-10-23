@@ -5390,3 +5390,16 @@ textarea.input-texte-parchemin {
 .popup-regions-info { font-weight: bold; margin: 2px 0 6px; color: #5c3a21; }
 .popup-regions-total { font-size: 12.5px; color: #7d5f40; margin-bottom: 6px; }
 .popup-regions-aide { margin: 6px 0 0; font-size: 12px; line-height: 1.4; color: #5c3a21; font-style: italic; }
+
+/* =========================================================================
+   L'ENGAGEMENT (v260) : les flèches courbes du pion sélectionné vers qui
+   l'engage (combat.js, dessinerEngagements) — rouges, à demi transparentes,
+   un souffle léger, un flux qui court vers l'agresseur.
+   ========================================================================= */
+.fleches-engagement .fleche-engagement { animation: engagement-souffle 1.8s ease-in-out infinite alternate; }
+.fleches-engagement .flux-engagement { animation: engagement-flux 1.1s linear infinite; }
+@keyframes engagement-souffle { from { opacity: 0.72; } to { opacity: 1; } }
+@keyframes engagement-flux { from { stroke-dashoffset: 28; } to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .fleches-engagement .fleche-engagement, .fleches-engagement .flux-engagement { animation: none; }
+}

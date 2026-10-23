@@ -191,7 +191,7 @@ RÈGLES ABSOLUES
 7. Sur une action Poussée : pas de Zone, de Persistance terrain ni d'étalement. Sur une Illusion : pas de Zone.
 8. Distance : seulement avec Arme polyvalente, Arme légère Distance ou Magie — ou sur un soin.${regleLumiere}
 10. N'utilise QUE des identifiants (id) de la liste fournie : aucun autre effet n'existe pour ce héros.
-11. Une Attaque Magique est TOUJOURS liée à un élément (champ element de l'action) : Feu, Foudre ou Glace, selon le récit. Il lui offre déjà 5 % de chance de Brûlé, Électrifié ou Glacé : n'ajoute ce sous-effet que pour monter cette chance. Une Distorsion mentale n'a pas d'élément : elle est TOUJOURS liée à un état du charisme (champ etat_mental de l'action) — Confusion, Immobilisation ou Peur, selon le récit — qui lui offre 5 % de chance de le poser ; n'ajoute ce sous-effet que pour monter cette chance.
+11. Une Attaque Magique est TOUJOURS liée à un élément (champ element de l'action) : Feu, Foudre ou Glace, selon le récit. Il lui offre déjà 5 % de chance de Brûlé, Électrifié ou Glacé : n'ajoute ce sous-effet que pour monter cette chance. Une Distorsion mentale n'a ni élément ni état lié : ce sont des dégâts bruts mentaux, que la cible ne peut ni esquiver ni parer, et qu'aucune armure ne réduit.
 
 TON STYLE
 - Reste fidèle au récit : l'élément, le geste, l'effet sur l'ennemi. N'ajoute pas d'effet que le récit ne justifie pas.
@@ -246,7 +246,6 @@ ${JSON.stringify(catalogueEffets(armes))}`;
                                 crans: { type: "INTEGER" },
                                 duree: { type: "INTEGER", description: "crans ⏳ ajoutés, 0 sinon" },
                                 element: { type: "STRING", enum: ["Feu", "Foudre", "Glace"], description: "L'élément d'une Attaque Magique (et d'elle seule)." },
-                                etat_mental: { type: "STRING", enum: ["Confusion", "Immobilisation", "Peur"], description: "L'état du charisme d'une Distorsion mentale (et d'elle seule)." },
                                 sous_effets: {
                                     type: "ARRAY",
                                     items: {
@@ -435,19 +434,6 @@ function elementPourLIA(propose, recit) {
     return "Feu";
 }
 
-// L'état du charisme d'une Distorsion mentale posée par LIA : le sien s'il est
-// valide, sinon celui que le récit évoque (folie, chaînes, terreur…), sinon la
-// Confusion.
-function etatMentalPourLIA(propose, recit) {
-    const ids = (window.ETATS_DISTORSION || []).map(e => e.id);
-    const p = (ids.find(id => sansAccents(id) === sansAccents(propose)));
-    if (p) return p;
-    const r = sansAccents(recit);
-    if (/(peur|terreur|effroi|epouvant|frayeur|cauchemar|panique)/.test(r)) return "Peur";
-    if (/(immobil|paralys|fige|entrav|chaine|lien|pietrif)/.test(r)) return "Immobilisation";
-    return "Confusion";
-}
-
 // Pose le plan de LIA dans la Forge. Rend { ok, notes, message }. Sur un
 // échec, la Forge est remise exactement comme avant.
 function appliquerPlanLIA(plan, recit) {
@@ -488,10 +474,6 @@ function appliquerPlanLIA(plan, recit) {
         // celui que le récit évoque, sinon le Feu.
         if (typeof window.estAttaqueElementaire === "function" && window.estAttaqueElementaire(eff.Nom)) {
             act.element = elementPourLIA(pa && pa.element, recit);
-        }
-        // Une Distorsion mentale reçoit son état du charisme, de même.
-        if (O.estDistorsion && O.estDistorsion(eff.Nom)) {
-            act.etatMental = etatMentalPourLIA(pa && (pa.etat_mental || pa.etatMental), recit);
         }
         fs.actions.push(act);
         if (O.getActiveTags().size > 2) { fs.actions.pop(); notes.push(`${nom} : une 3e caractéristique, écarté`); return; }

@@ -167,9 +167,19 @@ console.log("\n2 bis. RÉSONANCE DU BOUCLIER : LES ENNEMIS AU CONTACT ÉTOURDIS,
     verifier("rejoué depuis le journal : mêmes PV, mêmes états", rejoue.M.pv === 190 && rejoue.MN.pv === 97 && !!etourdi(rejoue.M));
     const titre = misEnScene(pas.entree.etapes.find(x => x.type === "techniqueClasse"), pas.etat);
     verifier("à l'écran : « 🛡️ Résonance du bouclier »", titre && /Résonance du bouclier/.test(titre.texte));
-    const imm = clonerEtat(e); imm.combattants.M.atouts.immunites = ["Étourdi"];
-    const ri = appliquerIntention(enTete(imm, "H", "CLASSE_RESONANCE_BOUCLIER"), i).etat.combattants.M;
-    verifier("un immunisé prend les dégâts, pas l'Étourdi", ri.pv === 190 && !etourdi(ri));
+    // v260 : plus d'immunité — qui RÉSISTE à l'Étourdi a un dé du cerveau, à 75 %.
+    const imm = clonerEtat(e); imm.combattants.M.atouts.resistances = ["Étourdi"];
+    const pasR = appliquerIntention(enTete(imm, "H", "CLASSE_RESONANCE_BOUCLIER"), i);
+    const ri = pasR.etat.combattants.M;
+    verifier("qui résiste prend les dégâts ; l'Étourdi à 75 % (pris, ou « résisté » dit)", ri.pv === 190
+             && (etourdi(ri) ? true : pasR.entree.etapes.some(x => x.type === "etatRate" && x.cible === "M")));
+    // Sur cent graines, il prend environ trois fois sur quatre.
+    let pris = 0;
+    for (let g = 1; g <= 200; g++) {
+        const s = clonerEtat(imm); s.graine = g;
+        if (etourdi(appliquerIntention(enTete(s, "H", "CLASSE_RESONANCE_BOUCLIER"), i).etat.combattants.M)) pris++;
+    }
+    verifier("…environ 3 fois sur 4 (sur 200 graines)", Math.abs(pris / 200 - 0.75) < 0.08, `${pris}/200`);
 }
 
 // =========================================================================

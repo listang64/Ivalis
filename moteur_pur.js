@@ -505,6 +505,8 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
     };
 
     (plan.attaques || []).forEach(attaque => {
+        // LA DISTORSION MENTALE ne demande aucun jet de défense (plus bas).
+        if (attaque.distorsion) return;
         (attaque.cibles || []).forEach(id => {
             const c = pourCible(id);
             // Un soin ne s'esquive pas.
@@ -515,6 +517,20 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
                 // tous les postes retirent ainsi le même.
                 if (c.purifie) c.purifJet = des.d100();
             }
+        });
+    });
+
+    // LA DISTORSION MENTALE NE S'ESQUIVE NI NE SE PARE (v260, Nico : « dégâts
+    // bruts qui ne prennent pas en compte l'esquive et la parade de la
+    // cible ») : sa cible n'a pas de jet de défense, et les états de la carte
+    // la suivent. Seul un autre coup de la même carte (une attaque physique ou
+    // magique sur la même cible) garde le sien — il a été tiré juste au-dessus,
+    // et n'arrête pas la Distorsion (resoudreCarte).
+    (plan.attaques || []).forEach(attaque => {
+        if (!attaque.distorsion) return;
+        (attaque.cibles || []).forEach(id => {
+            const c = pourCible(id);
+            if (c.esquive === undefined) c.esquive = false;
         });
     });
 
@@ -530,7 +546,7 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
             const c = pourCible(id);
             if (c.lumiere === undefined) c.lumiere = critique || des.d100() <= Math.min(100, nombre(attaque.chanceLumiere));
             if (aveugle > 0 && c.lumiereAveugle === undefined) {
-                c.lumiereAveugle = des.d100() <= aveugle;
+                c.lumiereAveugle = des.d100() <= chanceFaceA(combattant(etat, id), ETAT_AVEUGLE, aveugle);
                 if (c.lumiereAveugle) c.noirLumiere = { [id]: tirerDirectionsAveugle(des) };
             }
         });
@@ -557,9 +573,12 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
             // pas au bouclier que l'on reçoit, qu'on se le pose ou qu'un allié
             // nous l'offre.
             if (c.esquive === undefined) c.esquive = alt.isHeal ? false : jetDeDefense(id);
-            // Un coup critique impose les effets de la carte, sans jet.
+            // Un coup critique impose les effets de la carte, sans jet — sauf
+            // à une cible qui y résiste (v260) : un dé, à 75 %.
             if (c.etats[alt.nom] === undefined) {
-                c.etats[alt.nom] = critique || des.d100() <= chanceEtatDe(lanceur, alt, combattant(etat, id), c);
+                const cibleEtat = combattant(etat, id);
+                c.etats[alt.nom] = (critique && !resisteA(cibleEtat, alt.nom))
+                    || des.d100() <= (critique ? chanceFaceA(cibleEtat, alt.nom, 100) : chanceEtatDe(lanceur, alt, cibleEtat, c));
             }
             // L'AVEUGLEMENT tire ICI les 3 cases de noir autour de sa cible —
             // avec les autres dés, pour que tous les postes voient le même noir.
@@ -585,7 +604,7 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
     if (maitrise > 0) Object.keys(jets.parCible).forEach(id => {
         const c = jets.parCible[id];
         if (!(c.maitriseLumiere > 0) || c.etats[ETAT_AVEUGLE] !== undefined || c.lumiereAveugle !== undefined) return;
-        c.lumiereAveugle = des.d100() <= c.maitriseLumiere;
+        c.lumiereAveugle = des.d100() <= chanceFaceA(combattant(etat, id), ETAT_AVEUGLE, c.maitriseLumiere);
         if (c.lumiereAveugle) c.noirLumiere = { [id]: tirerDirectionsAveugle(des) };
     });
 
@@ -632,6 +651,16 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
     jets.equipPasOfferts = frappe ? nombre(equipLanceur.hexApresAttaque) : 0;
 
     return jets;
+}
+
+// UNE CARTE QUI N'ÉTALE QUE (v260, Nico : « étalement des dégâts et soins :
+// pas de critique possible ») : tous ses dégâts et soins sont étalés — elle ne
+// critique pas. Une carte qui frappe aussi d'un coup garde son critique, mais
+// ses parts étalées, elles, ne sont jamais doublées (chaineDeDegats).
+export function carteToutEtalee(action) {
+    const portants = ((action && action.attaques) || [])
+        .filter(a => a && !a.isShield && decimal(a.valeurBrute) > 0);
+    return portants.length > 0 && portants.every(a => !!a.estEtalement);
 }
 
 // Le coup critique : un jet par carte, réservé aux héros. Les créatures
@@ -747,7 +776,8 @@ export function estDansLeNoir(c, hex) {
 export const ETATS_BIENFAISANTS = new Set(["Absorption", "Contre", "Élan", "Soin étalé", "Nuée de chauve-souris",
                                            "Bouclier anti-magie"]);
 export function estEtatNefaste(e) {
-    return !!e && !ETATS_BIENFAISANTS.has(e.nom) && !e.bonusEquip;
+    // L'engagement (v260) n'est pas une altération : la mêlée, rien à purifier.
+    return !!e && !ETATS_BIENFAISANTS.has(e.nom) && !e.bonusEquip && e.nom !== "Engagé";
 }
 
 // L'AUTRE TRICHE : deux états seulement, la Peur et l'Étourdi, prennent huit
@@ -755,8 +785,43 @@ export function estEtatNefaste(e) {
 // soit sa stature. Ils s'ajoutent à la chance de la carte, plafonnés à 100.
 export const BONUS_CHANCE_ETAT_MONSTRE = { "Peur": 8, "Étourdi": 8 };
 
+// =========================================================================
+//  LES RÉSISTANCES AUX ÉTATS (v260)
+// =========================================================================
+//  Plus aucune immunité nulle part (Nico : « les classes qui ont une immunité
+//  à un type d'effet, remplace-les par une résistance de 25 % à cet effet,
+//  permanente — ça vient déduire aux chances de réussite de cet effet de la
+//  compétence lancée contre lui » ; les peuples aussi ; et les créatures :
+//  « si on fait un sort de feu avec 50 % de chance de le brûler et qu'il est
+//  résistant contre ça, ça fait 50 % − 25 % = 25 % »). Un état « à coup sûr »
+//  (un critique, une technique de classe) prend à 75 %.
+//
+//  Les résistances voyagent dans `atouts.resistances` (combat_etat.js) ; un
+//  combattant d'un journal d'avant porte encore `atouts.immunites` : elles
+//  valent résistances, elles aussi.
+export const RESISTANCE_ETAT_PCT = 25;
+// Les états auxquels une créature peut résister (tirage, app.js).
+export const ETATS_RESISTIBLES = ["Brûlé", "Électrifié", "Glacé", "Empoisonnement", "Saignement", "Étourdi",
+                                  "Confusion", "Peur", "Immobilisation", "Provocation", "Aveuglé"];
+export function resistancesDe(c) {
+    const a = (c && c.atouts) || {};
+    return [...new Set([...(Array.isArray(a.resistances) ? a.resistances : []),
+                        ...(Array.isArray(a.immunites) ? a.immunites : [])])];
+}
+export const resisteA = (c, nom) => !!nom && resistancesDe(c).includes(nom);
+// Ce qu'il reste d'une chance face à la résistance de la cible (jamais sous 0).
+export const chanceFaceA = (c, nom, chance) =>
+    Math.max(0, Math.min(100, nombre(chance)) - (resisteA(c, nom) ? RESISTANCE_ETAT_PCT : 0));
+// Un état « à coup sûr » (100 %) sur cette cible : pris d'office si elle n'y
+// résiste pas — sans dé ; sinon un dé, à 75 %.
+export function prisMalgreResistance(c, nom, des) {
+    if (!resisteA(c, nom)) return true;
+    return des.d100() <= 100 - RESISTANCE_ETAT_PCT;
+}
+
 // `cible` (facultative) : ce que la cible ajoute elle-même à la chance — le
-// Vampire, +20 % d'être Brûlé par un sort (brulureFacile, v237). `jetsCible`
+// Vampire, +20 % d'être Brûlé par un sort (brulureFacile, v237) — et ce
+// qu'elle en retire : sa résistance à cet état (−25 %, v260). `jetsCible`
 // (facultatif) : ses jets de la carte — un sort de foudre d'un Chasseur de
 // mages y a noté sa Maîtrise de la lumière (l'Aveuglement prend alors la plus
 // forte des deux chances, sans les additionner).
@@ -766,7 +831,68 @@ export function chanceEtatDe(lanceur, alt, cible, jetsCible) {
     const subie = (alt && alt.nom === "Brûlé" && cible && cible.atouts) ? nombre(cible.atouts.brulureFacile) : 0;
     let chance = base + bonus + (base > 0 ? subie : 0);
     if (alt && alt.nom === ETAT_AVEUGLE && jetsCible && jetsCible.maitriseLumiere > 0) chance = Math.max(chance, jetsCible.maitriseLumiere);
-    return Math.min(100, chance);
+    return chanceFaceA(cible, alt && alt.nom, chance);
+}
+
+// =========================================================================
+//  L'ENGAGEMENT (v260)
+// =========================================================================
+//  Nico : « Engagé = notre personnage est engagé quand il a reçu une attaque
+//  au càc à ce tour. Une attaque à distance sur une cible éloignée, alors que
+//  nous sommes engagés, fera −15 % de dégâts. Le malus de −30 % au càc pour
+//  les dégâts à distance, applique-le QUE si le personnage est engagé avec
+//  quelqu'un. Si l'ennemi qui engage est étourdi ou confus, ça annule le
+//  statut engagé tant qu'il a un de ces effets. » Et : une attaque esquivée
+//  ou parée engage quand même — être attaqué au contact suffit.
+//
+//  UN ÉTAT D'UNE MANCHE : posé par toute attaque AU CONTACT (une technique qui
+//  n'est pas à distance, sur un ennemi à une case — la morsure d'un zombie
+//  comprise), il retient QUI engage (`par`) et tombe en fin de manche
+//  (vieillirLesEtats). Il se recalcule à la lecture : un agresseur à terre,
+//  étourdi ou confus n'engage plus (engageursDe). Les attaques d'opportunité
+//  n'engagent pas : elles frappent qui quitte justement le contact.
+export const ETAT_ENGAGE = "Engagé";
+export const MALUS_TIR_ENGAGE_CONTACT = 30;   // un tir au contact, engagé
+export const MALUS_TIR_ENGAGE_LOIN = 15;      // un tir sur une cible éloignée, engagé
+export const DESC_ENGAGE = "A reçu une attaque au corps à corps cette manche : ses attaques à distance "
+    + "perdent 15 % de dégâts (30 % au contact). Un agresseur étourdi ou confus ne l'engage plus.";
+// (Pas d'image : le médaillon rouge « ⚔ » de l'écran le dessine — combat.js,
+// SYMBOLES_ETATS et COULEUR_ETAT —, sans alourdir chaque étape du journal.)
+// Ceux qui engagent ce combattant, maintenant : debout, ni étourdis, ni confus.
+export function engageursDe(etat, c) {
+    const e = ((c && c.etats) || []).find(x => x && x.nom === ETAT_ENGAGE);
+    if (!e) return [];
+    return [...new Set(e.par || [])].filter(id => {
+        const x = combattant(etat, id);
+        return !!x && !x.aTerre && !aLEtat(x, "Étourdi") && !aLEtat(x, "Confusion");
+    });
+}
+export const estEngage = (etat, c) => engageursDe(etat, c).length > 0;
+// Une attaque qui engage : au contact (pas un tir), un vrai coup (ni soin ni
+// bouclier), d'un ennemi à une case.
+export function attaqueEngage(attaque, lanceur, cible) {
+    return !!attaque && !attaque.isRanged && !attaque.isHeal && !attaque.isShield
+        && !!lanceur && !!cible && lanceur.id !== cible.id && !lanceur.estIllusion && !cible.estIllusion
+        && (lanceur.camp || "Allié") !== (cible.camp || "Allié") && distanceHex(lanceur, cible) === 1;
+}
+// Pose (ou complète) l'engagement de `cible` par `idAgresseur`. Vrai si l'état a changé.
+export function engager(cible, idAgresseur) {
+    if (!cible || !idAgresseur) return false;
+    const etats = cible.etats || [];
+    const deja = etats.find(x => x && x.nom === ETAT_ENGAGE);
+    if (deja) {
+        if ((deja.par || []).includes(idAgresseur) && nombre(deja.duree) >= 1) return false;
+        deja.par = [...new Set([...(deja.par || []), idAgresseur])];
+        deja.duree = Math.max(1, nombre(deja.duree));
+        return true;
+    }
+    cible.etats = [...etats, { nom: ETAT_ENGAGE, duree: 1, par: [idAgresseur], desc: DESC_ENGAGE }];
+    return true;
+}
+// Le malus d'un tir quand on est engagé (en %, 0 sinon).
+export function malusTirEngage(attaque, distance, engage, sansMalusContact) {
+    if (!attaque || !attaque.isRanged || !engage || sansMalusContact) return 0;
+    return distance <= 1 ? MALUS_TIR_ENGAGE_CONTACT : MALUS_TIR_ENGAGE_LOIN;
 }
 
 // =========================================================================
@@ -775,8 +901,8 @@ export function chanceEtatDe(lanceur, alt, cible, jetsCible) {
 //  L'ordre des opérations EST la règle du jeu. Il est repris tel quel de
 //  l'ancien moteur, et chaque ligne compte :
 //
-//    1. le brut, doublé si la frappe est critique ;
-//    2. le malus de tir à bout portant : une arme de jet perd 30 % au contact ;
+//    1. le brut, doublé si la frappe est critique (jamais un étalement) ;
+//    2. le malus de tir d'un ENGAGÉ (v260) : −30 % au contact, −15 % de loin ;
 //    3. l'absorption : la cible annule une part et se soigne de 10 % du brut,
 //       et ce soin compte AVANT que le reste ne frappe ;
 //    4. la résistance, physique ou magique selon l'attaque, réduite à zéro si
@@ -809,7 +935,10 @@ export function partsEtalees(montant, tours) {
 // `critique` : les parts viennent d'un coup critique (déjà doublées par
 // chaineDeDegats) — l'écran le redit à chaque tic, d'un « ! » (Nico, v251 :
 // « quand on fait un critique, l'étalement prend le critique en compte »).
-function empilerEtalement(cible, nomEtat, tics, idSource, critique) {
+// `nature` (v260) : la nature des dégâts rangés (physique, magique, mental) —
+// la couleur du chiffre de chaque tic. Deux natures sur la même file : la
+// première reste.
+function empilerEtalement(cible, nomEtat, tics, idSource, critique, nature) {
     const dejaLa = cible.etats.find(e => e && e.nom === nomEtat);
     if (dejaLa) {
         const file = [...(dejaLa.tics || [])];
@@ -818,10 +947,22 @@ function empilerEtalement(cible, nomEtat, tics, idSource, critique) {
         dejaLa.duree = Math.max(nombre(dejaLa.duree), file.length);
         if (idSource) dejaLa.idSource = idSource;
         if (critique) dejaLa.critique = true;
+        if (nature && !dejaLa.nature) dejaLa.nature = nature;
     } else {
         cible.etats = [...cible.etats, { nom: nomEtat, duree: tics.length, tics: [...tics],
-                                         ...(idSource ? { idSource } : {}), ...(critique ? { critique: true } : {}) }];
+                                         ...(idSource ? { idSource } : {}), ...(critique ? { critique: true } : {}),
+                                         ...(nature ? { nature } : {}) }];
     }
+}
+
+// LA NATURE D'UN COUP (v260) : ce que l'écran en montre — la couleur de son
+// chiffre (rouge physique, bleu magique, blanc pour la Distorsion mentale) et
+// le coup reçu qui va avec.
+export function natureDuCoup(attaque) {
+    if (!attaque) return "physique";
+    if (attaque.distorsion) return "mental";
+    if (attaque.brut === true) return "brut";
+    return attaque.typeRes === "Magique" ? "magique" : "physique";
 }
 
 // =========================================================================
@@ -852,12 +993,14 @@ export function partRendue(pctAnnule) {
     return Math.min(PART_RENDUE_MAX, Math.max(0, nombre(pctAnnule)) / 2);
 }
 
-// Ce qu'un sort perd contre qui est insensible à son élément (chaineDeDegats).
-export const REDUCTION_SORT_RESISTE = 20;
+// Ce qu'un sort perd contre qui résiste à son élément (chaineDeDegats) : 20 %,
+// puis 15 % depuis la v260 (Nico : « résister au Brûlé = −25 % de chance
+// d'être brûlé ET −15 % de dégâts des sorts de Feu ; pareil pour les autres »).
+export const REDUCTION_SORT_RESISTE = 15;
 const MESSAGES_RESISTANCE = { "Brûlé": "🔥 Résiste au feu", "Électrifié": "⚡ Résiste à la foudre", "Glacé": "❄️ Résiste à la glace" };
 
 export function chaineDeDegats(cible, attaque, options) {
-    const { critique = false, distance = 1, percee = false, sansMalusContact = false } = options || {};
+    const { critique = false, distance = 1, percee = false, sansMalusContact = false, engage = false } = options || {};
     const compte = { soinAbsorption: 0, degats: 0, secondTic: 0, versBouclier: 0, versPv: 0 };
 
     // 1. Le brut, doublé par un critique à la source : tout ce qui suit
@@ -866,7 +1009,9 @@ export function chaineDeDegats(cible, attaque, options) {
     //    ou une valeur négative venue d'ailleurs ferait autrement des dégâts
     //    NÉGATIFS — donc un soin déguisé, ou un bouclier qui grandit sous les
     //    coups. C'est le test de propriété qui l'a trouvé, au 633e essai.
-    let degats = Math.max(0, decimal(attaque.valeurBrute)) * (critique ? 2 : 1);
+    //    UN ÉTALEMENT NE CRITIQUE PAS (v260, Nico : « étalement des dégâts et
+    //    soins : pas de critique possible ») : ses parts gardent leur montant.
+    let degats = Math.max(0, decimal(attaque.valeurBrute)) * (critique && !attaque.estEtalement ? 2 : 1);
 
     // 2. Une attaque À DISTANCE employée au contact perd trente pour cent.
     //
@@ -881,7 +1026,16 @@ export function chaineDeDegats(cible, attaque, options) {
     //    ne perd à bout portant — ses sorts, et aussi ce qu'une arme a fait
     //    tirer (Nico : « le Sorcier a eu le malus de -30 % au contact alors
     //    qu'il n'est pas censé l'avoir »).
-    if (attaque.isRanged && distance === 1 && !sansMalusContact) degats = Math.floor(degats * 0.7);
+    //
+    //    v260 : SEULEMENT S'IL EST ENGAGÉ (Nico : « applique-le QUE si le
+    //    personnage est engagé avec quelqu'un ») — et un tir sur une cible
+    //    éloignée, engagé, perd 15 % (malusTirEngage). Le Sorcier ne perd rien,
+    //    ni au contact ni de loin.
+    const malusTir = malusTirEngage(attaque, distance, engage, sansMalusContact);
+    if (malusTir > 0) {
+        degats = Math.floor(degats * (100 - malusTir) / 100);
+        compte.malusTir = malusTir;
+    }
 
     // 2 bis. LES VULNÉRABILITÉS DE LA CIBLE. Un corps gelé casse plus
     //    facilement (+20 % de PHYSIQUE, règle de Nico : la glace casse sous
@@ -900,18 +1054,18 @@ export function chaineDeDegats(cible, attaque, options) {
     else vulnerabilite += regleDesEtats(cible, "degatsPhysiquesSubis");
     if (vulnerabilite !== 0) degats = Math.max(0, Math.round(degats * (1 + vulnerabilite / 100)));
 
-    // 2 ter. UN SORT D'UN ÉLÉMENT CONTRE QUI Y EST INSENSIBLE (règle de Nico) :
+    // 2 ter. UN SORT D'UN ÉLÉMENT CONTRE QUI Y RÉSISTE (règle de Nico) :
     //    l'Ondari au Feu, le Vampire à la Glace, une créature qui résiste à la
-    //    Foudre… encaissent 20 % de moins d'une Attaque Magique de cet élément.
-    //    Les éléments voyagent sur l'attaque avec le nom de leur état
-    //    (etatsElements, moteur_effets.js) : c'est la même liste d'immunités qui
-    //    décide. PLUSIEURS ÉLÉMENTS : la réduction se partage, −20 % ×
-    //    insensibles ÷ éléments — insensible à 1 des 3, c'est −6,67 %.
+    //    Foudre… encaissent 15 % de moins (20 % avant la v260) d'une Attaque
+    //    Magique de cet élément. Les éléments voyagent sur l'attaque avec le nom
+    //    de leur état (etatsElements, moteur_effets.js) : c'est la même liste de
+    //    résistances qui décide. PLUSIEURS ÉLÉMENTS : la réduction se partage,
+    //    −15 % × résistés ÷ éléments — résistant à 1 des 3, c'est −5 %.
     const etatsDuSort = brut ? [] : (Array.isArray(attaque.etatsElements) && attaque.etatsElements.length > 0
         ? attaque.etatsElements : (attaque.etatElement ? [attaque.etatElement] : []));
     if (etatsDuSort.length > 0) {
-        const immunites = (cible.atouts && cible.atouts.immunites) || [];
-        const resistes = etatsDuSort.filter(e => immunites.includes(e));
+        const resistances = resistancesDe(cible);
+        const resistes = etatsDuSort.filter(e => resistances.includes(e));
         if (resistes.length > 0) {
             compte.resiste = resistes[0];
             compte.resistes = resistes;
@@ -1113,11 +1267,13 @@ export function traverserZones(etat, id, hex, des, options = {}) {
         }
 
         // L'état garde le pourcentage calculé quand le sort a été lancé.
+        //  Une cible qui résiste à cet état (v260) en retire 25 points.
         if (zone.etat && zone.etat.nom) {
-            const immunites = (cible.atouts && cible.atouts.immunites) || [];
-            const pris = des.d100() <= nombre(zone.etat.chance);
-            if (immunites.includes(zone.etat.nom)) {
-                etapes.push({ type: "etatRate", cible: id, nom: zone.etat.nom, immunise: true });
+            const jet = des.d100();
+            const pris = jet <= chanceFaceA(cible, zone.etat.nom, zone.etat.chance);
+            // Sauvée par sa résistance seule (le jet aurait pris sans elle) : on le dit.
+            if (!pris && resisteA(cible, zone.etat.nom) && jet <= nombre(zone.etat.chance)) {
+                etapes.push({ type: "etatRate", cible: id, nom: zone.etat.nom, resiste: true });
             } else if (pris) {
                 const existant = (cible.etats || []).find(e => e && e.nom === zone.etat.nom);
                 if (existant) {
@@ -1589,13 +1745,15 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
         etapes.push({ type: "etats", cible: id, liste: c.etats, pose: ETAT_ANTIMAGIE });
     } else if (action.idCarte === "CLASSE_APPEL_LUMIERE") {
         // Les noirs ont été tirés par le cerveau (action.noirs), un par
-        // combattant : on ne fait que les poser.
+        // combattant : on ne fait que les poser. Qui résiste à l'Aveuglement
+        // (v260) a eu son dé chez le cerveau (action.prisMalgreResistance).
         const noirs = action.noirs || {};
+        const pris = action.prisMalgreResistance || {};
         Object.keys(noirs).sort().forEach(v => {
             const x = combattant(suivant, v);
             if (!x || x.aTerre) return;
-            if (((x.atouts && x.atouts.immunites) || []).includes(ETAT_AVEUGLE)) {
-                etapes.push({ type: "etatRate", cible: v, nom: ETAT_AVEUGLE, immunise: true });
+            if (resisteA(x, ETAT_AVEUGLE) && pris[v] !== true) {
+                etapes.push({ type: "etatRate", cible: v, nom: ETAT_AVEUGLE, resiste: true });
                 return;
             }
             const cases = casesDuNoir(x, noirs[v]);
@@ -1611,9 +1769,9 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
     } else if (action.idCarte === "CLASSE_CHARME_FRATRICIDE") {
         const ennemi = combattant(suivant, action.cible);
         if (ennemi && !ennemi.aTerre) {
-            const immunites = (ennemi.atouts && ennemi.atouts.immunites) || [];
-            if (immunites.includes(ETAT_CHARME)) {
-                etapes.push({ type: "etatRate", cible: ennemi.id, acteur: id, etat: ETAT_CHARME, immunise: true });
+            // À coup sûr, sauf à qui y résiste (v260 : un dé du cerveau, à 75 %).
+            if (resisteA(ennemi, ETAT_CHARME) && (action.prisMalgreResistance || {})[ennemi.id] !== true) {
+                etapes.push({ type: "etatRate", cible: ennemi.id, acteur: id, nom: ETAT_CHARME, etat: ETAT_CHARME, resiste: true });
             } else {
                 ennemi.etats = [...(ennemi.etats || []).filter(e => e && e.nom !== ETAT_CHARME),
                                 { nom: ETAT_CHARME, duree: MANCHES_CHARME, idSource: id,
@@ -1674,13 +1832,13 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
         }
     } else if (action.idCarte === "CLASSE_TIR_PRECIS") {
         // LE TIR PRÉCIS (Pisteur) : l'ennemi visé est immobilisé à coup sûr
-        // (aucun jet d'esquive) pour 2 manches — sauf s'il y est insensible.
+        // (aucun jet d'esquive) pour 2 manches — sauf s'il y résiste (v260 :
+        // un dé du cerveau, à 75 %).
         const ennemi = combattant(suivant, action.cible);
         if (ennemi && !ennemi.aTerre) {
-            const immunites = (ennemi.atouts && ennemi.atouts.immunites) || [];
             etapes.push({ type: "message", cible: ennemi.id, acteur: id, texte: "🎯 Tir précis !", couleur: "#e8c46a" });
-            if (immunites.includes(ETAT_IMMOBILISATION)) {
-                etapes.push({ type: "etatRate", cible: ennemi.id, acteur: id, etat: ETAT_IMMOBILISATION, immunise: true });
+            if (resisteA(ennemi, ETAT_IMMOBILISATION) && (action.prisMalgreResistance || {})[ennemi.id] !== true) {
+                etapes.push({ type: "etatRate", cible: ennemi.id, acteur: id, nom: ETAT_IMMOBILISATION, etat: ETAT_IMMOBILISATION, resiste: true });
             } else {
                 ennemi.etats = [...(ennemi.etats || []).filter(e => e && e.nom !== ETAT_IMMOBILISATION),
                                 { nom: ETAT_IMMOBILISATION, duree: MANCHES_TIR_PRECIS, desc: DESC_IMMOBILISATION }];
@@ -1761,7 +1919,8 @@ export function resoudreCarte(etat, action, plateau) {
 
     // Une créature ne critique jamais, même si l'action reçue le prétend. Le
     // premier verrou est au lancement ; celui-ci tient sur tous les écrans.
-    const critique = !!action.critique && !lanceur.estMonstre;
+    // Ni une carte qui n'étale que (carteToutEtalee, v260).
+    const critique = !!action.critique && !lanceur.estMonstre && !carteToutEtalee(action);
     const jets = action.jets || { parCible: {} };
     const desDe = (id) => (jets.parCible && jets.parCible[id]) || {};
 
@@ -1900,11 +2059,8 @@ export function resoudreCarte(etat, action, plateau) {
         (alt.cibles || []).forEach(idCible => {
             const cible = combattant(suivant, idCible);
             if (!cible || cible.aTerre) return;
-            const immunites = (cible.atouts && cible.atouts.immunites) || [];
-            if (immunites.includes(alt.nom)) {
-                etapes.push({ type: "etatRate", cible: idCible, nom: alt.nom, immunise: true });
-                return;
-            }
+            // (Plus d'immunité, v260 : une résistance retire 25 points à la
+            // chance, déjà comptée dans le jet de tirerDesCarte.)
             const des = desDe(idCible);
             if (des.esquive) { direEsquiveHorsAttaque(idCible, des); return; }   // sinon dite avec l'attaque
             if (!des.etats || des.etats[alt.nom] !== true) {
@@ -1919,6 +2075,11 @@ export function resoudreCarte(etat, action, plateau) {
     const touchees = new Set();
     const aveuglesParLaLumiere = new Set();
     const bonusMonstre = bonusMonstreDe(lanceur);
+    // L'ENGAGEMENT (v260) : le lanceur engagé au moment où sa carte part perd
+    // sur ses tirs (malusTirEngage) ; ceux qu'il frappe au contact deviennent
+    // engagés — esquive ou pas —, dit une fois par cible, après ses coups.
+    const engageLanceur = estEngage(suivant, lanceur);
+    const engagesParLaCarte = [];
 
     // LE VAMPIRISME (Vampire, niveau 5) : une carte qui en porte un soigne son
     // lanceur d'une part (70 %) de TOUT ce qu'elle inflige aux ennemis — PV et
@@ -1932,6 +2093,11 @@ export function resoudreCarte(etat, action, plateau) {
             const cible = combattant(suivant, idCible);
             if (!cible || cible.aTerre) return;
             const des = desDe(idCible);
+
+            // Attaqué au contact : engagé, qu'il esquive ou non (v260).
+            if (attaqueEngage(attaque, lanceur, cible) && engager(cible, idLanceur) && !engagesParLaCarte.includes(idCible)) {
+                engagesParLaCarte.push(idCible);
+            }
 
             // EN SURSIS (Nécromancien, niveau 10) : la vie est bloquée à zéro.
             // Les coups n'y changent rien, et aucun soin ne le relève.
@@ -1953,8 +2119,10 @@ export function resoudreCarte(etat, action, plateau) {
             }
 
             // Une esquive vaut pour toute la carte : la cible n'esquive pas
-            // chaque effet séparément, elle esquive le coup.
-            if (des.esquive) {
+            // chaque effet séparément, elle esquive le coup. Sauf la Distorsion
+            // mentale (v260) : elle ne s'esquive ni ne se pare, même quand un
+            // autre coup de la carte a été évité.
+            if (des.esquive && !attaque.distorsion) {
                 etapes.push({ type: "esquive", cible: idCible, acteur: idLanceur,
                               parade: !!des.parade });
                 return;
@@ -2004,7 +2172,8 @@ export function resoudreCarte(etat, action, plateau) {
             //  dégât ni un soin.
             if (attaque.isHeal) {
                 const avant = cible.pv;
-                let soin = Math.max(0, appliquerBonusMonstre(attaque.valeurBrute, bonusMonstre)) * (critique ? 2 : 1);
+                // (Un soin étalé ne critique pas, v260.)
+                let soin = Math.max(0, appliquerBonusMonstre(attaque.valeurBrute, bonusMonstre)) * (critique && !attaque.estEtalement ? 2 : 1);
                 // CE QUE LA CIBLE FAIT DU SOIN QU'ELLE REÇOIT. L'Éthéré en tire
                 // trente pour cent de plus ; une plaie qui brûle en perd la
                 // moitié. Ces deux règles ne vivaient que dans l'ancien moteur :
@@ -2018,7 +2187,7 @@ export function resoudreCarte(etat, action, plateau) {
                 // le nombre de tours, une part à chaque fin de manche, comme
                 // les dégâts étalés.
                 if (attaque.estEtalement && soin > 0) {
-                    empilerEtalement(cible, "Soin étalé", partsEtalees(soin, attaque.toursEtalement), undefined, critique);
+                    empilerEtalement(cible, "Soin étalé", partsEtalees(soin, attaque.toursEtalement), undefined, false);
                     etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
                     return;
                 }
@@ -2052,7 +2221,8 @@ export function resoudreCarte(etat, action, plateau) {
                 // LE BOUCLIER ANTI-MAGIE (Chasseur de mages) : le coup magique
                 // repart en entier sur son lanceur, qui l'encaisse avec ses
                 // propres défenses. Un coup renvoyé ne se renvoie plus.
-                if (!attaqueFrappe.renvoyeAntimagie && attaqueFrappe.typeRes === "Magique" && !attaqueFrappe.isHeal
+                // (La Distorsion mentale n'est pas un coup magique : elle passe.)
+                if (!attaqueFrappe.renvoyeAntimagie && attaqueFrappe.typeRes === "Magique" && !attaqueFrappe.isHeal && !attaqueFrappe.distorsion
                     && idCible !== idLanceur && aLEtat(cible, ETAT_ANTIMAGIE) && !lanceur.aTerre) {
                     etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
                                   texte: "🔮 Renvoyé !", couleur: "#90caf9" });
@@ -2060,7 +2230,10 @@ export function resoudreCarte(etat, action, plateau) {
                     return;
                 }
                 const sansMalusContact = !!(lanceur.atouts && lanceur.atouts.sortsSansMalusContact);
-                const compte = chaineDeDegats(cible, attaqueFrappe, { critique, distance: distanceHex(lanceur, cible), percee, sansMalusContact });
+                // Un étalement ne critique pas (v260) : ni ses parts, ni ce qu'en dit l'écran.
+                const critiqueCoup = critique && !attaqueFrappe.estEtalement;
+                const compte = chaineDeDegats(cible, attaqueFrappe, { critique: critiqueCoup, distance: distanceHex(lanceur, cible), percee,
+                                                                      sansMalusContact, engage: engageLanceur });
                 if (compte.resiste) {
                     // Un seul élément : « Résiste au feu ». Plusieurs : les icônes
                     // de ceux qui butent, et la part retirée.
@@ -2110,10 +2283,12 @@ export function resoudreCarte(etat, action, plateau) {
                     bouclierBrise: !!compte.bouclierBrise,
                     bouclierApres: cible.bouclier,
                     pvApres: cible.pv,
-                    critique,
+                    critique: critiqueCoup,
                     // LA NATURE DU COUP : l'écran montre le coup reçu qui va avec
-                    // (physique, magique, brut — animations_jeu.js).
-                    nature: attaqueFrappe.brut === true ? "brut" : attaqueFrappe.typeRes === "Magique" ? "magique" : "physique",
+                    // (physique, magique, brut — animations_jeu.js) et la couleur
+                    // de son chiffre (v260 : rouge, bleu, blanc pour la Distorsion
+                    // mentale — pont_combat.js).
+                    nature: natureDuCoup(attaqueFrappe),
                     // UN COUP ÉTALÉ ne retire rien tout de suite : ce qu'il
                     // rangera, critique compris, se dit à la place d'un « -0 ».
                     ...((compte.tics || []).length > 0 ? { etale: compte.tics.reduce((a, b) => a + nombre(b), 0) } : {}),
@@ -2140,7 +2315,8 @@ export function resoudreCarte(etat, action, plateau) {
                 // (compte.degats vaut zéro) ; tout est rangé dans l'état, une part
                 // par fin de manche, autant de parts que de tours.
                 if ((compte.tics || []).length > 0) {
-                    empilerEtalement(cible, attaque.versEnergie ? ETAT_TENEBRES_ETALEES : "Étalement", compte.tics, idLanceur, critique);
+                    empilerEtalement(cible, attaque.versEnergie ? ETAT_TENEBRES_ETALEES : "Étalement", compte.tics, idLanceur, false,
+                                     natureDuCoup(attaqueFrappe));
                     etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
                 }
 
@@ -2172,10 +2348,7 @@ export function resoudreCarte(etat, action, plateau) {
                 Object.keys(des.noirLumiere).forEach(v => {
                     const x = combattant(suivant, v);
                     if (!x || x.aTerre) return;
-                    if (((x.atouts && x.atouts.immunites) || []).includes(ETAT_AVEUGLE)) {
-                        etapesNoir.push({ type: "etatRate", cible: v, nom: ETAT_AVEUGLE, immunise: true });
-                        return;
-                    }
+                    // (Sa résistance à l'Aveuglement, v260, est déjà dans le jet.)
                     const cases = casesDuNoir(x, des.noirLumiere[v]);
                     const deja = (x.etats || []).find(e => e && e.nom === ETAT_AVEUGLE);
                     if (deja) {
@@ -2195,6 +2368,12 @@ export function resoudreCarte(etat, action, plateau) {
                 }
             }
         });
+    });
+
+    // L'engagement posé par la carte, dit à chaque écran (une étape par cible).
+    engagesParLaCarte.forEach(id => {
+        const c = combattant(suivant, id);
+        if (c) etapes.push({ type: "etats", cible: id, acteur: idLanceur, pose: ETAT_ENGAGE, liste: c.etats });
     });
 
     // --- LE SOIN DU VAMPIRISME -------------------------------------------
@@ -2223,15 +2402,9 @@ export function resoudreCarte(etat, action, plateau) {
             const cible = combattant(suivant, idCible);
             if (!cible || cible.aTerre) return;
 
-            // L'IMMUNITÉ DE PEUPLE PASSE AVANT TOUT LE RESTE : ni jet, ni
-            // esquive — la cible n'attrape tout simplement jamais cet état-là.
-            // Elle ne consomme aucun dé : le jet de la carte (tirerDesCarte)
-            // a été tiré pareil pour tout le monde, seule l'application change.
-            const immunites = (cible.atouts && cible.atouts.immunites) || [];
-            if (immunites.includes(alt.nom)) {
-                etapes.push({ type: "etatRate", cible: idCible, nom: alt.nom, immunise: true });
-                return;
-            }
+            // PLUS D'IMMUNITÉ (v260) : une cible qui résiste à cet état en a
+            // retiré 25 points à sa chance, dans le jet de tirerDesCarte. Le
+            // dire, quand l'état ne prend pas, c'est `resiste`.
 
             const des = desDe(idCible);
             // L'Assaut mortel empoisonne même la cible qui a esquivé le coup.
@@ -2240,7 +2413,7 @@ export function resoudreCarte(etat, action, plateau) {
                 return;
             }
             if (!des.etats || des.etats[alt.nom] !== true) {
-                etapes.push({ type: "etatRate", cible: idCible, nom: alt.nom });
+                etapes.push({ type: "etatRate", cible: idCible, nom: alt.nom, ...(resisteA(cible, alt.nom) ? { resiste: true } : {}) });
                 return;
             }
 

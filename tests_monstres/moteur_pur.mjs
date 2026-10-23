@@ -63,10 +63,13 @@ console.log("\n1. LA CHAÎNE DE DÉGÂTS, MAILLON PAR MAILLON");
     c = chaineDeDegats(sansDefense, { valeurBrute: 20 }, { critique: true });
     verifier("un critique double à la source", c.degats === 40, `(${c.degats})`);
 
+    // v260 : le malus de tir ne vaut que pour un tireur ENGAGÉ.
+    c = chaineDeDegats(sansDefense, { valeurBrute: 20, isRanged: true }, { distance: 1, engage: true });
+    verifier("une arme de jet, engagée, perd 30 % au contact", c.degats === 14, `(${c.degats})`);
+    c = chaineDeDegats(sansDefense, { valeurBrute: 20, isRanged: true }, { distance: 2, engage: true });
+    verifier("…et 15 % à deux cases (20 → 17)", c.degats === 17, `(${c.degats})`);
     c = chaineDeDegats(sansDefense, { valeurBrute: 20, isRanged: true }, { distance: 1 });
-    verifier("une arme de jet perd 30 % au contact", c.degats === 14, `(${c.degats})`);
-    c = chaineDeDegats(sansDefense, { valeurBrute: 20, isRanged: true }, { distance: 2 });
-    verifier("mais pas à deux cases", c.degats === 20, `(${c.degats})`);
+    verifier("pas engagée : rien au contact", c.degats === 20, `(${c.degats})`);
 
     // 25 % de résistance physique sur 20 de brut : 15.
     const blinde = { pv: 50, pvMax: 50, bouclier: 0, etats: [], def: { physique: 25, magique: 50 } };
@@ -138,7 +141,9 @@ console.log("\n3. UNE ESQUIVE ARRÊTE TOUTE LA CARTE");
     const { etat: apres, etapes } = resoudreCarte(etat, action);
 
     verifier("aucun point de vie perdu", apres.combattants.H1.pv === 60);
-    verifier("aucun état posé", apres.combattants.H1.etats.length === 0);
+    // (v260 : attaqué au contact, il est ENGAGÉ — esquive ou pas ; c'est tout.)
+    verifier("aucune altération posée (seulement l'engagement)", apres.combattants.H1.etats.length === 1
+             && apres.combattants.H1.etats[0].nom === "Engagé", JSON.stringify(apres.combattants.H1.etats));
     verifier("et l'esquive est racontée", etapes.some(e => e.type === "esquive"));
 }
 
@@ -480,8 +485,14 @@ console.log("\n13. LA DISTANCE, ET LE MALUS DE BOUT PORTANT EN SITUATION");
              distanceHex(etat.combattants.M1, etat.combattants.H2) === 2);
 
     const arc = (idCible) => ({ ...frappe(idCible, 20, { isRanged: true }) });
-    const proche = resoudreCarte(etat, arc("H1"));
-    verifier("l'arc tiré au contact ne fait que 14", proche.etat.combattants.H1.pv === 46,
+    // v260 : seulement ENGAGÉ (la goule a reçu un coup au contact de H1).
+    const libre = resoudreCarte(etat, arc("H1"));
+    verifier("l'arc tiré au contact, sans être engagé : plein (60 → 40)", libre.etat.combattants.H1.pv === 40,
+             `(${libre.etat.combattants.H1.pv})`);
+    const engagee = neuf();
+    engagee.combattants.M1.etats = [{ nom: "Engagé", duree: 1, par: ["H1"] }];
+    const proche = resoudreCarte(engagee, arc("H1"));
+    verifier("l'arc tiré au contact, engagé, ne fait que 14", proche.etat.combattants.H1.pv === 46,
              `(${proche.etat.combattants.H1.pv})`);
 
     // H2 a 25 % de résistance : 20 → 15.
@@ -624,15 +635,14 @@ console.log("\n15. UN BOUCLIER LANCÉ RESTE UN BOUCLIER — MÊME MARQUÉ « isH
 }
 
 // =========================================================================
-console.log("\n16. UNE IMMUNITÉ DE PEUPLE PASSE AVANT LES DÉS");
+console.log("\n16. UNE RÉSISTANCE DE PEUPLE JOUE DANS LE DÉ (v260 : plus d'immunité)");
 // =========================================================================
-//  L'Ankylar est immunisé à l'Étourdi. Le die est pourtant tiré pareil pour
-//  tout le monde (tirerDesCarte, à graine égale) : c'est l'APPLICATION qui
-//  doit refuser l'état, jamais le tirage — sans quoi deux cibles différentes
-//  consommeraient un nombre différent de dés, et le rejeu diverger.
+//  L'Ankylar RÉSISTE à l'Étourdi : 25 points de chance en moins, comptés
+//  dans le jet de tirerDesCarte (chanceEtatDe). À l'application, le jet a
+//  décidé : réussi, l'état prend, même sur lui.
 {
     let etat = neuf();
-    etat.combattants.H1.atouts = { ...(etat.combattants.H1.atouts || {}), immunites: ["Étourdi"] };
+    etat.combattants.H1.atouts = { ...(etat.combattants.H1.atouts || {}), resistances: ["Étourdi"] };
 
     const alterer = (etatDepart, idCible, chance = 100) => resoudreCarte(etatDepart, {
         type: "carte", idLanceur: "M1", idCarte: "CE",
@@ -640,13 +650,23 @@ console.log("\n16. UNE IMMUNITÉ DE PEUPLE PASSE AVANT LES DÉS");
         jets: { parCible: { [idCible]: { esquive: false, etats: { "Étourdi": true } } } }
     });
 
-    const surImmunise = alterer(etat, "H1");
-    verifier("l'Ankylar n'attrape pas l'Étourdi, même à 100 % de chance",
-             !surImmunise.etat.combattants.H1.etats.some(e => e.nom === "Étourdi"),
-             JSON.stringify(surImmunise.etat.combattants.H1.etats));
-    const etapeImmun = surImmunise.etapes.find(e => e.type === "etatRate" && e.cible === "H1");
-    verifier("l'étape le dit, et dit que c'est une immunité",
-             !!etapeImmun && etapeImmun.immunise === true, JSON.stringify(etapeImmun));
+    const surResistant = alterer(etat, "H1");
+    verifier("un jet réussi : l'Ankylar attrape l'Étourdi",
+             surResistant.etat.combattants.H1.etats.some(e => e.nom === "Étourdi"),
+             JSON.stringify(surResistant.etat.combattants.H1.etats));
+    // Lancé par un héros (pas de bonus de créature) : 100 → 75, 50 → 25 ; par
+    // une créature, son +8 % d'Étourdi vient d'abord : 50 → 58 → 33.
+    verifier("sa chance : 100 → 75, 50 → 25 (chanceEtatDe), 33 lancée par une créature",
+             chanceEtatDe(etat.combattants.H2, { nom: "Étourdi", chance: 100 }, etat.combattants.H1) === 75
+             && chanceEtatDe(etat.combattants.H2, { nom: "Étourdi", chance: 50 }, etat.combattants.H1) === 25
+             && chanceEtatDe(etat.combattants.M1, { nom: "Étourdi", chance: 50 }, etat.combattants.H1) === 33,
+             `${chanceEtatDe(etat.combattants.H2, { nom: "Étourdi", chance: 50 }, etat.combattants.H1)} / ${chanceEtatDe(etat.combattants.M1, { nom: "Étourdi", chance: 50 }, etat.combattants.H1)}`);
+    const rate = resoudreCarte(etat, { type: "carte", idLanceur: "M1", idCarte: "CE", attaques: [],
+        alterations: [{ nom: "Étourdi", chance: 50, duree: 2, cibles: ["H1"] }],
+        jets: { parCible: { H1: { esquive: false, etats: { "Étourdi": false } } } } });
+    const etapeRate = rate.etapes.find(e => e.type === "etatRate" && e.cible === "H1");
+    verifier("un jet raté : l'étape le dit, et dit qu'il résiste",
+             !!etapeRate && etapeRate.resiste === true && !etapeRate.immunise, JSON.stringify(etapeRate));
 
     // Sur une cible ordinaire, la même carte, le même jet : l'état se pose.
     const surH2 = alterer(etat, "H2");
@@ -656,15 +676,15 @@ console.log("\n16. UNE IMMUNITÉ DE PEUPLE PASSE AVANT LES DÉS");
 }
 
 // =========================================================================
-console.log("\n17. LA TRICHE DES CRÉATURES ET L'IMMUNITÉ VIVENT CHACUNE LEUR VIE");
+console.log("\n17. LA TRICHE DES CRÉATURES ET LA RÉSISTANCE VIVENT CHACUNE LEUR VIE");
 // =========================================================================
 //  Deux réglages posés le même jour, sur deux combattants différents : rien
-//  ne doit se mélanger entre le bonus de dégâts d'un monstre et l'immunité
-//  d'un héros.
+//  ne doit se mélanger entre le bonus de dégâts d'un monstre et la résistance
+//  d'un héros (une immunité avant la v260).
 {
     let etat = neuf();
     etat.combattants.M1.palier = "Boss";
-    etat.combattants.H2.atouts = { ...(etat.combattants.H2.atouts || {}), immunites: ["Étourdi"] };
+    etat.combattants.H2.atouts = { ...(etat.combattants.H2.atouts || {}), resistances: ["Étourdi"] };
 
     const carte = {
         type: "carte", idLanceur: "M1", idCarte: "CB",
@@ -672,15 +692,16 @@ console.log("\n17. LA TRICHE DES CRÉATURES ET L'IMMUNITÉ VIVENT CHACUNE LEUR V
         alterations: [{ nom: "Étourdi", chance: 100, duree: 2, cibles: ["H2"] }],
         jets: { parCible: {
             H1: { esquive: false, etats: {} },
-            H2: { esquive: false, etats: { "Étourdi": true } }
+            H2: { esquive: false, etats: { "Étourdi": false } }
         } }
     };
     const r = resoudreCarte(etat, carte);
     // 10 de brut + 10 % de triche (Boss) contre H1, sans défense : 11.
     verifier("le Boss inflige toujours son bonus de dégâts",
              r.etat.combattants.H1.pv === 49, `(${r.etat.combattants.H1.pv})`);
-    verifier("et H2 reste immunisé à l'Étourdi malgré le Boss qui frappe ailleurs",
-             !r.etat.combattants.H2.etats.some(e => e.nom === "Étourdi"),
+    verifier("et H2 résiste à l'Étourdi (jet raté, « résiste ») malgré le Boss qui frappe ailleurs",
+             !r.etat.combattants.H2.etats.some(e => e.nom === "Étourdi")
+             && r.etapes.some(e => e.type === "etatRate" && e.cible === "H2" && e.resiste),
              JSON.stringify(r.etat.combattants.H2.etats));
 }
 

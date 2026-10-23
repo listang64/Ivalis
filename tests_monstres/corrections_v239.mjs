@@ -102,9 +102,13 @@ console.log("\n2. LE CERVEAU : LA TECHNIQUE, LA ZONE DE GLACE, CEUX QUI S'Y TIEN
     verifier("ceux qui s'y tiennent : 5 % de leurs PV max, sans défense (M1, armure 50 % : -5 ; M2 : -5)",
              s.combattants.M1.pv === 95 && s.combattants.M2.pv === 95, `${s.combattants.M1.pv} / ${s.combattants.M2.pv}`);
     verifier("ceux du dehors n'ont rien", s.combattants.M3.pv === 100 && s.combattants.H.pv === 100 && s.combattants.P.pv === 100);
-    verifier("le Vampire (insensible au gel) : ses PV, mais jamais Glacé — « immunisé »",
-             s.combattants.V.pv === 95 && !s.combattants.V.etats.some(x => x.nom === "Glacé")
-             && pas.entree.etapes.some(x => x.type === "etatRate" && x.cible === "V" && x.immunise));
+    // v260 : le Vampire RÉSISTE au gel (plus d'immunité) — 75 % → 50 %.
+    const glaceV = s.combattants.V.etats.some(x => x.nom === "Glacé");
+    verifier("le Vampire (résiste au gel, v260) : ses PV, et Glacé à 50 % au lieu de 75",
+             s.combattants.V.pv === 95 && MP.chanceFaceA(s.combattants.V, "Glacé", 75) === 50
+             && !pas.entree.etapes.some(x => x.type === "etatRate" && x.cible === "V" && x.immunise)
+             && (glaceV || pas.entree.etapes.some(x => x.type === "etatRate" && x.cible === "V" && x.resiste)
+                 || !pas.entree.etapes.some(x => x.type === "etats" && x.cible === "V")));
     verifier("la technique : marquée, aucune fatigue, le tour clos",
              s.combattants.P.techniquesUtilisees.includes("CLASSE_POINTES_GLACE") && s.combattants.P.fatigue === 100 && s.file[0].id === "M3");
     const t = pas.entree.etapes.find(x => x.type === "techniqueClasse");

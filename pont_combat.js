@@ -52,6 +52,45 @@ export const COULEURS = {
     tenebres:  "#b388ff"     // Ténèbres : l'énergie bue, en violet
 };
 
+// LA COULEUR DU CHIFFRE QUI S'ENVOLE (v260, Nico : « rouge pour dégâts
+// physiques, bleu pour attaque magique, blanc pour distorsion mentale, vert
+// clair pour les soins ; pour une attaque qui regroupe plusieurs types de
+// dégâts, dissocie les chiffres de chaque catégorie »). Chaque attaque d'une
+// carte a déjà son étape « degats », donc son chiffre : il prend la couleur de
+// sa nature. La barre sous le pion, elle, garde la sienne (rouge, vert).
+export const COULEURS_CHIFFRE = {
+    physique: "#ff4c4c",
+    magique:  "#4aa8ff",
+    mental:   "#ffffff",
+    brut:     "#ff4c4c",
+    soin:     "#8cf08c"
+};
+// Les tics de fin de manche disent leur nature par leur nom : la brûlure ronge
+// en magique, le saignement en physique, le poison et la vieille plaie en brut.
+const NATURE_DU_TIC = {
+    "Brûlure": "magique", "Saignement": "physique", "Hémorragie interne": "physique",
+    "Empoisonnement": "brut", "Plaie rouverte": "brut", "Ténèbres étalées": "magique"
+};
+export function natureDuChiffre(e, etat) {
+    if (!e) return "physique";
+    if (e.nature) return e.nature;
+    if (e.tenebres) return "magique";
+    if (e.tic === "Étalement") {
+        // La nature que l'étalement a rangée avec ses parts (moteur_pur.js).
+        const c = combattantDe(etat, e.cible);
+        const etale = c && (c.etats || []).find(x => x && x.nom === "Étalement");
+        return (etale && etale.nature) || "physique";
+    }
+    if (e.tic) return NATURE_DU_TIC[e.tic] || "brut";
+    if (e.zone) {
+        const z = etat && etat.zones && etat.zones[e.zone];
+        const t = z && z.degats && z.degats.typeRes;
+        return t === "Magique" ? "magique" : t === "Brut" ? "brut" : "physique";
+    }
+    return "physique";
+}
+export const couleurDuChiffre = (e, etat) => COULEURS_CHIFFRE[natureDuChiffre(e, etat)] || COULEURS.degats;
+
 // Le rythme. Il est ici, en un seul endroit, pour qu'on puisse le régler sans
 // aller fouiller dans six fichiers — et pour qu'un banc puisse vérifier qu'une
 // animation ne rend pas la main avant d'avoir été vue.
@@ -130,6 +169,8 @@ function reactionAuCoup(e, champ) {
     if (e.nature === "physique" || e.nature === "magique" || e.nature === "brut") {
         return { reaction: { sorte: "coup-" + e.nature, pion: e.cible, depuis, ...chute } };
     }
+    // La Distorsion mentale (v260) frappe brut : le coup reçu du brut.
+    if (e.nature === "mental") return { reaction: { sorte: "coup-brut", pion: e.cible, depuis, ...chute } };
     // Un coup sans nature connue (une zone, un poison) qui abat : garder le pion.
     return chute.chute ? { reaction: { sorte: "retenir", pion: e.cible, chute: true } } : {};
 }
@@ -273,11 +314,12 @@ const SCENES = {
                    : {}) };
     },
     etatRate(e) {
-        // Une immunité de peuple n'est pas un jet manqué : c'est écrit sur la
-        // fiche, pas dans les dés. Le mot doit le dire, sans quoi un joueur
-        // qui teste sans arrêt le même état sur un Ankylar croira à une
-        // longue série de chance.
-        const texte = e.immunise ? `${e.nom || "État"} : immunisé` : `${e.nom || "État"} résisté`;
+        // Une immunité (le talent Immunisé, ou un journal d'avant la v260)
+        // n'est pas un jet manqué : le mot le dit. Une cible qui RÉSISTE à cet
+        // état (v260 : −25 % de chance) le dit aussi, avec son bouclier.
+        const texte = e.immunise ? `${e.nom || "État"} : immunisé`
+                    : e.resiste ? `🛡️ ${e.nom || "État"} résisté`
+                    : `${e.nom || "État"} résisté`;
         return { geste: "message", pion: e.cible, texte,
                  couleur: COULEURS.neutre, duree: RYTHME.message };
     },
@@ -345,7 +387,7 @@ const SCENES = {
                  vers: champ === "pv" ? nombre(e.pvApres, c.pv) : nombre(e.bouclierApres, c.bouclier),
                  max: champ === "pv" ? nombre(c.pvMax) : (nombre(c.bouclierMax) || nombre(c.bouclier)),
                  texte,
-                 couleurTexte: champ === "bouclier" ? COULEURS.bouclier : COULEURS.degats,
+                 couleurTexte: champ === "bouclier" ? COULEURS.bouclier : couleurDuChiffre(e, etat),
                  couleurBarre: champ === "bouclier" ? COULEURS.bouclier : COULEURS.degats,
                  bouclierBrise: !!e.bouclierBrise,
                  critique: !!e.critique,
@@ -370,7 +412,7 @@ const SCENES = {
         return { geste: "jauge", pion: e.cible, champ: "pv",
                  de: nombre(c.pv), vers: nombre(e.pvApres, c.pv), max: nombre(c.pvMax),
                  texte: `+${Math.max(0, montant)}${e.drain ? " 🩸" : ""}${e.critique ? " !" : ""}`,
-                 couleurTexte: COULEURS.soin, couleurBarre: COULEURS.soin,
+                 couleurTexte: COULEURS_CHIFFRE.soin, couleurBarre: COULEURS.soin,
                  duree: RYTHME.jauge,
                  ...(sorte ? { reaction: { sorte, pion: e.cible, depuis: e.acteur && e.acteur !== e.cible ? e.acteur : null } } : {}) };
     },

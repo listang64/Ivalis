@@ -37,12 +37,14 @@ console.log("\n2. PLUS D'ÉNERGIE : LA VIE, ×1,5");
     verifier("un critique double avant : 20 → 30", crit.degats === 30, `${crit.degats}`);
 }
 
-console.log("\n3. LE MALUS DE TIR : SEULEMENT SUR LA CIBLE AU CONTACT");
+console.log("\n3. LE MALUS DE TIR : SEULEMENT POUR UN TIREUR ENGAGÉ (v260)");
 {
     const tir = { valeurBrute: 10, typeRes: "Physique", isRanged: true };
     const sansArmure = cible({ def: { esquive: 0, parade: 0, physique: 0, magique: 0, critique: 0 } });
-    verifier("tir sur la cible au contact : -30 % (7)", chaineDeDegats(sansArmure, tir, { distance: 1 }).degats === 7);
-    verifier("tir sur une cible à 2 cases : plein (10)", chaineDeDegats(sansArmure, tir, { distance: 2 }).degats === 10);
+    verifier("engagé, tir sur la cible au contact : -30 % (7)", chaineDeDegats(sansArmure, tir, { distance: 1, engage: true }).degats === 7);
+    verifier("engagé, tir sur une cible à 2 cases : -15 % (8)", chaineDeDegats(sansArmure, tir, { distance: 2, engage: true }).degats === 8);
+    verifier("pas engagé : plein au contact comme de loin (10)", chaineDeDegats(sansArmure, tir, { distance: 1 }).degats === 10
+             && chaineDeDegats(sansArmure, tir, { distance: 2 }).degats === 10);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

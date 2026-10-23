@@ -90,8 +90,10 @@ console.log("\n1. LES PALIERS, ET LES VARGENS");
     const a1 = w.atoutRace(vampire(1)), a5 = w.atoutRace(vampire(5)), a10 = w.atoutRace(vampire(10));
     // v237 (Nico) : « son malus au feu niv.1 remplacé par +20 % de chance de
     // brûler sur les sorts qu'il reçoit et qui brûlent ».
-    verifier("niveau 1 : +10 résistance physique, +20 % d'être Brûlé, insensible au gel — plus de case gratuite",
-             a1.defPhysique === 10 && a1.brulureFacile === 20 && !a1.brulureAggravee && JSON.stringify(a1.immunites) === '["Glacé"]' && !a1.premierPasGratuit,
+    // v260 : plus d'immunité — il RÉSISTE au gel (−25 % de chance, −15 % des sorts de Glace).
+    verifier("niveau 1 : +10 résistance physique, +20 % d'être Brûlé, résiste au gel — plus de case gratuite",
+             a1.defPhysique === 10 && a1.brulureFacile === 20 && !a1.brulureAggravee && JSON.stringify(a1.resistances) === '["Glacé"]'
+             && !(a1.immunites || []).length && !a1.premierPasGratuit,
              JSON.stringify(a1));
     verifier("niveau 5 : le Baiser du vampire (technique), plus de Vampirisme dans la Forge",
              JSON.stringify(a5.techniques) === '["CLASSE_BAISER_VAMPIRE"]' && !(a5.effets || []).length, JSON.stringify(a5));
@@ -108,14 +110,14 @@ console.log("\n1. LES PALIERS, ET LES VARGENS");
     verifier("…mais peut être autre chose, et les autres peuples peuvent être Vampire",
              !w.classeInterditeA("Vargen", "Assassin") && !w.classeInterditeA("Humain", "Vampire") && !w.classeInterditeA("Ondari", "Vampire"));
     verifier("chaque atout du Vampire s'écrit en clair",
-             /\+20 % de chance d'être Brûlé/.test(w.texteAtout("brulureFacile", 20)) && /Glacé/.test(w.texteAtout("immunites", ["Glacé"])),
-             w.texteAtout("brulureFacile", 20) + " | " + w.texteAtout("immunites", ["Glacé"]));
+             /\+20 % de chance d'être Brûlé/.test(w.texteAtout("brulureFacile", 20)) && /Résiste.*Glacé/.test(w.texteAtout("resistances", ["Glacé"])),
+             w.texteAtout("brulureFacile", 20) + " | " + w.texteAtout("resistances", ["Glacé"]));
     const e = monde(1);
     verifier("en combat : 10 de résistance physique de plus qu'un héros sans classe",
              e.combattants.V.def.physique - e.combattants.H.def.physique === 10,
              `${e.combattants.V.def.physique} / ${e.combattants.H.def.physique}`);
-    verifier("…et ses atouts dans le combattant (feu facile, insensible au gel)",
-             e.combattants.V.atouts.brulureFacile === 20 && !e.combattants.V.atouts.brulureAggravee && e.combattants.V.atouts.immunites.includes("Glacé")
+    verifier("…et ses atouts dans le combattant (feu facile, résiste au gel)",
+             e.combattants.V.atouts.brulureFacile === 20 && !e.combattants.V.atouts.brulureAggravee && (e.combattants.V.atouts.resistances || []).includes("Glacé")
              && !e.combattants.V.atouts.premierPasGratuit && !e.combattants.H.atouts.brulureFacile);
 }
 
@@ -147,7 +149,7 @@ console.log("\n2. LE FEU LE PREND PLUS FACILEMENT (v237) — ET NE LE RONGE PLUS
     verifier("sans brûlure : rien de tout ça", regleDesEtats(sain.combattants.V, "soinsRecus") === 0);
 }
 
-console.log("\n3. INSENSIBLE AU GEL (LA PREMIÈRE CASE GRATUITE EST RETIRÉE)");
+console.log("\n3. RÉSISTE AU GEL (LA PREMIÈRE CASE GRATUITE EST RETIRÉE)");
 {
     const e = monde(1);
     const V = e.combattants.V, H = e.combattants.H;
@@ -156,8 +158,17 @@ console.log("\n3. INSENSIBLE AU GEL (LA PREMIÈRE CASE GRATUITE EST RETIRÉE)");
         attaques: [{ valeurBrute: 1, typeRes: "Magique", cibles: ["V", "A"] }],
         alterations: [{ nom: "Glacé", chance: 100, duree: 2, cibles: ["V", "A"] }],
         jets: { attaqueRatee: false, parCible: { V: { esquive: false, etats: { "Glacé": true } }, A: { esquive: false, etats: { "Glacé": true } } } } });
-    verifier("le Vampire n'est jamais Glacé", !glacer.etat.combattants.V.etats.some(x => x.nom === "Glacé")
-             && glacer.etapes.some(x => x.type === "etatRate" && x.cible === "V" && x.immunise), JSON.stringify(glacer.etat.combattants.V.etats));
+    // v260 : la résistance retire 25 points dans le dé (chanceEtatDe) ; un jet
+    // qui passe quand même le glace, un jet raté le dit « résisté ».
+    verifier("sa chance d'être Glacé : 100 → 75, 40 → 15", chanceEtatDe(e.combattants.M1, { nom: "Glacé", chance: 100 }, V) === 75
+             && chanceEtatDe(e.combattants.M1, { nom: "Glacé", chance: 40 }, V) === 15 && chanceEtatDe(e.combattants.M1, { nom: "Glacé", chance: 40 }, H) === 40);
+    verifier("un jet qui passe malgré tout : le Vampire est Glacé", glacer.etat.combattants.V.etats.some(x => x.nom === "Glacé"),
+             JSON.stringify(glacer.etat.combattants.V.etats));
+    const rate = resoudreCarte(monde(1), { type: "carte", idLanceur: "M1", idCarte: "G", critique: false, attaques: [],
+        alterations: [{ nom: "Glacé", chance: 40, duree: 2, cibles: ["V"] }],
+        jets: { attaqueRatee: false, parCible: { V: { esquive: false, etats: { "Glacé": false } } } } });
+    verifier("un jet raté : « résisté », sans immunité", !rate.etat.combattants.V.etats.some(x => x.nom === "Glacé")
+             && rate.etapes.some(x => x.type === "etatRate" && x.cible === "V" && x.resiste && !x.immunise));
     verifier("un allié, lui, l'est", glacer.etat.combattants.A.etats.some(x => x.nom === "Glacé"));
 }
 
@@ -396,7 +407,7 @@ console.log("\n7. LA GRILLE DES CLASSES : LE VAMPIRE GRISÉ POUR UN VARGEN");
            !r.apresClic.ficheOuverte && /Vargens ne peuvent pas être Vampire/.test(r.apresClic.message || ""), JSON.stringify(r.apresClic));
   verifier("Humain : rien de grisé, la fiche s'ouvre", !r.humain.grisee && JSON.stringify(r.fiche.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]');
   verifier("la fiche dit le feu, le gel, le Baiser (25 %, 60 %) et la Nuée à 40 % — plus la case gratuite ni le Vampirisme",
-           /\+20 % de chance d'être Brûlé/.test(r.fiche.texte) && /Gel/.test(r.fiche.texte) && /Baiser du vampire/.test(r.fiche.texte) && /25 %/.test(r.fiche.texte)
+           /\+20 % de chance d'être Brûlé/.test(r.fiche.texte) && /Résiste au gel/.test(r.fiche.texte) && /Baiser du vampire/.test(r.fiche.texte) && /25 %/.test(r.fiche.texte)
            && /60 %/.test(r.fiche.texte) && /Nuée/.test(r.fiche.texte) && /40 %/.test(r.fiche.texte)
            && !/première case/.test(r.fiche.texte) && !/Vampirisme/.test(r.fiche.texte));
   verifier("le message ne traîne pas sur la fiche suivante", r.fiche.messageCache);

@@ -270,11 +270,12 @@ console.log("\n8. LE NOYAU : UNE CRÉATURE INSENSIBLE AU GEL N'ENCAISSE MOINS QU
       alterations: [], jets: { attaqueRatee: false, parCible: { M1: { esquive: false, etats: {} } } } });
     return 400 - r.etat.combattants.M1.pv;
   };
-  const immunites = (e.combattants.M1.atouts || {}).immunites || [];
+  // v260 : une résistance (plus une immunité), et −15 % au lieu de −20 %.
+  const resistances = (e.combattants.M1.atouts || {}).resistances || [];
   const [feu, glace] = (extraits.DEUX.attaques || []).map(x => ({ element: x.element, etatElement: x.etats && x.etats[0], etatsElements: x.etats }));
   const total = frappe([feu, glace]);
-  verifier("la créature résiste bien au gel", immunites.includes("Glacé"), JSON.stringify(immunites));
-  verifier("Feu 100 + Glace 100 − 20 % = 180 (la boule de feu passe en entier)", total === 180, String(total));
+  verifier("la créature résiste bien au gel", resistances.includes("Glacé"), JSON.stringify(resistances));
+  verifier("Feu 100 + Glace 100 − 15 % = 185 (la boule de feu passe en entier)", total === 185, String(total));
 }
 
 verifier("aucune erreur JavaScript pendant tout le banc", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

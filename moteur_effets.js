@@ -1445,13 +1445,9 @@ window.demarrerCiblage = async function(idCarte, options) {
             const elementAct = (act.element && typeof window.elementMagique === "function"
                                 && window.estAttaqueElementaire(effBase.Nom))
                 ? window.elementMagique(act.element) : null;
-            // L'ÉTAT DU CHARISME D'UNE DISTORSION MENTALE (Nico : « tout comme
-            // les attaques magiques qui sont liées à un élément ») : Confusion,
-            // Immobilisation ou Peur, choisi dans la Forge, avec les mêmes 5 %.
-            const etatMentalAct = (act.etatMental && typeof window.etatDistorsion === "function"
-                                   && estDistorsionNom(effBase.Nom))
-                ? window.etatDistorsion(act.etatMental) : null;
-            const lienAct = elementAct || etatMentalAct;
+            // (La Distorsion mentale n'a plus d'état du charisme lié depuis la
+            // v260 : un `etatMental` resté sur une carte d'avant est ignoré.)
+            const lienAct = elementAct;
             const chanceOfferte = (etat) => (lienAct && lienAct.etat === etat)
                 ? (window.CHANCE_ELEMENT_OFFERTE || 5) : 0;
             const dureeOfferte = () => {
@@ -1706,11 +1702,15 @@ window.demarrerCiblage = async function(idCarte, options) {
                     ...(estTenebres ? { versEnergie: true } : {}),
                     // La part de ce que la carte inflige qui soigne le lanceur.
                     ...(estVampirisme ? { vampirisme: window.PART_VAMPIRISME || 70 } : {}),
+                    // LA DISTORSION MENTALE (v240, ex-Mots de pouvoir) frappe BRUT
+                    // depuis la v260 (Nico) : ni armure, ni absorption, et la
+                    // cible ne peut ni l'esquiver ni la parer (moteur_pur.js).
+                    ...(estDistorsionNom(effBase.Nom) && !isHeal ? { distorsion: true, brut: true } : {}),
                     // Un sort de lumière : il ne vaut que sur des dégâts magiques.
                     ...(chanceLumiere > 0 && typeRes === "Magique" && !isHeal
                         ? { chanceLumiere: Math.min(100, chanceLumiere), iconeAveugle: ICONE_AVEUGLE } : {}),
                     // L'élément d'une Attaque Magique (Feu, Foudre, Glace) et
-                    // l'état qui va avec : qui y est insensible en prend 20 %
+                    // l'état qui va avec : qui y résiste en prend 15 % (v260)
                     // de moins (chaineDeDegats, moteur_pur.js).
                     ...(elementAct && !isHeal ? { element: elementAct.id, etatElement: elementAct.etat } : {}),
                     cibles: []
@@ -2408,7 +2408,7 @@ window.demarrerCiblage = async function(idCarte, options) {
     // UN SORT À PLUSIEURS ÉLÉMENTS (Nico) : l'élément choisi pour l'Attaque
     // Magique, plus chaque état élémentaire que la carte pose aussi (une
     // Attaque de Feu qui glace et électrifie est Feu, Glace et Foudre). La
-    // réduction d'un insensible se partage : −20 % × insensibles ÷ éléments
+    // réduction d'un résistant se partage : −15 % × résistés ÷ éléments (v260)
     // (chaineDeDegats, moteur_pur.js). L'état offert de l'élément est toujours
     // parmi les altérations : l'élément choisi compte donc toujours.
     //
@@ -3115,6 +3115,10 @@ window.dessinerAnneauxCiblage = function() {
     const soiSeulement = window.phaseSurSoiSeulement(phase);
     // Le Sorcier ne perd rien au contact (sortsSansMalusContact) : pas d'étiquette « -30% ».
     const sansMalusContact = !!(typeof window.atoutRace === "function" && (window.atoutRace(lanceurData) || {}).sortsSansMalusContact);
+    // L'ENGAGEMENT (v260) : le malus d'un tir ne vaut que si le lanceur est
+    // engagé — −30 % au contact, −15 % sur une cible éloignée (malusTirEngage,
+    // moteur_pur.js). L'étiquette le dit sur chaque cible.
+    const lanceurEngage = typeof window.estEngageCombat === "function" && window.estEngageCombat(idLanceur);
 
     const ciblesValides = new Set();
     for (let idToken in window.TOKENS_VTT_DATA) {
@@ -3181,11 +3185,12 @@ window.dessinerAnneauxCiblage = function() {
             }
 
             let malusLabel = anneau.querySelector(".malus-cac");
-            if (configSort.isRanged && dist === 1 && phase.attaques.length > 0 && !configSort.isHeal && !sansMalusContact) {
+            const malusTir = (configSort.isRanged && lanceurEngage && phase.attaques.length > 0 && !configSort.isHeal && !sansMalusContact)
+                ? (dist === 1 ? 30 : 15) : 0;
+            if (malusTir > 0) {
                 if (!malusLabel) {
                     malusLabel = document.createElement("div");
                     malusLabel.className = "malus-cac";
-                    malusLabel.innerText = "-30% Dégâts";
                     malusLabel.style.position = "absolute";
                     malusLabel.style.top = "-20px";
                     malusLabel.style.left = "50%";
@@ -3197,6 +3202,7 @@ window.dessinerAnneauxCiblage = function() {
                     malusLabel.style.whiteSpace = "nowrap";
                     anneau.appendChild(malusLabel);
                 }
+                malusLabel.innerText = `-${malusTir}% Dégâts`;
             } else if (malusLabel) {
                 malusLabel.remove();
             }

@@ -8,6 +8,8 @@
 //      partageaient la même place sous le pion)
 //   4. « Quand on fait un critique, l'étalement de dégâts prend le critique en
 //      compte. » (c'était déjà le calcul ; l'écran disait « -0 ! »)
+//      v260 : RETOURNÉ par Nico — « étalement des dégâts et soins : pas de
+//      critique possible ». La section 4 vérifie désormais l'inverse.
 //   5. « Sur iPad Air, quand je déplace la caméra, j'ai des sortes de traits. »
 //   6. « Je n'ai plus qu'un seul perso debout, j'ai choisi ma compétence, et
 //      pourtant il me met en attente des joueurs ; le perso mort a disparu de
@@ -81,7 +83,7 @@ console.log("\n2. LA RÉGÉNÉRATION DE FIN DE MANCHE : TOUS EN MÊME TEMPS");
              && etatFinal.combattants.C.fatigue === 80, JSON.stringify(etatFinal.combattants));
 }
 
-console.log("\n4. LE CRITIQUE ET L'ÉTALEMENT");
+console.log("\n4. LE CRITIQUE ET L'ÉTALEMENT (v260 : un étalement ne critique plus)");
 {
     const monde = () => construireEtatCombat({ idPartie: "P1", cerveau: "P_03", graine: 7,
         combattants: [fiche("H1", "Allié", { idJoueur: "P_03" }), fiche("M1", "Ennemi", { estMonstre: true })],
@@ -101,13 +103,13 @@ console.log("\n4. LE CRITIQUE ET L'ÉTALEMENT");
     const normal = etale(false), crit = etale(true);
     const parts = (x) => x.parts;
     verifier("le calcul : 10 étalés sur 2 tours → 5 et 5", parts(normal) === "[5,5]", parts(normal));
-    verifier("le calcul : sur un critique → 10 et 10", parts(crit) === "[10,10]", parts(crit));
-    verifier("au lancement : plus de « -0 ! », ce qui est rangé (« ⏳ -20 ! »)",
-             crit.scene.texte === "⏳ -20 !" && crit.scene.geste === "message", `${crit.scene.geste} « ${crit.scene.texte} »`);
+    verifier("le calcul : « critique » → toujours 5 et 5 (v260)", parts(crit) === "[5,5]", parts(crit));
+    verifier("au lancement : ce qui est rangé, sans « ! » (« ⏳ -10 »)",
+             crit.scene.texte === "⏳ -10" && crit.scene.geste === "message", `${crit.scene.geste} « ${crit.scene.texte} »`);
     verifier("…et sans critique, « ⏳ -10 »", normal.scene.texte === "⏳ -10", `« ${normal.scene.texte} »`);
     verifier("le coup porté se voit encore (son geste)", !!(crit.scene.reaction && /^coup-/.test(crit.scene.reaction.sorte)),
              JSON.stringify(crit.scene.reaction));
-    verifier("à chaque fin de manche, la part critique le redit (« -10 ! »)", crit.texteTic === "-10 !", `« ${crit.texteTic} »`);
+    verifier("à chaque fin de manche, une part ordinaire (« -5 »)", crit.texteTic === "-5", `« ${crit.texteTic} »`);
     verifier("une part ordinaire reste « -5 »", normal.texteTic === "-5", `« ${normal.texteTic} »`);
     const soin = (() => {
         const e0 = monde(); e0.combattants.M1.pv = 20;
@@ -116,7 +118,7 @@ console.log("\n4. LE CRITIQUE ET L'ÉTALEMENT");
         const s = tics.find(e => e.type === "soin");
         return s ? PC.misEnScene(s, r.etat).texte : "";
     })();
-    verifier("un soin étalé critique : « +10 ! » à chaque part", soin === "+10 !", `« ${soin} »`);
+    verifier("un soin étalé « critique » : « +5 » à chaque part (v260)", soin === "+5", `« ${soin} »`);
 }
 
 console.log("\n8a. LE TABLEAU DES MONSTRES JUSQU'AU COMBAT (le cerveau)");

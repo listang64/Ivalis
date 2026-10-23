@@ -2,15 +2,15 @@
 //
 // Reprend, sous le régime cerveau, ce qu'atouts_races.mjs vérifiait sections
 // 2 à 4 via l'ancien jouerAnimationMoteur (supprimé à la grande suppression) :
-// résistances de peuple appliquées dans une vraie frappe, immunités qui
-// bloquent une altération même imposée par un critique, et bonus de soin
+// résistances de peuple appliquées dans une vraie frappe, résistances aux
+// états (des immunités jusqu'à la v260 : −25 % de chance), et bonus de soin
 // reçu. Les VRAIES formules (app.js, table ATOUTS_RACES incluse) sont
 // injectées comme `regles`, exactement comme le fait etatDepuisLeJeu
 // (combat_etat.js) en jeu réel — jamais une imitation de ces pourcentages.
 import fs from 'fs';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 import { construireEtatCombat, clonerEtat } from '../combat_etat.js';
-import { resoudreCarte } from '../moteur_pur.js';
+import { resoudreCarte, chanceEtatDe } from '../moteur_pur.js';
 import { resoudreOpportunite, DEGATS_OPPORTUNITE } from '../mouvement_pur.js';
 
 const w = {};
@@ -64,8 +64,11 @@ console.log("\n1. LES RÉSISTANCES À L'ŒUVRE DANS UNE FRAPPE");
 }
 
 // =========================================================================
-console.log("\n2. LES IMMUNITÉS, MÊME SUR UN CRITIQUE (qui impose l'état sans jet)");
+console.log("\n2. LES RÉSISTANCES (v260 : plus d'immunité, −25 % de chance)");
 // =========================================================================
+//  Les immunités de peuple sont devenues des résistances (Nico, v260) : le
+//  jet de la carte décide, avec 25 points de chance en moins — un jet réussi
+//  pose l'état, même sur un Ondari.
 {
     const empoisonner = (race, nomEtat) => resoudreCarte(etatAvec(race), {
         type: "carte", idLanceur: "LANCEUR", idCarte: "C1", critique: true,
@@ -76,16 +79,18 @@ console.log("\n2. LES IMMUNITÉS, MÊME SUR UN CRITIQUE (qui impose l'état sans
 
     verifier("un Humain attrape bien le poison",
              empoisonner("Humain", "Empoisonnement").includes("Empoisonnement"));
-    verifier("l'Éthéré est immunisé au poison",
-             !empoisonner("Ethéré", "Empoisonnement").includes("Empoisonnement"));
+    const chance = (race, nomEtat) => chanceEtatDe(etatAvec(race).combattants.LANCEUR, { nom: nomEtat, chance: 50 }, etatAvec(race).combattants.CIBLE);
+    verifier("l'Éthéré résiste au poison : 50 % → 25 %, un jet réussi le prend",
+             chance("Ethéré", "Empoisonnement") === 25 && empoisonner("Ethéré", "Empoisonnement").includes("Empoisonnement"));
     verifier("un Humain attrape bien la brûlure",
              empoisonner("Humain", "Brûlé").includes("Brûlé"));
-    verifier("l'Ondari est immunisé à la brûlure",
-             !empoisonner("Ondari", "Brûlé").includes("Brûlé"));
+    verifier("l'Ondari résiste à la brûlure : 50 % → 25 %, un jet réussi le prend",
+             chance("Ondari", "Brûlé") === 25 && empoisonner("Ondari", "Brûlé").includes("Brûlé"));
     verifier("un Humain se fait étourdir normalement",
              empoisonner("Humain", "Étourdi").includes("Étourdi"));
-    verifier("l'Ankylar est immunisé à l'Étourdi",
-             !empoisonner("Ankylar", "Étourdi").includes("Étourdi"));
+    verifier("l'Ankylar résiste à l'Étourdi : 50 % → 25 %, un jet réussi le prend",
+             chance("Ankylar", "Étourdi") === 25 && empoisonner("Ankylar", "Étourdi").includes("Étourdi"));
+    verifier("un Humain, lui, garde ses 50 %", chance("Humain", "Étourdi") === 50);
 }
 
 // =========================================================================

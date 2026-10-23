@@ -64,9 +64,10 @@ console.log("\n1. CHAQUE ATOUT A SA PHRASE");
     const sansPhrase = [...cles.entries()].filter(([k, v]) => w.texteAtout(k, v).startsWith(k + " :"));
     verifier(`les ${cles.size} sortes d'atouts existantes sont toutes écrites en clair`, sansPhrase.length === 0,
              sansPhrase.map(([k]) => k).join(", "));
-    verifier("exemples : esquive, immunités, technique",
-             w.texteAtout("esquive", 3) === "+3 % d'esquive" && w.texteAtout("immunites", ["Glacé"]) === "Insensible : Glacé (−20 % des sorts de Glace)"
-             && w.texteAtout("immunites", ["Étourdi"]) === "Insensible : Étourdi"
+    // (v260 : plus d'immunité — des résistances, −25 % de chance ; −15 % des sorts de l'élément.)
+    verifier("exemples : esquive, résistances, technique",
+             w.texteAtout("esquive", 3) === "+3 % d'esquive" && w.texteAtout("resistances", ["Glacé"]) === "Résiste (−25 % de chance) : Glacé (−15 % des sorts de Glace)"
+             && w.texteAtout("resistances", ["Étourdi"]) === "Résiste (−25 % de chance) : Étourdi"
              && /Technique : Mur de bouclier/.test(w.texteAtout("techniques", ["CLASSE_MUR_BOUCLIER"])));
     verifier("un atout inconnu se montre tel quel, plutôt que caché", w.texteAtout("nouveau", 4) === "nouveau : 4");
 }

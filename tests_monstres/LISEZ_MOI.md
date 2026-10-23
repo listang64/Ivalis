@@ -7446,3 +7446,90 @@ Nico déjà repris, le mauvais mot de passe, le changement de mot de passe,
 l'oubli (l'e-mail part), la déconnexion — 71 contrôles. Et avec
 REGLES_OUVERTES=1, la période de transition (la base encore ouverte) : tout
 pareil, la Clé de Rune vérifiée par la page.
+
+## v260 — Distorsion brute, résistances au lieu d'immunités, l'Engagement, les pools des créatures, la couleur des chiffres
+
+Nico, en une liste : la Distorsion mentale en dégâts bruts, sans esquive ni
+parade (et plus de choix d'état) ; l'étalement sans critique ; les zombies
+3 tours, à 2 cases dès le niveau 1 ; les pools des créatures de soutien et des
+mages (60/20/20), les combattants, tanks et tireurs seulement physiques ; la
+couleur des chiffres par type ; les immunités des classes, des peuples et des
+créatures remplacées par une résistance de 25 % sur tous les états ; un effet
+« Engagé » avec ses flèches ; −15 % au tir de loin quand on est engagé, et le
+−30 % au contact seulement si on est engagé ; un engageur étourdi ou confus
+n'engage plus. Ses réponses : les peuples aussi ; « résister au brûler =
+−25 % de chance d'être brûlé ET −15 % de dégâts des sorts de Feu, −15 % aussi
+pour les autres » ; une attaque esquivée ou parée engage quand même.
+
+- LA DISTORSION MENTALE (moteur_pur.js, moteur_effets.js) : `distorsion` +
+  `brut` sur l'attaque. Ni armure, ni esquive, ni parade : le jet de défense
+  de la carte la saute, la cible la prend entière (l'anti-magie non plus ne
+  l'arrête pas). La popup des états du charisme disparaît de la Forge
+  (competences.js) et de la LIA (lia_forge.js : plus d'`etat_mental`) ; une
+  technique d'avant qui en porte un n'en tient plus compte. Grimoire à jour.
+- L'ÉTALEMENT NE CRITIQUE PAS : une carte toute en étalement (dégâts ou soins)
+  ne tire jamais le critique (carteToutEtalee, cerveau_combat.js) ; et dans
+  une carte mixte, la part étalée n'est jamais doublée (chaineDeDegats, soins).
+- LES ZOMBIES (combat_etat.js, app.js, classes.js) : 3 tours au lieu de 4 ;
+  le rayon de 2 cases passe au niveau 1 (rayonZombies sur le palier 1 seul,
+  puisque les atouts s'additionnent), le niveau 10 garde le sursis.
+- LES CRÉATURES (monstres_competences.js) :
+  · une VOIE tirée à la fabrication, écrite sur la créature (Voie_Magique) :
+    combattant, tank et tireur → « physique » : ni Attaque Magique, ni
+    Distorsion, ni Brûlé/Électrifié/Glacé ; les mages → 60 % intelligence
+    (Attaque Magique, jamais de Distorsion), 20 % charisme (Distorsion, jamais
+    d'Attaque Magique, les états du charisme en tête), 20 % mixte (une carte
+    sur deux) — PART_VOIES_MAGES, réglable ;
+  · LE SOUTIEN : un patron « defense » (Bouclier, Contre ou Absorption, parfois
+    deux), un « faible » (petite attaque, dans la tranche la moins chère), deux
+    « soutien » (un vrai Soin, souvent avec une Purification), un
+    « soutienZone » (soin de zone), un « etat ».
+- LA COULEUR DES CHIFFRES (pont_combat.js) : rouge physique, bleu magique,
+  blanc Distorsion mentale, vert clair pour les soins. Chaque étape de dégâts
+  porte sa `nature` (natureDuCoup) : une carte qui mêle plusieurs types sort
+  un chiffre par catégorie, chacun dans sa couleur. Les tics d'étalement
+  gardent la nature de la carte d'origine.
+- LES RÉSISTANCES (moteur_pur.js, app.js, monstres.js) : plus aucune
+  immunité. Résister à un état retire 25 points à sa chance (chanceFaceA) —
+  dans le dé de la carte, des zones, de la Lumière, d'Appel, du Charme, du Tir
+  précis, de la Résonance ; même un « à coup sûr » (critique) passe à 75 %.
+  Un jet sauvé par la seule résistance le dit : « 🛡️ Brûlé résisté ».
+  Résister au Brûlé, à l'Électrifié ou au Glacé retire aussi 15 % des sorts
+  de l'élément (×résistés ÷ éléments du sort). Peuples (Ankylar, Ondari,
+  Éthéré), Vampire (le gel) : `resistances` au lieu d'`immunites` (un ancien
+  champ est relu comme résistance). Les créatures : 1 (Normal), 2 (Élite),
+  3 (Boss) tirées parmi TOUS les états (ETATS_RESISTIBLES : Provocation,
+  Saignement, Empoisonnement… compris) — Resistances_Etats ; une créature
+  d'avant garde ses Resistances_Elementaires, une plus ancienne les reçoit de
+  son identifiant. L'encart du tour les montre ; la fiche écrit « Résiste
+  (−25 % de chance) : … (−15 % des sorts de …) ».
+- L'ENGAGEMENT (moteur_pur.js, combat.js, style.css, moteur_effets.js) :
+  toute attaque AU CONTACT d'un ennemi (pas un tir, pas un soin, morsure de
+  zombie comprise) pose « Engagé » sur sa cible pour la manche, avec QUI
+  l'engage (`par`) — même esquivée ou parée. Un engageur à terre, étourdi ou
+  confus n'engage plus, tant qu'il l'est. Un tireur engagé perd 30 % sur une
+  cible au contact, 15 % sur une cible éloignée ; non engagé, rien (le Sorcier
+  n'a jamais de malus). Le ciblage affiche « -30% Dégâts » / « -15% Dégâts »
+  sur chaque cible. Un pion sélectionné montre ses engagements : des flèches
+  courbes rouges semi-transparentes, une lueur et un flux, de chaque engageur
+  vers lui (#svg-engagements).
+
+corrections_v260.mjs (dans la suite), sur le vrai moteur et le vrai
+générateur : la Distorsion brute (à travers 50 % de défense et 100 %
+d'esquive), sans popup ni état ; l'étalement jamais doublé ; les zombies
+(3 tours, 2 cases au niveau 1) ; les pools (aucune magie chez les physiques,
+les trois voies des mages, le soutien et sa défense, sa petite attaque, ses
+soins) ; les couleurs et les chiffres dissociés ; les résistances (peuples,
+Vampire, créatures, tous les états, le −15 %, le critique à 75 %, les zones,
+les techniques) ; l'engagement (posé, même esquivé, levé par l'Étourdi et la
+Confusion, tombé en fin de manche, −30/−15 %, seulement engagé, le Sorcier) ;
+les versions. Il mord sur l'ancien code (68 échecs).
+
+Les anciens bancs qui vérifiaient les règles d'avant (immunités, −20 %,
+−30 % sans engagement, choix d'état de la Distorsion, rayon des zombies au
+niveau 10, 4 tours, critique d'un étalement) ont été remis aux règles v260 :
+atouts_races_cerveau, bonus_race_classe, chasseur_de_mages, corrections_v233,
+v239, v240, v251, v258, cout_et_tir, deux_attaques_magiques,
+elements_magiques, etat_combat, hoplite, moteur_pur, necromancien, pisteur,
+profanateur, sorcier, tenebres_brut, tir_monstre_contact, traction_repartie,
+vampire, zones_cerveau.

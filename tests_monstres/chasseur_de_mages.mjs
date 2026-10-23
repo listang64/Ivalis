@@ -159,11 +159,16 @@ console.log("\n3. LA MAÎTRISE DE LA LUMIÈRE : UN SORT DE FOUDRE AVEUGLE SA CIB
     const esq = monde(1);
     esq.combattants.M1.def.esquive = 100;
     verifier("la cible esquive : pas d'aveuglement", !aveugle(jouer(esq, foudre(), desA(1)).etat.combattants.M1));
+    // v260 : plus d'immunité — une cible qui RÉSISTE à l'Aveuglement retire
+    // 25 points à la Maîtrise : 33 % → 8 %.
     const imm = monde(1);
-    imm.combattants.M1.atouts.immunites = ["Aveuglé"];
-    const ri = jouer(imm, foudre(), desA(1));
-    verifier("une cible immunisée ne l'est pas", !aveugle(ri.etat.combattants.M1)
-             && ri.etapes.some(x => x.type === "etatRate" && x.cible === "M1" && x.immunise));
+    imm.combattants.M1.atouts.resistances = ["Aveuglé"];
+    let nr = 0;
+    const jR9 = tirerDesCarte(imm, foudre(), "C", false, { ...desA(1), d100: () => { nr++; return nr === 2 ? 9 : 1; } });
+    nr = 0;
+    const jR8 = tirerDesCarte(imm, foudre(), "C", false, { ...desA(1), d100: () => { nr++; return nr === 2 ? 8 : 1; } });
+    verifier("une cible qui résiste : 33 % → 8 % (9 au dé : rien ; 8 : aveuglée)",
+             jR9.parCible.M1.lumiereAveugle === false && jR8.parCible.M1.lumiereAveugle === true);
     verifier("un sort de feu : pas d'aveuglement", !aveugle(jouer(monde(10), foudre({ element: "Feu" }), desA(1)).etat.combattants.M1));
     // Une carte de feu ne tire pas un dé de plus.
     let tires = 0;
@@ -230,8 +235,11 @@ console.log("\n3 ter. L'APPEL DE LA LUMIÈRE : TOUT LE PLATEAU AVEUGLÉ");
              [c.M1, c.M2, c.A, c.C].every(x => aveugle(x) && aveugle(x).duree === DUREE_AVEUGLE_LUMIERE && aveugle(x).cases.length === 4));
     verifier("le noir de M2 est autour de M2", aveugle(c.M2).cases.every(h => Math.abs(h.q - 2) <= 1 && Math.abs(h.r + 1) <= 1));
     verifier("le noir du Chasseur est autour de lui", aveugle(c.C).cases.every(h => Math.abs(h.q) <= 1 && Math.abs(h.r) <= 1));
-    verifier("pas un KO, pas un immunisé", !aveugle(c.M4) && !aveugle(c.M3)
-             && pas.entree.etapes.some(x => x.type === "etatRate" && x.cible === "M3"));
+    // v260 : M3 RÉSISTE (ses « immunites » d'avant valent résistance) — un dé
+    // du cerveau, à 75 % : aveuglé, ou le refus dit par une étape.
+    verifier("pas un KO ; qui résiste : un dé à 75 % (aveuglé, ou « résisté » dit)", !aveugle(c.M4)
+             && (aveugle(c.M3) ? !pas.entree.etapes.some(x => x.type === "etatRate" && x.cible === "M3")
+                               : pas.entree.etapes.some(x => x.type === "etatRate" && x.cible === "M3" && x.resiste)));
     verifier("aucune fatigue, une fois par combat", c.C.fatigue === 100 && !validerIntention(enTete(clonerEtat(pas.etat)), appel).ok);
     const rejoue = appliquerEntree(e, pas.entree).combattants;
     verifier("rejoué depuis le journal : mêmes noirs", JSON.stringify(aveugle(rejoue.M2)) === JSON.stringify(aveugle(c.M2)));

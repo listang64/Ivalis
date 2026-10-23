@@ -165,10 +165,13 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         // deux fois moins cher : deux règles qui vivent dans les atouts de race.
         esquiveOpportunite: nombre(race.esquiveOpportunite),
         diviseurDeplacement: nombre(race.diviseurDeplacement, 1) || 1,
-        // Ce à quoi ce peuple ne peut pas être soumis (l'Ondari et le feu,
-        // l'Éthéré et le poison, l'Ankylar et l'Étourdi désormais) : une liste
-        // de noms d'état, lue par le noyau au moment de poser une altération.
-        immunites: Array.isArray(race.immunites) ? race.immunites : [],
+        // Ce à quoi il résiste (l'Ondari au feu, l'Éthéré au poison, l'Ankylar
+        // à l'Étourdi, le Vampire au gel, une créature à ce qu'elle a tiré) :
+        // une liste de noms d'état. Plus d'immunité depuis la v260 — 25 % de
+        // chance en moins de l'attraper (resisteA, chanceEtatDe, moteur_pur.js).
+        // Une fiche d'avant qui dit encore `immunites` y passe aussi.
+        resistances: [...new Set([...(Array.isArray(race.resistances) ? race.resistances : []),
+                                  ...(Array.isArray(race.immunites) ? race.immunites : [])])],
         // L'Ophior reprend des points de vie à chaque fin de manche — la seule
         // race à en avoir, donc le seul atout de ce genre à porter un nombre.
         regenPv: nombre(race.regenPv),
@@ -217,7 +220,7 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         // moteur_pur.js).
         zombies: !!race.zombies,
         glacePhysique: !!race.glacePhysique,
-        // Le rayon où un ennemi qui tombe se relève (1 case ; 2 au niveau 10).
+        // Le rayon où un ennemi qui tombe se relève (2 cases dès le niveau 1, v260).
         rayonZombies: nombre(race.rayonZombies, race.zombies ? 1 : 0),
         degatsOpportunite: nombre(race.degatsOpportunite),
         defenseur: nombre(race.defenseur),
@@ -730,11 +733,11 @@ function recompenserLeTueur(etat, victime, idAuteur, finDeManche) {
 // morsure de 7 physiques, 2 cases de déplacement, en dernier : initiative 0)
 // et ne se relève plus si on la tue de nouveau. Son tour éventuel dans la
 // manche en cours tombe : elle jouera à partir de la suivante.
-// Et elle ne reste sur le terrain que QUATRE TOURS (v258, Nico : « fais que les
-// zombies ne restent sur le terrain que pendant 4 tours ») : chacun de ses
-// tours en retire un (cloturerTour, cerveau_combat.js) ; au bout du quatrième,
-// elle retombe pour de bon.
-export const ZOMBIE = { pv: 15, degats: 7, pas: 2, initiative: 0, tours: 4 };
+// Et elle ne reste sur le terrain que TROIS TOURS (v258 : quatre ; v260, Nico :
+// « les zombies du Profanateur ont 3 tours de vie ») : chacun de ses tours en
+// retire un (cloturerTour, cerveau_combat.js) ; au bout du troisième, elle
+// retombe pour de bon.
+export const ZOMBIE = { pv: 15, degats: 7, pas: 2, initiative: 0, tours: 3 };
 const distanceHexEtat = (a, b) => (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
 export function profanateurPourZombie(etat, victime, idTueur) {
     if (!victime || !victime.estMonstre || victime.estIllusion || victime.zombie || victime.compagnon) return null;
@@ -744,7 +747,7 @@ export function profanateurPourZombie(etat, victime, idTueur) {
     return Object.keys(table).sort().map(k => table[k])
         .find(p => peut(p) && p.q !== null && p.q !== undefined && victime.q !== null && victime.q !== undefined
                    && distanceHexEtat(p, victime) >= 1
-                   // Au niveau 10, deux cases tout autour de lui (rayonZombies).
+                   // Deux cases tout autour de lui dès le niveau 1 (rayonZombies, v260).
                    && distanceHexEtat(p, victime) <= Math.max(1, nombre(p.atouts.rayonZombies, 1))) || null;
 }
 function zombifier(etat, victime, idTueur) {

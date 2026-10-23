@@ -271,19 +271,25 @@ console.log("\n2. RÉINITIALISER LE COMBAT : LES MURS PARTENT TOUT DE SUITE");
 
 console.log("\n3. LE SORCIER N'A PAS L'ÉTIQUETTE « -30% » AU CONTACT");
 {
-  const etiquette = async (classe) => {
+  // (v260 : l'étiquette ne vaut que si le lanceur est ENGAGÉ — attaqué au
+  // contact cette manche, ici par M1.)
+  const etiquette = async (classe, engage = true) => {
     await preparer({ classe, q: 1, sansMurs: true });
-    return p.evaluate(async () => {
+    return p.evaluate(async (engage) => {
+      const s = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === "S");
+      if (s && engage) s.Etats_Alteres = [...(s.Etats_Alteres || []), { nom: "Engagé", duree: 1, par: ["M1"] }];
       await window.demarrerCiblage("C1", { idLanceur: "S" });
       const l = document.querySelector("#token-M1 .malus-cac");
       const texte = l ? l.innerText : null;
       window.nettoyerCiblage();
       return texte;
-    });
+    }, engage);
   };
   const autre = await etiquette("Hoplite");
+  const libre = await etiquette("Hoplite", false);
   const sorcier = await etiquette("Sorcier");
-  verifier("(un tir au contact, pour une autre classe : « -30% Dégâts »)", autre === "-30% Dégâts", String(autre));
+  verifier("(un tir au contact, pour une autre classe engagée : « -30% Dégâts »)", autre === "-30% Dégâts", String(autre));
+  verifier("(…pas engagée : aucune étiquette, v260)", libre === null, String(libre));
   verifier("le Sorcier au contact : aucune étiquette de malus", sorcier === null, String(sorcier));
 }
 
