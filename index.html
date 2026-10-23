@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=90">
+  <link rel="stylesheet" href="style.css?v=91">
 
  
   <!-- ===================================================================== -->
@@ -323,11 +323,14 @@
   </div>
 
   <!-- =========================================================
-       SCENE 2 : IDENTIFICATION
-       ========================================================= -->
+       SCENE 2 : IDENTIFICATION — LA CONNEXION AU COMPTE (v259)
+       =========================================================
+       comptes.js remplit le panneau : se connecter, créer un compte, la
+       demande en attente de Nico ou Ben… Un compte déjà reconnu sur cet
+       appareil est salué, et passe au menu sans rien taper. -->
   <div id="ecran-identification">
-    <h1 class="titre-etranger">QUI ES-TU, ÉTRANGER ?</h1>
-    <div class="conteneur-noms" id="liste-noms-joueurs"></div>
+    <h1 class="titre-etranger">PRÉSENTE-TOI, VOYAGEUR</h1>
+    <div class="panneau-connexion" id="panneau-connexion"></div>
   </div>
 
   <!-- =========================================================
@@ -339,6 +342,14 @@
     <div class="layer brume-proche"></div>
     <!-- NOUVEAU : BOUTON QUITTER EN HAUT À DROITE -->
     <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781472665/exit_rkpaeh.png" id="btn-quitter-accueil" title="Quitter Ivalis" onclick="jouerSonClic(); demanderQuitterJeu()">
+    <!-- LE JOUEUR CONNECTÉ (v259, comptes.js) : son nom, son compte, la
+         déconnexion — et pour Nico et Ben, les demandes d'inscription. -->
+    <div id="barre-compte" class="barre-compte" style="display: none;">
+      <span class="barre-compte-nom">⚜ <b id="barre-compte-nom"></b></span>
+      <button type="button" class="btn-barre-compte" id="btn-demandes" style="display: none;" onclick="jouerSonClic(); ouvrirDemandesInscription()">Demandes d'inscription <span class="pastille-demandes" id="pastille-demandes" style="display: none;">0</span></button>
+      <button type="button" class="btn-barre-compte" id="btn-mon-compte" onclick="jouerSonClic(); ouvrirMonCompte()">Mon compte</button>
+      <button type="button" class="btn-barre-compte" id="btn-se-deconnecter" onclick="jouerSonClic(); seDeconnecter()">Se déconnecter</button>
+    </div>
     <div class="conteneur-boutons">
       <button class="btn-jeu btn-nouvelle" onclick="jouerSonClic(); ouvrirModalNouvellePartie()"></button>
       <button class="btn-jeu btn-charger" onclick="jouerSonClic(); ouvrirModalChargerPartie()"></button>
@@ -368,6 +379,31 @@
       <button class="btn-modale" id="btn-creer-groupe" onclick="jouerSonClic(); validerCreationGroupe()">Créer</button>
       <button class="btn-modale" onclick="jouerSonClic(); fermerModales()">Annuler</button>
     </div>
+  </div>
+
+  <!-- MON COMPTE (v259) -->
+  <div id="modale-compte" class="modale-parchemin modale-compte">
+    <h2>Mon compte</h2>
+    <p class="compte-ligne"><span>Nom</span><b id="compte-nom"></b></p>
+    <p class="compte-ligne"><span>E-mail</span><b id="compte-email"></b></p>
+    <p class="compte-ligne"><span>Rôle</span><b id="compte-role"></b></p>
+    <h3 class="compte-sous-titre">Changer de mot de passe</h3>
+    <form id="form-changer-mdp" class="form-connexion" novalidate>
+      <input type="password" id="compte-mdp-actuel" class="input-parchemin" placeholder="Mot de passe actuel" autocomplete="current-password">
+      <input type="password" id="compte-mdp-nouveau" class="input-parchemin" placeholder="Nouveau mot de passe" autocomplete="new-password">
+      <input type="password" id="compte-mdp-confirmer" class="input-parchemin" placeholder="Confirme le nouveau" autocomplete="new-password">
+      <button type="submit" class="btn-modale">Changer</button>
+    </form>
+    <p class="message-connexion" id="message-compte"></p>
+    <button type="button" class="btn-modale" onclick="jouerSonClic(); fermerModalesCompte()">Fermer</button>
+  </div>
+
+  <!-- LES DEMANDES D'INSCRIPTION (v259) : Nico et Ben seulement. -->
+  <div id="modale-demandes" class="modale-parchemin modale-demandes">
+    <h2>Demandes d'inscription</h2>
+    <div id="liste-demandes"></div>
+    <p class="message-connexion ok" id="message-demandes"></p>
+    <button type="button" class="btn-modale" onclick="jouerSonClic(); fermerModalesCompte()">Fermer</button>
   </div>
 
   <div id="modale-charger" class="modale-parchemin">
@@ -2125,7 +2161,11 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=169"></script>
+<script src="trace_combat.js?v=170"></script>
+<!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
+     soit reconnu. Un script simple, avant tout module, pour que chacun puisse
+     s'y inscrire dès sa première ligne. -->
+<script src="porte_joueur.js?v=1"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2178,9 +2218,11 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=50"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=118"></script>
+<script type="module" src="app.js?v=119"></script>
+<!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
+<script type="module" src="comptes.js?v=1"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
-<script type="module" src="regions_carte.js?v=1"></script>
+<script type="module" src="regions_carte.js?v=2"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=16"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->
@@ -2219,7 +2261,7 @@
 <script type="module" src="mouvement.js?v=40"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
 <script type="module" src="moteur_effets.js?v=99"></script>
-<script type="module" src="monstres.js?v=33"></script>
+<script type="module" src="monstres.js?v=34"></script>
 <script type="module" src="monstres_competences.js?v=27"></script>
 <script type="module" src="monstres_ia.js?v=41"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->

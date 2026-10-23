@@ -144,20 +144,10 @@ body {
 .titre-etranger {
   color: #ffffff;
   font-size: 4vw;
-  margin-bottom: 60px;
+  margin: 0 0 30px;
   letter-spacing: 3px;
   text-align: center;
   text-shadow: 0px 0px 20px rgba(255, 255, 255, 0.5);
-  opacity: 0;
-  transition: opacity 2s ease;
-}
-
-.conteneur-noms {
-  display: flex;
-  gap: 5vw;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
   opacity: 0;
   transition: opacity 2s ease;
 }
@@ -167,24 +157,78 @@ body {
   opacity: 1 !important;
 }
 
-.nom-joueur {
-  color: #87CEFA;
-  font-size: 2.5vw;
+/* LA CONNEXION AU COMPTE (v259, comptes.js) : une carte de parchemin sous le
+   titre, comme les modales du menu. Sur un téléphone tenu debout, l'écran
+   défile plutôt que de couper le formulaire. */
+#ecran-identification { overflow-y: auto; }
+#ecran-identification > * { flex-shrink: 0; }
+.panneau-connexion {
+  width: min(440px, 92vw);
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+.carte-connexion {
+  background-color: #e8d5a5;
+  border: 3px solid #1a1a1a;
+  border-radius: 12px;
+  box-shadow: 0px 15px 30px rgba(0, 0, 0, 0.9);
+  padding: 22px 26px;
+  font-family: 'Georgia', serif;
+  color: #2c1e16;
+  text-align: center;
+}
+.onglets-connexion {
+  display: flex;
+  margin: -6px 0 18px;
+  border-bottom: 2px solid #5c3a21;
+}
+.onglet-connexion {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  padding: 10px 6px;
+  font-family: 'Georgia', serif;
+  font-size: 16px;
+  color: #7a5a3a;
   cursor: pointer;
-  animation: levitation infinite alternate ease-in-out;
-  transition: color 0.3s, text-shadow 0.3s, transform 0.3s;
 }
-
-.nom-joueur:hover {
-  color: #ffffff;
-  text-shadow: 0px 0px 15px #87CEFA;
-  transform: scale(1.1);
+.onglet-connexion.actif { color: #2c1e16; font-weight: bold; border-bottom-color: #4a2e1b; }
+.form-connexion { display: flex; flex-direction: column; align-items: center; }
+.form-connexion.occupe { opacity: 0.7; }
+.champ-connexion {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 14px;
+  color: #5c3a21;
+  letter-spacing: 0.5px;
 }
-
-@keyframes levitation {
-  0% { transform: translateY(0px); }
-  100% { transform: translateY(-20px); }
+.champ-connexion[hidden] { display: none; }
+/* 17 px : en dessous de 16, Safari sur iPad zoome la page à chaque saisie. */
+.champ-connexion .input-parchemin {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 4px 0 12px;
+  text-align: left;
+  font-size: 17px;
 }
+.lien-connexion {
+  background: none;
+  border: none;
+  margin-top: 8px;
+  color: #5c3a21;
+  text-decoration: underline;
+  font-family: 'Georgia', serif;
+  font-size: 14px;
+  cursor: pointer;
+}
+.note-connexion { margin: 0 0 8px; font-size: 13px; font-style: italic; color: #5c3a21; }
+.texte-connexion { margin: 6px 0 12px; font-size: 17px; line-height: 1.45; }
+.message-connexion { margin: 10px 0 0; font-size: 14px; font-weight: bold; color: #8b1a1a; }
+.message-connexion.ok { color: #2f5d1e; }
+.message-connexion:empty { display: none; }
 
 /* --- SCENE 3 : LE MENU PRINCIPAL --- */
 #ecran-menu {
@@ -253,6 +297,50 @@ body {
     z-index: 50;
     filter: drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.8));
     transition: filter 0.3s ease, transform 0.2s ease;
+}
+
+/* LE JOUEUR CONNECTÉ, EN HAUT À GAUCHE DU MENU (v259) */
+.barre-compte {
+  position: absolute;
+  top: 3vh;
+  left: 2vw;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-width: 70vw;
+}
+.barre-compte-nom {
+  margin-right: 6px;
+  color: #f3e2b8;
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-size: 20px;
+  text-shadow: 0 2px 6px #000;
+}
+.btn-barre-compte {
+  background: rgba(30, 18, 10, 0.78);
+  color: #f3e2b8;
+  border: 1px solid #b08a3a;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-family: 'Georgia', serif;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
+  transition: border-color 0.2s, color 0.2s;
+}
+.btn-barre-compte:hover { border-color: #f3d27a; color: #ffffff; }
+.pastille-demandes {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #c41c1c;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: bold;
 }
 
 #btn-quitter-accueil:hover {
@@ -344,6 +432,47 @@ body {
   padding-bottom: 10px;
   margin-bottom: 25px;
 }
+
+/* MON COMPTE ET LES DEMANDES D'INSCRIPTION (v259) */
+.modale-compte, .modale-demandes {
+  width: min(440px, 92vw);
+  box-sizing: border-box;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.compte-ligne {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 0;
+  font-size: 16px;
+  text-align: right;
+}
+.compte-ligne span { color: #5c3a21; text-align: left; }
+.compte-ligne b { word-break: break-all; }
+.compte-sous-titre {
+  margin: 18px 0 10px;
+  padding-top: 14px;
+  border-top: 1px solid #b08a3a;
+  font-size: 18px;
+}
+.modale-compte .input-parchemin { width: 90%; margin-bottom: 10px; }
+.demande-inscription {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #b08a3a;
+  text-align: left;
+}
+.demande-qui { display: flex; flex-direction: column; min-width: 0; }
+.demande-qui span { font-size: 13px; color: #5c3a21; word-break: break-all; }
+.demande-qui i { font-size: 12px; color: #7a5a3a; }
+.demande-boutons { display: flex; flex-shrink: 0; }
+.demande-boutons .btn-modale { padding: 8px 12px; font-size: 13px; }
+.demande-boutons .btn-refuser { background-color: #7a1c1c; }
+.texte-demandes { font-style: italic; }
 
 /* --- LES CHAMPS DE TEXTE --- */
 .input-parchemin {

@@ -7367,3 +7367,82 @@ chute au journal, le rejeu identique, les quatre messages, la mise à terre) ;
 plus de cinquième tour, ni joué ni choisi ; sa fiche à 0 PV ; aucun renfort
 de plus ; le zombie retué ; toute étape du moteur a sa mise en scène ; le
 descriptif et l'atout. Il mord sur l'ancien code (19 échecs).
+
+## v259 — Les comptes des joueurs
+
+Nico : « remplace le "Qui es-tu, étranger ?" par une connexion avec son mail,
+nom d'utilisateur et mot de passe perso et protégé, sans avoir à se reconnecter
+à chaque mise à jour ; les boutons qui vont bien sur le menu principal ;
+enregistre Nico, Ben et Adrien pour que nos persos restent utilisables avec nos
+anciens noms ; et les nouvelles demandes d'inscription, Nico ou Ben doit les
+valider. » Ses réponses : connexion par e-mail ; la Clé de Rune pour reprendre
+un ancien nom ; seuls Nico et Ben valident ; la base fermée aux comptes non
+validés ; « mot de passe oublié » par e-mail ; le mot de passe des Paramètres
+inchangé.
+
+- LE COMPTE, C'EST FIREBASE AUTH (comptes.js, nouveau). L'e-mail et le mot de
+  passe ne passent jamais par nos documents. La session reste sur l'appareil :
+  une mise à jour (un rechargement) ne la touche pas, on n'a plus rien à taper.
+  (Safari efface les données d'un site non ouvert depuis 7 jours, sauf s'il
+  est ajouté à l'écran d'accueil.)
+- L'ÉCRAN DE CONNEXION remplace la liste des noms à toucher (que n'importe qui
+  pouvait toucher à la place d'un autre) : « PRÉSENTE-TOI, VOYAGEUR », une
+  carte de parchemin à deux onglets — Se connecter (e-mail, mot de passe,
+  « Mot de passe oublié ? ») et Créer un compte (e-mail, nom d'utilisateur,
+  mot de passe deux fois). Un compte déjà reconnu sur l'appareil est salué
+  (« BIENVENUE, NICO ») et passe au menu. Les erreurs sont dites en français.
+- LES ANCIENS JOUEURS : un compte qui prend le nom Nico, Ben ou Adrien voit
+  paraître la Clé de Rune (« Tu reprends Nico et ses personnages ») ; avec la
+  bonne, il reprend P_01, P_02 ou P_03 — et leurs personnages — et il est
+  validé d'emblée. Nico et Ben sont administrateurs. Un nom ne sert qu'une
+  fois (Noms_Utilisateurs) : « Nico a déjà été repris par un compte ».
+- LES NOUVEAUX : leur demande attend (« Nico ou Ben doit l'accepter : cette
+  page s'ouvrira d'elle-même »). Sur le menu de Nico et de Ben, « Demandes
+  d'inscription » et une pastille rouge ; Accepter donne le numéro suivant
+  (P_04…, en transaction : jamais deux fois le même) et la page du nouveau
+  s'ouvre toute seule ; Refuser (confirmé) le lui dit.
+- LE MENU : en haut à gauche, « ⚜ Nico », Mon compte (nom, e-mail, rôle,
+  changer de mot de passe — l'actuel d'abord), Se déconnecter (la session
+  s'en va, la page repart de zéro).
+- LA PORTE DU JOUEUR (porte_joueur.js, nouveau, avant tout module) : tout ce
+  que le démarrage lisait dans la base — la date en jeu, les parties, les
+  effets, les lieux et les factions (app.js), les réglages et la table des
+  rencontres des monstres (monstres.js), les régions (regions_carte.js), et
+  les effets du préchargement — attend qu'un compte VALIDÉ soit reconnu. La
+  porte ne s'ouvre que sur un compte que la base a ENREGISTRÉ (et non sur la
+  copie locale qu'en montre Firestore juste après une inscription : ouverte
+  sur celle-là, elle lançait tous les écouteurs une fraction de seconde trop
+  tôt, et les règles les refusaient — trouvé par le banc à l'émulateur).
+  Seul comptes.js écrit désormais ID_JOUEUR_COURANT : le reste du jeu le lit
+  comme avant.
+- LES RÈGLES (firestore.rules) : le jeu entier n'est lisible et modifiable que
+  par un compte validé ; un compte en attente ne lit que le sien ; seuls Nico
+  et Ben valident ; la Clé de Rune est comparée côté serveur, sans que le
+  navigateur puisse la lire ; personne ne se valide ni ne se fait admin
+  lui-même. ELLES SONT À COLLER DANS LA CONSOLE (Firestore Database > Règles)
+  quand Nico, Ben et Adrien auront leur compte. Avant, la base reste ouverte
+  comme hier, et le jeu marche pareil (la page vérifie alors elle-même la
+  Clé de Rune, avant de créer le compte).
+- LES BANCS : un faux Firebase sans Auth (pas de getApp, ou BANC_IVALIS, que
+  firestore_partage.mjs déclare) est reconnu : la porte s'ouvre, la page se
+  comporte comme pour un compte validé, celui que le banc a posé.
+
+corrections_v259.mjs (dans la suite) : la porte (fermée, ouverte dans
+l'ordre, une erreur isolée, rien deux fois) ; la page d'un banc (porte
+ouverte, joueur gardé, plus de liste des noms ni d'écoute des Joueurs,
+« BIENVENUE » puis le menu, les noms, les erreurs, les anciens) ; la page SANS
+compte, qui ne lit RIEN dans la base, préchargement compris — puis lit les
+huit choses du démarrage dès que la porte s'ouvre ; le menu et ses fenêtres ;
+les règles et le code qui disent la même chose. Il mord sur l'ancien code
+(23 échecs).
+
+_comptes_emulateur.mjs (HORS suite : il lui faut l'émulateur Firebase, voir
+son en-tête) : les règles (29 cas : sans compte, la reprise de Nico, Ben,
+Adrien, une demande, la validation, ce qui doit être refusé), puis le jeu de
+bout en bout, avec les vrais modules Firebase et quatre appareils : la
+mauvaise Clé, la bonne, la session après un rechargement, la demande de
+Gaston acceptée par Nico et sa page qui s'ouvre d'elle-même, Hugo refusé,
+Nico déjà repris, le mauvais mot de passe, le changement de mot de passe,
+l'oubli (l'e-mail part), la déconnexion — 71 contrôles. Et avec
+REGLES_OUVERTES=1, la période de transition (la base encore ouverte) : tout
+pareil, la Clé de Rune vérifiée par la page.

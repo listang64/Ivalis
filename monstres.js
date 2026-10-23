@@ -461,7 +461,10 @@ window.ecouterReglagesMonstres = function() {
             (err) => console.error("Réglages des monstres :", err));
     } catch (e) { console.error("Réglages des monstres :", e); }
 };
-window.ecouterReglagesMonstres();
+// Derrière la porte du joueur (porte_joueur.js, v259) : la base n'est lisible
+// qu'à un compte validé.
+const quandJoueur = (fn) => (window.PorteJoueur ? window.PorteJoueur.quand(fn) : fn());
+quandJoueur(() => window.ecouterReglagesMonstres());
 
 // Le haut du tableau : deux lignes par stature, et le % des sorts.
 window.dessinerReglagesMonstres = function() {
@@ -765,7 +768,7 @@ window.ecouterTableRencontres = function() {
             (err) => console.error("Table des rencontres :", err));
     } catch (e) { console.error("Table des rencontres :", e); }
 };
-window.ecouterTableRencontres();
+quandJoueur(() => window.ecouterTableRencontres());
 
 // Le terrain accueille autant d'ennemis qu'il y a de joueurs, plus un. Les illusions
 // sont des leurres posés par les héros, pas des joueurs : les compter ferait grossir

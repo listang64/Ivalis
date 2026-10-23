@@ -1,22 +1,110 @@
 rules_version = '2';
 
 // =========================================================================
-//  IVALIS - Regles de securite Firestore
+//  IVALIS - Règles de sécurité Firestore (v259 : les comptes des joueurs)
 // =========================================================================
-//  ETAT ACTUEL (phase de developpement / tests entre amis) :
-//  - Lecture publique : tout le monde peut lire (necessaire pour l'affichage
-//    temps reel sur GitHub Pages, sans authentification).
-//  - Ecriture publique : autorisee POUR L'INSTANT, afin que l'application
-//    puisse creer des parties / personnages sans systeme de connexion.
+//  À COLLER DANS LA CONSOLE FIREBASE (Firestore Database > Règles > Publier),
+//  UNE FOIS que Nico, Ben et Adrien ont créé leur compte avec la nouvelle
+//  version du jeu. Avant, l'ancienne version (sans comptes) serait bloquée.
 //
-//  >>> A DURCIR plus tard <<< : quand on ajoutera Firebase Auth, remplacer
-//  "allow write: if true;" par des conditions basees sur request.auth.
+//  CE QU'ELLES FONT RESPECTER :
+//    · Le jeu entier (personnages, parties, combats…) n'est lisible et
+//      modifiable que par un compte VALIDÉ (Comptes/{uid}, Statut "Valide").
+//    · Un compte en attente ne voit que son propre compte.
+//    · Seuls Nico et Ben (Role "admin") valident ou refusent une demande.
+//    · Un nom d'utilisateur ne sert qu'une fois (Noms_Utilisateurs).
+//    · Reprendre Nico (P_01), Ben (P_02) ou Adrien (P_03) demande la Clé de
+//      Rune — comparée ici à MDP_Nouvelle_Partie/config, que le navigateur
+//      ne peut plus lire avant d'être validé.
+//    · Personne ne se donne lui-même le statut validé ni le rôle admin.
 // =========================================================================
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read: if true;
-      allow write: if true;
+
+    function connecte() { return request.auth != null; }
+    function chemin(col, id) { return /databases/$(database)/documents/$(col)/$(id); }
+    function monCompte() { return get(chemin("Comptes", request.auth.uid)); }
+    function valide() {
+      return connecte() && exists(chemin("Comptes", request.auth.uid))
+          && monCompte().data.Statut == "Valide";
+    }
+    function admin() { return valide() && monCompte().data.Role == "admin"; }
+
+    // Les trois joueurs d'avant les comptes (la même table que comptes.js).
+    function ancienValide(d) {
+      return (d.Nom_Normalise == "nico"   && d.ID_Joueur == "P_01" && d.Role == "admin")
+          || (d.Nom_Normalise == "ben"    && d.ID_Joueur == "P_02" && d.Role == "admin")
+          || (d.Nom_Normalise == "adrien" && d.ID_Joueur == "P_03" && d.Role == "joueur");
+    }
+    function estAncienNom(nom) { return nom in ["nico", "ben", "adrien"]; }
+
+    // La reprise d'un ancien joueur : la Clé de Rune, et un joueur pas encore repris.
+    function repriseValide(d) {
+      let cfg = get(chemin("MDP_Nouvelle_Partie", "config")).data;
+      return d.Statut == "Valide"
+          && ancienValide(d)
+          && d.Cle is string
+          && d.Cle.trim() == string(cfg.mdp_nouvelle_partie).trim()
+          && !("Uid" in get(chemin("Joueurs", d.ID_Joueur)).data);
+    }
+
+    // La création de son propre compte : une demande en attente, ou une reprise.
+    function creationValide(uid) {
+      let d = request.resource.data;
+      return d.Uid == uid
+          && d.Email == request.auth.token.email
+          && d.Nom is string && d.Nom.size() >= 2 && d.Nom.size() <= 20
+          && d.Nom_Normalise is string
+          && getAfter(chemin("Noms_Utilisateurs", d.Nom_Normalise)).data.Uid == uid
+          && ((d.Statut == "En_attente" && d.Role == "joueur" && d.ID_Joueur == ""
+               && !estAncienNom(d.Nom_Normalise))
+              || repriseValide(d));
+    }
+
+    // Ce que Nico ou Ben change en acceptant ou en refusant une demande.
+    function decisionValide() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(["Statut", "ID_Joueur", "Valide_Par", "Valide_Le"])
+          && request.resource.data.Statut in ["Valide", "Refuse", "En_attente"];
+    }
+
+    match /Comptes/{uid} {
+      allow get: if connecte() && (request.auth.uid == uid || admin());
+      allow list: if admin();
+      allow create: if connecte() && request.auth.uid == uid && creationValide(uid);
+      allow update: if admin() && decisionValide();
+      allow delete: if admin();
+    }
+
+    // Un nom est-il pris ? On peut le demander (un nom), pas lister les noms.
+    match /Noms_Utilisateurs/{nom} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if connecte()
+          && request.resource.data.Uid == request.auth.uid
+          && getAfter(chemin("Comptes", request.auth.uid)).data.Nom_Normalise == nom;
+      allow update, delete: if false;
+    }
+
+    // Les joueurs (P_01…) : lus par les validés ; créés par Nico ou Ben en
+    // acceptant une demande ; un ancien joueur reçoit l'Uid de son compte
+    // une seule fois, au moment de sa reprise.
+    match /Joueurs/{id} {
+      allow read: if valide();
+      allow create, delete: if admin();
+      allow update: if admin()
+          || (connecte()
+              && getAfter(chemin("Comptes", request.auth.uid)).data.ID_Joueur == id
+              && getAfter(chemin("Comptes", request.auth.uid)).data.Statut == "Valide"
+              && !("Uid" in resource.data)
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["Uid"])
+              && request.resource.data.Uid == request.auth.uid);
+    }
+
+    // Tout le reste du jeu : les comptes validés seulement.
+    match /{collection}/{document=**} {
+      allow read, write: if valide()
+          && !(collection in ["Comptes", "Noms_Utilisateurs", "Joueurs"]);
     }
   }
 }

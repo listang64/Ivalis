@@ -272,6 +272,8 @@ export const SOURCE_FAUX_APP = `
 export const initializeApp = () => ({ nom: "banc" });
 export const getApp = () => ({ nom: "banc" });
 export const getApps = () => [];
+// Un banc, pas le vrai Firebase : la page n'attend aucun compte (comptes.js, v259).
+export const BANC_IVALIS = true;
 `;
 
 // =========================================================================

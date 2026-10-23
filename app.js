@@ -60,6 +60,11 @@ const DOC_CONFIG_MDP = "config";
 // =========================================================================
 window.ID_PARTIE_COURANTE = null;
 window.ID_PARTIE_EN_ATTENTE = null;
+
+// La porte du joueur (porte_joueur.js, v259) : ce qui lit la base attend que
+// le compte soit reconnu. Sans la porte (un banc qui isole ce fichier), tout
+// de suite.
+const quandJoueur = (fn) => (window.PorteJoueur ? window.PorteJoueur.quand(fn) : fn());
 window.LISTE_PARTIES_CACHE = [];
 
 // --- NOUVEAU CACHE DES COMPÉTENCES ---
@@ -69,7 +74,6 @@ window.UNSUBSCRIBE_COMPETENCES = {};
 // References de desabonnement pour les ecouteurs temps reel
 let unsubscribePersonnages = null;
 let unsubscribeDate = null;
-let unsubscribeJoueurs = null;
 
 // =========================================================================
 //  MIXEUR AUDIO GLOBAL
@@ -3491,19 +3495,6 @@ function ecouterDateEnJeu() {
   }, (err) => console.error("onSnapshot Date_En_Jeu :", err));
 }
 
-// Liste des joueurs (ecran d'identification) en temps reel
-function ecouterJoueurs() {
-  if (unsubscribeJoueurs) unsubscribeJoueurs();
-  unsubscribeJoueurs = onSnapshot(collection(db, COL.JOUEURS), (snap) => {
-    const joueurs = [];
-    snap.forEach((document) => {
-      const d = document.data();
-      if (d.Nom) joueurs.push({ id: d.ID_Joueur || document.id, nom: d.Nom });
-    });
-    construireListeJoueurs(joueurs);
-  }, (err) => console.error("onSnapshot Joueurs :", err));
-}
-
 // Liste des parties pré-chargée en temps réel (pour éviter le temps d'attente)
 //
 // ELLE NE SERT QU'AU MENU, ET ELLE RESTAIT OUVERTE PENDANT TOUTE LA PARTIE.
@@ -4303,36 +4294,8 @@ window.envoyerMessageChat = async function() {
 // =========================================================================
 //  SCENE 1/2 : ACCUEIL + IDENTIFICATION
 // =========================================================================
-function construireListeJoueurs(joueurs) {
-  const conteneur = document.getElementById("liste-noms-joueurs");
-  if (!conteneur) return;
-  conteneur.innerHTML = "";
-
-  joueurs.forEach((joueur) => {
-    const span = document.createElement("span");
-    span.className = "nom-joueur";
-    span.innerText = joueur.nom;
-
-    const dureeAleatoire = 2.5 + Math.random() * 2;
-    const delaiAleatoire = Math.random() * 2;
-    span.style.animationDuration = `${dureeAleatoire}s`;
-    span.style.animationDelay = `-${delaiAleatoire}s`;
-
-    span.onclick = function () {
-      jouerSonClic();
-      validerIdentification(joueur.id);
-    };
-
-    conteneur.appendChild(span);
-  });
-}
-
-function validerIdentification(idJoueur) {
-  localStorage.setItem("ID_JOUEUR_COURANT", idJoueur);
-  const ecranIdentification = document.getElementById("ecran-identification");
-  ecranIdentification.style.opacity = "0";
-  setTimeout(() => { ecranIdentification.style.display = "none"; }, 1500);
-}
+//  L'identification, c'est désormais le compte du joueur (comptes.js) : plus
+//  de nom à toucher, que n'importe qui pouvait toucher à la place d'un autre.
 
 // LE CLIC DES BOUTONS : la Goutte de la Fabrique (fabrique_sons.js,
 // SON_CLIC_JEU). Le volume suit Interface × Général.
@@ -4497,7 +4460,10 @@ window.prechargerLeJeu = async function() {
     // un besoin qui ne se présente qu'au combat — où il est déjà couvert.
     const effetsVides = !window.EFFETS_BDD_CACHE
         || Object.keys(window.EFFETS_BDD_CACHE).length === 0;
-    if (effetsVides && typeof window.chargerCacheEffetsBDD === "function") {
+    // (Et seulement si la porte du joueur est ouverte : avant la connexion, la
+    // base refuse ; le démarrage les lira de toute façon à son ouverture.)
+    const porteOuverte = !window.PorteJoueur || window.PorteJoueur.ouverte;
+    if (effetsVides && porteOuverte && typeof window.chargerCacheEffetsBDD === "function") {
         travaux.push(Promise.resolve()
             .then(() => window.chargerCacheEffetsBDD())
             .catch(e => console.warn("Préchargement des effets :", e)));
@@ -4529,11 +4495,11 @@ function entrerDansLeJeu() {
   accueil.style.opacity = "0";
 
   const sceau = document.getElementById("ecran-sceau");
+  // L'ÉCRAN DE CONNEXION (v259, comptes.js) : un compte déjà reconnu sur cet
+  // appareil est salué et passe au menu ; sinon, le formulaire.
   const identification = () => {
+    if (typeof window.afficherEcranConnexion === "function") { window.afficherEcranConnexion(); return; }
     document.querySelector(".titre-etranger").classList.add("visible");
-    setTimeout(() => {
-      document.getElementById("liste-noms-joueurs").classList.add("visible");
-    }, 2500);
   };
 
   setTimeout(() => {
@@ -5841,7 +5807,8 @@ function initialiserCarteInteractive() {
   // Safari (iPad) : le pincement de la page elle-même.
   conteneur.addEventListener("gesturestart", function(e) { e.preventDefault(); });
 
-  window.dessinerIconesCarte();
+  // Les lieux de la carte sont en base : derrière la porte du joueur (v259).
+  quandJoueur(() => window.dessinerIconesCarte());
 }
 
 // --- CORRECTION DU BUG PLEIN ÉCRAN ---
@@ -5924,13 +5891,21 @@ window.placerPionSurHex = function(idHex) {
 //  INITIALISATION (DOMContentLoaded)
 // =========================================================================
 document.addEventListener("DOMContentLoaded", function () {
-  // TEMPS REEL : liste des joueurs (identification) + date en jeu (parchemin)
-  ecouterJoueurs();
-  ecouterDateEnJeu();
-  ecouterPartiesEnCours();
-
-  // 🔻 NOUVEAU : Chargement en cache de tous les effets du jeu au démarrage
-  if (typeof window.chargerCacheEffetsBDD === "function") window.chargerCacheEffetsBDD();
+  // LA BASE N'EST LUE QU'UNE FOIS LE JOUEUR CONNECTÉ ET VALIDÉ (v259) : la
+  // porte du joueur (porte_joueur.js) lance ces lectures quand le compte est
+  // reconnu (comptes.js). Lancées plus tôt, les règles les refuseraient.
+  // (La liste des noms à toucher n'existe plus : on se connecte à son compte.)
+  quandJoueur(() => {
+    // TEMPS REEL : date en jeu (parchemin) + parties en cours (menu)
+    ecouterDateEnJeu();
+    ecouterPartiesEnCours();
+    // Chargement en cache de tous les effets du jeu
+    if (typeof window.chargerCacheEffetsBDD === "function") window.chargerCacheEffetsBDD();
+    // Pre-chargement des factions pour le menu deroulant de la fiche
+    recupererFactionsPourSelect()
+      .then(remplirSelectFactions)
+      .catch((e) => console.error("Chargement des factions :", e));
+  });
 
   // Catalogue des objets pouvant apparaître en butin.
 
@@ -5942,11 +5917,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Rendre la fiche de personnage deplacable
   rendreFenetreDeplacable(document.getElementById("fenetre-fiche-perso"));
-
-  // Pre-chargement des factions pour le menu deroulant de la fiche
-  recupererFactionsPourSelect()
-    .then(remplirSelectFactions)
-    .catch((e) => console.error("Chargement des factions :", e));
 
   // Initialisation Outils IA
   document.getElementById("temp-range").value = localStorage.getItem("ivalis_IA_TEMPERATURE") || "1.0";
@@ -7436,7 +7406,7 @@ window.ajouterLigneRaceVide = function() {
 // =========================================================================
 Object.assign(window, {
   // Accueil / identification
-  entrerDansLeJeu, jouerSonClic, validerIdentification,
+  entrerDansLeJeu, jouerSonClic,
   // Modales nouvelle partie / chargement
   ouvrirModalNouvellePartie, fermerModales, validerCle, validerCreationGroupe,
   ouvrirModalChargerPartie, demanderMdpPartie, validerMdpPartie,

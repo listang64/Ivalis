@@ -377,10 +377,15 @@ window.actualiserRegionsDev = function() {
 (function demarrer() {
     const lancer = () => {
         window.actualiserRegionsDev();
-        try {
-            onSnapshot(ref(), (snap) => appliquerInstantane(snap && snap.exists() ? snap.data() : {}),
-                       (e) => console.error("Régions de la carte :", e));
-        } catch (e) { console.error("Régions de la carte :", e); }
+        // La base n'est lisible qu'à un compte validé : derrière la porte du
+        // joueur (porte_joueur.js, v259).
+        const ecouter = () => {
+            try {
+                onSnapshot(ref(), (snap) => appliquerInstantane(snap && snap.exists() ? snap.data() : {}),
+                           (e) => console.error("Régions de la carte :", e));
+            } catch (e) { console.error("Régions de la carte :", e); }
+        };
+        if (window.PorteJoueur) window.PorteJoueur.quand(ecouter); else ecouter();
         let attente = null;
         window.addEventListener("resize", () => {
             if (attente) return;
