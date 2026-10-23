@@ -483,6 +483,22 @@ export function cloturerTour(etat, des) {
         }
     }
 
+    // LE ZOMBIE NE TIENT QUE QUATRE TOURS (v258). Chacun de ses tours en
+    // retire un ; au bout du dernier, il retombe et quitte le terrain. Le tour
+    // de la manche où il s'est relevé ne compte pas : il n'en a pas joué.
+    const etapesZombie = [];
+    if (enFin && enFin.zombie && !enFin.aTerre) {
+        const reste = Math.max(0, nombre(enFin.zombie.tours, ZOMBIE.tours) - 1);
+        enFin.zombie = { ...enFin.zombie, tours: reste };
+        etapesZombie.push({ type: "zombieTours", cible: partie.id, tours: reste });
+        if (reste === 0) {
+            enFin.aTerre = true;
+            enFin.pv = 0;
+            enFin.sursis = null;
+            etapesZombie.push({ type: "chute", cible: partie.id, acteur: partie.id, finZombie: true });
+        }
+    }
+
     const file = etat.file.slice(1).filter(f => {
         const c = combattant(etat, f.id);
         return c && !c.aTerre;
@@ -502,7 +518,7 @@ export function cloturerTour(etat, des) {
     // l'entrée marquée « repos pris ».
     const etapesRepos = finDeManche ? [] : reposDuRetourArriere(etat);
 
-    const etapes = [...etapesSursis,
+    const etapes = [...etapesSursis, ...etapesZombie,
                     { type: "tour", fini: partie.id, file, phase: etat.phase,
                       manche: etat.manche, ontJoue: etat.ontJoue },
                     ...etapesRepos];

@@ -730,7 +730,11 @@ function recompenserLeTueur(etat, victime, idAuteur, finDeManche) {
 // morsure de 7 physiques, 2 cases de déplacement, en dernier : initiative 0)
 // et ne se relève plus si on la tue de nouveau. Son tour éventuel dans la
 // manche en cours tombe : elle jouera à partir de la suivante.
-export const ZOMBIE = { pv: 15, degats: 7, pas: 2, initiative: 0 };
+// Et elle ne reste sur le terrain que QUATRE TOURS (v258, Nico : « fais que les
+// zombies ne restent sur le terrain que pendant 4 tours ») : chacun de ses
+// tours en retire un (cloturerTour, cerveau_combat.js) ; au bout du quatrième,
+// elle retombe pour de bon.
+export const ZOMBIE = { pv: 15, degats: 7, pas: 2, initiative: 0, tours: 4 };
 const distanceHexEtat = (a, b) => (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
 export function profanateurPourZombie(etat, victime, idTueur) {
     if (!victime || !victime.estMonstre || victime.estIllusion || victime.zombie || victime.compagnon) return null;
@@ -747,7 +751,7 @@ function zombifier(etat, victime, idTueur) {
     const maitre = profanateurPourZombie(etat, victime, idTueur);
     if (!maitre) return [];
     const etape = { type: "zombie", cible: victime.id, acteur: maitre.id, camp: maitre.camp || "Allié",
-                    pv: ZOMBIE.pv, pvMax: ZOMBIE.pv };
+                    pv: ZOMBIE.pv, pvMax: ZOMBIE.pv, tours: ZOMBIE.tours };
     APPLICATEURS.zombie(etat, etape);
     return [etape];
 }
@@ -1008,7 +1012,9 @@ export const APPLICATEURS = {
         const c = combattant(etat, e.cible);
         if (!c) return;
         c.aTerre = false;
-        c.zombie = { idMaitre: e.acteur };
+        // Les tours qui lui restent sur le terrain (un journal d'avant la v258
+        // n'en dit rien : il a les quatre).
+        c.zombie = { idMaitre: e.acteur, tours: nombre(e.tours, ZOMBIE.tours) };
         c.camp = e.camp || c.camp;
         c.pv = nombre(e.pv, 15);
         c.pvMax = nombre(e.pvMax, c.pv);
@@ -1018,6 +1024,14 @@ export const APPLICATEURS = {
         c.sursis = null;
         c.def = { ...(c.def || {}), esquive: 0, parade: 0 };
         etat.file = (etat.file || []).filter((f, i) => i === 0 || f.id !== e.cible);
+    },
+
+    // Un tour de zombie s'achève : le RÉSULTAT, les tours qui lui restent. À
+    // zéro, la chute qui suit l'emporte (cloturerTour, cerveau_combat.js).
+    zombieTours(etat, e) {
+        const c = combattant(etat, e.cible);
+        if (!c || !c.zombie) return;
+        c.zombie = { ...c.zombie, tours: Math.max(0, nombre(e.tours)) };
     },
 
     // Un mur de terre levé, entamé ou cassé (Géomancien) ; les gravats qu'il

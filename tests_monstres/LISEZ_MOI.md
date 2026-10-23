@@ -7331,3 +7331,39 @@ La suite complète passe. Seul bémol, déjà là avant : le contrôle de fondu 
 corrections_v246 (l'opacité lue 200 ms après le début d'un fondu de 450 ms) est
 sensible à la charge de la machine ; il échoue parfois, sur l'ancien code comme
 sur le nouveau, et passe relancé seul.
+
+## v258 — Les zombies ne restent que quatre tours
+
+Nico : « fais que les zombies ne restent sur le terrain que pendant 4 tours. »
+(Une demande juste avant — retirer les immunités des petits monstres — a été
+annulée par Nico lui-même : rien n'a changé de ce côté.)
+
+- QUATRE TOURS (combat_etat.js, ZOMBIE.tours = 4). Une créature qui se relève
+  en zombie du Profanateur reçoit ses 4 tours ; l'étape « zombie » du journal
+  les porte (un journal d'avant, qui n'en dit rien, en donne 4 aussi).
+- CHACUN DE SES TOURS EN RETIRE UN (cloturerTour, cerveau_combat.js), comme le
+  sursis : le RÉSULTAT voyage dans une étape neuve, « zombieTours » (les tours
+  qui restent), que tous les postes rejouent à l'identique. La manche où il se
+  relève ne compte pas : son tour de cette manche-là tombe, il ne le joue pas.
+  Il joue donc quatre tours pleins — quatre morsures — puis, au bout du
+  quatrième, il retombe : une « chute » (finZombie) le met à terre, 0 PV, et
+  le plateau le retire comme une créature tuée (sa mise à terre, puis plus de
+  pion). Il ne revient pas, n'appelle aucun renfort de plus (sa place était
+  libérée dès qu'il s'est relevé) et ne rapporte rien une seconde fois.
+- À L'ÉCRAN (pont_combat.js) : au bout de chacun de ses tours, au-dessus de
+  lui, « 🧟 Encore 3 tours », « 2 tours », « 1 tour », puis « 🧟 Retombe en
+  poussière » et sa mise à terre.
+- ÉCRIT EN CLAIR : le descriptif du Profanateur (classes.js) — « Il ne reste
+  sur le terrain que 4 tours, puis retombe en poussière » — et son atout sur
+  la fiche (app.js) — « …se relèvent en zombies à son service, pour 4 tours ».
+  Le Codex suit.
+- Un zombie qu'on retue avant tombe toujours aussitôt, sans plus de décompte.
+
+corrections_v258.mjs, sur le vrai moteur : relevé avec 4 tours (et au
+journal, et rejoué, et depuis un journal d'avant) ; la manche du relèvement
+qui ne compte pas ; quatre tours joués par le cerveau (quatre morsures, 3, 2,
+1, 0, debout puis à terre, l'état cohérent à chaque pas, « 0 tour » puis la
+chute au journal, le rejeu identique, les quatre messages, la mise à terre) ;
+plus de cinquième tour, ni joué ni choisi ; sa fiche à 0 PV ; aucun renfort
+de plus ; le zombie retué ; toute étape du moteur a sa mise en scène ; le
+descriptif et l'atout. Il mord sur l'ancien code (19 échecs).

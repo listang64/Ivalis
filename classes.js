@@ -162,6 +162,7 @@ window.DESCRIPTIFS_CLASSES = {
             { niveau: 1, titre: "Passif : Relève des morts · Glace funèbre",
               points: ["Un ennemi qu'il tue, ou qui tombe à côté de lui, se relève en zombie à son service",
                        "15 PV · morsure de 7 dégâts physiques · 2 cases par tour · joue en dernier",
+                       "Il ne reste sur le terrain que 4 tours, puis retombe en poussière",
                        "Garde ses résistances, mais plus d'esquive ni de parade",
                        "Ses attaques magiques de glace font des dégâts physiques au lieu de magiques"] },
             { niveau: 5, titre: "Technique : Pointes de glace",

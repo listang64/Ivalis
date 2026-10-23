@@ -1550,7 +1550,7 @@ window.texteAtout = function(cle, valeur) {
         case "terrainFacile":  return "Se déplace sur le terrain difficile comme sur un terrain normal";
         case "traverseSesMurs": return "Traverse ses murs de terre";
         case "zonesProlongees": return `Ses zones persistantes durent ${n === 1 ? "un" : n} tour${n > 1 ? "s" : ""} de plus`;
-        case "zombies":        return "Les ennemis qu'il tue, ou qui tombent à côté de lui, se relèvent en zombies à son service";
+        case "zombies":        return "Les ennemis qu'il tue, ou qui tombent à côté de lui, se relèvent en zombies à son service, pour 4 tours";
         case "rayonZombies":   return n > 1 ? `Ses zombies se relèvent jusqu'à ${n} cases autour de lui` : "";
         case "glacePhysique":  return "Ses attaques magiques de glace font des dégâts physiques au lieu de magiques";
         case "degatsOpportunite": return `${plus(n)} aux dégâts de ses attaques d'opportunité`;

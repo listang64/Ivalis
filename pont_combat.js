@@ -500,6 +500,14 @@ const SCENES = {
                  reaction: { sorte: "releve-zombie", pion: e.cible, depuis: e.acteur || null, loin, texte, couleur: "#9fe070", remplace: true } };
     },
 
+    // Le tour d'un zombie s'achève (v258) : combien il lui en reste ; au bout
+    // du dernier, il retombe en poussière (la chute qui suit le met à terre).
+    zombieTours(e) {
+        const tours = nombre(e.tours);
+        const texte = tours > 0 ? `🧟 Encore ${tours} tour${tours > 1 ? "s" : ""}` : "🧟 Retombe en poussière";
+        return { geste: "message", pion: e.cible, texte, couleur: "#7cb342", duree: RYTHME.message };
+    },
+
     // Un mur de terre levé, entamé ou cassé (Géomancien). Le mur n'a pas de
     // pion : c'est le dessin des murs (murs_terre.js) qui le montre ; on dit
     // seulement sa chute, et les gravats sous qui n'a pas pu être poussé.
