@@ -7778,3 +7778,65 @@ et 30 de fatigue (les montants comparés au calcul du moteur, le mot, plus de
 montants comparés à appliquerBonusMonstre) ; les versions. Il mord sur
 l'ancien code (9 échecs). corrections_v263 remis à cette règle (montants
 surpuissance comprise, le mot au lieu de « ×1,25 »).
+
+## v265 — L'aura du leader ; le nom des états ; le nom dans l'encart ; les zones physiques ; la Distorsion mentale
+
+Nico : « Refais l'anneau rouge autour des tokens des leaders, plus organique et
+joli, un peu plus discret, qui ondule doucement autour. Quand je zoome ou
+dézoome, ça déplace ce cercle : corrige ça » ; « les symboles des états à
+gauche du bouton fin de tour : en plus du nombre de tours restants, indique
+aussi le nom de l'état quand on clique dessus » ; « déplace un peu vers la
+droite le nom du personnage dans l'encart, pour qu'il n'empiète pas sur les
+états » ; « pour l'animation d'une attaque légère ou lourde en zone, enlève les
+zones rouges qui explosent au sol, ne garde que le coup sur chaque ennemi
+touché » ; « refais l'animation de Distorsion mentale : des ondes psychiques
+qui déforment l'image en dessous vers la cible, et à la réception la cible se
+déforme un peu sur elle-même avant de redevenir normale ».
+
+- L'AURA DU LEADER (combat.js, auraLeader ; style.css) : un anneau rouge pâle,
+  dessiné en SVG — un halo large, un trait moyen et un fil vif qui suivent une
+  même forme ronde légèrement bosselée, et passent d'une forme à l'autre en
+  boucle (il ondule sans tourner d'un bloc), plus un fil pointillé très pâle qui
+  glisse lentement ; le tout respire à peine. LE DÉCALAGE AU ZOOM venait du
+  centrage par translate(−50 %, −50 %) DANS une animation CSS de transform :
+  Safari garde ce pourcentage calculé sur l'ancienne taille du pion pendant
+  que l'animation tourne. Plus aucune animation de transform : la boîte se cale
+  par ses bords (−30 %, 160 %), et tout ce qui bouge vit dans le SVG, en unités
+  de son repère. Un pion redessiné reprend l'animation là où le temps en est
+  (setCurrentTime), sans saut.
+- LA BULLE D'UN ÉTAT (montrerDureeEtat) : le nom de l'état en or, ses tours
+  restants dessous, deux secondes.
+- LE NOM DANS L'ENCART : un peu plus à droite (REGLAGES_HUD.encartNom.x 2 au
+  lieu de −5). Les rangées d'états en plus montent vers le portrait au lieu de
+  descendre sur le nom (wrap-reverse, la boîte remonte de ce qui dépasse sa
+  première rangée, --ligne-etats). Et si une icône touche encore le nom (la
+  hauteur de l'image de la plaque en décide), il glisse juste à droite de la
+  dernière (eviterEtatsNomEncart).
+- LES ZONES PHYSIQUES (pont_combat.js) : la zone d'une attaque légère ou lourde
+  n'explose plus au sol quand son geste du Studio a frappé chaque ennemi touché.
+  Les sorts de zone gardent leurs cases qui flamboient ; un geste qui n'a pas pu
+  se jouer (la ruée) aussi, pour que rien ne reste invisible.
+- LA DISTORSION MENTALE (animations_catalogue.js, ondesPsychiques et
+  tordreCible ; en jeu et dans le Studio) : trois ondes en arc roulent du lanceur
+  vers la cible, un fil violet clair sur chaque crête. La carte (l'image de fond
+  et la grille) est recopiée sur la bande dans un canevas posé SOUS les pions ;
+  au passage de chaque onde, la copie est redessinée en fines couronnes, chacune
+  légèrement agrandie ou rétrécie autour du lanceur : le sol gonfle puis se
+  creuse comme sous une lentille, et redevient lui-même derrière (aucune lecture
+  de pixels, aucun filtre sur tout le plateau). À l'arrivée, la cible se tord :
+  son pion s'écrase et se penche dans un sens puis dans l'autre, et son image
+  ondule (un filtre de turbulence sur l'image seule, le temps du coup) ; tout
+  est rangé après.
+
+corrections_v265.mjs (dans la suite) : dans le noyau, le pont (légère et lourde
+en zone sans cases au sol, un sort de zone avec, un geste raté avec) ; sur la
+vraie page, l'aura (SVG qui ondule, sans animation CSS ni transform, centrée à
+×1, ×3, ×0,6, ×1,4, reprise du temps) ; la bulle d'un état (nom, tours, une
+seule à la fois) ; le nom dans l'encart (place réglée, six états sur deux
+rangées sans en toucher aucun, les rangées qui montent) ; la Distorsion (la
+voix, trois ondes, le sol copié sous les pions, la cible qui se tord et ondule,
+rien qui reste) ; les versions. Il mord sur l'ancien code (19 échecs).
+
+Les anciens bancs remis aux règles v265 : corrections_v262 (l'aura ondule au
+lieu de scintiller en tournant), encart_fige (le nom à 2 %), hud_heros (la
+bulle porte le nom de l'état au-dessus des tours).

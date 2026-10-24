@@ -706,11 +706,14 @@ console.log("=========================================================");
       await new Promise(r => setTimeout(r, 400));
       const b = t.querySelector(".etat-piste-duree");
       const rb = b.getBoundingClientRect(), rt = t.getBoundingClientRect();
-      return { texte: b.innerText, visible: +getComputedStyle(b).opacity > 0.5,
+      // v265 : le nom de l'état au-dessus, les tours dessous.
+      return { texte: (b.querySelector(".etat-piste-tours") || b).innerText, nom: (b.querySelector(".etat-piste-nom") || {}).innerText || "",
+               visible: +getComputedStyle(b).opacity > 0.5,
                dessous: rb.top >= rt.bottom - 1,
                centre: Math.abs((rb.left + rb.width / 2) - (rt.left + rt.width / 2)) <= 2 };
     });
     verifier("LE CLIC ANNONCE LES TOURS RESTANTS", reponse.texte === "4 Tours", reponse.texte);
+    verifier("ET LE NOM DE L'ÉTAT (v265)", reponse.nom === "Peur", reponse.nom);
     verifier("il s'affiche", reponse.visible === true);
     verifier("SOUS L'ICÔNE TOUCHÉE, centré dessus",
              reponse.dessous === true && reponse.centre === true,
@@ -721,7 +724,7 @@ console.log("=========================================================");
       window.PERSOS_PARTIE[0].Etats_Alteres.find(e => e.nom === "Peur").duree = 1;
       document.querySelector('.etat-piste[data-nom="Peur"]').click();
       await new Promise(r => setTimeout(r, 300));
-      return document.querySelector('.etat-piste[data-nom="Peur"] .etat-piste-duree').innerText;
+      return document.querySelector('.etat-piste[data-nom="Peur"] .etat-piste-duree .etat-piste-tours').innerText;
     });
     verifier("et il accorde le singulier", singulier === "1 Tour", singulier);
 

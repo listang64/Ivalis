@@ -99,7 +99,9 @@
         // plaque, comme toutes les tailles ici : c'est ce qui la fait suivre.
         encartAvatar:  { x: -8.5, bas: 0, hauteur: 62 },
         encartEtats:   { x: -3.5, y: 78, largeur: 22, taille: 5, ecart: 1.4 },
-        encartNom:     { x: -5, y: 85, taille: 8 },
+        // v265 : un peu plus à droite (il empiétait sur les états) ; s'il en
+        // touche encore un, il s'écarte de lui-même (eviterEtatsNomEncart).
+        encartNom:     { x: 2, y: 85, taille: 8 },
         encartCarte:   { x: 33, y: 46, taille: 3.6 },
         // LA DISTANCE (v263, Nico : « en haut à droite, juste une petite cible
         // et à côté le chiffre en blanc ») : sur la ligne du nom de la
@@ -340,6 +342,7 @@
             etats.style.width = r.encartEtats.largeur + "%";
             etats.dataset.taille = Math.round(pc(r.encartEtats.taille));
             etats.style.gap = pc(r.encartEtats.ecart) + "px";
+            etats.style.setProperty("--ligne-etats", Math.round(pc(r.encartEtats.taille)) + "px");
             // Redessiner à la prochaine occasion : la signature change de forme.
             etats.dataset.signature = "";
         }

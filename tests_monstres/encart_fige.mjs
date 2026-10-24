@@ -162,7 +162,7 @@ const FIGES = {
   encartPion:    { x: -2.5, y: 34, taille: 41 },
   encartAvatar:  { x: -8.5, bas: 0, hauteur: 62 },
   encartEtats:   { x: -3.5, y: 78, largeur: 22, taille: 5, ecart: 1.4 },
-  encartNom:     { x: -5, y: 85, taille: 8 },
+  encartNom:     { x: 2, y: 85, taille: 8 },   // v265 : un peu plus à droite
   encartCarte:   { x: 33, y: 46, taille: 3.6 },
   encartDetail:  { x: 40, y: 53, taille: 2.1, largeur: 74 },
   encartAttente: { x: 39.5, y: 90, taille: 2.5 }
@@ -197,7 +197,7 @@ console.log("\n3. ET L'ÉCRAN LES APPLIQUE (écran 1366×1024, plaque de 740 px)
   const pres = (a, b) => Math.abs(a - b) <= 0.6;
   verifier("la plaque fait 740 px, à 52 px du bord", pres(m.largeur, 740) && pres(m.gauche, 52),
            `(${m.largeur.toFixed(1)} px, gauche ${m.gauche.toFixed(1)})`);
-  verifier("le nom du combattant est en bas à gauche (-5 %, 85 %)", pres(m.nom.x, -5) && pres(m.nom.y, 85),
+  verifier("le nom du combattant est en bas à gauche (2 %, 85 % — v265)", pres(m.nom.x, 2) && pres(m.nom.y, 85),
            `(${m.nom.x.toFixed(1)}, ${m.nom.y.toFixed(1)})`);
   verifier("le nom de la technique au milieu (33 %, 46 %)", pres(m.carte.x, 33) && pres(m.carte.y, 46),
            `(${m.carte.x.toFixed(1)}, ${m.carte.y.toFixed(1)})`);

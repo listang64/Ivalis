@@ -3684,6 +3684,11 @@ textarea.input-texte-parchemin {
     transform: translate(-50%, 0);
 }
 
+/* Le nom de l'état au-dessus, en or ; les tours dessous, plus petits (v265). */
+.etat-piste-duree { text-align: center; line-height: 1.2; }
+.etat-piste-nom { color: #ffd98a; }
+.etat-piste-tours { font-size: 0.85em; font-weight: normal; color: #e8d5a5; }
+
 /* ========================================================================= */
 /* L'ENCART DE TOUR                                                          */
 /* ========================================================================= */
@@ -3776,6 +3781,14 @@ textarea.input-texte-parchemin {
     justify-content: center;
     align-items: center;
     min-height: 4px;
+}
+/* LES RANGÉES EN PLUS MONTENT (v265). Les états restent à leur place, sous le
+   portrait ; au-delà d'une rangée, les suivantes s'empilent AU-DESSUS (vers le
+   portrait) au lieu de descendre sur le nom du combattant : la boîte remonte
+   de tout ce qui dépasse sa première rangée (--ligne-etats, hud_disposition.js). */
+#voile-tour-etats {
+    flex-wrap: wrap-reverse;
+    transform: translateY(calc(-100% + var(--ligne-etats, 32px)));
 }
 
 /* LE NOM DU COMBATTANT, dans l'or brossé du reste du jeu. */
@@ -5380,22 +5393,12 @@ textarea.input-texte-parchemin {
 .choix-apparition-aide { font-family: 'Almendra', serif; font-size: 13px; color: #a89f91; line-height: 1.3; }
 @media (max-width: 480px) { .choix-apparitions { grid-template-columns: 1fr; } }
 
-/* LE PION DU LEADER (v262) : une aura rouge qui scintille, sous son image. */
-.aura-leader { position: absolute; left: 50%; top: 50%; width: 150%; height: 150%; border-radius: 50%;
-  pointer-events: none; z-index: 1; transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(255, 40, 40, 0) 38%, rgba(255, 28, 28, 0.6) 52%, rgba(255, 70, 70, 0.28) 61%, rgba(255, 40, 40, 0) 70%);
-  animation: aura-leader-souffle 1.7s ease-in-out infinite alternate; }
-.aura-leader::before, .aura-leader::after { content: ""; position: absolute; inset: 4%; border-radius: 50%;
-  -webkit-mask: radial-gradient(circle, transparent 54%, #000 59%, #000 66%, transparent 71%);
-          mask: radial-gradient(circle, transparent 54%, #000 59%, #000 66%, transparent 71%); }
-.aura-leader::before { background: repeating-conic-gradient(from 0deg, rgba(255, 225, 225, 0.95) 0deg 3deg, rgba(255, 60, 60, 0) 3deg 26deg);
-  animation: aura-leader-tourne 8s linear infinite, aura-leader-scintille 1.1s ease-in-out infinite; }
-.aura-leader::after { background: repeating-conic-gradient(from 13deg, rgba(255, 120, 120, 0.9) 0deg 2deg, rgba(255, 60, 60, 0) 2deg 19deg);
-  animation: aura-leader-tourne 5.5s linear infinite reverse, aura-leader-scintille 0.8s ease-in-out 0.4s infinite; }
-@keyframes aura-leader-souffle { from { opacity: 0.65; transform: translate(-50%, -50%) scale(0.95); }
-                                 to   { opacity: 1;    transform: translate(-50%, -50%) scale(1.06); } }
-@keyframes aura-leader-tourne { to { transform: rotate(360deg); } }
-@keyframes aura-leader-scintille { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+/* LE PION DU LEADER (v262 ; v265 : un anneau organique qui ondule, combat.js,
+   auraLeader). Calée par ses bords, sans transform : rien ne la décale quand le
+   pion change de taille au zoom. Tout ce qui bouge vit dans son SVG. */
+.aura-leader { position: absolute; left: -30%; top: -30%; width: 160%; height: 160%;
+  pointer-events: none; z-index: 1; }
+.aura-leader svg { display: block; width: 100%; height: 100%; overflow: visible; }
 
 /* LA LECTURE AUTOMATIQUE DES TOURS (DEV, v254) : une case à gauche de l'œil d'or. */
 .btn-hud-lecture-auto { position: absolute; bottom: 100%; right: calc(4% + 44px); margin-bottom: 10px;

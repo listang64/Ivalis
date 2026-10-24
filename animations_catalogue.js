@@ -46,6 +46,167 @@
         return { a, b, v: axe(a, b) };
     };
     const etat = (o, calque, pion, texte) => o.texte(calque, pion, texte, COULEURS.etat);
+
+    // =====================================================================
+    //  LA DISTORSION MENTALE (v265)
+    // =====================================================================
+    //  Nico : « des ondes psychiques qui déforment l'image en dessous vers la
+    //  cible, et à la réception des dégâts la cible se déforme un peu sur
+    //  elle-même avant de redevenir normale. »
+    //
+    //  LE SOL SE DÉFORME POUR DE BON. La carte (l'image de fond et la grille)
+    //  est recopiée une fois, sur la bande qui va du lanceur à sa cible, dans
+    //  un canevas posé SOUS les pions. Chaque onde est un arc qui roule vers la
+    //  cible ; sous elle, la copie est redessinée en fines couronnes, chacune
+    //  légèrement agrandie ou rétrécie autour du lanceur : la carte gonfle puis
+    //  se creuse au passage de l'onde, comme sous une lentille, et redevient
+    //  elle-même derrière. Ni lecture de pixels (l'image vient d'ailleurs) ni
+    //  filtre sur tout le plateau : rien que des copies découpées, ce que
+    //  l'iPad sait faire vite. Sur chaque crête, un fil violet clair (la couleur
+    //  de la Distorsion, pont_combat.js) — trois, `anim-arc-mots`.
+    const VIOLET_DISTORSION = "#c9a2ff";
+    const sourcesDuSol = () => {
+        const ids = ["image-map-vtt", "studio-image-carte", "studio-canvas"];
+        const els = ids.map(id => document.getElementById(id));
+        if (window.PLATEAU_VTT && window.PLATEAU_VTT.canvas) els.push(window.PLATEAU_VTT.canvas);
+        return els.filter((el, i, l) => el && l.indexOf(el) === i && el.isConnected
+                && (el.tagName !== "IMG" || (el.complete && el.naturalWidth > 0))
+                && el.getBoundingClientRect().width > 0 && getComputedStyle(el).visibility !== "hidden")
+            .sort((x, y) => (x.tagName === "IMG" ? 0 : 1) - (y.tagName === "IMG" ? 0 : 1));
+    };
+    const ondesPsychiques = (o, sc, a, b, p = {}) => {
+        const n = p.ondes || 3, ecartement = (p.demiAngle || 34) * Math.PI / 180;
+        const v = axe(a, b), t = a.t;
+        const r0 = t * 0.45, r1 = Math.max(r0 + t * 0.5, v.d);
+        const duree = p.duree || 760, decale = p.decale || 170, largeur = t * 0.62, force = t * (p.force || 0.17);
+        const vitesse = Math.max(0.05, Number(window.VITESSE_ANIMATIONS) || 1);
+        // Les fils violets, sur les crêtes : posés dans le calque, au-dessus du sol.
+        const R = r1 + largeur;
+        const arcDeg = (ecartement * 180 / Math.PI).toFixed(1);
+        const fils = Array.from({ length: n }, (_, i) => {
+            const d = o.poser(sc.calque, a.x, a.y, `width:${R * 2}px; height:${R * 2}px; z-index:${Z.haut}; opacity:0;`,
+                `<svg viewBox="-1 -1 2 2" width="100%" height="100%" style="overflow:visible; filter:drop-shadow(0 0 4px ${VIOLET_DISTORSION})">
+                   <path d="M${Math.cos(-ecartement).toFixed(4)} ${Math.sin(-ecartement).toFixed(4)} A1 1 0 0 1 ${Math.cos(ecartement).toFixed(4)} ${Math.sin(ecartement).toFixed(4)}"
+                         fill="none" stroke="${VIOLET_DISTORSION}" stroke-width="2.2" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+                   <path d="M${Math.cos(-ecartement * 0.8).toFixed(4)} ${Math.sin(-ecartement * 0.8).toFixed(4)} A1 1 0 0 1 ${Math.cos(ecartement * 0.8).toFixed(4)} ${Math.sin(ecartement * 0.8).toFixed(4)}"
+                         fill="none" stroke="#f3e9ff" stroke-width="0.9" stroke-opacity="0.8" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`);
+            d.classList.add("anim-arc-mots");
+            d.dataset.arc = arcDeg;
+            const echelle = (r) => (r / R).toFixed(4);
+            return o.jouerPuisRetirer(d, [
+                { transform: `translate(-50%,-50%) rotate(${deg(v.angle)}deg) scale(${echelle(r0)})`, opacity: 0 },
+                { transform: `translate(-50%,-50%) rotate(${deg(v.angle)}deg) scale(${echelle(r0 + (r1 - r0) * 0.2)})`, opacity: 0.9, offset: 0.2 },
+                { transform: `translate(-50%,-50%) rotate(${deg(v.angle)}deg) scale(${echelle(r0 + (r1 - r0) * 0.8)})`, opacity: 0.75, offset: 0.8 },
+                { transform: `translate(-50%,-50%) rotate(${deg(v.angle)}deg) scale(${echelle(r1)})`, opacity: 0 }
+            ], { duration: duree, delay: i * decale, easing: "linear" });
+        });
+        // LE SOL : une copie de la carte sur la bande, déformée au passage des ondes.
+        const sources = sourcesDuSol();
+        let sol = Promise.resolve();
+        if (sources.length && !o.annulee()) {
+            const cr = sc.calque.getBoundingClientRect();
+            const angles = Array.from({ length: 13 }, (_, i) => v.angle - ecartement + (2 * ecartement * i) / 12);
+            const xs = [a.x, ...angles.map(g => a.x + Math.cos(g) * R)], ys = [a.y, ...angles.map(g => a.y + Math.sin(g) * R)];
+            const boite = { x: Math.floor(Math.min(...xs) - 4), y: Math.floor(Math.min(...ys) - 4) };
+            boite.l = Math.ceil(Math.max(...xs) + 4) - boite.x; boite.h = Math.ceil(Math.max(...ys) + 4) - boite.y;
+            const dpr = Math.min(2, window.devicePixelRatio || 1);
+            const copie = document.createElement("canvas");
+            copie.width = Math.max(1, Math.round(boite.l * dpr)); copie.height = Math.max(1, Math.round(boite.h * dpr));
+            const cc = copie.getContext("2d");
+            sources.forEach(el => {
+                const r = el.getBoundingClientRect();
+                const nl = el.tagName === "IMG" ? el.naturalWidth : el.width, nh = el.tagName === "IMG" ? el.naturalHeight : el.height;
+                const x0 = Math.max(cr.left + boite.x, r.left), y0 = Math.max(cr.top + boite.y, r.top);
+                const x1 = Math.min(cr.left + boite.x + boite.l, r.right), y1 = Math.min(cr.top + boite.y + boite.h, r.bottom);
+                if (x1 <= x0 || y1 <= y0 || !nl || !nh) return;
+                try {
+                    cc.drawImage(el, (x0 - r.left) * nl / r.width, (y0 - r.top) * nh / r.height, (x1 - x0) * nl / r.width, (y1 - y0) * nh / r.height,
+                                 (x0 - cr.left - boite.x) * dpr, (y0 - cr.top - boite.y) * dpr, (x1 - x0) * dpr, (y1 - y0) * dpr);
+                } catch (e) {}
+            });
+            const porteur = o.poser(sc.calque, boite.x + boite.l / 2, boite.y + boite.h / 2,
+                `width:${boite.l}px; height:${boite.h}px; z-index:1;`, "");
+            porteur.classList.add("anim-sol-distorsion");
+            const ecran = document.createElement("canvas");
+            ecran.width = copie.width; ecran.height = copie.height;
+            ecran.style.cssText = "width:100%; height:100%; display:block;";
+            porteur.appendChild(ecran);
+            const ce = ecran.getContext("2d");
+            const ax = (a.x - boite.x) * dpr, ay = (a.y - boite.y) * dpr;
+            const couronnes = 5, bandes = [[-1, -0.45, 0.45], [-0.45, 0.45, 1], [0.45, 1, 0.45]];
+            const debut = performance.now(), total = (duree + (n - 1) * decale) / vitesse;
+            sol = new Promise(fin => {
+                const image = (maintenant) => {
+                    if (o.annulee() || !porteur.isConnected) { porteur.remove(); return fin(); }
+                    const ecoule = maintenant - debut;
+                    ce.clearRect(0, 0, ecran.width, ecran.height);
+                    for (let i = 0; i < n; i++) {
+                        const u = (ecoule - (i * decale) / vitesse) / (duree / vitesse);
+                        if (u <= 0 || u >= 1) continue;
+                        const rayon = (r0 + (r1 - r0) * u) * dpr, enveloppe = Math.sin(Math.PI * u), w = largeur * dpr;
+                        for (let k = 0; k < couronnes; k++) {
+                            const ri = Math.max(1, rayon - w / 2 + (k * w) / couronnes), re = ri + w / couronnes + 0.6;
+                            const milieu = (k + 0.5) / couronnes;
+                            bandes.forEach(([g0, g1, poids]) => {
+                                const delta = force * dpr * enveloppe * poids * Math.sin(Math.PI * 2 * milieu);
+                                const echelle = 1 + delta / ((ri + re) / 2);
+                                ce.save();
+                                ce.beginPath();
+                                ce.arc(ax, ay, re, v.angle + g0 * ecartement, v.angle + g1 * ecartement);
+                                ce.arc(ax, ay, ri, v.angle + g1 * ecartement, v.angle + g0 * ecartement, true);
+                                ce.closePath();
+                                ce.clip();
+                                ce.translate(ax, ay); ce.scale(echelle, echelle); ce.translate(-ax, -ay);
+                                ce.drawImage(copie, 0, 0);
+                                ce.restore();
+                            });
+                        }
+                    }
+                    if (ecoule < total) requestAnimationFrame(image);
+                    else { porteur.remove(); fin(); }
+                };
+                requestAnimationFrame(image);
+            });
+        }
+        // `arrivee` : quand la première onde touche (o.attendre tient compte de la vitesse).
+        return { arrivee: duree * 0.92, fin: Promise.all([...fils, sol]) };
+    };
+    // LA CIBLE SE TORD SUR ELLE-MÊME, puis redevient elle-même : son pion
+    // s'écrase et se penche dans un sens, dans l'autre, et son image ondule
+    // (un filtre de turbulence sur l'image seule, le temps du coup).
+    let numeroTorsion = 0;
+    const tordreCible = (o, el, p = {}) => {
+        const duree = p.duree || 760;
+        const image = el && el.querySelector ? (el.querySelector(".token-img-main") || el) : null;
+        let filtre = null, avant = "";
+        if (image && !o.annulee()) {
+            const id = "anim-torsion-" + (++numeroTorsion);
+            filtre = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            filtre.setAttribute("width", "0"); filtre.setAttribute("height", "0");
+            filtre.style.cssText = "position:absolute; width:0; height:0; overflow:hidden;";
+            filtre.innerHTML = `<filter id="${id}" x="-20%" y="-20%" width="140%" height="140%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="${numeroTorsion % 9}" result="bruit"/>
+                <feDisplacementMap in="SourceGraphic" in2="bruit" scale="0" xChannelSelector="R" yChannelSelector="G"/></filter>`;
+            document.body.appendChild(filtre);
+            const deplacement = filtre.querySelector("feDisplacementMap");
+            avant = image.style.filter;
+            image.style.filter = `url(#${id})`;
+            const vitesse = Math.max(0.05, Number(window.VITESSE_ANIMATIONS) || 1);
+            const debut = performance.now(), total = duree / vitesse, fort = (image.getBoundingClientRect().width || 60) * 0.16;
+            const pas = (maintenant) => {
+                const u = Math.min(1, (maintenant - debut) / total);
+                deplacement.setAttribute("scale", (fort * Math.sin(Math.PI * u) * (1 - 0.4 * u)).toFixed(2));
+                if (u < 1 && !o.annulee() && filtre.isConnected) requestAnimationFrame(pas);
+                else { image.style.filter = avant; filtre.remove(); }
+            };
+            requestAnimationFrame(pas);
+        }
+        return o.bouger(el, [{ transform: "scale(1, 1) skewX(0deg)" },
+            { transform: "scale(1.13, 0.88) skewX(8deg) rotate(-3deg)", offset: 0.22 },
+            { transform: "scale(0.9, 1.1) skewX(-7deg) rotate(3deg)", offset: 0.48 },
+            { transform: "scale(1.05, 0.96) skewX(3deg)", offset: 0.74 },
+            { transform: "scale(1, 1) skewX(0deg)" }], { duration: duree, easing: "ease-in-out" });
+    };
     // Tenir une teinte sur un pion le temps de l'animation (elle s'en va au nettoyage).
     const teinte = (o, el, filtre, duree) => o.teinter(el, [{ filter: "none" }, { filter: filtre }], { duration: duree || 300, fill: "forwards" });
     const deteindre = (o, el, filtre, duree) => o.teinter(el, [{ filter: filtre }, { filter: "none" }], { duration: duree || 400, fill: "forwards" });
@@ -818,25 +979,15 @@
             // Renommée Distorsion mentale (v240) ; l'identifiant reste, pour
             // garder la case « intégrée » que le MJ a cochée.
             id: "mots-de-pouvoir", nom: "Distorsion mentale", sens: "vers l'ennemi",
-            description: "Le héros prononce les mots : trois ondes de voix, en arcs, roulent vers l'ennemi et le frappent de dégâts bruts, sans couleur.",
+            description: "Des ondes psychiques violet clair roulent vers l'ennemi et déforment la carte sous elles ; touché, l'ennemi se tord sur lui-même puis redevient normal. Dégâts bruts.",
             async jouer(sc, o) {
-                const { a, b, v } = lieux(sc);
+                const { a, b } = lieux(sc);
                 o.son("mots");
-                o.eclat(sc.lanceur, "brightness(1.3) grayscale(0.5) drop-shadow(0 0 8px #fff)", 600);
-                const rot = deg(v.angle);
-                const arcs = [0, 1, 2].map(i => {
-                    const d = o.poser(sc.calque, a.x, a.y, `width:${a.t * 0.5}px; height:${a.t * 1.1}px; z-index:${Z.haut}; border-radius:50%;
-                        border-right:4px solid rgba(240,240,240,0.9); filter:drop-shadow(0 0 6px #fff);`);
-                    return o.jouerPuisRetirer(d, [
-                        { transform: `translate(-50%,-50%) rotate(${rot}deg) scale(0.5)`, opacity: 0 },
-                        { transform: `translate(calc(-50% + ${(b.x - a.x) * 0.3}px), calc(-50% + ${(b.y - a.y) * 0.3}px)) rotate(${rot}deg) scale(0.9)`, opacity: 1, offset: 0.3 },
-                        { transform: `translate(calc(-50% + ${b.x - a.x}px), calc(-50% + ${b.y - a.y}px)) rotate(${rot}deg) scale(1.5)`, opacity: 0 }
-                    ], { duration: 620, delay: i * 140, easing: "ease-out" });
-                });
-                await o.attendre(480);
-                o.jauge(sc.calque, sc.cible, 40, 30, 40, "-10", "#e6e6e6", "#e6e6e6");
-                await Promise.all([...arcs, o.onde(sc.calque, b, { couleur: "#e6e6e6", taille: 0.9, duree: 600, echelle: 1.8 }),
-                    o.secouer(sc.cible, b.t * 0.14, 500, v), o.eclat(sc.cible, "grayscale(1) brightness(1.5)", 500)]);
+                o.eclat(sc.lanceur, `brightness(1.15) drop-shadow(0 0 9px ${VIOLET_DISTORSION})`, 700);
+                const ondes = ondesPsychiques(o, sc, a, b);
+                await o.attendre(ondes.arrivee);
+                o.jauge(sc.calque, sc.cible, 40, 30, 40, "-10", VIOLET_DISTORSION, "#e6e6e6");
+                await Promise.all([ondes.fin, tordreCible(o, sc.cible), o.eclat(sc.cible, `drop-shadow(0 0 8px ${VIOLET_DISTORSION})`, 600)]);
                 o.texte(sc.calque, sc.cible, "Dégâts bruts", COULEURS.neutre);
                 await o.attendre(300);
             }
@@ -3936,25 +4087,17 @@
         // mots, trois ondes de voix roulent en arcs jusqu'à la cible et la
         // frappent, sans couleur.
         { id: "jeu-mots-de-pouvoir", async jouer(sc, o) {
+            // La Distorsion mentale (v265) : des ondes psychiques qui déforment
+            // la carte jusqu'à chaque cible ; touchée, elle se tord sur elle-même.
             const a = centre(sc.lanceur, sc.calque);
             o.son("mots");
-            o.eclat(sc.lanceur, "brightness(1.3) grayscale(0.5) drop-shadow(0 0 8px #fff)", 600);
+            o.eclat(sc.lanceur, `brightness(1.15) drop-shadow(0 0 9px ${VIOLET_DISTORSION})`, 700);
             await Promise.all(sc.cibles.map(async el => {
-                const b = centre(el, sc.calque), v = axe(a, b), rot = deg(v.angle), touchee = toucheEnJeu(sc, el);
-                const arcs = [0, 1, 2].map(i => {
-                    const d = o.poser(sc.calque, a.x, a.y, `width:${a.t * 0.5}px; height:${a.t * 1.1}px; z-index:${Z.haut}; border-radius:50%;
-                        border-right:4px solid rgba(240,240,240,0.9); filter:drop-shadow(0 0 6px #fff);`);
-                    d.classList.add("anim-arc-mots");
-                    return o.jouerPuisRetirer(d, [
-                        { transform: `translate(-50%,-50%) rotate(${rot}deg) scale(0.5)`, opacity: 0 },
-                        { transform: `translate(calc(-50% + ${(b.x - a.x) * 0.3}px), calc(-50% + ${(b.y - a.y) * 0.3}px)) rotate(${rot}deg) scale(0.9)`, opacity: 1, offset: 0.3 },
-                        { transform: `translate(calc(-50% + ${b.x - a.x}px), calc(-50% + ${b.y - a.y}px)) rotate(${rot}deg) scale(1.5)`, opacity: 0 }
-                    ], { duration: 620, delay: i * 140, easing: "ease-out" });
-                });
-                await o.attendre(480);
-                if (!touchee) return Promise.all(arcs);
-                await Promise.all([...arcs, o.onde(sc.calque, b, { couleur: "#e6e6e6", taille: 0.9, duree: 600, echelle: 1.8 }),
-                    o.secouer(el, b.t * 0.14, 500, v), o.eclat(el, "grayscale(1) brightness(1.5)", 500)]);
+                const b = centre(el, sc.calque), touchee = toucheEnJeu(sc, el);
+                const ondes = ondesPsychiques(o, sc, a, b);
+                await o.attendre(ondes.arrivee);
+                if (!touchee) return ondes.fin;
+                await Promise.all([ondes.fin, tordreCible(o, el), o.eclat(el, `drop-shadow(0 0 8px ${VIOLET_DISTORSION})`, 600)]);
             }));
         } },
         // LA LUMIÈRE : un arc de lumière s'ouvre devant le lanceur ; le rayon en

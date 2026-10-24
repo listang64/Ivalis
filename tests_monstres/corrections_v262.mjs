@@ -479,7 +479,8 @@ titre("7. LA PISTE (BLANC, OR, ROUGE ; LISERÉ DU LEADER) ET L'AURA DU PION");
     return { petit: fond("M_P"), normal: fond("M_N2"), boss: fond("M_B"), heros: fond("H1"), leaderFond: fond("M_N"),
              ombreLeader: ombre("M_N"), ombreNormal: ombre("M_N2"),
              aura: !!a, sansAura: ["M_P", "M_N2", "M_B", "H1"].filter(id => !!aura(id)),
-             animation: a ? getComputedStyle(a).animationName : "", avant: a ? getComputedStyle(a, "::before").animationName : "",
+             // v265 : un anneau organique dessiné en SVG, qui ondule (formes animées).
+             ondule: a ? a.querySelectorAll("svg animate[attributeName='d']").length : 0,
              plusGrande: !!(ra && rp && ra.width > rp.width * 1.3), dessous: !!(a && img && Number(getComputedStyle(a).zIndex) < Number(getComputedStyle(img).zIndex)) };
   });
   const rgb = (hex) => { const n = parseInt(hex.slice(1), 16); return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`; };
@@ -490,8 +491,7 @@ titre("7. LA PISTE (BLANC, OR, ROUGE ; LISERÉ DU LEADER) ET L'AURA DU PION");
   verifier("LE LEADER : sa couleur (or), cerclée de rouge", r.leaderFond === rgb("#d4a72c") && /rgb\(255, 31, 31\) 0px 0px 0px 2px/.test(r.ombreLeader), r.ombreLeader.slice(0, 120));
   verifier("un Normal ordinaire n'a pas de liseré rouge", !/rgb\(255, 31, 31\)/.test(r.ombreNormal));
   verifier("LE PION DU LEADER : une aura rouge, et lui seul", r.aura && r.sansAura.length === 0, r.sansAura.join(","));
-  verifier("elle respire et ses éclats scintillent en tournant", /aura-leader-souffle/.test(r.animation) && /aura-leader-tourne/.test(r.avant) && /aura-leader-scintille/.test(r.avant),
-           `${r.animation} | ${r.avant}`);
+  verifier("elle ondule (v265 : un anneau organique, plus d'éclats qui tournent)", r.ondule >= 3, `${r.ondule}`);
   verifier("elle déborde du pion, sous son image", r.plusGrande && r.dessous);
 }
 

@@ -1409,7 +1409,9 @@ function etatsDuHeros() {
     });
 }
 
-// LE CLIC MONTRE LES TOURS QUI RESTENT, DEUX SECONDES.
+// LE CLIC MONTRE LE NOM DE L'ÉTAT ET LES TOURS QUI RESTENT, DEUX SECONDES
+// (le nom depuis la v265 — Nico : « quand on clique dessus, en plus du nombre
+// de tours restants, indique aussi le nom de l'état »).
 window.montrerDureeEtat = function(nom) {
     const piste = document.getElementById("piste-etats");
     if (!piste) return;
@@ -1428,7 +1430,15 @@ window.montrerDureeEtat = function(nom) {
     const tours = Math.max(0, parseInt(etat.duree) || 0);
     const bulle = tuile.querySelector(".etat-piste-duree");
     if (!bulle) return;
-    bulle.innerText = tours + (tours > 1 ? " Tours" : " Tour");
+    const nomAffiche = typeof window.nomEffetActuel === "function" ? window.nomEffetActuel(etat.nom) : etat.nom;
+    bulle.innerHTML = "";
+    const ligneNom = document.createElement("div");
+    ligneNom.className = "etat-piste-nom";
+    ligneNom.textContent = nomAffiche;
+    const ligneTours = document.createElement("div");
+    ligneTours.className = "etat-piste-tours";
+    ligneTours.textContent = tours + (tours > 1 ? " Tours" : " Tour");
+    bulle.append(ligneNom, ligneTours);
     bulle.classList.add("visible");
     bulle.dataset.minuterie = String(setTimeout(() => {
         bulle.classList.remove("visible");
@@ -3425,6 +3435,76 @@ window.fantomeAllieKO = function(idPerso, data, taille) {
     return div;
 };
 
+// =========================================================================
+//  L'AURA DU LEADER (v265)
+// =========================================================================
+//  Nico : « refais l'anneau rouge autour des tokens des leaders, quelque chose
+//  de plus organique, plus joli et un peu plus discret, qui ondule doucement
+//  autour. Quand je zoome ou dézoome, ça déplace ce cercle. »
+//
+//  LE DÉCALAGE AU ZOOM venait du centrage : un translate(-50 %, -50 %) DANS une
+//  animation CSS de transform. Pendant qu'elle tourne, Safari garde ce
+//  pourcentage calculé sur l'ancienne taille du pion ; le pion grandit au
+//  zoom, l'aura reste décalée. Ici, plus aucune animation de transform : la
+//  boîte se cale par ses bords (style.css), et tout ce qui bouge le fait DANS
+//  un SVG, en unités de son propre repère — il suit le pion à toutes les
+//  échelles.
+//
+//  L'ANNEAU : trois traits superposés (un halo large et pâle, un trait moyen,
+//  un fil vif) qui suivent la même forme ronde légèrement bosselée, et qui
+//  passent d'une forme à l'autre en boucle — il ondule sans jamais tourner
+//  d'un bloc. Un quatrième fil, pointillé et très pâle, glisse lentement
+//  autour. Le tout respire à peine. Le repère : le pion a un rayon de 37,5
+//  (la boîte fait 160 % du pion, 120 unités de côté).
+const RAYON_AURA = 41, AMPLEUR_AURA = 2.8, DUREE_AURA = 7;
+function formeAura(rayon, ampleur, graine) {
+    const n = 9;
+    const pts = Array.from({ length: n }, (_, i) => {
+        const a = (i / n) * Math.PI * 2;
+        const r = rayon + ampleur * (0.6 * Math.sin(a * 2 + graine * 1.7) + 0.4 * Math.sin(a * 3 + graine * 2.9));
+        return [r * Math.cos(a), r * Math.sin(a)];
+    });
+    const f = (v) => v.toFixed(2);
+    const point = (i) => pts[(i + n) % n];
+    // Une courbe fermée qui passe par chaque point (Catmull-Rom → Bézier).
+    let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
+    for (let i = 0; i < n; i++) {
+        const p0 = point(i - 1), p1 = point(i), p2 = point(i + 1), p3 = point(i + 2);
+        d += ` C${f(p1[0] + (p2[0] - p0[0]) / 6)} ${f(p1[1] + (p2[1] - p0[1]) / 6)}`
+           + ` ${f(p2[0] - (p3[0] - p1[0]) / 6)} ${f(p2[1] - (p3[1] - p1[1]) / 6)} ${f(p2[0])} ${f(p2[1])}`;
+    }
+    return d + "Z";
+}
+const FORMES_AURA = [0, 1, 2, 3, 0].map(g => formeAura(RAYON_AURA, AMPLEUR_AURA, g)).join(";");
+const DOUX_AURA = Array(4).fill("0.45 0 0.55 1").join(";");
+const traitAura = (largeur, opacite, decalage) => `<path fill="none" stroke="#ff3b3b" stroke-width="${largeur}" stroke-opacity="${opacite}"
+      stroke-linejoin="round" d="${formeAura(RAYON_AURA, AMPLEUR_AURA, 0)}">
+      <animate attributeName="d" dur="${DUREE_AURA}s" begin="${decalage}s" repeatCount="indefinite" calcMode="spline"
+               keyTimes="0;0.25;0.5;0.75;1" keySplines="${DOUX_AURA}" values="${FORMES_AURA}"/></path>`;
+const SVG_AURA = `<svg viewBox="-60 -60 120 120" aria-hidden="true">
+    <defs><radialGradient id="aura-halo" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="47">
+      <stop offset="0.78" stop-color="#ff2a2a" stop-opacity="0"/><stop offset="0.88" stop-color="#ff2a2a" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ff2a2a" stop-opacity="0"/></radialGradient></defs>
+    <g opacity="0.8">
+      <animate attributeName="opacity" values="0.6;0.85;0.6" dur="3.6s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1"/>
+      <circle r="47" fill="url(#aura-halo)"/>
+      ${traitAura(9, 0.14, 0)}${traitAura(4.5, 0.26, -0.4)}${traitAura(1.4, 0.9, -0.8)}
+      <circle r="45.5" fill="none" stroke="#ff8a8a" stroke-width="0.7" stroke-opacity="0.35" stroke-dasharray="1.5 7" stroke-linecap="round">
+        <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="48s" repeatCount="indefinite"/></circle>
+    </g></svg>`;
+window.auraLeader = function() {
+    const aura = document.createElement("div");
+    aura.className = "aura-leader";
+    aura.innerHTML = SVG_AURA;
+    // Un pion se redessine souvent (chaque nouvelle du combat) : l'aura reprend
+    // là où le temps en est, au lieu de repartir de zéro à chaque fois.
+    const svg = aura.firstElementChild;
+    if (svg && typeof svg.setCurrentTime === "function") {
+        try { svg.setCurrentTime((performance.now() / 1000) % 336); } catch (e) {}
+    }
+    return aura;
+};
+
 window.appliquerTokensVTT = function(tokensMap) {
     if (!window.PLATEAU_VTT) return;
     
@@ -3688,13 +3768,11 @@ window.appliquerTokensVTT = function(tokensMap) {
             // création du héros) ; à défaut, l'image commune.
             const imageDuPion = (pData.compagnonDe && (pData.urlToken || pData.urlCloudinary)) || window.IMAGE_TOKEN_ENNEMI;
             if (pData.compagnonDe) divToken.classList.add("token-compagnon");
-            // LE LEADER (v262) : une aura rouge qui scintille autour du pion,
-            // sous son image.
+            // LE LEADER (v262) : une aura rouge autour du pion, sous son image —
+            // un anneau organique qui ondule doucement (v265, auraLeader).
             if (pData.leader && !pData.zombie) {
                 divToken.classList.add("token-leader");
-                const aura = document.createElement("div");
-                aura.className = "aura-leader";
-                divToken.appendChild(aura);
+                divToken.appendChild(window.auraLeader());
             }
             imgEnnemi.src = typeof window.redimensionnerImageCloudinary === "function"
                 ? window.redimensionnerImageCloudinary(imageDuPion, 700)
@@ -6223,9 +6301,37 @@ function ajusterSurUneLigne(element, tailleMax, tailleMin) {
 // chaque redessin de l'écran de combat (rafraichirAffichageCombat), sur la
 // même fiche que la piste des états du héros, et un même état ne compte
 // qu'une fois, comme là-bas.
+// LE NOM NE PASSE JAMAIS SOUS LES ÉTATS (v265, Nico : « déplace un peu vers la
+// droite le nom du personnage pour qu'il n'empiète pas sur les états »). Il
+// part de sa place réglée (REGLAGES_HUD.encartNom, déjà un peu plus à droite) ;
+// si une icône d'état le touche encore — l'image de la plaque décide des
+// hauteurs —, il glisse juste à droite de la dernière.
+window.eviterEtatsNomEncart = function() {
+    const nom = document.getElementById("voile-tour-nom");
+    const elEtats = document.getElementById("voile-tour-etats");
+    const encart = document.getElementById("voile-tour-encart");
+    const base = window.REGLAGES_HUD && window.REGLAGES_HUD.encartNom;
+    if (!nom || !elEtats || !encart || !base) return;
+    nom.style.left = base.x + "%";
+    const L = encart.getBoundingClientRect().width;
+    if (L <= 0 || elEtats.children.length === 0) return;
+    const n = nom.getBoundingClientRect();
+    let droite = -Infinity;
+    [...elEtats.children].forEach(icone => {
+        const r = icone.getBoundingClientRect();
+        if (r.width > 0 && n.top < r.bottom - 1 && n.bottom > r.top + 1 && n.left < r.right) droite = Math.max(droite, r.right);
+    });
+    if (droite === -Infinity) return;
+    const ecart = 0.012 * L;
+    nom.style.left = (((droite + ecart) - encart.getBoundingClientRect().left) / L * 100) + "%";
+};
+
 window.actualiserEtatsEncart = function() {
     const elEtats = document.getElementById("voile-tour-etats");
     if (!elEtats || !elEtats.dataset.acteur) return;
+    try { actualiserIconesEtatsEncart(elEtats); } finally { window.eviterEtatsNomEncart(); }
+};
+function actualiserIconesEtatsEncart(elEtats) {
     const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === elEtats.dataset.acteur) || {};
     const vus = new Set();
     const etats = (perso.Etats_Alteres || []).filter(e => {
@@ -6261,7 +6367,7 @@ window.actualiserEtatsEncart = function() {
         return `<div class="pastille-resistance" title="${titre}"
                      style="--el-couleur: ${couleur}; --el-fond: ${fond}; width: ${tailleEtat}px; height: ${tailleEtat}px; font-size: ${Math.round(tailleEtat * 0.55)}px;">${symbole}</div>`;
     }).join("");
-};
+}
 
 window.rafraichirVoileTour = function(queueParam, phaseParam) {
     const voile = document.getElementById("voile-tour-combat");

@@ -775,15 +775,17 @@ export function creerPont(effets) {
                     await Promise.resolve().then(() => reaction({ sorte: "confusion-allie", pion: scene.pion,
                                                                   texte: "Confus : attaque un allié !", couleur: "#cc66ff" })).catch(() => false);
                 }
+                // Le geste du Studio a-t-il été joué (le coup sur chaque touché) ?
+                let gesteJoue = false;
                 // Un zombie ne s'élance pas comme un combattant : il titube et griffe.
                 if (scene.zombie && zombie && (scene.cibles || []).length) await zombie({ pion: scene.pion, cible: scene.cibles[0] });
                 // LES ATTAQUES DU STUDIO (coup d'épée, légère, lourde, tir, boule
                 // de feu) jouent leur geste entier, le coup reçu sur qui est
                 // touché ; elles disent si elles ont su le jouer.
-                else if (!(attaque && await attaque({ pion: scene.pion, cibles: scene.cibles, touches: scene.touches,
+                else if (!(gesteJoue = !!(attaque && await attaque({ pion: scene.pion, cibles: scene.cibles, touches: scene.touches,
                                                        frappe: scene.frappe || null, element: scene.element || null,
                                                        sort: scene.sort || null,
-                                                       projectile: scene.projectile, carte: scene.carte }))) {
+                                                       projectile: scene.projectile, carte: scene.carte })))) {
                     await ruee({ pion: scene.pion, cibles: scene.cibles });
                     // PUIS CE QUI TRAVERSE, s'il y a quelque chose à voir voler.
                     // Dans cet ordre, et pas l'inverse : le lanceur s'élance, PUIS
@@ -796,8 +798,12 @@ export function creerPont(effets) {
                                            sorte: scene.projectile });
                     }
                 }
-                // UNE ATTAQUE DE ZONE : ses cases rougeoient, puis explosent.
-                if (scene.zone && zoneCarte) await zoneCarte({ pion: scene.pion, cases: scene.zone, cibles: scene.cibles });
+                // UNE ATTAQUE DE ZONE : ses cases rougeoient, puis explosent —
+                // sauf celle d'une attaque légère ou lourde (v265, Nico : « on ne
+                // garde que l'animation du coup sur chaque ennemi touché ») :
+                // son geste a déjà frappé chacun d'eux.
+                const coupSeul = gesteJoue && (scene.frappe === "legere" || scene.frappe === "lourde");
+                if (scene.zone && zoneCarte && !coupSeul) await zoneCarte({ pion: scene.pion, cases: scene.zone, cibles: scene.cibles });
                 // UN SOIN DE ZONE : ses cases fleurissent ; UN SOIN ÉTALÉ : son
                 // sceau se pose sous chaque soigné.
                 if (scene.soinZone && reaction) await Promise.resolve().then(() => reaction({ sorte: "soin-zone", pion: scene.pion, cases: scene.soinZone })).catch(() => false);
