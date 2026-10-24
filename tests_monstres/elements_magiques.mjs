@@ -424,8 +424,10 @@ console.log("\n6. LES CRÉATURES : LEUR ÉLÉMENT, LEURS RÉSISTANCES À L'ÉCRA
            /estAttaqueElementaire\(effetBase\.Nom\)/.test(src) && /act\.element = els\[Math\.floor\(Math\.random\(\)/.test(src)
            && /\.\.\.\(act\.element \? \{ element: act\.element \} : \{\}\)/.test(src));
   const mon = fs.readFileSync('/home/user/Ivalis/monstres.js', 'utf-8');
-  verifier("à sa création : Resistances_Etats tirées selon son palier ; relues à l'écoute (l'ancien champ aussi)",
-           /Resistances_Etats: typeof window\.tirerResistancesEtats === "function"\s*\?\s*window\.tirerResistancesEtats\(gabarit\.Palier\)/.test(mon)
+  // v263 : leur nombre suit aussi le niveau du groupe (nbResistancesCreature).
+  verifier("à sa création : Resistances_Etats tirées selon son palier (et le niveau du groupe) ; relues à l'écoute (l'ancien champ aussi)",
+           /window\.tirerResistancesEtats\(gabarit\.Palier, undefined, /.test(mon)
+           && /Resistances_Etats: nbResistances === undefined \? tirees : tirees\.slice\(0, nbResistances\)/.test(mon)
            && /objet\.resistancesEtats = Array\.isArray\(brut\.Resistances_Etats\)/.test(mon)
            && /Array\.isArray\(brut\.Resistances_Elementaires\)/.test(mon));
 }
