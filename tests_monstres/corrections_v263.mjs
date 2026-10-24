@@ -465,6 +465,8 @@ titre("9. L'ENCART DE LA COMPÉTENCE JOUÉE, EN SYMBOLES");
       boite.remove();
       return { montants, texte };
     };
+    window.PERSOS_JOUEURS_PARTIE = window.__heros([["H1", "Aldric", 0]]);
+    window.__ou(() => window.recomposerCombattants(), null);
     const h = lireCarte(carte, heros);
     const m = lireCarte(carte, creature);
     // Un étalement posé sur une Distance vaut pour toute la carte.
@@ -478,8 +480,9 @@ titre("9. L'ENCART DE LA COMPÉTENCE JOUÉE, EN SYMBOLES");
              memePalette: JSON.stringify(window.__ou(() => window.couleursChiffres(), null)) === JSON.stringify(palette) && !!palette.mental };
   });
   const m = r.h.montants;
+  // (v264 : le montant affiché est celui qui tombera, surpuissance ×1,25 comprise.)
   verifier("quatre montants, dans l'ordre : physique, magique, Distorsion mentale, soin",
-           m.map(x => `${x.nature}:${x.chiffre}`).join(" ") === "physique:12 magique:9 mental:5 soin:6", m.map(x => `${x.nature}:${x.chiffre}`).join(" "));
+           m.map(x => `${x.nature}:${x.chiffre}`).join(" ") === "physique:15 magique:11 mental:6 soin:8", m.map(x => `${x.nature}:${x.chiffre}`).join(" "));
   verifier("chacun avec son symbole (explosion, baguette, tête, croix)", m.length === 4 && m.every(x => x.svg));
   verifier("plus de texte : ni « dégâts », ni « soins », ni le nom des attaques",
            !/d[ée]g[âa]t|soins?\b|Attaque|Distorsion|Mots de pouvoir/i.test(r.h.texte), r.h.texte.slice(0, 120));
@@ -492,8 +495,8 @@ titre("9. L'ENCART DE LA COMPÉTENCE JOUÉE, EN SYMBOLES");
   verifier("l'étalement : « (Sur 2 Tours) » sur le montant étalé, et lui seul",
            m[0] && m[0].etal === "(Sur 2 Tours)" && m.slice(1).every(x => x.etal === ""), m.map(x => x.etal || "—").join(" | "));
   verifier("…et plus de ligne d'étalement", !/divis|étalement|fin de manche/i.test(r.h.texte), r.h.texte.slice(0, 120));
-  verifier("la surpuissance (80 de fatigue) : « ×1,25 » en or, à côté de chaque montant",
-           m.length === 4 && m.every(x => x.surp === "×1,25" && x.or === r.rgb.or), m.map(x => x.surp || "—").join(" | "));
+  verifier("la surpuissance (80 de fatigue) : le mot « Surpuissance » en or, à côté de chaque montant (v264)",
+           m.length === 4 && m.every(x => x.surp === "Surpuissance" && x.or === r.rgb.or), m.map(x => x.surp || "—").join(" | "));
   verifier("une créature n'a pas de surpuissance", r.m.montants.length === 4 && r.m.montants.every(x => x.surp === ""), r.m.montants.map(x => x.surp || "—").join(" | "));
   verifier("les états restent comme avant : « ↳ Brûlé », sans pourcentage", /↳ Brûlé/.test(r.h.texte) && !/%/.test(r.h.texte), r.h.texte.slice(0, 160));
   verifier("le bouclier et le Contre gardent leur ligne (ce ne sont pas des montants)", /• Bouclier magique/.test(r.h.texte) && /• Contre/.test(r.h.texte), r.h.texte.slice(0, 200));

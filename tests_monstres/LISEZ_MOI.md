@@ -7724,7 +7724,8 @@ l'encart de la compétence jouée en symboles.
   dans la bulle (title). Un étalement n'a plus sa ligne : « (Sur 2 Tours) »
   s'écrit sur le montant étalé (sur tous, s'il est posé sur une Distance ou une
   Zone, comme dans le moteur). La surpuissance d'une technique de héros
-  (« ×1,25 ») s'écrit en or, juste à côté de chaque montant. Les états gardent
+  s'écrit en or, juste à côté de chaque montant (v264 : le mot seul, et le
+  montant la compte déjà, voir plus bas). Les états gardent
   leur ligne, sans pourcentage, comme avant ; un bouclier, une purification,
   un Contre aussi (ce ne sont pas des montants).
 - LA DISTANCE, EN HAUT À DROITE (#voile-tour-distance ; distanceEncartCarte) :
@@ -7754,3 +7755,26 @@ nouvelles couleurs ; le tirage des résistances passe par une variable), v261
 triche du niveau 1, 8 %, sous le leader et ses PV), elements_magiques (le
 nombre de résistances suit le niveau), cout_et_tir et fenetre_tour (la
 distance en haut à droite, les montants en symboles).
+
+## v264 — L'encart dit le montant qui tombera
+
+Nico, sur l'encart de la compétence jouée : « la triche et la surpuissance
+doivent être prises en compte directement. Et la surpuissance, tu indiques
+juste "surpuissance", pas le calcul. »
+
+- LE MONTANT AFFICHÉ (combat.js, ligneEffetsCarte → montantReel) est celui
+  que le moteur fera tomber, avant les défenses de la cible : pour un héros,
+  la valeur de la carte multipliée par sa surpuissance (×1,25 dès 70 de
+  fatigue, ×1,35 dès 100, arrondie à l'unité comme dans moteur_effets.js) ;
+  pour une créature, sa triche selon le niveau du groupe, leader compris (la
+  même fonction que le moteur, bonusMonstreDe), arrondie à l'unité. Un zombie
+  ou un compagnon (sans stature) garde le chiffre de sa carte.
+- LA SURPUISSANCE se dit d'un mot, « Surpuissance », en or à côté du montant :
+  plus de « ×1,25 ». Une créature n'en a jamais.
+
+corrections_v264.mjs (dans la suite), sur la vraie page : un héros à 80, 100
+et 30 de fatigue (les montants comparés au calcul du moteur, le mot, plus de
+« × ») ; une créature au niveau 1 et 5 du groupe, un leader, un zombie (les
+montants comparés à appliquerBonusMonstre) ; les versions. Il mord sur
+l'ancien code (9 échecs). corrections_v263 remis à cette règle (montants
+surpuissance comprise, le mot au lieu de « ×1,25 »).

@@ -5978,9 +5978,10 @@ window.distanceEncartCarte = function(dataCarte, lanceur) {
 // bleu ciel pour des dégâts magiques, une tête violet clair qui ondule pour la
 // Distorsion mentale, une croix verte pour un soin — chacun dans la couleur de
 // son chiffre qui s'envole. Un étalement s'écrit à côté du montant qu'il
-// étale (« (Sur 2 Tours) ») au lieu d'avoir sa ligne ; la surpuissance, en or,
-// juste à côté (« ×1,25 »). La distance est partie en haut à droite de
-// l'encart (distanceEncartCarte) ; la zone est dessinée à côté.
+// étale (« (Sur 2 Tours) ») au lieu d'avoir sa ligne. Le montant est celui
+// qui tombera : surpuissance ou triche des créatures déjà comptées ; la
+// surpuissance le dit d'un mot, en or, juste à côté. La distance est partie en
+// haut à droite de l'encart (distanceEncartCarte) ; la zone est dessinée à côté.
 //
 // LES ÉTATS GARDENT LEUR LIGNE, ET LA RÈGLE SE LIT DANS LE TEXTE : pas de
 // pourcentage dans l'encart. Toute description qui contient un « % » se réduit
@@ -6010,14 +6011,31 @@ window.ligneEffetsCarte = function(dataCarte, lanceur) {
             </div>`;
     };
 
-    // LA SURPUISSANCE de la carte (app.js) : une technique de héros forgée à 70
-    // de fatigue ou plus. Celles des créatures ne sont pas forgées.
+    // LE MONTANT QUI TOMBERA VRAIMENT (Nico : « la triche et la surpuissance
+    // doivent être prises en compte directement »), par les mêmes règles que le
+    // moteur : la SURPUISSANCE d'une technique de héros forgée à 70 de fatigue
+    // ou plus (app.js ; arrondie à l'unité, moteur_effets.js), la TRICHE d'une
+    // créature selon le niveau du groupe, leader compris (bonusMonstreDe,
+    // moteur_pur.js). Les cartes des créatures ne sont pas forgées : jamais de
+    // surpuissance pour elles. La surpuissance se dit d'un mot, en or.
     const estCreature = !!(lanceur && (lanceur.estMonstre
         || (typeof window.estMonstre === "function" && window.estMonstre(lanceur.idPersonnage))));
-    const surpuissance = (lanceur && !estCreature && typeof window.texteSurpuissance === "function")
-        ? window.texteSurpuissance(typeof window.fatigueDeSurpuissance === "function"
+    const multiplicateurSurpuissance = (lanceur && !estCreature && typeof window.multiplicateurSurpuissance === "function")
+        ? window.multiplicateurSurpuissance(typeof window.fatigueDeSurpuissance === "function"
             ? window.fatigueDeSurpuissance(dataCarte, lanceur) : dataCarte.Fatigue)
-        : "";
+        : 1;
+    const surpuissance = multiplicateurSurpuissance > 1;
+    const noyau = window.moteurPur || {};
+    const triche = (estCreature && typeof noyau.bonusMonstreDe === "function")
+        ? Number(noyau.bonusMonstreDe({ estMonstre: true, palier: lanceur.Palier || lanceur.palier || "", leader: !!lanceur.leader })) || 0
+        : 0;
+    const montantReel = (texte) => {
+        if (!surpuissance && !triche) return texte;
+        let v = parseFloat(String(texte).replace(",", ".")) || 0;
+        if (surpuissance) v = Math.round(v * multiplicateurSurpuissance);
+        if (triche) v = v * (1 + triche / 100);
+        return String(Math.round(v));
+    };
 
     // L'ÉTALEMENT, par action : un effet de base et les sous-effets qui le
     // suivent. Posé sur une Distance ou une Zone, il vaut pour toute la carte,
@@ -6058,7 +6076,7 @@ window.ligneEffetsCarte = function(dataCarte, lanceur) {
         return `<div class="encart-montant" data-nature="${nature}" title="${echapperAttr(nom)}" style="${retrait} color: ${couleur};">`
             + SYMBOLES_ENCART[nature === "brut" ? "physique" : nature]
             + `<span class="encart-chiffre">${montant}</span>`
-            + (surpuissance ? `<span class="encart-surpuissance" style="color: ${OR_SURPUISSANCE};">${surpuissance}</span>` : "")
+            + (surpuissance ? `<span class="encart-surpuissance" style="color: ${OR_SURPUISSANCE};">Surpuissance</span>` : "")
             + (tours > 0 ? `<span class="encart-etalement">(Sur ${tours} Tours)</span>` : "")
             + `</div>`;
     };
@@ -6083,7 +6101,7 @@ window.ligneEffetsCarte = function(dataCarte, lanceur) {
         const nature = window.natureEffetEncart(eff.nom, sansBalises(eff.desc));
         const chiffre = nature ? sansBalises(eff.desc).match(/(\d+(?:[.,]\d+)?)/) : null;
         if (nature && chiffre) {
-            lignes.push(ligneMontant(nature, nom, chiffre[1].replace(".", ","), toursPour(i), !!eff.isMod));
+            lignes.push(ligneMontant(nature, nom, montantReel(chiffre[1]).replace(".", ","), toursPour(i), !!eff.isMod));
             return;
         }
         const montreDesc = eff.desc && !/%/.test(eff.desc);
