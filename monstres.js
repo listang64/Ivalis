@@ -203,6 +203,12 @@ window.recomposerCombattants = function() {
     const monstres = window.MONSTRES_PARTIE || [];
     const fraiches = [...joueurs, ...monstres];
 
+    // Le niveau du groupe suit : un héros qui monte, qui arrive ou qui part
+    // passe tous par ici (v263).
+    if (typeof window.actualiserNiveauGroupe === "function") {
+        try { window.actualiserNiveauGroupe(); } catch (e) { console.error("Niveau du groupe :", e); }
+    }
+
     // TANT QUE LE CERVEAU TIENT CE COMBAT, SES CHIFFRES FONT FOI — jamais ceux
     // que Personnages ou Monstres viennent de renvoyer. Ces documents ne
     // reçoivent plus une seule écriture de PV, fatigue, bouclier ou états
@@ -311,6 +317,8 @@ window.ecouterMonstresPartie = function(idPartie) {
             // à son premier KO (Apparition 1).
             objet.leader        = !!brut.Leader;
             objet.releveEnLeader = !!brut.Releve_En_Leader && !brut.Leader;
+            // Les résistances de son rang de leader, tirées d'avance (v263).
+            if (Array.isArray(brut.Resistances_En_Leader)) objet.resistancesEnLeader = [...brut.Resistances_En_Leader];
             // LE TABLEAU DES MONSTRES JUSQU'AU COMBAT (Nico, v251 : « assure-toi
             // que Paramètres > Outils > Monstres soit bien relié aux stats
             // réelles des monstres en jeu »). Le nombre d'actions décide d'une
@@ -351,6 +359,21 @@ window.ecouterMonstresPartie = function(idPartie) {
 window.creerMonstreDepuisGabarit = async function(idMonstre, gabarit, donneesSupplementaires = {}) {
     if (!gabarit) return null;
 
+    // LA TRICHE SELON LE NIVEAU DU GROUPE (v263) : autant de PV en plus que de
+    // % de dégâts et de soins. Un leader y ajoute les siens (champsLeader).
+    const pvTriche = window.tricheMonstresActuelle();
+    // SES RÉSISTANCES, SELON LE NIVEAU DU GROUPE ET SA STATURE (v263). Celle qui
+    // se relèvera en leader (Apparition 1) tire déjà celles de son futur rang :
+    // les premières sont les siennes, les suivantes viennent avec la relève.
+    const leader = !!donneesSupplementaires.Leader;
+    const releve = !!donneesSupplementaires.Releve_En_Leader && !leader;
+    const nbResistances = typeof window.nbResistancesCreature === "function"
+        ? window.nbResistancesCreature(gabarit.Palier, { leader }) : undefined;
+    const nbEnLeader = releve && typeof window.nbResistancesCreature === "function"
+        ? window.nbResistancesCreature(gabarit.Palier, { leader: true }) : 0;
+    const tirees = typeof window.tirerResistancesEtats === "function"
+        ? window.tirerResistancesEtats(gabarit.Palier, undefined, Math.max(nbResistances || 0, nbEnLeader) || nbResistances) : [];
+
     const data = {
         ID_Partie: window.ID_PARTIE_COURANTE,
         ID_Joueur: "MJ",
@@ -359,8 +382,8 @@ window.creerMonstreDepuisGabarit = async function(idMonstre, gabarit, donneesSup
         Gabarit: gabarit.Cle,
         Archetype: gabarit.Archetype,
         Palier: gabarit.Palier,
-        PV_Max: gabarit.PV,
-        PV_Actuels: gabarit.PV,
+        PV_Max: (Number(gabarit.PV) || 0) + pvTriche,
+        PV_Actuels: (Number(gabarit.PV) || 0) + pvTriche,
         Fatigue_Max: gabarit.Fatigue_Max,
         Fatigue_Actuelle: gabarit.Fatigue_Max,
         Def_Physique: gabarit.Res_Physique,
@@ -379,10 +402,10 @@ window.creerMonstreDepuisGabarit = async function(idMonstre, gabarit, donneesSup
         Personnalite: (typeof window.tirerPersonnaliteMonstre === "function")
             ? window.tirerPersonnaliteMonstre(gabarit.Archetype)
             : "brutal",
-        // Une résistance à partir de Normal, deux en Élite, trois en Boss —
-        // parmi tous les états (v260 : 25 % de chance en moins de l'attraper).
-        Resistances_Etats: typeof window.tirerResistancesEtats === "function"
-            ? window.tirerResistancesEtats(gabarit.Palier) : [],
+        // Parmi tous les états (v260 : 25 % de chance en moins de l'attraper),
+        // autant que le niveau du groupe et sa stature le disent (v263).
+        Resistances_Etats: nbResistances === undefined ? tirees : tirees.slice(0, nbResistances),
+        ...(releve ? { Resistances_En_Leader: tirees } : {}),
         ...donneesSupplementaires
     };
 
@@ -428,18 +451,23 @@ const PALIERS_TENUS = ["Petit", "Normal", "Élite", "Boss"];
 const noyauMoteur = () => (typeof window !== "undefined" && window.moteurPur) || {};
 const noyauIA = () => (typeof window !== "undefined" && window.iaPure) || {};
 window.REGLAGES_MONSTRES_DEFAUT = Object.freeze({
-    // En % de leurs dégâts et soins (v255), 10 % pour chaque stature.
-    bonusDegats: { ...(noyauMoteur().BONUS_MONSTRE_DEFAUT || { "Petit": 10, "Normal": 10, "Élite": 10, "Boss": 10 }) },
+    // LA TRICHE SELON LE NIVEAU DU GROUPE (Nico, v263 : « du niveau 1 à 4 :
+    // base de 7 + 1 × niveau du groupe ; du niveau 5 à 10 : base de 5 + 2 ×
+    // niveau ; ça donne un % de dégâts et de soins qui se rajoute, et un nombre
+    // de points de vie qui se rajoutent — au niveau 1, 8 % et 8 PV »). Elle
+    // remplace la triche par stature (10 % chacune, v255).
+    tricheNiveau: { base14: 7, parNiveau14: 1, base510: 5, parNiveau510: 2 },
     bonusSortsPct: 20,
     deplacement: { ...(noyauIA().PAS_PAR_PALIER_DEFAUT || { "Petit": 6, "Normal": 5, "Élite": 4, "Boss": 4 }) },
     leader: { ...(noyauMoteur().LEADER_DEFAUT || { degats: 15, resistances: 15, pv: 15, chanceEtat: 15 }) }
 });
 const BORNES_REGLAGES = { bonusDegats: [-50, 200], bonusSortsPct: [-50, 200], deplacement: [0, 15],
+                          tricheBase: [-50, 200], trichePente: [-20, 50],
                           leaderDegats: [-50, 200], leaderResistances: [-50, 70], leaderPv: [0, 300], leaderChanceEtat: [-50, 100] };
 // Les quatre chiffres du leader : leur nom en base, leur borne, leur libellé.
 const CHAMPS_LEADER = [
     { cle: "degats", champ: "Degats_Soins_Pct", borne: "leaderDegats", titre: "Dégâts et soins en plus", unite: "%",
-      aide: "En pour cent du brut de chaque attaque et de chaque soin, en plus de la triche de sa stature" },
+      aide: "En pour cent du brut de chaque attaque et de chaque soin, en plus de la triche du niveau du groupe" },
     { cle: "resistances", champ: "Resistances", borne: "leaderResistances", titre: "Défenses physique et magique", unite: "pts",
       aide: "Points ajoutés à ses résistances physique et magique (20 % deviennent 35 %)" },
     { cle: "pv", champ: "PV", borne: "leaderPv", titre: "Points de vie en plus", unite: "PV",
@@ -447,6 +475,23 @@ const CHAMPS_LEADER = [
     { cle: "chanceEtat", champ: "Chance_Etat_Pct", borne: "leaderChanceEtat", titre: "Chance de poser un état", unite: "pts",
       aide: "Points ajoutés à chaque chance d'état de ses compétences (30 % deviennent 45 %)" }
 ];
+// Les quatre chiffres de la triche selon le niveau.
+const CHAMPS_TRICHE = [
+    { cle: "base14", champ: "Base_1_4", borne: "tricheBase" },
+    { cle: "parNiveau14", champ: "Par_Niveau_1_4", borne: "trichePente" },
+    { cle: "base510", champ: "Base_5_10", borne: "tricheBase" },
+    { cle: "parNiveau510", champ: "Par_Niveau_5_10", borne: "trichePente" }
+];
+// Le % de dégâts et de soins (et les PV) que les créatures prennent en plus, à
+// ce niveau du groupe. Au-delà du niveau 10, la même pente.
+window.tricheDuNiveau = function(niveau, t) {
+    const r = t || (window.REGLAGES_MONSTRES || window.REGLAGES_MONSTRES_DEFAUT).tricheNiveau;
+    const n = Math.max(1, Math.round(Number(niveau) || 1));
+    return n <= 4 ? r.base14 + r.parNiveau14 * n : r.base510 + r.parNiveau510 * n;
+};
+// La triche du moment, au niveau du groupe d'aujourd'hui.
+window.tricheMonstresActuelle = () => window.tricheDuNiveau(window.NIVEAU_GROUPE || 1);
+
 const borner = (famille, v, defaut) => {
     // Une case vidée (ou un champ absent) garde la valeur d'avant.
     if (v === undefined || v === null || String(v).trim() === "") return defaut;
@@ -466,21 +511,28 @@ window.normaliserReglagesMonstres = function(brut) {
     };
     const leader = {};
     CHAMPS_LEADER.forEach(c => { leader[c.cle] = borner(c.borne, (src.Leader || {})[c.champ], d.leader[c.cle]); });
+    const tricheNiveau = {};
+    CHAMPS_TRICHE.forEach(c => { tricheNiveau[c.cle] = borner(c.borne, (src.Triche_Niveau || {})[c.champ], d.tricheNiveau[c.cle]); });
+    // La triche par stature d'avant (Bonus_Degats_Pct, v255) ne se lit plus :
+    // c'est le niveau du groupe qui la donne, la même pour toutes les statures.
+    const pct = window.tricheDuNiveau(window.NIVEAU_GROUPE || 1, tricheNiveau);
     return {
-        // Un champ neuf : l'ancien (Bonus_Degats) comptait des POINTS (+1, +2…),
-        // qu'on ne doit pas relire comme des pour cent.
-        bonusDegats: parPalier("bonusDegats", "Bonus_Degats_Pct"),
+        bonusDegats: Object.fromEntries(PALIERS_TENUS.map(p => [p, pct])),
+        tricheNiveau,
         bonusSortsPct: borner("bonusSortsPct", src.Bonus_Sorts_Pct, d.bonusSortsPct),
         deplacement: parPalier("deplacement", "Deplacement"),
         leader
     };
 };
+// La triche telle qu'on l'écrit en base.
+const tricheVersBase = (t) => Object.fromEntries(CHAMPS_TRICHE.map(c => [c.champ, t[c.cle]]));
 // Le leader tel qu'on l'écrit en base.
 const leaderVersBase = (leader) => Object.fromEntries(CHAMPS_LEADER.map(c => [c.champ, leader[c.cle]]));
 // Les poser partout où le jeu les lit.
 window.appliquerReglagesMonstres = function(brut) {
     const r = window.normaliserReglagesMonstres(brut);
     window.REGLAGES_MONSTRES = r;
+    window.REGLAGES_MONSTRES_BRUTS = brut || null;
     if (typeof noyauMoteur().reglerBonusMonstres === "function") noyauMoteur().reglerBonusMonstres(r.bonusDegats);
     if (typeof noyauIA().reglerPasMonstres === "function") noyauIA().reglerPasMonstres(r.deplacement);
     if (typeof noyauMoteur().reglerLeader === "function") noyauMoteur().reglerLeader(r.leader);
@@ -504,7 +556,50 @@ window.ecouterReglagesMonstres = function() {
 const quandJoueur = (fn) => (window.PorteJoueur ? window.PorteJoueur.quand(fn) : fn());
 quandJoueur(() => window.ecouterReglagesMonstres());
 
-// Le haut du tableau : deux lignes par stature, et le % des sorts.
+// =========================================================================
+//  LE NIVEAU DU GROUPE (v263)
+// =========================================================================
+//  Nico : « le niveau du groupe, mis quelque part, qui se met à jour dès un
+//  changement de niveau, un départ ou une arrivée dans le groupe, car il va
+//  être lu par plusieurs choses — c'est le niveau du personnage le plus fort
+//  du groupe ». Le groupe : les héros de la partie qui ne sont pas mis de
+//  côté (ni illusion, ni créature). Recalculé à chaque recomposition des
+//  combattants (une fiche reçue, un héros qui arrive ou qui part) ; lu dans
+//  window.NIVEAU_GROUPE. Il règle la triche des créatures et leurs résistances.
+window.NIVEAU_GROUPE = 1;
+window.NIVEAU_GROUPE_HEROS = "";
+window.niveauDuGroupe = function(persos) {
+    const groupe = (persos || window.PERSOS_JOUEURS_PARTIE || [])
+        .filter(p => p && !p.estMonstre && !p.estIllusion && p.actif !== false && p.camp !== "Ennemi");
+    let niveau = 0, plusFort = null;
+    groupe.forEach(p => {
+        const n = typeof window.niveauDuPerso === "function" ? window.niveauDuPerso(p) : 1;
+        if (n > niveau) { niveau = n; plusFort = p; }
+    });
+    return { niveau: Math.max(1, niveau), heros: plusFort ? (plusFort.prenom || plusFort.nom || plusFort.idPersonnage || "") : "" };
+};
+window.actualiserNiveauGroupe = function() {
+    const { niveau, heros } = window.niveauDuGroupe();
+    const change = niveau !== window.NIVEAU_GROUPE || heros !== window.NIVEAU_GROUPE_HEROS;
+    window.NIVEAU_GROUPE = niveau;
+    window.NIVEAU_GROUPE_HEROS = heros;
+    if (change) {
+        // La triche suit, tout de suite (le noyau du combat la lit).
+        window.appliquerReglagesMonstres(window.REGLAGES_MONSTRES_BRUTS);
+        if (typeof window.afficherNiveauGroupe === "function") window.afficherNiveauGroupe();
+        try { window.dispatchEvent(new CustomEvent("niveau-groupe", { detail: { niveau, heros } })); } catch (e) {}
+    }
+    return niveau;
+};
+// Partout où il s'affiche : la fenêtre 💀, l'encart de la triche.
+window.afficherNiveauGroupe = function() {
+    const n = window.NIVEAU_GROUPE || 1, pct = window.tricheMonstresActuelle();
+    const texte = `Niveau du groupe : ${n}${window.NIVEAU_GROUPE_HEROS ? ` (${window.NIVEAU_GROUPE_HEROS})` : ""} — créatures +${pct} % de dégâts et de soins, +${pct} PV`;
+    document.querySelectorAll(".niveau-groupe-texte").forEach(el => { el.textContent = texte; });
+};
+
+// Le haut du tableau : la marche par stature, la triche selon le niveau du
+// groupe, le % des sorts, le leader.
 window.dessinerReglagesMonstres = function() {
     const corps = document.getElementById("tbody-reglages-monstres");
     const sorts = document.getElementById("reglage-bonus-sorts");
@@ -518,9 +613,25 @@ window.dessinerReglagesMonstres = function() {
               data-famille="${famille}" data-palier="${p}" value="${r[famille][p]}"
               min="${BORNES_REGLAGES[famille][0]}" max="${BORNES_REGLAGES[famille][1]}"
               onchange="window.modifierReglageMonstre('${famille}', '${p}', this)"></td>`).join("") + `</tr>`;
-    corps.innerHTML = ligne("Dégâts et soins en plus (%)", "bonusDegats", "En pour cent du brut de chaque attaque et de chaque soin, avant les résistances")
-                    + ligne("Déplacement (cases)", "deplacement", "Cases que la créature peut marcher à son tour");
+    corps.innerHTML = ligne("Déplacement (cases)", "deplacement", "Cases que la créature peut marcher à son tour");
     if (sorts) sorts.value = r.bonusSortsPct;
+    const triche = document.getElementById("corps-triche-niveau");
+    if (triche) {
+        const champ = (cle) => { const c = CHAMPS_TRICHE.find(x => x.cle === cle);
+            return `<input type="number" inputmode="numeric" class="reglage-monstres-valeur" data-famille="triche" data-cle="${cle}"
+                value="${r.tricheNiveau[cle]}" min="${BORNES_REGLAGES[c.borne][0]}" max="${BORNES_REGLAGES[c.borne][1]}"
+                onchange="window.modifierReglageMonstre('triche', '${cle}', this)">`; };
+        const niveaux = Array.from({ length: 10 }, (_, i) => i + 1);
+        triche.innerHTML = `<div class="triche-formules">
+              <label>Niveaux 1 à 4 : ${champ("base14")} + ${champ("parNiveau14")} × niveau</label>
+              <label>Niveaux 5 et plus : ${champ("base510")} + ${champ("parNiveau510")} × niveau</label>
+            </div>
+            <table class="table-reglages-monstres table-triche-niveau">
+              <thead><tr><th>Niveau</th>${niveaux.map(n => `<th class="${n === window.NIVEAU_GROUPE ? "niveau-actuel" : ""}">${n}</th>`).join("")}</tr></thead>
+              <tbody><tr><td class="reglage-monstres-titre">% et PV en plus</td>${niveaux.map(n => `<td class="${n === window.NIVEAU_GROUPE ? "niveau-actuel" : ""}">${window.tricheDuNiveau(n, r.tricheNiveau)}</td>`).join("")}</tr></tbody>
+            </table>`;
+    }
+    if (typeof window.afficherNiveauGroupe === "function") window.afficherNiveauGroupe();
     const leader = document.getElementById("corps-reglages-leader");
     if (leader) leader.innerHTML = CHAMPS_LEADER.map(c => `<label class="reglage-leader" title="${c.aide}">
           <span class="reglage-leader-titre">${c.titre}</span>
@@ -535,21 +646,23 @@ window.dessinerReglagesMonstres = function() {
 window.modifierReglageMonstre = async function(famille, palier, input) {
     const actuels = window.REGLAGES_MONSTRES || window.normaliserReglagesMonstres(null);
     const champLeader = famille === "leader" ? CHAMPS_LEADER.find(c => c.cle === palier) : null;
-    if (famille === "leader" && !champLeader) return;
+    const champTriche = famille === "triche" ? CHAMPS_TRICHE.find(c => c.cle === palier) : null;
+    if ((famille === "leader" && !champLeader) || (famille === "triche" && !champTriche)) return;
     const valeur = famille === "bonusSortsPct"
         ? borner(famille, input && input.value, actuels.bonusSortsPct)
         : champLeader ? borner(champLeader.borne, input && input.value, actuels.leader[palier])
+        : champTriche ? borner(champTriche.borne, input && input.value, actuels.tricheNiveau[palier])
         : borner(famille, input && input.value, actuels[famille][palier]);
     if (input) input.value = valeur;
     const etat = document.getElementById("reglages-monstres-etat");
     const maj = famille === "bonusSortsPct" ? { Bonus_Sorts_Pct: valeur }
         : champLeader ? { Leader: leaderVersBase({ ...actuels.leader, [palier]: valeur }) }
-        : { [famille === "bonusDegats" ? "Bonus_Degats_Pct" : "Deplacement"]:
-            { ...actuels[famille], [palier]: valeur } };
+        : champTriche ? { Triche_Niveau: tricheVersBase({ ...actuels.tricheNiveau, [palier]: valeur }) }
+        : { Deplacement: { ...actuels[famille], [palier]: valeur } };
     // Tout de suite sur ce poste ; la base le porte aux autres.
     const brut = {
-        Bonus_Degats_Pct: actuels.bonusDegats, Bonus_Sorts_Pct: actuels.bonusSortsPct, Deplacement: actuels.deplacement,
-        Leader: leaderVersBase(actuels.leader), ...maj
+        Bonus_Sorts_Pct: actuels.bonusSortsPct, Deplacement: actuels.deplacement,
+        Leader: leaderVersBase(actuels.leader), Triche_Niveau: tricheVersBase(actuels.tricheNiveau), ...maj
     };
     window.appliquerReglagesMonstres(brut);
     try {
@@ -1035,8 +1148,10 @@ RÈGLES :
 //  Pose d'un monstre sur le plateau
 // -------------------------------------------------------------------------
 //  Crée le document, le pion, et l'inscrit dans l'ordre d'initiative. Sert à la
-//  génération initiale ET à l'arrivée d'un renfort.
-window.poserMonstreSurTerrain = async function(monstre, tokensData) {
+//  génération initiale ET à l'arrivée d'un renfort. `options.premiereArrivee` :
+//  une créature du départ, qui entre autour du repère des ennemis (v263) ; un
+//  renfort entre par les cases d'apparition peintes.
+window.poserMonstreSurTerrain = async function(monstre, tokensData, options) {
     let gabarit = window.gabaritMonstre(monstre.archetype, monstre.palier);
 
     // LE BESTIAIRE N'EST PAS TOUJOURS EN MÉMOIRE, et ça a coûté tous les renforts.
@@ -1087,13 +1202,13 @@ window.poserMonstreSurTerrain = async function(monstre, tokensData) {
         URL_Token: ""
     });
 
-    // Sur une case d'apparition peinte par le MJ (pinceau SPAWN, v261), libre,
-    // au hasard ; sans case peinte, autour du repère d'apparition des ennemis —
-    // et à défaut de repère (ou de module de combat chargé), au plus près du
-    // centre comme autrefois.
-    const hexLibre = typeof window.caseApparitionEnnemi === "function"
-        ? window.caseApparitionEnnemi(tokensData)
-        : window.trouverHexLibreVTT(tokensData);
+    // Une créature du DÉPART entre autour du repère des ennemis posé à la
+    // réinitialisation (v263). Un RENFORT entre sur une case d'apparition
+    // peinte par le MJ (pinceau SPAWN, v261), libre, au hasard ; sans case
+    // peinte, autour du repère — et à défaut de repère (ou de module de combat
+    // chargé), au plus près du centre comme autrefois.
+    const placer = options && options.premiereArrivee ? window.casePremiereArriveeEnnemi : window.caseApparitionEnnemi;
+    const hexLibre = typeof placer === "function" ? placer(tokensData) : window.trouverHexLibreVTT(tokensData);
     tokensData[idMonstre] = { q: hexLibre.q, r: hexLibre.r, url: "", taille: 55 };
 
     const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
@@ -1185,7 +1300,8 @@ window.poserCompagnonSurTerrain = async function(heros, tokensData) {
 // rehaussés, d'après les réglages du moment (Paramètres > Monstres).
 window.champsLeader = function(gabarit) {
     const l = (window.REGLAGES_MONSTRES || window.normaliserReglagesMonstres(null)).leader;
-    const pv = (Number(gabarit.PV) || 0) + l.pv;
+    // Sur la triche du niveau du groupe (v263).
+    const pv = (Number(gabarit.PV) || 0) + window.tricheMonstresActuelle() + l.pv;
     return {
         Leader: true,
         PV_Max: pv, PV_Actuels: pv,
@@ -1198,8 +1314,8 @@ window.champsLeader = function(gabarit) {
 //  Génération complète, déclenchée par le bouton "Valider" de la fenêtre
 // -------------------------------------------------------------------------
 //  `choix` : 1, 2, 3, 4 — ou « aleatoire ». Toutes les créatures du départ
-//  entrent (sur les cases d'apparition peintes) ; les renforts attendent leur
-//  heure dans la réserve. Toute la rencontre est nommée d'un seul appel,
+//  entrent, autour du repère des ennemis (v263) ; les renforts attendent leur
+//  heure dans la réserve, et entreront par les cases d'apparition peintes. Toute la rencontre est nommée d'un seul appel,
 //  renforts compris : l'IA évite ainsi les doublons.
 window.genererRencontreMonstres = async function(choix) {
     if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) {
@@ -1231,7 +1347,7 @@ window.genererRencontreMonstres = async function(choix) {
     const tokensData = { ...window.TOKENS_VTT_DATA };
     const poses = [];
     for (const monstre of tirage.depart) {
-        const idPose = await window.poserMonstreSurTerrain(monstre, tokensData);
+        const idPose = await window.poserMonstreSurTerrain(monstre, tokensData, { premiereArrivee: true });
         if (idPose) poses.push({ ...monstre, id: idPose });
     }
 
@@ -1355,7 +1471,8 @@ window.enregistrerReleveLeader = async function(idMonstre, c) {
     const maj = {
         Leader: true, Releve_En_Leader: false,
         ...(c && n(c.pvMax) > 0 ? { PV_Max: n(c.pvMax) } : {}),
-        ...(c && c.def ? { Def_Physique: n(c.def.physique), Def_Magique: n(c.def.magique) } : {})
+        ...(c && c.def ? { Def_Physique: n(c.def.physique), Def_Magique: n(c.def.magique) } : {}),
+        ...(c && c.atouts && Array.isArray(c.atouts.resistances) ? { Resistances_Etats: [...c.atouts.resistances] } : {})
     };
     await updateDoc(doc(db, COLLECTION_MONSTRES, idMonstre), maj)
         .catch(e => console.error("Relève du leader :", e));
@@ -1505,6 +1622,8 @@ window.ouvrirGenerationRencontre = function() {
     if (!voile) return;
 
     window.choisirApparitionRencontre("aleatoire");
+    window.actualiserNiveauGroupe();
+    window.afficherNiveauGroupe();
 
     const btn = document.getElementById("btn-valider-rencontre");
     if (btn) { btn.disabled = false; btn.innerText = "Valider"; }

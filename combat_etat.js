@@ -378,7 +378,9 @@ function combattantBrut(fiche, position, bornes) {
         // sont déjà sur sa fiche. Celle qui se relèvera en leader au premier
         // KO (Apparition 1) le porte aussi.
         ...(fiche.estMonstre && fiche.leader ? { leader: true } : {}),
-        ...(fiche.estMonstre && fiche.releveEnLeader && !fiche.leader ? { releveEnLeader: true } : {}),
+        ...(fiche.estMonstre && fiche.releveEnLeader && !fiche.leader ? { releveEnLeader: true,
+            // Les résistances de son rang de leader, tirées à sa création (v263).
+            ...(Array.isArray(fiche.resistancesEnLeader) ? { resistancesEnLeader: [...fiche.resistancesEnLeader] } : {}) } : {}),
         // LE COMPAGNON DU PISTEUR : une créature de son camp, jouée par le
         // cerveau juste après son maître (jouerCompagnon, cerveau_combat.js).
         ...(fiche.compagnonDe ? { compagnon: { idMaitre: String(fiche.compagnonDe) } } : {})
@@ -838,7 +840,9 @@ function releverEnLeader(etat, c, acteur, options) {
         type: "releveLeader", cible: c.id, acteur: acteur || c.id,
         pvMax, pv: pvMax, fatigue: nombre(c.fatigueMax),
         defPhysique: nombre(c.def && c.def.physique) + nombre(bonus.resistances),
-        defMagique: nombre(c.def && c.def.magique) + nombre(bonus.resistances)
+        defMagique: nombre(c.def && c.def.magique) + nombre(bonus.resistances),
+        // Et les résistances aux états de son nouveau rang (v263).
+        ...(Array.isArray(c.resistancesEnLeader) ? { resistances: [...c.resistancesEnLeader] } : {})
     };
     const recompenses = [];
     if (acteur && acteur !== c.id) recompenses.push(...recompenserLeTueur(etat, c, acteur, !!(options && options.finDeManche)));
@@ -1127,6 +1131,8 @@ export const APPLICATEURS = {
         c.def = { ...(c.def || {}),
                   physique: nombre(e.defPhysique, nombre(c.def && c.def.physique)),
                   magique: nombre(e.defMagique, nombre(c.def && c.def.magique)) };
+        if (Array.isArray(e.resistances)) c.atouts = { ...(c.atouts || {}), resistances: [...e.resistances] };
+        delete c.resistancesEnLeader;
     },
 
     // Un allié relevé par le Médicus (Prise en charge) : debout, ses PV, ses

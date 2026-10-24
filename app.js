@@ -1427,14 +1427,35 @@ window.NB_RESISTANCES_PALIER = { "Petit": 0, "Normal": 1, "Élite": 2, "Elite": 
 window.nbResistancesPalier = function(palier) {
     return window.NB_RESISTANCES_PALIER[String(palier || "").trim()] || 0;
 };
-window.tirerResistancesEtats = function(palier, alea) {
+// SELON LE NIVEAU DU GROUPE (Nico, v263 : « on prend le niveau du personnage
+// joueur le plus fort. Du niveau 1 à 4 : les petits 0 résistance, les normaux
+// 1, les leaders et boss 2. Du 5 à 8 : petits 1, normaux 1, leaders et boss 3.
+// Du 9 à 10 : petits 1, normaux 2, leaders et boss 4 »). Une créature Élite
+// d'avant compte comme un chef. Au-delà du niveau 10, la dernière tranche.
+window.RESISTANCES_SELON_NIVEAU = [
+    { jusqua: 4, Petit: 0, Normal: 1, Chef: 2 },
+    { jusqua: 8, Petit: 1, Normal: 1, Chef: 3 },
+    { jusqua: Infinity, Petit: 1, Normal: 2, Chef: 4 }
+];
+window.nbResistancesCreature = function(palier, options) {
+    const o = options || {};
+    const niveau = Math.max(1, Math.round(Number(o.niveau !== undefined ? o.niveau : window.NIVEAU_GROUPE) || 1));
+    const tranche = window.RESISTANCES_SELON_NIVEAU.find(t => niveau <= t.jusqua);
+    const p = String(palier || "").trim();
+    const chef = !!o.leader || p === "Boss" || p === "Élite" || p === "Elite";
+    return chef ? tranche.Chef : p === "Petit" ? tranche.Petit : tranche.Normal;
+};
+// `nombre` (facultatif) : combien en tirer — sinon le compte d'avant la v263,
+// par stature (une créature d'avant, resistancesParDefaut).
+window.tirerResistancesEtats = function(palier, alea, nombre) {
     const tirer = typeof alea === "function" ? alea : Math.random;
     const etats = [...window.ETATS_RESISTIBLES];
     for (let i = etats.length - 1; i > 0; i--) {
         const j = Math.floor(tirer() * (i + 1));
         [etats[i], etats[j]] = [etats[j], etats[i]];
     }
-    return etats.slice(0, Math.min(etats.length, window.nbResistancesPalier(palier)));
+    const n = Number.isFinite(Number(nombre)) && nombre !== undefined && nombre !== null ? Number(nombre) : window.nbResistancesPalier(palier);
+    return etats.slice(0, Math.max(0, Math.min(etats.length, n)));
 };
 window.resistancesParDefaut = function(id, palier) {
     let graine = 2166136261;

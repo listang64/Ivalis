@@ -5311,6 +5311,16 @@ textarea.input-texte-parchemin {
 .reglages-monstres-sorts { margin-top: 8px; font-size: 14px; }
 .reglages-monstres-etat { margin-left: 8px; font-size: 13px; color: #1b6e3a; }
 
+/* LA TRICHE SELON LE NIVEAU DU GROUPE (v263, Paramètres > Monstres). */
+.reglages-triche-niveau { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #8b5a2b; }
+.niveau-groupe-reglages { font-size: 14px; font-weight: bold; color: #7a2a1a; margin-bottom: 6px; }
+.triche-formules { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; margin-bottom: 6px; }
+.triche-formules label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.table-triche-niveau td, .table-triche-niveau th { padding: 2px 4px; }
+.table-triche-niveau .niveau-actuel { background: rgba(165, 42, 42, 0.18); font-weight: bold; color: #7a2a1a; border-radius: 4px; }
+/* Dans la fenêtre 💀. */
+.niveau-groupe-rencontre { text-align: center; font-family: 'Almendra', serif; font-size: 14px; color: #e8c46a; margin: -8px 0 14px 0; }
+
 /* LE LEADER (v262, Paramètres > Monstres) : ce qu'il gagne en plus. */
 .reglages-leader { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #8b5a2b; }
 .corps-reglages-leader { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px 14px; }

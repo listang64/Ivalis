@@ -1623,17 +1623,27 @@
         Les plafonds (Rés. 70 %, Parade/Esquive 50 %) sont appliqués automatiquement à la saisie.
       </p>
 
-      <!-- LA TRICHE ET LA MARCHE DES CRÉATURES (v252) : pour toutes, par stature ;
-           appliquées tout de suite, combat en cours compris (monstres.js). -->
+      <!-- LA MARCHE DES CRÉATURES (v252, la triche par stature retirée en v263) :
+           appliquée tout de suite, combat en cours compris (monstres.js). -->
       <div id="reglages-monstres" class="reglages-monstres">
         <div class="reglages-monstres-entete">
-          <span class="reglages-monstres-nom">Triche et déplacement des créatures</span>
+          <span class="reglages-monstres-nom">Déplacement des créatures</span>
           <span class="reglages-monstres-aide">s'appliquent tout de suite, en jeu</span>
         </div>
         <table class="table-reglages-monstres">
           <thead><tr><th></th><th>Petit</th><th>Normal</th><th>Boss</th></tr></thead>
           <tbody id="tbody-reglages-monstres"></tbody>
         </table>
+        <!-- LA TRICHE SELON LE NIVEAU DU GROUPE (v263) : % de dégâts et de soins,
+             et autant de PV, en plus (monstres.js). -->
+        <div id="reglages-triche-niveau" class="reglages-triche-niveau">
+          <div class="reglages-monstres-entete">
+            <span class="reglages-monstres-nom">Triche selon le niveau du groupe</span>
+            <span class="reglages-monstres-aide">% de dégâts et de soins, et autant de PV, en plus</span>
+          </div>
+          <div class="niveau-groupe-texte niveau-groupe-reglages"></div>
+          <div id="corps-triche-niveau"></div>
+        </div>
         <div class="reglages-monstres-sorts">
           Chances d'état de leurs sorts (Glacé, Peur, Étourdi…) :
           <input id="reglage-bonus-sorts" type="number" inputmode="numeric" class="reglage-monstres-valeur" min="-50" max="200"
@@ -1685,8 +1695,8 @@
       </div>
       <p style="font-size: 13px; color: #5c3a21; margin: 0 0 10px 0; font-style: italic;">
         Le bouton 💀 demande l'apparition : le nombre d'ennemis engagés dans le récit. Chaque « ou » se tire au hasard.
-        Les créatures entrent sur les cases d'apparition (pinceau SPAWN) ; un renfort entre au début de la manche prévue,
-        ou dès la suivante si plus aucune créature ne tient debout.
+        Les créatures du départ entrent autour du repère des ennemis ; un renfort entre par les cases d'apparition (pinceau SPAWN),
+        au début de la manche prévue, ou dès la suivante si plus aucune créature ne tient debout.
       </p>
       <div id="corps-rencontres-monstres" class="corps-rencontres-monstres"></div>
     </div>
@@ -2295,8 +2305,11 @@
       Invoquer une rencontre
     </div>
     <p style="text-align: center; font-family: 'Almendra', serif; font-size: 14px; color: #c2a878; margin: 0 0 18px 0; font-style: italic;">
-      Combien d'ennemis sont engagés dans le récit ? La composition est tirée au sort ; les créatures entrent sur les cases d'apparition.
+      Combien d'ennemis sont engagés dans le récit ? La composition est tirée au sort : le départ entre autour du repère des ennemis, les renforts par les cases d'apparition.
     </p>
+
+    <!-- Le niveau du groupe et la triche qu'il donne (v263, monstres.js). -->
+    <div class="niveau-groupe-texte niveau-groupe-rencontre"></div>
 
     <!-- LES APPARITIONS (v262) : plus de difficulté (monstres.js, APPARITIONS). -->
     <div class="choix-apparitions">

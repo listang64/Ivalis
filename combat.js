@@ -2852,8 +2852,11 @@ window.genererTokensCombat = async function() {
         if (!imgToUse) return;
 
         if (!tokensData[perso.idPersonnage]) {
-            const hexLibre = perso.camp === "Ennemi" && typeof window.caseApparitionEnnemi === "function"
-                ? window.caseApparitionEnnemi(tokensData)
+            // Le déploiement est une PREMIÈRE ARRIVÉE : l'ennemi entre autour de
+            // son repère, comme la rencontre (v263) ; les cases peintes sont
+            // celles des renforts.
+            const hexLibre = perso.camp === "Ennemi" && typeof window.casePremiereArriveeEnnemi === "function"
+                ? window.casePremiereArriveeEnnemi(tokensData)
                 : window.trouverHexLibreAutour(tokensData, window.pointApparition(perso.camp), 2);
             tokensData[perso.idPersonnage] = {
                 q: hexLibre.q,
@@ -6935,41 +6938,31 @@ window.trouverHexLibreAutour = function(tokensData, centre, rayon) {
 };
 
 // Le point d'apparition d'un camp, tel qu'il est enregistré pour cette partie.
-// Celui des ennemis, s'il n'a pas été posé, est le cœur des cases d'apparition
-// peintes (v261) : la demande du début de combat n'a alors plus à le réclamer.
+// Les DEUX se reposent à chaque réinitialisation, cases peintes ou non (Nico,
+// v263 : « quand on réinitialise un combat, on choisit encore les spawn joueur
+// et ennemi, qui arrivent en premier sur la map ; ensuite les renforts
+// viendront par les hexagones spawn »).
 window.pointApparition = function(camp) {
     const partie = window.PARTIE_DATA || {};
     const point = camp === "Ennemi" ? partie.Spawn_Ennemis : partie.Spawn_Allies;
-    if (!point || point.q === undefined || point.r === undefined) {
-        return camp === "Ennemi" ? coeurDesCasesSpawn() : null;
-    }
+    if (!point || point.q === undefined || point.r === undefined) return null;
     return { q: point.q, r: point.r };
 };
 
 // =========================================================================
 //  LES CASES D'APPARITION DES ENNEMIS (le pinceau SPAWN, v261)
 // =========================================================================
-//  Le MJ les peint sur la carte comme des murs : les créatures d'une
-//  rencontre, puis leurs renforts, entrent sur l'une d'elles, libre, au
-//  hasard. Toutes prises, elles débordent sur la case libre la plus proche
-//  de l'une d'elles. Sans case peinte, rien ne change : autour du repère.
-//  Une case gommée ou murée par-dessus ne compte plus.
+//  Le MJ les peint sur la carte comme des murs : les RENFORTS entrent sur
+//  l'une d'elles, libre, au hasard. Toutes prises, ils débordent sur une case
+//  libre au contact de l'une d'elles. Sans case peinte, autour du repère.
+//  Une case gommée ou murée par-dessus ne compte plus. Les créatures du départ,
+//  elles, entrent autour du repère des ennemis (v263, casePremiereArriveeEnnemi).
 window.casesSpawnEnnemis = function() {
     const grille = (window.PLATEAU_VTT && window.PLATEAU_VTT.gridState) || {};
     return Object.keys(grille)
         .filter(cle => grille[cle].isSpawnEnnemi && !grille[cle].isDeleted && !grille[cle].isBlocked)
         .map(cle => { const [q, r] = cle.split(",").map(Number); return { q, r }; });
 };
-
-// La case peinte la plus proche du centre de toutes les autres.
-function coeurDesCasesSpawn() {
-    const cases = window.casesSpawnEnnemis();
-    if (cases.length === 0) return null;
-    const mq = cases.reduce((t, c) => t + c.q, 0) / cases.length;
-    const mr = cases.reduce((t, c) => t + c.r, 0) / cases.length;
-    const centre = { q: Math.round(mq), r: Math.round(mr) };
-    return cases.reduce((meilleure, c) => distanceHexVTT(c, centre) < distanceHexVTT(meilleure, centre) ? c : meilleure);
-}
 
 // Une case d'apparition libre, tirée au sort — ou null s'il n'y en a aucune
 // de peinte. Toutes prises (v262 : « ou adjacent au spawn si plus aucun spawn
@@ -7002,11 +6995,20 @@ window.trouverHexSpawnEnnemi = function(tokensData) {
     return window.trouverHexLibreAutour(tokensData, cases[Math.floor(Math.random() * cases.length)], 1);
 };
 
-// Où entre une créature : sur une case peinte, sinon autour du repère des
+// Où entre un RENFORT : sur une case peinte, sinon autour du repère des
 // ennemis (et sans repère, au plus près du centre).
 window.caseApparitionEnnemi = function(tokensData) {
     return window.trouverHexSpawnEnnemi(tokensData)
         || window.trouverHexLibreAutour(tokensData, window.pointApparition("Ennemi"), 2);
+};
+
+// Où entre une créature du DÉPART (la rencontre, le bouton PIONS) : autour du
+// repère des ennemis posé à la réinitialisation (v263) ; sans repère, sur les
+// cases peintes ; sans rien, au plus près du centre.
+window.casePremiereArriveeEnnemi = function(tokensData) {
+    const repere = window.pointApparition("Ennemi");
+    if (repere) return window.trouverHexLibreAutour(tokensData, repere, 2);
+    return window.trouverHexSpawnEnnemi(tokensData) || window.trouverHexLibreVTT(tokensData);
 };
 
 // Un clic franc : ni un glissement de carte, ni un appui prolongé, ni un
@@ -7132,8 +7134,8 @@ window.demarrerPlacementApparition = function() {
     const titre = document.getElementById("placement-apparition-titre");
     if (!calque || !titre) return;
 
-    // On ne demande que ce qui manque : avec des cases d'apparition peintes,
-    // le repère des ennemis est déjà là (pointApparition).
+    // On ne demande que ce qui manque — les deux, après une réinitialisation,
+    // cases d'apparition peintes ou non (v263).
     const points = {};
     const etapeSuivante = (apres) => {
         if (!apres && !window.pointApparition("Allié")) return "Allié";
@@ -7187,8 +7189,7 @@ window.enregistrerPointsApparition = async function(allies, ennemis) {
     if (!window.ID_PARTIE_COURANTE) return;
     // Écriture immédiate en mémoire : la génération des pions qui suit ne doit
     // pas attendre l'aller-retour réseau pour connaître les deux repères.
-    // Seuls les repères posés s'écrivent : celui des ennemis manque quand des
-    // cases d'apparition sont peintes (v261).
+    // Seuls les repères posés s'écrivent (un repère déjà posé n'est pas redemandé).
     const reperes = {};
     if (allies) reperes.Spawn_Allies = allies;
     if (ennemis) reperes.Spawn_Ennemis = ennemis;
