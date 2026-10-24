@@ -149,6 +149,8 @@ const res = await p.evaluate(async ({ sVoile, sSequence }) => {
     nbEtats: etats.querySelectorAll('img').length,
     carte: carte.textContent,
     tailleCarte: parseFloat(getComputedStyle(carte).fontSize),
+    tailleEffets: parseFloat(getComputedStyle(effets).fontSize),
+    carteSurUneLigne: carte.scrollWidth <= carte.clientWidth + 1,
     effets: effets.textContent,
     okVisible: ok.style.display !== "none",
     attente: attente.textContent,
@@ -329,9 +331,12 @@ verifier("L'ENCART EST LÀ, avec le gros pion du combattant",
 verifier("le nom du combattant est affiché", res.avecOk.nom === "Goule putride", `(${res.avecOk.nom})`);
 verifier("dans l'or brossé du jeu, celui du nom du héros", res.memeOr);
 verifier("ses états sont sous son nom", res.avecOk.nbEtats === 2, `(${res.avecOk.nbEtats})`);
-verifier("la technique est annoncée en grand", res.avecOk.carte === "Hurlement putride" && res.avecOk.tailleCarte >= 24,
-         `(${res.avecOk.carte}, ${res.avecOk.tailleCarte}px)`);
-verifier("elle est plus grosse que le détail des effets", res.avecOk.tailleCarte > 20);
+// v266 : la distance, 1,5× plus grosse, borne la place du titre — un titre
+// long rétrécit pour s'arrêter avant elle, sur une ligne, au lieu de passer dessous.
+verifier("la technique est annoncée en grand", res.avecOk.carte === "Hurlement putride" && res.avecOk.tailleCarte >= 18 && res.avecOk.carteSurUneLigne,
+         `(${res.avecOk.carte}, ${res.avecOk.tailleCarte}px, une ligne : ${res.avecOk.carteSurUneLigne})`);
+verifier("elle est plus grosse que le détail des effets", res.avecOk.tailleCarte > res.avecOk.tailleEffets * 1.3,
+         `(${res.avecOk.tailleCarte}px / ${res.avecOk.tailleEffets}px)`);
 // v263 : les dégâts se lisent en symbole (la tête qui ondule de la Distorsion
 // mentale) et en chiffre ; le nom de l'effet passe dans la bulle (title).
 verifier("ses effets sont listés dessous", /data-nature="mental"/.test(res.avecOk.effetsHtml) && /title="Distorsion mentale"/.test(res.avecOk.effetsHtml)

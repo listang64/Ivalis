@@ -108,7 +108,8 @@
         // technique, calée par son bord DROIT (`droite`, en % de la largeur).
         // Le nom de la technique s'arrête avant elle (`ecart`, en %) : trop
         // long, il rétrécit au lieu de passer dessous.
-        encartDistance: { droite: 21, y: 46, taille: 3.2, ecart: 8 },
+        // v266 : 1,5× plus grande (Nico) — le nom de la technique s'arrête d'autant plus tôt.
+        encartDistance: { droite: 21, y: 45.5, taille: 4.8, ecart: 12 },
         encartDetail:  { x: 40, y: 53, taille: 2.1, largeur: 74 },
         encartAttente: { x: 39.5, y: 90, taille: 2.5 }
     };

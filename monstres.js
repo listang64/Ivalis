@@ -681,11 +681,23 @@ window.modifierReglageMonstre = async function(famille, palier, input) {
 // Ce que l'utilisateur a modifié mais pas encore enregistré : { cle: { champ: valeur } }
 let modificationsEnAttente = {};
 
+// La hauteur de l'en-tête collé en haut de la fenêtre (v266) : l'en-tête du
+// tableau se colle juste dessous en défilant (style.css, --entete-monstres).
+window.calerEnteteMonstres = function() {
+    const fen = document.getElementById("etape-gestion-monstres");
+    const entete = fen && fen.querySelector(".entete-gestion-monstres");
+    if (entete && entete.offsetHeight > 0) fen.style.setProperty("--entete-monstres", entete.offsetHeight + "px");
+};
+// (Gardé : les bancs du noyau chargent ce module dans Node, sans vrai window.)
+if (typeof window.addEventListener === "function") window.addEventListener("resize", () => window.calerEnteteMonstres());
+
 window.ouvrirGestionMonstres = async function() {
     const menuLat = document.getElementById("menu-lateral");
     if (menuLat) menuLat.style.display = "none";
 
     window.naviguerFenetre("etape-menu-outils", "etape-gestion-monstres");
+    // Elle s'affiche au bout du fondu (naviguerFenetre) : on mesure alors.
+    setTimeout(() => window.calerEnteteMonstres(), 500);
 
     const chargement = document.getElementById("chargement-monstres");
     const conteneur = document.getElementById("conteneur-table-monstres");

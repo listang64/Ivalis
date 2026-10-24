@@ -6545,10 +6545,17 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
     const elCarte = document.getElementById("voile-tour-carte");
     const elEffets = document.getElementById("voile-tour-effets");
     const elZone = document.getElementById("voile-tour-zone");
-    if (elCarte && elCarte.textContent !== titre) {
-        elCarte.textContent = titre;
+    // Réajusté quand le titre change, MAIS AUSSI quand la place qu'on lui
+    // laisse change (v266 : la distance, plus grosse, borne sa largeur ; la
+    // mise en page de l'encart peut se poser après le premier titre).
+    // Et tant qu'il déborde encore (un premier ajustement fait pendant que
+    // l'encart n'avait pas de taille ne mesurait rien).
+    const cleCarte = `${titre}|${elCarte ? elCarte.style.maxWidth : ""}|${elCarte ? elCarte.dataset.base : ""}`;
+    if (elCarte && (elCarte.dataset.cle !== cleCarte || elCarte.scrollWidth > elCarte.clientWidth + 1)) {
+        if (elCarte.textContent !== titre) elCarte.textContent = titre;
         const baseCarte = parseFloat(elCarte.dataset.base) || 26;
         ajusterSurUneLigne(elCarte, baseCarte, baseCarte * 0.5);
+        elCarte.dataset.cle = elCarte.clientWidth > 0 ? cleCarte : "";
     }
     // Comparé à ce qu'on a écrit, pas à ce que le navigateur relit : un SVG ne
     // se relit pas mot pour mot, et l'encart se réécrirait à chaque battement.

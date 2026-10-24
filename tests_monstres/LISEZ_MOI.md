@@ -7840,3 +7840,36 @@ rien qui reste) ; les versions. Il mord sur l'ancien code (19 échecs).
 Les anciens bancs remis aux règles v265 : corrections_v262 (l'aura ondule au
 lieu de scintiller en tournant), encart_fige (le nom à 2 %), hud_heros (la
 bulle porte le nom de l'état au-dessus des tours).
+
+## v266 — La distance de l'encart plus grosse ; la fenêtre des Monstres qui tient dans l'écran
+
+Nico : « l'icône de distance et son chiffre sur le visuel de la compétence qui
+va être jouée : fais-les 1,5× plus gros » ; « sur iPad, la fenêtre Paramètres >
+Monstres est tronquée, on ne voit pas le haut : fais-la tenir selon la taille
+de la fenêtre ».
+
+- LA DISTANCE (hud_disposition.js, REGLAGES_HUD.encartDistance) : 4,8 % de la
+  largeur de la plaque au lieu de 3,2 % ; l'icône suit (0,95 em). Elle remonte
+  d'un demi-point pour rester sur la ligne du nom de la technique, et le nom
+  s'arrête plus tôt avant elle (écart 12 % au lieu de 8). LE NOM SE RÉAJUSTE
+  (combat.js, rafraichirVoileTour) : jusqu'ici il ne rétrécissait que quand le
+  titre changeait ; s'il avait été mesuré pendant que l'encart n'avait pas
+  encore de taille, ou si la place qu'on lui laisse changeait (la distance
+  plus grosse, un réglage), il passait sous la distance. Il se réajuste
+  désormais aussi quand sa largeur permise change, et tant qu'il déborde.
+- PARAMÈTRES > MONSTRES (style.css, index.html, monstres.js) : la fenêtre ne
+  dépasse plus la hauteur de l'écran (--app-h moins 20 px) et défile dedans —
+  au lieu d'un tableau qui défilait à 70 % de la hauteur dans une fenêtre
+  centrée plus haute que l'écran, dont le haut (titre, Enregistrer, Retour)
+  sortait par le haut sur iPad. L'en-tête de la fenêtre reste collé en haut
+  pendant qu'on défile, et l'en-tête du tableau se colle juste dessous (sa
+  hauteur mesurée à l'ouverture et au redimensionnement, calerEnteteMonstres).
+
+corrections_v266.mjs (dans la suite) : sur la vraie page, la distance (réglage
+1,5×, 4,8 % de la plaque à l'écran, l'icône qui suit ; un titre court à sa
+taille pleine, un titre long qui rétrécit avant elle sur une ligne ; la place
+du titre qui rétrécit puis revient, il suit) ; la fenêtre des Monstres en iPad
+paysage (1180×820) et portrait (820×1180) : tout son haut et son bas à l'écran,
+c'est elle qui défile, son en-tête reste en haut, celui du tableau se colle
+dessous ; les versions. Il mord sur l'ancien code (14 échecs : le haut de la
+fenêtre y est à −126 px en paysage).

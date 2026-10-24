@@ -2804,6 +2804,29 @@ textarea.input-texte-parchemin {
 
 /* Le rappel de plafond passe sous le titre, en plus discret, comme sur le
    tableau d'origine : "Rés Phys (max 70)". */
+/* PARAMÈTRES > MONSTRES TIENT DANS LA HAUTEUR DE L'ÉCRAN (v266, Nico : « sur
+   iPad la fenêtre est tronquée, on ne voit pas le haut »). Centrée par son
+   conteneur, elle débordait en haut comme en bas dès qu'elle dépassait l'écran,
+   et son haut — le titre, Enregistrer, Retour — devenait inaccessible. Elle est
+   bornée à la hauteur de l'écran et défile dedans ; son en-tête reste collé en
+   haut, et celui du tableau juste dessous (--entete-monstres, monstres.js). */
+#etape-gestion-monstres {
+  box-sizing: border-box;
+  max-height: calc(var(--app-h, 100vh) - 20px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+#etape-gestion-monstres > .entete-gestion-monstres {
+  position: sticky;
+  top: -20px;              /* le collage se compte depuis le contenu : on remonte de la marge */
+  z-index: 6;
+  margin-top: -20px;
+  padding-top: 20px;
+  background-color: #e8d5a5;
+}
+#etape-gestion-monstres .table-monstres-ivalis th { top: calc(var(--entete-monstres, 84px) - 20px); }
+
 .table-monstres-ivalis th .plafond-colonne {
   display: block;
   font-size: 10px;

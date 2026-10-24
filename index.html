@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=96">
+  <link rel="stylesheet" href="style.css?v=97">
 
  
   <!-- ===================================================================== -->
@@ -1613,7 +1613,9 @@
     <!--  MONSTRES : tableau d'équilibrage (gabarits de stats)   -->
     <!-- ======================================================= -->
     <div id="etape-gestion-monstres" class="fenetre-volante-parchemin-large fondu-interne" style="display: none; opacity: 0;">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #5c3a21; margin-bottom: 10px; padding-bottom: 10px;">
+      <!-- L'EN-TÊTE RESTE EN HAUT (v266) : la fenêtre tient dans la hauteur de
+           l'écran et défile dessous (style.css). -->
+      <div class="entete-gestion-monstres" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #5c3a21; margin-bottom: 10px; padding-bottom: 10px;">
         <h2 style="margin: 0; border: none; padding: 0;">Bestiaire — Gabarits de stats</h2>
         <div style="display: flex; gap: 10px;">
           <button id="btn-sauver-monstres" class="btn-parametres" disabled style="opacity: 0.4; cursor: not-allowed;" onclick="window.sauvegarderGabaritsMonstres()">Enregistrer</button>
@@ -1665,7 +1667,9 @@
 
       <div id="chargement-monstres" style="font-style: italic;">Réveil du bestiaire...</div>
 
-      <div id="conteneur-table-monstres" style="display: none; max-height: 70vh; overflow: auto;">
+      <!-- Plus de défilement à part (v266) : c'est la fenêtre qui défile, et
+           l'en-tête du tableau reste collé sous le sien. -->
+      <div id="conteneur-table-monstres" style="display: none;">
         <table class="table-monstres-ivalis">
           <thead>
             <tr>
@@ -2188,7 +2192,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=176"></script>
+<script src="trace_combat.js?v=177"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2221,7 +2225,7 @@
      périmée, autant s'en apercevoir avant d'avoir chargé le jeu entier.
      Elle ne touche jamais au localStorage — les clés d'API restent en place. -->
 <script src="mise_a_jour.js?v=1"></script>
-<script src="hud_disposition.js?v=7"></script>
+<script src="hud_disposition.js?v=8"></script>
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
@@ -2283,12 +2287,12 @@
 <script type="module" src="sequence_tour.js?v=25"></script>
 <script src="zombie_token.js?v=1"></script>
 <script src="murs_terre.js?v=10"></script>
-<script type="module" src="combat.js?v=150"></script>
+<script type="module" src="combat.js?v=151"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=40"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
 <script type="module" src="moteur_effets.js?v=100"></script>
-<script type="module" src="monstres.js?v=38"></script>
+<script type="module" src="monstres.js?v=39"></script>
 <script type="module" src="monstres_competences.js?v=28"></script>
 <script type="module" src="monstres_ia.js?v=41"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
