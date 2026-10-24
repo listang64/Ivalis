@@ -7746,3 +7746,11 @@ création, la relève) ; les repères redemandés, le départ autour du repère,
 renforts par les cases peintes, le bouton PIONS ; l'encart en symboles
 (montants, couleurs, une seule palette, étalement, surpuissance, états) ; la
 distance en haut à droite ; les versions. Il mord sur l'ancien code (79 échecs).
+
+Les anciens bancs remis aux règles v263 : corrections_v252 et v255 (la triche
+a quitté le tableau des statures pour l'encart du niveau du groupe), v260 (les
+nouvelles couleurs ; le tirage des résistances passe par une variable), v261
+(plus de cœur des cases ; le bouton PIONS et la demande des repères), v262 (la
+triche du niveau 1, 8 %, sous le leader et ses PV), elements_magiques (le
+nombre de résistances suit le niveau), cout_et_tir et fenetre_tour (la
+distance en haut à droite, les montants en symboles).
