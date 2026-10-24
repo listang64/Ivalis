@@ -3808,6 +3808,37 @@ textarea.input-texte-parchemin {
     text-shadow: 1px 2px 5px rgba(0, 0, 0, 0.95);
 }
 
+/* LA DISTANCE (v263) : une petite cible et le nombre, en blanc, en haut à
+   droite. Place et taille : hud_disposition.js. */
+#voile-tour-distance {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+    color: #ffffff;
+    font-family: 'Cinzel', serif;
+    font-weight: bold;
+    line-height: 1;
+    white-space: nowrap;
+    text-shadow: 1px 2px 5px rgba(0, 0, 0, 0.95);
+}
+#voile-tour-distance .encart-symbole { width: 0.95em; height: 0.95em; filter: drop-shadow(1px 2px 3px rgba(0, 0, 0, 0.9)); }
+
+/* LES DÉGÂTS ET LES SOINS EN SYMBOLES (v263) : le symbole, le montant dans sa
+   couleur, la surpuissance en or, l'étalement entre parenthèses. */
+#voile-tour-effets .encart-montant {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+    font-weight: bold;
+    font-size: 1.12em;
+    line-height: 1.2;
+}
+#voile-tour-effets .encart-symbole { flex-shrink: 0; filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.9)); }
+#voile-tour-effets .encart-chiffre { font-family: 'Cinzel', serif; font-size: 1.1em; }
+#voile-tour-effets .encart-surpuissance { font-family: 'Cinzel', serif; font-size: 0.95em; text-shadow: 0 0 6px rgba(245, 197, 66, 0.55), 1px 1px 3px black; }
+#voile-tour-effets .encart-etalement { font-weight: normal; font-style: italic; font-size: 0.85em; }
+
 #voile-tour-bas {
     position: absolute;
     display: flex;

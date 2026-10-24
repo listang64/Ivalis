@@ -395,7 +395,7 @@ titre("5. LES STATURES : PETIT, NORMAL, BOSS — PLUS D'ÉLITE");
     window.__ou(() => window.dessinerTableauMonstres(), null);
     const lignes = [...document.querySelectorAll("#tbody-monstres .cellule-palier-monstres")].map(td => td.textContent.trim());
     window.__ou(() => window.dessinerReglagesMonstres(), null);
-    const entetes = [...document.querySelectorAll("#reglages-monstres .table-reglages-monstres thead th")].map(th => th.textContent.trim());
+    const entetes = [...document.querySelectorAll("#reglages-monstres > .table-reglages-monstres thead th")].map(th => th.textContent.trim());
     const cases = [...document.querySelectorAll("#tbody-reglages-monstres input")].map(i => i.dataset.palier);
     return { paliers: [...new Set(g.map(x => x.Palier))], nb: g.length, amorces: window.__lots.map(o => o.data && o.data.Palier),
              lignes, entetes, cases, soutienBoss: !!window.__ou(() => window.gabaritMonstre("SOUTIEN", "Boss"), null),
@@ -406,8 +406,9 @@ titre("5. LES STATURES : PETIT, NORMAL, BOSS — PLUS D'ÉLITE");
   verifier("le bestiaire en mémoire : Petit, Normal, Boss", JSON.stringify(r.paliers) === '["Petit","Normal","Boss"]' && r.nb === 17, `${JSON.stringify(r.paliers)} (${r.nb})`);
   verifier("une vieille ligne Élite en base ne revient pas", r.eliteLue === false);
   verifier("le tableau de Paramètres > Monstres : 17 lignes, aucune Élite", r.lignes.length === 17 && !r.lignes.includes("Élite"), `${r.lignes.length} : ${[...new Set(r.lignes)].join("/")}`);
-  verifier("la triche et la marche : trois colonnes, Petit / Normal / Boss",
-           JSON.stringify(r.entetes) === '["","Petit","Normal","Boss"]' && r.cases.length === 6 && !r.cases.includes("Élite"), `${JSON.stringify(r.entetes)} ${r.cases.length}`);
+  // (v263 : la triche a quitté ce tableau pour l'encart du niveau du groupe.)
+  verifier("la marche : trois colonnes, Petit / Normal / Boss",
+           JSON.stringify(r.entetes) === '["","Petit","Normal","Boss"]' && r.cases.length === 3 && !r.cases.includes("Élite"), `${JSON.stringify(r.entetes)} ${r.cases.length}`);
 }
 
 titre("6. L'ENCART DU LEADER (Paramètres > Monstres)");
@@ -438,15 +439,16 @@ titre("6. L'ENCART DU LEADER (Paramètres > Monstres)");
   });
   verifier("quatre réglages, 15 à l'origine", r.n === 4 && r.avant === "degats=15 resistances=15 pv=15 chanceEtat=15", r.avant);
   verifier("dans le bloc des réglages, en haut du tableau", r.dansLeBloc === true);
-  verifier("dégâts du leader à 30 : le moteur frappe à +40 % (10 + 30) tout de suite",
-           r.apres.noyau && r.apres.noyau.degats === 30 && r.apres.bonus === 40, JSON.stringify(r.apres.noyau) + " " + r.apres.bonus);
+  // (v263 : la triche du niveau 1 du groupe, 8 %, au lieu des 10 % par stature.)
+  verifier("dégâts du leader à 30 : le moteur frappe à +38 % (8 + 30) tout de suite",
+           r.apres.noyau && r.apres.noyau.degats === 30 && r.apres.bonus === 38, JSON.stringify(r.apres.noyau) + " " + r.apres.bonus);
   verifier("une saisie folle est bornée (999 → 300 PV)", r.apres.champPv === "300", r.apres.champPv);
   verifier("chaque changement s'écrit (Monstres_Modeles/_REGLAGES, champ Leader, fusionné)",
            r.apres.ecrit.length === 2 && r.apres.ecrit.every(x => /"Leader":\{/.test(x) && x.endsWith("+merge")) && /"Degats_Soins_Pct":30/.test(r.apres.ecrit[0]),
            r.apres.ecrit.join(" | "));
   verifier("un autre poste les change : l'encart les montre", r.ailleurs.champs === "degats=15 resistances=20 pv=25 chanceEtat=15", r.ailleurs.champs);
-  verifier("et le prochain leader posé les reçoit : 70 + 25 PV, 20 + 20 / 15 + 20 de défenses",
-           !!r.ailleurs.stats && r.ailleurs.stats.Leader === true && r.ailleurs.stats.PV_Max === 95 && r.ailleurs.stats.PV_Actuels === 95
+  verifier("et le prochain leader posé les reçoit : 70 + 8 (triche, v263) + 25 PV, 20 + 20 / 15 + 20 de défenses",
+           !!r.ailleurs.stats && r.ailleurs.stats.Leader === true && r.ailleurs.stats.PV_Max === 103 && r.ailleurs.stats.PV_Actuels === 103
            && r.ailleurs.stats.Def_Physique === 40 && r.ailleurs.stats.Def_Magique === 35, JSON.stringify(r.ailleurs.stats));
   verifier("sans réglage en base : les chiffres d'origine", !!r.retour && r.retour.degats === 15 && r.retour.pv === 15, JSON.stringify(r.retour));
 }
@@ -600,14 +602,15 @@ titre("9. LA GÉNÉRATION : TOUT LE DÉPART ENTRE, SUR LES CASES PEINTES, AVEC S
     const chef = g4.docs.filter(d => d.Leader);
     out.a4 = { n: g4.docs.length, cases: g4.cases, surPeintes: g4.cases.every(c => CASES.includes(c)), distinctes: new Set(g4.cases).size === g4.cases.length,
                leaders: chef.length, pvChef: chef[0] ? chef[0].PV_Max - gab(chef[0]).PV : null, defChef: chef[0] ? chef[0].Def_Physique - gab(chef[0]).Res_Physique : null,
-               reserve: g4.reserve, maj: g4.maj, ordre: g4.ordre.length, paliers: g4.docs.map(d => d.Palier) };
+               reserve: g4.reserve, maj: g4.maj, ordre: g4.ordre.length, paliers: g4.docs.map(d => d.Palier),
+               triche: window.__ou(() => window.tricheMonstresActuelle(), 0) };
     // L'Apparition 1, jusqu'à voir ses deux cas.
     out.a1 = {};
     for (let k = 0; k < 30 && !(out.a1.chef && out.a1.releve); k++) {
       const g = await generer(1);
       if (!g.res) break;
       if (g.res.cas === 1) out.a1.chef = { leader: g.docs.length === 1 && g.docs[0].Leader === true, reserve: (g.reserve || []).map(m => `${m.palier}@${m.entreeManche}${m.leader ? "*" : ""}`) };
-      else out.a1.releve = { releve: g.docs.length === 1 && g.docs[0].Releve_En_Leader === true && !g.docs[0].Leader, pv: g.docs[0] && g.docs[0].PV_Max === gab(g.docs[0]).PV,
+      else out.a1.releve = { releve: g.docs.length === 1 && g.docs[0].Releve_En_Leader === true && !g.docs[0].Leader, pv: g.docs[0] && g.docs[0].PV_Max === gab(g.docs[0]).PV + window.__ou(() => window.tricheMonstresActuelle(), 0),
                              reserve: (g.reserve || []).map(m => (m.surReleve ? "relève" : "?") + (m.entreeManche ? "@" + m.entreeManche : "")) };
     }
     const g2 = await generer(2);
@@ -618,14 +621,15 @@ titre("9. LA GÉNÉRATION : TOUT LE DÉPART ENTRE, SUR LES CASES PEINTES, AVEC S
   verifier("Apparition 4 : 4 ou 5 créatures posées, au-delà des « joueurs + 1 » d'avant (3)", r.a4.n >= 4 && r.a4.n <= 5, `${r.a4.n} (${r.a4.paliers.join(",")})`);
   verifier("toutes sur les cases peintes, une par case", r.a4.surPeintes && r.a4.distinctes, r.a4.cases.join(" "));
   verifier("toutes dans l'ordre d'initiative", r.a4.ordre === 2 + r.a4.n, `${r.a4.ordre}`);
-  verifier("un leader, et un seul, avec ses +15 PV et +15 de défense physique", r.a4.leaders === 1 && r.a4.pvChef === 15 && r.a4.defChef === 15,
+  // (v263 : sur les PV de la triche du niveau du groupe, 8 au niveau 1.)
+  verifier("un leader, et un seul, avec ses +15 PV (sur la triche) et +15 de défense physique", r.a4.leaders === 1 && r.a4.triche === 8 && r.a4.pvChef === 15 + 8 && r.a4.defChef === 15,
            `${r.a4.leaders} leader(s), +${r.a4.pvChef} PV, +${r.a4.defChef} déf.`);
   verifier("pas de renfort en réserve", Array.isArray(r.a4.reserve) && r.a4.reserve.length === 0, JSON.stringify(r.a4.reserve));
   verifier("la partie retient l'apparition et la rencontre, plus de difficulté",
            !!r.a4.maj && r.a4.maj.Apparition_Rencontre === 4 && typeof r.a4.maj.ID_Rencontre === "string" && !("Difficulte_Rencontre" in r.a4.maj), JSON.stringify(r.a4.maj));
   verifier("Apparition 1, le chef : leader, quatre Petits en réserve pour la manche 2",
            !!r.a1.chef && r.a1.chef.leader && JSON.stringify(r.a1.chef.reserve) === '["Petit@2","Petit@2","Petit@2","Petit@2"]', JSON.stringify(r.a1.chef));
-  verifier("Apparition 1, la relève : pas encore leader (PV du gabarit), ses renforts attendent sa relève",
+  verifier("Apparition 1, la relève : pas encore leader (PV du gabarit + triche), ses renforts attendent sa relève",
            !!r.a1.releve && r.a1.releve.releve && r.a1.releve.pv && r.a1.releve.reserve.length === 3 && r.a1.releve.reserve.every(x => x === "relève"), JSON.stringify(r.a1.releve));
   verifier("Apparition 2 : trois renforts pour la manche 3, un seul leader en tout", JSON.stringify(r.a2.reserve) === "[3,3,3]" && r.a2.leaders === 1,
            `${JSON.stringify(r.a2.reserve)} — ${r.a2.leaders} leader(s)`);

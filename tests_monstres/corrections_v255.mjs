@@ -233,31 +233,34 @@ console.log("\n3b. LE CONTRE AU CIBLAGE : SUR SOI SEULEMENT");
 }
 
 console.log("\n4b. LE TABLEAU DES MONSTRES : LA TRICHE EN %");
+// v263 : la triche reste en % du brut (dégâts et soins), mais elle suit le
+// niveau du groupe, la même pour toutes les statures, dans son propre encart.
 {
   const r = await p.evaluate(async () => {
+    window.NIVEAU_GROUPE = 1;
     window.__ou(() => window.appliquerReglagesMonstres(null), null);
     window.__ou(() => window.dessinerReglagesMonstres(), null);
-    const lignes = [...document.querySelectorAll("#tbody-reglages-monstres tr")];
-    const titre = lignes[0] ? lignes[0].querySelector("td").textContent : "";
-    const valeurs = lignes[0] ? [...lignes[0].querySelectorAll("input")].map(i => i.value).join("/") : "";
+    const titre = (document.querySelector("#reglages-triche-niveau .reglages-monstres-aide") || {}).textContent || "";
+    const champs = () => [...document.querySelectorAll("#corps-triche-niveau input")];
+    const valeurs = champs().map(i => i.value).join("/");
     window.__ecrits = [];
-    const champ = lignes[0] && lignes[0].querySelectorAll("input")[1];
-    if (champ) { champ.value = "25"; champ.dispatchEvent(new Event("change")); }
+    const champ = champs().find(i => i.dataset.cle === "base14");
+    if (champ) { champ.value = "24"; champ.dispatchEvent(new Event("change")); }
     await new Promise(res => setTimeout(res, 50));
     const ecrit = (window.__ecrits || []).filter(x => x.chemin === "Monstres_Modeles/_REGLAGES").map(x => JSON.stringify(x.data));
     const MP = await import('./moteur_pur.js');
     const normal = MP.bonusMonstreDe({ estMonstre: true, palier: "Normal" });
-    // L'ancien champ (des POINTS : +1, +2…) n'est pas relu comme des pour cent.
-    window.__ou(() => window.appliquerReglagesMonstres({ Bonus_Degats: { Petit: 0, Normal: 1, "Élite": 2, Boss: 3 } }), null);
+    // Les anciens champs (des POINTS, puis le % par stature) ne sont plus relus.
+    window.__ou(() => window.appliquerReglagesMonstres({ Bonus_Degats: { Petit: 0, Normal: 1, "Élite": 2, Boss: 3 },
+                                                         Bonus_Degats_Pct: { Petit: 1, Normal: 2, "Élite": 3, Boss: 4 } }), null);
     const ancien = MP.bonusMonstreDe({ estMonstre: true, palier: "Boss" });
     window.__ou(() => window.appliquerReglagesMonstres(null), null);
     return { titre, valeurs, ecrit, normal, ancien };
   });
-  // (v262 : plus de colonne Élite.)
-  verifier("la ligne dit « Dégâts et soins en plus (%) », 10 partout", /\(%\)/.test(r.titre) && r.valeurs === "10/10/10", `${r.titre} ${r.valeurs}`);
-  verifier("Normale à 25 % : le moteur le sait, la base l'écrit (Bonus_Degats_Pct)", r.normal === 25
-           && r.ecrit.some(x => /"Bonus_Degats_Pct":\{[^}]*"Normal":25/.test(x)), JSON.stringify(r.ecrit));
-  verifier("l'ancien réglage en points (Bonus_Degats) n'est pas relu en %", r.ancien === 10, `${r.ancien}`);
+  verifier("l'encart dit « % de dégâts et de soins », 7 + 1 × niveau (8 % au niveau 1)", /% de dégâts et de soins/.test(r.titre) && r.valeurs === "7/1/5/2", `${r.titre} ${r.valeurs}`);
+  verifier("base à 24 : +25 % au niveau 1, le moteur le sait, la base l'écrit (Triche_Niveau)", r.normal === 25
+           && r.ecrit.some(x => /"Triche_Niveau":\{[^}]*"Base_1_4":24/.test(x)), JSON.stringify(r.ecrit));
+  verifier("les anciens réglages (Bonus_Degats, Bonus_Degats_Pct) ne sont plus relus", r.ancien === 8, `${r.ancien}`);
 }
 
 await fin();

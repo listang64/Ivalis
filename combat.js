@@ -5888,39 +5888,115 @@ window.ouvrirArretDuTemps = function(idLanceur) {
     fenetre.style.display = "flex";
 };
 
-// Les effets d'une carte, en toutes lettres. "Initiative +" n'en fait pas
-// partie : ce n'est pas un effet de jeu, et la carte ne l'affiche pas non plus.
+// LES COULEURS DES DÉGÂTS ET DES SOINS (v263) : celles des chiffres qui
+// s'envolent au-dessus des pions (COULEURS_CHIFFRE, pont_combat.js) — Nico :
+// « assure-toi de remettre ces mêmes couleurs aux dégâts qui s'envolent ».
+// Le pont est un module chargé à côté ; ce repli, identique, ne sert qu'avant
+// lui (un banc qui isole ce fichier).
+const COULEURS_CHIFFRE_REPLI = { physique: "#ff4c4c", magique: "#7fd0ff", mental: "#c9a2ff", brut: "#ff4c4c", soin: "#8cf08c" };
+window.couleursChiffres = () => (window.pontCombat && window.pontCombat.COULEURS_CHIFFRE) || COULEURS_CHIFFRE_REPLI;
+// L'or de la surpuissance.
+const OR_SURPUISSANCE = "#f5c542";
+
+// LES SYMBOLES DE L'ENCART (v263), dessinés ici et peints de la couleur du
+// texte (currentColor) : l'explosion des dégâts physiques, la baguette des
+// dégâts magiques, la tête qui ondule de la Distorsion mentale, la croix des
+// soins, la cible de la distance.
+const pointsEtoile = (branches, grand, petit, cx, cy) => Array.from({ length: branches * 2 }, (_, i) => {
+    const a = Math.PI * i / branches - Math.PI / 2;
+    const r = i % 2 ? petit : (Array.isArray(grand) ? grand[(i / 2) % grand.length] : grand);
+    return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`;
+}).join(" ");
+const svgSymbole = (largeur, contenu) =>
+    `<svg class="encart-symbole" viewBox="0 0 ${largeur} 24" width="${(largeur / 24 * 1.35).toFixed(2)}em" height="1.35em" aria-hidden="true">${contenu}</svg>`;
+const SYMBOLES_ENCART = {
+    physique: svgSymbole(24, `<polygon points="${pointsEtoile(10, [11.5, 9.5, 11, 9], 5, 12, 12)}" fill="currentColor"/>`
+        + `<polygon points="${pointsEtoile(7, 5.2, 2.6, 12, 12.4)}" fill="#000" fill-opacity="0.28"/>`),
+    magique: svgSymbole(24, `<line x1="3.5" y1="20.5" x2="13.5" y2="10.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/>`
+        + `<polygon points="${pointsEtoile(5, 5.4, 2.3, 16.5, 7.5)}" fill="currentColor"/>`
+        + `<polygon points="${pointsEtoile(4, 2.2, 0.7, 21.5, 14)}" fill="currentColor"/>`
+        + `<polygon points="${pointsEtoile(4, 1.8, 0.6, 9, 3)}" fill="currentColor"/>`),
+    mental: svgSymbole(32, `<path d="M8.6 22v-3.4C5.9 17.5 4 14.9 4 11.8 4 7.5 7.5 4 11.9 4c3.8 0 6.9 2.7 7.6 6.2l1.8 3c.3.5 0 1-.6 1h-1.3v2.6c0 1.1-.9 2-2 2h-2.3V22z" fill="currentColor"/>`
+        + [4, 7, 10].map((r, i) => `<path d="M${(21 + r * Math.cos(-0.85)).toFixed(1)} ${(10 + r * Math.sin(-0.85)).toFixed(1)} A${r} ${r} 0 0 1 ${(21 + r * Math.cos(0.85)).toFixed(1)} ${(10 + r * Math.sin(0.85)).toFixed(1)}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-opacity="${(1 - i * 0.25).toFixed(2)}"/>`).join("")),
+    soin: svgSymbole(24, `<path d="M9.2 2.5h5.6a.8.8 0 0 1 .8.8v5.9h5.9a.8.8 0 0 1 .8.8v5.6a.8.8 0 0 1-.8.8h-5.9v5.9a.8.8 0 0 1-.8.8H9.2a.8.8 0 0 1-.8-.8v-5.9H2.5a.8.8 0 0 1-.8-.8V10a.8.8 0 0 1 .8-.8h5.9V3.3a.8.8 0 0 1 .8-.8z" fill="currentColor"/>`),
+    cible: svgSymbole(24, `<circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" stroke-width="2"/>`
+        + `<circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/>`
+        + `<circle cx="12" cy="12" r="1.5" fill="currentColor"/>`
+        + `<path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`)
+};
+window.SYMBOLES_ENCART = SYMBOLES_ENCART;
+
+// La nature d'un effet de carte qui frappe ou soigne : la même lecture du nom
+// que celle du moteur (moteur_effets.js) — ni bouclier ni purification, qui ne
+// sont pas des montants. Rien : ce n'est ni un dégât ni un soin.
+window.natureEffetEncart = function(nom, desc) {
+    const n = String(nom || "").toLowerCase();
+    if (!n || n.includes("bouclier") || n.includes("purification")) return null;
+    if (n.includes("soin") || n.includes("guérison")) return "soin";
+    const distorsion = typeof window.estDistorsionMentale === "function"
+        ? window.estDistorsionMentale(nom) : /distorsion|pouvoir/i.test(n);
+    if (distorsion) return "mental";
+    const sombre = (typeof window.estEffetTenebres === "function" && window.estEffetTenebres(nom))
+        || (typeof window.estEffetVampirisme === "function" && window.estEffetVampirisme(nom));
+    if (sombre) return "magique";
+    // Une attaque, ou un effet dont la description COMMENCE par ses dégâts
+    // (« 7 dégâts physiques » d'une morsure de créature) — pas « Annule 20 %
+    // des dégâts » d'un Contre ou d'une Absorption.
+    const texte = String(desc || "").toLowerCase();
+    if (n.includes("attaque") || /^\s*\d+(?:[.,]\d+)?\s+d[ée]g[âa]ts?/.test(texte)) {
+        return (n.includes("magique") || /d[ée]g[âa]ts?\s+magique/.test(texte)) ? "magique" : "physique";
+    }
+    return null;
+};
+
+// LA DISTANCE DE L'ENCART (v263) : le nombre seul, à côté d'une petite cible,
+// en haut à droite de l'encart. La même portée que la carte en grand
+// (distanceAAfficher, moteur_effets.js) ; sinon celle qu'écrit la carte ; rien
+// pour une technique de contact.
+window.distanceEncartCarte = function(dataCarte, lanceur) {
+    const vraie = (lanceur && typeof window.distanceAAfficher === "function")
+        ? window.distanceAAfficher(dataCarte, lanceur) : null;
+    if (vraie) return { portee: vraie.portee, apportArme: vraie.apportArme || 0 };
+    const effets = (dataCarte && dataCarte.Effets_Compiles) || [];
+    for (const eff of effets) {
+        const nom = typeof eff === "string" ? eff : (eff && eff.nom) || "";
+        if (!/^Distance\b/.test(nom.trim()) || /\+/.test(nom)) continue;
+        const texte = typeof eff === "string" ? eff : String(eff.desc || "");
+        const m = texte.replace(/<[^>]*>/g, " ").match(/(\d+)/);
+        const portee = m ? Number(m[1]) : 0;
+        if (portee > 1) return { portee, apportArme: 0 };
+    }
+    return null;
+};
+
+// Les effets d'une carte, tels que l'encart de tour les annonce. "Initiative +"
+// n'en fait pas partie : ce n'est pas un effet de jeu, et la carte ne
+// l'affiche pas non plus.
 //
-// PAS DE POURCENTAGES DANS L'ENCART DE TOUR, ET LA RÈGLE SE LIT DANS LE TEXTE.
+// LES DÉGÂTS ET LES SOINS SE LISENT EN SYMBOLES (v263, Nico). Plus de texte :
+// une explosion rouge et son montant pour des dégâts physiques, une baguette
+// bleu ciel pour des dégâts magiques, une tête violet clair qui ondule pour la
+// Distorsion mentale, une croix verte pour un soin — chacun dans la couleur de
+// son chiffre qui s'envole. Un étalement s'écrit à côté du montant qu'il
+// étale (« (Sur 2 Tours) ») au lieu d'avoir sa ligne ; la surpuissance, en or,
+// juste à côté (« ×1,25 »). La distance est partie en haut à droite de
+// l'encart (distanceEncartCarte) ; la zone est dessinée à côté.
 //
-// L'encart annonce ce qui va se passer, en une seconde, pendant qu'on regarde
-// le plateau. « Peur — 6% chance de faire Peur (Max 60%) » n'a rien à y faire :
-// le joueur veut savoir qu'il y a de la Peur, pas jouer aux probabilités. Un
-// montant de dégâts ou un nombre de cases, lui, change ce qu'on va voir.
-//
-// Le partage se fait sur la description elle-même, et pas sur une liste
-// d'effets tenue à la main : toute description qui contient un « % » tombe,
-// toutes les autres restent. C'est exactement le découpage voulu sur les vrais
-// effets du jeu — « 2 dégats physique », « 1 hexagone » et « 2 soins » restent ;
-// « Peur », « Brûlé » et « Bouclier magique » (dont le texte dit « 30% des pv
-// restants ») se réduisent à leur titre — et une nouvelle chance qu'on ajoutera
-// un jour au bestiaire suivra la règle sans qu'on y pense.
+// LES ÉTATS GARDENT LEUR LIGNE, ET LA RÈGLE SE LIT DANS LE TEXTE : pas de
+// pourcentage dans l'encart. Toute description qui contient un « % » se réduit
+// à son titre (« Peur », « Brûlé », « Bouclier magique ») ; les autres restent
+// (« 2 hexagones » d'une Poussée). Une nouvelle chance qu'on ajoutera un jour
+// au bestiaire suivra la règle sans qu'on y pense.
 window.ligneEffetsCarte = function(dataCarte, lanceur) {
     const effets = (dataCarte && dataCarte.Effets_Compiles) || [];
     const lignes = [];
+    const couleurs = window.couleursChiffres();
+    // Une carte d'avant le renommage dit encore « Mots de pouvoirs ».
+    const nomActuel = (t) => typeof window.nomEffetActuel === "function" ? window.nomEffetActuel(t) : t;
+    const sansBalises = (t) => String(t || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    const echapperAttr = (t) => String(t).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
-    // LA MÊME PORTÉE QUE SUR LA CARTE EN GRAND, ET PAR LA MÊME RÈGLE.
-    // L'encart de tour annonce la technique qui va partir : s'il affichait la
-    // portée écrite dans la Forge pendant que la carte en grand affiche celle
-    // que l'arme donne, les deux écrans se contrediraient à un mètre l'un de
-    // l'autre. `distanceAAfficher` et `texteDistanceReelle` vivent dans
-    // moteur_effets.js et servent aux deux.
-    const porteeVraie = (lanceur && typeof window.distanceAAfficher === "function")
-        ? window.distanceAAfficher(dataCarte, lanceur) : null;
-    const reecrireDistance = (texte) => (porteeVraie && typeof window.texteDistanceReelle === "function")
-        ? window.texteDistanceReelle(texte, porteeVraie) : texte;
-    // Le format d'une ligne, à un seul endroit : la ligne de Distance ajoutée
-    // doit être indiscernable des vraies.
+    // Le format d'une ligne d'état ou d'un autre effet, à un seul endroit.
     const ligneEffet = (nom, desc, estMod) => {
         const retrait = estMod ? "margin-left: 18px; margin-top: 4px;" : "margin-top: 8px;";
         const couleur = estMod ? "#ddd4c4" : "#f4efe4";
@@ -5933,40 +6009,86 @@ window.ligneEffetsCarte = function(dataCarte, lanceur) {
                 ${detail}
             </div>`;
     };
-    let aDejaSaDistance = false;
-    // Une carte d'avant le renommage dit encore « Mots de pouvoirs ».
-    const nomActuel = (t) => typeof window.nomEffetActuel === "function" ? window.nomEffetActuel(t) : t;
 
-    effets.forEach(eff => {
+    // LA SURPUISSANCE de la carte (app.js) : une technique de héros forgée à 70
+    // de fatigue ou plus. Celles des créatures ne sont pas forgées.
+    const estCreature = !!(lanceur && (lanceur.estMonstre
+        || (typeof window.estMonstre === "function" && window.estMonstre(lanceur.idPersonnage))));
+    const surpuissance = (lanceur && !estCreature && typeof window.texteSurpuissance === "function")
+        ? window.texteSurpuissance(typeof window.fatigueDeSurpuissance === "function"
+            ? window.fatigueDeSurpuissance(dataCarte, lanceur) : dataCarte.Fatigue)
+        : "";
+
+    // L'ÉTALEMENT, par action : un effet de base et les sous-effets qui le
+    // suivent. Posé sur une Distance ou une Zone, il vaut pour toute la carte,
+    // comme dans le moteur (toursEtalementDeLaCarte, moteur_effets.js).
+    const estEtalement = (nom) => {
+        const n = String(nom || "").toLowerCase().trim();
+        return n === "dot" || n.includes("étalement") || n.includes("etalement");
+    };
+    const toursDe = (desc) => {
+        const t = sansBalises(desc);
+        const m = t.match(/pendant\s+(\d+)\s+tours?/i) || t.match(/divis[ée]s?\s+par\s+(\d+)/i);
+        return Math.max(2, m ? Number(m[1]) : 2);
+    };
+    const groupes = [];
+    effets.forEach((eff, i) => {
+        if (!eff || typeof eff === "string" || !eff.isMod || groupes.length === 0) groupes.push({ debut: i, base: eff, tours: 0, zone: false });
+        const g = groupes[groupes.length - 1];
+        g.fin = i;
+        if (eff && typeof eff === "object") {
+            if (estEtalement(eff.nom)) g.tours = Math.max(g.tours, toursDe(eff.desc));
+            if (eff.isZone || eff.nom === "Zone") g.zone = true;
+        }
+    });
+    let toursDeLaCarte = 0;
+    groupes.forEach(g => {
+        const nomBase = g.base && typeof g.base === "object" ? g.base.nom : "";
+        if (g.tours > 0 && (nomBase === "Distance" || g.zone)) toursDeLaCarte = Math.max(toursDeLaCarte, g.tours);
+    });
+    const toursPour = (i) => {
+        const g = groupes.find(x => i >= x.debut && i <= x.fin);
+        return Math.max(toursDeLaCarte, g ? g.tours : 0);
+    };
+
+    // Un montant de dégâts ou de soin : le symbole, le chiffre, l'or, l'étalement.
+    const ligneMontant = (nature, nom, montant, tours, estMod) => {
+        const couleur = couleurs[nature] || couleurs.physique;
+        const retrait = estMod ? "margin-left: 18px; margin-top: 4px;" : "margin-top: 8px;";
+        return `<div class="encart-montant" data-nature="${nature}" title="${echapperAttr(nom)}" style="${retrait} color: ${couleur};">`
+            + SYMBOLES_ENCART[nature === "brut" ? "physique" : nature]
+            + `<span class="encart-chiffre">${montant}</span>`
+            + (surpuissance ? `<span class="encart-surpuissance" style="color: ${OR_SURPUISSANCE};">${surpuissance}</span>` : "")
+            + (tours > 0 ? `<span class="encart-etalement">(Sur ${tours} Tours)</span>` : "")
+            + `</div>`;
+    };
+
+    effets.forEach((eff, i) => {
         // Les vieilles cartes gardent des effets en simple texte : on les
         // affiche tels quels, sans description.
         if (typeof eff === "string") {
             const brut = nomActuel(eff.replace(/\s+/g, " ").trim());
-            if (!brut || brut.indexOf("Initiative +") >= 0) return;
-            const estDistance = brut.indexOf("Distance") >= 0;
-            if (estDistance) aDejaSaDistance = true;
-            lignes.push(`<div style="margin-top: 6px; color: #f4efe4;">• ${estDistance ? reecrireDistance(brut) : brut}</div>`);
+            if (!brut || brut.indexOf("Initiative +") >= 0 || brut.indexOf("Distance") >= 0) return;
+            lignes.push(`<div style="margin-top: 6px; color: #f4efe4;">• ${brut}</div>`);
             return;
         }
         if (!eff || !eff.nom) return;
         if (eff.nom.indexOf("Initiative +") === 0) return;
-        // La zone est dessinée à côté, pas décrite en toutes lettres.
-        if (eff.isZone) return;
+        // La zone est dessinée à côté, la distance est en haut à droite.
+        if (eff.isZone || eff.nom.indexOf("Distance") >= 0) return;
+        // L'étalement s'écrit sur le montant qu'il étale.
+        if (estEtalement(eff.nom)) return;
 
-        const estDistance = eff.nom.indexOf("Distance") >= 0;
-        if (estDistance) aDejaSaDistance = true;
-        const chiffre = eff.desc && !/%/.test(eff.desc);
-        lignes.push(ligneEffet(nomActuel(eff.nom),
-                               chiffre ? (estDistance ? reecrireDistance(eff.desc) : eff.desc) : "",
-                               !!eff.isMod));
+        const nom = nomActuel(eff.nom);
+        const nature = window.natureEffetEncart(eff.nom, sansBalises(eff.desc));
+        const chiffre = nature ? sansBalises(eff.desc).match(/(\d+(?:[.,]\d+)?)/) : null;
+        if (nature && chiffre) {
+            lignes.push(ligneMontant(nature, nom, chiffre[1].replace(".", ","), toursPour(i), !!eff.isMod));
+            return;
+        }
+        const montreDesc = eff.desc && !/%/.test(eff.desc);
+        lignes.push(ligneEffet(nom, montreDesc ? eff.desc : "", !!eff.isMod));
     });
-
-    // La carte ne dit rien de sa portée, et pourtant elle porte : c'est l'arme.
-    // On l'écrit en tête, dans le même format qu'une vraie ligne.
-    if (porteeVraie && !aDejaSaDistance) {
-        lignes.unshift(ligneEffet("Distance",
-                                  reecrireDistance(window.gabaritTexteDistance()), false));
-    }
 
     if (lignes.length === 0) return `<span style="color: #a89f91; font-style: italic;">Aucun effet</span>`;
     return lignes.join("");
@@ -6280,6 +6402,7 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
     let titre = "";
     let ligne = "";
     let dessinZone = "";
+    let distance = null;
     // La couleur du combattant ne sert plus qu'au dessin de sa zone : le nom de
     // la technique est rouge pour tout le monde (voir plus bas).
     const couleur = window.couleurCombattant(perso);
@@ -6292,6 +6415,7 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
         ligne = dataCarte ? window.ligneEffetsCarte(dataCarte, perso)
                           : `<span style="color: #a89f91; font-style: italic;">Technique inconnue de ce poste</span>`;
         if (dataCarte) dessinZone = window.dessinZoneCarte(dataCarte, couleur, 16);
+        if (dataCarte) distance = window.distanceEncartCarte(dataCarte, perso);
     }
 
     const elCarte = document.getElementById("voile-tour-carte");
@@ -6302,8 +6426,21 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
         const baseCarte = parseFloat(elCarte.dataset.base) || 26;
         ajusterSurUneLigne(elCarte, baseCarte, baseCarte * 0.5);
     }
-    if (elEffets && elEffets.innerHTML !== ligne) elEffets.innerHTML = ligne;
+    // Comparé à ce qu'on a écrit, pas à ce que le navigateur relit : un SVG ne
+    // se relit pas mot pour mot, et l'encart se réécrirait à chaque battement.
+    if (elEffets && elEffets.dataset.ecrit !== ligne) { elEffets.dataset.ecrit = ligne; elEffets.innerHTML = ligne; }
     if (elZone && elZone.innerHTML !== dessinZone) elZone.innerHTML = dessinZone;
+    // LA DISTANCE, EN HAUT À DROITE (v263) : une petite cible et le nombre, en
+    // blanc. Rien pour une technique de contact.
+    const elDistance = document.getElementById("voile-tour-distance");
+    const cleDistance = distance ? `${distance.portee}|${distance.apportArme}` : "";
+    if (elDistance && elDistance.dataset.cle !== cleDistance) {
+        elDistance.dataset.cle = cleDistance;
+        elDistance.innerHTML = distance ? `${window.SYMBOLES_ENCART.cible}<span class="encart-distance-chiffre">${distance.portee}</span>` : "";
+        elDistance.title = distance ? `Distance : ${distance.portee} case${distance.portee > 1 ? "s" : ""}`
+            + (distance.apportArme > 0 ? ` (dont ${distance.apportArme} de l'arme)` : "") : "";
+        elDistance.style.display = distance ? "" : "none";
+    }
 
     // L'état de la barrière : ce que ce poste attend, et de qui.
     const elAttente = document.getElementById("voile-tour-attente");

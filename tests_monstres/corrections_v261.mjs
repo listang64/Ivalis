@@ -335,7 +335,8 @@ console.log("=========================================================");
   verifier("deux cases prises : la troisième, toujours", JSON.stringify(r.derniere) === '["11,0"]', JSON.stringify(r.derniere));
   verifier("toutes prises : à une case de l'une d'elles, jamais sur un pion", r.debordOk);
   verifier("un mur peint par-dessus en retire une", JSON.stringify(r.sansMur) === '["10,0","12,0"]', JSON.stringify(r.sansMur));
-  verifier("sans repère posé, le cœur des cases en sert", r.coeur && r.coeur.q === 11 && r.coeur.r === 0, JSON.stringify(r.coeur));
+  // v263 : plus de repère tiré des cases — on le redemande à chaque réinitialisation.
+  verifier("sans repère posé, pas de repère (le cœur des cases ne sert plus, v263)", r.coeur === null, JSON.stringify(r.coeur));
   verifier("sans case peinte : autour du repère, comme avant", r.commeAvant);
   verifier("ni case ni repère : pas de repère", r.sansRepere === null, JSON.stringify(r.sansRepere));
   verifier("la vraie pose (monstres.js) : trois créatures sur les trois cases",
@@ -345,7 +346,7 @@ console.log("=========================================================");
 }
 
 console.log("\n=========================================================");
-console.log("  8. LE BOUTON PIONS : UN ENNEMI SANS PION ENTRE PAR LÀ AUSSI");
+console.log("  8. LE BOUTON PIONS : UN ENNEMI SANS PION ENTRE AUTOUR DE SON REPÈRE (v263)");
 console.log("=========================================================");
 {
   const r = await p.evaluate(async () => {
@@ -360,14 +361,17 @@ console.log("=========================================================");
     await window.genererTokensCombat();
     const t = window.TOKENS_VTT_DATA;
     const dist = (a, b) => Math.max(Math.abs(a.q - b.q), Math.abs(a.r - b.r), Math.abs((-a.q - a.r) - (-b.q - b.r)));
-    return { ennemi: t.M9 && (t.M9.q + "," + t.M9.r), herosPres: !!t.H1 && dist(t.H1, { q: 2, r: 2 }) <= 2 };
+    return { ennemi: t.M9 && (t.M9.q + "," + t.M9.r), ennemiPres: !!t.M9 && dist(t.M9, { q: 9, r: 9 }) <= 2,
+             herosPres: !!t.H1 && dist(t.H1, { q: 2, r: 2 }) <= 2 };
   });
-  verifier("l'ennemi sur la case peinte", r.ennemi === "-5,6", r.ennemi);
+  // v263 : le déploiement est une première arrivée, autour du repère des
+  // ennemis ; les cases peintes sont celles des renforts.
+  verifier("l'ennemi autour de son repère, pas sur la case peinte (v263)", r.ennemiPres && r.ennemi !== "-5,6", r.ennemi);
   verifier("le héros, lui, autour de son repère", r.herosPres);
 }
 
 console.log("\n=========================================================");
-console.log("  9. LA DEMANDE DES REPÈRES : PLUS QUE CELUI DES HÉROS");
+console.log("  9. LA DEMANDE DES REPÈRES : LES DEUX, CASES PEINTES OU NON (v263)");
 console.log("=========================================================");
 {
   const r = await p.evaluate(async () => {
@@ -381,13 +385,15 @@ console.log("=========================================================");
         conteneur.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: e.x, clientY: e.y })));
       await new Promise(r => setTimeout(r, 20));
     };
-    // Des cases peintes, aucun repère : on ne demande que les héros.
+    // Des cases peintes, aucun repère : v263, on demande les deux quand même.
     window.appliquerSpawnEnnemis && window.appliquerSpawnEnnemis(["10,0", "11,0"]);
     delete window.PARTIE_DATA.Spawn_Allies; delete window.PARTIE_DATA.Spawn_Ennemis;
     window.APPARITION_REPORTEE = false; window.arreterPlacementApparition(); window.__majs = [];
     window.verifierPointsApparition();
     res.ouverte = calque(); res.titre = titre();
     await clic(1, 1);
+    res.titreEnnemis = calque() ? titre() : "(fermée)";
+    await clic(9, -3);
     res.fermee = !calque();
     res.majs = (window.__majs || []).filter(m => m.chemin === "Systeme_Parties/P1").map(m => m.data);
     res.memoire = { allies: window.PARTIE_DATA.Spawn_Allies, ennemis: window.PARTIE_DATA.Spawn_Ennemis };
@@ -405,9 +411,12 @@ console.log("=========================================================");
     return res;
   });
   verifier("cases peintes : la demande s'ouvre sur les héros", r.ouverte && /héros/i.test(r.titre), r.titre);
-  verifier("un seul clic la ferme", r.fermee);
-  verifier("seul Spawn_Allies s'écrit", r.majs.length === 1 && JSON.stringify(Object.keys(r.majs[0])) === '["Spawn_Allies"]'
-           && r.majs[0].Spawn_Allies.q === 1, JSON.stringify(r.majs));
+  // v263 (Nico : « quand on réinitialise un combat, on choisit encore les
+  // spawn joueur et ennemi ») : les cases peintes ne dispensent plus du repère.
+  verifier("…puis sur les ennemis, cases peintes ou non (v263)", /ennemis/i.test(r.titreEnnemis), r.titreEnnemis);
+  verifier("deux clics la ferment", r.fermee);
+  verifier("les deux repères s'écrivent", r.majs.length === 1 && r.majs[0].Spawn_Allies && r.majs[0].Spawn_Allies.q === 1
+           && r.majs[0].Spawn_Ennemis && r.majs[0].Spawn_Ennemis.q === 9, JSON.stringify(r.majs));
   verifier("sans case peinte : héros, puis ennemis, puis les deux écrits",
            /héros/i.test(r.t1) && /ennemis/i.test(r.t2) && r.deux.length === 1
            && r.deux[0].Spawn_Allies && r.deux[0].Spawn_Allies.q === 1 && r.deux[0].Spawn_Ennemis && r.deux[0].Spawn_Ennemis.q === 9,

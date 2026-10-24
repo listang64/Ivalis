@@ -375,22 +375,26 @@ if (!idAttaque || !idDistance) {
   console.log("=========================================================");
   // Deux écrans à un mètre l'un de l'autre qui annoncent deux portées
   // différentes, c'est pire que pas de portée du tout.
+  // v263 : la distance a quitté les lignes de l'encart pour son coin en haut à
+  // droite (une petite cible et le nombre) — le même nombre, par la même règle.
   const encart = await p.evaluate(() => {
     const perso = window.PERSOS_PARTIE[0];
     const lire = (id) => {
-      const html = window.ligneEffetsCarte(window.COMPETENCES_CACHE[id], perso);
+      const d = window.distanceEncartCarte(window.COMPETENCES_CACHE[id], perso);
       const boite = document.createElement("div");
-      boite.innerHTML = html;
-      return (boite.innerText || boite.textContent || "").replace(/\s+/g, " ");
+      boite.innerHTML = window.ligneEffetsCarte(window.COMPETENCES_CACHE[id], perso);
+      return { portee: d ? d.portee : null, texte: (boite.innerText || boite.textContent || "").replace(/\s+/g, " ") };
     };
     return { cac: lire("C_CAC"), tir: lire("C_TIR"), rp: lire("C_RP") };
   });
-  verifier("la carte de contact y annonce ses 2 hexagones",
-           /2 hexagone/.test(encart.cac), encart.cac.slice(0, 110));
+  verifier("la carte de contact y annonce ses 2 cases",
+           encart.cac.portee === 2, String(encart.cac.portee));
   verifier("la carte à distance y annonce ses 4, pas ses 3",
-           /4 hexagone/.test(encart.tir) && !/3 hexagone/.test(encart.tir), encart.tir.slice(0, 110));
+           encart.tir.portee === 4, String(encart.tir.portee));
   verifier("et la technique sans arme n'y parle pas de distance",
-           !/hexagone/.test(encart.rp), encart.rp.slice(0, 110));
+           encart.rp.portee === null && !/hexagone/.test(encart.rp.texte), `${encart.rp.portee} ${encart.rp.texte.slice(0, 80)}`);
+  verifier("plus de ligne « Distance » dans le détail (v263)",
+           ![encart.cac, encart.tir].some(e => /hexagone|Distance/.test(e.texte)), encart.tir.texte.slice(0, 80));
 
   console.log("\n=========================================================");
   console.log("  3. LA CARTE PORTE SON PROPRE COÛT EN ÉNERGIE");

@@ -332,7 +332,10 @@ verifier("ses états sont sous son nom", res.avecOk.nbEtats === 2, `(${res.avecO
 verifier("la technique est annoncée en grand", res.avecOk.carte === "Hurlement putride" && res.avecOk.tailleCarte >= 24,
          `(${res.avecOk.carte}, ${res.avecOk.tailleCarte}px)`);
 verifier("elle est plus grosse que le détail des effets", res.avecOk.tailleCarte > 20);
-verifier("ses effets sont listés dessous", /Distorsion mentale/.test(res.avecOk.effets) && /Peur/.test(res.avecOk.effets),
+// v263 : les dégâts se lisent en symbole (la tête qui ondule de la Distorsion
+// mentale) et en chiffre ; le nom de l'effet passe dans la bulle (title).
+verifier("ses effets sont listés dessous", /data-nature="mental"/.test(res.avecOk.effetsHtml) && /title="Distorsion mentale"/.test(res.avecOk.effetsHtml)
+         && /Peur/.test(res.avecOk.effets),
          `(${res.avecOk.effets.replace(/\s+/g, ' ').trim()})`);
 verifier("l'initiative n'y figure pas", !/Initiative/.test(res.avecOk.effets));
 verifier("tant qu'aucun événement n'est arrivé, la fenêtre est là mais sans OK",
@@ -353,7 +356,7 @@ verifier("et sans dégradé, un aplat franc",
 // les DEUX côtés du partage — sans le second, on pourrait tout supprimer et
 // passer quand même.
 verifier("LES DÉGÂTS GARDENT LEUR CHIFFRE",
-         /9 dégâts/.test(res.avecOk.effetsHtml),
+         /data-nature="mental"[\s\S]*?class="encart-chiffre">9</.test(res.avecOk.effetsHtml),
          `(${res.avecOk.effetsHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90)}…)`);
 verifier("ET PLUS AUCUN POURCENTAGE N'APPARAÎT",
          !/%/.test(res.avecOk.effetsHtml),
@@ -367,7 +370,7 @@ verifier("l'arrivée d'un événement RETIENT le tour au lieu de le jouer",
 verifier("le gros OK doré s'allume et le clic passe partout sur la fenêtre",
          res.enPose.visible && res.enPose.okVisible && res.enPose.clicPasse);
 verifier("et le joueur a sous les yeux la technique qui va se dérouler",
-         res.enPose.carte === "Hurlement putride" && /9 dégâts/.test(res.enPose.effets),
+         res.enPose.carte === "Hurlement putride" && /(^|\s)9(\s|$)/.test(res.enPose.effets),
          `(${res.enPose.carte})`);
 verifier("le OK clignote", /clignotement/i.test(res.anim || ""), `(${res.anim})`);
 verifier("une fois touché, l'animation du tour se joue", res.apresClic.anims.join(">") === "carte",
@@ -658,11 +661,11 @@ console.log("\n  LE PORTRAIT : MÉDAILLON OU AVATAR EN PIED");
            `${formes.compagnon.largeurImg}×${formes.compagnon.hauteurImg}px, bord droit ${formes.compagnon.droiteImg} / titre ${formes.compagnon.gaucheTitre}`);
   verifier("SON ATTAQUE PORTE SON NOM RP, plus « Technique »", formes.compagnon.carte === "Croc du chasseur", formes.compagnon.carte);
   verifier("et ses effets sont décrits (plus « inconnue de ce poste »)",
-           !/inconnue/.test(formes.compagnon.effets) && /6 dégâts bruts/.test(formes.compagnon.effets) && /3 cases/.test(formes.compagnon.effets),
+           !/inconnue/.test(formes.compagnon.effets) && /(^|\s)6(\s|$)/.test(formes.compagnon.effets) && /3 cases/.test(formes.compagnon.effets),
            formes.compagnon.effets);
   verifier("sans nom RP encore : « Attaque de <son nom> »", formes.compagnonSansNom.carte === "Attaque de Brume", formes.compagnonSansNom.carte);
   verifier("le zombie : « Morsure », 7 dégâts physiques, en médaillon",
-           formes.zombie.carte === "Morsure" && /7 dégâts physiques/.test(formes.zombie.effets) && !/inconnue/.test(formes.zombie.effets)
+           formes.zombie.carte === "Morsure" && /(^|\s)7(\s|$)/.test(formes.zombie.effets) && !/inconnue/.test(formes.zombie.effets)
            && formes.zombie.enPied === false, `${formes.zombie.carte} — ${formes.zombie.effets}`);
 
   // La capture, pour l'œil.

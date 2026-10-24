@@ -7662,3 +7662,87 @@ piste_initiative (les couleurs), renforts (il monte une réserve d'avant pour
 garder vivante l'entrée à la place d'un mort), campagne_complete (trois
 apparitions, la ligne Normale du butin, les renforts appelés comme le ferait
 le cerveau).
+
+## v263 — Les repères à chaque combat ; le niveau du groupe ; la triche et les résistances qui le suivent ; l'encart en symboles
+
+Nico : « Quand on réinitialise un combat, on choisit encore les spawn joueur et
+ennemi qui arrivent en premier sur la map. Ensuite les renforts viendront par
+les hexagones spawn » ; « le niveau du groupe, quelque part, qui se met à jour
+dès un changement de niveau, un départ ou une arrivée, car il va être lu par
+plusieurs choses — le niveau du personnage le plus fort » ; les résistances
+des monstres selon ce niveau ; la triche des monstres selon ce niveau,
+réglable dans le panneau Monstres ; les dégâts de distorsion en violet clair ;
+l'encart de la compétence jouée en symboles.
+
+- LES REPÈRES (combat.js) : pointApparition ne lit plus que le repère posé —
+  plus de « cœur des cases peintes » à sa place. Une réinitialisation efface
+  les deux repères ; la demande du début de combat les redemande donc tous les
+  deux, héros puis ennemis, cases peintes ou non. LE DÉPART (la rencontre de
+  la fenêtre 💀, le bouton PIONS) entre autour du repère des ennemis
+  (casePremiereArriveeEnnemi ; poserMonstreSurTerrain avec premiereArrivee) ;
+  LES RENFORTS entrent par les cases peintes (caseApparitionEnnemi, comme en
+  v261). Une partie sans repère (d'avant) pose son départ sur les cases
+  peintes, faute de mieux.
+- LE NIVEAU DU GROUPE (monstres.js) : window.NIVEAU_GROUPE, le niveau du héros
+  le plus fort (window.NIVEAU_GROUPE_HEROS) parmi ceux de la partie — ni
+  créature, ni illusion, ni héros mis de côté. Recalculé à chaque recomposition
+  des combattants (une fiche reçue, un héros qui monte, arrive ou part) ;
+  chaque changement s'annonce par l'événement « niveau-groupe » et règle tout
+  de suite la triche. window.niveauDuGroupe(persos) le calcule pour qui veut.
+  Il s'affiche dans la fenêtre 💀 et dans l'encart de la triche : « Niveau du
+  groupe : 3 (Aldric) — créatures +10 % de dégâts et de soins, +10 PV ».
+- LA TRICHE SELON LE NIVEAU : du niveau 1 à 4, 7 + 1 × niveau ; à partir du 5,
+  5 + 2 × niveau (8, 9, 10, 11, puis 15, 17, 19, 21, 23, 25). Ce chiffre est le
+  % de dégâts et de soins en plus pour TOUTES les statures (il remplace la
+  triche par stature de la v255 : reglerBonusMonstres reçoit le même % pour
+  chacune), et autant de PV en plus, posés à la création de la créature (et
+  sous les +15 PV d'un leader). Paramètres > Monstres : la ligne « Dégâts et
+  soins en plus » du tableau des statures est partie (le bloc s'appelle
+  « Déplacement des créatures ») ; un encart « Triche selon le niveau du
+  groupe » porte les quatre chiffres (base et pente de chaque tranche, bornés)
+  et la table des dix niveaux, celui du groupe surligné. Ils s'écrivent dans
+  Monstres_Modeles/_REGLAGES, champ Triche_Niveau (Base_1_4, Par_Niveau_1_4,
+  Base_5_10, Par_Niveau_5_10), et valent tout de suite sur chaque poste.
+  L'ancien Bonus_Degats_Pct n'est plus relu.
+- LES RÉSISTANCES DES CRÉATURES (app.js, RESISTANCES_SELON_NIVEAU ;
+  nbResistancesCreature) : niveaux 1 à 4 : Petit 0, Normal 1, leader ou Boss 2 ;
+  5 à 8 : 1, 1, 3 ; 9 et plus : 1, 2, 4 (une Élite d'avant compte comme un
+  chef). Tirées à la création, au niveau du moment. Celle qui se relèvera en
+  leader (Apparition 1) tire aussi celles de son futur rang
+  (Resistances_En_Leader : les siennes, plus les suivantes) ; la relève
+  (releverEnLeader, combat_etat.js) les lui donne, et le cerveau les écrit sur
+  sa fiche (enregistrerReleveLeader → Resistances_Etats).
+- LES CHIFFRES QUI S'ENVOLENT (pont_combat.js, COULEURS_CHIFFRE, offerte sur
+  window.pontCombat) : la Distorsion mentale en violet clair (#c9a2ff), les
+  dégâts magiques en bleu ciel (#7fd0ff) ; rouge pour le physique, vert clair
+  pour les soins, comme avant.
+- L'ENCART DE LA COMPÉTENCE JOUÉE (combat.js, ligneEffetsCarte) : un montant
+  de dégâts ou de soin n'a plus de texte, mais un symbole et son chiffre, de la
+  couleur de son chiffre qui s'envole (la même palette) — une explosion rouge
+  (physique), une baguette bleu ciel (magique), une tête violet clair qui
+  ondule (Distorsion mentale), une croix verte (soin). Le nom de l'effet passe
+  dans la bulle (title). Un étalement n'a plus sa ligne : « (Sur 2 Tours) »
+  s'écrit sur le montant étalé (sur tous, s'il est posé sur une Distance ou une
+  Zone, comme dans le moteur). La surpuissance d'une technique de héros
+  (« ×1,25 ») s'écrit en or, juste à côté de chaque montant. Les états gardent
+  leur ligne, sans pourcentage, comme avant ; un bouclier, une purification,
+  un Contre aussi (ce ne sont pas des montants).
+- LA DISTANCE, EN HAUT À DROITE (#voile-tour-distance ; distanceEncartCarte) :
+  une petite cible et le nombre, en blanc, sur la ligne du nom de la technique.
+  La même portée que la carte en grand (distanceAAfficher), sinon celle
+  qu'écrit la carte ; rien pour une technique de contact. Sa place se règle
+  dans hud_disposition.js (REGLAGES_HUD.encartDistance : bord droit, hauteur,
+  taille, écart) ; le nom de la technique s'arrête avant elle et rétrécit s'il
+  est trop long.
+
+corrections_v263.mjs (dans la suite), en deux parties. Dans le noyau : les
+couleurs des chiffres ; la triche du niveau, la même pour toutes les statures ;
+la relève en leader qui emporte ses résistances (et le rejeu). Sur la vraie
+page : le niveau du groupe (le plus fort, à jour à chaque montée, départ,
+arrivée, ni créature ni illusion ni héros écarté, annoncé, affiché) ; la
+triche (le calcul, le moteur, les PV) ; son encart (champs, table, surlignage,
+saisie bornée, écriture, autre poste) ; les résistances (la grille, à la
+création, la relève) ; les repères redemandés, le départ autour du repère, les
+renforts par les cases peintes, le bouton PIONS ; l'encart en symboles
+(montants, couleurs, une seule palette, étalement, surpuissance, états) ; la
+distance en haut à droite ; les versions. Il mord sur l'ancien code (79 échecs).

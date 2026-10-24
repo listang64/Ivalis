@@ -101,6 +101,12 @@
         encartEtats:   { x: -3.5, y: 78, largeur: 22, taille: 5, ecart: 1.4 },
         encartNom:     { x: -5, y: 85, taille: 8 },
         encartCarte:   { x: 33, y: 46, taille: 3.6 },
+        // LA DISTANCE (v263, Nico : « en haut à droite, juste une petite cible
+        // et à côté le chiffre en blanc ») : sur la ligne du nom de la
+        // technique, calée par son bord DROIT (`droite`, en % de la largeur).
+        // Le nom de la technique s'arrête avant elle (`ecart`, en %) : trop
+        // long, il rétrécit au lieu de passer dessous.
+        encartDistance: { droite: 21, y: 46, taille: 3.2, ecart: 8 },
         encartDetail:  { x: 40, y: 53, taille: 2.1, largeur: 74 },
         encartAttente: { x: 39.5, y: 90, taille: 2.5 }
     };
@@ -341,6 +347,15 @@
         poser("voile-tour-nom", r.encartNom);
         poser("voile-tour-carte", r.encartCarte);
         poser("voile-tour-attente", r.encartAttente);
+
+        const distance = document.getElementById("voile-tour-distance");
+        const carte = document.getElementById("voile-tour-carte");
+        if (distance && r.encartDistance) {
+            distance.style.right = r.encartDistance.droite + "%";
+            distance.style.top = r.encartDistance.y + "%";
+            distance.style.fontSize = pc(r.encartDistance.taille) + "px";
+            if (carte) carte.style.maxWidth = Math.max(10, 100 - r.encartCarte.x - r.encartDistance.droite - r.encartDistance.ecart) + "%";
+        }
 
         const bas = document.getElementById("voile-tour-bas");
         if (bas) {

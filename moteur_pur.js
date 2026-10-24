@@ -964,8 +964,8 @@ function empilerEtalement(cible, nomEtat, tics, idSource, critique, nature) {
 }
 
 // LA NATURE D'UN COUP (v260) : ce que l'écran en montre — la couleur de son
-// chiffre (rouge physique, bleu magique, blanc pour la Distorsion mentale) et
-// le coup reçu qui va avec.
+// chiffre (rouge physique, bleu ciel magique, violet clair pour la Distorsion
+// mentale, v263) et le coup reçu qui va avec.
 export function natureDuCoup(attaque) {
     if (!attaque) return "physique";
     if (attaque.distorsion) return "mental";

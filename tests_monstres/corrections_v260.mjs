@@ -219,12 +219,12 @@ console.log("\n5. LA COULEUR DES CHIFFRES");
     const sc = (etape) => essai(() => PC.misEnScene(etape, e), {});
     const coul = (nature) => (sc({ type: "degats", cible: "M1", acteur: "A", montant: 5, pvApres: 95, ...(nature ? { nature } : {}) }) || {}).couleurTexte;
     verifier("physique : rouge", coul("physique") === "#ff4c4c", coul("physique"));
-    verifier("magique : bleu", coul("magique") === "#4aa8ff", coul("magique"));
-    verifier("Distorsion mentale : blanc", coul("mental") === "#ffffff", coul("mental"));
+    verifier("magique : bleu (bleu ciel depuis la v263)", coul("magique") === "#7fd0ff", coul("magique"));
+    verifier("Distorsion mentale : blanc (violet clair depuis la v263)", coul("mental") === "#c9a2ff", coul("mental"));
     const soin = sc({ type: "soin", cible: "A", acteur: "A", montant: 5, pvApres: 100 });
     verifier("soin : vert clair (la barre garde son vert)", soin.couleurTexte === "#8cf08c" && soin.couleurBarre === "#1b6e3a", `${soin.couleurTexte} / ${soin.couleurBarre}`);
     const brulure = sc({ type: "degats", cible: "M1", montant: 3, pvApres: 97, tic: "Brûlure" });
-    verifier("la brûlure de fin de manche : bleu (dégâts magiques)", brulure.couleurTexte === "#4aa8ff", brulure.couleurTexte);
+    verifier("la brûlure de fin de manche : bleu (dégâts magiques)", brulure.couleurTexte === "#7fd0ff", brulure.couleurTexte);
     // Une carte de deux natures : deux chiffres, chacun sa couleur.
     const r = essai(() => MP.resoudreCarte(monde(), { ...carte("A", [
         { nom: "Attaque lourde", valeurBrute: 6, typeRes: "Physique", cibles: ["M1"] },
@@ -236,7 +236,7 @@ console.log("\n5. LA COULEUR DES CHIFFRES");
     const etale = essai(() => MP.resoudreCarte(monde(), { ...carte("A", [{ nom: "Attaque Magique", valeurBrute: 10, typeRes: "Magique", estEtalement: true,
         toursEtalement: 2, cibles: ["M1"] }]), jets: jetsSimples(["M1"]) }), { etat: monde() });
     const tic = essai(() => PC.misEnScene({ type: "degats", cible: "M1", montant: 5, pvApres: 95, tic: "Étalement" }, etale.etat), {});
-    verifier("un étalement magique garde son bleu à chaque part", tic.couleurTexte === "#4aa8ff", tic.couleurTexte);
+    verifier("un étalement magique garde son bleu à chaque part", tic.couleurTexte === "#7fd0ff", tic.couleurTexte);
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +295,9 @@ console.log("\n6. LES RÉSISTANCES REMPLACENT LES IMMUNITÉS");
              w.tirerResistancesEtats("Boss").length].join("/"), "") === "1/2/3");
     const cr = essai(() => w.atoutCreature({ estMonstre: true, resistancesEtats: ["Provocation"] }), {});
     verifier("atoutCreature rend des résistances, plus des immunités", JSON.stringify(cr) === '{"resistances":["Provocation"]}', JSON.stringify(cr));
-    verifier("monstres.js écrit Resistances_Etats (et relit l'ancien champ)", /Resistances_Etats: typeof window\.tirerResistancesEtats/.test(lire('monstres.js'))
+    // v263 : le tirage passe par une variable (son nombre suit le niveau du groupe).
+    verifier("monstres.js écrit Resistances_Etats (et relit l'ancien champ)", /Resistances_Etats: /.test(lire('monstres.js'))
+             && /= typeof window\.tirerResistancesEtats === "function"/.test(lire('monstres.js'))
              && /brut\.Resistances_Elementaires/.test(lire('monstres.js')));
     // Une fiche d'avant (immunites) vaut résistance.
     const vieux = essai(() => CE.combattantDepuisFiche(fiche("V"), { q: 0, r: 0 }, { ...REGLES, atouts: () => ({ immunites: ["Glacé"] }) }), { atouts: {} });

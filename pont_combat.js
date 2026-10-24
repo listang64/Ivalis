@@ -58,10 +58,13 @@ export const COULEURS = {
 // dégâts, dissocie les chiffres de chaque catégorie »). Chaque attaque d'une
 // carte a déjà son étape « degats », donc son chiffre : il prend la couleur de
 // sa nature. La barre sous le pion, elle, garde la sienne (rouge, vert).
+// v263 (Nico) : la Distorsion mentale en violet clair, les dégâts magiques en
+// bleu ciel — les mêmes couleurs que les symboles de l'encart de la compétence
+// jouée (ligneEffetsCarte, combat.js, qui les lit ici).
 export const COULEURS_CHIFFRE = {
     physique: "#ff4c4c",
-    magique:  "#4aa8ff",
-    mental:   "#ffffff",
+    magique:  "#7fd0ff",
+    mental:   "#c9a2ff",
     brut:     "#ff4c4c",
     soin:     "#8cf08c"
 };
@@ -1155,7 +1158,7 @@ export function fusionnerFichesCombat(fichesFraiches, fichesActuelles, combattan
 
 if (typeof window !== "undefined") {
     window.pontCombat = {
-        COULEURS, RYTHME, misEnScene, TYPES_MIS_EN_SCENE, creerPont,
+        COULEURS, COULEURS_CHIFFRE, RYTHME, misEnScene, TYPES_MIS_EN_SCENE, creerPont,
         pionsDepuisEtat, fichesDepuisEtat, fileDepuisEtat, creerProjection,
         fusionnerPionsVTT, fusionnerFichesCombat
     };
