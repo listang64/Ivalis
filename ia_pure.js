@@ -23,7 +23,7 @@
 //  reste : imprévisible pour le joueur, reproductible pour le banc.
 // =========================================================================
 
-import { combattant } from './combat_etat.js';
+import { combattant, fuyardActif } from './combat_etat.js';
 import { aLEtat, ligneDeVue, estDansLeNoir } from './moteur_pur.js';
 import { distance, voisinsDe, occupantVivant, coutDuPas, cheminsDeRepli, ennemisAuContact } from './mouvement_pur.js';
 
@@ -655,9 +655,58 @@ export function choisirZone(etat, id, infosCarte, plateau, des, depart) {
 //  sort — où aller, qui frapper. Aucune écriture, aucune animation : c'est le
 //  moteur qui exécutera ce plan, et le journal qui le racontera.
 
+// LE FUYARD (v268, Apparition 2 : « ils fuient puis attaquent à distance, ou
+// fuient juste du maximum de cases et se reposent, pas forcément dans les mêmes
+// directions »). Il s'éloigne d'abord : parmi les cases qu'il atteint, celle
+// qui le met le plus loin des héros (sans finir au contact, hors des zones),
+// un peu à l'écart de ses semblables. S'il peut encore tirer de là — sa carte
+// porte, la cible est en vue, et il garde de l'énergie —, il tire ; sinon il
+// file aussi loin qu'il peut et se repose (`repos`).
+function deciderFuite(etat, id, infos, plateau, des) {
+    const moi = combattant(etat, id);
+    const carte = plateau || PLAINE;
+    const ennemis = Object.values(etat.combattants || {})
+        .filter(c => c && c.camp !== moi.camp && !c.aTerre && !c.estIllusion && c.q !== null && c.q !== undefined);
+    const rien = (raison) => ({ acteur: id, cible: null, chemin: [], coutTrajet: 0, lancera: false, repos: true, raison });
+    if (ennemis.length === 0) return rien("aucune cible");
+    const semblables = Object.values(etat.combattants || {})
+        .filter(c => c && c.id !== id && c.camp === moi.camp && !c.aTerre && c.fuyard && c.q !== null && c.q !== undefined);
+    const cases = aLEtat(moi, "Immobilisation") ? [{ q: moi.q, r: moi.r, chemin: [], ao: 0 }]
+        : casesAccessibles(etat, id, carte, infos.pasMax);
+    const coutDe = (chemin) => chemin.reduce((t, step, i) => t + coutDuPas(moi, i + 1, !!((carte.etatCase(step.q, step.r) || {}).difficile), false), 0);
+    const loinDe = (h) => Math.min(...ennemis.map(e => distance(h, e)));
+    const note = (h) => loinDe(h) * 10 - ennemisAuContactDepuis(etat, h.q, h.r, moi.camp) * 15
+        - dangerDeLaCase(etat, h.q, h.r) * 20 - nombre(h.ao) * 12
+        - semblables.filter(s => distance(h, s) <= 2).length * 6 + bruit(des, 3);
+    const portee = nombre(infos.portee, 1);
+    const fatigueCarte = nombre(infos.fatigue);
+    // Il tire s'il le peut sans se vider : au moins 30 % de sa jauge après le tir.
+    const tirePossible = portee > 1 && nombre(moi.fatigue) - fatigueCarte >= 0.3 * nombre(moi.fatigueMax);
+    const cibleDepuis = (h) => {
+        const visibles = ennemis.filter(e => distance(h, e) <= portee && ligneDeVue(carte, h, e) && !estDansLeNoir({ ...moi, q: h.q, r: h.r }, e))
+            .sort((a, b) => distance(h, a) - distance(h, b) || (a.id < b.id ? -1 : 1));
+        return visibles[0] || null;
+    };
+    const notees = cases.map(h => ({ h, cout: coutDe(h.chemin), score: note(h) }));
+    if (tirePossible) {
+        const budget = nombre(moi.fatigue) - fatigueCarte;
+        const tirs = notees.filter(x => x.cout <= budget).map(x => ({ ...x, cible: cibleDepuis(x.h) })).filter(x => x.cible)
+            .sort((a, b) => b.score - a.score);
+        if (tirs.length) {
+            const t = tirs[0];
+            return { acteur: id, cible: t.cible.id, chemin: t.h.chemin, coutTrajet: t.cout, lancera: true, raison: null, fuite: true };
+        }
+    }
+    const fuites = notees.filter(x => x.cout <= nombre(moi.fatigue)).sort((a, b) => b.score - a.score);
+    const f = fuites[0] || { h: { chemin: [] }, cout: 0 };
+    return { acteur: id, cible: null, chemin: f.h.chemin, coutTrajet: f.cout, lancera: false, repos: true, fuite: true,
+             raison: "fuit et se repose" };
+}
+
 export function deciderTourCreature(etat, id, infosCarte, plateau, des) {
     const moi = combattant(etat, id);
     if (!moi || moi.aTerre) return null;
+    if (fuyardActif(etat, moi)) return deciderFuite(etat, id, infosCarte || {}, plateau, des);
 
     const infos = infosCarte || {};
     const cible = choisirCible(etat, id, infos, des);

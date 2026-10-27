@@ -788,16 +788,19 @@ window.poserImageDansLaReserve = async function(chemin, uid, url, objet) {
 // avant de tirer quoi que ce soit de neuf. Ce qui manque encore (un héros de
 // plus qu'au tirage) est complété à la volée, sans image — la fouille des
 // cadavres s'en chargera, exactement comme avant cette mécanique.
-window.servirDepuisLaReserve = function(reserve, participants, difficulte) {
+// `parHeros` (v268) : combien d'objets chacun reçoit (les cohues de
+// l'Apparition 4 en donnent 2 au hasard, Apparition_Butin).
+window.servirDepuisLaReserve = function(reserve, participants, difficulte, parHeros) {
     const utilisable = reserve && (!reserve.difficulte || reserve.difficulte === difficulte);
     const disponibles = ((utilisable && reserve.items) || []).slice();
     const parPersonnage = {};
+    const combien = Number.isFinite(Number(parHeros)) ? Math.max(0, Number(parHeros)) : window.NB_OBJETS_PAR_HEROS;
     participants.forEach(id => {
         const items = [];
-        while (items.length < window.NB_OBJETS_PAR_HEROS && disponibles.length > 0) {
+        while (items.length < combien && disponibles.length > 0) {
             items.push(disponibles.shift());
         }
-        const manquants = window.NB_OBJETS_PAR_HEROS - items.length;
+        const manquants = combien - items.length;
         if (manquants > 0) items.push(...window.tirerObjetsAleatoires(difficulte, manquants));
         parPersonnage[id] = { items, decisions: {}, valide: false };
     });
@@ -1010,7 +1013,9 @@ window.demarrerButin = async function() {
         // La réserve est relue DANS la transaction, comme tout le reste : c'est
         // la seule façon d'être sûr que deux postes qui détectent la victoire au
         // même instant ne distribuent pas deux fois les mêmes objets.
-        const service = window.servirDepuisLaReserve(reserveLue, participants, difficulte);
+        // Le butin d'une cohue (v268) : tant d'objets par joueur, pas de partage.
+        const butinCas = data.Apparition_Butin || null;
+        const service = window.servirDepuisLaReserve(reserveLue, participants, difficulte, butinCas ? butinCas.parJoueur : undefined);
         const parPersonnage = service.parPersonnage;
 
         return { resultat: { restants: service.restants, utilise: service.utilise, xp: xpVictoire },
@@ -1028,6 +1033,7 @@ window.demarrerButin = async function() {
             parPersonnage,
             // L'XP que chaque héros vient de gagner (annoncée dans la fenêtre).
             xp: xpVictoire,
+            ...(butinCas && butinCas.partage === false ? { sansPartage: true } : {}),
             pool: [],
             poolValides: [],
             resolu: false
@@ -1054,9 +1060,12 @@ window.xpDeLaVictoire = function() {
     // Un zombie est tombé une première fois : son XP est due (une seule fois).
     const tombee = (m) => m.statut === "Mort" || m.zombie
         || (typeof window.estCombattantMort === "function" && window.estCombattantMort(m.idPersonnage));
-    return (window.MONSTRES_PARTIE || [])
+    const brut = (window.MONSTRES_PARTIE || [])
         .filter(m => m && !m.estIllusion && !m.compagnonDe && tombee(m))
         .reduce((total, m) => total + (typeof window.xpDeLaCreature === "function" ? window.xpDeLaCreature(m) : 0), 0);
+    // UNE COHUE RAPPORTE MOINS (v268, Apparition 4 : « exp −10 / −20 / −30 % »).
+    const pct = Number((((window.PARTIE_DATA || {}).Apparition_Butin) || {}).xpPct) || 0;
+    return pct ? Math.max(0, Math.round(brut * (1 + pct / 100))) : brut;
 };
 
 // Ajoute cette XP à chaque héros. Un incrément, pas une réécriture : deux
@@ -1769,7 +1778,14 @@ window.validerButinPersonnel = async function(idPersonnage) {
         dejaValides.add(idPersonnage);
         const tousValides = butin.participants.every(id => dejaValides.has(id));
 
-        if (tousValides) {
+        if (tousValides && butin.sansPartage) {
+            // « Pas d'autres loots » (v268) : ce qu'on n'a pas gardé est perdu,
+            // le butin est réparti.
+            maj["Butin.pool"] = [];
+            maj["Butin.poolValides"] = [...butin.participants];
+            maj["Butin.resolu"] = true;
+            maj["Butin.etape"] = "termine";
+        } else if (tousValides) {
             const pool = [];
             butin.participants.forEach(id => {
                 const b = butin.parPersonnage[id];

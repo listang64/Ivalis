@@ -496,93 +496,29 @@ titre("7. LA PISTE (BLANC, OR, ROUGE ; LISERÉ DU LEADER) ET L'AURA DU PION");
   verifier("elle déborde du pion, sous son image", r.plusGrande && r.dessous);
 }
 
-titre("8. LES QUATRE APPARITIONS, RÈGLE PAR RÈGLE (400 tirages chacune)");
+titre("8. LES APPARITIONS : LE TABLEAU DE NICO (v268)");
 {
+  // v268 : le tableau des apparitions est celui de Nico (apparitions.js) ; ses
+  // cas sont contrôlés un à un par corrections_v268.mjs. Ici, sa forme.
   const r = await p.evaluate(() => {
-    // v267 : un leader dans 60 % des combats seulement — ici, les règles de
-    // composition, leader toujours là (corrections_v267.mjs mesure les 60 %).
-    window.CHANCE_LEADER_COMBAT = 100;
-    const tirer = window.tirerApparition;
-    if (typeof tirer !== "function") return null;
-    const CAC = ["TANK CAC", "DPS CAC", "DPS MAGE CAC"];
-    const cle = (l) => { const n = l.filter(m => m.palier === "Normal").length, pe = l.filter(m => m.palier === "Petit").length; return `${n}N${pe}P`; };
-    const stats = {};
-    for (const n of [1, 2, 3, 4]) {
-      const s = stats[n] = { departs: {}, renforts: {}, heures: {}, fautes: [], cas: {}, leaderRenfort: 0, soutienDepart: 0, soutiens: 0 };
-      for (let i = 0; i < 400; i++) {
-        const t = tirer(n);
-        const tous = [...t.depart, ...t.renforts];
-        s.cas[t.cas] = (s.cas[t.cas] || 0) + 1;
-        s.departs[cle(t.depart)] = 1;
-        const surReleve = t.renforts.filter(m => m.surReleve), prevus = t.renforts.filter(m => !m.surReleve);
-        if (prevus.length) s.renforts[cle(prevus)] = 1;
-        if (surReleve.length) s.renforts["relève " + cle(surReleve)] = 1;
-        prevus.forEach(m => { s.heures[m.entreeManche] = 1; });
-        const leaders = tous.filter(m => m.leader);
-        const soutiens = (l) => l.filter(m => m.archetype === "SOUTIEN").length;
-        if (tous.some(m => m.palier !== "Petit" && m.palier !== "Normal")) s.fautes.push("stature " + tous.map(m => m.palier).join(","));
-        if (t.apparition !== n || t.aleatoire) s.fautes.push("numéro");
-        if (soutiens(t.depart)) s.soutienDepart++;
-        s.soutiens += soutiens(tous);
-        if (n === 1) {
-          if (cle(t.depart) !== "1N0P" || !CAC.includes(t.depart[0].archetype)) s.fautes.push("départ " + cle(t.depart) + " " + t.depart[0].archetype);
-          if (t.cas === 1) {
-            if (leaders.length !== 1 || !t.depart[0].leader) s.fautes.push("cas 1 : le Normal n'est pas leader");
-            if (cle(prevus) !== "0N4P" || prevus.some(m => m.entreeManche !== 2) || soutiens(prevus) !== 1) s.fautes.push("cas 1 : renfort " + cle(prevus) + " soutiens " + soutiens(prevus));
-          } else {
-            if (leaders.length !== 0 || !t.depart[0].releveEnLeader) s.fautes.push("cas 2 : relève");
-            if (prevus.length || !["1N2P", "0N3P", "2N1P"].includes(cle(surReleve)) || soutiens(surReleve) > 1) s.fautes.push("cas 2 : renfort " + cle(surReleve));
-          }
-        }
-        if (n === 2) {
-          if (!["2N0P", "1N1P"].includes(cle(t.depart))) s.fautes.push("départ " + cle(t.depart));
-          if (!t.depart.some(m => m.archetype === "TANK CAC") || soutiens(t.depart)) s.fautes.push("départ sans tank ou avec soutien");
-          if (!["1N2P", "0N3P", "2N1P"].includes(cle(prevus)) || prevus.some(m => m.entreeManche !== 3) || soutiens(prevus) > 1) s.fautes.push("renfort " + cle(prevus));
-          if (leaders.length !== 1) s.fautes.push("leaders " + leaders.length);
-          if (prevus.some(m => m.leader)) s.leaderRenfort++;
-        }
-        if (n === 3) {
-          if (!["3N0P", "1N2P", "2N1P", "0N4P"].includes(cle(t.depart)) || soutiens(t.depart) > 1) s.fautes.push("départ " + cle(t.depart));
-          if (!["1N1P", "0N3P", "2N0P"].includes(cle(prevus)) || prevus.some(m => m.entreeManche !== 5) || soutiens(prevus) > 1) s.fautes.push("renfort " + cle(prevus));
-          if (leaders.length !== 1 || !t.depart.some(m => m.leader)) s.fautes.push("leader hors du départ");
-        }
-        if (n === 4) {
-          if (!["4N0P", "3N1P", "2N2P", "0N5P"].includes(cle(t.depart)) || soutiens(t.depart) > 1) s.fautes.push("départ " + cle(t.depart));
-          if (t.renforts.length) s.fautes.push("renfort");
-          if (leaders.length !== 1 || !t.depart.some(m => m.leader)) s.fautes.push("leader");
-        }
-      }
-      s.fautes = [...new Set(s.fautes)].slice(0, 4);
-      s.departs = Object.keys(s.departs).sort(); s.renforts = Object.keys(s.renforts).sort(); s.heures = Object.keys(s.heures).sort();
-    }
-    const alea = {}; let marque = true;
-    for (let i = 0; i < 200; i++) { const t = tirer("aleatoire"); alea[t.apparition] = 1; if (!t.aleatoire) marque = false; }
-    const sansGabarit = (() => { const v = window.gabaritMonstre; window.gabaritMonstre = () => null; try { return tirer(4).depart.length; } finally { window.gabaritMonstre = v; } })();
-    return { stats, alea: Object.keys(alea).sort().join(","), marque, sansGabarit };
+    const d = window.APPARITIONS_DEFAUT;
+    if (!d) return null;
+    const t = [1, 2, 3, 4].map(n => window.__ou(() => window.tirerApparition(n), null));
+    return { cas: [1, 2, 3, 4].map(n => d[n].cas.length), tirages: t.map(x => x && x.apparition), departs: t.map(x => x ? x.depart.length : 0) };
   });
-  const s = (n) => (r && r.stats[n]) || { fautes: ["absent"], departs: [], renforts: [], heures: [], cas: {} };
-  verifier("APPARITION 1 : un Normal au départ — tank, combattant ou mage au contact", !!r && s(1).fautes.length === 0, s(1).fautes.join(" | "));
-  verifier("  cas 1 (le chef) ≈ 40 %, cas 2 (la relève) ≈ 60 %", !!r && s(1).cas[1] > 120 && s(1).cas[1] < 200 && s(1).cas[2] > 200, JSON.stringify(s(1).cas));
-  verifier("  cas 1 : quatre Petits au bout de 1 tour (manche 2), dont un soutien", JSON.stringify(s(1).heures) === '["2"]' && s(1).renforts.includes("0N4P"), s(1).renforts.join(" / "));
-  verifier("  cas 2 : à la relève, 1N+2P ou 3P ou 2N+1P", ["relève 0N3P", "relève 1N2P", "relève 2N1P"].every(x => s(1).renforts.includes(x)), s(1).renforts.join(" / "));
-  verifier("APPARITION 2 : 2 Normaux ou 1 Normal + 1 Petit, dont un tank, sans soutien", !!r && s(2).fautes.length === 0 && JSON.stringify(s(2).departs) === '["1N1P","2N0P"]',
-           s(2).fautes.join(" | ") + " " + s(2).departs.join(","));
-  verifier("  renfort au bout de 2 tours (manche 3) : 1N+2P, 3P ou 2N+1P, un soutien au plus", JSON.stringify(s(2).heures) === '["3"]' && s(2).renforts.length === 3, s(2).renforts.join(" / "));
-  verifier("  un leader parmi TOUS : parfois un renfort", s(2).leaderRenfort > 100 && s(2).leaderRenfort < 340, `${s(2).leaderRenfort} / 400`);
-  verifier("APPARITION 3 : 3N, 1N+2P, 2N+1P ou 4P, un soutien au plus, le leader au départ", !!r && s(3).fautes.length === 0 && s(3).departs.length === 4,
-           s(3).fautes.join(" | ") + " " + s(3).departs.join(","));
-  verifier("  renfort au bout de 4 tours (manche 5) : 1N+1P, 3P ou 2N", JSON.stringify(s(3).heures) === '["5"]' && JSON.stringify(s(3).renforts) === '["0N3P","1N1P","2N0P"]', s(3).renforts.join(" / "));
-  verifier("  des soutiens tombent parfois au départ (un au plus)", s(3).soutienDepart > 20, `${s(3).soutienDepart} / 400`);
-  verifier("APPARITION 4 : 4N, 3N+1P, 2N+2P ou 5P, un leader, pas de renfort", !!r && s(4).fautes.length === 0 && JSON.stringify(s(4).departs) === '["0N5P","2N2P","3N1P","4N0P"]',
-           s(4).fautes.join(" | ") + " " + s(4).departs.join(","));
-  verifier("ALÉATOIRE : les quatre sortent, et le tirage le dit", !!r && r.alea === "1,2,3,4" && r.marque === true, r ? r.alea : "");
-  verifier("bestiaire pas encore lu : le tirage n'est pas vide (la pose relira)", !!r && r.sansGabarit >= 4, r ? `${r.sansGabarit}` : "");
+  verifier("quatre apparitions, 5 / 5 / 3 / 5 cas, chacune se tire", !!r && JSON.stringify(r.cas) === "[5,5,3,5]" && JSON.stringify(r.tirages) === "[1,2,3,4]"
+           && r.departs.every(n => n >= 1), r ? JSON.stringify(r) : "");
 }
 
 titre("9. LA GÉNÉRATION : TOUT LE DÉPART ENTRE, SUR LES CASES PEINTES, AVEC SON LEADER");
 {
   const r = await p.evaluate(async () => {
     const out = {};
+    // v268 : les cas que ce banc regarde — l'escouade (Apparition 4), le chef
+    // et la relève (Apparition 1), la patrouille (Apparition 2) —, leader sûr.
+    window.CHANCE_LEADER_COMBAT = 100;
+    const z = (n, garde) => Array.from({ length: n }, (_, i) => ({ chance: garde.includes(i) ? 50 : 0 }));
+    window.APPARITIONS = window.__ou(() => window.normaliserTableApparitions({ 1: { cas: z(5, [0, 1]) }, 2: { cas: z(5, [0]) }, 4: { cas: z(5, [0]) } }), window.APPARITIONS);
     const CASES = ["10,0", "11,0", "12,0", "10,1", "11,1", "12,-1"];
     window.__ou(() => window.appliquerSpawnEnnemis(CASES), null);
     window.PERSOS_JOUEURS_PARTIE = [{ idPersonnage: "H1", camp: "Allié" }, { idPersonnage: "H2", camp: "Allié" }];
@@ -634,10 +570,10 @@ titre("9. LA GÉNÉRATION : TOUT LE DÉPART ENTRE, SUR LES CASES PEINTES, AVEC S
   verifier("Apparition 1, le chef : leader, quatre Petits en réserve pour la manche 2",
            !!r.a1.chef && r.a1.chef.leader && JSON.stringify(r.a1.chef.reserve) === '["Petit@2","Petit@2","Petit@2","Petit@2"]', JSON.stringify(r.a1.chef));
   verifier("Apparition 1, la relève : pas encore leader (PV du gabarit + triche), ses renforts attendent sa relève",
-           !!r.a1.releve && r.a1.releve.releve && r.a1.releve.pv && r.a1.releve.reserve.length === 3 && r.a1.releve.reserve.every(x => x === "relève"), JSON.stringify(r.a1.releve));
-  verifier("Apparition 2 : trois renforts pour la manche 3, un seul leader en tout", JSON.stringify(r.a2.reserve) === "[3,3,3]" && r.a2.leaders === 1,
+           !!r.a1.releve && r.a1.releve.releve && r.a1.releve.pv && [2, 3, 4].includes(r.a1.releve.reserve.length) && r.a1.releve.reserve.every(x => x === "relève"), JSON.stringify(r.a1.releve));
+  verifier("Apparition 2 (la patrouille) : ses renforts pour la manche 3, un seul leader en tout", [2, 3].includes(r.a2.reserve.length) && r.a2.reserve.every(m => m === 3) && r.a2.leaders === 1,
            `${JSON.stringify(r.a2.reserve)} — ${r.a2.leaders} leader(s)`);
-  verifier("toute la rencontre est nommée d'un coup, renforts compris, sans doublon", r.a2.noms.length === 5 && r.a2.noms.every(Boolean) && new Set(r.a2.noms).size === 5,
+  verifier("toute la rencontre est nommée d'un coup, renforts compris, sans doublon", r.a2.noms.length === 2 + r.a2.reserve.length && r.a2.noms.every(Boolean) && new Set(r.a2.noms).size === r.a2.noms.length,
            r.a2.noms.join(", "));
 }
 
@@ -739,9 +675,10 @@ titre("11. LA FENÊTRE 💀 ET LA FENÊTRE DES APPARITIONS");
   verifier("Aléatoire est choisi d'office ; un clic choisit l'Apparition 3", r.actifDefaut === "aleatoire" && r.actifApres === "3", `${r.actifDefaut} → ${r.actifApres}`);
   verifier("Valider invoque l'apparition choisie, et ferme", r.recu === 3 && r.fermee, String(r.recu));
   verifier("Paramètres > Outils : « Apparitions », les quatre lues dans la table du tirage", (r.bouton || "").trim() === "Apparitions" && r.blocs === "1,2,3,4", `${(r.bouton || "").trim()} ${r.blocs}`);
-  verifier("on y lit les renforts, leur heure, la relève, les chances des deux cas",
-           ["Au bout de 1 tour", "Au bout de 2 tours", "Au bout de 4 tours", "À sa relève", "40 %", "60 %", "leader", "un soutien au plus"].every(m => r.texte.includes(m)),
-           ["Au bout de 1 tour", "Au bout de 2 tours", "Au bout de 4 tours", "À sa relève", "40 %", "60 %", "leader", "un soutien au plus"].filter(m => !r.texte.includes(m)).join(", "));
+  // v268 : les valeurs y sont des champs à régler (corrections_v268.mjs) ; on y lit les heures et les règles.
+  const MOTS = ["Au tour", "À sa relève", "Quand tous sont morts", "Tous les", "tant que le premier vit", "leader", "un soutien au plus", "Rétablir le tableau de Nico"];
+  verifier("on y lit les renforts, leur heure, la relève, qui mène, les règles",
+           MOTS.every(m => r.texte.includes(m)), MOTS.filter(m => !r.texte.includes(m)).join(", "));
   const src = lire('combat.js');
   verifier("la réinitialisation efface l'apparition de la partie", /Apparition_Rencontre: deleteField\(\)/.test(src) && /delete window\.PARTIE_DATA\.Apparition_Rencontre/.test(src));
   verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

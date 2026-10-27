@@ -858,6 +858,8 @@ const MEMOIRE_RENFORTS = { annonces: TOMBES_ANNONCEES, attente: [], clePrecedent
 // Les renforts prévus par l'apparition (v262) : la manche déjà vue, les
 // leaders déjà relevés (apparitionsDuTour, pont_combat.js).
 const MEMOIRE_APPARITIONS = { mancheVue: null, releves: new Set() };
+// Les cases piégées déjà déclenchées et servies (v268) : « q_r ».
+const MEMOIRE_PIEGES = new Set();
 let RENFORTS_EN_COURS = Promise.resolve();
 // La relève en leader (Apparition 1) appelle ses renforts : ils attendent la
 // fin de la manche, comme les autres (v267).
@@ -1247,6 +1249,22 @@ function contexteDuJeu() {
                                 .catch(e => signalerPanne("entrerRenfortMonstre", e));
                         }
 
+                        // UNE CASE PIÉGÉE SOUS LE PIED D'UN HÉROS (v268) : deux
+                        // créatures surgissent autour, et entrent tout de suite
+                        // dans le combat (leur arrivée, en fumée, suit le « ! »).
+                        (etat.piegesDeclenches || []).forEach(d => {
+                            const cle = `${d.q}_${d.r}`;
+                            if (!d || MEMOIRE_PIEGES.has(cle)) return;
+                            MEMOIRE_PIEGES.add(cle);
+                            if (typeof window.tracerCombat === "function") {
+                                window.tracerCombat("🪤", `piège déclenché en (${d.q},${d.r})`, d.acteur || "");
+                            }
+                            RENFORTS_EN_COURS = RENFORTS_EN_COURS
+                                .then(() => typeof window.declencherPiegeApparition === "function" ? window.declencherPiegeApparition(d) : [])
+                                .then(ids => accueillirLesRenfortsMaintenant(ids || []))
+                                .catch(e => signalerPanne("declencherPiegeApparition", e));
+                        });
+
                         // LES RENFORTS DE L'APPARITION (v262) : au début de la
                         // manche prévue — plus tôt si le terrain s'est vidé —, et
                         // ceux qu'appelle la créature relevée en leader. Même file
@@ -1526,6 +1544,7 @@ if (typeof window !== "undefined") {
             MEMOIRE_RENFORTS.clePrecedente = null;
             MEMOIRE_APPARITIONS.mancheVue = null;
             MEMOIRE_APPARITIONS.releves.clear();
+            MEMOIRE_PIEGES.clear();
             LEURRES_EFFACES.clear();
             REGIME = null;
             partieSuivie = null;

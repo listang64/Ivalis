@@ -738,10 +738,16 @@ function parCritique(etapes, etatEtale) {
 // brûlure, l'étalement, et demain ce qu'on ajoutera) — l'écrire une fois
 // évite qu'ils divergent.
 //  `idSource` : qui a posé l'état — le KO lui revient (Instinct du tueur).
+// LE POISON, LA BRÛLURE ET LE SAIGNEMENT PASSENT SOUS LE BOUCLIER (v268,
+// Nico : « poison / brûlure / saignement infligent des dégâts aux PV même si
+// un bouclier est actif ; les DOT, c'est au bouclier ») : ils rongent la vie
+// directement. L'étalement d'une technique (et la Ténèbres étalée) frappe
+// comme un coup : le bouclier d'abord.
+export const TICS_SOUS_LE_BOUCLIER = new Set(["Empoisonnement", "Brûlure", "Saignement"]);
 function infligerTic(c, id, montant, nomDuTic, etat, idSource) {
     const etapes = [];
     if (enSursis(c)) return etapes;             // en sursis : les coups sont ignorés
-    const bouclierAvant = nombre(c.bouclier);
+    const bouclierAvant = TICS_SOUS_LE_BOUCLIER.has(nomDuTic) ? 0 : nombre(c.bouclier);
     if (bouclierAvant > 0) {
         c.bouclier = Math.max(0, bouclierAvant - montant);
         etapes.push({ type: "degats", cible: id, montant,
@@ -751,7 +757,7 @@ function infligerTic(c, id, montant, nomDuTic, etat, idSource) {
         const pvApres = Math.max(0, nombre(c.pv) - montant);
         c.pv = pvApres;
         etapes.push({ type: "degats", cible: id, montant, pvApres,
-                      bouclierApres: 0, tic: nomDuTic });
+                      bouclierApres: nombre(c.bouclier), tic: nomDuTic });
         etapes.push(...tomber(etat, id, idSource || id, { finDeManche: true }));
     }
     return etapes;
@@ -1471,6 +1477,16 @@ function actionDeCreature(etat, id, carte, plateau, des, options) {
         etapes.push({ type: "message", cible: id, acteur: id, texte: "Frappe le mur", couleur: "#a1887f",
                       frappeMur: { q: nombre(mur.q), r: nombre(mur.r) } });
         etapes.push(...frapperMurs(courant, { [mur.id]: degats }, id, false));
+    } else if (!aPortee && plan.repos && moi && !moi.aTerre && !opts.seconde) {
+        // UN FUYARD QUI NE TIRE PAS SE REPOSE (v268, deciderFuite) : il a filé
+        // aussi loin qu'il pouvait, il reprend son souffle — le repos long.
+        courant = clonerEtat(courant);
+        const elle = combattant(courant, id);
+        const apres = Math.min(nombre(elle.fatigueMax), nombre(elle.fatigue) + gainReposLong(elle));
+        if (apres !== nombre(elle.fatigue)) {
+            elle.fatigue = apres;
+            etapes.push({ type: "fatigue", cible: id, fatigueApres: apres, repos: true });
+        }
     } else if (!aPortee && !opts.seconde) {
         // Pourquoi elle n'a rien lancé. Dans la trace, cette ligne vaut de l'or :
         // « tour de 20 millisecondes sans rien faire » restait inexplicable.

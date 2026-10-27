@@ -383,8 +383,23 @@ function combattantBrut(fiche, position, bornes) {
             ...(Array.isArray(fiche.resistancesEnLeader) ? { resistancesEnLeader: [...fiche.resistancesEnLeader] } : {}) } : {}),
         // LE COMPAGNON DU PISTEUR : une créature de son camp, jouée par le
         // cerveau juste après son maître (jouerCompagnon, cerveau_combat.js).
-        ...(fiche.compagnonDe ? { compagnon: { idMaitre: String(fiche.compagnonDe) } } : {})
+        ...(fiche.compagnonDe ? { compagnon: { idMaitre: String(fiche.compagnonDe) } } : {}),
+        // LES APPARITIONS (v268) : un fuyard (ia_pure.js, mouvement_pur.js),
+        // l'ancre d'une vague, une créature surgie d'un piège (son entrée en
+        // fumée, animations_jeu.js).
+        ...(fiche.estMonstre && fiche.fuyard ? { fuyard: {
+            esquiveOpportunite: nombre(fiche.fuyard.esquiveOpportunite),
+            ...(nombre(fiche.fuyard.jusqua) > 0 ? { jusqua: nombre(fiche.fuyard.jusqua) } : {}) } } : {}),
+        ...(fiche.estMonstre && fiche.ancre ? { ancre: true } : {}),
+        ...(fiche.estMonstre && fiche.piege ? { piege: true } : {})
     };
+}
+
+// UN FUYARD QUI FUIT ENCORE (v268) : il fuit, tire ou se repose, et se dérobe
+// aux attaques d'opportunité — jusqu'à la manche où sa fuite cesse (`jusqua`,
+// l'Apparition 2 : la vague qui arrive au tour 8 le rend agressif).
+export function fuyardActif(etat, c) {
+    return !!(c && c.fuyard && !c.aTerre && (!c.fuyard.jusqua || nombre(etat && etat.manche, 1) < nombre(c.fuyard.jusqua)));
 }
 
 // UN LEURRE, ET RIEN D'AUTRE. L'Illusion est un combattant à part : un seul
@@ -486,6 +501,12 @@ export function construireEtatCombat(source) {
         phase: partie.Phase_Combat || "Preparation",
         manche: nombre(partie.Tour_Combat, 1),
         ordre: [...(partie.Ordre_Initiative || [])],
+        // LES CASES PIÉGÉES (v268, Apparition 2) : « q_r ». Un héros qui y pose
+        // le pied la déclenche (mouvement_pur.js) ; `piegesDeclenches` garde
+        // l'histoire, que le poste du cerveau lit pour faire surgir les
+        // créatures (regime_cerveau.js).
+        pieges: [...(partie.Pieges_Apparition || [])].map(String),
+        piegesDeclenches: [],
         // LE `pas` D'UNE ENTRÉE DE FILE : COMBIEN DE CASES CE COMBATTANT A DÉJÀ
         // MARCHÉ DANS CE TOUR-CI.
         //
@@ -1189,6 +1210,17 @@ export const APPLICATEURS = {
         if (!e.combattant || !e.combattant.id) return;
         etat.combattants[e.combattant.id] = JSON.parse(JSON.stringify(e.combattant));
         if (Array.isArray(e.ordre)) etat.ordre = [...e.ordre];
+    },
+
+    // Une case piégée sous le pied d'un héros (v268, declencherPiege dans
+    // mouvement_pur.js) : elle ne sert qu'une fois.
+    piege(etat, e) {
+        if (!e.hex) return;
+        const cle = `${nombre(e.hex.q)}_${nombre(e.hex.r)}`;
+        etat.pieges = (etat.pieges || []).filter(k => k !== cle);
+        const deja = (etat.piegesDeclenches || []).some(d => d && d.q === nombre(e.hex.q) && d.r === nombre(e.hex.r));
+        if (!deja) etat.piegesDeclenches = [...(etat.piegesDeclenches || []),
+            { q: nombre(e.hex.q), r: nombre(e.hex.r), acteur: e.acteur, manche: nombre(e.manche, etat.manche) }];
     }
 };
 

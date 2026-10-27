@@ -7993,3 +7993,82 @@ ne démarrent pas (ENOENT) ; ils tournent sur un poste qui a gardé ses copies.
 studio_catalogue_1 (« la puce 8 amène la liste aux Classes ») échoue aussi
 sans ces changements, dans ce conteneur : un défilement qui n'arrive pas au
 bout en 900 ms.
+
+## v268 — Le système d'apparition revu (le tableau de Nico), réglable ; poison, brûlure et saignement sous le bouclier
+
+Nico : « Revoir le système d'apparition : je te donne le tableau mis à jour » ;
+« dans Paramètres > Apparitions, fais en sorte que l'on puisse modifier les
+valeurs du tour d'apparition des renforts, et qu'on puisse changer ou non les
+compositions de monstres » ; « poison / brûlure / saignement infligent des
+dégâts aux PV même si un bouclier est actif ; les DOT, c'est au bouclier ».
+
+LE TABLEAU (apparitions.js, nouveau fichier, chargé avant monstres.js) :
+APPARITIONS_DEFAUT, 5 / 5 / 3 / 5 cas, chacun sa chance. Un cas dit qui mène
+(un Normal imposé, deux Normaux, tout le départ, « possible » au départ / parmi
+les renforts / parmi tous — 60 %, CHANCE_LEADER_COMBAT —, personne, ou la
+relève), son départ (compositions N/P, règle d'archetype : au contact, tanks,
+à distance, sans soutien, ni tank ni soutien…, PV réduits, fuyards, ancre) et
+ses vagues de renforts, chacune à son heure : un tour fixe, tous les N tours
+(X fois, ou X à Y), chaque tour tant que l'ancre vit, à la relève, quand tous
+sont morts — et ce qu'elle fait si le terrain se vide avant : elle avance, ou
+elle ne vient plus (« ou que tous les monstres soient vaincus »).
+Interprétations : « au tour 2 » = la manche 2, donc à la fin du tour 1 (v267) ;
+« au bout de N tours » = la manche N+1 ; les deux murailles (2.3) : un Petit
+tous les 2 tours, 5 fois, comme la horde (3.3) — tout se règle dans la fenêtre.
+
+LES MÉCANIQUES NEUVES
+- LES FUYARDS (Apparition 2, cas 2 et 4 ; ia_pure.js deciderFuite) : ils filent
+  loin des héros (sans finir au contact, un peu à l'écart l'un de l'autre),
+  puis tirent si leur carte porte et qu'il leur reste de l'énergie, sinon se
+  reposent (le repos long, cerveau_combat.js). Ils se dérobent à 70 % des
+  attaques d'opportunité (mouvement_pur.js). Ceux du cas 2 cessent de fuir au
+  tour 8 (`jusqua`, fuyardActif) : la vague de l'Apparition 4 entre — sauf si
+  tous ont été vaincus avant.
+- L'ANCRE (Apparition 1, cas 5) : le tank du départ ; un Petit à chaque fin de
+  tour tant qu'il vit (au plus 12), plus rien quand il tombe.
+- LES CASES PIÉGÉES (Apparition 2, cas 4) : 25 % des cases libres, tirées à la
+  génération (tirerCasesPiegees, ni sous un pion ni à côté), reprises par l'état
+  du combat. Un héros qui y pose le pied (mouvement_pur.js declencherPiege)
+  s'arrête, l'étape « piege » dit « ❗ Piège ! » (le grand « ! » jaillit), et le
+  poste du cerveau fait surgir 2 Petits à −50 % de PV autour de la case
+  (declencherPiegeApparition), qui entrent tout de suite dans le combat, en
+  fumée (« Pouf ! », jeu-apparition-fumee). Une case ne sert qu'une fois.
+- LES COHUES (Apparition 4, cas 3 à 5) : −25 / −40 / −50 % de PV au départ ;
+  2 objets au hasard par joueur, pas d'étape de partage (« pas d'autres
+  loots ») ; −10 / −20 / −30 % d'expérience (xpDeLaVictoire).
+- « QUAND TOUS SONT MORTS » (Apparition 4, cas 2) : 4 Petits entrent quand le
+  terrain se vide ; une créature qui meurt n'appelle plus cette vague.
+- La rencontre écrit sur la partie ce que son cas change (Apparition_Cas,
+  Apparition_Butin, Pieges_Apparition, Pieges_Renfort) ; la réinitialisation
+  l'efface.
+
+PARAMÈTRES > OUTILS > APPARITIONS SE RÈGLE : chaque chance, qui mène, chaque
+composition (N et P, une composition s'ajoute ou se retire), chaque règle
+d'archetype, chaque heure de renfort (tour, intervalle, nombre de fois,
+maximum), les PV, les pièges (%, ce qui surgit, ses PV), le butin et l'XP des
+cohues. Chaque changement s'écrit tout de suite (Monstres_Modeles/_REGLAGES,
+champ Apparitions) et gagne les autres postes ; « Rétablir le tableau de Nico »
+efface le réglage. La forme du tableau (les cas, leurs mécaniques) reste celle
+de Nico : on en règle les valeurs (normaliserTableApparitions borne tout).
+
+LE BOUCLIER (cerveau_combat.js, TICS_SOUS_LE_BOUCLIER) : l'Empoisonnement, la
+Brûlure et le Saignement rongent la vie directement ; l'Étalement (et la
+Ténèbres étalée) frappe le bouclier d'abord.
+
+corrections_v268.mjs (dans la suite) : dans le noyau, le bouclier et les tics ;
+le fuyard (s'éloigne, tire, se repose, 70 % de dérobade, fin de fuite au
+tour 8) ; les cases piégées (le pas, l'arrêt, une seule fois, le rejeu, rien
+pour une créature, l'état les reprend) ; le tableau tiré 6000 fois, cas par
+cas (compositions, archetypes, heures, leaders, fuyards, pièges, cohues, les
+chances, les 60 %), et son réglage ; la mise en scène (« ! », fumée) ; sur la
+vraie page, la fenêtre qui se règle et s'écrit, les renforts à leur heure (en
+avance, annulés, l'ancre, quand tous sont morts), la pose (PV, fuyard, ancre,
+autour du piège), les pièges (25 %, loin des pions, deux Petits à −50 %), le
+butin et l'XP des cohues ; les versions. Il mord sur l'ancien code (63 échecs).
+
+Les anciens bancs remis aux règles v268 : corrections_v262 (le tableau de
+Nico remplace le sien ; sa génération regarde l'escouade, le chef, la relève
+et la patrouille, leader sûr ; la fenêtre se lit en champs), corrections_v267
+(le leader « possible » à 60 %), cerveau_combat et tableaux_nico (la brûlure
+et le poison passent sous le bouclier), campagne_complete (apparitions.js
+chargé avant monstres.js).

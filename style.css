@@ -5490,6 +5490,19 @@ textarea.input-texte-parchemin {
   background: rgba(255, 240, 200, 0.5); font-size: 13px; color: #4a2a12; }
 .apparition-cas ul { margin: 4px 0 0 0; padding-left: 18px; font-size: 14px; line-height: 1.4; }
 .apparition-regle { font-size: 13px; font-style: italic; color: #7a5230; }
+/* LE TABLEAU DES APPARITIONS SE RÈGLE (v268) : de petits champs dans le texte. */
+.apparition-champ { width: 3.2em; padding: 1px 3px; margin: 0 2px; font-size: 13px; text-align: center; }
+.apparition-cas ul li { margin: 3px 0; }
+.apparition-compos { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; vertical-align: middle; }
+.apparition-compo { display: inline-flex; align-items: center; gap: 1px; padding: 1px 4px; border: 1px solid #c2a878; border-radius: 6px; background: rgba(255, 248, 230, 0.6); }
+.apparition-unite { font-size: 12px; font-weight: bold; color: #5c3a21; margin-right: 3px; }
+.apparition-ou { font-size: 12px; color: #7a5230; }
+.apparition-ajouter, .apparition-retirer { border: 1px solid #b08a3a; border-radius: 50%; width: 20px; height: 20px; padding: 0; line-height: 18px;
+  font-size: 11px; cursor: pointer; background: #f6e8c6; color: #5c3a21; }
+.apparition-retirer { width: 16px; height: 16px; line-height: 14px; font-size: 9px; margin-left: 2px; }
+.apparition-choix { font-size: 12px; padding: 1px 3px; max-width: 280px; border: 1px solid #c2a878; border-radius: 4px; background: #fffaf0; color: #4a2a12; }
+.apparition-detail { font-size: 12px; font-style: italic; color: #7a5230; }
+.apparition-retablir { margin-left: 8px; padding: 3px 10px; font-size: 12px; }
 
 /* LA FENÊTRE 💀 (v262) : l'apparition à invoquer. */
 .choix-apparitions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }

@@ -7099,6 +7099,11 @@ window.reinitialiserCombat = async function(options) {
                 // s'attribuerait l'identifiant de l'ancienne.
                 Difficulte_Rencontre: deleteField(),
                 Apparition_Rencontre: deleteField(),
+                // Ce que le cas de l'apparition changeait (v268).
+                Apparition_Cas: deleteField(),
+                Apparition_Butin: deleteField(),
+                Pieges_Apparition: deleteField(),
+                Pieges_Renfort: deleteField(),
                 ID_Rencontre: deleteField(),
                 // Le ménage qui suit prend plusieurs écritures (créatures,
                 // pions, soins). Tant qu'il dure, aucun poste ne doit prendre
@@ -7304,6 +7309,26 @@ window.reinitialiserCombat = async function(options) {
 // =========================================================================
 
 // Outil mutualisé : Cherche la case vide la plus proche du centre
+// LES CASES DU PLATEAU (v268, les cases piégées) : celles que la carte dessine
+// (renderMap, Plateau.js), sans les cases gommées ni les murs.
+window.casesDuPlateau = function() {
+    const P = window.PLATEAU_VTT;
+    if (!P || typeof P.hexToPixel !== "function") return [];
+    const L = Number(P.largeurLogique) || 1800, H = Number(P.hauteurLogique) || 1800, t = Number(P.hexSize) || 60;
+    const rayon = Math.ceil(Math.sqrt((L / 2) ** 2 + (H / 2) ** 2) / t);
+    const cases = [];
+    for (let q = -rayon; q <= rayon; q++) {
+        for (let r = Math.max(-rayon, -q - rayon); r <= Math.min(rayon, -q + rayon); r++) {
+            const { x, y } = P.hexToPixel(q, r);
+            if (x < t / 2 || x > L - t / 2 || y < t / 2 || y > H - t / 2) continue;
+            const e = (typeof P.getCaseState === "function" && P.getCaseState(q, r)) || {};
+            if (e.isDeleted || e.isBlocked) continue;
+            cases.push({ q, r });
+        }
+    }
+    return cases;
+};
+
 window.trouverHexLibreVTT = function(tokensData) {
     function estHexLibre(q, r) {
         if (!window.PLATEAU_VTT) return false;

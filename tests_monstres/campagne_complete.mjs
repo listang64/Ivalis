@@ -51,7 +51,8 @@ const SRC_STATS_EQUIP = ['window.bonusEquip = function',
                          'window.defMagiqueCombattant = function',
                          'window.critiqueCombattant = function']
     .map(m => extraire('app.js', m)).join('\n\n');
-const SRC_MONSTRES = sansImports('monstres.js');
+// Le tableau des apparitions et son tirage (v268) : avant monstres.js, comme dans la page.
+const SRC_MONSTRES = fs.readFileSync('/home/user/Ivalis/apparitions.js', 'utf-8') + '\n' + sansImports('monstres.js');
 const SRC_OBJETS = fs.readFileSync('/home/user/Ivalis/objets.js', 'utf-8');
 const SRC_LOOT = sansImports('loot.js');
 

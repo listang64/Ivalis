@@ -103,7 +103,8 @@ console.log("\n2. LE POISON : 10 % DE L'ÉNERGIE MAX, 8 % DES PV MAX EN BRUT");
     verifier("dégâts bruts : la défense magique ne réduit rien", defMag.pv === 92, String(defMag.pv));
     verifier("l'armure physique non plus", defPhys.pv === 92, String(defPhys.pv));
     const bouclier = empoisonner({ Bouclier_Actuel: 20, Bouclier_Max: 20 });
-    verifier("le bouclier encaisse d'abord", bouclier.pv === 100, String(bouclier.pv));
+    // v268 (Nico : « poison / brûlure / saignement infligent des dégâts aux PV même si bouclier actif »).
+    verifier("le poison passe sous le bouclier : la vie le prend (v268)", bouclier.pv === 92, String(bouclier.pv));
     const peu = empoisonner({ Fatigue_Actuelle: 5 });
     verifier("l'énergie ne descend pas sous 0", peu.fatigue === 0, String(peu.fatigue));
 }

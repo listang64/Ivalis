@@ -864,14 +864,15 @@ console.log("\nCE QUE LES ÉTATS FONT À CHAQUE FIN DE MANCHE");
     verifier("et une armure physique totale ne l'arrête pas",
              blinde.combattants.H1.pv === pvBlinde - 5, String(blinde.combattants.H1.pv));
 
-    // Le bouclier encaisse en premier, comme pour n'importe quel coup.
+    // v268 (Nico : « poison / brûlure / saignement infligent des dégâts aux PV
+    // même si un bouclier est actif ») : la brûlure passe sous le bouclier.
     let protege = monde();
     protege.combattants.H1.bouclier = 10;
     protege.combattants.H1.etats = [{ nom: "Brûlé", duree: 2, typeDegats: "Magique" }];
     const pvProtege = protege.combattants.H1.pv;
     ticsDeFinDeManche(protege);
-    verifier("le bouclier prend la brûlure avant la chair",
-             protege.combattants.H1.bouclier === 5 && protege.combattants.H1.pv === pvProtege,   // 10 - 5
+    verifier("la brûlure passe sous le bouclier : la chair la prend, le bouclier reste (v268)",
+             protege.combattants.H1.bouclier === 10 && protege.combattants.H1.pv === pvProtege - 5,
              `(bouclier ${protege.combattants.H1.bouclier})`);
 
     // --- L'ÉTALEMENT : une moitié par manche, jamais au lancement -----------

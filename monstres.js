@@ -319,6 +319,12 @@ window.ecouterMonstresPartie = function(idPartie) {
             objet.releveEnLeader = !!brut.Releve_En_Leader && !brut.Leader;
             // Les résistances de son rang de leader, tirées d'avance (v263).
             if (Array.isArray(brut.Resistances_En_Leader)) objet.resistancesEnLeader = [...brut.Resistances_En_Leader];
+            // LES APPARITIONS (v268) : un fuyard (sa fuite, son esquive des
+            // attaques d'opportunité, la manche où elle cesse), l'ancre dont la
+            // vie appelle des renforts, une créature surgie d'un piège.
+            objet.fuyard        = brut.Comportement_Fuyard && typeof brut.Comportement_Fuyard === "object" ? { ...brut.Comportement_Fuyard } : null;
+            objet.ancre         = !!brut.Ancre_Apparition;
+            objet.piege         = !!brut.Piege;
             // LE TABLEAU DES MONSTRES JUSQU'AU COMBAT (Nico, v251 : « assure-toi
             // que Paramètres > Outils > Monstres soit bien relié aux stats
             // réelles des monstres en jeu »). Le nombre d'actions décide d'une
@@ -537,8 +543,20 @@ window.appliquerReglagesMonstres = function(brut) {
     if (typeof noyauIA().reglerPasMonstres === "function") noyauIA().reglerPasMonstres(r.deplacement);
     if (typeof noyauMoteur().reglerLeader === "function") noyauMoteur().reglerLeader(r.leader);
     window.MULTIPLICATEUR_SORTS_MONSTRE = 1 + r.bonusSortsPct / 100;
+    // LES APPARITIONS RÉGLÉES (v268, apparitions.js) : le document entier les
+    // porte ; un réglage d'une autre famille (sans elles) n'y touche pas.
+    if ((!brut || Object.prototype.hasOwnProperty.call(brut, "Apparitions")) && typeof window.appliquerTableApparitions === "function") {
+        window.appliquerTableApparitions(brut ? brut.Apparitions : null);
+    }
     if (typeof window.dessinerReglagesMonstres === "function") window.dessinerReglagesMonstres();
     return r;
+};
+
+// Le tableau des apparitions réglé dans Paramètres > Apparitions (v268) : écrit
+// avec les autres réglages des monstres, il gagne les autres postes. `null` :
+// le tableau de Nico revient.
+window.enregistrerTableApparitions = async function(table) {
+    await setDoc(doc(db, COLLECTION_GABARITS, DOC_REGLAGES), { Apparitions: table ? JSON.parse(JSON.stringify(table)) : deleteField() }, { merge: true });
 };
 window.appliquerReglagesMonstres(null);
 
@@ -884,40 +902,8 @@ window.sauvegarderGabaritsMonstres = async function() {
 //  butin tire ses raretés sur la ligne « Normale » (loot.js).
 // =========================================================================
 
-const ARCHETYPE_TANK = "TANK CAC";
-const ARCHETYPE_SOUTIEN = "SOUTIEN";
-const ARCHETYPES_PREMIER_AU_CONTACT = ["TANK CAC", "DPS CAC", "DPS MAGE CAC"];
-const RENFORT_TROIS = [{ Normal: 1, Petit: 2 }, { Petit: 3 }, { Normal: 2, Petit: 1 }];
-
-// Une vague : ses possibilités (tirées à chances égales) et sa règle
-// d'archetype — "premierAuContact", "tankSansSoutien", "unSoutien" ou
-// "auPlusUnSoutien".
-window.APPARITIONS = Object.freeze({
-    1: { titre: "Apparition 1", cas: [
-        { chance: 40, nom: "Le chef et sa meute", leader: "depart",
-          depart: { possibilites: [{ Normal: 1 }], regle: "premierAuContact" },
-          renforts: [{ apresTours: 1, possibilites: [{ Petit: 4 }], regle: "unSoutien" }] },
-        { chance: 60, nom: "Celui qui se relève", releveEnLeader: true,
-          depart: { possibilites: [{ Normal: 1 }], regle: "premierAuContact" },
-          renforts: [{ surReleve: true, possibilites: RENFORT_TROIS, regle: "auPlusUnSoutien" }] }
-    ] },
-    2: { titre: "Apparition 2", cas: [
-        { chance: 100, leader: "tous",
-          depart: { possibilites: [{ Normal: 2 }, { Normal: 1, Petit: 1 }], regle: "tankSansSoutien" },
-          renforts: [{ apresTours: 2, possibilites: RENFORT_TROIS, regle: "auPlusUnSoutien" }] }
-    ] },
-    3: { titre: "Apparition 3", cas: [
-        { chance: 100, leader: "depart",
-          depart: { possibilites: [{ Normal: 3 }, { Normal: 1, Petit: 2 }, { Normal: 2, Petit: 1 }, { Petit: 4 }], regle: "auPlusUnSoutien" },
-          renforts: [{ apresTours: 4, possibilites: [{ Normal: 1, Petit: 1 }, { Petit: 3 }, { Normal: 2 }], regle: "auPlusUnSoutien" }] }
-    ] },
-    4: { titre: "Apparition 4", cas: [
-        { chance: 100, leader: "depart",
-          depart: { possibilites: [{ Normal: 4 }, { Normal: 3, Petit: 1 }, { Normal: 2, Petit: 2 }, { Petit: 5 }], regle: "auPlusUnSoutien" },
-          renforts: [] }
-    ] }
-});
-const NUMEROS_APPARITION = [1, 2, 3, 4];
+// LE TABLEAU, SON TIRAGE ET SA FENÊTRE vivent dans apparitions.js (v268) :
+// le tableau de Nico, réglable dans Paramètres > Apparitions. Ici, on pose.
 
 // Le terrain accueille autant d'ennemis qu'il y a de joueurs, plus un. Les illusions
 // sont des leurres posés par les héros, pas des joueurs : les compter ferait grossir
@@ -956,98 +942,9 @@ const AMBIANCE_ARCHETYPES = {
 function hasard(tableau) {
     return tableau[Math.floor(Math.random() * tableau.length)];
 }
+// Les archetypes du bestiaire, pour le tirage des apparitions (apparitions.js).
+window.ARCHETYPES_MONSTRES = Object.keys(AMBIANCE_ARCHETYPES);
 
-// Les archetypes disponibles pour un palier donné : le tableau d'équilibrage ne
-// prévoit pas de Boss pour le SOUTIEN, on ne doit donc jamais en tirer un.
-function archetypesPourPalier(palier) {
-    return Object.keys(AMBIANCE_ARCHETYPES).filter(a => window.gabaritMonstre(a, palier));
-}
-
-// Ceux d'une liste qui ont un gabarit à cette stature — la liste entière si
-// le bestiaire n'est pas encore lu (la pose le relira).
-function parmiLesGabarits(liste, palier) {
-    const dispo = liste.filter(a => window.gabaritMonstre(a, palier));
-    return dispo.length > 0 ? dispo : liste;
-}
-
-// Les créatures d'une vague : ses statures (les Normaux d'abord), puis leurs
-// archetypes selon sa règle. Le tank ou le soutien imposé prend une place au
-// hasard dans la vague.
-function tirerVague(vague) {
-    const repartition = hasard(vague.possibilites);
-    const paliers = [];
-    for (let i = 0; i < (repartition.Normal || 0); i++) paliers.push("Normal");
-    for (let i = 0; i < (repartition.Petit || 0); i++) paliers.push("Petit");
-    if (paliers.length === 0) return [];
-    const tous = Object.keys(AMBIANCE_ARCHETYPES);
-    const sansSoutien = tous.filter(a => a !== ARCHETYPE_SOUTIEN);
-    const archetypes = new Array(paliers.length).fill(null);
-    const place = Math.floor(Math.random() * paliers.length);
-    if (vague.regle === "premierAuContact") archetypes[0] = hasard(parmiLesGabarits(ARCHETYPES_PREMIER_AU_CONTACT, paliers[0]));
-    else if (vague.regle === "tankSansSoutien") archetypes[place] = ARCHETYPE_TANK;
-    else if (vague.regle === "unSoutien") archetypes[place] = ARCHETYPE_SOUTIEN;
-    // Le reste : sans soutien quand la règle en impose un (ou n'en veut pas),
-    // sinon au hasard jusqu'au premier soutien tiré.
-    const jamaisSoutien = vague.regle === "tankSansSoutien" || vague.regle === "unSoutien";
-    let soutienPris = archetypes.includes(ARCHETYPE_SOUTIEN);
-    paliers.forEach((palier, i) => {
-        if (archetypes[i]) return;
-        archetypes[i] = hasard(parmiLesGabarits(jamaisSoutien || soutienPris ? sansSoutien : tous, palier));
-        if (archetypes[i] === ARCHETYPE_SOUTIEN) soutienPris = true;
-    });
-    return paliers.map((palier, i) => ({ archetype: archetypes[i], palier }));
-}
-
-// Tire une apparition : `choix` vaut 1, 2, 3 ou 4 — n'importe quoi d'autre
-// (« aleatoire ») en tire une des quatre. Rend ce qui entre au départ, et les
-// renforts avec leur heure d'entrée (`entreeManche`) ou leur déclencheur
-// (`surReleve` : la relève en leader de l'Apparition 1).
-// UN LEADER DANS 60 % DES COMBATS (v267, Nico : « pour les apparitions de
-// leaders, fais en sorte qu'il y ait 60 % de chance qu'il y ait un leader dans
-// le combat »). Un jet par rencontre : raté, personne ne mène — et la créature
-// qui se relève en leader (Apparition 1, cas 2) n'est plus tirée, puisque
-// c'est un leader elle aussi : l'Apparition 1 devient alors « le chef et sa
-// meute », sans leader.
-window.CHANCE_LEADER_COMBAT = 60;
-window.tirerApparition = function(choix) {
-    const choisie = NUMEROS_APPARITION.includes(Number(choix));
-    const numero = choisie ? Number(choix) : hasard(NUMEROS_APPARITION);
-    const def = window.APPARITIONS[numero];
-    const avecLeader = Math.random() * 100 < window.CHANCE_LEADER_COMBAT;
-    const casPossibles = def.cas.map((c, i) => ({ c, i })).filter(({ c }) => avecLeader || !c.releveEnLeader);
-    const tirables = casPossibles.length > 0 ? casPossibles : def.cas.map((c, i) => ({ c, i }));
-    let jet = Math.random() * tirables.reduce((t, x) => t + x.c.chance, 0);
-    let indexCas = tirables[tirables.length - 1].i;
-    for (const x of tirables) {
-        if (jet < x.c.chance) { indexCas = x.i; break; }
-        jet -= x.c.chance;
-    }
-    const cas = def.cas[indexCas];
-    const depart = tirerVague(cas.depart);
-    const renforts = [];
-    cas.renforts.forEach(vague => tirerVague(vague).forEach(m => renforts.push(
-        { ...m, ...(vague.surReleve ? { surReleve: true } : { entreeManche: 1 + vague.apresTours }) })));
-    if (avecLeader && cas.releveEnLeader && depart[0]) depart[0].releveEnLeader = true;
-    const candidats = !avecLeader ? [] : cas.leader === "tous" ? [...depart, ...renforts] : cas.leader === "depart" ? depart : [];
-    if (candidats.length > 0) hasard(candidats).leader = true;
-    return { apparition: numero, aleatoire: !choisie, cas: indexCas + 1, nomCas: cas.nom || "", depart, renforts, avecLeader };
-};
-
-// -------------------------------------------------------------------------
-//  LA FENÊTRE DES APPARITIONS (Paramètres > Outils > Apparitions)
-// -------------------------------------------------------------------------
-//  Elle tenait la table des rencontres par difficulté (v253), qui n'a plus
-//  lieu d'être : elle montre maintenant ce que chaque apparition fait entrer,
-//  lu dans APPARITIONS — la même table que celle du tirage.
-const PLURIELS_PALIER = { Normal: "Normaux", Petit: "Petits" };
-const texteRepartition = (r) => ["Normal", "Petit"].filter(p => r[p] > 0)
-    .map(p => `${r[p]} ${r[p] > 1 ? PLURIELS_PALIER[p] : p}`).join(" + ");
-const TEXTES_REGLE = {
-    premierAuContact: "un tank, un combattant ou un mage au contact",
-    tankSansSoutien: "un tank et une créature au hasard, pas un soutien",
-    unSoutien: "un soutien, les autres au hasard",
-    auPlusUnSoutien: "au hasard, un soutien au plus"
-};
 window.ouvrirTableRencontres = function() {
     const menuLat = document.getElementById("menu-lateral");
     if (menuLat) menuLat.style.display = "none";
@@ -1059,31 +956,6 @@ window.fermerTableRencontres = function() {
     if (menuLat) menuLat.style.display = "flex";
     window.naviguerFenetre("etape-rencontres-monstres", "etape-menu-outils");
 };
-window.dessinerTableRencontres = function() {
-    const hote = document.getElementById("corps-rencontres-monstres");
-    if (!hote) return;
-    const vague = (v) => `${v.possibilites.map(texteRepartition).join(" <em>ou</em> ")} <span class="apparition-regle">(${TEXTES_REGLE[v.regle] || ""})</span>`;
-    hote.innerHTML = `<div class="apparition-note-leader">👑 Un leader dans <b>${window.CHANCE_LEADER_COMBAT} %</b> des combats : sinon, personne ne mène (et l'Apparition 1 est toujours « le chef et sa meute »).</div>`
-        + NUMEROS_APPARITION.map(n => {
-        const def = window.APPARITIONS[n];
-        const lesCas = def.cas.map(cas => {
-            const leader = cas.releveEnLeader ? "Mise KO, elle se relève en <b>leader</b>, ses PV et son énergie au plein."
-                : cas.leader === "tous" ? "Un <b>leader</b> parmi toutes, renforts compris."
-                : cas.leader === "depart" ? (cas.depart.possibilites.every(r => texteRepartition(r) === "1 Normal")
-                    ? "Ce Normal est le <b>leader</b>." : "Un <b>leader</b> parmi celles du départ.") : "";
-            const renforts = cas.renforts.length === 0 ? "<li>Pas de renfort.</li>"
-                : cas.renforts.map(v => `<li>${v.surReleve ? "À sa relève" : `Au bout de ${v.apresTours} tour${v.apresTours > 1 ? "s" : ""}`} : ${vague(v)}</li>`).join("");
-            return `<div class="apparition-cas">
-                ${def.cas.length > 1 ? `<div class="apparition-cas-titre">${cas.nom} — ${cas.chance} %</div>` : ""}
-                <ul><li>Au départ : ${vague(cas.depart)}</li><li>${leader}</li>${renforts}</ul></div>`;
-        }).join("");
-        return `<div class="bloc-rencontre bloc-apparition" data-apparition="${n}">
-            <div class="reglages-monstres-entete"><span class="reglages-monstres-nom">${def.titre}${n === 4 ? " et plus" : ""}</span>
-              <span class="reglages-monstres-aide">${n === 4 ? "quatre ennemis ou plus" : `${n} ennemi${n > 1 ? "s" : ""}`} au départ</span></div>
-            ${lesCas}</div>`;
-    }).join("");
-};
-
 // -------------------------------------------------------------------------
 //  Sous-agent IA : MIA_BESTIAIRE (nomme toute la rencontre en un seul appel)
 // -------------------------------------------------------------------------
@@ -1176,6 +1048,11 @@ RÈGLES :
 //  renfort entre par les cases d'apparition peintes.
 window.poserMonstreSurTerrain = async function(monstre, tokensData, options) {
     let gabarit = window.gabaritMonstre(monstre.archetype, monstre.palier);
+    // Des PV en moins (ou en plus) que le gabarit (v268 : les cohues de
+    // l'Apparition 4, les surgis d'un piège).
+    const ajusterPv = (g) => (!g || !Number(monstre.pvPct)) ? g
+        : { ...g, PV: Math.max(1, Math.round((Number(g.PV) || 0) * (1 + Number(monstre.pvPct) / 100))) };
+    gabarit = ajusterPv(gabarit);
 
     // LE BESTIAIRE N'EST PAS TOUJOURS EN MÉMOIRE, et ça a coûté tous les renforts.
     //
@@ -1196,7 +1073,7 @@ window.poserMonstreSurTerrain = async function(monstre, tokensData, options) {
     if (!gabarit) {
         try {
             await window.chargerGabaritsMonstres();
-            gabarit = window.gabaritMonstre(monstre.archetype, monstre.palier);
+            gabarit = ajusterPv(window.gabaritMonstre(monstre.archetype, monstre.palier));
         } catch (e) {
             console.error("Relecture du bestiaire impossible :", e);
         }
@@ -1214,6 +1091,10 @@ window.poserMonstreSurTerrain = async function(monstre, tokensData, options) {
         // dégâts, soins et chances d'état en plus, au combat (moteur_pur.js).
         ...(monstre.leader ? window.champsLeader(gabarit) : {}),
         ...(monstre.releveEnLeader && !monstre.leader ? { Releve_En_Leader: true } : {}),
+        // Les apparitions (v268) : fuyard, ancre, surgi d'un piège.
+        ...(monstre.fuyard ? { Comportement_Fuyard: { ...monstre.fuyard } } : {}),
+        ...(monstre.ancre ? { Ancre_Apparition: true } : {}),
+        ...(monstre.piege ? { Piege: true } : {}),
         // Le moteur de combat lit Prenom/Nom_Personnage pour l'affichage : le nom
         // trouvé par l'IA tient dans le prénom, le nom reste vide.
         Prenom_Personnage: monstre.nom,
@@ -1230,7 +1111,10 @@ window.poserMonstreSurTerrain = async function(monstre, tokensData, options) {
     // peinte par le MJ (pinceau SPAWN, v261), libre, au hasard ; sans case
     // peinte, autour du repère — et à défaut de repère (ou de module de combat
     // chargé), au plus près du centre comme autrefois.
-    const placer = options && options.premiereArrivee ? window.casePremiereArriveeEnnemi : window.caseApparitionEnnemi;
+    // Surgie d'un piège (v268) : autour de la case piégée.
+    const placer = options && options.autour && typeof window.trouverHexLibreAutour === "function"
+        ? (t) => window.trouverHexLibreAutour(t, options.autour, 1)
+        : options && options.premiereArrivee ? window.casePremiereArriveeEnnemi : window.caseApparitionEnnemi;
     const hexLibre = typeof placer === "function" ? placer(tokensData) : window.trouverHexLibreVTT(tokensData);
     tokensData[idMonstre] = { q: hexLibre.q, r: hexLibre.r, url: "", taille: 55 };
 
@@ -1393,10 +1277,18 @@ window.genererRencontreMonstres = async function(choix) {
     // combat en cours ou à un combat déjà terminé (cf. demarrerButin). Plus de
     // difficulté : le butin tire ses raretés sur la ligne « Normale ».
     if (typeof window.modifierPartie === "function") {
+        // Ce que le cas change (v268) : son butin et son expérience (les
+        // cohues de l'Apparition 4), ses cases piégées (Apparition 2).
+        const pieges = tirage.pieges ? window.tirerCasesPiegees(tirage.pieges.pct, tokensData) : [];
         await window.modifierPartie(() => ({ maj: {
             Apparition_Rencontre: tirage.apparition,
+            Apparition_Cas: tirage.cas,
+            Apparition_Butin: tirage.butin ? { ...tirage.butin } : deleteField(),
+            Pieges_Apparition: pieges.length ? pieges : deleteField(),
+            Pieges_Renfort: tirage.pieges ? { possibilites: tirage.pieges.possibilites, pvPct: tirage.pieges.pvPct } : deleteField(),
             ID_Rencontre: "renc_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8)
         } }));
+        if (pieges.length) console.log(`🪤 ${pieges.length} cases piégées.`);
     }
 
     console.log(`🐲 Apparition ${tirage.apparition}${tirage.nomCas ? ` (${tirage.nomCas})` : ""} : `
@@ -1426,7 +1318,7 @@ window.lireReserveMonstres = async function() {
     return snap.exists() ? (snap.data().Reserve_Monstres || []) : [];
 };
 
-const estRenfortPrevu = (r) => !!(r && (r.surReleve || Number(r.entreeManche) > 0));
+const estRenfortPrevu = (r) => !!(r && (r.surReleve || r.quandVide || Number(r.entreeManche) > 0));
 
 // Fait entrer une partie de la réserve, d'un coup : leurs pions sur les cases
 // d'apparition, leur place dans l'ordre d'initiative, la réserve récrite sans
@@ -1461,18 +1353,104 @@ async function faireEntrerRenforts(reserve, entrent, pourquoi) {
 window.entrerRenfortsPrevus = async function(manche, options) {
     if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return [];
     const reserve = await window.lireReserveMonstres();
-    const prevus = reserve.filter(r => r && !r.surReleve && Number(r.entreeManche) > 0);
+    const prevus = reserve.filter(r => r && !r.surReleve && (Number(r.entreeManche) > 0 || r.quandVide));
     if (prevus.length === 0) return [];
-    let entrent = prevus.filter(r => Number(r.entreeManche) <= Number(manche));
     const vide = !!(options && options.terrainVide)
         && !(typeof window.ennemisEncoreDebout === "function" && window.ennemisEncoreDebout());
-    if (entrent.length === 0 && vide) {
-        const prochaine = Math.min(...prevus.map(r => Number(r.entreeManche)));
-        entrent = prevus.filter(r => Number(r.entreeManche) === prochaine);
+    // CE QUI NE VIENT PLUS (v268) : une vague « annulée si tous sont vaincus »
+    // quand le terrain s'est vidé avant son heure ; les renforts d'une ANCRE
+    // qui ne tient plus debout (« tant qu'il est en vie »).
+    const ancreDebout = typeof window.ancreApparitionDebout === "function" ? window.ancreApparitionDebout() : true;
+    const caducs = reserve.filter(r => r && ((vide && (r.annuleSiVide || r.tantQueVivant)) || (r.tantQueVivant && !ancreDebout)));
+    const restants = caducs.length ? reserve.filter(r => !caducs.includes(r)) : reserve;
+    if (caducs.length) {
+        console.log(`🐲 ${caducs.length} renfort(s) ne viendront plus (${vide ? "le terrain s'est vidé" : "l'ancre est tombée"}).`);
+        await window.sauvegarderReserveMonstres(restants);
     }
-    if (entrent.length === 0) return [];
-    return faireEntrerRenforts(reserve, entrent, entrent.some(r => Number(r.entreeManche) <= Number(manche))
+    const encore = prevus.filter(r => !caducs.includes(r));
+    let entrent = encore.filter(r => !r.quandVide && Number(r.entreeManche) <= Number(manche));
+    if (vide) {
+        // « Une fois tous morts » : leur vague entre ; sinon la suivante n'attend pas.
+        const quandVide = encore.filter(r => r.quandVide);
+        if (quandVide.length) entrent = [...entrent, ...quandVide];
+        else if (entrent.length === 0) {
+            const heures = encore.filter(r => Number(r.entreeManche) > 0).map(r => Number(r.entreeManche));
+            if (heures.length) {
+                const prochaine = Math.min(...heures);
+                entrent = encore.filter(r => Number(r.entreeManche) === prochaine);
+            }
+        }
+    }
+    if (entrent.length === 0) {
+        if (caducs.length && typeof window.verifierVictoireCombat === "function") setTimeout(() => window.verifierVictoireCombat(), 300);
+        return [];
+    }
+    // LES FUYARDS CESSENT DE FUIR (Apparition 2) : la vague qui arrive le dit à
+    // leurs fiches — le cerveau, lui, le sait déjà par leur `jusqua`.
+    if (entrent.some(r => r.finFuite) && typeof window.arreterFuyards === "function") window.arreterFuyards().catch(e => console.error(e));
+    return faireEntrerRenforts(restants, entrent, entrent.some(r => !r.quandVide && Number(r.entreeManche) <= Number(manche))
         ? `manche ${manche}` : "le terrain s'est vidé");
+};
+
+// L'ANCRE D'UNE APPARITION (v268, « à chaque fin de tour, tant qu'il est en
+// vie, apparition d'un Petit ») tient-elle encore debout ?
+window.ancreApparitionDebout = function() {
+    const ancres = (window.MONSTRES_PARTIE || []).filter(m => m && m.ancre);
+    if (ancres.length === 0) return false;
+    const tombe = (m) => m.statut === "Mort" || m.zombie
+        || (typeof window.estCombattantMort === "function" && window.estCombattantMort(m.idPersonnage));
+    return ancres.some(m => !tombe(m));
+};
+
+// Les fuyards de l'Apparition 2 deviennent agressifs : leurs fiches le disent.
+window.arreterFuyards = async function() {
+    const fuyards = (window.MONSTRES_PARTIE || []).filter(m => m && m.fuyard);
+    for (const m of fuyards) {
+        await updateDoc(doc(db, COLLECTION_MONSTRES, m.idPersonnage), { Comportement_Fuyard: deleteField() })
+            .catch(e => console.error("Fin de fuite :", e));
+    }
+};
+
+// =========================================================================
+//  LES CASES PIÉGÉES (v268, Apparition 2, « le terrain piégé »)
+// =========================================================================
+//  Nico : « sur la carte, 25 % de cases piégées. Si un joueur va sur une case
+//  piégée : renfort de 2 Petits (avec −50 % de PV) autour de cette case, avec
+//  un point d'exclamation et un nuage de fumée à la Naruto. » Les cases sont
+//  tirées à la génération (Pieges_Apparition, sur la partie) — ni sous un pion,
+//  ni à côté d'un héros —, et l'état du combat les reprend. Le cerveau dit qui
+//  a marché dessus (mouvement_pur.js) ; le poste qui le tient fait surgir les
+//  créatures (regime_cerveau.js).
+window.tirerCasesPiegees = function(pct, tokensData) {
+    const cases = typeof window.casesDuPlateau === "function" ? window.casesDuPlateau() : [];
+    const pions = Object.values(tokensData || window.TOKENS_VTT_DATA || {}).filter(t => t && t.q !== undefined);
+    const dist = (a, b) => (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
+    const libres = cases.filter(c => !pions.some(t => dist(t, c) <= 1));
+    const n = Math.round(libres.length * Math.max(0, Math.min(100, Number(pct) || 0)) / 100);
+    for (let i = libres.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [libres[i], libres[j]] = [libres[j], libres[i]]; }
+    return libres.slice(0, n).map(c => `${c.q}_${c.r}`);
+};
+window.declencherPiegeApparition = async function(hex) {
+    if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT || !hex) return [];
+    const regle = ((window.PARTIE_DATA || {}).Pieges_Renfort) || { possibilites: [{ Normal: 0, Petit: 2 }], pvPct: -50 };
+    const creatures = (typeof window.tirerVagueApparition === "function"
+        ? window.tirerVagueApparition({ possibilites: regle.possibilites, regle: "sansSoutien" }) : [])
+        .map(m => ({ ...m, piege: true, ...(Number(regle.pvPct) ? { pvPct: Number(regle.pvPct) } : {}) }));
+    if (creatures.length === 0) return [];
+    const noms = await window.nommerMonstresIA(creatures).catch(() => []);
+    creatures.forEach((m, i) => { m.nom = (noms && noms[i]) || "Embusqué"; });
+    const tokensData = { ...window.TOKENS_VTT_DATA };
+    const poses = [];
+    for (const m of creatures) {
+        const id = await window.poserMonstreSurTerrain(m, tokensData, { autour: { q: Number(hex.q), r: Number(hex.r) } });
+        if (id) poses.push({ ...m, id });
+    }
+    if (poses.length === 0) return [];
+    window.TOKENS_VTT_DATA = tokensData;
+    await window.enregistrerPionsVTT(...poses.map(p => p.id));
+    if (typeof window.equiperCompetencesRencontre === "function") window.equiperCompetencesRencontre(poses).catch(e => console.error(e));
+    console.log(`🪤 Piège en (${hex.q},${hex.r}) : ${poses.map(p => p.nom).join(", ")} surgi${poses.length > 1 ? "ssent" : "t"}.`);
+    return poses.map(p => p.id);
 };
 
 // LES RENFORTS DE LA RELÈVE (Apparition 1, cas 2) : la créature vient de se
@@ -1660,7 +1638,7 @@ window.fermerGenerationRencontre = function() {
 };
 
 window.choisirApparitionRencontre = function(choix) {
-    window.APPARITION_RENCONTRE_CHOISIE = NUMEROS_APPARITION.includes(Number(choix)) ? Number(choix) : "aleatoire";
+    window.APPARITION_RENCONTRE_CHOISIE = (window.NUMEROS_APPARITION || [1, 2, 3, 4]).includes(Number(choix)) ? Number(choix) : "aleatoire";
     document.querySelectorAll(".choix-apparition-rencontre").forEach(el => {
         el.classList.toggle("actif", el.dataset.apparition === String(window.APPARITION_RENCONTRE_CHOISIE));
     });

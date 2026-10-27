@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=98">
+  <link rel="stylesheet" href="style.css?v=99">
 
  
   <!-- ===================================================================== -->
@@ -1717,9 +1717,9 @@
         </div>
       </div>
       <p style="font-size: 13px; color: #5c3a21; margin: 0 0 10px 0; font-style: italic;">
-        Le bouton 💀 demande l'apparition : le nombre d'ennemis engagés dans le récit. Chaque « ou » se tire au hasard.
+        Le bouton 💀 demande l'apparition : le nombre d'ennemis engagés dans le récit ; chaque apparition tire un de ses cas à sa chance.
         Les créatures du départ entrent autour du repère des ennemis ; un renfort entre par les cases d'apparition (pinceau SPAWN),
-        au début de la manche prévue, ou dès la suivante si plus aucune créature ne tient debout.
+        à la fin du tour qui précède son tour d'arrivée. Toutes les valeurs ci-dessous se modifient, et valent pour tous les postes.
       </p>
       <div id="corps-rencontres-monstres" class="corps-rencontres-monstres"></div>
     </div>
@@ -2208,7 +2208,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=178"></script>
+<script src="trace_combat.js?v=179"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2225,14 +2225,14 @@
      vérifie qu'ils sont identiques. Elle doit précéder tout module. -->
 <script type="importmap">
 { "imports": {
-    "./combat_etat.js": "./combat_etat.js?v=43",
+    "./combat_etat.js": "./combat_etat.js?v=44",
     "./moteur_pur.js": "./moteur_pur.js?v=68",
-    "./mouvement_pur.js": "./mouvement_pur.js?v=22",
-    "./ia_pure.js": "./ia_pure.js?v=15",
-    "./cerveau_combat.js": "./cerveau_combat.js?v=60",
+    "./mouvement_pur.js": "./mouvement_pur.js?v=23",
+    "./ia_pure.js": "./ia_pure.js?v=16",
+    "./cerveau_combat.js": "./cerveau_combat.js?v=61",
     "./spectateur_combat.js": "./spectateur_combat.js?v=8",
     "./depot_firestore.js": "./depot_firestore.js?v=11",
-    "./pont_combat.js": "./pont_combat.js?v=45",
+    "./pont_combat.js": "./pont_combat.js?v=46",
     "./playlist.js": "./playlist.js?v=1"
 } }
 </script>
@@ -2245,14 +2245,14 @@
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
-<script type="module" src="combat_etat.js?v=43"></script>
+<script type="module" src="combat_etat.js?v=44"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
 <script type="module" src="moteur_pur.js?v=68"></script>
-<script type="module" src="mouvement_pur.js?v=22"></script>
-<script type="module" src="ia_pure.js?v=15"></script>
+<script type="module" src="mouvement_pur.js?v=23"></script>
+<script type="module" src="ia_pure.js?v=16"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
-<script type="module" src="cerveau_combat.js?v=60"></script>
+<script type="module" src="cerveau_combat.js?v=61"></script>
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
      la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
 <script type="module" src="spectateur_combat.js?v=8"></script>
@@ -2261,9 +2261,9 @@
 <script type="module" src="depot_firestore.js?v=11"></script>
 <!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
      vers les animations existantes — il ne recalcule jamais rien. -->
-<script type="module" src="pont_combat.js?v=45"></script>
+<script type="module" src="pont_combat.js?v=46"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
-<script type="module" src="regime_cerveau.js?v=52"></script>
+<script type="module" src="regime_cerveau.js?v=53"></script>
 <script type="module" src="ia_master.js?v=7"></script>
 <script type="module" src="app.js?v=122"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
@@ -2274,9 +2274,9 @@
 <script src="fabrique_sons.js?v=16"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->
 <script src="animations_combat.js?v=11"></script>
-<script src="animations_catalogue.js?v=22"></script>
+<script src="animations_catalogue.js?v=23"></script>
 <!-- …et leur branchement sur le vrai combat (les animations validées dans le Studio). -->
-<script src="animations_jeu.js?v=10"></script>
+<script src="animations_jeu.js?v=11"></script>
 <script src="experience.js?v=2"></script>
 <!-- La montée de niveau (v256) : la popup du héros qui prend un niveau. -->
 <script src="montee_niveau.js?v=1"></script>
@@ -2303,19 +2303,22 @@
 <script type="module" src="sequence_tour.js?v=25"></script>
 <script src="zombie_token.js?v=1"></script>
 <script src="murs_terre.js?v=10"></script>
-<script type="module" src="combat.js?v=152"></script>
+<script type="module" src="combat.js?v=153"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=40"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
 <script type="module" src="moteur_effets.js?v=101"></script>
-<script type="module" src="monstres.js?v=40"></script>
+<!-- LES APPARITIONS (v268) : le tableau de Nico, son tirage, sa fenêtre de
+     réglage. Avant monstres.js, qui le lit dès son chargement. -->
+<script src="apparitions.js?v=1"></script>
+<script type="module" src="monstres.js?v=41"></script>
 <script type="module" src="monstres_competences.js?v=29"></script>
 <script type="module" src="monstres_ia.js?v=42"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=18"></script>
 <script src="variations_tenues.js?v=2"></script>
 <script type="module" src="objets_ia.js?v=16"></script>
-<script type="module" src="loot.js?v=28"></script>
+<script type="module" src="loot.js?v=29"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->
@@ -2338,19 +2341,19 @@
     <div class="choix-apparitions">
       <div class="choix-apparition-rencontre" data-apparition="1" onclick="window.choisirApparitionRencontre(1)">
         <div class="choix-apparition-titre">Apparition 1</div>
-        <div class="choix-apparition-aide">Un chef, sa meute au tour suivant — ou une créature qui se relève en leader, avec des renforts (60 % de chance d'un leader).</div>
+        <div class="choix-apparition-aide">Un ennemi : un chef et sa meute, celui qui se relève en leader, la meute qui grossit, le chef et ses lieutenants, le gardien et sa nichée.</div>
       </div>
       <div class="choix-apparition-rencontre" data-apparition="2" onclick="window.choisirApparitionRencontre(2)">
         <div class="choix-apparition-titre">Apparition 2</div>
-        <div class="choix-apparition-aide">Deux ennemis dont un tank ; un renfort au bout de 2 tours ; 60 % de chance d'un leader parmi tous.</div>
+        <div class="choix-apparition-aide">Deux ennemis : la patrouille, les éclaireurs qui fuient, les deux murailles, le terrain piégé, les vagues.</div>
       </div>
       <div class="choix-apparition-rencontre" data-apparition="3" onclick="window.choisirApparitionRencontre(3)">
         <div class="choix-apparition-titre">Apparition 3</div>
-        <div class="choix-apparition-aide">Trois ou quatre ennemis, 60 % de chance d'un leader ; un renfort au bout de 4 tours.</div>
+        <div class="choix-apparition-aide">Trois ennemis : la bande, les deux chefs, la horde qui revient.</div>
       </div>
       <div class="choix-apparition-rencontre" data-apparition="4" onclick="window.choisirApparitionRencontre(4)">
         <div class="choix-apparition-titre">Apparition 4 et plus</div>
-        <div class="choix-apparition-aide">Quatre ou cinq ennemis, 60 % de chance d'un leader ; pas de renfort.</div>
+        <div class="choix-apparition-aide">Quatre ennemis ou plus : l'escouade, la relève, les cohues (moins de PV, moins d'XP, 2 objets par joueur).</div>
       </div>
       <div class="choix-apparition-rencontre choix-aleatoire" data-apparition="aleatoire" onclick="window.choisirApparitionRencontre('aleatoire')">
         <div class="choix-apparition-titre">Aléatoire</div>

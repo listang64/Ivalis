@@ -517,7 +517,15 @@ const SCENES = {
     // forme (animations_jeu.js).
     arrivee(e) {
         return { geste: "arrivee", pion: e.combattant && e.combattant.id,
-                 ...(e.combattant && e.combattant.estIllusion ? { illusion: true } : {}) };
+                 ...(e.combattant && e.combattant.estIllusion ? { illusion: true } : {}),
+                 // Surgie d'un piège (v268) : elle entre dans un nuage de fumée.
+                 ...(e.combattant && e.combattant.piege ? { piege: true } : {}) };
+    },
+    // UNE CASE PIÉGÉE (v268, Apparition 2) : un grand « ! » au-dessus du héros
+    // qui y a posé le pied — les créatures surgissent ensuite, en fumée.
+    piege(e) {
+        return { geste: "message", pion: e.acteur, texte: "❗ Piège !", couleur: "#ffb74d", duree: RYTHME.message,
+                 reaction: { sorte: "piege", pion: e.acteur, remplace: true } };
     },
     zone(e)    { return { geste: "zone", id: e.id, zone: e.zone || null, retiree: !!e.retiree }; },
 
@@ -860,7 +868,7 @@ export function creerPont(effets) {
                 break;
 
             case "arrivee":
-                await arrivee({ pion: scene.pion, ...(scene.illusion ? { illusion: true } : {}) });
+                await arrivee({ pion: scene.pion, ...(scene.illusion ? { illusion: true } : {}), ...(scene.piege ? { piege: true } : {}) });
                 break;
 
             // « etats » et « manche » n'ont pas d'animation propre :

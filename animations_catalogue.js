@@ -3932,6 +3932,50 @@
             await o.attendre(900);
             await o.effacer(cercle);
         } },
+        // SURGIE D'UN PIÈGE (v268, Apparition 2 : « avec animations point
+        // d'exclamation et un nuage de fumée à la Naruto ») : un « pouf » de
+        // fumée blanche éclate sur la case, la créature est dedans quand il se
+        // dissipe.
+        { id: "jeu-apparition-fumee", async jouer(sc, o) {
+            const pos = positionDe(o, sc);
+            o.son("poussee");
+            const bouffees = [];
+            for (let k = 0; k < 7; k++) {
+                const ang = (k / 7) * Math.PI * 2, r = pos.t * (k === 0 ? 0 : 0.32);
+                const t = pos.t * (k === 0 ? 1.1 : 0.75);
+                const d = o.poser(sc.calque, pos.x + Math.cos(ang) * r, pos.y + Math.sin(ang) * r,
+                    `width:${t}px; height:${t}px; border-radius:50%; z-index:${Z.haut}; opacity:0;
+                     background:radial-gradient(circle at 40% 38%, #ffffff 0%, #eceff1 45%, rgba(176,190,197,0.85) 70%, rgba(176,190,197,0) 100%);`);
+                d.classList.add("anim-fumee-piege");
+                bouffees.push(d);
+                o.teinter(d, [{ opacity: 0, transform: `${BASE} scale(0.2)` }, { opacity: 1, transform: `${BASE} scale(1)`, offset: 0.25 },
+                              { opacity: 0.95, transform: `${BASE} scale(1.15)`, offset: 0.6 }, { opacity: 0, transform: `${BASE} scale(1.5)` }],
+                          { duration: 1100, delay: k * 35, easing: "ease-out", fill: "forwards" });
+            }
+            o.gerbe(sc.calque, pos.x, pos.y, { nombre: 12, dist: pos.t * 0.9, couleurs: ["#ffffff", "#cfd8dc"], taille: 7, duree: 700 });
+            await o.attendre(300);
+            if (sc.montrer) sc.montrer();
+            o.texte(sc.calque, sc.lanceur, "Pouf !", "#eceff1");
+            await o.attendre(900);
+            bouffees.forEach(d => d.remove());
+        } },
+        // UNE CASE PIÉGÉE (v268) : un grand « ! » jaillit au-dessus du héros.
+        { id: "jeu-piege", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            o.son("marque");
+            const t = a.t * 0.9;
+            const point = o.poser(sc.calque, a.x, a.y - a.t * 0.95,
+                `width:${t}px; height:${t}px; z-index:${Z.ciel}; display:flex; align-items:center; justify-content:center;
+                 font-family:'Cinzel', serif; font-weight:bold; font-size:${Math.round(t * 0.95)}px; color:#ffcc33;
+                 text-shadow:0 0 6px #000, 0 2px 0 #7a4a00, 0 0 14px rgba(255,170,0,0.9);`, "!");
+            point.classList.add("anim-exclamation-piege");
+            await o.teinter(point, [{ opacity: 0, transform: `${BASE} translateY(20%) scale(0.3)` }, { opacity: 1, transform: `${BASE} translateY(0) scale(1.25)`, offset: 0.35 },
+                                    { opacity: 1, transform: `${BASE} scale(1)`, offset: 0.55 }, { opacity: 1, transform: `${BASE} scale(1)`, offset: 0.85 },
+                                    { opacity: 0, transform: `${BASE} scale(1.1)` }], { duration: 1200, easing: "ease-out", fill: "forwards" });
+            point.remove();
+            o.texte(sc.calque, sc.lanceur, "Piège !", "#ffb74d");
+            await o.attendre(400);
+        } },
         // UNE ILLUSION : des éclats irisés convergent sur sa case et forment le
         // leurre, qui sort du flou et chatoie.
         { id: "jeu-apparition-illusion", async jouer(sc, o) {

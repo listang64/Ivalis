@@ -594,8 +594,11 @@ titre("14. LE LEADER : +40 % D'XP ; UN LEADER DANS 60 % DES COMBATS ; PLUS QUE T
     return res;
   });
   verifier("un leader rapporte 40 % d'XP de plus : 100 → 140, 40 → 56", r.normal === 100 && r.chef === 140 && r.petitChef === 56, JSON.stringify(r));
-  verifier("SUR 3000 RENCONTRES, ~60 % ONT UN LEADER", Math.abs(r.part - 0.6) <= 0.04, `${Math.round(r.part * 1000) / 10} %`);
-  verifier("…sans leader, aucune créature n'attend de relève (ses renforts ne viendraient jamais)", r.releveSansLeader === 0, `${r.releveSansLeader}`);
+  // v268 : le tableau de Nico dit, cas par cas, si le leader est imposé, possible
+  // (ces 60 %) ou absent — mesuré par corrections_v268.mjs. Ici, la chance réglée.
+  const chance = await p.evaluate(() => window.CHANCE_LEADER_COMBAT);
+  verifier("UN LEADER « POSSIBLE » : 60 % de chance", chance === 60, `${chance}`);
+  verifier("…une relève a toujours son leader (ses renforts viennent)", r.releveSansLeader === 0, `${r.releveSansLeader}`);
   verifier("les réglages du leader : trois (la « chance d'état », 15 pts, est retirée)", r.reglages === 3 && !/Chance de poser/.test(r.texte), `${r.reglages} : ${r.texte.replace(/\s+/g, " ").slice(0, 120)}`);
 }
 

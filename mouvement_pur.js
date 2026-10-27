@@ -26,7 +26,7 @@
 //  lui passe en argument.
 // =========================================================================
 
-import { clonerEtat, combattant, tomber, franchissablePour } from './combat_etat.js';
+import { clonerEtat, combattant, tomber, franchissablePour, fuyardActif } from './combat_etat.js';
 import { esquiveDe, paradeDe, defPhysiqueDe, bonusDesEtats, aLEtat, traverserZones, protecteurRempart,
          ligneDeVue, caseLibre, destinationPoussee } from './moteur_pur.js';
 
@@ -320,7 +320,9 @@ export function resoudreOpportunite(etat, idAttaquant, idCible, des) {
 
     // L'atout du Vargen : une chance de se dérober AVANT le jet de défense.
     // C'est une esquive supplémentaire, pas un remplacement.
-    const derobade = nombre(cible.atouts && cible.atouts.esquiveOpportunite);
+    // Un fuyard (v268, les apparitions) : sa dérobade à lui, tant qu'il fuit.
+    const derobade = Math.max(nombre(cible.atouts && cible.atouts.esquiveOpportunite),
+                              fuyardActif(etat, cible) ? nombre(cible.fuyard.esquiveOpportunite) : 0);
     if (derobade > 0 && des.d100() <= derobade) {
         return { attaquant: idAttaquant, cible: idCible, evitee: true, mot: "Dérobade 🐾", montant: 0 };
     }
@@ -483,12 +485,35 @@ export function resoudreMouvement(etat, action, des, plateau) {
             etapes.push({ type: "trajetEcourte", acteur: id, raison: "à terre" });
             break;
         }
+
+        // UNE CASE PIÉGÉE (v268, Apparition 2) : un héros qui y pose le pied la
+        // déclenche — elle sert une fois, il s'arrête là, et des créatures
+        // surgissent autour (le poste du cerveau les fait entrer).
+        const piege = declencherPiege(suivant, id, pas.vers);
+        if (piege) {
+            etapes.push(piege);
+            if (plan.pas.indexOf(pas) < plan.pas.length - 1) etapes.push({ type: "trajetEcourte", acteur: id, raison: "piège" });
+            break;
+        }
     }
 
     // Tombé en chemin : la marche s'arrête là où elle s'est arrêtée.
     if (plan.tronque) etapes.push({ type: "trajetEcourte", acteur: id, raison: plan.plafond ? "blessure" : "énergie" });
 
     return { etat: suivant, etapes, cout: plan.cout };
+}
+
+// UNE CASE PIÉGÉE SOUS LE PIED D'UN HÉROS (v268). Rend l'étape « piege », ou
+// null. La même règle s'applique en rejouant l'étape (combat_etat.js).
+export function declencherPiege(etat, id, hex) {
+    const c = combattant(etat, id);
+    if (!c || c.estMonstre || c.estIllusion || (c.camp || "Allié") === "Ennemi" || !hex) return null;
+    const cle = `${nombre(hex.q)}_${nombre(hex.r)}`;
+    if (!Array.isArray(etat.pieges) || !etat.pieges.includes(cle)) return null;
+    etat.pieges = etat.pieges.filter(k => k !== cle);
+    const declenche = { q: nombre(hex.q), r: nombre(hex.r), acteur: id, manche: nombre(etat.manche, 1) };
+    etat.piegesDeclenches = [...(etat.piegesDeclenches || []), declenche];
+    return { type: "piege", acteur: id, cible: id, hex: { q: declenche.q, r: declenche.r }, manche: declenche.manche };
 }
 
 // =========================================================================

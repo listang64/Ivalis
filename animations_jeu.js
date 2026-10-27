@@ -327,6 +327,7 @@
         ko: "jeu-mise-a-terre", "illusion-brisee": "jeu-illusion-brisee",
         soin: "jeu-soin", "soin-tic": "jeu-soin-tic", "soin-zone": "jeu-soin-zone", "soin-etale": "jeu-soin-etale",
         purification: "jeu-purification", "benediction-magique": "jeu-benediction-magique",
+        piege: "jeu-piege",
         "benediction-physique": "jeu-benediction-physique", "benediction-offensive": "jeu-benediction-offensive",
         repos: "jeu-repos-long", regen: "jeu-regen-energie", depense: "jeu-depense-energie",
         opportunite: "jeu-attaque-opportunite", "frappe-mur": "jeu-frappe-mur", critique: "jeu-critique",
@@ -404,6 +405,7 @@
     //  rien.
     window.PIONS_EN_ENTREE = window.PIONS_EN_ENTREE || {};
     const ANIMATION_D_ENTREE = { renfort: "jeu-arrivee-renfort", illusion: "jeu-apparition-illusion", deploiement: "jeu-deploiement",
+                                 fumee: "jeu-apparition-fumee",
                                  zombie: "jeu-releve-zombie", "zombie-loin": "jeu-releve-zombie-2" };
     function montrer(id) {
         delete window.PIONS_EN_ENTREE[id];
@@ -490,12 +492,13 @@
         return true;
     };
     window.ARRIVEES_ANNONCEES = window.ARRIVEES_ANNONCEES || {};
-    window.annoncerArriveeCombat = async function ({ pion, illusion }) {
+    window.annoncerArriveeCombat = async function ({ pion, illusion, piege }) {
         if (!pion) return;
         window.ARRIVEES_ANNONCEES[pion] = Date.now();
-        const sorte = illusion ? "illusion" : "renfort";
+        // Surgie d'un piège (v268) : en fumée, comme un ninja.
+        const sorte = illusion ? "illusion" : piege ? "fumee" : "renfort";
         // Un renfort fait la queue, la caméra sur lui ; une illusion paraît où elle est.
-        if (pionDe(pion)) { return sorte === "renfort" ? apparaitreAuCentre(pion, sorte) : entrer(pion, sorte); }
+        if (pionDe(pion)) { return sorte !== "illusion" ? apparaitreAuCentre(pion, sorte) : entrer(pion, sorte); }
         arrivees[pion] = { sorte, quand: Date.now() };
         window.PIONS_EN_ENTREE[pion] = true;
         setTimeout(() => { if (arrivees[pion]) { delete arrivees[pion]; montrer(pion); } }, 10000);
@@ -524,7 +527,7 @@
             const a = arrivees[id];
             if (!a) return;
             delete arrivees[id];
-            if (a.sorte === "renfort") apparaitreAuCentre(id, a.sorte, a.plus);
+            if (a.sorte === "renfort" || a.sorte === "fumee") apparaitreAuCentre(id, a.sorte, a.plus);
             else entrer(id, a.sorte, a.plus);
         });
         if (!avant || Date.now() - DEBUT_PAGE < (window.DELAI_DEPLOIEMENT_MS === undefined ? 6000 : window.DELAI_DEPLOIEMENT_MS)) return;
