@@ -419,7 +419,8 @@ console.log("\n5. LE VRAI PLATEAU : LES ÉTATS POSÉS, CEUX QUI DURENT, LES TICS
            r.brule.joue && son(r.brule, "brule") && dit(r.brule, "Brûlé !", "🔥") && r.brulure.joue && dit(r.brulure, "Brûlure") && son(r.brulure, "brule"), court(r.brule));
   verifier("glacé : « Glacé ! », ce qu'il change, sans trait de glace lancé",
            r.glace.joue && son(r.glace, "glace-impact") && !son(r.glace, "gel-lancer") && dit(r.glace, "Glacé !", "Marche ×2 · +20 % dégâts phys."), court(r.glace));
-  verifier("électrifié : « Électrifié ! », « -35 initiative »", r.elec.joue && son(r.elec, "electrique") && dit(r.elec, "Électrifié !", "-35 initiative"), court(r.elec));
+  // v267 : l'Électrifié ne retire plus d'initiative — il dit ce qu'il fait encore.
+  verifier("électrifié : « Électrifié ! », « +20 % dégâts magiques »", r.elec.joue && son(r.elec, "electrique") && dit(r.elec, "Électrifié !", "+20 % dégâts magiques"), court(r.elec));
   verifier("aveuglé : l'obscurité, « Aveuglé : 4 cases »", r.aveugle.joue && son(r.aveugle, "aveugle") && dit(r.aveugle, "Aveuglé : 4 cases", "🌑"), court(r.aveugle));
   verifier("étourdi (présence) : « Étourdi : 20 % d'échec », ses étoiles",
            r.etourdi.joue && son(r.etourdi, "etourdi") && dit(r.etourdi, "Étourdi : 20 % d'échec"), court(r.etourdi));

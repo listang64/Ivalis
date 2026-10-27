@@ -1278,7 +1278,8 @@ function chantierVersDocument(carte, nom, arme, palette) {
             isMod: false
         });
         // ⚖️ règle Forge : l'état de l'élément, 5 % offerts.
-        if (el) effetsCompiles.push({ nom: el.etat, desc: `${window.CHANCE_ELEMENT_OFFERTE || 5}% de chance (offert)`, isMod: true });
+        // (L'Arcane n'a pas d'état : rien d'offert, v267.)
+        if (el && el.etat) effetsCompiles.push({ nom: el.etat, desc: `${window.CHANCE_ELEMENT_OFFERTE || 5}% de chance (offert)`, isMod: true });
         act.modsEffets.forEach(m => {
             if (m.effet.Nom === "Zone") {
                 const taille = act.zoneHexes.length > 0 ? act.zoneHexes.length : m.count;

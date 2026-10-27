@@ -301,12 +301,15 @@ console.log("\n4. LES ENTRÉES EN SCÈNE");
         Fatigue_Max: 50, fatigueActuelle: 50, Etats_Alteres: [], statut: "Vivant" }, extra || {}));
       window.TOKENS_VTT_DATA[id] = { q, r, taille: 55 };
     };
-    // UN RENFORT annoncé par le journal avant d'être dessiné.
+    // UN RENFORT annoncé par le journal avant d'être dessiné. (v267 : la caméra
+    // glisse d'abord jusqu'à lui, puis il entre ; la pause entre deux
+    // apparitions, raccourcie ici.)
+    window.PAUSE_APPARITION_MS = 200;
     window.__noter();
     await window.annoncerArriveeCombat({ pion: "M2" });
     ajouter("M2", {}, 3, 2);
     window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 900));
     const reel = document.getElementById("token-M2");
     res.renfortPendant = { cache: reel.classList.contains("pion-en-entree") && getComputedStyle(reel).visibility === "hidden",
                            copie: !!document.querySelector("#conteneur-tokens-vtt .anim-figurant") };
@@ -361,8 +364,9 @@ console.log("\n4. LES ENTRÉES EN SCÈNE");
            JSON.stringify(r.pleinCombat));
   verifier("le déploiement en début de combat : chaque nouveau pion descend sur sa case illuminée",
            r.deploiementPendant.every(Boolean) && r.deploiement.cases === 2 && r.deploiement.visibles, JSON.stringify(r.deploiement));
-  verifier("…un seul son de déploiement, « Déploiement » une fois, rien ne reste",
-           r.deploiement.sons.filter(s => s === "deploiement").length === 1 && r.deploiement.textes.filter(t => t === "Déploiement").length === 1
+  // v267 : les héros descendent ensemble (un son), les créatures une à une (chacune le sien).
+  verifier("…un son pour les héros, un par créature ; « Déploiement » une fois, rien ne reste",
+           r.deploiement.sons.filter(s => s === "deploiement").length === 2 && r.deploiement.textes.filter(t => t === "Déploiement").length === 1
            && r.deploiement.reste === 0, JSON.stringify(r.deploiement));
 }
 

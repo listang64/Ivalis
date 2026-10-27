@@ -191,7 +191,8 @@ console.log("\n3. UN TIR, ENGAGÉ AU CONTACT, PEUT VISER PLUS LOIN (SANS MALUS)"
   verifier("une attaque au contact vise toujours l'ennemi collé", !auContact.tir && auContact.cible === "M1", JSON.stringify(auContact));
   const src = fs.readFileSync('/home/user/Ivalis/moteur_effets.js', 'utf-8');
   verifier("l'anneau et le clic suivent la même règle (deux tests, même exception)",
-           (src.match(/estEngage && dist > 1 && !configSort\.isRanged/g) || []).length === 2);
+           // v267 : la règle vit dans une seule fonction (contactInterditLaCible), que les trois lisent.
+           (src.match(/contactInterditLaCible\(configSort, /g) || []).length === 3);
 }
 
 // =========================================================================

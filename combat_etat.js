@@ -815,7 +815,8 @@ function briserIllusion(etat, illusion, idAuteur) {
 //  window.moteurPur.reglerLeader) ; ces chiffres sont ceux d'origine. Les PV
 //  et les défenses sont posés sur la fiche à la création du leader ; la
 //  relève de l'Apparition 1 (tomber, plus bas) les lit ici.
-export const LEADER_DEFAUT = Object.freeze({ degats: 15, resistances: 15, pv: 15, chanceEtat: 15 });
+// (v267 : plus de chance d'état en plus — Nico a retiré la colonne.)
+export const LEADER_DEFAUT = Object.freeze({ degats: 15, resistances: 15, pv: 15 });
 const TABLE_LEADER = { ...LEADER_DEFAUT };
 export function reglerLeader(table) {
     Object.keys(LEADER_DEFAUT).forEach(cle => {
@@ -957,6 +958,23 @@ export function reductionInertie(etat, idLanceur, action) {
     return reduction;
 }
 
+// LE DÉSENGAGEMENT (v267) : qui n'est plus au contact de son agresseur n'est
+// plus engagé par lui. (La même règle que moteur_pur.js, desengagerLesEloignes :
+// ce fichier-ci ne l'importe pas, il est en dessous.)
+function desengagerEloignes(etat) {
+    const dist = (a, b) => (Math.abs(nombre(a.q) - nombre(b.q)) + Math.abs(nombre(a.q) + nombre(a.r) - nombre(b.q) - nombre(b.r))
+                           + Math.abs(nombre(a.r) - nombre(b.r))) / 2;
+    Object.values((etat && etat.combattants) || {}).forEach(c => {
+        const e = ((c && c.etats) || []).find(x => x && x.nom === "Engagé");
+        if (!e) return;
+        const restent = [...new Set(e.par || [])].filter(id => { const x = combattant(etat, id); return !!x && dist(c, x) <= 1; });
+        if (restent.length === (e.par || []).length) return;
+        if (restent.length === 0) { c.etats = c.etats.filter(x => x !== e); return; }
+        e.par = restent;
+        if (e.depuis) e.depuis = Object.fromEntries(Object.entries(e.depuis).filter(([id]) => restent.includes(id)));
+    });
+}
+
 export const APPLICATEURS = {
     // Un hexagone franchi. Un pas, un événement : c'est ce qui permet à
     // l'animation de sauter de case en case au lieu de téléporter le pion.
@@ -969,6 +987,9 @@ export const APPLICATEURS = {
 
         // Et le compteur de cases du tour avance — voir compterPasMarche.
         compterPasMarche(etat, e);
+        // Un pas qui quitte le contact désengage (v267, desengagerLesEloignes
+        // dans moteur_pur.js) — ici, la même règle, rejouée à l'identique.
+        desengagerEloignes(etat);
     },
 
     // Un déplacement imposé : poussée, traction, bond. Même effet sur l'état,

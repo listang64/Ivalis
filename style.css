@@ -299,25 +299,54 @@ body {
     transition: filter 0.3s ease, transform 0.2s ease;
 }
 
-/* LE JOUEUR CONNECTÉ, EN HAUT À GAUCHE DU MENU (v259) */
+/* LE JOUEUR CONNECTÉ, EN HAUT À DROITE, À GAUCHE DE LA CROIX (v259, v267) :
+   son nom est un bouton, la petite flèche beige dit qu'il s'ouvre, et ses
+   trois boutons tombent dessous. */
 .barre-compte {
   position: absolute;
   top: 3vh;
-  left: 2vw;
+  right: calc(2vw + max(2vw, 30px) + 14px);
   z-index: 50;
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
   max-width: 70vw;
 }
+.btn-nom-compte {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.btn-nom-compte:hover, .btn-nom-compte[aria-expanded="true"] { background: rgba(30, 18, 10, 0.55); border-color: rgba(176, 138, 58, 0.7); }
 .barre-compte-nom {
-  margin-right: 6px;
   color: #f3e2b8;
   font-family: 'Cinzel', 'Georgia', serif;
   font-size: 20px;
   text-shadow: 0 2px 6px #000;
+  white-space: nowrap;
 }
+.fleche-menu-compte { flex-shrink: 0; filter: drop-shadow(0 1px 2px #000); transition: transform 0.25s ease; }
+.btn-nom-compte[aria-expanded="true"] .fleche-menu-compte { transform: rotate(180deg); }
+.menu-compte {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 190px;
+  padding: 8px;
+  border: 1px solid #b08a3a;
+  border-radius: 8px;
+  background: rgba(20, 12, 6, 0.9);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+}
+.menu-compte .btn-barre-compte { text-align: left; }
 .btn-barre-compte {
   background: rgba(30, 18, 10, 0.78);
   color: #f3e2b8;
@@ -2989,6 +3018,26 @@ textarea.input-texte-parchemin {
     pointer-events: none;
 }
 
+/* La consigne du OK, juste au-dessus de lui (v267). */
+#voile-tour-consigne {
+    position: absolute;
+    top: 130px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 90%;
+    padding: 4px 16px;
+    border-radius: 14px;
+    background: rgba(20, 12, 6, 0.62);
+    font-family: 'Almendra', serif;
+    font-style: italic;
+    font-size: clamp(14px, 1.7vw, 19px);
+    color: #f3e2b8;
+    text-align: center;
+    white-space: nowrap;
+    text-shadow: 1px 1px 3px black;
+    pointer-events: none;
+}
+
 .btn-ok-voile::before {
     top: -3px; right: -3px; bottom: -3px; left: -3px;
     border-radius: 26px;
@@ -3894,6 +3943,30 @@ textarea.input-texte-parchemin {
 
 #voile-tour-zone { flex-shrink: 0; }
 
+/* Les états et résistances de l'encart se touchent (v267) : ils disent leur
+   nom dans une bulle, et le toucher ne lance pas le tour. */
+#voile-tour-etats > [data-nom-encart] { pointer-events: auto; cursor: pointer; }
+.bulle-nom-encart {
+    position: absolute;
+    transform: translate(-50%, calc(-100% - 6px));
+    z-index: 8;
+    padding: 4px 10px;
+    border: 1px solid #c2a878;
+    border-radius: 8px;
+    background: rgba(24, 14, 8, 0.94);
+    color: #f3e2b8;
+    font-family: 'Cinzel', serif;
+    font-weight: bold;
+    font-size: clamp(11px, 1.3vw, 15px);
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.7);
+    animation: bulle-nom-encart 2.2s ease forwards;
+}
+@keyframes bulle-nom-encart {
+    0% { opacity: 0; } 10% { opacity: 1; } 82% { opacity: 1; } 100% { opacity: 0; }
+}
+
 #voile-tour-attente {
     position: absolute;
     font-family: 'Almendra', serif;
@@ -4242,7 +4315,7 @@ textarea.input-texte-parchemin {
    Tout en % du pion, pour suivre le zoom sans calcul. */
 .jauges-selection-token {
     position: absolute; top: 104%; left: 50%; transform: translateX(-50%);
-    width: 74%; height: 21%;
+    width: 84%; height: 30%;
     display: flex; flex-direction: column; justify-content: space-between;
     pointer-events: none; z-index: 5;
     opacity: 1; transition: opacity 0.45s ease;
@@ -4250,8 +4323,17 @@ textarea.input-texte-parchemin {
 }
 .jauges-selection-token.repliee { opacity: 0; }
 .jauge-selection {
-    height: 42%; background: #111; border: 1px solid #c2a878; border-radius: 3px;
+    position: relative;
+    height: 46%; background: #111; border: 1px solid #c2a878; border-radius: 3px;
     overflow: hidden; box-sizing: border-box;
+}
+/* Les chiffres sur les jauges (v267) : centrés dans la barre, en relief. */
+.jauge-selection-chiffre {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Cinzel', serif; font-weight: bold; line-height: 1; letter-spacing: 0.02em;
+    color: #ffffff; white-space: nowrap;
+    text-shadow: 0 0 2px #000, 0 1px 1px #000, 0 0 3px rgba(0, 0, 0, 0.9);
 }
 .jauge-selection-remplie { height: 100%; width: 0; transition: width 0.5s ease-out; }
 .jauge-selection-vie .jauge-selection-remplie { background: #ff2b2b; }
@@ -5403,6 +5485,9 @@ textarea.input-texte-parchemin {
 .bloc-apparition { text-align: left; }
 .apparition-cas + .apparition-cas { margin-top: 8px; padding-top: 6px; border-top: 1px dashed #8b5a2b; }
 .apparition-cas-titre { font-family: 'Cinzel', serif; font-size: 13px; font-weight: bold; color: #7a2a1a; }
+/* La chance d'un leader dans le combat (v267). */
+.apparition-note-leader { margin: 0 0 10px; padding: 6px 10px; border: 1px dashed #b08a3a; border-radius: 6px;
+  background: rgba(255, 240, 200, 0.5); font-size: 13px; color: #4a2a12; }
 .apparition-cas ul { margin: 4px 0 0 0; padding-left: 18px; font-size: 14px; line-height: 1.4; }
 .apparition-regle { font-size: 13px; font-style: italic; color: #7a5230; }
 

@@ -236,7 +236,7 @@ const A = await appareil("Nico");
   verifier("l'écran de connexion s'en va", (await etatPage(p)).identification === "none");
   verifier("sur le menu : « ⚜ Nico », Demandes d'inscription, Mon compte, Se déconnecter",
            (await visible(p, "#barre-compte")) && (await texte(p, "#barre-compte-nom")) === "Nico"
-           && (await visible(p, "#btn-demandes")) && (await visible(p, "#btn-mon-compte")) && (await visible(p, "#btn-se-deconnecter")));
+           && (await p.evaluate(() => window.basculerMenuCompte(true))) && (await visible(p, "#btn-demandes")) && (await visible(p, "#btn-mon-compte")) && (await visible(p, "#btn-se-deconnecter")));
   verifier("Nico lit le jeu", (await lireJeu(p)) === "lu");
   await p.waitForTimeout(800);
   verifier("le jeu s'est chargé derrière la porte (la date en jeu)", /3/.test(await texte(p, "#affichage-jour") || ""), await texte(p, "#affichage-jour"));
@@ -273,6 +273,7 @@ const B = await appareil("Gaston");
   const { p } = A;
   await p.waitForFunction(() => window.ComptesIvalis.demandes.length === 1, null, { timeout: 8000 }).catch(() => {});
   verifier("chez Nico, la pastille : 1 demande", (await texte(p, "#pastille-demandes")) === "1" && (await visible(p, "#pastille-demandes")));
+  await p.evaluate(() => window.basculerMenuCompte(true));
   await p.click("#btn-demandes");
   verifier("la fenêtre : Gaston, son e-mail", /Gaston/.test(await texte(p, "#liste-demandes")) && /gaston@ivalis\.fr/.test(await texte(p, "#liste-demandes")));
   await p.click('.demande-inscription [data-decision="accepter"]');
@@ -289,6 +290,7 @@ const B = await appareil("Gaston");
   verifier("CHEZ GASTON, LA PAGE S'OUVRE D'ELLE-MÊME : joueur P_04, porte ouverte",
            ok && e.id === "P_04" && e.porte && /BIENVENUE, GASTON/.test(e.titre), JSON.stringify({ phase: e.phase, id: e.id, titre: e.titre }));
   verifier("il lit le jeu", (await lireJeu(p)) === "lu");
+  await p.evaluate(() => window.basculerMenuCompte(true));
   verifier("pas de Demandes pour lui (il n'est pas admin)", !(await visible(p, "#btn-demandes")));
   await B.contexte.close();
 }
@@ -303,6 +305,7 @@ const C = await appareil("Hugo");
   await p.click('#form-inscription button[type="submit"]');
   await phase(p, "attente");
   await A.p.waitForFunction(() => window.ComptesIvalis.demandes.length === 1, null, { timeout: 8000 }).catch(() => {});
+  await A.p.evaluate(() => window.basculerMenuCompte(true));
   await A.p.click("#btn-demandes");
   await A.p.click('.demande-inscription [data-decision="refuser"]');
   const refuse_ = await phase(p, "refuse");
@@ -336,6 +339,7 @@ const D = await appareil("Tablette");
 
   // Mon compte : changer de mot de passe.
   await p.waitForTimeout(3200);
+  await p.evaluate(() => window.basculerMenuCompte(true));
   await p.click("#btn-mon-compte");
   verifier("Mon compte : son nom, son e-mail, son rôle",
            (await texte(p, "#compte-nom")) === "Nico" && (await texte(p, "#compte-email")) === "nico@ivalis.fr" && /inscriptions/.test(await texte(p, "#compte-role")));
@@ -350,7 +354,7 @@ const D = await appareil("Tablette");
   await p.evaluate(() => window.fermerModalesCompte());
 
   // Se déconnecter : la page repart de zéro, sans joueur.
-  await Promise.all([p.waitForNavigation({ timeout: 15000 }).catch(() => {}), p.click("#btn-se-deconnecter")]);
+  await Promise.all([p.waitForNavigation({ timeout: 15000 }).catch(() => {}), p.evaluate(() => window.basculerMenuCompte(true)).then(() => p.click("#btn-se-deconnecter"))]);
   await p.waitForFunction(() => window.ComptesIvalis && window.ComptesIvalis.phase !== "chargement", null, { timeout: 15000 }).catch(() => {});
   await ecran(p);
   const e = await etatPage(p);

@@ -93,11 +93,15 @@
     };
 
     // L'XP que rapporte une créature tombée, à chaque membre de l'équipe.
+    // UN LEADER RAPPORTE 40 % DE PLUS (v267, Nico : « déterminer l'XP en plus
+    // d'un leader : +40 % d'XP sur ce monstre »), arrondi à l'unité.
+    window.BONUS_XP_LEADER = 40;
     window.xpDeLaCreature = function (m) {
         if (!m) return 0;
         const v = Number(m.XP_Groupe);
-        if (v > 0) return v;
-        return XP_PAR_PALIER[m.Palier || m.palier] || 0;
+        const base = v > 0 ? v : (XP_PAR_PALIER[m.Palier || m.palier] || 0);
+        const chef = !!(m.leader || m.Leader);
+        return chef ? Math.round(base * (1 + window.BONUS_XP_LEADER / 100)) : base;
     };
 
     // --- LA JAUGE DE LA FICHE ----------------------------------------------

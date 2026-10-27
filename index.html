@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=97">
+  <link rel="stylesheet" href="style.css?v=98">
 
  
   <!-- ===================================================================== -->
@@ -344,11 +344,22 @@
     <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781472665/exit_rkpaeh.png" id="btn-quitter-accueil" title="Quitter Ivalis" onclick="jouerSonClic(); demanderQuitterJeu()">
     <!-- LE JOUEUR CONNECTÉ (v259, comptes.js) : son nom, son compte, la
          déconnexion — et pour Nico et Ben, les demandes d'inscription. -->
+    <!-- v267 (Nico) : le nom du joueur devient un bouton, à droite, juste à
+         gauche de la croix ; une petite flèche beige dit qu'il s'ouvre, et
+         dessous viennent Mon compte, l'autorisation de création (Nico et Ben)
+         et la déconnexion (basculerMenuCompte, comptes.js). -->
     <div id="barre-compte" class="barre-compte" style="display: none;">
-      <span class="barre-compte-nom">⚜ <b id="barre-compte-nom"></b></span>
-      <button type="button" class="btn-barre-compte" id="btn-demandes" style="display: none;" onclick="jouerSonClic(); ouvrirDemandesInscription()">Demandes d'inscription <span class="pastille-demandes" id="pastille-demandes" style="display: none;">0</span></button>
-      <button type="button" class="btn-barre-compte" id="btn-mon-compte" onclick="jouerSonClic(); ouvrirMonCompte()">Mon compte</button>
-      <button type="button" class="btn-barre-compte" id="btn-se-deconnecter" onclick="jouerSonClic(); seDeconnecter()">Se déconnecter</button>
+      <button type="button" class="btn-nom-compte" id="btn-nom-compte" aria-haspopup="true" aria-expanded="false"
+              onclick="jouerSonClic(); basculerMenuCompte()">
+        <span class="barre-compte-nom">⚜ <b id="barre-compte-nom"></b></span>
+        <span class="pastille-demandes" id="pastille-demandes-nom" style="display: none;">0</span>
+        <svg class="fleche-menu-compte" viewBox="0 0 12 8" width="12" height="8" aria-hidden="true"><path d="M1 1.5 L6 6.5 L11 1.5" fill="none" stroke="#e8d5a5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div id="menu-compte" class="menu-compte" style="display: none;">
+        <button type="button" class="btn-barre-compte" id="btn-mon-compte" onclick="jouerSonClic(); fermerMenuCompte(); ouvrirMonCompte()">Mon compte</button>
+        <button type="button" class="btn-barre-compte" id="btn-demandes" style="display: none;" onclick="jouerSonClic(); fermerMenuCompte(); ouvrirDemandesInscription()">Autorisation de création <span class="pastille-demandes" id="pastille-demandes" style="display: none;">0</span></button>
+        <button type="button" class="btn-barre-compte" id="btn-se-deconnecter" onclick="jouerSonClic(); fermerMenuCompte(); seDeconnecter()">Déconnexion</button>
+      </div>
     </div>
     <div class="conteneur-boutons">
       <button class="btn-jeu btn-nouvelle" onclick="jouerSonClic(); ouvrirModalNouvellePartie()"></button>
@@ -990,6 +1001,11 @@
             <!-- Le gros bouton doré n'est plus utilisé : chaque écran rejoue le
                  journal du combat tout seul, sans attendre les autres. Il reste
                  ici, masqué, plutôt que d'éparpiller sa mise en page. -->
+            <!-- LA CONSIGNE, EN HAUT, AU-DESSUS DU OK (v267, Nico : « mets le
+                 message “toucher pour voir le tour” en haut, au-dessus de OK ») :
+                 elle quittait le bas de la plaque. Posée par combat.js
+                 (rafraichirVoileTour), juste sous la piste d'initiative. -->
+            <div id="voile-tour-consigne" style="display: none;"></div>
             <div id="voile-tour-ok" class="btn-lancer-carte btn-ok-voile" style="display: none;">OK</div>
             <div id="voile-tour-forcer" style="display: none;"></div>
 
@@ -2192,7 +2208,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=177"></script>
+<script src="trace_combat.js?v=178"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2209,11 +2225,11 @@
      vérifie qu'ils sont identiques. Elle doit précéder tout module. -->
 <script type="importmap">
 { "imports": {
-    "./combat_etat.js": "./combat_etat.js?v=42",
-    "./moteur_pur.js": "./moteur_pur.js?v=67",
+    "./combat_etat.js": "./combat_etat.js?v=43",
+    "./moteur_pur.js": "./moteur_pur.js?v=68",
     "./mouvement_pur.js": "./mouvement_pur.js?v=22",
     "./ia_pure.js": "./ia_pure.js?v=15",
-    "./cerveau_combat.js": "./cerveau_combat.js?v=59",
+    "./cerveau_combat.js": "./cerveau_combat.js?v=60",
     "./spectateur_combat.js": "./spectateur_combat.js?v=8",
     "./depot_firestore.js": "./depot_firestore.js?v=11",
     "./pont_combat.js": "./pont_combat.js?v=45",
@@ -2229,14 +2245,14 @@
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
-<script type="module" src="combat_etat.js?v=42"></script>
+<script type="module" src="combat_etat.js?v=43"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=67"></script>
+<script type="module" src="moteur_pur.js?v=68"></script>
 <script type="module" src="mouvement_pur.js?v=22"></script>
 <script type="module" src="ia_pure.js?v=15"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
-<script type="module" src="cerveau_combat.js?v=59"></script>
+<script type="module" src="cerveau_combat.js?v=60"></script>
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
      la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
 <script type="module" src="spectateur_combat.js?v=8"></script>
@@ -2247,21 +2263,21 @@
      vers les animations existantes — il ne recalcule jamais rien. -->
 <script type="module" src="pont_combat.js?v=45"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
-<script type="module" src="regime_cerveau.js?v=51"></script>
+<script type="module" src="regime_cerveau.js?v=52"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=121"></script>
+<script type="module" src="app.js?v=122"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
-<script type="module" src="comptes.js?v=1"></script>
+<script type="module" src="comptes.js?v=2"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=2"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=16"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->
 <script src="animations_combat.js?v=11"></script>
-<script src="animations_catalogue.js?v=21"></script>
+<script src="animations_catalogue.js?v=22"></script>
 <!-- …et leur branchement sur le vrai combat (les animations validées dans le Studio). -->
-<script src="animations_jeu.js?v=9"></script>
-<script src="experience.js?v=1"></script>
+<script src="animations_jeu.js?v=10"></script>
+<script src="experience.js?v=2"></script>
 <!-- La montée de niveau (v256) : la popup du héros qui prend un niveau. -->
 <script src="montee_niveau.js?v=1"></script>
 <!-- Les talents : les règles (script simple), puis leur fenêtre. -->
@@ -2271,14 +2287,14 @@
 <script type="module" src="creation_personnage.js?v=26"></script>
 <script type="module" src="classes.js?v=27"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
-<script type="module" src="competences.js?v=66"></script>
+<script type="module" src="competences.js?v=67"></script>
 <script type="module" src="talents_ui.js?v=1"></script>
 <script type="module" src="blessures_ui.js?v=5"></script>
 <!-- Les zones procédurales : le givre (v243), le brasier (v244), le poison et la foudre (v245), au Studio puis en jeu (v246) ; les gravats (v247) et les chausse-trappes (v248), au Studio puis en jeu (v249) ; la lumière du soin (v250), au Studio. -->
 <script src="zones_procedurales.js?v=6"></script>
 <script type="module" src="studio_animation.js?v=13"></script>
 <!-- LIA, l'aide à la création de la Forge -->
-<script type="module" src="lia_forge.js?v=6"></script>
+<script type="module" src="lia_forge.js?v=7"></script>
 <!-- L'illustration des compétences (prompt IA + image IA, en file) -->
 <script type="module" src="illustration_competence.js?v=10"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
@@ -2287,14 +2303,14 @@
 <script type="module" src="sequence_tour.js?v=25"></script>
 <script src="zombie_token.js?v=1"></script>
 <script src="murs_terre.js?v=10"></script>
-<script type="module" src="combat.js?v=151"></script>
+<script type="module" src="combat.js?v=152"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=40"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=100"></script>
-<script type="module" src="monstres.js?v=39"></script>
-<script type="module" src="monstres_competences.js?v=28"></script>
-<script type="module" src="monstres_ia.js?v=41"></script>
+<script type="module" src="moteur_effets.js?v=101"></script>
+<script type="module" src="monstres.js?v=40"></script>
+<script type="module" src="monstres_competences.js?v=29"></script>
+<script type="module" src="monstres_ia.js?v=42"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=18"></script>
 <script src="variations_tenues.js?v=2"></script>
@@ -2322,19 +2338,19 @@
     <div class="choix-apparitions">
       <div class="choix-apparition-rencontre" data-apparition="1" onclick="window.choisirApparitionRencontre(1)">
         <div class="choix-apparition-titre">Apparition 1</div>
-        <div class="choix-apparition-aide">Un chef, sa meute au tour suivant — ou une créature qui se relève en leader, avec des renforts.</div>
+        <div class="choix-apparition-aide">Un chef, sa meute au tour suivant — ou une créature qui se relève en leader, avec des renforts (60 % de chance d'un leader).</div>
       </div>
       <div class="choix-apparition-rencontre" data-apparition="2" onclick="window.choisirApparitionRencontre(2)">
         <div class="choix-apparition-titre">Apparition 2</div>
-        <div class="choix-apparition-aide">Deux ennemis dont un tank ; un renfort au bout de 2 tours ; un leader parmi tous.</div>
+        <div class="choix-apparition-aide">Deux ennemis dont un tank ; un renfort au bout de 2 tours ; 60 % de chance d'un leader parmi tous.</div>
       </div>
       <div class="choix-apparition-rencontre" data-apparition="3" onclick="window.choisirApparitionRencontre(3)">
         <div class="choix-apparition-titre">Apparition 3</div>
-        <div class="choix-apparition-aide">Trois ou quatre ennemis dont un leader ; un renfort au bout de 4 tours.</div>
+        <div class="choix-apparition-aide">Trois ou quatre ennemis, 60 % de chance d'un leader ; un renfort au bout de 4 tours.</div>
       </div>
       <div class="choix-apparition-rencontre" data-apparition="4" onclick="window.choisirApparitionRencontre(4)">
         <div class="choix-apparition-titre">Apparition 4 et plus</div>
-        <div class="choix-apparition-aide">Quatre ou cinq ennemis dont un leader ; pas de renfort.</div>
+        <div class="choix-apparition-aide">Quatre ou cinq ennemis, 60 % de chance d'un leader ; pas de renfort.</div>
       </div>
       <div class="choix-apparition-rencontre choix-aleatoire" data-apparition="aleatoire" onclick="window.choisirApparitionRencontre('aleatoire')">
         <div class="choix-apparition-titre">Aléatoire</div>

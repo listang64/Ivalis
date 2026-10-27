@@ -575,11 +575,36 @@ function rendreBarre() {
     if (nom) nom.textContent = c.nom;
     const btn = document.getElementById("btn-demandes");
     if (btn) btn.style.display = c.admin ? "" : "none";
-    const pastille = document.getElementById("pastille-demandes");
-    if (pastille) {
+    // La pastille des demandes : sur le bouton du menu, et sur le nom tant que
+    // le menu est fermé (il y a quelque chose à voir dessous).
+    ["pastille-demandes", "pastille-demandes-nom"].forEach(id => {
+        const pastille = document.getElementById(id);
+        if (!pastille) return;
         pastille.textContent = String(etat.demandes.length);
-        pastille.style.display = etat.demandes.length ? "" : "none";
-    }
+        pastille.style.display = (c.admin && etat.demandes.length) ? "" : "none";
+    });
+}
+
+// LE MENU DU JOUEUR (v267) : son nom l'ouvre et le ferme ; un toucher ailleurs
+// le referme.
+window.basculerMenuCompte = function (ouvrir) {
+    const menu = document.getElementById("menu-compte");
+    const bouton = document.getElementById("btn-nom-compte");
+    if (!menu) return false;
+    const ouvert = ouvrir === undefined ? menu.style.display === "none" : !!ouvrir;
+    menu.style.display = ouvert ? "flex" : "none";
+    if (bouton) bouton.setAttribute("aria-expanded", ouvert ? "true" : "false");
+    return ouvert;
+};
+window.fermerMenuCompte = function () { window.basculerMenuCompte(false); };
+if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+    document.addEventListener("click", (ev) => {
+        const barre = document.getElementById("barre-compte");
+        const menu = document.getElementById("menu-compte");
+        if (!barre || !menu || menu.style.display === "none") return;
+        if (ev.target && barre.contains(ev.target)) return;
+        window.fermerMenuCompte();
+    });
 }
 
 function ouvrirModale(id) {

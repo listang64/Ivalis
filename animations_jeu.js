@@ -283,7 +283,7 @@
     //  son élément (Feu, Foudre, Glace) ou sa nature (`sort` : les Mots de
     //  pouvoir, plusieurs éléments, la Lumière) — au contact comme à distance.
     const GESTE_DE_FRAPPE = { legere: "jeu-attaque-legere", lourde: "jeu-attaque-lourde", epee: "jeu-coup-epee" };
-    const GESTE_D_ELEMENT = { Feu: "jeu-boule-de-feu", Foudre: "jeu-attaque-foudre", Glace: "jeu-attaque-glace" };
+    const GESTE_D_ELEMENT = { Feu: "jeu-boule-de-feu", Foudre: "jeu-attaque-foudre", Glace: "jeu-attaque-glace", Arcane: "jeu-attaque-arcane" };
     // « mots » : la Distorsion mentale (ex-Mots de pouvoir).
     const GESTE_DE_SORT = { mots: "jeu-mots-de-pouvoir", multi: "jeu-attaque-multi", lumiere: "jeu-lumiere" };
     window.gesteAttaqueCombat = function ({ projectile, frappe, element, sort, carte, touches }) {
@@ -424,6 +424,51 @@
         return window.jouerAnimationJeu(ANIMATION_D_ENTREE[sorte], scene)
             .finally(() => { clearTimeout(filet); montrer(id); });
     }
+    // LES CRÉATURES APPARAISSENT UNE À UNE, LA CAMÉRA SUR ELLES (v267, Nico :
+    // « pour les spawns de monstres, j'aimerais qu'ils se fassent un à un, que
+    // la caméra se centre sur eux, qu'ils apparaissent, puis après 2 secondes
+    // on passe à l'apparition suivante ; à la fin, la caméra se recentre sur le
+    // perso du joueur. Ça ne touche pas au zoom actuel »). Une file : chaque
+    // créature attend son tour cachée, la caméra glisse jusqu'à elle (même
+    // zoom, centrerMapSurToken), elle entre, deux secondes ; la file vide, la
+    // caméra revient sur le héros de ce poste. Les héros et les illusions ne
+    // font pas la queue.
+    window.PAUSE_APPARITION_MS = window.PAUSE_APPARITION_MS === undefined ? 2000 : window.PAUSE_APPARITION_MS;
+    const GLISSE_CAMERA_MS = 450;
+    let fileApparitions = Promise.resolve();
+    let apparitionsEnAttente = 0;
+    const attendre = (ms) => new Promise(r => setTimeout(r, ms));
+    function recentrerSurMonHeros() {
+        const heros = typeof window.herosDuPoste === "function" ? window.herosDuPoste() : null;
+        const id = heros && heros.idPersonnage;
+        if (id && (window.TOKENS_VTT_DATA || {})[id] && typeof window.centrerMapSurToken === "function") window.centrerMapSurToken(id);
+    }
+    window.apparitionsEnCours = () => apparitionsEnAttente;
+    function apparaitreAuCentre(id, sorte, plus) {
+        apparitionsEnAttente++;
+        // Cachée tant que ce n'est pas son tour (un filet la montre quoi qu'il arrive).
+        window.PIONS_EN_ENTREE[id] = true;
+        const el0 = pionDe(id);
+        if (el0) el0.classList.add("pion-en-entree");
+        const filet = setTimeout(() => montrer(id), 8000 + apparitionsEnAttente * (window.PAUSE_APPARITION_MS + 2500));
+        const tour = fileApparitions.then(async () => {
+            if ((window.TOKENS_VTT_DATA || {})[id] && typeof window.centrerMapSurToken === "function") {
+                window.centrerMapSurToken(id);
+                await attendre(GLISSE_CAMERA_MS);
+            }
+            await entrer(id, sorte, { ...(plus || {}), retard: 0 });
+            await attendre(window.PAUSE_APPARITION_MS);
+        }).catch(e => console.error("Apparition :", e)).finally(() => {
+            clearTimeout(filet);
+            montrer(id);
+            apparitionsEnAttente = Math.max(0, apparitionsEnAttente - 1);
+            if (apparitionsEnAttente === 0) recentrerSurMonHeros();
+        });
+        fileApparitions = tour;
+        return tour;
+    }
+    window.apparaitreAuCentre = apparaitreAuCentre;
+
     // L'ARRIVÉE, annoncée par le journal (un renfort, une illusion). Son pion est
     // souvent dessiné juste APRÈS l'étape (l'état descend ensuite) : on la note,
     // et appliquerTokensVTT la lance quand il paraît.
@@ -444,10 +489,13 @@
         setTimeout(() => { if (arrivees[pion]) { delete arrivees[pion]; montrer(pion); } }, 10000);
         return true;
     };
+    window.ARRIVEES_ANNONCEES = window.ARRIVEES_ANNONCEES || {};
     window.annoncerArriveeCombat = async function ({ pion, illusion }) {
         if (!pion) return;
+        window.ARRIVEES_ANNONCEES[pion] = Date.now();
         const sorte = illusion ? "illusion" : "renfort";
-        if (pionDe(pion)) { entrer(pion, sorte); return; }
+        // Un renfort fait la queue, la caméra sur lui ; une illusion paraît où elle est.
+        if (pionDe(pion)) { return sorte === "renfort" ? apparaitreAuCentre(pion, sorte) : entrer(pion, sorte); }
         arrivees[pion] = { sorte, quand: Date.now() };
         window.PIONS_EN_ENTREE[pion] = true;
         setTimeout(() => { if (arrivees[pion]) { delete arrivees[pion]; montrer(pion); } }, 10000);
@@ -476,11 +524,15 @@
             const a = arrivees[id];
             if (!a) return;
             delete arrivees[id];
-            entrer(id, a.sorte, a.plus);
+            if (a.sorte === "renfort") apparaitreAuCentre(id, a.sorte, a.plus);
+            else entrer(id, a.sorte, a.plus);
         });
         if (!avant || Date.now() - DEBUT_PAGE < (window.DELAI_DEPLOIEMENT_MS === undefined ? 6000 : window.DELAI_DEPLOIEMENT_MS)) return;
         if (!auDebutDuCombat()) return;
         const nouveaux = (ids || []).filter(id => !avant.has(id) && !window.PIONS_EN_ENTREE[id]);
-        nouveaux.forEach((id, i) => entrer(id, "deploiement", { retard: i * 140, allie: estAllie(id), sonne: i === 0, texte: i === 0 }));
+        // Les héros descendent ensemble ; les créatures, une à une, la caméra sur elles (v267).
+        const heros = nouveaux.filter(id => estAllie(id)), creatures = nouveaux.filter(id => !estAllie(id));
+        heros.forEach((id, i) => entrer(id, "deploiement", { retard: i * 140, allie: true, sonne: i === 0, texte: i === 0 }));
+        creatures.forEach((id, i) => apparaitreAuCentre(id, "deploiement", { allie: false, sonne: true, texte: i === 0 && heros.length === 0 }));
     };
 })();

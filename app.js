@@ -1358,7 +1358,14 @@ window.ELEMENTS_MAGIQUES = [
     { id: "Foudre", nom: "Foudre", icone: "⚡", etat: "Électrifié", effetId: "EFF_ELECTRIFIE", motCle: "électrif",
       couleur: "#f2cf3a", fond: "#5e4a08" },
     { id: "Glace",  nom: "Glace",  icone: "❄️", etat: "Glacé",      effetId: "EFF_GLACE",      motCle: "glac",
-      couleur: "#6cc6f0", fond: "#0f4560" }
+      couleur: "#6cc6f0", fond: "#0f4560" },
+    // L'ARCANE (v267, Nico : « se choisit au moment des choix d'une attaque
+    // magique avec les autres éléments. Si on choisit arcane, pas de bonus en
+    // particulier, mais il n'existe aucune résistance à l'arcane ») : ni état
+    // offert, ni état lié — donc rien à quoi résister (chaineDeDegats ne
+    // retire les 15 % qu'aux sorts d'un élément dont la cible résiste à l'état).
+    { id: "Arcane", nom: "Arcane", icone: "🔮", etat: null, effetId: null, motCle: null, sansResistance: true,
+      couleur: "#b98cff", fond: "#3a1a66" }
 ];
 window.CHANCE_ELEMENT_OFFERTE = 5;
 window.REDUCTION_SORT_RESISTE = 15;
@@ -1409,6 +1416,22 @@ window.nomEffetActuel = function(nom) {
 };
 // Le grimoire, renommé au chargement (completerEffetsDeSecours).
 window.EFFETS_RENOMMES = { EFF_MOTS_DE_POUVOIRS: "Distorsion mentale" };
+// LES RÈGLES QUE LE JEU IMPOSE AU GRIMOIRE (v267). Le grimoire appartient à
+// Nico et le jeu n'y écrit jamais seul : ces chiffres passent par-dessus ce
+// qu'il dit, au chargement (completerEffetsDeSecours) — le bouton de mise à
+// jour du grimoire (MAJ_GRIMOIRE_REGLES) les y recopie quand il le veut.
+//  · Électrifié : « 15 % de chance d'être électrifié (max 75 %), on retire la
+//    baisse d'initiative » — l'état ne fait plus que les 20 % de dégâts
+//    magiques subis en plus.
+//  · Purification : « on passe à 35 de fatigue, et ça enlève 2 états »
+//    (Cout_PT ×5 = la fatigue ; Valeur = le nombre d'états retirés).
+window.REGLES_EFFETS_IMPOSEES = {
+    EFF_ELECTRIFIE: { Valeur: 0, Pourcent_Base: 15, Pourcent_Max: 75,
+                      Effet_Base: "15% chance d'électrifier la cible (Max 75%)",
+                      Notes: "Électrifié : subit 20 % de dégâts magiques en plus tant que l'état dure. Plus de baisse d'initiative (v267)." },
+    EFF_PURIFICATION: { Cout_PT: "7", Valeur: 2,
+                        Effet_Base: "Enlève deux états aléatoires sur la cible." }
+};
 // LES RÉSISTANCES DES CRÉATURES (Nico) : « une résistance aléatoire pour
 // chaque ennemi à partir de Normal : 1 résistance, les Élites 2, les Boss 3 ».
 // Tirées une fois à la création de la créature (Resistances_Etats,
@@ -3752,6 +3775,12 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              }
          }
 
+         // LE COMBAT FINI VIDE LA CARTE (v267, combat.js).
+         if (typeof window.verifierNettoyageFinCombat === "function") {
+             try { window.verifierNettoyageFinCombat(dataPartie); }
+             catch (e) { console.error("Nettoyage de fin de combat (le jeu continue) :", e); }
+         }
+
          // LE BUTIN SE TIRE AU DÉBUT DU COMBAT, PAS À LA FIN. Les objets partent
          // se faire dessiner pendant qu'on joue : à la victoire, la fouille des
          // cadavres ne dure plus qu'un clignement d'œil. Un combat perdu ne perd
@@ -4592,6 +4621,7 @@ async function validerCreationGroupe() {
 
     document.getElementById("ecran-menu").style.display = "none";
     document.getElementById("ecran-jeu").style.display = "block";
+    if (typeof window.rangerMenuALArrivee === "function") window.rangerMenuALArrivee();
     // NOUVEAU : On trace la grille à la seconde où l'écran s'affiche
     window.dessinerGrilleHexagonale();
     // CORRECTION BUG DRAPEAU : On charge immédiatement les données de la partie pour placer le pion !
@@ -4684,6 +4714,7 @@ function lancerPartieChargee(idChoisi) {
   fermerModales();
   document.getElementById("ecran-menu").style.display = "none";
   document.getElementById("ecran-jeu").style.display = "block";
+  if (typeof window.rangerMenuALArrivee === "function") window.rangerMenuALArrivee();
   // NOUVEAU : On trace la grille à la seconde où l'écran s'affiche
   window.dessinerGrilleHexagonale();
   console.log("⏱️ table de jeu dessinée en " + (Date.now() - depart) + " ms");
@@ -5217,6 +5248,9 @@ window.completerEffetsDeSecours = function(cache) {
     Object.keys(window.EFFETS_RENOMMES || {}).forEach(id => {
         if (cache[id]) cache[id] = { ...cache[id], Nom: window.EFFETS_RENOMMES[id] };
     });
+    Object.keys(window.REGLES_EFFETS_IMPOSEES || {}).forEach(id => {
+        if (cache[id]) cache[id] = { ...cache[id], ...window.REGLES_EFFETS_IMPOSEES[id] };
+    });
     return cache;
 };
 
@@ -5285,7 +5319,9 @@ window.MAJ_GRIMOIRE_REGLES = [
         Classe: "Sorcier", Niveau_Requis: 1,
         Notes: "Réservé au Sorcier (ex-Nécromancien), dès le niveau 1. Dégâts bruts : aucune armure (résistance magique) ne s'applique. Les dégâts vont à l'énergie (fatigue) de la cible au lieu de ses PV. Si elle n'a plus d'énergie, le reste frappe ses PV ×1,5 (arrondi à l'inférieur). Le bouclier ne protège pas l'énergie ; il n'absorbe que ce qui frappe les PV." } },
     { id: "EFF_VAMPIRISME", champs: {
-        Notes: "RETIRÉ DE LA FORGE : remplacé par le Baiser du vampire (technique de classe du Vampire, niveau 5). Les cartes déjà forgées gardent leur effet (1 dégât magique par cran, soin de 70 % des dégâts infligés)." } }
+        Notes: "RETIRÉ DE LA FORGE : remplacé par le Baiser du vampire (technique de classe du Vampire, niveau 5). Les cartes déjà forgées gardent leur effet (1 dégât magique par cran, soin de 70 % des dégâts infligés)." } },
+    // v267 : les règles que le jeu impose déjà (REGLES_EFFETS_IMPOSEES).
+    ...Object.keys(window.REGLES_EFFETS_IMPOSEES || {}).map(id => ({ id, champs: { ...window.REGLES_EFFETS_IMPOSEES[id] } }))
 ];
 
 window.mettreAJourGrimoireRegles = async function() {
@@ -6157,15 +6193,22 @@ window.deplierMenuLateral = function(options) {
   return true;
 };
 
+// L'arrivée sur la carte du monde (une partie créée ou chargée) : menu rangé.
+window.rangerMenuALArrivee = function() {
+  if (typeof window.replierMenuLateral === "function") window.replierMenuLateral({ sansAnimation: true, silencieux: true });
+};
+
 // Au chargement : le choix de ce poste, et l'observateur qui tient le petit
 // bouton à jour quoi qu'il arrive au menu.
 (function initialiserMenuRangeable() {
   const demarrer = () => {
     const menu = document.getElementById('menu-lateral');
     if (!menu) return;
-    let replie = false;
-    try { replie = localStorage.getItem(CLE_MENU_REPLIE) === "1"; } catch (e) { replie = false; }
-    if (replie) menu.classList.add('menu-replie');
+    // REPLIÉ PAR DÉFAUT (v267, Nico : « quand on arrive sur la map globale du
+    // jeu, le menu droit est par défaut enroulé ») : on arrive toujours menu
+    // rangé, quel qu'ait été le choix de la fois d'avant ; la flèche du coin le
+    // rouvre (et l'arrivée en partie le range encore : rangerMenuALArrivee).
+    menu.classList.add('menu-replie');
     if (typeof MutationObserver === "function") {
       new MutationObserver(synchroniserBoutonRouvrirMenu).observe(menu, { attributes: true, attributeFilter: ['style', 'class'] });
     }

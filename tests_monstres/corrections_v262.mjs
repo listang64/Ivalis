@@ -78,17 +78,17 @@ titre("1. LE LEADER AU COMBAT : DÉGÂTS, SOINS, CHANCES D'ÉTAT");
   verifier("un héros n'est jamais leader de rien", b({ estMonstre: false, leader: true }) === 0, `${b({ estMonstre: false, leader: true })}`);
   verifier("le soin d'un leader : 20 brut → 25 (×1,25)", essai(() => MP.appliquerBonusMonstre(20, b(chef)), null) === 25);
   const ch = (lanceur, chance, nom = "Brûlé") => essai(() => MP.chanceEtatDe(lanceur, { nom, chance }, { atouts: {} }), null);
-  verifier("chance d'état : 30 % → 45 % pour un leader (+15 points)", ch(normal, 30) === 30 && ch(chef, 30) === 45, `${ch(normal, 30)} / ${ch(chef, 30)}`);
+  // v267 : le leader n'ajoute plus de chance d'état (Nico a retiré la colonne des 15 pts).
+  verifier("chance d'état : la même pour un leader (30 %, v267)", ch(normal, 30) === 30 && ch(chef, 30) === 30, `${ch(normal, 30)} / ${ch(chef, 30)}`);
   verifier("une carte qui ne pose pas l'état (0 %) n'en gagne pas", ch(chef, 0) === 0, `${ch(chef, 0)}`);
-  verifier("plafond 100 : 95 % → 100 %", ch(chef, 95) === 100, `${ch(chef, 95)}`);
-  verifier("contre une cible qui y résiste : 30 + 15 − 25 = 20 %",
-           essai(() => MP.chanceEtatDe(chef, { nom: "Brûlé", chance: 30 }, { atouts: { resistances: ["Brûlé"] } }), null) === 20);
+  verifier("contre une cible qui y résiste : 30 − 25 = 5 %",
+           essai(() => MP.chanceEtatDe(chef, { nom: "Brûlé", chance: 30 }, { atouts: { resistances: ["Brûlé"] } }), null) === 5);
   // Réglable : le tableau des monstres le règle ici.
-  essai(() => CE.reglerLeader({ degats: 30, chanceEtat: 5 }));
-  verifier("réglé à +30 % / +5 points : le noyau suit", b(chef) === 40 && ch(chef, 30) === 35, `${b(chef)} / ${ch(chef, 30)}`);
+  essai(() => CE.reglerLeader({ degats: 30 }));
+  verifier("réglé à +30 % : le noyau suit", b(chef) === 40, `${b(chef)}`);
   essai(() => CE.reglerLeader(null));
-  verifier("sans réglage : les chiffres d'origine (15 / 15 / 15 / 15)",
-           JSON.stringify(essai(() => CE.leaderActuel(), null)) === '{"degats":15,"resistances":15,"pv":15,"chanceEtat":15}',
+  verifier("sans réglage : les chiffres d'origine (15 / 15 / 15)",
+           JSON.stringify(essai(() => CE.leaderActuel(), null)) === '{"degats":15,"resistances":15,"pv":15}',
            JSON.stringify(essai(() => CE.leaderActuel(), null)));
   // La fiche dit leader : le cerveau aussi.
   const fiche = { idPersonnage: "M1", estMonstre: true, camp: "Ennemi", leader: true, PV_Max: 85, PV_Actuels: 85, Fatigue_Max: 120 };
@@ -291,7 +291,6 @@ titre("4. LE VRAI CERVEAU : LA RELÈVE N'EST PAS UNE MORT, LES RENFORTS ARRIVENT
            `morts : ${appels.morts.join(",") || "personne"}`);
   verifier("le poste du cerveau inscrit la relève dans son document", appels.releves.length === 1 && appels.releves[0].id === "M1" && appels.releves[0].pvMax === 25,
            JSON.stringify(appels.releves));
-  verifier("et appelle les renforts de la relève, une fois", appels.deReleve === 1, `${appels.deReleve}`);
   verifier("la trace le dit", traces.some(t => t.includes("se relève en leader")), traces.filter(t => t.includes("leader")).join(" | "));
 
   // La manche se ferme : la suivante appelle les renforts prévus.
@@ -299,6 +298,7 @@ titre("4. LE VRAI CERVEAU : LA RELÈVE N'EST PAS UNE MORT, LES RENFORTS ARRIVENT
   verifier("la manche 2 commence : les renforts prévus sont appelés (terrain occupé)",
            appels.prevus.some(a => a.manche === 2 && a.vide === false), JSON.stringify(appels.prevus));
   verifier("la manche 1 l'avait été aussi, à l'ouverture", appels.prevus.some(a => a.manche === 1), JSON.stringify(appels.prevus));
+  verifier("…et les renforts de la relève entrent avec la fin de la manche, une fois", appels.deReleve === 1, `${appels.deReleve}`);
 
   // Manche 2 : le héros l'abat pour de bon ; la manche 3 trouve le terrain vide.
   await notifier();
@@ -437,7 +437,8 @@ titre("6. L'ENCART DU LEADER (Paramètres > Monstres)");
     window.__ou(() => window.appliquerReglagesMonstres(null), null);
     return { n: champs.length, avant, dansLeBloc, apres, ailleurs, retour: window.__ou(() => MP.leaderActuel(), null) };
   });
-  verifier("quatre réglages, 15 à l'origine", r.n === 4 && r.avant === "degats=15 resistances=15 pv=15 chanceEtat=15", r.avant);
+  // v267 : trois réglages (la chance d'état en plus est retirée).
+  verifier("trois réglages, 15 à l'origine", r.n === 3 && r.avant === "degats=15 resistances=15 pv=15", r.avant);
   verifier("dans le bloc des réglages, en haut du tableau", r.dansLeBloc === true);
   // (v263 : la triche du niveau 1 du groupe, 8 %, au lieu des 10 % par stature.)
   verifier("dégâts du leader à 30 : le moteur frappe à +38 % (8 + 30) tout de suite",
@@ -446,7 +447,7 @@ titre("6. L'ENCART DU LEADER (Paramètres > Monstres)");
   verifier("chaque changement s'écrit (Monstres_Modeles/_REGLAGES, champ Leader, fusionné)",
            r.apres.ecrit.length === 2 && r.apres.ecrit.every(x => /"Leader":\{/.test(x) && x.endsWith("+merge")) && /"Degats_Soins_Pct":30/.test(r.apres.ecrit[0]),
            r.apres.ecrit.join(" | "));
-  verifier("un autre poste les change : l'encart les montre", r.ailleurs.champs === "degats=15 resistances=20 pv=25 chanceEtat=15", r.ailleurs.champs);
+  verifier("un autre poste les change : l'encart les montre", r.ailleurs.champs === "degats=15 resistances=20 pv=25", r.ailleurs.champs);
   verifier("et le prochain leader posé les reçoit : 70 + 8 (triche, v263) + 25 PV, 20 + 20 / 15 + 20 de défenses",
            !!r.ailleurs.stats && r.ailleurs.stats.Leader === true && r.ailleurs.stats.PV_Max === 103 && r.ailleurs.stats.PV_Actuels === 103
            && r.ailleurs.stats.Def_Physique === 40 && r.ailleurs.stats.Def_Magique === 35, JSON.stringify(r.ailleurs.stats));
@@ -498,6 +499,9 @@ titre("7. LA PISTE (BLANC, OR, ROUGE ; LISERÉ DU LEADER) ET L'AURA DU PION");
 titre("8. LES QUATRE APPARITIONS, RÈGLE PAR RÈGLE (400 tirages chacune)");
 {
   const r = await p.evaluate(() => {
+    // v267 : un leader dans 60 % des combats seulement — ici, les règles de
+    // composition, leader toujours là (corrections_v267.mjs mesure les 60 %).
+    window.CHANCE_LEADER_COMBAT = 100;
     const tirer = window.tirerApparition;
     if (typeof tirer !== "function") return null;
     const CAC = ["TANK CAC", "DPS CAC", "DPS MAGE CAC"];

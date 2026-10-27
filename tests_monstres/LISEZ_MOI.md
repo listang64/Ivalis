@@ -7873,3 +7873,123 @@ paysage (1180×820) et portrait (820×1180) : tout son haut et son bas à l'écr
 c'est elle qui défile, son en-tête reste en haut, celui du tableau se colle
 dessous ; les versions. Il mord sur l'ancien code (14 échecs : le haut de la
 fenêtre y est à −126 px en paysage).
+
+## v267 — Vingt-trois demandes : le combat, le menu, les effets, les créatures
+
+Nico : (21 demandes, puis 2 en cours de route — voir l'en-tête de
+corrections_v267.mjs pour leurs mots exacts).
+
+LE COMBAT
+- LA CONSIGNE DU OK (combat.js, rafraichirVoileTour ; index.html
+  #voile-tour-consigne) : « Touchez l'écran pour voir ce tour » se lit en haut,
+  juste sous la piste, et le OK se pose dessous ; le bas de la plaque ne la
+  répète plus (les autres messages y restent).
+- LES RÉSISTANCES ET LES ÉTATS DE L'ENCART SE TOUCHENT (brancherBullesEncart,
+  montrerBulleEncart) : le toucher s'arrête à l'icône — la fenêtre, dessous,
+  lançait le tour — et une bulle dit « Résiste : Glacé » ou « Brûlé — 2 tours ».
+- ENGAGÉ : plus aucun symbole (ETATS_SANS_SYMBOLE, etatsAffiches : pion, piste,
+  encart, piste du héros ; les flèches restent). Frappé au contact, on est
+  engagé à cette manche ET à la suivante (MANCHES_ENGAGE = 2, chaque agresseur
+  garde sa manche, `depuis`). Quitter le contact de son agresseur DÉSENGAGE,
+  pour de bon (desengagerLesEloignes au début de chaque carte, desengagerEloignes
+  à chaque pas rejoué, combat_etat.js) ; engageursDe ne compte d'ailleurs que les
+  agresseurs encore au contact.
+- TRACTION MAGIQUE, ENGAGÉ (moteur_effets.js, contactInterditLaCible) : la
+  cible qu'une Traction en tête va ramener se vise jusqu'à sa portée, même
+  collé à un ennemi ; les trois chemins de ciblage (anneau, clic, mur) lisent
+  cette seule règle.
+- LES SYMBOLES D'ÉTAT EN LOSANGE (medaillonEtat : un cadre doré en losange, la
+  couleur de l'état dedans ; les gouttes du pion, des petits carrés tournés).
+  Les pastilles de résistance restent rondes : ce ne sont pas des états.
+- LE CONTRE RENVOIE TOUJOURS AU MOINS 1 (chaineDeDegats) : 10 % d'un coup de 9,
+  arrondis à l'inférieur, ne renvoyaient rien — d'où « l'ennemi ne prend pas
+  les dégâts ».
+- LES JAUGES DU PION SÉLECTIONNÉ PORTENT LEURS CHIFFRES (poserJaugesSelection :
+  « 34/50 », « 80/120 »), un peu plus hautes pour qu'on les lise.
+- LE COMBAT FINI VIDE LA CARTE (verifierNettoyageFinCombat, appelé à chaque
+  notification de la partie) : une défaite 9 s après le grand « Défaite », une
+  victoire 5 s après « Butin réparti » ; un seul poste réclame le nettoyage
+  (Nettoyage_Fin_Combat, transaction) et lance reinitialiserCombat({ finDeCombat })
+  — sans question, et sans effacer le butin réparti, qui se lit encore.
+
+LES RENFORTS ET LES APPARITIONS
+- LES RENFORTS ENTRENT À LA FIN DE LA MANCHE, APRÈS LA RÉGÉNÉRATION
+  (regime_cerveau.js, accueillirLesRenfortsMaintenant) : posés quand la manche
+  change, ils n'entraient dans le combat qu'à l'ouverture de la suivante, une
+  fois les cartes choisies. Le cerveau les accueille maintenant tout de suite :
+  leur « arrivée » s'écrit juste après la fin de manche, et se rejoue après la
+  régénération. Ceux de la relève en leader attendent eux aussi la fin de la
+  manche. Un renfort posé reste caché jusqu'à son arrivée (pionAttendSonEntree,
+  10 s au plus).
+- UNE À UNE, LA CAMÉRA SUR ELLES (animations_jeu.js, apparaitreAuCentre) : les
+  créatures du déploiement et les renforts font la queue — la caméra glisse
+  jusqu'à chacune (même zoom), elle entre, 2 s (PAUSE_APPARITION_MS), la
+  suivante ; la file vide, la caméra revient sur le héros du poste. Les héros
+  descendent toujours ensemble.
+
+LES EFFETS
+- RÈGLES IMPOSÉES AU GRIMOIRE (app.js, REGLES_EFFETS_IMPOSEES, appliquées par
+  completerEffetsDeSecours et ajoutées au bouton de mise à jour du grimoire) :
+  ÉLECTRIFIÉ 15 % par cran, 75 % au plus, plus de baisse d'initiative (combat.js
+  et monstres_ia.js ne retirent plus 35 ; l'état ne fait plus que +20 % de
+  dégâts magiques subis, et il dure ses tours) ; PURIFICATION 7 pts (35 de
+  fatigue) et deux états retirés. Les cartes déjà forgées gardent la fatigue
+  écrite à leur forge (re-forger la met à 35).
+- L'ARCANE (ELEMENTS_MAGIQUES) : un quatrième élément de l'Attaque Magique,
+  sans état offert ni état lié — donc sans résistance possible ; son geste
+  (jeu-attaque-arcane : un sceau violet, une orbe, deux cercles runiques). La
+  Forge, LIA et le générateur de créatures le connaissent.
+- L'ÉTALEMENT D'UNE MÊME COMPÉTENCE NE SE CUMULE PAS (empilerEtalement,
+  `sources`) : relancée, elle retire ce qui lui restait et repose ses parts — son
+  temps repart ; une autre compétence s'ajoute comme avant ; deux coups étalés
+  d'une même carte, au même lancer, s'additionnent. Les sources avancent avec
+  les tics (avancerSourcesEtalement). Vérifié : un étalement ne critique jamais.
+- LA SURPUISSANCE D'UN DOT SE JUGE APRÈS L'ÉTALEMENT (fatigueDeSurpuissance,
+  SURPUISSANCE_APRES_ETALEMENT) : 70 et 100 doivent être atteints par la fatigue
+  payée. Vérifié : une créature ne fait jamais de surpuissance.
+
+LES CRÉATURES
+- UN LEADER RAPPORTE 40 % D'XP DE PLUS (xpDeLaCreature).
+- UN LEADER DANS 60 % DES COMBATS (tirerApparition, CHANCE_LEADER_COMBAT) :
+  sans leader, l'Apparition 1 est toujours « le chef et sa meute » (une relève
+  sans leader n'appellerait jamais ses renforts).
+- PLUS DE CHANCE D'ÉTAT EN PLUS POUR LE LEADER : la colonne « 15 pts » est
+  retirée des réglages et du combat (LEADER_DEFAUT, CHAMPS_LEADER, chanceEtatDe).
+
+LE MENU
+- LE NOM DU JOUEUR EST UN BOUTON (index.html, comptes.js basculerMenuCompte) :
+  en haut à droite, à gauche de la croix, avec une petite flèche beige ; dessous,
+  Mon compte, Autorisation de création (Nico et Ben, avec sa pastille) et
+  Déconnexion ; un toucher ailleurs le referme.
+- LA CARTE DU MONDE S'OUVRE MENU DROIT REPLIÉ (rangerMenuALArrivee, et au
+  chargement).
+
+corrections_v267.mjs (dans la suite) : dans le noyau, l'engagement (deux manches,
+le second agresseur, le désengagement par un pas), le Contre, l'étalement
+(non-cumul, autre compétence, même lancer, soin étalé, jamais de critique), le
+leader ; LE VRAI CERVEAU sur un Firestore en mémoire : le renfort de la manche 2
+est dans le combat avant les cartes, et le journal dit régénération → manche 2
+→ arrivée ; sur la vraie page, les effets imposés et leur extraction
+(Électrifié, Purification, Arcane, surpuissance du héros, du DOT, de la
+créature), la Traction, Engagé et les losanges, la consigne du OK, les
+résistances touchées, les jauges chiffrées, le menu du joueur, le menu replié,
+l'XP et les 60 % du leader, ses trois réglages, le nettoyage de fin de combat,
+le renfort caché, les apparitions une à une, le geste de l'Arcane, les
+versions. Il mord sur l'ancien code (65 échecs, sans planter).
+
+Les anciens bancs remis aux règles v267 : animations_en_jeu (la caméra avant le
+renfort ; un son par créature au déploiement), corrections_v242 (l'Électrifié
+dit « +20 % dégâts magiques »), corrections_v262 (plus de chance d'état du
+leader, trois réglages, la relève appelle ses renforts à la fin de la manche,
+les tirages de composition à 100 % de leader), corrections_v265 (le Glacé au
+lieu de l'Engagé dans la piste), engagement_tombe (une seule règle,
+contactInterditLaCible), etalement_tours (deux compétences se cumulent, la
+même non), _comptes_emulateur (le menu du joueur s'ouvre avant ses boutons).
+
+À SAVOIR POUR LES BANCS : depuis les comptes (v259), la base refuse les lectures
+anonymes — `tirer_effets.mjs` ne peut plus régénérer `effets_reels.json`,
+`gabarits_reels.json`, `persos_reels.json` (ignorés par git). Sans eux, 54 bancs
+ne démarrent pas (ENOENT) ; ils tournent sur un poste qui a gardé ses copies.
+studio_catalogue_1 (« la puce 8 amène la liste aux Classes ») échoue aussi
+sans ces changements, dans ce conteneur : un défilement qui n'arrive pas au
+bout en 900 ms.

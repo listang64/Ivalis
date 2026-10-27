@@ -665,6 +665,7 @@ export function ticsDeFinDeManche(etat) {
             let montant = 0;
             if (Array.isArray(etalement.tics) && etalement.tics.length > 0) {
                 montant = nombre(etalement.tics.shift());
+                avancerSourcesEtalement(etalement);
             } else if (!etalement.tickFait) {
                 // Un étalement posé par une version précédente du jeu : il ne
                 // porte qu'un seul montant, sous son ancien nom. On l'honore.
@@ -681,6 +682,7 @@ export function ticsDeFinDeManche(etat) {
         const tenebres = c.etats.find(e => e && e.nom === ETAT_TENEBRES_ETALEES);
         if (tenebres && Array.isArray(tenebres.tics) && tenebres.tics.length > 0) {
             const part = nombre(tenebres.tics.shift());
+            avancerSourcesEtalement(tenebres);
             if (part > 0) {
                 const partage = partageTenebres(c.fatigue, part);
                 if (partage.surEnergie > 0) {
@@ -701,6 +703,7 @@ export function ticsDeFinDeManche(etat) {
         if (soinEtale && Array.isArray(soinEtale.tics) && soinEtale.tics.length > 0) {
             const part = enSursis(c) ? (soinEtale.tics.shift(), 0)   // en sursis : aucun soin
                                      : nombre(soinEtale.tics.shift());
+            avancerSourcesEtalement(soinEtale);
             const pvApres = Math.min(nombre(c.pvMax), nombre(c.pv) + part);
             if (pvApres > nombre(c.pv)) {
                 const montant = pvApres - nombre(c.pv);
@@ -712,6 +715,15 @@ export function ticsDeFinDeManche(etat) {
     });
 
     return etapes;
+}
+
+// Chaque source d'un étalement (v267, empilerEtalement dans moteur_pur.js)
+// avance avec la file : sa part de cette manche vient de tomber.
+function avancerSourcesEtalement(etatEtale) {
+    if (!etatEtale || !Array.isArray(etatEtale.sources)) return;
+    etatEtale.sources = etatEtale.sources
+        .map(x => ({ ...x, tics: (x && Array.isArray(x.tics) ? x.tics : []).slice(1) }))
+        .filter(x => x.tics.length > 0);
 }
 
 // Les parts d'un étalement CRITIQUE le restent jusqu'au bout : chaque tic le

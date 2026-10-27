@@ -586,17 +586,8 @@ window.preparerCartesMonstres = async function() {
             continue;
         }
 
-        // Électrifié : même règle que pour les joueurs, -35 d'initiative sur la
-        // prochaine carte jouée, puis l'état se dissipe.
+        // (L'Électrifié ne retire plus d'initiative depuis la v267.)
         let initiative = carte.data.Initiative || 0;
-        const electrifie = (monstre.Etats_Alteres || []).find(e => e.nom === "Électrifié");
-        if (electrifie) {
-            initiative = Math.max(0, initiative - 35);
-            const restants = (monstre.Etats_Alteres || []).filter(e => e !== electrifie);
-            monstre.Etats_Alteres = restants;
-            updateDoc(window.refCombattant(monstre.idPersonnage), { Etats_Alteres: restants })
-                .catch(e => console.error(e));
-        }
 
         // UN BOSS EFFECTUE DEUX COMPÉTENCES DANS SON TOUR. La seconde se choisit
         // comme la première, sur ce qu'il lui reste d'énergie une fois la

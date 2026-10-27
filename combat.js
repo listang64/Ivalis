@@ -1399,10 +1399,19 @@ function reglagesPisteEtats() {
 // LE MÊME ÉTAT NE COMPTE QU'UNE FOIS. Il ne s'empile jamais sur la fiche non
 // plus — poser deux fois une brûlure allonge sa durée, elle n'en crée pas une
 // seconde — donc deux icônes identiques ne diraient rien de plus qu'une.
+// LES ÉTATS QUI N'ONT PAS DE SYMBOLE (v267, Nico : « Engagé : ne mets pas de
+// symbole d'état, ni sur le token ni ailleurs ») : ils agissent, ils ne se
+// dessinent pas — ni goutte sur le pion, ni icône sur la piste, l'encart ou la
+// piste des états du héros. Les flèches d'engagement, elles, restent.
+window.ETATS_SANS_SYMBOLE = new Set(["Engagé"]);
+window.etatsAffiches = function(liste) {
+    return (liste || []).filter(e => e && e.nom && !window.ETATS_SANS_SYMBOLE.has(e.nom));
+};
+
 function etatsDuHeros() {
     const heros = window.herosDuPoste ? window.herosDuPoste() : null;
     const vus = new Set();
-    return ((heros && heros.Etats_Alteres) || []).filter(e => {
+    return (window.etatsAffiches || ((l) => l || []))((heros && heros.Etats_Alteres) || []).filter(e => {
         if (!e || !e.nom || vus.has(e.nom)) return false;
         vus.add(e.nom);
         return true;
@@ -2716,6 +2725,18 @@ window.poserJaugesSelection = function(divToken, perso, existantes) {
                        + `<div class="jauge-selection jauge-selection-fatigue"><div class="jauge-selection-remplie"></div></div>`
                        + `<div class="jauges-selection-nom"></div>`;
     }
+    // LES CHIFFRES SUR LES JAUGES (v267, Nico : « quand on clique sur un token,
+    // affiche le nombre de PV et de fatigue sur ses jauges en dessous ») :
+    // « 34/50 » dans la barre de vie, « 80/120 » dans celle de la fatigue.
+    const largeurChiffres = divToken.offsetWidth || parseFloat(divToken.style.width) || 55;
+    [[".jauge-selection-vie", `${m.pv}/${m.pvMax}`], [".jauge-selection-fatigue", `${m.energie}/${m.energieMax}`]].forEach(([sel, texte]) => {
+        const jauge = bloc.querySelector(sel);
+        if (!jauge) return;
+        let chiffre = jauge.querySelector(".jauge-selection-chiffre");
+        if (!chiffre) { chiffre = document.createElement("span"); chiffre.className = "jauge-selection-chiffre"; jauge.appendChild(chiffre); }
+        chiffre.textContent = texte;
+        chiffre.style.fontSize = Math.max(6, Math.round(largeurChiffres * 0.125)) + "px";
+    });
     // LE NOM, EN TOUT PETIT, SOUS LES JAUGES (Nico, v255), une ombre portée
     // dessous pour le relief. Sa taille suit celle du pion.
     let nom = bloc.querySelector(".jauges-selection-nom");
@@ -3141,11 +3162,20 @@ window.medaillonEtat = function(etat, taille) {
     const couleur = (window.COULEUR_ETAT || {})[nom] || window.COULEUR_ETAT_DEFAUT || "#9e9e9e";
     const symbole = (window.SYMBOLES_ETATS || {})[nom] || (nom.trim()[0] || "?").toUpperCase();
     const t = Math.max(12, Math.round(taille || 18));
+    // EN LOSANGE, COMME LES IMAGES DES ÉTATS (v267, Nico : « refais les
+    // symboles d'état qui sont ronds : il faut qu'ils soient tous en losange
+    // comme les images que j'ai implantées moi-même ») : un cadre doré en
+    // losange, la couleur de l'état dedans, le symbole droit au centre.
+    const losange = "clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); -webkit-clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);";
     return `<span class="medaillon-etat" data-etat="${nom.replace(/"/g, "&quot;")}" title="${nom.replace(/"/g, "&quot;")}"`
-         + ` style="display: inline-flex; align-items: center; justify-content: center; width: ${t}px; height: ${t}px;`
-         + ` border-radius: 50%; font-size: ${Math.round(t * 0.62)}px; line-height: 1;`
-         + ` background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.55) 0%, ${couleur} 45%, ${couleur} 72%, rgba(0,0,0,0.45) 100%);`
-         + ` border: 1px solid rgba(0,0,0,0.55); box-shadow: 0 ${t > 30 ? 3 : 1}px ${t > 30 ? 5 : 3}px rgba(0,0,0,0.85);">${symbole}</span>`;
+         + ` style="position: relative; display: inline-flex; align-items: center; justify-content: center; width: ${t}px; height: ${t}px;`
+         + ` font-size: ${Math.round(t * 0.46)}px; line-height: 1; vertical-align: middle;`
+         + ` filter: drop-shadow(0 ${t > 30 ? 3 : 1}px ${t > 30 ? 4 : 2}px rgba(0,0,0,0.85));">`
+         + `<span class="medaillon-etat-cadre" style="position: absolute; inset: 0; ${losange}`
+         + ` background: linear-gradient(135deg, #fff1c2 0%, #d9b45a 35%, #8a6424 70%, #4a3212 100%);"></span>`
+         + `<span class="medaillon-etat-fond" style="position: absolute; inset: 11%; ${losange}`
+         + ` background: radial-gradient(circle at 50% 32%, rgba(255,255,255,0.55) 0%, ${couleur} 42%, ${couleur} 68%, rgba(0,0,0,0.55) 100%);"></span>`
+         + `<span style="position: relative;">${symbole}</span></span>`;
 };
 window.imageEtat = function(etat, taille) {
     if (!etat || !etat.nom && !etat.icone) return "";
@@ -3282,7 +3312,7 @@ window.COULEUR_ETAT_DEFAUT = "#9e9e9e";
 window.construireIndicateursEtatsToken = function(etats, taille) {
     // Un même état ne compte qu'une fois (il ne s'empile jamais sur la fiche
     // non plus) : deux points identiques ne diraient rien de plus qu'un seul.
-    const noms = [...new Set((etats || []).map(e => e && e.nom).filter(Boolean))];
+    const noms = [...new Set((window.etatsAffiches || ((l) => l || []))(etats).map(e => e && e.nom).filter(Boolean))];
     if (noms.length === 0) return [];
 
     const n = noms.length;
@@ -3309,8 +3339,9 @@ window.construireIndicateursEtatsToken = function(etats, taille) {
         point.style.top = y + "%";
         point.style.width = diametre + "px";
         point.style.height = diametre + "px";
-        point.style.borderRadius = "50%";
-        point.style.transform = "translate(-50%, -50%)";
+        // En losange, comme les icônes des états (v267) : un carré tourné.
+        point.style.borderRadius = "1px";
+        point.style.transform = "translate(-50%, -50%) rotate(45deg)";
         point.style.zIndex = "4";
         point.style.pointerEvents = "none";
         // Le dégradé façon goutte : un reflet clair en haut-gauche (la lumière
@@ -3615,7 +3646,10 @@ window.appliquerTokensVTT = function(tokensMap) {
         divToken.style.borderRadius = "50%";
         divToken.id = "token-" + idPerso;
         // Un pion en pleine entrée en scène reste caché : c'est sa copie qu'on voit.
-        if (window.PIONS_EN_ENTREE && window.PIONS_EN_ENTREE[idPerso]) divToken.classList.add("pion-en-entree");
+        // Un renfort posé mais pas encore entré dans le combat aussi (v267) :
+        // il paraît à son arrivée, après la fin de manche, pas avant.
+        if ((window.PIONS_EN_ENTREE && window.PIONS_EN_ENTREE[idPerso])
+            || (typeof window.pionAttendSonEntree === "function" && window.pionAttendSonEntree(idPerso, pData))) divToken.classList.add("pion-en-entree");
         (jaugesEnCours[idPerso] || []).forEach(jauge => divToken.appendChild(jauge));
 
         // LA CROIX ROUGE SOUS LE PION : ON RENONCE À CE QU'ON ÉTAIT EN TRAIN DE
@@ -3875,14 +3909,31 @@ window.appliquerTokensVTT = function(tokensMap) {
 //  La règle vit dans le noyau (engageursDe, moteur_pur.js) ; l'écran la relit
 //  sur ce qu'il affiche : l'état « Engagé » du pion (`par` : qui l'a frappé au
 //  contact cette manche), moins ceux qui sont à terre, étourdis ou confus.
+// La manche que montre l'écran : celle de l'état du combat qu'il affiche, sinon
+// celle de la partie.
+window.mancheAffichee = function() {
+    try {
+        const regime = typeof window.regimeDuJeu === "function" ? window.regimeDuJeu() : null;
+        const etat = regime && typeof regime.etatAffiche === "function" ? regime.etatAffiche() : null;
+        if (etat && Number(etat.manche) > 0) return Number(etat.manche);
+    } catch (e) { /* pas de régime : la partie */ }
+    return Number((window.PARTIE_DATA || {}).Tour_Combat) || 1;
+};
 window.engageursActifs = function(idPerso) {
     const persos = window.PERSOS_PARTIE || [];
     const perso = persos.find(p => p.idPersonnage === idPerso);
     const etat = ((perso && perso.Etats_Alteres) || []).find(e => e && e.nom === "Engagé");
     if (!etat) return [];
+    // v267 : un coup porte sur sa manche et la suivante (`depuis`, MANCHES_ENGAGE).
+    const manche = typeof window.mancheAffichee === "function" ? window.mancheAffichee() : (Number((window.PARTIE_DATA || {}).Tour_Combat) || 1);
     return [...new Set(etat.par || [])].filter(id => {
         const x = persos.find(p => p.idPersonnage === id);
         if (!x) return false;
+        const depuis = etat.depuis && etat.depuis[id];
+        if (depuis !== undefined && manche - Number(depuis) >= 2) return false;
+        // Plus au contact : désengagé (v267).
+        const a = (window.TOKENS_VTT_DATA || {})[idPerso], b = (window.TOKENS_VTT_DATA || {})[id];
+        if (a && b && (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2 > 1) return false;
         const tombe = typeof window.estCombattantMort === "function" ? window.estCombattantMort(id) : x.statut === "Mort";
         if (tombe) return false;
         return !(x.Etats_Alteres || []).some(e => e && (e.nom === "Étourdi" || e.nom === "Confusion"));
@@ -4867,7 +4918,6 @@ window.jouerCarteCombat = async function(idCarte) {
     if (typeof window.rangerDeckApresChoix === "function") window.rangerDeckApresChoix();
     window.mettreAJourJaugeFatigue(0); // Cache la jauge rouge
 
-    let etatsApresElectrifie = null;
 
     try {
         // Sous transaction : trois joueurs qui choisissent au même instant ne
@@ -4876,11 +4926,6 @@ window.jouerCarteCombat = async function(idCarte) {
             let file = data.File_Attente_Combat || [];
             file = file.filter(item => item.idPersonnage !== persoActuel.idPersonnage);
 
-            // Électrifié : consommé sur la toute prochaine carte jouée, quelle qu'elle soit —
-            // -35 en initiative sur CETTE carte (la piste se retrie automatiquement puisque
-            // file.sort() ci-dessous relit la valeur qu'on vient d'écrire), puis l'état disparaît.
-            // Une transaction peut être rejouée plusieurs fois : on n'écrit rien
-            // d'autre ici, on note seulement ce qu'il faudra faire après coup.
             // L'équipement (épée courte, effet A/B "+3 initiative") avance le
             // héros dans la piste ; l'élan temporaire gagné en frappant s'y
             // ajoute tant qu'il dure.
@@ -4891,11 +4936,9 @@ window.jouerCarteCombat = async function(idCarte) {
                 + (typeof window.bonusEquip === "function" ? window.bonusEquip(persoActuel, "initiative") : 0)
                 + (typeof window.bonusInitiativeClasse === "function"
                     ? window.bonusInitiativeClasse(persoActuel, dataCarte) : 0);
-            const etatElectrifie = persoActuel.Etats_Alteres && persoActuel.Etats_Alteres.find(e => e.nom === "Électrifié");
-            if (etatElectrifie) {
-                initiativeCarte = Math.max(0, initiativeCarte - 35);
-                etatsApresElectrifie = persoActuel.Etats_Alteres.filter(e => e !== etatElectrifie);
-            }
+            // (L'Électrifié ne retire plus d'initiative depuis la v267 — Nico :
+            // « on retire la baisse d'initiative » : il dure ses tours, et la
+            // cible subit 20 % de dégâts magiques en plus.)
 
             file.push({
                 idPersonnage: persoActuel.idPersonnage,
@@ -4933,14 +4976,6 @@ window.jouerCarteCombat = async function(idCarte) {
         if (!ecriture.ok) throw (ecriture.erreur || new Error("la carte n'a pas pu être inscrite"));
         if (avecRetourArriere) window.RETOUR_ARRIERE_EN_ATTENTE = null;
 
-        // L'état Électrifié se dissipe une fois la carte réellement inscrite.
-        if (etatsApresElectrifie) {
-            persoActuel.Etats_Alteres = etatsApresElectrifie;
-            const persoPartieElec = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === persoActuel.idPersonnage);
-            if (persoPartieElec) persoPartieElec.Etats_Alteres = etatsApresElectrifie;
-            updateDoc(window.refCombattant(persoActuel.idPersonnage), { Etats_Alteres: etatsApresElectrifie })
-                .catch(e => console.error(e));
-        }
     } catch (e) {
         console.error("Erreur jouerCarteCombat:", e);
         if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
@@ -5655,9 +5690,10 @@ function contenuTuilePiste(entree, cestSonTour, choix, choixNeuf) {
     const lisereLeader = estLeader ? `, 0 0 0 2px ${window.LISERE_LEADER_INITIATIVE}, 0 0 7px 2px rgba(255, 31, 31, 0.8)` : "";
 
     let etatsHtml = "";
-    if (perso.Etats_Alteres && perso.Etats_Alteres.length > 0) {
+    const etatsPiste = (window.etatsAffiches || ((l) => l || []))(perso.Etats_Alteres);
+    if (etatsPiste.length > 0) {
         etatsHtml = `<div style="position: absolute; bottom: -${PISTE_MARGE_ETATS - 4}px; left: 50%; transform: translateX(-50%); display: flex; gap: 2px; justify-content: center; z-index: 5;">`;
-        perso.Etats_Alteres.forEach(etat => { etatsHtml += window.imageEtat(etat, 18); });
+        etatsPiste.forEach(etat => { etatsHtml += window.imageEtat(etat, 18); });
         etatsHtml += `</div>`;
     }
 
@@ -6334,7 +6370,7 @@ window.actualiserEtatsEncart = function() {
 function actualiserIconesEtatsEncart(elEtats) {
     const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === elEtats.dataset.acteur) || {};
     const vus = new Set();
-    const etats = (perso.Etats_Alteres || []).filter(e => {
+    const etats = (window.etatsAffiches || ((l) => l || []))(perso.Etats_Alteres).filter(e => {
         if (!e || !e.nom || vus.has(e.nom)) return false;
         vus.add(e.nom);
         return true;
@@ -6354,8 +6390,10 @@ function actualiserIconesEtatsEncart(elEtats) {
     // de la plaque : une image se dimensionne à la construction, elle ne
     // peut pas se contenter d'un pourcentage CSS ici.
     const tailleEtat = parseInt(elEtats.dataset.taille) || 32;
+    const attr = (t) => String(t).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    const tours = (n) => `${n} tour${Number(n) > 1 ? "s" : ""}`;
     elEtats.innerHTML = etats.map(etat =>
-        `<div title="${etat.nom} (${etat.duree})" style="line-height: 0;">${window.imageEtat(etat, tailleEtat)}</div>`
+        `<div class="icone-etat-encart" title="${attr(etat.nom)} (${etat.duree})" data-nom-encart="${attr(`${etat.nom} — ${tours(etat.duree)}`)}" style="line-height: 0;">${window.imageEtat(etat, tailleEtat)}</div>`
     ).join("") + resistances.map(nomEtat => {
         const el = (window.ELEMENTS_MAGIQUES || []).find(e => e.etat === nomEtat);
         const pct = window.RESISTANCE_ETAT_PCT || 25;
@@ -6364,10 +6402,50 @@ function actualiserIconesEtatsEncart(elEtats) {
         const couleur = el ? el.couleur : ((window.COULEUR_ETAT || {})[nomEtat] || "#9e9e9e");
         const fond = el ? el.fond : "#2a1a0f";
         const symbole = el ? el.icone : ((window.SYMBOLES_ETATS || {})[nomEtat] || nomEtat.trim()[0] || "?");
-        return `<div class="pastille-resistance" title="${titre}"
+        return `<div class="pastille-resistance" title="${titre}" data-nom-encart="${attr(`Résiste : ${nomEtat}`)}"
                      style="--el-couleur: ${couleur}; --el-fond: ${fond}; width: ${tailleEtat}px; height: ${tailleEtat}px; font-size: ${Math.round(tailleEtat * 0.55)}px;">${symbole}</div>`;
     }).join("");
+    brancherBullesEncart(elEtats);
 }
+
+// TOUCHER UNE RÉSISTANCE (OU UN ÉTAT) DE L'ENCART DIT SON NOM (v267, Nico :
+// « cliquer sur les bulles de résistance des ennemis ne fait pas passer le
+// tour, mais affiche le nom de la résistance ») : le toucher s'arrête à
+// l'icône — la fenêtre, dessous, lançait le tour au moindre toucher — et une
+// bulle dit le nom, deux secondes.
+function brancherBullesEncart(elEtats) {
+    if (!elEtats || elEtats.dataset.bulles === "1") return;
+    elEtats.dataset.bulles = "1";
+    const arreter = (ev) => {
+        const icone = ev.target && ev.target.closest ? ev.target.closest("[data-nom-encart]") : null;
+        if (!icone || !elEtats.contains(icone)) return null;
+        ev.stopPropagation();
+        return icone;
+    };
+    elEtats.addEventListener("pointerdown", arreter);
+    elEtats.addEventListener("click", (ev) => {
+        const icone = arreter(ev);
+        if (!icone) return;
+        ev.preventDefault();
+        if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+        window.montrerBulleEncart(icone, icone.dataset.nomEncart || "");
+    });
+}
+window.montrerBulleEncart = function(icone, texte) {
+    const encart = document.getElementById("voile-tour-encart");
+    if (!encart || !icone || !texte) return null;
+    encart.querySelectorAll(".bulle-nom-encart").forEach(b => b.remove());
+    const bulle = document.createElement("div");
+    bulle.className = "bulle-nom-encart";
+    bulle.textContent = texte;
+    const e = encart.getBoundingClientRect(), r = icone.getBoundingClientRect();
+    bulle.style.left = ((r.left + r.width / 2 - e.left) / (e.width || 1) * 100) + "%";
+    bulle.style.top = ((r.top - e.top) / (e.height || 1) * 100) + "%";
+    encart.appendChild(bulle);
+    clearTimeout(window.montrerBulleEncart._minuteur);
+    window.montrerBulleEncart._minuteur = setTimeout(() => bulle.remove(), 2200);
+    return bulle;
+};
 
 window.rafraichirVoileTour = function(queueParam, phaseParam) {
     const voile = document.getElementById("voile-tour-combat");
@@ -6384,6 +6462,8 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
         }, 460);
         const ok = document.getElementById("voile-tour-ok");
         if (ok) ok.style.display = "none";
+        const consigne = document.getElementById("voile-tour-consigne");
+        if (consigne) consigne.style.display = "none";
         const forcer = document.getElementById("voile-tour-forcer");
         if (forcer) forcer.style.display = "none";
     };
@@ -6592,6 +6672,8 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
         if (att) att.textContent = "";
         const ok0 = document.getElementById("voile-tour-ok");
         if (ok0) ok0.style.display = "none";
+        const co0 = document.getElementById("voile-tour-consigne");
+        if (co0) co0.style.display = "none";
         const fo0 = document.getElementById("voile-tour-forcer");
         if (fo0) fo0.style.display = "none";
         voile.style.display = "block";
@@ -6605,19 +6687,36 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
     // animations. Elle ne revient que si la barrière suivante fait attendre.
     if (etape && etape.masquee) return masquer();
 
+    // LA CONSIGNE DU OK MONTE AU-DESSUS DE LUI (v267) : quand le OK attend un
+    // toucher, son message (« Touchez l'écran pour voir ce tour ») se lit en
+    // haut, juste sous la piste, et le bas de la plaque se tait ; les autres
+    // messages (le tour qui se prépare, l'attente des joueurs) y restent.
+    const okAttendu = !!(etape && etape.okVisible);
+    const elConsigne = document.getElementById("voile-tour-consigne");
     if (elAttente && etape) {
-        const texte = etape.message || "";
+        const texte = okAttendu && elConsigne ? "" : (etape.message || "");
         if (elAttente.textContent !== texte) elAttente.textContent = texte;
     }
+    if (elConsigne) {
+        const texte = okAttendu ? (etape.message || "") : "";
+        if (elConsigne.textContent !== texte) elConsigne.textContent = texte;
+        elConsigne.style.display = texte ? "block" : "none";
+    }
     if (elOk) {
-        elOk.style.display = (etape && etape.okVisible) ? "inline-flex" : "none";
+        elOk.style.display = okAttendu ? "inline-flex" : "none";
         // Juste sous la piste d'initiative, quelle que soit sa hauteur sur cet
         // écran : on lit son bas réel, relatif au voile qui porte le bouton.
+        // La consigne d'abord, le OK dessous.
         if (elOk.style.display !== "none") {
             const piste = document.getElementById("piste-initiative");
             const basPiste = piste ? piste.getBoundingClientRect().bottom : 0;
             const hautVoile = voile.getBoundingClientRect().top;
-            if (basPiste > 0) elOk.style.top = Math.round(basPiste - hautVoile + 10) + "px";
+            let haut = basPiste > 0 ? Math.round(basPiste - hautVoile + 10) : 130;
+            if (elConsigne && elConsigne.style.display !== "none") {
+                elConsigne.style.top = haut + "px";
+                haut += Math.round(elConsigne.getBoundingClientRect().height || 22) + 8;
+            }
+            elOk.style.top = haut + "px";
         }
     }
     if (elForcer) elForcer.style.display = (etape && etape.forcerVisible) ? "block" : "none";
@@ -6843,9 +6942,88 @@ window.animerTexteTour = function(tour) {
 };
 
 // 3. Le super bouton RESET
-window.reinitialiserCombat = async function() {
-    if (!confirm("Voulez-vous vraiment réinitialiser ce combat ? Tous les PV et la Fatigue seront restaurés, et le combat repassera au Tour 1.")) return;
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+// `options.finDeCombat` (v267) : la carte se vide d'elle-même, le combat fini
+// (verifierNettoyageFinCombat) — sans question, sans clic, et le butin déjà
+// réparti reste en base : la fenêtre « Butin réparti » ne se ferme pas sous
+// les yeux de ceux qui la lisent encore.
+// UN RENFORT QUI N'EST PAS ENCORE ENTRÉ (v267, Nico : « les renforts ennemis
+// se font en fin de tour, après les animations de régénération »). Son pion est
+// posé dès que la manche change, mais il n'entre dans le combat qu'à son étape
+// « arrivée », que le journal rejoue APRÈS la fin de manche : d'ici là, il reste
+// caché. Seulement en plein combat (une manche passée, ou en résolution) : au
+// début, les créatures paraissent avant que le combat ne s'ouvre. Un filet le
+// montre au bout de 10 s quoi qu'il arrive.
+const PREMIERE_VUE_EN_ATTENTE = {};
+window.pionAttendSonEntree = function(id, pData) {
+    if (!id || !pData || !pData.estMonstre || pData.compagnonDe || pData.zombie) return false;
+    let etat = null;
+    try {
+        const regime = typeof window.regimeDuJeu === "function" ? window.regimeDuJeu() : null;
+        etat = regime && typeof regime.etatAffiche === "function" ? regime.etatAffiche() : null;
+    } catch (e) { etat = null; }
+    if (!etat || !etat.combattants || etat.combattants[id]) { delete PREMIERE_VUE_EN_ATTENTE[id]; return false; }
+    // Son arrivée est annoncée (animations_jeu.js) : c'est elle qui le montre.
+    if (window.ARRIVEES_ANNONCEES && window.ARRIVEES_ANNONCEES[id]) return false;
+    if (!(Number(etat.manche) >= 2 || etat.phase === "Resolution")) return false;
+    if (!PREMIERE_VUE_EN_ATTENTE[id]) {
+        PREMIERE_VUE_EN_ATTENTE[id] = Date.now();
+        setTimeout(() => { if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA || {}); }, 10100);
+    }
+    return Date.now() - PREMIERE_VUE_EN_ATTENTE[id] <= 10000;
+};
+
+// =========================================================================
+//  LE COMBAT FINI VIDE LA CARTE (v267)
+// =========================================================================
+//  Nico : « fais en sorte que quand le combat est terminé, ça fasse comme
+//  Réinitialiser, pour vider la map combat ». Le combat est terminé quand sa
+//  fin est écrite (Fin_Combat) ET qu'il n'y a plus rien à y lire : une défaite,
+//  quelques secondes après le grand « Défaite » ; une victoire, quand le butin
+//  est entièrement réparti (« Butin réparti »). Chaque poste le constate à
+//  chaque notification de la partie ; un seul, celui qui réclame le premier le
+//  nettoyage (Nettoyage_Fin_Combat, dans une transaction), réinitialise.
+window.DELAIS_NETTOYAGE_FIN_MS = { defaite: 9000, victoire: 5000 };
+let nettoyageFinProgramme = "";
+window.combatTerminePourDeBon = function(partie) {
+    const p = partie || window.PARTIE_DATA || {};
+    const idRencontre = p.ID_Rencontre || "";
+    const fin = p.Fin_Combat;
+    if (!idRencontre || !fin || fin.idRencontre !== idRencontre) return null;
+    if (p.Nettoyage_Fin_Combat === idRencontre) return null;
+    if (fin.issue === "defaite") return "defaite";
+    const butin = p.Butin;
+    if (butin && butin.idRencontre === idRencontre && (butin.etape === "termine" || butin.resolu)) return "victoire";
+    return null;
+};
+window.verifierNettoyageFinCombat = function(partie) {
+    const issue = window.combatTerminePourDeBon(partie);
+    if (!issue) return false;
+    const idRencontre = (partie || window.PARTIE_DATA || {}).ID_Rencontre;
+    if (nettoyageFinProgramme === idRencontre) return true;
+    nettoyageFinProgramme = idRencontre;
+    setTimeout(async () => {
+        try {
+            if (typeof window.modifierPartie !== "function") return;
+            const pris = await window.modifierPartie((data) => {
+                if ((data.ID_Rencontre || "") !== idRencontre || data.Nettoyage_Fin_Combat === idRencontre) return null;
+                if (!window.combatTerminePourDeBon(data)) return null;
+                return { resultat: true, maj: { Nettoyage_Fin_Combat: idRencontre } };
+            });
+            if (!pris) return;
+            if (typeof window.tracerCombat === "function") window.tracerCombat("🧹", "combat terminé", "la carte du combat se vide");
+            await window.reinitialiserCombat({ finDeCombat: true });
+        } catch (e) {
+            console.error("Nettoyage de fin de combat :", e);
+            nettoyageFinProgramme = "";
+        }
+    }, (window.DELAIS_NETTOYAGE_FIN_MS || {})[issue] || 6000);
+    return true;
+};
+
+window.reinitialiserCombat = async function(options) {
+    const finDeCombat = !!(options && options.finDeCombat);
+    if (!finDeCombat && !confirm("Voulez-vous vraiment réinitialiser ce combat ? Tous les PV et la Fatigue seront restaurés, et le combat repassera au Tour 1.")) return;
+    if (!finDeCombat && typeof window.jouerSonClic === "function") window.jouerSonClic();
 
     // PENDANT TOUT CE QUI SUIT, ON NE JUGE PERSONNE À TERRE. Les fiches vont
     // traverser un instant à zéro point de vie avant de recevoir leurs valeurs
@@ -6908,8 +7086,11 @@ window.reinitialiserCombat = async function() {
                 // Le butin du combat précédent non plus. Il est déjà réparti :
                 // ce qui a été pris est équipé, le reste est perdu. Le laisser
                 // en base ferait traîner un butin réputé "de cette rencontre"
-                // par-dessus le combat suivant.
-                Butin: deleteField(),
+                // par-dessus le combat suivant. (Sauf la fin de combat
+                // automatique : le butin réparti se lit encore — sans
+                // rencontre, il ne se rejoue jamais, butinPerime.)
+                ...(finDeCombat ? {} : { Butin: deleteField() }),
+                Nettoyage_Fin_Combat: deleteField(),
                 // Le suivi du round repart de zéro : personne n'est à terre,
                 // personne n'a encore joué.
                 Combattants_Hors_Jeu: [],
@@ -6939,7 +7120,7 @@ window.reinitialiserCombat = async function() {
             if (window.PARTIE_DATA) {
                 delete window.PARTIE_DATA.Spawn_Allies;
                 delete window.PARTIE_DATA.Spawn_Ennemis;
-                delete window.PARTIE_DATA.Butin;
+                if (!finDeCombat) delete window.PARTIE_DATA.Butin;
                 delete window.PARTIE_DATA.Difficulte_Rencontre;
                 delete window.PARTIE_DATA.Apparition_Rencontre;
                 delete window.PARTIE_DATA.ID_Rencontre;

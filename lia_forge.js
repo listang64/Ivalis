@@ -191,7 +191,7 @@ RÈGLES ABSOLUES
 7. Sur une action Poussée : pas de Zone, de Persistance terrain ni d'étalement. Sur une Illusion : pas de Zone.
 8. Distance : seulement avec Arme polyvalente, Arme légère Distance ou Magie — ou sur un soin.${regleLumiere}
 10. N'utilise QUE des identifiants (id) de la liste fournie : aucun autre effet n'existe pour ce héros.
-11. Une Attaque Magique est TOUJOURS liée à un élément (champ element de l'action) : Feu, Foudre ou Glace, selon le récit. Il lui offre déjà 5 % de chance de Brûlé, Électrifié ou Glacé : n'ajoute ce sous-effet que pour monter cette chance. Une Distorsion mentale n'a ni élément ni état lié : ce sont des dégâts bruts mentaux, que la cible ne peut ni esquiver ni parer, et qu'aucune armure ne réduit.
+11. Une Attaque Magique est TOUJOURS liée à un élément (champ element de l'action) : Feu, Foudre, Glace ou Arcane, selon le récit. Feu, Foudre et Glace lui offrent déjà 5 % de chance de Brûlé, Électrifié ou Glacé : n'ajoute ce sous-effet que pour monter cette chance. L'Arcane n'offre aucun état, mais aucune créature n'y résiste. Une Distorsion mentale n'a ni élément ni état lié : ce sont des dégâts bruts mentaux, que la cible ne peut ni esquiver ni parer, et qu'aucune armure ne réduit.
 
 TON STYLE
 - Reste fidèle au récit : l'élément, le geste, l'effet sur l'ennemi. N'ajoute pas d'effet que le récit ne justifie pas.
@@ -245,7 +245,7 @@ ${JSON.stringify(catalogueEffets(armes))}`;
                                 effet: { type: "STRING", description: "id d'un effet de rôle « action »." },
                                 crans: { type: "INTEGER" },
                                 duree: { type: "INTEGER", description: "crans ⏳ ajoutés, 0 sinon" },
-                                element: { type: "STRING", enum: ["Feu", "Foudre", "Glace"], description: "L'élément d'une Attaque Magique (et d'elle seule)." },
+                                element: { type: "STRING", enum: ["Feu", "Foudre", "Glace", "Arcane"], description: "L'élément d'une Attaque Magique (et d'elle seule)." },
                                 sous_effets: {
                                     type: "ARRAY",
                                     items: {
@@ -431,6 +431,7 @@ function elementPourLIA(propose, recit) {
     const r = sansAccents(recit);
     if (/(foudre|eclair|electri|orage|tonnerre)/.test(r)) return "Foudre";
     if (/(glace|givre|gel|froid|neige|glacial)/.test(r)) return "Glace";
+    if (/(arcan|runique|astral|eldritch|ether|ethere)/.test(r)) return "Arcane";
     return "Feu";
 }
 

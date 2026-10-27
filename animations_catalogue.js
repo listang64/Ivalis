@@ -1869,8 +1869,8 @@
                      { largeur: 0.35, duree: 320, retard: k * 140, segments: 6 });
         }
         etat(o, calque, el, "Électrifié !");
-        o.attendre(450).then(() => o.texte(calque, el, "-35 initiative", COULEURS.attention));
-        o.attendre(900).then(() => o.texte(calque, el, "+20 % dégâts magiques", COULEURS.attention));
+        // (Plus de « -35 initiative » : l'Électrifié n'en retire plus, v267.)
+        o.attendre(600).then(() => o.texte(calque, el, "+20 % dégâts magiques", COULEURS.attention));
         await o.teinter(el, [{ filter: "none" }, { filter: ELEC, offset: 0.1 }, { filter: "none", offset: 0.2 }, { filter: ELEC, offset: 0.35 },
                              { filter: "none", offset: 0.5 }, { filter: ELEC, offset: 0.65 }, { filter: "none" }], { duration: 1200 });
     };
@@ -4082,6 +4082,34 @@
                     o.gerbe(sc.calque, b.x, b.y, { nombre: 15, dist: b.t * 1.1, couleurs: ["#ff7a1a", "#bdf3ff", "#8fb0ff"], taille: 6, duree: 800 }),
                     o.secouer(el, b.t * 0.12, 380, v)]);
             }));
+        } },
+        // L'ARCANE (v267) : un sceau violet s'ouvre sous le lanceur, trois runes
+        // s'y rassemblent ; une orbe violette file, traînant des éclats de
+        // lumière pâle, et sur la cible touchée deux cercles runiques se
+        // déploient puis s'éteignent. Manquée, l'orbe passe et se disperse.
+        { id: "jeu-attaque-arcane", async jouer(sc, o) {
+            const a = centre(sc.lanceur, sc.calque);
+            const VIOLET = "#b98cff", PALE = "#efe3ff";
+            o.son("lumiere");
+            const marque = sceau(o, sc.calque, a, VIOLET, { taille: 1.15, duree: 1500, tours: 120 });
+            await Promise.all([rassembler(o, sc.calque, a, { couleur: VIOLET, n: 6, duree: 420, rayon: 0.9 }),
+                o.eclat(sc.lanceur, `brightness(1.2) drop-shadow(0 0 9px ${VIOLET})`, 520)]);
+            let sonne = false;
+            await Promise.all(sc.cibles.map(async el => {
+                const b = centre(el, sc.calque), v = axe(a, b), touchee = toucheEnJeu(sc, el);
+                const fin = touchee ? b : { x: b.x + v.ux * b.t * 1.2, y: b.y + v.uy * b.t * 1.2, t: b.t };
+                await orbe(o, sc.calque, a, fin, { couleur: VIOLET, coeur: PALE, taille: 0.34, arc: 0.18, duree: Math.min(780, 340 + v.d * 0.8),
+                                                   traine: [VIOLET, PALE] });
+                if (!sonne) { sonne = true; o.son("impact-magique"); }
+                if (!touchee) return o.gerbe(sc.calque, fin.x, fin.y, { nombre: 7, dist: b.t * 0.5, couleurs: [VIOLET, PALE], taille: 4, duree: 450 });
+                const cercle = sceau(o, sc.calque, b, VIOLET, { taille: 1.05, duree: 900, tours: -90 });
+                await Promise.all([o.onde(sc.calque, b, { couleur: VIOLET, taille: 0.85, duree: 650, echelle: 2 }),
+                    o.onde(sc.calque, b, { couleur: PALE, taille: 0.7, duree: 650, echelle: 1.7, retard: 110 }),
+                    o.gerbe(sc.calque, b.x, b.y, { nombre: 12, dist: b.t * 0.9, couleurs: [VIOLET, PALE, "#7d4dff"], taille: 5, duree: 700 }),
+                    o.secouer(el, b.t * 0.1, 340, v), o.eclat(el, `drop-shadow(0 0 8px ${VIOLET})`, 600)]);
+                await fondre(o, cercle, 300);
+            }));
+            await fondre(o, marque, 300);
         } },
         // LA DISTORSION MENTALE (ex-Mots de pouvoir) : le lanceur prononce les
         // mots, trois ondes de voix roulent en arcs jusqu'à la cible et la

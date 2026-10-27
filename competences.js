@@ -1806,7 +1806,8 @@ window.ajouterComposantPrincipal = function(effetId) {
 const TEXTES_CHOIX_LIEN = {
     element: { titre: "Élément du sort",
                texte: `Une Attaque Magique est toujours liée à un élément.
-         Il lui offre <b>5 %</b> de chance de poser son état, que tu peux monter comme un sous-effet.` }
+         Il lui offre <b>5 %</b> de chance de poser son état, que tu peux monter comme un sous-effet.
+         L'<b>Arcane</b> n'offre rien, mais <b>personne n'y résiste</b>.` }
 };
 // L'icône d'un lien : le dessin d'un état du charisme (des dégradés aux
 // identifiants rendus uniques, la même icône pouvant se montrer deux fois à
@@ -1848,7 +1849,7 @@ window.ouvrirChoixElement = function(surChoix, actuel, pris, options) {
                 onclick="if (typeof jouerSonClic === 'function') jouerSonClic(); window.choisirElementForge('${el.id}')">
             <span class="forge-element-disque"><span class="forge-element-icone${el.dessin ? " dessin" : ""}">${iconeDuLien(el)}</span></span>
             <span class="forge-element-nom">${el.nom}</span>
-            <span class="forge-element-etat">${prisAilleurs ? "déjà sur la carte" : `${el.etat} · ${offert} %`}</span>
+            <span class="forge-element-etat">${prisAilleurs ? "déjà sur la carte" : el.etat ? `${el.etat} · ${offert} %` : "aucune résistance"}</span>
         </button>`;
     }).join("");
     modale.style.display = "block";
@@ -2630,9 +2631,15 @@ window.coutDUneActionForge = coutDUneAction;
 // sort de 80. Les cartes forgées depuis la portent (Fatigue_Surpuissance) ;
 // pour celles d'avant, on refait le compte de la Forge sur leurs composants
 // (coutDUneAction) : sans étalement, c'est leur fatigue, telle quelle.
+// v267 (Nico : « pour la surpuissance sur les DOT, le cap de fatigue de 70 et
+// de 100 doit être atteint APRÈS la réduction due à l'étalement ») : la
+// puissance d'une carte est sa fatigue telle qu'elle se paie, ristourne de
+// l'étalement comprise. Le compte d'avant l'étalement ne sert plus.
+window.SURPUISSANCE_APRES_ETALEMENT = true;
 window.fatigueDeSurpuissance = function(carte, perso) {
     if (!carte) return 0;
     const fatigue = Number(carte.Fatigue) || 0;
+    if (window.SURPUISSANCE_APRES_ETALEMENT) return fatigue;
     const ecrite = Number(carte.Fatigue_Surpuissance) || 0;
     if (ecrite > 0) return Math.max(fatigue, ecrite);
     const actions = (carte.Composants && Array.isArray(carte.Composants.actions)) ? carte.Composants.actions : [];
@@ -2704,7 +2711,8 @@ window.rafraichirForge = function() {
     // l'affichage : LIA rabote ses crans jusqu'à tenir sous le cap.
     // LA PUISSANCE DE LA CARTE (v241) : sa fatigue sans la ristourne de
     // l'étalement. C'est elle qui donne la surpuissance (fatigueDeSurpuissance).
-    const fatigueSurpuissance = Math.max(fatigueConsommee, Math.floor(totalPCPlein * 5));
+    // v267 : la surpuissance se juge sur la fatigue payée, après l'étalement.
+    const fatigueSurpuissance = window.SURPUISSANCE_APRES_ETALEMENT ? fatigueConsommee : Math.max(fatigueConsommee, Math.floor(totalPCPlein * 5));
     window.forgeState.bilan = { totalPC, fatigue: fatigueConsommee, cap: capFatigue, initiative, fatigueSurpuissance };
 
     const armeContainer = document.getElementById("forge-weapon-tag-container");

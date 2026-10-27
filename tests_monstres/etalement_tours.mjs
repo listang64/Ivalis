@@ -119,8 +119,8 @@ const monde = () => construireEtatCombat({
     partie: { Phase_Combat: "Resolution", Tour_Combat: 1, Ordre_Initiative: ["M1", "H1"],
               File_Attente_Combat: [{ idPersonnage: "M1", idCarte: "C1" }] }
 });
-const carte = (idLanceur, idCible, attaque) => ({
-    type: "carte", idLanceur, idCarte: "C1",
+const carte = (idLanceur, idCible, attaque, idCarte) => ({
+    type: "carte", idLanceur, idCarte: idCarte || "C1",
     attaques: [{ ...attaque, cibles: [idCible] }], alterations: [],
     jets: { attaqueRatee: false, parCible: { [idCible]: { esquive: false, etats: {} } } }
 });
@@ -165,12 +165,18 @@ console.log("\n3. DES DÉGÂTS ÉTALÉS : RIEN AU LANCEMENT, UNE PART PAR MANCHE
     verifier("sur 3 tours : 4, 3, 3", JSON.stringify(releves) === "[56,53,50]", JSON.stringify(releves));
     verifier("l'état dure bien les 3 manches, puis s'en va", !etatNomme(etat.combattants.H1, "Étalement"));
 
-    // Un second étalement s'ajoute part à part à ce qui reste.
-    etat = resoudreCarte(monde(), carte("M1", "H1", { valeurBrute: 10, estEtalement: true, toursEtalement: 2 })).etat;
-    etat = resoudreCarte(etat, carte("M1", "H1", { valeurBrute: 10, estEtalement: true, toursEtalement: 3 })).etat;
+    // Un second étalement — d'une AUTRE compétence — s'ajoute part à part à ce
+    // qui reste. (v267 : la même compétence, relancée, ne se cumule pas ; son
+    // temps repart — corrections_v267.mjs.)
+    etat = resoudreCarte(monde(), carte("M1", "H1", { valeurBrute: 10, estEtalement: true, toursEtalement: 2 }, "C1")).etat;
+    etat = resoudreCarte(etat, carte("M1", "H1", { valeurBrute: 10, estEtalement: true, toursEtalement: 3 }, "C2")).etat;
     const cumul = etatNomme(etat.combattants.H1, "Étalement") || {};
-    verifier("deux étalements se cumulent part à part : 9, 8, 3",
+    verifier("deux étalements de deux compétences se cumulent part à part : 9, 8, 3",
              JSON.stringify(cumul.tics) === "[9,8,3]" && cumul.duree === 3, JSON.stringify(cumul));
+    etat = resoudreCarte(etat, carte("M1", "H1", { valeurBrute: 10, estEtalement: true, toursEtalement: 3 }, "C2")).etat;
+    const relance = etatNomme(etat.combattants.H1, "Étalement") || {};
+    verifier("la même compétence relancée ne se cumule pas (9, 8, 3 reste)",
+             JSON.stringify(relance.tics) === "[9,8,3]", JSON.stringify(relance.tics));
 }
 
 console.log("\n4. UN SOIN ÉTALÉ : LA VIE REVIENT UNE PART PAR MANCHE");

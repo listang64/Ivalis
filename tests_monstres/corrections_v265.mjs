@@ -203,7 +203,8 @@ titre("3. LA BULLE D'UN ÉTAT : SON NOM ET SES TOURS");
 {
   const r = await p.evaluate(async () => {
     window.herosDuPoste = () => window.PERSOS_PARTIE[0];
-    window.PERSOS_PARTIE[0].Etats_Alteres = [{ nom: "Brûlé", duree: 2 }, { nom: "Engagé", duree: 1 }];
+    // (Engagé n'a plus de symbole depuis la v267 : un autre état, le Glacé.)
+    window.PERSOS_PARTIE[0].Etats_Alteres = [{ nom: "Brûlé", duree: 2 }, { nom: "Glacé", duree: 1 }];
     document.getElementById("combat-hud-bas-droite").style.display = "block";
     window.__ou(() => window.actualiserPisteEtats(), null);
     await new Promise(r2 => setTimeout(r2, 100));
@@ -212,7 +213,7 @@ titre("3. LA BULLE D'UN ÉTAT : SON NOM ET SES TOURS");
     tuile.click();
     await new Promise(r2 => setTimeout(r2, 300));
     const bulle = tuile.querySelector(".etat-piste-duree");
-    const autre = document.querySelector('.etat-piste[data-nom="Engagé"]');
+    const autre = document.querySelector('.etat-piste[data-nom="Glacé"]');
     autre.click();
     await new Promise(r2 => setTimeout(r2, 300));
     const b2 = autre.querySelector(".etat-piste-duree");
@@ -222,14 +223,14 @@ titre("3. LA BULLE D'UN ÉTAT : SON NOM ET SES TOURS");
   });
   verifier("toucher un état : son nom, « Brûlé »", r.tuile && r.nom === "Brûlé", JSON.stringify(r));
   verifier("…et ses tours restants, dessous : « 2 Tours »", r.tours === "2 Tours", r.tours);
-  verifier("un autre : « Engagé », « 1 Tour » — et la première bulle s'éteint", r.nom2 === "Engagé" && r.tours2 === "1 Tour" && r.premiereEteinte, JSON.stringify(r));
+  verifier("un autre : « Glacé », « 1 Tour » — et la première bulle s'éteint", r.nom2 === "Glacé" && r.tours2 === "1 Tour" && r.premiereEteinte, JSON.stringify(r));
 }
 
 titre("4. LE NOM DANS L'ENCART : UN PEU PLUS À DROITE, JAMAIS SOUS UN ÉTAT");
 {
   const r = await p.evaluate(async () => {
     window.herosDuPoste = () => null;
-    const etats = ["Brûlé", "Glacé", "Engagé", "Peur", "Étourdi", "Saignement"].map(n => ({ nom: n, duree: 2 }));
+    const etats = ["Brûlé", "Glacé", "Électrifié", "Peur", "Étourdi", "Saignement"].map(n => ({ nom: n, duree: 2 }));
     window.PERSOS_PARTIE[1].Etats_Alteres = etats;
     window.CACHE_COMPETENCES_GLOBAL = { M1: { C1: { Nom: "Hurlement putride", Arme: "Magie", Fatigue: 40, Initiative: 50, Composants: { actions: [] },
       Effets_Compiles: [{ nom: "Distorsion mentale", desc: "9 dégat brut", isMod: false }] } } };

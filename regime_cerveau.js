@@ -725,6 +725,8 @@ export function creerRegime(contexte) {
         etatAffiche: () => spectateur.etat(),
         vue: () => spectateur.vue(),
         jeSuisLeCerveau: () => !!moi.cerveau,
+        // Le cerveau est-il en train de faire un pas ? (Un accueil attend.)
+        occupe: () => !!moi.enTrainDeTourner,
         ouvertureAilleurs: () => moi.ouvertureAilleurs,
         cerveauPerdu: () => cerveauPerdu(moi.etat, maintenant()),
         // La vraie question, celle qui ne compare pas deux montres : depuis
@@ -857,6 +859,38 @@ const MEMOIRE_RENFORTS = { annonces: TOMBES_ANNONCEES, attente: [], clePrecedent
 // leaders déjà relevés (apparitionsDuTour, pont_combat.js).
 const MEMOIRE_APPARITIONS = { mancheVue: null, releves: new Set() };
 let RENFORTS_EN_COURS = Promise.resolve();
+// La relève en leader (Apparition 1) appelle ses renforts : ils attendent la
+// fin de la manche, comme les autres (v267).
+let RELEVES_EN_ATTENTE = 0;
+
+// LES RENFORTS ENTRENT À LA FIN DE LA MANCHE, APRÈS LA RÉGÉNÉRATION (v267,
+// Nico : « les renforts ennemis se font en fin de tour, après les animations
+// de régénération : s'ils doivent arriver au tour 2, ils apparaissent à la fin
+// du tour 1 »). Leurs pions étaient posés quand la manche changeait, mais ils
+// n'entraient dans le combat — leur étape « arrivée », leur animation — qu'à
+// l'ouverture de la manche suivante, une fois toutes les cartes choisies. Le
+// cerveau les accueille maintenant tout de suite : leur arrivée s'écrit dans
+// le journal juste après la fin de manche, et se rejoue après elle. Leurs
+// fiches arrivent par une notification : on réessaie quelques fois.
+async function accueillirLesRenfortsMaintenant(ids, essais) {
+    const attendus = (ids || []).filter(Boolean);
+    if (attendus.length === 0) return 0;
+    const regime = typeof window !== "undefined" && typeof window.regimeDuJeu === "function" ? window.regimeDuJeu() : null;
+    if (!regime || typeof regime.jeSuisLeCerveau !== "function" || !regime.jeSuisLeCerveau()) return 0;
+    let entres = 0;
+    for (let i = 0; i < (essais || 12); i++) {
+        if (!(typeof regime.occupe === "function" && regime.occupe())) {
+            try { entres += (await regime.accueillirLesNouveaux()) || 0; }
+            catch (e) { console.error("Accueil des renforts :", e); }
+        }
+        const etat = typeof regime.etatPublie === "function" ? regime.etatPublie() : null;
+        const connus = (etat && etat.combattants) || {};
+        if (attendus.every(id => connus[id])) break;
+        await new Promise(r => setTimeout(r, 400));
+    }
+    return entres;
+}
+if (typeof window !== "undefined") window.accueillirLesRenfortsMaintenant = accueillirLesRenfortsMaintenant;
 
 function contexteDuJeu() {
     return {
@@ -1209,6 +1243,7 @@ function contexteDuJeu() {
                             // Un renfort après l'autre : chacun relit la réserve.
                             RENFORTS_EN_COURS = RENFORTS_EN_COURS
                                 .then(() => typeof window.entrerRenfortMonstre === "function" ? window.entrerRenfortMonstre() : null)
+                                .then(id => accueillirLesRenfortsMaintenant(id ? [id] : []))
                                 .catch(e => signalerPanne("entrerRenfortMonstre", e));
                         }
 
@@ -1220,17 +1255,27 @@ function contexteDuJeu() {
                         prevus.releves.forEach(id => {
                             const c = etat.combattants[id] || {};
                             if (typeof window.tracerCombat === "function") {
-                                window.tracerCombat("👑", `${c.nom || id} se relève en leader`, "ses renforts entrent à la manche suivante");
+                                window.tracerCombat("👑", `${c.nom || id} se relève en leader`, "ses renforts entrent à la fin de la manche");
                             }
+                            RELEVES_EN_ATTENTE++;
                             RENFORTS_EN_COURS = RENFORTS_EN_COURS
                                 .then(() => typeof window.enregistrerReleveLeader === "function" ? window.enregistrerReleveLeader(id, c) : null)
-                                .then(() => typeof window.entrerRenfortsDeReleve === "function" ? window.entrerRenfortsDeReleve() : null)
-                                .catch(e => signalerPanne("entrerRenfortsDeReleve", e));
+                                .catch(e => signalerPanne("enregistrerReleveLeader", e));
                         });
                         if (prevus.manche !== null) {
+                            const releves = RELEVES_EN_ATTENTE;
+                            RELEVES_EN_ATTENTE = 0;
                             RENFORTS_EN_COURS = RENFORTS_EN_COURS
-                                .then(() => typeof window.entrerRenfortsPrevus === "function"
-                                    ? window.entrerRenfortsPrevus(prevus.manche, { terrainVide: prevus.terrainVide }) : null)
+                                .then(async () => {
+                                    const poses = [];
+                                    if (releves > 0 && typeof window.entrerRenfortsDeReleve === "function") {
+                                        poses.push(...((await window.entrerRenfortsDeReleve()) || []));
+                                    }
+                                    if (typeof window.entrerRenfortsPrevus === "function") {
+                                        poses.push(...((await window.entrerRenfortsPrevus(prevus.manche, { terrainVide: prevus.terrainVide })) || []));
+                                    }
+                                    return accueillirLesRenfortsMaintenant(poses);
+                                })
                                 .catch(e => signalerPanne("entrerRenfortsPrevus", e));
                         }
                     }

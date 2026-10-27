@@ -137,6 +137,17 @@ function getHexDistance(a, b) {
 // sa zone à distance 2 ne se posait plus qu'à côté de lui, son tir ne partait
 // plus qu'au contact. Même lecture que la case occupée (estCombattantMort) :
 // statut Mort OU plus un seul PV.
+// LA TRACTION EN TÊTE VISE À SA PORTÉE, MÊME AU CONTACT (v267, Nico : « je
+// ne peux pas faire Traction magique sur des ennemis à distance si je suis
+// engagé au càc, alors que je devrais pouvoir »). Engagé au contact, une
+// technique qui n'est pas un tir ne vise qu'à une case — sauf la cible qu'une
+// Traction en tête va ramener : on la vise jusqu'à sa portée (porteeMinTraction).
+window.contactInterditLaCible = function(configSort, state, estEngage, dist) {
+    if (!configSort || configSort.isHeal || configSort.isRanged || !estEngage || dist <= 1) return false;
+    if (Number(state && state.porteeMinTraction) >= dist) return false;
+    return true;
+};
+
 window.estEngageAuContact = function(idLanceur, tkLanceur, lanceurData) {
     if (!tkLanceur || !lanceurData) return false;
     const tombe = (p) => (typeof window.estCombattantMort === "function")
@@ -2073,10 +2084,10 @@ window.demarrerCiblage = async function(idCarte, options) {
             }
 
             // 🔻 NOUVEAU : DÉTECTION ÉLECTRIFIÉ 🔻
-            // Même formule que Brûlé/Glacé (10%/action, cap 60%, durée de base 2 tours + bonus
-            // Durée+). Consommé en un seul jet : la TOUTE PROCHAINE carte jouée par la cible
-            // électrifiée perd 35 en initiative (voir jouerCarteCombat, combat.js), puis l'état
-            // disparaît immédiatement, que la durée soit écoulée ou non.
+            // v267 (Nico : « Électrifié = 15 % de chance d'être électrifié (max 75 %), on
+            // retire la baisse d'initiative ») : 15 % par cran (REGLES_EFFETS_IMPOSEES,
+            // app.js), plafond 75 %, durée de base 2 tours + bonus Durée+. L'état dure ses
+            // tours ; la cible subit 20 % de dégâts magiques en plus (REGLES_ETATS).
             let isElectrifie = false;
             let electrifieChance = 0;
             let electrifieDuree = 0;
@@ -2110,14 +2121,14 @@ window.demarrerCiblage = async function(idCarte, options) {
             }
 
             if (isElectrifie) {
-                electrifieChance = Math.min(electrifieChance, plafondDuGrimoire("électri", 60)); // plafond du grimoire
+                electrifieChance = Math.min(electrifieChance, plafondDuGrimoire("électri", 75)); // plafond du grimoire (75 %, v267)
                 if (electrifieDuree <= 0) electrifieDuree = 2; // Sécurité si la BDD n'a pas de durée
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({
                     nom: "Électrifié",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788088220/IMG_2081_p5xenm.png",
-                    desc: "La prochaine carte jouée perd 35 en initiative, puis l'état disparaît. Subit 20% de dégâts magiques en plus.",
+                    desc: "Subit 20% de dégâts magiques en plus tant qu'il dure.",
                     chance: electrifieChance,
                     duree: electrifieDuree,
                     isRanged: isRanged,
@@ -3152,7 +3163,7 @@ window.dessinerAnneauxCiblage = function() {
         // ENGAGÉ AU CONTACT, on frappe au contact — SAUF un TIR : il peut viser
         // un ennemi plus loin, à portée, et sans malus (le malus de 30 % ne
         // vaut que pour un tir à bout portant, chaineDeDegats).
-        if (!configSort.isHeal && estEngage && dist > 1 && !configSort.isRanged) continue;
+        if (window.contactInterditLaCible(configSort, window.ETAT_CIBLAGE, estEngage, dist)) continue;
         if (!sansVue && !verifierLigneDeVue(tkLanceur, tk)) continue;
 
         ciblesValides.add(idToken);
@@ -3372,7 +3383,7 @@ window.ajouterCibleCiblage = function(idCible) {
 
     const estEngage = window.estEngageAuContact(idLanceur, tkLanceur, lanceurData);
 
-    if (!configSort.isHeal && estEngage && dist > 1 && !configSort.isRanged) {
+    if (window.contactInterditLaCible(configSort, window.ETAT_CIBLAGE, estEngage, dist)) {
         window.afficherMessageFlottantHex(tkCible.q, tkCible.r, "Engagé au CAC !", "#aaaaaa");
         return;
     }
@@ -3568,7 +3579,7 @@ window.ajouterMurCiblage = function(idMur) {
     const dist = getHexDistance(tkLanceur, mur);
     const porteeEffective = Math.max(configSort.rangeMax, state.porteeMinTraction || 0);
     if (dist > porteeEffective) return dire("Hors de portée");
-    if (dist > 1 && !configSort.isRanged && window.estEngageAuContact(idLanceur, tkLanceur, lanceurData)) return dire("Engagé au CAC !");
+    if (window.contactInterditLaCible(configSort, state, window.estEngageAuContact(idLanceur, tkLanceur, lanceurData), dist)) return dire("Engagé au CAC !");
     if (!verifierLigneDeVue(tkLanceur, mur)) return dire("Vue obstruée");
     if (state.cibleUnique === idMur) {
         state.cibleUnique = null;

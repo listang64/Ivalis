@@ -836,8 +836,9 @@ export function chanceEtatDe(lanceur, alt, cible, jetsCible) {
     const base = nombre(alt && alt.chance);
     const bonus = (lanceur && lanceur.estMonstre) ? (BONUS_CHANCE_ETAT_MONSTRE[alt && alt.nom] || 0) : 0;
     const subie = (alt && alt.nom === "Brûlé" && cible && cible.atouts) ? nombre(cible.atouts.brulureFacile) : 0;
-    const chef = (lanceur && lanceur.estMonstre && lanceur.leader && base > 0) ? nombre(leaderActuel().chanceEtat) : 0;
-    let chance = base + bonus + chef + (base > 0 ? subie : 0);
+    // (Le leader n'ajoute plus de chance d'état depuis la v267 — Nico : « la
+    // dernière colonne, 15 pts, on ne sait pas dans quoi : enlève-la ».)
+    let chance = base + bonus + (base > 0 ? subie : 0);
     if (alt && alt.nom === ETAT_AVEUGLE && jetsCible && jetsCible.maitriseLumiere > 0) chance = Math.max(chance, jetsCible.maitriseLumiere);
     return chanceFaceA(cible, alt && alt.nom, chance);
 }
@@ -862,20 +863,52 @@ export function chanceEtatDe(lanceur, alt, cible, jetsCible) {
 export const ETAT_ENGAGE = "Engagé";
 export const MALUS_TIR_ENGAGE_CONTACT = 30;   // un tir au contact, engagé
 export const MALUS_TIR_ENGAGE_LOIN = 15;      // un tir sur une cible éloignée, engagé
-export const DESC_ENGAGE = "A reçu une attaque au corps à corps cette manche : ses attaques à distance "
+export const DESC_ENGAGE = "A reçu une attaque au corps à corps à cette manche ou à la précédente : ses attaques à distance "
     + "perdent 15 % de dégâts (30 % au contact). Un agresseur étourdi ou confus ne l'engage plus.";
+// v267 (Nico : « on est engagé quand un ennemi nous a attaqué au tour d'avant
+// au càc ») : l'engagement court sur la manche du coup ET la suivante — c'est
+// à la suivante qu'on choisit et qu'on joue sa carte en le sachant. Chaque
+// agresseur garde sa manche (`depuis`) : un second agresseur ne prolonge pas
+// le premier. Et l'état n'a plus d'image nulle part (Nico : « ne mets pas de
+// symbole d'état, ni sur le token ni ailleurs ») — ETATS_SANS_SYMBOLE, combat.js.
+export const MANCHES_ENGAGE = 2;
 // (Pas d'image : le médaillon rouge « ⚔ » de l'écran le dessine — combat.js,
 // SYMBOLES_ETATS et COULEUR_ETAT —, sans alourdir chaque étape du journal.)
 // Ceux qui engagent ce combattant, maintenant : debout, ni étourdis, ni confus.
 export function engageursDe(etat, c) {
     const e = ((c && c.etats) || []).find(x => x && x.nom === ETAT_ENGAGE);
     if (!e) return [];
+    const manche = nombre(etat && etat.manche, 1);
     return [...new Set(e.par || [])].filter(id => {
         const x = combattant(etat, id);
+        // Un coup de plus d'une manche : il n'engage plus (v267).
+        const depuis = e.depuis && e.depuis[id];
+        if (depuis !== undefined && manche - nombre(depuis) >= MANCHES_ENGAGE) return false;
+        // Plus au contact : désengagé (v267, Nico : « le désengagement se fait
+        // si on quitte le càc du personnage auquel on est engagé »).
+        if (x && distanceHex(c, x) > 1) return false;
         return !!x && !x.aTerre && !aLEtat(x, "Étourdi") && !aLEtat(x, "Confusion");
     });
 }
 export const estEngage = (etat, c) => engageursDe(etat, c).length > 0;
+// LE DÉSENGAGEMENT (v267) : quitter le contact d'un agresseur le retire pour de
+// bon de ceux qui nous engagent — revenir à côté de lui ne réengage pas sans
+// un nouveau coup. Fait sur tout l'état (combat_etat.js le refait à chaque
+// déplacement rejoué, desengagerEloignes).
+export function desengagerLesEloignes(etat) {
+    Object.values((etat && etat.combattants) || {}).forEach(c => {
+        const e = ((c && c.etats) || []).find(x => x && x.nom === ETAT_ENGAGE);
+        if (!e) return;
+        const restent = [...new Set(e.par || [])].filter(id => {
+            const x = combattant(etat, id);
+            return !!x && distanceHex(c, x) <= 1;
+        });
+        if (restent.length === (e.par || []).length) return;
+        if (restent.length === 0) { c.etats = c.etats.filter(x => x !== e); return; }
+        e.par = restent;
+        if (e.depuis) e.depuis = Object.fromEntries(Object.entries(e.depuis).filter(([id]) => restent.includes(id)));
+    });
+}
 // Une attaque qui engage : au contact (pas un tir), un vrai coup (ni soin ni
 // bouclier), d'un ennemi à une case.
 export function attaqueEngage(attaque, lanceur, cible) {
@@ -883,18 +916,26 @@ export function attaqueEngage(attaque, lanceur, cible) {
         && !!lanceur && !!cible && lanceur.id !== cible.id && !lanceur.estIllusion && !cible.estIllusion
         && (lanceur.camp || "Allié") !== (cible.camp || "Allié") && distanceHex(lanceur, cible) === 1;
 }
-// Pose (ou complète) l'engagement de `cible` par `idAgresseur`. Vrai si l'état a changé.
-export function engager(cible, idAgresseur) {
+// Pose (ou complète) l'engagement de `cible` par `idAgresseur`, frappé à la
+// manche `manche`. Vrai si l'état a changé.
+export function engager(cible, idAgresseur, manche) {
     if (!cible || !idAgresseur) return false;
     const etats = cible.etats || [];
+    const m = nombre(manche, 1);
     const deja = etats.find(x => x && x.nom === ETAT_ENGAGE);
     if (deja) {
-        if ((deja.par || []).includes(idAgresseur) && nombre(deja.duree) >= 1) return false;
+        const depuis = { ...(deja.depuis || {}) };
+        if ((deja.par || []).includes(idAgresseur) && nombre(depuis[idAgresseur], -1) === m
+            && nombre(deja.duree) >= MANCHES_ENGAGE) return false;
         deja.par = [...new Set([...(deja.par || []), idAgresseur])];
-        deja.duree = Math.max(1, nombre(deja.duree));
+        depuis[idAgresseur] = m;
+        deja.depuis = depuis;
+        deja.duree = MANCHES_ENGAGE;
+        deja.desc = DESC_ENGAGE;
         return true;
     }
-    cible.etats = [...etats, { nom: ETAT_ENGAGE, duree: 1, par: [idAgresseur], desc: DESC_ENGAGE }];
+    cible.etats = [...etats, { nom: ETAT_ENGAGE, duree: MANCHES_ENGAGE, par: [idAgresseur],
+                               depuis: { [idAgresseur]: m }, desc: DESC_ENGAGE }];
     return true;
 }
 // Le malus d'un tir quand on est engagé (en %, 0 sinon).
@@ -946,20 +987,45 @@ export function partsEtalees(montant, tours) {
 // `nature` (v260) : la nature des dégâts rangés (physique, magique, mental) —
 // la couleur du chiffre de chaque tic. Deux natures sur la même file : la
 // première reste.
-function empilerEtalement(cible, nomEtat, tics, idSource, critique, nature) {
+//
+// UNE MÊME COMPÉTENCE NE SE CUMULE PAS (v267, Nico : « vérifie qu'on ne puisse
+// pas cumuler un même étalement de dégâts ou de soins d'une même compétence ;
+// mais ça réinitialise le temps de DOT »). Chaque source (`source` : son
+// lanceur et sa carte) garde ses parts à elle (`sources`) : relancée, elle
+// RETIRE ce qui lui restait et repose ses parts neuves — le compte repart de
+// zéro, rien ne s'ajoute. Une autre compétence, elle, s'ajoute comme avant.
+// `lancer` (un Set propre à une résolution de carte) : deux coups étalés d'une
+// même carte, au même lancer, s'additionnent — c'est un seul sort.
+function empilerEtalement(cible, nomEtat, tics, idSource, critique, nature, source, lancer) {
     const dejaLa = cible.etats.find(e => e && e.nom === nomEtat);
+    const marque = source ? `${nomEtat}|${source}` : null;
+    const memeLancer = !!(marque && lancer && lancer.has(`${cible.id}|${marque}`));
+    if (marque && lancer) lancer.add(`${cible.id}|${marque}`);
     if (dejaLa) {
-        const file = [...(dejaLa.tics || [])];
+        let file = [...(dejaLa.tics || [])];
+        const sources = (dejaLa.sources || []).map(x => ({ ...x, tics: [...(x.tics || [])] }));
+        const sienne = marque ? sources.find(x => x && x.cle === source) : null;
+        if (sienne && !memeLancer) {
+            sienne.tics.forEach((part, i) => { file[i] = Math.max(0, nombre(file[i]) - nombre(part)); });
+            sienne.tics = [];
+        }
         tics.forEach((part, i) => { file[i] = nombre(file[i]) + part; });
+        while (file.length > 0 && nombre(file[file.length - 1]) <= 0) file.pop();
+        if (marque) {
+            if (sienne) tics.forEach((part, i) => { sienne.tics[i] = nombre(sienne.tics[i]) + part; });
+            else sources.push({ cle: source, tics: [...tics] });
+        }
         dejaLa.tics = file;
-        dejaLa.duree = Math.max(nombre(dejaLa.duree), file.length);
+        dejaLa.sources = sources.filter(x => x && (x.tics || []).length > 0);
+        dejaLa.duree = sienne && !memeLancer ? Math.max(file.length, tics.length) : Math.max(nombre(dejaLa.duree), file.length);
         if (idSource) dejaLa.idSource = idSource;
         if (critique) dejaLa.critique = true;
         if (nature && !dejaLa.nature) dejaLa.nature = nature;
     } else {
         cible.etats = [...cible.etats, { nom: nomEtat, duree: tics.length, tics: [...tics],
                                          ...(idSource ? { idSource } : {}), ...(critique ? { critique: true } : {}),
-                                         ...(nature ? { nature } : {}) }];
+                                         ...(nature ? { nature } : {}),
+                                         ...(source ? { sources: [{ cle: source, tics: [...tics] }] } : {}) }];
     }
 }
 
@@ -1104,7 +1170,11 @@ export function chaineDeDegats(cible, attaque, options) {
     if (contre) {
         const pctAnnule = nombre(contre.valeurContre, 20);
         const aAnnuler = Math.floor(degats * (pctAnnule / 100));
-        compte.renvoi = Math.floor(degats * (partRendue(pctAnnule) / 100));
+        // UN CONTRE RENVOIE TOUJOURS QUELQUE CHOSE (v267, Nico : « quand mon
+        // perso fait un contre, l'ennemi ne prend pas les dégâts ») : 10 % d'un
+        // coup de 9, arrondis à l'inférieur, ne renvoyaient rien. Au moins 1.
+        const renvoi = degats * (partRendue(pctAnnule) / 100);
+        compte.renvoi = degats > 0 && renvoi > 0 ? Math.max(1, Math.round(renvoi)) : 0;
         degats = Math.max(0, degats - aAnnuler);
     }
 
@@ -1906,6 +1976,11 @@ export function resoudreCarte(etat, action, plateau) {
     action = ciblesSurSoi(action, idLanceur);
     const lanceur = combattant(suivant, idLanceur);
     if (!lanceur) return { etat: suivant, etapes };
+    // Qui a quitté le contact de son agresseur n'est plus engagé par lui (v267).
+    desengagerLesEloignes(suivant);
+    // L'étalement d'une même compétence ne se cumule pas (empilerEtalement, v267).
+    const sourceEtalement = action.idCarte ? `${idLanceur}|${action.idCarte}` : null;
+    const lancerEtale = new Set();
 
     // LA CONFUSION DÉCIDE D'ABORD SI LA CARTE PART (voir appliquerConfusion).
     // Dissipée : il n'est plus confus, et c'est dit AVANT que la carte ne parte
@@ -2103,7 +2178,7 @@ export function resoudreCarte(etat, action, plateau) {
             const des = desDe(idCible);
 
             // Attaqué au contact : engagé, qu'il esquive ou non (v260).
-            if (attaqueEngage(attaque, lanceur, cible) && engager(cible, idLanceur) && !engagesParLaCarte.includes(idCible)) {
+            if (attaqueEngage(attaque, lanceur, cible) && engager(cible, idLanceur, suivant.manche) && !engagesParLaCarte.includes(idCible)) {
                 engagesParLaCarte.push(idCible);
             }
 
@@ -2195,7 +2270,8 @@ export function resoudreCarte(etat, action, plateau) {
                 // le nombre de tours, une part à chaque fin de manche, comme
                 // les dégâts étalés.
                 if (attaque.estEtalement && soin > 0) {
-                    empilerEtalement(cible, "Soin étalé", partsEtalees(soin, attaque.toursEtalement), undefined, false);
+                    empilerEtalement(cible, "Soin étalé", partsEtalees(soin, attaque.toursEtalement), undefined, false, undefined,
+                                     sourceEtalement, lancerEtale);
                     etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
                     return;
                 }
@@ -2324,7 +2400,7 @@ export function resoudreCarte(etat, action, plateau) {
                 // par fin de manche, autant de parts que de tours.
                 if ((compte.tics || []).length > 0) {
                     empilerEtalement(cible, attaque.versEnergie ? ETAT_TENEBRES_ETALEES : "Étalement", compte.tics, idLanceur, false,
-                                     natureDuCoup(attaqueFrappe));
+                                     natureDuCoup(attaqueFrappe), sourceEtalement, lancerEtale);
                     etapes.push({ type: "etats", cible: idCible, liste: cible.etats });
                 }
 

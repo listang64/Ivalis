@@ -459,21 +459,21 @@ window.REGLAGES_MONSTRES_DEFAUT = Object.freeze({
     tricheNiveau: { base14: 7, parNiveau14: 1, base510: 5, parNiveau510: 2 },
     bonusSortsPct: 20,
     deplacement: { ...(noyauIA().PAS_PAR_PALIER_DEFAUT || { "Petit": 6, "Normal": 5, "Élite": 4, "Boss": 4 }) },
-    leader: { ...(noyauMoteur().LEADER_DEFAUT || { degats: 15, resistances: 15, pv: 15, chanceEtat: 15 }) }
+    leader: { ...(noyauMoteur().LEADER_DEFAUT || { degats: 15, resistances: 15, pv: 15 }) }
 });
 const BORNES_REGLAGES = { bonusDegats: [-50, 200], bonusSortsPct: [-50, 200], deplacement: [0, 15],
                           tricheBase: [-50, 200], trichePente: [-20, 50],
-                          leaderDegats: [-50, 200], leaderResistances: [-50, 70], leaderPv: [0, 300], leaderChanceEtat: [-50, 100] };
-// Les quatre chiffres du leader : leur nom en base, leur borne, leur libellé.
+                          leaderDegats: [-50, 200], leaderResistances: [-50, 70], leaderPv: [0, 300] };
+// Les trois chiffres du leader : leur nom en base, leur borne, leur libellé.
+// (La chance d'état en plus, 15 pts, est retirée en v267 — Nico : « on ne sait
+// pas dans quoi, enlève-la de là et de la création des leaders ».)
 const CHAMPS_LEADER = [
     { cle: "degats", champ: "Degats_Soins_Pct", borne: "leaderDegats", titre: "Dégâts et soins en plus", unite: "%",
       aide: "En pour cent du brut de chaque attaque et de chaque soin, en plus de la triche du niveau du groupe" },
     { cle: "resistances", champ: "Resistances", borne: "leaderResistances", titre: "Défenses physique et magique", unite: "pts",
       aide: "Points ajoutés à ses résistances physique et magique (20 % deviennent 35 %)" },
     { cle: "pv", champ: "PV", borne: "leaderPv", titre: "Points de vie en plus", unite: "PV",
-      aide: "Ajoutés à son maximum de vie" },
-    { cle: "chanceEtat", champ: "Chance_Etat_Pct", borne: "leaderChanceEtat", titre: "Chance de poser un état", unite: "pts",
-      aide: "Points ajoutés à chaque chance d'état de ses compétences (30 % deviennent 45 %)" }
+      aide: "Ajoutés à son maximum de vie" }
 ];
 // Les quatre chiffres de la triche selon le niveau.
 const CHAMPS_TRICHE = [
@@ -1002,25 +1002,35 @@ function tirerVague(vague) {
 // (« aleatoire ») en tire une des quatre. Rend ce qui entre au départ, et les
 // renforts avec leur heure d'entrée (`entreeManche`) ou leur déclencheur
 // (`surReleve` : la relève en leader de l'Apparition 1).
+// UN LEADER DANS 60 % DES COMBATS (v267, Nico : « pour les apparitions de
+// leaders, fais en sorte qu'il y ait 60 % de chance qu'il y ait un leader dans
+// le combat »). Un jet par rencontre : raté, personne ne mène — et la créature
+// qui se relève en leader (Apparition 1, cas 2) n'est plus tirée, puisque
+// c'est un leader elle aussi : l'Apparition 1 devient alors « le chef et sa
+// meute », sans leader.
+window.CHANCE_LEADER_COMBAT = 60;
 window.tirerApparition = function(choix) {
     const choisie = NUMEROS_APPARITION.includes(Number(choix));
     const numero = choisie ? Number(choix) : hasard(NUMEROS_APPARITION);
     const def = window.APPARITIONS[numero];
-    let jet = Math.random() * def.cas.reduce((t, c) => t + c.chance, 0);
-    let indexCas = def.cas.length - 1;
-    for (let i = 0; i < def.cas.length; i++) {
-        if (jet < def.cas[i].chance) { indexCas = i; break; }
-        jet -= def.cas[i].chance;
+    const avecLeader = Math.random() * 100 < window.CHANCE_LEADER_COMBAT;
+    const casPossibles = def.cas.map((c, i) => ({ c, i })).filter(({ c }) => avecLeader || !c.releveEnLeader);
+    const tirables = casPossibles.length > 0 ? casPossibles : def.cas.map((c, i) => ({ c, i }));
+    let jet = Math.random() * tirables.reduce((t, x) => t + x.c.chance, 0);
+    let indexCas = tirables[tirables.length - 1].i;
+    for (const x of tirables) {
+        if (jet < x.c.chance) { indexCas = x.i; break; }
+        jet -= x.c.chance;
     }
     const cas = def.cas[indexCas];
     const depart = tirerVague(cas.depart);
     const renforts = [];
     cas.renforts.forEach(vague => tirerVague(vague).forEach(m => renforts.push(
         { ...m, ...(vague.surReleve ? { surReleve: true } : { entreeManche: 1 + vague.apresTours }) })));
-    if (cas.releveEnLeader && depart[0]) depart[0].releveEnLeader = true;
-    const candidats = cas.leader === "tous" ? [...depart, ...renforts] : cas.leader === "depart" ? depart : [];
+    if (avecLeader && cas.releveEnLeader && depart[0]) depart[0].releveEnLeader = true;
+    const candidats = !avecLeader ? [] : cas.leader === "tous" ? [...depart, ...renforts] : cas.leader === "depart" ? depart : [];
     if (candidats.length > 0) hasard(candidats).leader = true;
-    return { apparition: numero, aleatoire: !choisie, cas: indexCas + 1, nomCas: cas.nom || "", depart, renforts };
+    return { apparition: numero, aleatoire: !choisie, cas: indexCas + 1, nomCas: cas.nom || "", depart, renforts, avecLeader };
 };
 
 // -------------------------------------------------------------------------
@@ -1053,7 +1063,8 @@ window.dessinerTableRencontres = function() {
     const hote = document.getElementById("corps-rencontres-monstres");
     if (!hote) return;
     const vague = (v) => `${v.possibilites.map(texteRepartition).join(" <em>ou</em> ")} <span class="apparition-regle">(${TEXTES_REGLE[v.regle] || ""})</span>`;
-    hote.innerHTML = NUMEROS_APPARITION.map(n => {
+    hote.innerHTML = `<div class="apparition-note-leader">👑 Un leader dans <b>${window.CHANCE_LEADER_COMBAT} %</b> des combats : sinon, personne ne mène (et l'Apparition 1 est toujours « le chef et sa meute »).</div>`
+        + NUMEROS_APPARITION.map(n => {
         const def = window.APPARITIONS[n];
         const lesCas = def.cas.map(cas => {
             const leader = cas.releveEnLeader ? "Mise KO, elle se relève en <b>leader</b>, ses PV et son énergie au plein."
