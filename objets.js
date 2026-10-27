@@ -81,6 +81,53 @@ window.CHANCES_RARETE = {
     "Très difficile": { "Commun": 20, "Rare": 40, "Très rare": 35, "Épique": 5 }
 };
 
+// LE BUTIN PAR MONSTRE VAINCU (Nico, v269, « Vierge 1 ») : chaque créature
+// tombée rapporte un objet, dont la rareté se tire sur la ligne de SA stature
+// (Petit ou Normal) au niveau du groupe. Un Boss lit la ligne Normal, la plus
+// haute du tableau. Au-delà du niveau 10, la ligne du 10.
+window.CHANCES_BUTIN_NIVEAU = {
+    1:  { Petit: { "Commun": 85, "Rare": 15, "Très rare": 0,  "Épique": 0 },
+          Normal: { "Commun": 50, "Rare": 35, "Très rare": 12, "Épique": 3 } },
+    2:  { Petit: { "Commun": 80, "Rare": 17, "Très rare": 3,  "Épique": 0 },
+          Normal: { "Commun": 50, "Rare": 30, "Très rare": 15, "Épique": 5 } },
+    3:  { Petit: { "Commun": 75, "Rare": 20, "Très rare": 5,  "Épique": 0 },
+          Normal: { "Commun": 45, "Rare": 35, "Très rare": 15, "Épique": 5 } },
+    4:  { Petit: { "Commun": 70, "Rare": 23, "Très rare": 6,  "Épique": 1 },
+          Normal: { "Commun": 45, "Rare": 30, "Très rare": 18, "Épique": 7 } },
+    5:  { Petit: { "Commun": 65, "Rare": 25, "Très rare": 8,  "Épique": 2 },
+          Normal: { "Commun": 40, "Rare": 35, "Très rare": 18, "Épique": 7 } },
+    6:  { Petit: { "Commun": 60, "Rare": 27, "Très rare": 10, "Épique": 3 },
+          Normal: { "Commun": 40, "Rare": 30, "Très rare": 20, "Épique": 10 } },
+    7:  { Petit: { "Commun": 55, "Rare": 30, "Très rare": 11, "Épique": 4 },
+          Normal: { "Commun": 35, "Rare": 35, "Très rare": 20, "Épique": 10 } },
+    8:  { Petit: { "Commun": 50, "Rare": 33, "Très rare": 12, "Épique": 5 },
+          Normal: { "Commun": 35, "Rare": 30, "Très rare": 23, "Épique": 12 } },
+    9:  { Petit: { "Commun": 45, "Rare": 36, "Très rare": 13, "Épique": 6 },
+          Normal: { "Commun": 30, "Rare": 35, "Très rare": 23, "Épique": 12 } },
+    10: { Petit: { "Commun": 40, "Rare": 39, "Très rare": 14, "Épique": 7 },
+          Normal: { "Commun": 30, "Rare": 30, "Très rare": 25, "Épique": 15 } }
+};
+
+// La ligne du tableau d'un niveau et d'une stature. Tout ce qui n'est pas
+// « Petit » lit la ligne Normal (le Boss compris).
+window.statureDuButin = (palier) => (palier === "Petit" ? "Petit" : "Normal");
+window.lignesButinNiveau = function(niveau, stature) {
+    const n = Math.min(10, Math.max(1, Math.round(Number(niveau) || 1)));
+    return window.CHANCES_BUTIN_NIVEAU[n][window.statureDuButin(stature)];
+};
+
+// La rareté d'UN objet de butin. `alea` (0..1) se passe pour les bancs d'essai.
+window.tirerRareteButin = function(niveau, stature, alea) {
+    const table = window.lignesButinNiveau(niveau, stature);
+    const total = window.RARETES.reduce((s, r) => s + (table[r] || 0), 0);
+    let jet = (alea === undefined ? Math.random() : alea) * total;
+    for (const rarete of window.RARETES) {
+        jet -= (table[rarete] || 0);
+        if (jet < 0) return rarete;
+    }
+    return "Commun";
+};
+
 // La caractéristique minimale exigée pour PORTER l'objet, selon sa rareté.
 // Revu par Nico : 10 / 11 / 12 / 13 (c'était 0 / 10 / 12 / 12). L'équipement
 // de départ, lui, n'en a aucune (voir equipementDeDepart).
@@ -675,7 +722,12 @@ function estBouclierOuArmure(modele) {
 window.PART_ARMES_BUTIN = 0.75;
 
 window.tirerObjetPourDifficulte = function(difficulte) {
-    const rarete = window.tirerRarete(difficulte);
+    return window.tirerObjetDeRarete(window.tirerRarete(difficulte));
+};
+
+// Un objet d'une rareté déjà tirée (le butin par monstre, v269).
+window.tirerObjetDeRarete = function(rarete) {
+    if (!window.RARETES.includes(rarete)) rarete = "Commun";
     const catalogue = window.MODELES_OBJETS || [];
     const poolArmes = catalogue.filter(m => !estBouclierOuArmure(m));
     const poolDefense = catalogue.filter(estBouclierOuArmure);

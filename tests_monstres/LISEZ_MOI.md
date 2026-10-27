@@ -8072,3 +8072,37 @@ et la patrouille, leader sûr ; la fenêtre se lit en champs), corrections_v267
 (le leader « possible » à 60 %), cerveau_combat et tableaux_nico (la brûlure
 et le poison passent sous le bouclier), campagne_complete (apparitions.js
 chargé avant monstres.js).
+
+## v269 — Le butin par monstre vaincu (tableau « Vierge 1 » de Nico)
+
+UN MONSTRE VAINCU = UN OBJET DE SA CATÉGORIE (loot.js, composerButin). La
+rareté se tire sur la ligne de sa stature, Petit ou Normal (un Boss lit la
+ligne Normal), au niveau du groupe (objets.js, CHANCES_BUTIN_NIVEAU : 10
+niveaux × Petit/Normal × Commun/Rare/Très rare/Épique, les chiffres de Nico ;
+au-delà du 10, la ligne du 10). Chaque joueur reçoit 2 objets : 3 joueurs,
+6 au moins. Moins de 6 créatures : des objets « au hasard » complètent (leur
+ligne : Petit ou Normal à pile ou face). Plus de 6 : le surplus part
+directement à la mise en commun (Butin.commun, qui ouvre la mise en commun
+avant les objets laissés). Un leader, ou plusieurs, ajoute UN objet de plus à
+la mise en commun, tiré sur la stature du plus grand (👑 « Bonus du leader »
+sur sa carte). La cohue de l'Apparition 4 garde sa règle : 2 par joueur, ni
+mise en commun ni bonus.
+
+LA RÉSERVE TIRÉE D'AVANCE SUIT : au début du combat, preparerButinEnAvance
+tire une « prévision » (une rareté par créature du plateau, le complément au
+hasard, le bonus) et range dans la réserve des objets de ces raretés, que le
+dessinateur illustre pendant le combat. À la victoire, chaque créature tombée
+reçoit sa rareté prévue et l'objet de cette rareté dans la réserve ; une
+créature sans prévision (renfort de la dernière seconde, pose à la main) tire
+la sienne à ce moment-là, et ce qui manque à la réserve se tire à neuf (la
+fouille le dessine). La mise en commun d'office est dessinée par le poste du
+premier héros du butin.
+
+corrections_v269.mjs (dans la suite) : les 80 cases du tableau ; le tirage
+sur 20 000 jets ; la composition (minimum, hasard, surplus, un seul bonus de
+la stature du plus grand, la prévision servie telle quelle, la cohue) ; la
+prévision (complétée, stable, renforts, combat d'avant) ; la scène réelle à
+3 héros et 9 créatures dont 2 leaders (10 objets en réserve, dessinés ;
+2 chacun, 4 d'office ; le partage à 6) ; 4 Petits (4 + 2 au hasard) ; un
+renfort sans prévision ; la cohue ; ce que la fenêtre annonce ; les versions.
+Il mord sur l'ancien code (40 échecs).

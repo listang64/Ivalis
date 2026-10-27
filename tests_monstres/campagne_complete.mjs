@@ -695,12 +695,15 @@ verifier("chaque combat a eu son propre butin",
 verifier("et sa propre rencontre",
          new Set(historique.map(h => h.idRencontre)).size === 3);
 
-// Les raretés se tirent sur la ligne « Normale » (v262) : l'épique n'y existe
-// pas (tableau de loot), et le banc doit le voir sur trois combats.
+// Les raretés se tirent, depuis la v269, sur le tableau de Nico par niveau et
+// par stature : un Normal peut donner un Épique dès le niveau 1 (3 %). Le banc
+// regarde que chaque objet porte une rareté du tableau (corrections_v269 en
+// vérifie les chances).
 const raretes = historique.flatMap(h => h.butin.participants
     .flatMap(id => h.butin.parPersonnage[id].items.map(i => i.rarete)));
 console.log("     raretés tirées :", JSON.stringify(raretes));
-verifier("aucun épique ne tombe (ligne Normale)", !raretes.includes("Épique"), `(${raretes.join(",")})`);
+verifier("chaque objet porte une rareté du tableau", raretes.length > 0
+         && raretes.every(r => ["Commun", "Rare", "Très rare", "Épique"].includes(r)), `(${raretes.join(",")})`);
 
 // L'équipement final : chaque objet porté doit venir d'un butin réellement joué.
 const poste = postes[0];

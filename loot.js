@@ -64,6 +64,7 @@ window.imagesEncoreUtilisees = function(options) {
     if (butin) {
         Object.values(butin.parPersonnage || {}).forEach(b => (b.items || []).forEach(ajouterObjet));
         (butin.pool || []).forEach(ajouterObjet);
+        (butin.commun || []).forEach(ajouterObjet);
     }
 
     // La réserve tirée d'avance : ses objets sont déjà payés et attendent la
@@ -528,6 +529,15 @@ window.tirerObjetsAleatoires = function(difficulte, n) {
     return tires;
 };
 
+// Un objet par rareté demandée (le butin par monstre vaincu, v269).
+window.tirerObjetsDeRaretes = function(raretes) {
+    if (typeof window.tirerObjetDeRarete !== "function") {
+        console.warn("Butin : objets.js n'est pas chargé, aucun objet à tirer.");
+        return [];
+    }
+    return (raretes || []).map(r => window.tirerObjetDeRarete(r));
+};
+
 // =========================================================================
 //  LE BUTIN TIRÉ D'AVANCE
 // =========================================================================
@@ -595,6 +605,136 @@ window.participantsAuButin = function() {
         .map(p => p.idPersonnage);
 };
 
+// =========================================================================
+//  LE BUTIN PAR MONSTRE VAINCU (Nico, v269)
+// =========================================================================
+//  « 1 monstre vaincu = 1 loot de sa catégorie » : la rareté se tire sur la
+//  ligne de sa stature (Petit / Normal) au niveau du groupe (objets.js,
+//  CHANCES_BUTIN_NIVEAU). Chaque joueur reçoit 2 objets : 3 joueurs, 6 objets
+//  au moins. Moins de 6 créatures ? Des objets « au hasard » complètent
+//  jusqu'à 6. Plus ? Le surplus part directement à la mise en commun. Et un
+//  leader (ou plusieurs : le bonus est unique) ajoute un objet de plus à la
+//  mise en commun, tiré sur la stature du plus grand d'entre eux.
+//
+//  Les raretés se tirent D'AVANCE, au début du combat (la « prévision », dans
+//  le document de la réserve) : c'est ce qui permet de dessiner pendant le
+//  combat les objets que la victoire servira vraiment. Une créature arrivée
+//  sans prévision (posée à la main, renfort de la dernière seconde) tire sa
+//  rareté à la victoire, comme le reste qui manquerait.
+
+// Le niveau qui choisit la ligne du tableau : celui du groupe (monstres.js).
+window.niveauDuButin = () => Math.max(1, Math.round(Number(window.NIVEAU_GROUPE) || 1));
+
+// Les créatures qui rapportent un objet : les mêmes que pour l'XP — un leurre
+// ou le compagnon du Pisteur, non ; un zombie, oui (il est tombé une fois).
+// `toutes` : aussi celles encore debout (la prévision du début de combat).
+window.creaturesDuButin = function(toutes) {
+    const tombee = (m) => m.statut === "Mort" || m.zombie
+        || (typeof window.estCombattantMort === "function" && window.estCombattantMort(m.idPersonnage));
+    return (window.MONSTRES_PARTIE || [])
+        .filter(m => m && m.idPersonnage && !m.estIllusion && !m.compagnonDe && (toutes || tombee(m)))
+        .map(m => ({ id: m.idPersonnage, stature: window.statureDuButin(m.Palier || m.palier),
+                     leader: !!(m.leader || m.Leader) }));
+};
+
+// La stature d'un objet « au hasard » : Petit ou Normal, à pile ou face.
+window.statureAuHasard = (alea) => ((alea || Math.random)() < 0.5 ? "Petit" : "Normal");
+
+// La stature qui donne le bonus de leader : celle du plus grand.
+window.statureDuBonus = function(creatures) {
+    const leaders = (creatures || []).filter(c => c.leader);
+    if (leaders.length === 0) return null;
+    return leaders.some(c => c.stature === "Normal") ? "Normal" : "Petit";
+};
+
+// Ce que la victoire distribue, en raretés : qui reçoit quoi, et ce qui part
+// à la mise en commun. Pur (le hasard se passe en `alea`) — c'est ce qui le
+// rend vérifiable au banc.
+//   creatures    : [{ id, stature, leader }] — les créatures tombées
+//   participants : les héros qui touchent une part
+//   prevision    : { monstres: {id: rareté}, hasard: [rareté], bonus: {stature, rarete} }
+//   parHeros     : 2 (le réglage de la cohue peut le changer)
+//   sansPartage  : la cohue (Apparition 4) — pas de mise en commun, pas de bonus
+window.composerButin = function(o) {
+    const alea = o.alea || Math.random;
+    const prevision = o.prevision || {};
+    const niveau = o.niveau || window.niveauDuButin();
+    const participants = o.participants || [];
+    const parHeros = Number.isFinite(Number(o.parHeros)) ? Math.max(0, Number(o.parHeros)) : window.NB_OBJETS_PAR_HEROS;
+    const tirer = (stature) => window.tirerRareteButin(niveau, stature, alea());
+    const creatures = o.creatures || [];
+
+    const lots = creatures.map(c => ({
+        rarete: (prevision.monstres || {})[c.id] || tirer(c.stature),
+        origine: "monstre", stature: c.stature, idMonstre: c.id
+    }));
+    const minimum = participants.length * parHeros;
+    const hasardPrevu = (prevision.hasard || []).slice();
+    while (lots.length < minimum) {
+        lots.push({ rarete: hasardPrevu.length ? hasardPrevu.shift() : tirer(window.statureAuHasard(alea)), origine: "hasard" });
+    }
+    // Personne ne sait d'avance quel cadavre lui revient.
+    for (let i = lots.length - 1; i > 0; i--) {
+        const j = Math.floor(alea() * (i + 1));
+        [lots[i], lots[j]] = [lots[j], lots[i]];
+    }
+    const parPersonnage = {};
+    participants.forEach((id, i) => { parPersonnage[id] = lots.slice(i * parHeros, (i + 1) * parHeros); });
+    if (o.sansPartage) return { parPersonnage, commun: [] };
+
+    const commun = lots.slice(minimum);
+    const stature = window.statureDuBonus(creatures);
+    if (stature) {
+        const prevu = prevision.bonus && prevision.bonus.stature === stature ? prevision.bonus.rarete : null;
+        commun.push({ rarete: prevu || tirer(stature), origine: "leader", stature });
+    }
+    return { parPersonnage, commun };
+};
+
+// La prévision du combat en cours, complétée : une rareté pour chaque créature
+// du plateau (debout ou tombée) qui n'en a pas, assez d'objets « au hasard »
+// pour arriver au minimum, le bonus si un leader est là. `null` quand il n'y
+// a rien à ajouter. Les créatures disparues du plateau (combat d'avant)
+// quittent la prévision.
+window.completerPrevision = function(prevision, creatures, nbHeros, niveau, alea) {
+    const tirer = (stature) => window.tirerRareteButin(niveau, stature, (alea || Math.random)());
+    const avant = prevision || {};
+    const monstres = {};
+    let change = !!avant.niveau && avant.niveau !== niveau;
+    creatures.forEach(c => {
+        const deja = !change && (avant.monstres || {})[c.id];
+        monstres[c.id] = deja || tirer(c.stature);
+        if (!deja) change = true;
+    });
+    if (Object.keys(avant.monstres || {}).some(id => !(id in monstres))) change = true;
+    const besoinHasard = Math.max(0, nbHeros * window.NB_OBJETS_PAR_HEROS - creatures.length);
+    const hasard = change ? [] : (avant.hasard || []).slice();
+    while (hasard.length < besoinHasard) { hasard.push(tirer(window.statureAuHasard(alea))); change = true; }
+    const stature = window.statureDuBonus(creatures);
+    let bonus = (!change && avant.bonus) || null;
+    if (stature && !(bonus && bonus.stature === stature)) { bonus = { stature, rarete: tirer(stature) }; change = true; }
+    if (!stature && bonus) { bonus = null; change = true; }
+    return change ? { niveau, monstres, hasard, bonus } : null;
+};
+
+// Les raretés que la réserve doit tenir prêtes pour cette prévision.
+window.raretesDeLaPrevision = function(prevision, nbCreatures, nbHeros) {
+    if (!prevision) return [];
+    const besoinHasard = Math.max(0, nbHeros * window.NB_OBJETS_PAR_HEROS - nbCreatures);
+    return [...Object.values(prevision.monstres || {}),
+            ...(prevision.hasard || []).slice(0, besoinHasard),
+            ...(prevision.bonus ? [prevision.bonus.rarete] : [])];
+};
+
+// Ce qui manque à la réserve, rareté par rareté.
+window.raretesManquantes = function(items, raretes) {
+    const dispo = {};
+    (items || []).forEach(it => { const r = it.rarete || "Commun"; dispo[r] = (dispo[r] || 0) + 1; });
+    const manque = [];
+    (raretes || []).forEach(r => { if (dispo[r] > 0) dispo[r]--; else manque.push(r); });
+    return manque;
+};
+
 // Ce que ce poste a vu de la réserve, pour ne pas retourner la lire à chaque
 // notification de la partie. Quand elle est pleine et dessinée, il n'y a plus
 // jamais rien à faire : pas une lecture, pas une écriture.
@@ -613,8 +753,10 @@ window.dessinReserveEnCours = function(reserve) {
     return (Date.now() - reserve.dessinLe) < window.DELAI_DESSIN_RESERVE_MS;
 };
 
-// Complète la réserve de cette difficulté jusqu'à deux objets par héros, puis
-// envoie chez le dessinateur ce qui n'a pas encore de visage.
+// Complète la réserve de cette difficulté jusqu'à ce que la victoire promet
+// (v269 : un objet par créature du plateau, le complément au hasard, le bonus
+// de leader — voir completerPrevision), puis envoie chez le dessinateur ce qui
+// n'a pas encore de visage.
 //
 // Rejouée à chaque notification de la partie, comme la piste d'initiative :
 // elle DOIT donc être bon marché quand il n'y a rien à faire. Le premier
@@ -650,13 +792,19 @@ window.preparerButinEnAvance = async function() {
     const participants = window.participantsAuButin();
     if (participants.length === 0) return;
 
-    const cible = participants.length * window.NB_OBJETS_PAR_HEROS;
+    // Ce que la victoire servira (v269) : un objet par créature du plateau,
+    // le complément « au hasard », le bonus de leader.
+    const creatures = window.creaturesDuButin(true);
+    const niveau = window.niveauDuButin();
+    const nbHeros = participants.length;
     const cle = window.cleReserve(difficulte);
     const chemin = window.cheminReserve(window.ID_PARTIE_COURANTE, difficulte);
 
-    // LE CAS ORDINAIRE, ET IL DOIT ÊTRE GRATUIT.
+    // LE CAS ORDINAIRE, ET IL DOIT ÊTRE GRATUIT : la prévision connue couvre
+    // déjà chaque créature du plateau, et la réserve tient ses raretés.
     const connue = window.RESERVE_CONNUE[cle] || null;
-    if (connue && !window.reserveADuTravail(connue, cible)) return;
+    if (connue && !window.completerPrevision(connue.prevision, creatures, nbHeros, niveau)
+        && !window.reserveADuTravail(connue, window.raretesDeLaPrevision(connue.prevision, creatures.length, nbHeros))) return;
 
     // On ne retourne pas voir toutes les cinq secondes : ce qu'on ignore, c'est
     // le travail d'un AUTRE poste, et il ne va pas plus vite parce qu'on regarde.
@@ -674,8 +822,12 @@ window.preparerButinEnAvance = async function() {
         vue = actuel;
         const liste = ((actuel && actuel.items) || []).slice();
 
-        const manquants = cible - liste.length;
-        if (manquants > 0) liste.push(...window.tirerObjetsAleatoires(difficulte, manquants));
+        const avant = (actuel && actuel.prevision) || null;
+        const nouvelle = window.completerPrevision(avant, creatures, nbHeros, niveau);
+        const prevision = nouvelle || avant;
+        const raretes = window.raretesManquantes(liste, window.raretesDeLaPrevision(prevision, creatures.length, nbHeros));
+        const manquants = raretes.length;
+        if (manquants > 0) liste.push(...window.tirerObjetsDeRaretes(raretes));
 
         const aDessiner = liste.some(it => !it.image);
         const jePeuxDessiner = typeof window.peutIllustrerLesObjets === "function"
@@ -684,7 +836,7 @@ window.preparerButinEnAvance = async function() {
         // Rien à ajouter, et le dessin est fait ou déjà pris en charge : on se
         // retire sans rien écrire. C'est ce `null` qui empêche les deux autres
         // postes de lancer le dessinateur à leur tour.
-        if (manquants <= 0 && (!aDessiner || !jePeuxDessiner
+        if (manquants <= 0 && !nouvelle && (!aDessiner || !jePeuxDessiner
                                || window.dessinReserveEnCours(actuel))) return null;
 
         ecrite = {
@@ -695,6 +847,7 @@ window.preparerButinEnAvance = async function() {
             creeLe: (actuel && actuel.creeLe) || Date.now(),
             difficulte,
             items: liste,
+            prevision,
             // La revendication du dessin voyage dans la MÊME écriture que les
             // objets : impossible pour un poste de voir les uns sans l'autre.
             //
@@ -712,8 +865,8 @@ window.preparerButinEnAvance = async function() {
     // Seul le poste qui a RÉELLEMENT écrit paie les images. Les autres ont vu
     // leur transaction rendre null (un concurrent les a doublés) et se taisent.
     if (!aEcrit) return;
-    if (!vue || ((vue.items || []).length < cible)) {
-        console.log(`🎁 Butin préparé d'avance : ${cible} objet(s) en réserve pour une rencontre ${difficulte}.`);
+    if (!vue || ((vue.items || []).length < (ecrite.items || []).length)) {
+        console.log(`🎁 Butin préparé d'avance : ${(ecrite.items || []).length} objet(s) en réserve pour une rencontre ${difficulte}.`);
     }
     await window.lancerIllustrationReserve(ecrite, chemin);
 };
@@ -721,9 +874,11 @@ window.preparerButinEnAvance = async function() {
 // Reste-t-il quelque chose à faire sur cette réserve ? La question se pose deux
 // fois — avant d'aller la lire, et une fois lue — et elle doit donner la même
 // réponse aux deux endroits.
-window.reserveADuTravail = function(reserve, cible) {
+// `raretes` : ce que la prévision attend (v269) ; un nombre (l'ancienne
+// forme) demande seulement autant d'objets, de n'importe quelle rareté.
+window.reserveADuTravail = function(reserve, raretes) {
     const items = (reserve && reserve.items) || [];
-    if (items.length < cible) return true;
+    if (Array.isArray(raretes) ? window.raretesManquantes(items, raretes).length > 0 : items.length < raretes) return true;
     if (!items.some(it => !it.image)) return false;
     if (typeof window.peutIllustrerLesObjets !== "function" || !window.peutIllustrerLesObjets()) return false;
     return !window.dessinReserveEnCours(reserve);
@@ -790,10 +945,26 @@ window.poserImageDansLaReserve = async function(chemin, uid, url, objet) {
 // cadavres s'en chargera, exactement comme avant cette mécanique.
 // `parHeros` (v268) : combien d'objets chacun reçoit (les cohues de
 // l'Apparition 4 en donnent 2 au hasard, Apparition_Butin).
-window.servirDepuisLaReserve = function(reserve, participants, difficulte, parHeros) {
+// `plan` (v269, composerButin) : les raretés de chacun et de la mise en
+// commun. Chaque objet se prend dans la réserve à rareté égale, sinon se tire
+// à neuf ; il garde d'où il vient (`origine` : monstre, hasard, leader).
+window.servirDepuisLaReserve = function(reserve, participants, difficulte, parHeros, plan) {
     const utilisable = reserve && (!reserve.difficulte || reserve.difficulte === difficulte);
     const disponibles = ((utilisable && reserve.items) || []).slice();
     const parPersonnage = {};
+    if (plan) {
+        const servir = (lot) => {
+            const i = disponibles.findIndex(it => (it.rarete || "Commun") === lot.rarete);
+            const objet = i >= 0 ? disponibles.splice(i, 1)[0] : window.tirerObjetsDeRaretes([lot.rarete])[0];
+            return objet ? Object.assign({}, objet, { origine: lot.origine }) : null;
+        };
+        participants.forEach(id => {
+            parPersonnage[id] = { items: ((plan.parPersonnage || {})[id] || []).map(servir).filter(Boolean),
+                                  decisions: {}, valide: false };
+        });
+        const commun = (plan.commun || []).map(servir).filter(Boolean);
+        return { parPersonnage, commun, restants: disponibles, utilise: !!utilisable };
+    }
     const combien = Number.isFinite(Number(parHeros)) ? Math.max(0, Number(parHeros)) : window.NB_OBJETS_PAR_HEROS;
     participants.forEach(id => {
         const items = [];
@@ -821,7 +992,8 @@ window.reglerLaReserveApresPartage = async function(chemin, reserve, restants) {
     const cle = window.cleReserve(reserve.difficulte);
     try {
         if (restants.length > 0) {
-            const suite = Object.assign({}, reserve, { items: restants, dessinLe: null });
+            // La prévision appartenait au combat qui vient d'être servi.
+            const suite = Object.assign({}, reserve, { items: restants, dessinLe: null, prevision: null });
             await io.lot([{ op: "set", chemin, data: suite }]);
             window.RESERVE_CONNUE[cle] = suite;
         } else {
@@ -932,6 +1104,8 @@ window.demarrerButin = async function() {
     // Elle voyage avec le butin, donc sous la même transaction : un seul poste
     // la distribue, une seule fois par combat.
     const xpVictoire = window.xpDeLaVictoire();
+    // Les créatures tombées, lues AVANT la transaction (la liste est locale).
+    const creatures = window.creaturesDuButin(false);
 
     // LA RÉSERVE SE LIT AVANT LA TRANSACTION, parce qu'elle vit dans son propre
     // document (voir plus haut : le butin n'a rien à faire sur le document que
@@ -1015,7 +1189,17 @@ window.demarrerButin = async function() {
         // même instant ne distribuent pas deux fois les mêmes objets.
         // Le butin d'une cohue (v268) : tant d'objets par joueur, pas de partage.
         const butinCas = data.Apparition_Butin || null;
-        const service = window.servirDepuisLaReserve(reserveLue, participants, difficulte, butinCas ? butinCas.parJoueur : undefined);
+        // LE BUTIN PAR MONSTRE VAINCU (v269) : un objet par créature tombée,
+        // complété au hasard jusqu'à deux par héros, le surplus et le bonus de
+        // leader à la mise en commun.
+        const prevision = reserveLue && (!reserveLue.difficulte || reserveLue.difficulte === difficulte)
+            ? reserveLue.prevision : null;
+        const plan = window.composerButin({
+            creatures, participants, prevision, niveau: window.niveauDuButin(),
+            parHeros: butinCas ? butinCas.parJoueur : undefined,
+            sansPartage: !!(butinCas && butinCas.partage === false)
+        });
+        const service = window.servirDepuisLaReserve(reserveLue, participants, difficulte, undefined, plan);
         const parPersonnage = service.parPersonnage;
 
         return { resultat: { restants: service.restants, utilise: service.utilise, xp: xpVictoire },
@@ -1034,6 +1218,9 @@ window.demarrerButin = async function() {
             // L'XP que chaque héros vient de gagner (annoncée dans la fenêtre).
             xp: xpVictoire,
             ...(butinCas && butinCas.partage === false ? { sansPartage: true } : {}),
+            // Ce qui part directement à la mise en commun : le surplus des
+            // créatures, le bonus de leader (v269).
+            commun: service.commun || [],
             pool: [],
             poolValides: [],
             resolu: false
@@ -1575,8 +1762,18 @@ window.rendreVuePersonnelleButin = function(butin, mesPersonnages, herosCourant)
         ? `<p class="butin-file-heros">Ensuite : ${suivants.map(p => p.prenom).join(", ")}</p>`
         : "";
 
+    // Ce qui attend déjà à la mise en commun (v269 : le surplus des créatures,
+    // le bonus de leader), pour que personne ne garde un objet par crainte de
+    // repartir les mains vides.
+    const commun = butin.commun || [];
+    const bonus = commun.some(it => it.origine === "leader");
+    const annonceCommun = commun.length > 0
+        ? `<p class="butin-annonce-commun">🎁 À la mise en commun : ${commun.length} objet${commun.length > 1 ? "s" : ""} de plus${bonus ? " (dont le bonus du leader)" : ""}.</p>`
+        : "";
+
     conteneur.innerHTML = `
         <div class="bloc-heros-butin">
+            ${annonceCommun}
             <div class="butin-grille">${cartes}</div>
             <div class="butin-actions">
                 <button class="btn-parametres" style="background-color:#1b6e3a; border-color:#0f4021;${tousDecides ? "" : " opacity:0.4; cursor:not-allowed;"}"
@@ -1786,7 +1983,8 @@ window.validerButinPersonnel = async function(idPersonnage) {
             maj["Butin.resolu"] = true;
             maj["Butin.etape"] = "termine";
         } else if (tousValides) {
-            const pool = [];
+            // Le surplus et le bonus de leader ouvrent la mise en commun (v269).
+            const pool = (butin.commun || []).map(item => ({ ...item, candidats: [], gagnant: null }));
             butin.participants.forEach(id => {
                 const b = butin.parPersonnage[id];
                 const decisions = id === idPersonnage ? (bloc.decisions || {}) : (b.decisions || {});
@@ -1869,6 +2067,7 @@ window.rendreCarteLootPool = function(item, mesIds, dejaValide) {
         <div class="carre-equipement">${image}</div>
         <div class="libelle-emplacement">${window.libelleEmplacement(item)}</div>
         <div class="nom-objet-equipe">${item.nom}</div>
+        ${item.origine === "leader" ? `<div class="origine-loot">👑 Bonus du leader</div>` : ""}
         ${window.bandeauObjetButin(item, mesIds[0])}
         <div class="effet-objet-equipe">${item.effetTexte || ""}</div>
         <div class="candidats-loot">${nomsCandidats.length ? "Convoité par : " + nomsCandidats.join(", ") : "Personne pour l'instant"}</div>

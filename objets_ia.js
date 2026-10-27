@@ -454,6 +454,11 @@ window.objetsAIllustrer = function(butin, idsPersonnages) {
         const bloc = butin.parPersonnage[id];
         (bloc && bloc.items || []).forEach(item => { if (!item.image) sortie.push(item); });
     });
+    // La mise en commun d'office (v269 : surplus, bonus de leader) n'est à
+    // personne : le poste du premier héros du butin la fait dessiner.
+    if ((idsPersonnages || []).includes((butin.participants || [])[0])) {
+        (butin.commun || []).forEach(item => { if (!item.image) sortie.push(item); });
+    }
     return sortie;
 };
 
@@ -495,6 +500,14 @@ window.poserImageObjetEnBase = async function(uid, url, objet) {
             Object.assign(cible, extra);
             maj[`Butin.parPersonnage.${id}.items`] = items;
         });
+
+        const commun = butin.commun || [];
+        const dansCommun = commun.find(it => it.uid === uid);
+        if (dansCommun && !dansCommun.image) {
+            dansCommun.image = url;
+            Object.assign(dansCommun, extra);
+            maj["Butin.commun"] = commun;
+        }
 
         const pool = butin.pool || [];
         const dansPool = pool.find(it => it.uid === uid);
