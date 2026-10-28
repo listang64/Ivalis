@@ -3472,62 +3472,138 @@ window.fantomeAllieKO = function(idPerso, data, taille) {
 };
 
 // =========================================================================
-//  L'AURA DU LEADER (v265)
+//  L'AURA DU LEADER (v265 ; v271 : le feu rouge de Nico)
 // =========================================================================
-//  Nico : « refais l'anneau rouge autour des tokens des leaders, quelque chose
-//  de plus organique, plus joli et un peu plus discret, qui ondule doucement
-//  autour. Quand je zoome ou dézoome, ça déplace ce cercle. »
+//  v265, Nico : « quand je zoome ou dézoome, ça déplace ce cercle ». LE
+//  DÉCALAGE venait d'un translate(-50 %, -50 %) dans une animation CSS de
+//  transform, que Safari calcule sur l'ancienne taille du pion. Ici, toujours
+//  aucune animation CSS de transform : la boîte se cale par ses bords
+//  (style.css), et tout ce qui bouge le fait DANS le SVG, en unités de son
+//  propre repère — l'aura suit le pion à toutes les échelles.
 //
-//  LE DÉCALAGE AU ZOOM venait du centrage : un translate(-50 %, -50 %) DANS une
-//  animation CSS de transform. Pendant qu'elle tourne, Safari garde ce
-//  pourcentage calculé sur l'ancienne taille du pion ; le pion grandit au
-//  zoom, l'aura reste décalée. Ici, plus aucune animation de transform : la
-//  boîte se cale par ses bords (style.css), et tout ce qui bouge le fait DANS
-//  un SVG, en unités de son propre repère — il suit le pion à toutes les
-//  échelles.
+//  v271, Nico, une image à l'appui : « pour les monstres leader, exactement
+//  cet effet sous le token, en mouvement ». Ce qu'elle montre, couche par
+//  couche, de l'extérieur vers le pion :
+//    · des langues de fumée rouge, translucides, qui partent du bord du pion
+//      et s'enroulent toutes dans le même sens, jusqu'à une fois et demie son
+//      rayon ; plusieurs nappes superposées, plus claires vers le bout ;
+//    · un halo rouge qui baigne le tout ;
+//    · un anneau rouge vif, au cœur presque blanc, collé au bord du médaillon,
+//      avec deux éclats de lumière (en haut, en bas) ;
+//    · des gouttelettes rouges éparpillées autour.
+//  EN MOUVEMENT : chaque nappe tourne à sa vitesse (deux dans un sens, une
+//  dans l'autre) À TRAVERS un champ de turbulence fixe — les langues se
+//  tordent et se reforment en passant, comme une fumée, sans qu'aucune ne
+//  tourne d'un bloc. L'anneau respire, les éclats palpitent, les gouttelettes
+//  s'échappent et s'éteignent.
 //
-//  L'ANNEAU : trois traits superposés (un halo large et pâle, un trait moyen,
-//  un fil vif) qui suivent la même forme ronde légèrement bosselée, et qui
-//  passent d'une forme à l'autre en boucle — il ondule sans jamais tourner
-//  d'un bloc. Un quatrième fil, pointillé et très pâle, glisse lentement
-//  autour. Le tout respire à peine. Le repère : le pion a un rayon de 37,5
-//  (la boîte fait 160 % du pion, 120 unités de côté).
-const RAYON_AURA = 41, AMPLEUR_AURA = 2.8, DUREE_AURA = 7;
-function formeAura(rayon, ampleur, graine) {
-    const n = 9;
-    const pts = Array.from({ length: n }, (_, i) => {
-        const a = (i / n) * Math.PI * 2;
-        const r = rayon + ampleur * (0.6 * Math.sin(a * 2 + graine * 1.7) + 0.4 * Math.sin(a * 3 + graine * 2.9));
-        return [r * Math.cos(a), r * Math.sin(a)];
-    });
-    const f = (v) => v.toFixed(2);
-    const point = (i) => pts[(i + n) % n];
-    // Une courbe fermée qui passe par chaque point (Catmull-Rom → Bézier).
-    let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
-    for (let i = 0; i < n; i++) {
-        const p0 = point(i - 1), p1 = point(i), p2 = point(i + 1), p3 = point(i + 2);
-        d += ` C${f(p1[0] + (p2[0] - p0[0]) / 6)} ${f(p1[1] + (p2[1] - p0[1]) / 6)}`
-           + ` ${f(p2[0] - (p3[0] - p1[0]) / 6)} ${f(p2[1] - (p3[1] - p1[1]) / 6)} ${f(p2[0])} ${f(p2[1])}`;
-    }
-    return d + "Z";
+//  Le repère : le pion fait 100 unités (rayon 50), la boîte de l'aura 200
+//  (200 % du pion, style.css). Tout est tiré d'une graine fixe : chaque
+//  leader porte la même aura, et le dessin ne change pas d'un rendu à l'autre.
+const RAYON_PION_AURA = 50;
+function hasardAura(graine) {
+    let n = graine;
+    return () => { n = (n * 16807) % 2147483647; return (n - 1) / 2147483646; };
 }
-const FORMES_AURA = [0, 1, 2, 3, 0].map(g => formeAura(RAYON_AURA, AMPLEUR_AURA, g)).join(";");
-const DOUX_AURA = Array(4).fill("0.45 0 0.55 1").join(";");
-const traitAura = (largeur, opacite, decalage) => `<path fill="none" stroke="#ff3b3b" stroke-width="${largeur}" stroke-opacity="${opacite}"
-      stroke-linejoin="round" d="${formeAura(RAYON_AURA, AMPLEUR_AURA, 0)}">
-      <animate attributeName="d" dur="${DUREE_AURA}s" begin="${decalage}s" repeatCount="indefinite" calcMode="spline"
-               keyTimes="0;0.25;0.5;0.75;1" keySplines="${DOUX_AURA}" values="${FORMES_AURA}"/></path>`;
-const SVG_AURA = `<svg viewBox="-60 -60 120 120" aria-hidden="true">
-    <defs><radialGradient id="aura-halo" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="47">
-      <stop offset="0.78" stop-color="#ff2a2a" stop-opacity="0"/><stop offset="0.88" stop-color="#ff2a2a" stop-opacity="0.18"/>
-      <stop offset="1" stop-color="#ff2a2a" stop-opacity="0"/></radialGradient></defs>
-    <g opacity="0.8">
-      <animate attributeName="opacity" values="0.6;0.85;0.6" dur="3.6s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1"/>
-      <circle r="47" fill="url(#aura-halo)"/>
-      ${traitAura(9, 0.14, 0)}${traitAura(4.5, 0.26, -0.4)}${traitAura(1.4, 0.9, -0.8)}
-      <circle r="45.5" fill="none" stroke="#ff8a8a" stroke-width="0.7" stroke-opacity="0.35" stroke-dasharray="1.5 7" stroke-linecap="round">
-        <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="48s" repeatCount="indefinite"/></circle>
-    </g></svg>`;
+const fAura = (v) => v.toFixed(2);
+const polaireAura = (r, a) => [r * Math.cos(a), r * Math.sin(a)];
+// Une langue de fumée : sa base posée sur le bord du pion (largeur en
+// radians), sa pointe à `longueur` plus loin, décalée de `torsion` radians —
+// toutes dans le même sens, d'où l'enroulement.
+function langueAura(angle, largeur, longueur, torsion, r0) {
+    const P = (r, a) => polaireAura(r, a).map(fAura).join(" ");
+    const g = angle - largeur / 2, d = angle + largeur / 2, bout = r0 + longueur, pointe = angle + torsion;
+    return `M${P(r0, g)}`
+        + ` C${P(r0 + longueur * 0.35, g + torsion * 0.15)} ${P(r0 + longueur * 0.8, pointe - largeur * 0.25)} ${P(bout, pointe)}`
+        + ` C${P(r0 + longueur * 0.7, pointe + largeur * 0.45)} ${P(r0 + longueur * 0.3, d + torsion * 0.45)} ${P(r0, d)}`
+        + ` A${r0} ${r0} 0 0 0 ${P(r0, g)}Z`;
+}
+// Une nappe : `n` langues réparties tout autour, chacune un peu différente.
+function nappeAura(graine, n, longueur, largeur, torsion) {
+    const h = hasardAura(graine);
+    return Array.from({ length: n }, (_, i) => {
+        const a = (i / n) * Math.PI * 2 + (h() - 0.5) * 0.35;
+        return langueAura(a, largeur * (0.75 + h() * 0.5), longueur * (0.7 + h() * 0.45),
+                          torsion * (0.75 + h() * 0.5), RAYON_PION_AURA - 2);
+    }).join(" ");
+}
+// Les filets : les traits plus sombres et nets qui strient la fumée de
+// l'image, chacun finissant en crochet (la pointe qui s'enroule).
+function filetsAura(graine, n, longueur, torsion) {
+    const h = hasardAura(graine);
+    const P = (r, a) => polaireAura(r, a).map(fAura).join(" ");
+    return Array.from({ length: n }, (_, i) => {
+        const a = (i / n) * Math.PI * 2 + (h() - 0.5) * 0.5;
+        const L = longueur * (0.75 + h() * 0.45), t = torsion * (0.8 + h() * 0.45), r0 = RAYON_PION_AURA + 1;
+        const bout = r0 + L, pointe = a + t;
+        return `M${P(r0, a)} C${P(r0 + L * 0.4, a + t * 0.2)} ${P(r0 + L * 0.85, pointe - 0.12)} ${P(bout, pointe)}`
+             + ` C${P(bout + 5, pointe + 0.1)} ${P(bout + 2, pointe + 0.24)} ${P(bout - 4, pointe + 0.22)}`;
+    }).join(" ");
+}
+const filetsTournants = (d, couleur, largeur, opacite, duree, sens) =>
+    `<g><animateTransform attributeName="transform" type="rotate" from="0" to="${360 * sens}" dur="${duree}s" repeatCount="indefinite"/>
+       <path d="${d}" fill="none" stroke="${couleur}" stroke-width="${largeur}" stroke-opacity="${opacite}" stroke-linecap="round"/></g>`;
+// La nappe qui tourne : `sens` 1 ou −1, `duree` le tour complet.
+const nappeTournante = (d, remplissage, opacite, duree, sens) =>
+    `<g><animateTransform attributeName="transform" type="rotate" from="0" to="${360 * sens}" dur="${duree}s" repeatCount="indefinite"/>
+       <path d="${d}" fill="${remplissage}" fill-opacity="${opacite}"/></g>`;
+// Les gouttelettes : certaines s'échappent du bord et s'éteignent, d'autres
+// flottent en place (les points épars de l'image).
+function gouttesAura() {
+    const h = hasardAura(4242);
+    const fuyantes = Array.from({ length: 12 }, () => {
+        const angle = h() * 360, dur = 2.6 + h() * 2.4, debut = -h() * dur, r = 0.9 + h() * 1.1;
+        const depart = -(RAYON_PION_AURA + 6 + h() * 8), arrivee = -(RAYON_PION_AURA + 34 + h() * 14);
+        return `<g transform="rotate(${fAura(angle)})"><circle cx="0" cy="${fAura(depart)}" r="${fAura(r)}" fill="#ff1f1f" opacity="0">
+            <animate attributeName="cy" values="${fAura(depart)};${fAura(arrivee)}" dur="${fAura(dur)}s" begin="${fAura(debut)}s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0.95;0.8;0" keyTimes="0;0.15;0.65;1" dur="${fAura(dur)}s" begin="${fAura(debut)}s" repeatCount="indefinite"/></circle></g>`;
+    }).join("");
+    const eparses = Array.from({ length: 10 }, () => {
+        const [x, y] = polaireAura(RAYON_PION_AURA + 26 + h() * 22, h() * Math.PI * 2);
+        const dur = 2 + h() * 3;
+        return `<circle cx="${fAura(x)}" cy="${fAura(y)}" r="${fAura(0.7 + h() * 1.2)}" fill="#e01010">
+            <animate attributeName="opacity" values="0.25;0.9;0.25" dur="${fAura(dur)}s" begin="${fAura(-h() * dur)}s" repeatCount="indefinite"/></circle>`;
+    }).join("");
+    return eparses + fuyantes;
+}
+const SVG_AURA = `<svg viewBox="-100 -100 200 200" aria-hidden="true">
+    <defs>
+      <radialGradient id="aura-feu" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="${RAYON_PION_AURA + 46}">
+        <stop offset="${fAura((RAYON_PION_AURA - 2) / (RAYON_PION_AURA + 46))}" stop-color="#ff1414" stop-opacity="0.95"/>
+        <stop offset="${fAura((RAYON_PION_AURA + 14) / (RAYON_PION_AURA + 46))}" stop-color="#ff2020" stop-opacity="0.6"/>
+        <stop offset="${fAura((RAYON_PION_AURA + 30) / (RAYON_PION_AURA + 46))}" stop-color="#ff4a4a" stop-opacity="0.25"/>
+        <stop offset="1" stop-color="#ff6b6b" stop-opacity="0"/></radialGradient>
+      <radialGradient id="aura-halo-feu" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="${RAYON_PION_AURA + 30}">
+        <stop offset="${fAura((RAYON_PION_AURA - 4) / (RAYON_PION_AURA + 30))}" stop-color="#ff0000" stop-opacity="0.75"/>
+        <stop offset="${fAura((RAYON_PION_AURA + 8) / (RAYON_PION_AURA + 30))}" stop-color="#ff1a1a" stop-opacity="0.3"/>
+        <stop offset="1" stop-color="#ff1a1a" stop-opacity="0"/></radialGradient>
+      <radialGradient id="aura-eclat" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="#ffffff" stop-opacity="1"/><stop offset="0.35" stop-color="#ff8080" stop-opacity="0.8"/>
+        <stop offset="1" stop-color="#ff0000" stop-opacity="0"/></radialGradient>
+      <filter id="aura-fumee" x="-10%" y="-10%" width="120%" height="120%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="7" result="bruit"/>
+        <feDisplacementMap in="SourceGraphic" in2="bruit" scale="11" xChannelSelector="R" yChannelSelector="G" result="tordu"/>
+        <feGaussianBlur in="tordu" stdDeviation="0.45"/></filter>
+      <filter id="aura-flou" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.4"/></filter>
+    </defs>
+    <circle r="${RAYON_PION_AURA + 30}" fill="url(#aura-halo-feu)">
+      <animate attributeName="opacity" values="0.75;1;0.75" dur="3.2s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1"/></circle>
+    <g filter="url(#aura-fumee)">
+      ${nappeTournante(nappeAura(11, 9, 50, 0.62, 0.95), "url(#aura-feu)", 0.45, 26, 1)}
+      ${nappeTournante(nappeAura(23, 12, 34, 0.42, 0.75), "url(#aura-feu)", 0.65, 19, 1)}
+      ${nappeTournante(nappeAura(37, 8, 28, 0.5, -0.6), "url(#aura-feu)", 0.4, 33, -1)}
+      ${filetsTournants(filetsAura(53, 12, 27, 0.8), "#c80000", 2.4, 0.32, 19, 1)}
+    </g>
+    <g>
+      <animate attributeName="opacity" values="0.85;1;0.85" dur="2.4s" repeatCount="indefinite"/>
+      <circle r="${RAYON_PION_AURA + 1}" fill="none" stroke="#ff0000" stroke-width="6" stroke-opacity="0.7" filter="url(#aura-flou)"/>
+      <circle r="${RAYON_PION_AURA + 1}" fill="none" stroke="#ff1e1e" stroke-width="2.4"/>
+      <circle r="${RAYON_PION_AURA + 1}" fill="none" stroke="#ffd2d2" stroke-width="0.7" stroke-opacity="0.9"/>
+    </g>
+    ${[[0, -(RAYON_PION_AURA + 1)], [0, RAYON_PION_AURA + 1]].map(([x, y], i) => `<ellipse cx="${x}" cy="${y}" rx="3.2" ry="9" fill="url(#aura-eclat)">
+      <animate attributeName="opacity" values="0.55;1;0.55" dur="${2.2 + i * 0.7}s" repeatCount="indefinite"/></ellipse>`).join("")}
+    ${gouttesAura()}
+  </svg>`;
 window.auraLeader = function() {
     const aura = document.createElement("div");
     aura.className = "aura-leader";
@@ -3536,7 +3612,7 @@ window.auraLeader = function() {
     // là où le temps en est, au lieu de repartir de zéro à chaque fois.
     const svg = aura.firstElementChild;
     if (svg && typeof svg.setCurrentTime === "function") {
-        try { svg.setCurrentTime((performance.now() / 1000) % 336); } catch (e) {}
+        try { svg.setCurrentTime((performance.now() / 1000) % 1716); } catch (e) {}
     }
     return aura;
 };

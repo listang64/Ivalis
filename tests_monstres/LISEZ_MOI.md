@@ -8162,3 +8162,38 @@ mord sur l'ancien code (40 échecs).
 Les anciens bancs remis aux règles v270 : experience (la grille), talents
 (niveaux pairs), corrections_v268 et corrections_v269 (la cohue garde la
 mise en commun ; versions « ou plus »).
+
+## v271 — L'aura du leader : le feu rouge de Nico
+
+Nico, une image à l'appui : « pour les monstres leader, exactement cet effet
+sous le token, en mouvement ». combat.js, auraLeader (même place, même nom
+qu'en v265) dessine désormais, sous l'image du pion (z 1 contre 2), dans une
+boîte deux fois grande comme lui (style.css, .aura-leader, calée par ses
+bords à −50 %) :
+  · trois nappes de langues de fumée rouge (dégradé du bord vers le bout,
+    translucides), plus une nappe de filets sombres à crochet, qui tournent
+    chacune à sa vitesse — deux dans un sens, une dans l'autre — À TRAVERS un
+    champ de turbulence fixe (feTurbulence + feDisplacementMap) : les langues
+    se tordent et se reforment en passant ; elles vont jusqu'à une fois et
+    demie le rayon du pion, et un peu au-delà, plus pâles ;
+  · un halo rouge qui respire ;
+  · un anneau rouge vif collé au bord du médaillon (rayon 51 pour 50), en
+    trois traits (un flou large, le rouge, un cœur presque blanc), et deux
+    éclats de lumière, en haut et en bas, qui palpitent ;
+  · 22 gouttelettes : 10 éparses qui scintillent, 12 qui s'échappent du bord
+    et s'éteignent.
+Toujours aucune animation CSS (le décalage au zoom de Safari, v265) : tout
+bouge dans le SVG, dans son propre repère ; le dessin vient d'une graine fixe
+(chaque leader a la même aura) ; un pion redessiné reprend où le temps en
+est.
+
+corrections_v271.mjs (dans la suite) : sur la vraie page, qui la porte (le
+leader, pas un ordinaire, pas un zombie), sous l'image, ×2 ; la turbulence,
+les nappes qui tournent dans les deux sens, le dégradé rouge, l'anneau, les
+éclats, les gouttelettes ; aux pixels sur le plateau sombre, l'anneau, la
+couronne de fumée, le bout des langues, rien au-delà de deux rayons ni autour
+d'un monstre ordinaire, et la fumée qui change en 0,9 s ; centrée et ×2 à
+quatre zooms ; les versions. Il mord sur l'ancien code (13 échecs).
+corrections_v262 et corrections_v265 regardent maintenant ce mouvement-là
+(les nappes qui tournent dans la turbulence) au lieu de l'anneau qui
+ondulait.

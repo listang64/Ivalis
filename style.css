@@ -5536,10 +5536,12 @@ textarea.input-texte-parchemin {
 .choix-apparition-aide { font-family: 'Almendra', serif; font-size: 13px; color: #a89f91; line-height: 1.3; }
 @media (max-width: 480px) { .choix-apparitions { grid-template-columns: 1fr; } }
 
-/* LE PION DU LEADER (v262 ; v265 : un anneau organique qui ondule, combat.js,
-   auraLeader). Calée par ses bords, sans transform : rien ne la décale quand le
-   pion change de taille au zoom. Tout ce qui bouge vit dans son SVG. */
-.aura-leader { position: absolute; left: -30%; top: -30%; width: 160%; height: 160%;
+/* LE PION DU LEADER (v262 ; v265 : un anneau organique qui ondule ; v271 : le
+   feu rouge de Nico, combat.js, auraLeader). Calée par ses bords, sans
+   transform : rien ne la décale quand le pion change de taille au zoom. Tout ce
+   qui bouge vit dans son SVG. Deux fois la taille du pion (les langues de
+   fumée vont jusqu'à une fois et demie son rayon), SOUS son image (z 2). */
+.aura-leader { position: absolute; left: -50%; top: -50%; width: 200%; height: 200%;
   pointer-events: none; z-index: 1; }
 .aura-leader svg { display: block; width: 100%; height: 100%; overflow: visible; }
 

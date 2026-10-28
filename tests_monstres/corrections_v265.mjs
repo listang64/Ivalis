@@ -171,8 +171,11 @@ titre("2. L'AURA DU LEADER : ORGANIQUE, QUI ONDULE, ET QUI NE BOUGE PLUS AU ZOOM
     res.existe = !!a;
     res.autre = !!(document.getElementById("token-M2") || document.createElement("i")).querySelector(".aura-leader");
     res.svg = !!(a && a.querySelector("svg"));
-    res.formes = a ? a.querySelectorAll("svg animate[attributeName='d']").length : 0;
-    res.couleur = a ? [...a.querySelectorAll("path")].map(x => x.getAttribute("stroke")).filter(Boolean)[0] : null;
+    // v271 : le feu rouge de Nico remplace l'anneau qui ondulait — ses nappes
+    // tournent à travers un champ de turbulence (le mouvement), et l'anneau
+    // collé au pion reste rouge.
+    res.formes = a && a.querySelector("svg feTurbulence") ? a.querySelectorAll("svg animateTransform[type='rotate']").length : 0;
+    res.couleur = a ? [...a.querySelectorAll("circle")].map(x => x.getAttribute("stroke")).filter(Boolean)[0] : null;
     res.animationsCss = a ? [a, ...a.querySelectorAll("*")].filter(x => x instanceof HTMLElement).some(x => getComputedStyle(x).animationName !== "none") : true;
     res.transform = a ? getComputedStyle(a).transform : "";
     const mesures = [];
@@ -192,7 +195,7 @@ titre("2. L'AURA DU LEADER : ORGANIQUE, QUI ONDULE, ET QUI NE BOUGE PLUS AU ZOOM
   });
   verifier("le pion du leader porte son aura, et lui seul", r.existe && !r.autre);
   verifier("un anneau dessiné (SVG), rouge", r.svg && /^#ff/i.test(r.couleur || ""), r.couleur);
-  verifier("IL ONDULE : ses traits passent d'une forme à l'autre (au moins trois)", r.formes >= 3, `${r.formes}`);
+  verifier("IL BOUGE : au moins trois nappes tournent à travers la turbulence (v271)", r.formes >= 3, `${r.formes}`);
   verifier("aucune animation CSS, aucun transform : rien qui se fige à l'ancienne taille", !r.animationsCss && (r.transform === "none" || r.transform === ""), `${r.animationsCss} ${r.transform}`);
   verifier("CENTRÉ SUR LE PION À TOUS LES ZOOMS (×1, ×3, ×0,6, ×1,4), à la même taille relative",
            r.mesures.length === 4 && r.mesures.every(m => Math.abs(m.dx) <= 1 && Math.abs(m.dy) <= 1 && m.ratio === r.mesures[0].ratio), JSON.stringify(r.mesures));
