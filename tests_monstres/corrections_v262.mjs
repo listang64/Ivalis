@@ -369,6 +369,9 @@ const erreurs = [];
 p.on('pageerror', e => erreurs.push(e.message));
 await p.goto(base + '/index.html');
 await p.waitForTimeout(1500);
+// Les ±5 % de la v270 (varierStatsMonstre) ont leur propre banc (corrections_v270) :
+// ici on vérifie des PV au point près, sans eux.
+await p.evaluate(() => { window.VARIATION_STATS_MONSTRE_PCT = 0; });
 await p.evaluate(() => {
   window.__ou = (f, d) => { try { return f(); } catch (e) { return d; } };
   window.__ouAsync = async (f, d) => { try { return await f(); } catch (e) { return d; } };

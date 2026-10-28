@@ -375,6 +375,8 @@ window.STATS_VARIEES_MONSTRE = ["PV_Max", "Fatigue_Max", "Def_Physique", "Def_Ma
 window.varierStatsMonstre = function(data, alea) {
     const tirer = alea || Math.random;
     const amplitude = window.VARIATION_STATS_MONSTRE_PCT;
+    // Elle entre en pleine forme : sa vie et son énergie suivent leur maximum.
+    const auPlein = { PV_Max: "PV_Actuels", Fatigue_Max: "Fatigue_Actuelle" };
     const ecarts = {};
     window.STATS_VARIEES_MONSTRE.forEach(cle => {
         const v = Number(data[cle]);
@@ -382,10 +384,8 @@ window.varierStatsMonstre = function(data, alea) {
         const pct = Math.round(((tirer() * 2 - 1) * amplitude) * 10) / 10;
         ecarts[cle] = pct;
         data[cle] = Math.max(0, Math.round(v * (1 + pct / 100)));
+        if (auPlein[cle]) data[auPlein[cle]] = data[cle];
     });
-    // Elle entre en pleine forme : sa vie et son énergie au plein.
-    if ("PV_Max" in ecarts) data.PV_Actuels = data.PV_Max;
-    if ("Fatigue_Max" in ecarts) data.Fatigue_Actuelle = data.Fatigue_Max;
     data.Variation_Stats = ecarts;
     return data;
 };

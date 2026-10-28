@@ -223,7 +223,7 @@ console.log("\n2. LA MONTÉE DE NIVEAU");
            `${r.jaugeDepart} %, en route ${r.jaugeEnRoute} %`);
   verifier("le chiffre change en grossissant : II puis III", r.arrive === "III" && r.grossi, `${r.arrive} ${r.grossi}`);
   verifier("la trompette à chaque niveau", r.trompettes === 2, `${r.trompettes}`);
-  verifier("ce que chaque niveau apporte", JSON.stringify(r.gains) === '["Niveau II : +1 compétence","Niveau III : Talent mineur"]', JSON.stringify(r.gains));
+  verifier("ce que chaque niveau apporte (grille v270)", JSON.stringify(r.gains) === '["Niveau II : Talent","Niveau III : +1 compétence"]', JSON.stringify(r.gains));
   verifier("la jauge finit sur l'XP du niveau III (100 / 600 → 17 %)", Math.abs(r.jaugeFin - 17) <= 2, `${r.jaugeFin} % · ${r.xp}`);
   verifier("« Continuer » referme la popup", r.bouton && r.fermee);
   verifier("le héros d'un autre joueur : rien sur ce poste", r.autreJoueur === 0);

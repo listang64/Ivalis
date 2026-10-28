@@ -691,7 +691,10 @@ console.log("\n13. L'OMBRE SOUS LE BANDEAU A VRAIMENT UN DÉGRADÉ DOUX");
   // ① EN DESCENDANT : une colonne d'un pixel, du bas des portraits à 120 px
   //    dessous. Le voile doit y être léger, s'éclaircir sans à-coup, et avoir
   //    complètement disparu avant d'être devenu une épaisseur.
-  const colonne = await enGris({ x: cadre.centre, y: cadre.basDesPortraits, width: 1, height: 120 });
+  // (v270 : la piste entière grandit d'un bloc — ECHELLE_PISTE_INITIATIVE —,
+  //  son voile avec elle ; les longueurs se lisent à cette échelle.)
+  const echellePiste = await p.evaluate(() => Number(window.ECHELLE_PISTE_INITIATIVE) || 1);
+  const colonne = await enGris({ x: cadre.centre, y: cadre.basDesPortraits, width: 1, height: Math.round(120 * echellePiste) });
   const plusSombre = Math.min(...colonne);
   const reculs = colonne.slice(1).filter((v, i) => v < colonne[i] - 2).length;
   const finDuVoile = colonne.findIndex(v => v >= 250);
@@ -701,10 +704,10 @@ console.log("\n13. L'OMBRE SOUS LE BANDEAU A VRAIMENT UN DÉGRADÉ DOUX");
   verifier("IL S'ÉCLAIRCIT SANS LA MOINDRE MARCHE",
            pireMarche(colonne) <= 12, `${pireMarche(colonne)} niveaux entre deux pixels voisins`);
   verifier("et sans jamais s'assombrir en descendant", reculs === 0, `${reculs} recul(s)`);
-  verifier("SON ÉPAISSEUR RESTE CONTENUE : éteint en moins de 60 px",
-           finDuVoile > 0 && finDuVoile <= 60, `${finDuVoile} px`);
+  verifier(`SON ÉPAISSEUR RESTE CONTENUE : éteint en moins de 60 px (× ${echellePiste}, l'échelle de la piste)`,
+           finDuVoile > 0 && finDuVoile <= 60 * echellePiste, `${finDuVoile} px`);
   verifier("mais il s'étale vraiment, ce n'est pas un trait",
-           finDuVoile >= 20, `${finDuVoile} px`);
+           finDuVoile >= 20 * echellePiste, `${finDuVoile} px`);
   console.log(`     profil en descendant : ${colonne.slice(0, 60).filter((_, i) => i % 4 === 0).join(" ")}`);
 
   // ② SUR LE CÔTÉ : une ligne d'un pixel, du bord droit de la piste vers le
