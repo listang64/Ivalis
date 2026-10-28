@@ -8441,3 +8441,46 @@ carte (région, monde, centrage) ; le chat (sans IA, archivage avec le lieu,
 cimetière, tous les 4 voyages) ; le DEV (tailles, base, téléports, hors
 DEV) ; le voyage laissé en marche ; les versions. Il mord sur l'ancien code
 (24 échecs).
+
+## v276 — La journée de marche à 30 % ; ce que le maître du jeu sait du décor
+
+LA JOURNÉE (voyage_groupe.js) : DISTANCE_JOUR passe de 0,45 à 0,30 de la
+hauteur de la carte régionale (window.DISTANCE_JOUR_VOYAGE) — les nuits
+viennent plus souvent. corrections_v275 lit la constante.
+
+« DANS LA NATURE » : chaque écriture du lieu par le voyage (départ, camp,
+arrivée, rester, téléport) écrit aussi Situation — « Dans la nature »
+(Lieu_Actuel vide) ou « Dans un lieu ».
+
+MIA_TERRAIN (environnement_mj.js, nouveau module) : le carré (25 % de la
+hauteur de la carte, centré sur le groupe, rentré dans l'image près des
+bords) tiré de l'image de la carte régionale, les calques des villages
+dessinés dessus, puis le point rouge cerclé de blanc au point EXACT du
+groupe ; envoyé en JPEG (768 px au plus) à Gemini, froid (0,2), avec le nord
+en haut, l'échelle (≈ 0,8 journée de marche d'un bord à l'autre), les lieux
+connus proches ; il rend { terrain, sous_le_groupe, alentours, elements_
+notables, resume_mj }. UNE FOIS PAR POSITION : gardé dans la partie
+(Analyse_Terrain { Cle "région:x:y", Region, x, y, Terrain, Descriptif, Le
+}) ; le voyage le prépare dès qu'il s'arrête (camp, arrivée, rester,
+téléport) ; un tour du MJ sur une position sans analyse la fait d'abord.
+
+LE MJ (ia_master.js, declencherTourIA → contexteEnvironnementMJ) : « Type :
+Dans la nature » hors d'un lieu ; le bloc « OÙ SE TROUVE LE GROUPE » : la
+région, la position (en mots et en x, y), le terrain lu, les lieux connus à
+moins de deux jours (direction, temps de marche), la consigne (des
+rencontres, oui ; aucun bâtiment, village, ruine ni lieu construit
+inventé) ; dans un lieu connu, le lieu (sa fiche reste jointe, la réputation
+aussi — en nature, plus de réputation locale). Dans les deux cas « LA
+RÉGION » : son descriptif RP (v274) et son lore. Le bloc envoyé s'écrit dans
+la console à chaque tour (« 🧭 [MJ] Environnement envoyé… »), l'analyse aussi
+(« 🗺️ [MIA_Terrain] … »). DEV : « 🔍 Ce que le MJ voit (console) » dans la
+section « Le groupe » (relit le terrain, forcé).
+
+corrections_v276.mjs (dans la suite, Gemini simulé) : 30 % et les jours ;
+Situation ; le carré (taille, bord, JPEG, point rouge à sa place) ; MIA_
+TERRAIN (départ automatique, consigne, échelle, lieux proches, froid, gardé,
+console, pas refait, forcé, pas dans un lieu) ; le bloc du MJ (région,
+position, terrain, lieux proches, consigne, descriptif, lore, console, lieu
+connu) ; le tour du MJ (consigne du narrateur, pas de réputation en nature,
+analyse gardée, réponse, analyse faite d'abord, lieu connu) ; le voyage
+(analyse au camp, pas refaite) ; le bouton DEV ; les versions.

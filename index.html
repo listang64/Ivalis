@@ -1270,6 +1270,7 @@
                      oninput="window.reglerTailleGroupe('monde', this.value)" onchange="window.reglerTailleGroupe('monde', this.value, true)">
               <span id="taille-groupe-monde-valeur" class="popup-regions-valeur"></span></span></label>
             <button type="button" id="btn-groupe-teleport-monde" class="popup-regions-bouton" onclick="jouerSonClic(); window.basculerTeleportGroupe()">⤳ Déplacer le groupe (téléport)</button>
+            <button type="button" class="popup-regions-bouton secondaire btn-tester-environnement" onclick="jouerSonClic(); window.testerEnvironnementMJ()" title="Analyse le terrain autour du groupe et écrit dans la console ce que le maître du jeu recevrait">🔍 Ce que le MJ voit (console)</button>
             <div id="groupe-dev-monde-etat" class="popup-regions-total"></div>
           </div>
           <p class="popup-regions-aide">Boîtes affichées, un clic ne déclenche rien : on édite. Clic maintenu sur une boîte : la déplacer. Carré d'un coin : l'étirer. Clic sur un bord : un nouveau point, à étirer. Double-clic sur un point : le retirer.</p>
@@ -1330,6 +1331,7 @@
                        oninput="window.reglerTailleGroupe('region', this.value)" onchange="window.reglerTailleGroupe('region', this.value, true)">
                 <span id="taille-groupe-region-valeur" class="popup-regions-valeur"></span></span></label>
               <button type="button" id="btn-groupe-teleport-region" class="popup-regions-bouton" onclick="jouerSonClic(); window.basculerTeleportGroupe()">⤳ Déplacer le groupe (téléport)</button>
+              <button type="button" class="popup-regions-bouton secondaire btn-tester-environnement" onclick="jouerSonClic(); window.testerEnvironnementMJ()" title="Analyse le terrain autour du groupe et écrit dans la console ce que le maître du jeu recevrait">🔍 Ce que le MJ voit (console)</button>
               <div id="groupe-dev-region-etat" class="popup-regions-total"></div>
             </div>
             <p class="popup-regions-aide">Terrains affichés : clic maintenu sur un terrain pour le déplacer, carré d'un coin pour l'étirer, clic sur un bord pour un nouveau point, double-clic sur un point pour le retirer. Pinceau ou gomme en main, le doigt peint (deux doigts zooment toujours). Les zones rouges restent provisoires : « Valider les nuages » les change en nuages, pour toutes les parties. Édition du titre : le glisser pour le déplacer, le carré de son coin haut droit pour sa taille ; décocher l'enregistre.</p>
@@ -2302,7 +2304,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=180"></script>
+<script src="trace_combat.js?v=181"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2358,7 +2360,7 @@
 <script type="module" src="pont_combat.js?v=46"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=53"></script>
-<script type="module" src="ia_master.js?v=8"></script>
+<script type="module" src="ia_master.js?v=9"></script>
 <script type="module" src="app.js?v=124"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=2"></script>
@@ -2368,13 +2370,15 @@
 <script type="module" src="cartes_regionales.js?v=4"></script>
 <!-- Le lore du monde, par région (v273), puis les villages des cartes régionales et MIA_VILLAGE. -->
 <script src="lore_ivalis.js?v=1"></script>
-<script type="module" src="villages_regionaux.js?v=2"></script>
+<script type="module" src="villages_regionaux.js?v=3"></script>
 <!-- Les descriptifs RP des régions (v274) : le mode DEV et sa fenêtre pleine page. -->
 <script type="module" src="descriptifs_regions.js?v=1"></script>
 <!-- Le déplacement des PJ (v275) : les terrains praticables des cartes régionales,
      puis le groupe, son bouton voyage, les tracés, les votes, la marche et les nuits. -->
 <script type="module" src="terrains_regionaux.js?v=1"></script>
-<script type="module" src="voyage_groupe.js?v=1"></script>
+<script type="module" src="voyage_groupe.js?v=2"></script>
+<!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
+<script type="module" src="environnement_mj.js?v=1"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=16"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->

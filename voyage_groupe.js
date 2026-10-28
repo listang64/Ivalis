@@ -59,9 +59,10 @@ const LARGEUR_MONDE = 3840, HAUTEUR_MONDE = 2160;
 const TAILLE_MONDE_DEFAUT = 150;       // pixels de la carte du monde
 const TAILLE_REGION_DEFAUT = 0.07;     // part de la hauteur de la carte régionale
 const BORNES_MONDE = [40, 600], BORNES_REGION = [0.02, 0.25];
-// Une journée de marche : 45 % de la hauteur d'une carte régionale (une
-// carte se traverse en trois ou quatre jours, un village voisin en un).
-const DISTANCE_JOUR = 0.45;
+// Une journée de marche : 30 % de la hauteur d'une carte régionale (Nico,
+// v276 : « réduis les distances avant chaque nuit, de 45 % mets plutôt 30 % »).
+const DISTANCE_JOUR = 0.30;
+window.DISTANCE_JOUR_VOYAGE = DISTANCE_JOUR;
 const TOLERANCE_JOUR = 0.1;            // un trajet de 1,05 jour se fait en un jour
 const MARCHE_JOUR_MS = 5200;           // le temps d'écran d'une journée de marche
 const MARCHE_MIN_MS = 1600;
@@ -286,7 +287,7 @@ function champsDepart(data, v, votes) {
             "Voyage_Groupe.Duree_Marche_Ms": duree,
             "Voyage_Groupe.Delai_Depart_Ms": delai,
             Voyages_Effectues: numero,
-            Lieu_Actuel: ""
+            Lieu_Actuel: "", Situation: SITUATION_NATURE
         },
         resultat: { demarre: true, lieuQuitte: data.Lieu_Actuel || "", numero }
     };
@@ -335,7 +336,7 @@ window.proposerVoyageGroupe = async function(proposition) {
             const depart = champsDepart(data, v, v.Votes);
             const { delai, duree } = dureeEtape(v, 1);
             Object.assign(v, { Etat: "marche", Jour: 1, Debut_Marche: Date.now(), Duree_Marche_Ms: duree, Delai_Depart_Ms: delai });
-            return { maj: { ...maj, Voyage_Groupe: v, Voyages_Effectues: depart.maj.Voyages_Effectues, Lieu_Actuel: "" }, resultat: depart.resultat };
+            return { maj: { ...maj, Voyage_Groupe: v, Voyages_Effectues: depart.maj.Voyages_Effectues, Lieu_Actuel: "", Situation: SITUATION_NATURE }, resultat: depart.resultat };
         }
         return { maj, resultat: { vote: true } };
     });
@@ -396,7 +397,7 @@ async function terminerEtape(id, k) {
             const arr = centreMonde(n) || v.Trace[v.Trace.length - 1];
             const spawn = typeof window.pointArriveeRegion === "function"
                 ? window.pointArriveeRegion(n, { dx: dep.x - arr.x, dy: dep.y - arr.y }) : { x: 0.5, y: 0.5 };
-            return { maj: { ...fini, Position_Groupe: { Region: n, x: arrondi(spawn.x), y: arrondi(spawn.y) }, Lieu_Actuel: "" },
+            return { maj: { ...fini, Position_Groupe: { Region: n, x: arrondi(spawn.x), y: arrondi(spawn.y) }, Lieu_Actuel: "", Situation: SITUATION_NATURE },
                      resultat: { arrivee: true, region: n } };
         }
         const n = Number(v.Arrivee.Region);
@@ -407,10 +408,12 @@ async function terminerEtape(id, k) {
                             Position_Groupe: { Region: n, x: c.x, y: c.y } },
                      resultat: { nuit: true, jour: k } };
         }
-        return { maj: { ...fini, Position_Groupe: { Region: n, x: arrondi(v.Arrivee.x), y: arrondi(v.Arrivee.y) }, Lieu_Actuel: v.Arrivee.Lieu || "" },
+        return { maj: { ...fini, Position_Groupe: { Region: n, x: arrondi(v.Arrivee.x), y: arrondi(v.Arrivee.y) }, Lieu_Actuel: v.Arrivee.Lieu || "",
+                        Situation: situationDe(v.Arrivee.Lieu) },
                  resultat: { arrivee: true, region: n, lieu: v.Arrivee.Lieu || "" } };
     });
     if (r && r.nuit) posterMessageCampement();
+    if (r && (r.nuit || r.arrivee)) analyserLeTerrain();
     return r;
 }
 window.terminerEtapeVoyageGroupe = terminerEtape;
@@ -436,7 +439,7 @@ window.choisirNuitVoyageGroupe = async function(reponse, options) {
         if (voulu === "rester") {
             const camp = v.Camp || pointDuVoyage(v, v.Etapes[k - 1]);
             return { maj: { Voyage_Groupe: deleteField(), Voyage_Termine: { Id: id, Le: Date.now() },
-                            Position_Groupe: { Region: Number(v.Arrivee.Region), x: arrondi(camp.x), y: arrondi(camp.y) }, Lieu_Actuel: "" },
+                            Position_Groupe: { Region: Number(v.Arrivee.Region), x: arrondi(camp.x), y: arrondi(camp.y) }, Lieu_Actuel: "", Situation: SITUATION_NATURE },
                      date: lendemain(date), resultat: { reste: true } };
         }
         const { delai, duree } = dureeEtape(v, k + 1);
@@ -447,8 +450,19 @@ window.choisirNuitVoyageGroupe = async function(reponse, options) {
     }, { avecDate: true });
     clic();
     if (r && r.repart) nettoyerChat({ cimetiere: false });
+    if (r && r.reste) analyserLeTerrain();
     return r;
 };
+
+// « DANS LA NATURE » (v276) : hors d'un lieu connu, la partie le dit
+// (Situation) ; le maître du jeu reçoit alors le terrain analysé
+// (environnement_mj.js), qu'on prépare dès que le groupe s'arrête.
+const SITUATION_NATURE = "Dans la nature";
+const situationDe = (lieu) => (lieu ? "Dans un lieu" : SITUATION_NATURE);
+function analyserLeTerrain() {
+    if (typeof window.analyserTerrainGroupe !== "function") return;
+    Promise.resolve(window.analyserTerrainGroupe()).catch(e => console.error("Analyse du terrain (le jeu continue) :", e));
+}
 
 // --- LE CHAT ---------------------------------------------------------------
 function apresDepart(r) {
@@ -477,15 +491,15 @@ async function posterMessageCampement() {
 async function teleporter(cible) {
     if (!window.ID_PARTIE_COURANTE || !estDev()) return false;
     const pos = { Region: Number(cible.Region), x: arrondi(cible.x), y: arrondi(cible.y) };
-    const maj = { Position_Groupe: pos, Lieu_Actuel: cible.Lieu || "", Voyage_Groupe: deleteField() };
+    const maj = { Position_Groupe: pos, Lieu_Actuel: cible.Lieu || "", Situation: situationDe(cible.Lieu), Voyage_Groupe: deleteField() };
     // Tout de suite à l'écran ; la base suit.
-    partie = { ...partie, Position_Groupe: pos, Lieu_Actuel: cible.Lieu || "" };
+    partie = { ...partie, Position_Groupe: pos, Lieu_Actuel: cible.Lieu || "", Situation: situationDe(cible.Lieu) };
     delete partie.Voyage_Groupe;
     voyage = null;
     arreterAnimation();
     quitterChoix();
     dessinerTout();
-    try { await updateDoc(refPartie(), maj); return true; }
+    try { await updateDoc(refPartie(), maj); analyserLeTerrain(); return true; }
     catch (e) { console.error("Téléport du groupe :", e); annoncer("Le téléport n'a pas pu s'écrire (connexion ?)."); return false; }
 }
 window.teleporterGroupe = teleporter;

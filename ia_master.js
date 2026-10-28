@@ -1469,7 +1469,8 @@ window.declencherTourIA = async function() {
 
     try {
         const snapPartie = await getDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE));
-        const lieuActuel = snapPartie.exists() ? snapPartie.data().Lieu_Actuel : null;
+        const dataPartieMJ = snapPartie.exists() ? snapPartie.data() : {};
+        const lieuActuel = dataPartieMJ.Lieu_Actuel || null;
 
         const qMsgAll = query(collection(db, "Messages_Chat"), where("ID_Partie", "==", window.ID_PARTIE_COURANTE), orderBy("Timestamp", "asc"));
         const snapMsgAll = await getDocs(qMsgAll);
@@ -1518,18 +1519,30 @@ window.declencherTourIA = async function() {
 
         let contexte = `--- CONTEXTE TEMPOREL ET SPATIAL ---\n`;
         contexte += `DATE ACTUELLE EN JEU : Nous sommes le Jour ${jourActuel} de l'an ${anActuel}.\n`;
-        contexte += `Type : ${env.type}\n`;
-        contexte += `Description de la zone : ${JSON.stringify(env.details)}\n`;
+        // DANS LA NATURE (v276) : hors d'un lieu connu, il n'y a pas de fiche de
+        // zone ; le décor vient du terrain lu sur la carte (environnement_mj.js).
+        contexte += `Type : ${lieuActuel ? env.type : "Dans la nature"}\n`;
+        if (env.details) contexte += `Description de la zone : ${JSON.stringify(env.details)}\n`;
         if (env.type === "Lieu" && env.listeBatiments.length > 0) {
             contexte += `Bâtiments visibles ici : ${env.listeBatiments.join(", ")}\n`;
         }
 
+        // OÙ SONT LES HÉROS (v276) : la région, son descriptif et son lore ; en
+        // pleine nature, le terrain analysé sur la carte et la consigne de ne
+        // rien bâtir. Le texte envoyé s'écrit aussi dans la console.
+        if (typeof window.contexteEnvironnementMJ === "function") {
+            try { contexte += `\n${await window.contexteEnvironnementMJ(dataPartieMJ)}\n`; }
+            catch (e) { console.error("Environnement du MJ (le tour continue) :", e); }
+        }
+
         // NOUVEAU : Injection des tags et de la jauge (ISOLATION STRICTE)
-        contexte += `\n--- RÉPUTATION DU GROUPE DANS CE LIEU PRÉCIS ---\n`;
-        contexte += `RÈGLE ABSOLUE : Cette réputation est strictement LOCALE et indépendante des autres lieux. Les PNJ d'ici ignorent tout des actes commis par le groupe ailleurs.\n`;
-        contexte += `Score local : ${env.reputationScore}/10 (-10 = Hostile, 0 = Neutre, +10 = Adulés).\n`;
-        contexte += `Tags de rumeur locaux : ${env.reputationTags.length > 0 ? env.reputationTags.join(", ") : "Inconnus (Nouveaux venus ici)"}.\n`;
-        contexte += `CONSIGNE ABSOLUE : Adapte obligatoirement le comportement des PNJ de cette zone en fonction de cette réputation (crainte, respect, agressivité, arnaque, etc.).\n`;
+        if (lieuActuel) {
+            contexte += `\n--- RÉPUTATION DU GROUPE DANS CE LIEU PRÉCIS ---\n`;
+            contexte += `RÈGLE ABSOLUE : Cette réputation est strictement LOCALE et indépendante des autres lieux. Les PNJ d'ici ignorent tout des actes commis par le groupe ailleurs.\n`;
+            contexte += `Score local : ${env.reputationScore}/10 (-10 = Hostile, 0 = Neutre, +10 = Adulés).\n`;
+            contexte += `Tags de rumeur locaux : ${env.reputationTags.length > 0 ? env.reputationTags.join(", ") : "Inconnus (Nouveaux venus ici)"}.\n`;
+            contexte += `CONSIGNE ABSOLUE : Adapte obligatoirement le comportement des PNJ de cette zone en fonction de cette réputation (crainte, respect, agressivité, arnaque, etc.).\n`;
+        }
 
         if (nomsPnjPresents.length > 0) {
             contexte += `\n--- PNJ PRÉSENTS DANS LA ZONE ---\n`;

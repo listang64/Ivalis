@@ -77,7 +77,8 @@ function lireVillage(id, d) {
     const pos = d.Position_Region || {};
     return { id, numero: Number(d.Carte_Regionale), nom: d.Nom_Du_Lieu || "Village", description: d.Description_Global || "",
              securite: d.Niveau_De_Securite || "Inconnue", peuple: d.Peuple_Dominant || "", visuel: d.Visuel_Village || "",
-             x: Number(pos.x), y: Number(pos.y), taille: Number(pos.taille), calque: d.URL_Calque_Region || "" };
+             x: Number(pos.x), y: Number(pos.y), taille: Number(pos.taille), calque: d.URL_Calque_Region || "",
+             type: d.Type_Lieu || "Village", image: d.URL_Cloudinary || "" };
 }
 // Ce que l'écoute (ou un banc) reçoit : [{ id, data }].
 window.appliquerVillagesDeLaBase = function(liste) {

@@ -476,8 +476,10 @@ await section(async () => {
            && Math.abs(t[t.length - 1].x - 0.8) < 0.01 && Math.abs(t[t.length - 1].y - 0.3) < 0.01, JSON.stringify([t[0], t[t.length - 1]]));
   verifier("une route compliquée : des courbes, loin de la ligne droite", t.length >= 60 && g.ecart > 0.02 && g.virages > 20, `écart ${g.ecart.toFixed(3)}, ${g.virages} virages`);
   verifier("elle reste sur le terrain praticable", g.surTerrain);
-  const jours = Math.max(1, Math.ceil(propRegion.longueur / 0.45 - 0.1));
-  verifier("la marche se compte en jours (une journée ≈ 45 % de la hauteur de la carte)", propRegion.jours === jours && jours >= 2, `${propRegion.longueur} → ${propRegion.jours} j`);
+  // (v276 : la journée est passée de 45 % à 30 % de la hauteur de la carte.)
+  const distanceJour = await p.evaluate(() => window.DISTANCE_JOUR_VOYAGE || 0.45);
+  const jours = Math.max(1, Math.ceil(propRegion.longueur / distanceJour - 0.1));
+  verifier("la marche se compte en jours (une journée = une part de la hauteur de la carte)", propRegion.jours === jours && jours >= 2, `${propRegion.longueur} → ${propRegion.jours} j`);
   const r = await p.evaluate(() => ({ texte: document.getElementById("bandeau-voyage").textContent, d: document.querySelector("#carte-region-voyage .trace-voyage") && document.querySelector("#carte-region-voyage .trace-voyage").getAttribute("d"),
                                       croix: !!document.querySelector("#carte-region-voyage .croix-voyage") }));
   verifier("dessiné sur la carte (pointillé, croix) ; le bandeau dit les jours", !!r.d && r.croix && new RegExp(`≈ ${jours} jours de marche`).test(r.texte), r.texte.slice(0, 70));
