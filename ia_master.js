@@ -1287,6 +1287,9 @@ async function genererEtStockerIconeCarte(nomLieu, descriptionLieu) {
 // grille, n'existe plus : le groupe voyage sur les cartes (voyage_groupe.js).
 // Ses peintres servent aux lieux découverts en voyage (v277, poi_creation.js).
 window.genererImageLieu = genererEtStockerImageLieu;
+// Le lieu où se tiennent les héros, ses bâtiments et ses PNJ (v278 : le lieu
+// du combat, les ennemis qu'on y affronte).
+window.preparerEnvironnementMJ = preparerEnvironnement;
 window.genererImageBatiment = genererEtStockerImageBatiment;
 
 window.regenererImagesLieuActuel = async function() {
@@ -1432,9 +1435,17 @@ async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTe
 
 // --- 4. LA BOUCLE GLOBALE (Bouton MJ) ---
 
-window.declencherTourIA = async function() {
+// `options.issueCombat` (v278, combat_rp.js) : le récit d'après un combat du
+// récit — ce qui s'est passé (issue, blessures, lieu saccagé) part avec le
+// contexte, et il n'y a rien à détecter. Pendant un combat, le MJ se tait.
+window.declencherTourIA = async function(options) {
     console.log("🟢 Le bouton MJ a bien été détecté !");
     if (!window.ID_PARTIE_COURANTE) return;
+    const issueCombat = (options && options.issueCombat) || "";
+    if (!issueCombat && typeof window.combatRPActif === "function" && window.combatRPActif()) {
+        console.log("⚔️ Un combat est en cours : le MJ attend sa fin.");
+        return;
+    }
 
     // 🔻 SÉCURITÉ : VÉRIFICATION DES CLÉS API 🔻
     const cles = {
@@ -1564,6 +1575,8 @@ window.declencherTourIA = async function() {
             });
         }
 
+        if (issueCombat) contexte += `\n${issueCombat}\n`;
+
         const reponseTexte = await genererReponseNarrateur(contexte, historiqueComplet);
 
         if (reponseTexte) {
@@ -1617,6 +1630,14 @@ window.declencherTourIA = async function() {
 
             texteAffiche = texteAffiche.replace(/\n/g, "<br>");
 
+            // LE COMBAT EST-IL LANCÉ ? (v278, combat_rp.js). La partie dit qu'un
+            // verdict est attendu AVANT que le message n'arrive : la fin du
+            // parchemin sait ainsi qu'elle doit l'attendre (« Le destin
+            // hésite… ») au lieu de se refermer.
+            const horodatage = new Date().getTime();
+            const detecter = !issueCombat && typeof window.annoncerDetectionCombat === "function"
+                && await window.annoncerDetectionCombat(horodatage).catch(e => { console.error("Détection du combat :", e); return false; });
+
             // =====================================================================
             // 3. ENVOI DU MESSAGE (CE QUI VA DÉCLENCHER LE RÉCIT DYNAMIQUE CHEZ TOUT LE MONDE)
             // =====================================================================
@@ -1625,8 +1646,16 @@ window.declencherTourIA = async function() {
                 Auteur_ID: "MJ", Auteur_Nom: "MJ", Auteur_Couleur: "#ffffff",
                 Texte: texteAffiche,
                 Est_Narration_IA: true, // 🔻 C'EST CETTE LIGNE QUI DÉCLENCHE LE VISUAL NOVEL 🔻
-                Timestamp: new Date().getTime()
+                Timestamp: horodatage
             });
+
+            // MIA_COMBAT tourne pendant que les joueurs lisent, EN MÊME TEMPS
+            // que les IA d'arrière-plan ci-dessous (Nico : « 2. Ok ») : elle n'a
+            // besoin que des messages, et le bouton COMBATTRE est prêt plus tôt.
+            if (detecter && typeof window.detecterCombatRP === "function") {
+                window.detecterCombatRP({ ts: horodatage, texteMJ: reponseTexte, messages: historiqueReduit })
+                    .catch(e => console.error("Détection du combat :", e));
+            }
             
             if (typeof window.relancerInitiativeChat === "function") {
                 await window.relancerInitiativeChat();

@@ -32,6 +32,14 @@ import {
     collection, doc, setDoc, updateDoc, onSnapshot, writeBatch
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
+// LES IA DU COMBAT PRENNENT LA SECONDE CLÉ GEMINI (v278, cles_gemini.js) : un
+// combat demande ses techniques à chaque créature, la première clé y laisserait
+// son quota. Sans le module des clés (un banc partiel), l'appel d'avant.
+const geminiCombat = (cle, corps) => typeof window.fetchGemini === "function"
+    ? window.fetchGemini("combat", corps)
+    : fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cle}`,
+            { method: "POST", headers: { "Content-Type": "application/json" }, body: corps });
+
 const COLLECTION_MONSTRES = "Monstres";
 
 // Les 6 tranches de fatigue, en POURCENTAGE de la fatigue max du monstre.
@@ -405,7 +413,8 @@ function affinitesParDefaut(monstre) {
 
 window.determinerAffinitesMonstre = async function(monstre) {
     const parDefaut = affinitesParDefaut(monstre);
-    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+    // Une IA du combat : la seconde clé (cles_gemini.js), à défaut la première.
+    const cleGemini = typeof window.cleGemini === "function" ? window.cleGemini("combat") : localStorage.getItem("ivalis_GEMINI_API_KEY");
     const palette = window.paletteEffetsMonstres();
     if (!cleGemini || palette.length === 0) return parDefaut;
 
@@ -459,16 +468,12 @@ Effets de combat existants :
 ${listeEffets}`;
 
     try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+        const res = await geminiCombat(cleGemini, JSON.stringify({
                 systemInstruction: { parts: [{ text: promptSysteme }] },
                 contents: [{ role: "user", parts: [{ text: description }] }],
                 tools: outils,
                 toolConfig: { functionCallingConfig: { mode: "ANY" } }
-            })
-        });
+            }));
 
         const data = await res.json();
         const appel = data.candidates?.[0]?.content?.parts?.find(p => p.functionCall)?.functionCall;
@@ -1404,7 +1409,8 @@ function nomsTechniquesParDefaut(cartes) {
 
 window.nommerTechniquesIA = async function(monstre, cartes) {
     const parDefaut = nomsTechniquesParDefaut(cartes);
-    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+    // Une IA du combat : la seconde clé (cles_gemini.js), à défaut la première.
+    const cleGemini = typeof window.cleGemini === "function" ? window.cleGemini("combat") : localStorage.getItem("ivalis_GEMINI_API_KEY");
     if (!cleGemini || cartes.length === 0) return parDefaut;
 
     // On décrit à l'IA ce que fait réellement chaque carte, pas son patron
@@ -1440,17 +1446,13 @@ RÈGLES :
     }];
 
     try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+        const res = await geminiCombat(cleGemini, JSON.stringify({
                 systemInstruction: { parts: [{ text: promptSysteme }] },
                 contents: [{ role: "user", parts: [{ text:
                     `Créature : ${monstre.nom} (${monstre.archetype}, palier ${monstre.palier})\n\nSes techniques :\n${description}` }] }],
                 tools: outils,
                 toolConfig: { functionCallingConfig: { mode: "ANY" } }
-            })
-        });
+            }));
 
         const data = await res.json();
         const noms = data.candidates?.[0]?.content?.parts?.find(p => p.functionCall)?.functionCall?.args?.noms;

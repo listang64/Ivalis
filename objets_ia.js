@@ -95,7 +95,8 @@ window.decrireObjetsAvecMIA = async function(objets, options) {
     const descriptions = {};
     if (!objets || objets.length === 0) return descriptions;
 
-    const cleGemini = window.clesApiObjets().gemini;
+    // Une IA du combat (le butin) : la seconde clé, à défaut la première (v278).
+    const cleGemini = typeof window.cleGemini === "function" ? window.cleGemini("combat") : window.clesApiObjets().gemini;
     if (!cleGemini) {
         console.warn("[MIA_Objets] Pas de clé Gemini : les objets seront dessinés sur leur seul nom.");
         return descriptions;
@@ -164,16 +165,16 @@ Trois à quatre phrases par objet. Utilise l'outil 'decrireObjets'.` + (options 
     }];
 
     try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                systemInstruction: { parts: [{ text: promptSysteme }] },
-                contents: [{ role: "user", parts: [{ text: JSON.stringify(fiches) }] }],
-                tools: outils,
-                toolConfig: { functionCallingConfig: { mode: "ANY" } },
-                generationConfig: { temperature }
-            })
+        const corps = JSON.stringify({
+            systemInstruction: { parts: [{ text: promptSysteme }] },
+            contents: [{ role: "user", parts: [{ text: JSON.stringify(fiches) }] }],
+            tools: outils,
+            toolConfig: { functionCallingConfig: { mode: "ANY" } },
+            generationConfig: { temperature }
         });
+        const res = typeof window.fetchGemini === "function" ? await window.fetchGemini("combat", corps)
+            : await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: corps });
         const data = await res.json();
         const appel = (data.candidates?.[0]?.content?.parts || []).find(p => p.functionCall)?.functionCall;
         (appel?.args?.objets || []).forEach(o => {

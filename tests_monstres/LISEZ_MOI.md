@@ -8546,3 +8546,90 @@ journée reprise, route gardée, redécoupage, les deux cas) ; l'attente RP et
 le poste sans clés ; la panne ; le survol et l'aperçu ; le curseur DEV ; les
 versions. Il mord sur l'ancien code (20 échecs). corrections_v275 et v276
 coupent les POI (Chance_POI 0).
+
+## v278 — Les combats branchés sur le récit
+
+LE BOUTON DE COMBAT (modale-pre-combat) : deux encarts. « Combat en cours » —
+le combat du récit de CETTE partie (inactif sans lui ; « le champ de bataille
+se prépare… » puis « la bataille fait rage », un toucher y mène) — et « Arène
+de combat », la fenêtre de combat telle qu'on la connaît. Ils partagent le
+plateau : l'arène est fermée tant que le combat du récit n'est pas terminé.
+En DEV : lancer un combat du récit sans le MJ, l'abandonner.
+
+L'ÉTAT : Systeme_Parties/{id}.Combat_RP — Etat detection | aucun | preparation
+| en_cours | narration, Message (l'horodatage du message du MJ jugé),
+Createur {id, t}, Remise, Lieu {Titre, Description, Interieur}, Carte,
+Regleurs, Apercu_Grille, Grille {Taille, Par}, Ennemis {Apparition, Tirage,
+Visuels}, Tokens, Peinture, Peint, Deploye, ID_Rencontre, Issue. Chaque étape
+écrit son résultat : un poste qui reprend repart de là.
+
+LA DÉTECTION (combat_rp.js, MIA_COMBAT) : declencherTourIA annonce le verdict
+(Etat detection) AVANT d'écrire le message du MJ, puis MIA_COMBAT juge les
+actions des joueurs depuis la réponse précédente et la nouvelle réponse,
+pendant que les IA d'arrière-plan tournent. La fin du parchemin
+(recit_dynamique.js → finRecitCombat) attend le verdict (« Le destin
+hésite… », 30 s au plus), puis montre COMBATTRE (rouge, gouttes de sang) ou
+se referme. Pendant un combat, le MJ se tait et le chat ne s'écrit plus : un
+bandeau « Combat en cours » remplace la saisie, avec « Rejoindre le combat ».
+
+LA PRÉPARATION (le poste qui a lancé le MJ ; un poste muet plus de 60 s est
+relayé par un poste qui a les clés) :
+  · remise : l'arène mise de côté (Combat_VTT.Arene_Sauvegarde : carte,
+    grille, couches), reinitialiserCombat({ rp: true }) — sans question, sans
+    demander les repères —, le plateau vidé ;
+  · MIA_CHAMP_DE_BATAILLE : les 15 derniers messages, le lieu (Monde_Lieux /
+    Monde_Batiment) ou, dans la nature, le terrain et la région → titre,
+    description spatiale, intérieur ;
+  · la carte : l'instruction « Style map crea » de Cerveau_IA (cherchée par
+    son titre) + la description ; gpt-image-2, qualité medium, 1536×1024 ;
+    Cloudinary (Combats/Cartes) ; sans dessin, la carte de l'arène ;
+  · MIA_ENNEMIS : combien d'adversaires (→ Apparition 1 à 4), qui (un PNJ
+    nommé présent garde son nom), des idées de renforts ; le cas tiré par
+    tirerApparition, selon ses règles ; puis chaque créature habillée (nom,
+    visuel partagé — cinq au plus) ;
+  · les pions (app.js, fabriquerTokenIA) : le médaillon des héros
+    (promptPionMedaillon), en direct d'après l'apparence, ou depuis l'avatar
+    d'un PNJ nommé ; qualité low comme les héros ; Tokens/Ennemis ;
+  · la grille : la boîte pour les joueurs en mode DEV, la main à P_01 (Nico)
+    puis P_02 (Ben), sinon au premier arrivé ; les autres voient l'aperçu ;
+    personne en DEV pendant 60 s : la taille de l'arène ;
+  · MIA_PEINTURE_MURS, _INACCESSIBLE, _DIFFICILE : la carte avec sa grille
+    numérotée (casesGrilleCombatRP, la géométrie de Plateau.js ;
+    imageGrilleNumerotee, les cases déjà classées teintées) → Tuiles_Murs,
+    Tuiles_Supprimees, Tuiles_Difficiles ; une réponse sur plus de 75 % des
+    cases est écartée ;
+  · MIA_SPAWN : la même image et les 6 derniers messages → Spawn_Allies,
+    Spawn_Ennemis, Tuiles_Spawn_Ennemis (cases praticables ; repli sur les
+    bords) ;
+  · le déploiement : genererTokensCombat, puis genererRencontreMonstres
+    (apparition, { tirage }) : les créatures portent URL_Token, et un PNJ
+    nommé PNJ_Nomme + son avatar (URL_Cloudinary) — la fenêtre de tour le
+    montre en pied. Le « Tour 1 » attend que tout soit prêt.
+
+LA FIN : victoire — Butin réparti et refermé (ou la croix de sa dernière
+fenêtre) ; défaite — le grand « Défaite » refermé : chacun revient au récit.
+UN poste qui a les clés réclame la narration (Etat narration), pose un
+message du Destin et appelle declencherTourIA({ issueCombat }) avec
+resumeCombatPourMJ : l'issue, les adversaires, les blessures (Fin_Combat),
+la mort, la consigne (suite à inventer pour les vivants ; lieu saccagé si
+intérieur). Puis l'arène retrouve sa carte et Combat_RP disparaît. Un
+combat effacé du plateau clôt le combat du récit.
+
+LA SECONDE CLÉ (cles_gemini.js) : GEMINI_API_KEY_2 dans l'onglet des clés et
+le fichier JSON. clesGeminiPour("combat") : la seconde, puis la première ;
+fetchGemini passe à l'autre clé sur un 429/503. Les IA du combat la prennent :
+MIA_COMBAT, le lieu, les ennemis, les peintures, MIA_BESTIAIRE, les
+techniques des créatures (MIA_AFFINITES, MIA_TECHNIQUES), MIA_Objets.
+
+corrections_v278.mjs (dans la suite, Gemini, OpenAI et Cloudinary simulés) :
+la seconde clé (champ, fichier, import, ordre, relais sur 429) ; les encarts ;
+le parchemin (attente, COMBATTRE, refus, délai) ; la détection (ordre,
+messages lus, clé) ; la préparation (arène gardée, lieu et ses 15 messages,
+style + description, réglages de la carte, apparition, noms, PNJ nommé,
+visuels, pions) ; la boîte de la grille (DEV, priorité, lecture, aperçu,
+validation) ; la grille numérotée et les peintures ; MIA_SPAWN ; le
+déploiement (héros, créatures, pions, réserve, PNJ en pied) ; le chat ; la
+victoire (retour, Destin, MJ, arène rendue) ; la défaite (blessures, mort,
+retour, MJ) ; le relais et les replis ; les versions. Il mord sur l'ancien
+code (45 échecs). fiche_race_classe.mjs lit le médaillon dans
+promptPionMedaillon.

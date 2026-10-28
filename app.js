@@ -2400,6 +2400,8 @@ async function supprimerPersonnageBDD(idPersonnage) {
 // =========================================================================
 const CLES_LS = {
   gemini: "ivalis_GEMINI_API_KEY", // <-- Ajout de Gemini
+  // La seconde clé, celle des IA du combat (v278, cles_gemini.js).
+  gemini2: "ivalis_GEMINI_API_KEY_2",
   openai: "ivalis_OPENAI_API_KEY",
   cloudName: "ivalis_CLOUDINARY_CLOUD_NAME",
   cloudKey: "ivalis_CLOUDINARY_API_KEY",
@@ -2409,6 +2411,7 @@ const CLES_LS = {
 function lireClesApi() {
   return {
     gemini: (localStorage.getItem(CLES_LS.gemini) || "").trim(),
+    gemini2: (localStorage.getItem(CLES_LS.gemini2) || "").trim(),
     openai: (localStorage.getItem(CLES_LS.openai) || "").trim(),
     cloudName: (localStorage.getItem(CLES_LS.cloudName) || "").trim(),
     cloudKey: (localStorage.getItem(CLES_LS.cloudKey) || "").trim(),
@@ -2419,6 +2422,7 @@ function lireClesApi() {
 function prefillClesApi() {
   const cles = lireClesApi();
   document.getElementById("cle-gemini").value = cles.gemini;
+  document.getElementById("cle-gemini-2").value = cles.gemini2;
   document.getElementById("cle-openai").value = cles.openai;
   document.getElementById("cle-cloud-name").value = cles.cloudName;
   document.getElementById("cle-cloud-key").value = cles.cloudKey;
@@ -2434,6 +2438,7 @@ function ouvrirClesApi(idFenetreSortante) {
 
 function sauvegarderClesApi() {
   localStorage.setItem(CLES_LS.gemini, document.getElementById("cle-gemini").value.trim());
+  localStorage.setItem(CLES_LS.gemini2, document.getElementById("cle-gemini-2").value.trim());
   localStorage.setItem(CLES_LS.openai, document.getElementById("cle-openai").value.trim());
   localStorage.setItem(CLES_LS.cloudName, document.getElementById("cle-cloud-name").value.trim());
   localStorage.setItem(CLES_LS.cloudKey, document.getElementById("cle-cloud-key").value.trim());
@@ -2444,7 +2449,7 @@ function sauvegarderClesApi() {
 
 function basculerAffichageCles(afficher) {
   const type = afficher ? "text" : "password";
-  ["cle-gemini", "cle-openai", "cle-cloud-name", "cle-cloud-key", "cle-cloud-secret"].forEach((id) => {
+  ["cle-gemini", "cle-gemini-2", "cle-openai", "cle-cloud-name", "cle-cloud-key", "cle-cloud-secret"].forEach((id) => {
     document.getElementById(id).type = type;
   });
 }
@@ -2462,6 +2467,7 @@ function afficherMessageClesApi(texte, estErreur) {
 function creerFichierExempleClesApi() {
   const exemple = {
     GEMINI_API_KEY: "",
+    GEMINI_API_KEY_2: "",
     OPENAI_API_KEY: "",
     CLOUDINARY_CLOUD_NAME: "",
     CLOUDINARY_API_KEY: "",
@@ -2492,6 +2498,7 @@ function importerFichierClesApi(evenement) {
       const donnees = JSON.parse(lecteur.result);
 
       document.getElementById("cle-gemini").value = (donnees.GEMINI_API_KEY || "").trim();
+      document.getElementById("cle-gemini-2").value = (donnees.GEMINI_API_KEY_2 || "").trim();
       document.getElementById("cle-openai").value = (donnees.OPENAI_API_KEY || "").trim();
       document.getElementById("cle-cloud-name").value = (donnees.CLOUDINARY_CLOUD_NAME || "").trim();
       document.getElementById("cle-cloud-key").value = (donnees.CLOUDINARY_API_KEY || "").trim();
@@ -2779,6 +2786,94 @@ async function portraitVersBlobPng(urlPortrait, fond = "#FF00FF") {
     }
 }
 
+// LE MÉDAILLON DE BOIS DES PIONS. `description` (v278, les ennemis des combats
+// du récit) : sans image de référence, la tête est celle d'une créature
+// DÉCRITE — le reste du médaillon est exactement celui des héros.
+function promptPionMedaillon(sujet, description) {
+    const decrit = !!String(description || "").trim();
+    const source = decrit ? "described below (there is no reference" : "from the provided reference";
+    const reference = decrit ? "described " : "reference ";
+    return "A detailed photograph of a circular hand-carved high-relief wooden plaque medallion, featuring only the head of the " + sujet + " " + source + " " +
+                       (decrit ? "image): " + String(description).trim().replace(/\s+/g, " ") + " —" : "image —") +
+                       " a close-up head shot, not the bust or full body — rendered in meticulously sculpted detail. The head emerges from the " +
+                       "central field with deep undercuts for a powerful three-dimensional effect, matching the exact facial features, head shape and any " +
+                       "head-attached details (horns, ears, hair, headwear) of the " + reference + sujet + ". The head is fully contained within the medallion's central " +
+                       "circular field, filling it closely, never overflowing past its inner border. The outer rim of the medallion carries a fine, delicate thin line of gold gilding traced along its circular edge. " +
+                       "The entire piece is crafted from a rich, medium-toned hardwood, like aged walnut, " +
+                       "with a tactile, oiled finish. Visible wood grain patterns and fine, authentic chisel marks are present across all surfaces. " +
+                       "The head's hair, headwear and specific details (like jewelry or facial textures) are faithfully translated into sculpted wood forms, matching the depth " +
+                       "and detail level of the " + (decrit ? "description" : "reference") + ". The background is a clean, isolated pure fluorescent magenta (#FF00FF), used as a chroma key backdrop, " +
+                       "with absolutely no cast shadows or drop shadows. " +
+                       "The lighting is natural sunlight — warm, clear daylight from a sun — precise, enhancing the forms and textures. " +
+                       "The magenta backdrop is only a chroma key and casts NO light: there must be absolutely no purple, violet, pink or magenta " +
+                       "reflections, rim light, glow or colour spill anywhere on the medallion or the head. " +
+                       "The image must be in a perfectly square format, with the medallion token scaled as large as possible while leaving a small margin from the edges. " +
+                       "The entire medallion, including any protruding details such as horns, ears or headwear, must be fully visible inside the frame — " +
+                       "nothing may be cropped or cut off by the image border.";
+}
+
+// LE PION D'UN ENNEMI DES COMBATS DU RÉCIT (v278, combat_rp.js). Nico :
+// « garde le même process qualité paramètres que la création de token joueur
+// actuelle » — le même médaillon, la même qualité, le même détourage. Un PNJ
+// nommé qui a déjà son portrait part de ce portrait (comme un héros) ; un
+// ennemi ordinaire n'a pas de portrait (« token direct ») : sa tête vient de
+// sa description. Rend l'URL du pion, ou "" (le pion commun le remplace).
+window.QUALITE_PION_ENNEMI = "low";
+window.fabriquerTokenIA = async function(options) {
+    const o = options || {};
+    const cles = lireClesApi();
+    if (!cles.openai || !cles.cloudName || !cles.cloudKey || !cles.cloudSecret) return "";
+    const blobPortrait = o.portrait ? await portraitVersBlobPng(o.portrait).catch(() => null) : null;
+    const sujet = o.sujet || (blobPortrait ? "character" : "creature");
+    const prompt = blobPortrait ? promptPionMedaillon(sujet)
+        : "Universe: Mythic Ancient Fantasy. " + promptPionMedaillon(sujet, o.description || "a fearsome creature");
+    const modeles = blobPortrait
+        ? [{ model: "gpt-image-2" }, { model: "gpt-image-1.5", input_fidelity: "high" }, { model: "gpt-image-1", input_fidelity: "high" }]
+        : [{ model: "gpt-image-2" }, { model: "gpt-image-1.5" }, { model: "gpt-image-1" }];
+    const delais = [5000, 15000, 30000];
+    let json = null;
+    for (const candidat of modeles) {
+        for (let tentative = 0; tentative < 3 && !json; tentative++) {
+            let statut = 0, texte = "";
+            try {
+                let rep;
+                if (blobPortrait) {
+                    const form = new FormData();
+                    form.append("model", candidat.model);
+                    form.append("prompt", prompt);
+                    form.append("image", blobPortrait, "portrait.png");
+                    form.append("n", "1");
+                    form.append("size", "1024x1024");
+                    form.append("quality", window.QUALITE_PION_ENNEMI);
+                    form.append("output_format", "png");
+                    if (candidat.input_fidelity) form.append("input_fidelity", candidat.input_fidelity);
+                    rep = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": "Bearer " + cles.openai }, body: form });
+                } else {
+                    rep = await fetch("https://api.openai.com/v1/images/generations", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + cles.openai },
+                        body: JSON.stringify({ model: candidat.model, prompt, n: 1, size: "1024x1024",
+                                               quality: window.QUALITE_PION_ENNEMI, output_format: "png", moderation: "low" })
+                    });
+                }
+                statut = rep.status;
+                texte = await rep.text();
+            } catch (e) { texte = "error code: 1015"; }
+            if (statut === 429 || texte.includes("error code: 1015") || texte.includes("Rate Limited")) {
+                await new Promise(r => setTimeout(r, delais[tentative]));
+                continue;
+            }
+            if (statut === 404 || texte.includes("model_not_found") || texte.includes("does not support")) break;
+            try { const j = JSON.parse(texte); if (j && j.data && j.data.length) json = j; } catch (e) {}
+            break;
+        }
+        if (json) break;
+    }
+    if (!json) { console.error("⚔️ [Pion ennemi] Aucune image renvoyée."); return ""; }
+    const source = json.data[0].url || ("data:image/png;base64," + json.data[0].b64_json);
+    return televerserImageDetouree(source, "Tokens/Ennemis", cles);
+};
+
 // Fonction silencieuse qui tourne en arrière-plan
 // `options` : { sujet, champ } — le pion du compagnon du Pisteur passe par
 // ici aussi, à partir de SON image (sujet « animal companion », écrit dans
@@ -2797,22 +2892,7 @@ async function genererEtStockerTokenBackground(donnees, idPersonnage, urlPortrai
         return false;
     }
 
-    const promptText = "A detailed photograph of a circular hand-carved high-relief wooden plaque medallion, featuring only the head of the " + sujet + " from the provided " +
-                       "reference image — a close-up head shot, not the bust or full body — rendered in meticulously sculpted detail. The head emerges from the " +
-                       "central field with deep undercuts for a powerful three-dimensional effect, matching the exact facial features, head shape and any " +
-                       "head-attached details (horns, ears, hair, headwear) of the reference " + sujet + ". The head is fully contained within the medallion's central " +
-                       "circular field, filling it closely, never overflowing past its inner border. The outer rim of the medallion carries a fine, delicate thin line of gold gilding traced along its circular edge. " +
-                       "The entire piece is crafted from a rich, medium-toned hardwood, like aged walnut, " +
-                       "with a tactile, oiled finish. Visible wood grain patterns and fine, authentic chisel marks are present across all surfaces. " +
-                       "The head's hair, headwear and specific details (like jewelry or facial textures) are faithfully translated into sculpted wood forms, matching the depth " +
-                       "and detail level of the reference. The background is a clean, isolated pure fluorescent magenta (#FF00FF), used as a chroma key backdrop, " +
-                       "with absolutely no cast shadows or drop shadows. " +
-                       "The lighting is natural sunlight — warm, clear daylight from a sun — precise, enhancing the forms and textures. " +
-                       "The magenta backdrop is only a chroma key and casts NO light: there must be absolutely no purple, violet, pink or magenta " +
-                       "reflections, rim light, glow or colour spill anywhere on the medallion or the head. " +
-                       "The image must be in a perfectly square format, with the medallion token scaled as large as possible while leaving a small margin from the edges. " +
-                       "The entire medallion, including any protruding details such as horns, ears or headwear, must be fully visible inside the frame — " +
-                       "nothing may be cropped or cut off by the image border.";
+    const promptText = promptPionMedaillon(sujet);
 
     // input_fidelity est ignoré par gpt-image-2 (déjà haute fidélité) mais indispensable aux modèles précédents.
     const modelesCandidats = [
@@ -3700,6 +3780,13 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              catch (e) { console.error("Voyage du groupe (le jeu continue) :", e); }
          }
 
+         // LES COMBATS DU RÉCIT (v278, combat_rp.js) : le verdict de MIA_COMBAT,
+         // la préparation, le bandeau du chat, la fin et le retour au récit.
+         if (typeof window.appliquerCombatRPDeLaPartie === "function") {
+             try { window.appliquerCombatRPDeLaPartie(dataPartie); }
+             catch (e) { console.error("Combat du récit (le jeu continue) :", e); }
+         }
+
          // =========================================================
          // LECTURE DE LA PISTE D'INITIATIVE ET DES PHASES DE COMBAT
          // =========================================================
@@ -3834,6 +3921,7 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
 
   window.unsubscribeMessages = onSnapshot(qMsg, (snap) => {
       let recitDeclenche = null; 
+      let recitHorodatage = 0;
 
       // On analyse chirurgicalement chaque changement (Ajout ou Suppression)
       snap.docChanges().forEach(change => {
@@ -3843,6 +3931,7 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
           if (change.type === "added") {
               if (window.INITIAL_CHAT_LOADED && data.Est_Narration_IA && data.Timestamp >= (timestampChargement - 1000)) {
                   recitDeclenche = data.Texte;
+                  recitHorodatage = data.Timestamp;
               }
               // 🔻 NOUVEAU : On injecte uniquement ce nouveau message !
               ajouterUnSeulMessageChat(data);
@@ -3861,7 +3950,7 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
       if (zoneChat) zoneChat.scrollTop = zoneChat.scrollHeight;
 
       if (recitDeclenche && typeof window.lancerRecitDynamique === "function") {
-          window.lancerRecitDynamique(recitDeclenche);
+          window.lancerRecitDynamique(recitDeclenche, { ts: recitHorodatage });
       }
   });
 
@@ -4219,6 +4308,8 @@ window.envoyerMessageChat = async function() {
    const input = document.getElementById("input-chat");
    const texte = input.value.trim();
    if(texte === "" || !window.ID_PARTIE_COURANTE) return;
+   // Pendant un combat du récit, le chat ne s'écrit plus (v278).
+   if (typeof window.combatRPActif === "function" && window.combatRPActif()) return;
 
    const partie = window.PARTIE_DATA || {};
    const ordre = partie.Ordre_Initiative || [];

@@ -9,6 +9,11 @@ let skipTyping = false;
 let typingSpans = [];
 let typingIndex = 0;
 let currentTimer = null;
+// LA FIN DU PARCHEMIN PEUT ATTENDRE (v278, combat_rp.js) : le verdict de
+// MIA_COMBAT (« Le destin hésite… »), puis le bouton COMBATTRE. Tant qu'elle
+// est là, un toucher sur le parchemin ne fait rien.
+let optionsRecit = {};
+let finRecitEnCours = false;
 
 // 1. Initialisation de l'interface graphique (Créée dynamiquement)
 function initInterfaceRecit() {
@@ -63,8 +68,11 @@ function initInterfaceRecit() {
 }
 
 // 2. Point d'entrée : Lancement de la scène
-window.lancerRecitDynamique = function(texteHtml) {
+// `options.ts` : l'horodatage du message du MJ (c'est lui que juge MIA_COMBAT).
+window.lancerRecitDynamique = function(texteHtml, options) {
     initInterfaceRecit();
+    optionsRecit = options || {};
+    finRecitEnCours = false;
     paragraphesRecit = texteHtml.split(/<br\s*\/?>/i).filter(p => p.trim() !== "");
     indexParagraphe = 0;
 
@@ -80,7 +88,7 @@ window.lancerRecitDynamique = function(texteHtml) {
 // 3. Jouer un paragraphe
 function jouerParagrapheCourant() {
     if (indexParagraphe >= paragraphesRecit.length) {
-        fermerRecitDynamique();
+        terminerRecit();
         return;
     }
 
@@ -215,8 +223,19 @@ function lancerTypingEffet() {
     }
 }
 
+// La dernière page lue : le combat du récit a peut-être son mot à dire.
+function terminerRecit() {
+    if (typeof window.finRecitCombat === "function") {
+        try {
+            if (window.finRecitCombat(optionsRecit.ts, { fermer: fermerRecitDynamique })) { finRecitEnCours = true; return; }
+        } catch (e) { console.error("Fin du parchemin (combat) :", e); }
+    }
+    fermerRecitDynamique();
+}
+
 // 6. Gestionnaire de clic (CORRECTION DU FONDU DE TRANSITION)
 function gererClicRecit() {
+    if (finRecitEnCours) return;
     if (isTyping) {
         skipTyping = true;
         clearTimeout(currentTimer);
@@ -261,6 +280,7 @@ function gererClicRecit() {
 
 // 7. Fin de la scène
 function fermerRecitDynamique() {
+    finRecitEnCours = false;
     const overlay = document.getElementById("ecran-recit-dynamique");
     overlay.style.opacity = "0"; 
     setTimeout(() => {
@@ -270,3 +290,4 @@ function fermerRecitDynamique() {
         document.getElementById("portrait-recit-dynamique").removeAttribute("src"); // On nettoie proprement la source
     }, 1500);
 }
+window.fermerRecitDynamique = fermerRecitDynamique;

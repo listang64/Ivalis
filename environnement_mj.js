@@ -275,7 +275,8 @@ window.contexteEnvironnementMJ = async function(partie, options) {
     }
     const texte = lignes.join("\n");
     // Nico : « un message dans la console avec le descriptif envoyé ».
-    console.log("🧭 [MJ] Environnement envoyé au maître du jeu :\n" + texte);
+    // (`silencieux` : c'est une autre IA qui le lit, v278.)
+    if (!(options && options.silencieux)) console.log("🧭 [MJ] Environnement envoyé au maître du jeu :\n" + texte);
     return texte;
 };
 

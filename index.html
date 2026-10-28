@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=108">
+  <link rel="stylesheet" href="style.css?v=109">
 
  
   <!-- ===================================================================== -->
@@ -548,19 +548,32 @@
 
     <!-- MODALE PRÉ-COMBAT (POPUP RENCONTRE) -->
     <div id="modale-pre-combat" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-h); background-color: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center;">
-        <div style="background: rgba(20, 15, 10, 0.95); border: 2px solid #c2a878; border-radius: 12px; padding: 30px; width: 450px; text-align: center; box-shadow: 0 0 30px rgba(0,0,0,1);">
-            <h3 style="font-family: 'Cinzel', serif; color: #e8d5a5; font-size: 26px; margin-top: 0; margin-bottom: 25px; text-shadow: 2px 2px 4px black; letter-spacing: 2px; text-transform: uppercase;">
-                Préparation de la Rencontre
-            </h3>
-            
-            <div id="contenu-pre-combat" style="min-height: 120px; color: #a89f91; font-family: 'Almendra', serif; font-size: 18px; margin-bottom: 25px; display: flex; justify-content: center; align-items: center; border: 1px dashed #5c3a21; border-radius: 8px; background: rgba(0,0,0,0.3);">
-                <!-- C'est ici que tu mettras les futurs paramètres -->
-                <span style="font-style: italic;">(Options de la rencontre à venir...)</span>
+        <div class="carte-encarts-combat">
+            <h3 class="encarts-combat-titre">Les combats</h3>
+
+            <!-- DEUX ENCARTS (v278, combat_rp.js). En haut, le combat du récit
+                 de CETTE partie : il se prépare ou il fait rage, on le rejoint.
+                 En dessous, l'arène : la fenêtre de combat telle qu'on la
+                 connaît. Ils partagent le plateau : l'arène est fermée tant
+                 que le combat du récit n'est pas terminé. -->
+            <div id="contenu-pre-combat" class="encarts-combat">
+                <div id="encart-combat-en-cours" class="encart-combat encart-en-cours inactif" onclick="window.rejoindreCombatRP()">
+                    <div class="encart-combat-titre">⚔️ Combat en cours</div>
+                    <div class="encart-combat-texte" id="encart-combat-en-cours-texte">Aucun combat en cours dans cette partie.</div>
+                </div>
+                <div id="encart-arene" class="encart-combat encart-arene" onclick="window.validerPopupRencontre()">
+                    <div class="encart-combat-titre">🏛️ Arène de combat</div>
+                    <div class="encart-combat-texte">L'arène d'entraînement : la fenêtre de combat, ses outils et ses rencontres.</div>
+                    <div class="encart-combat-note"></div>
+                </div>
+                <div id="encart-combat-dev" class="encart-combat-dev" style="display: none;">
+                    <button id="btn-forcer-combat-rp" class="btn-combat-switch" onclick="window.forcerCombatRP()">DEV : lancer un combat du récit</button>
+                    <button id="btn-abandonner-combat-rp" class="btn-combat-switch" onclick="window.abandonnerCombatRP()">DEV : abandonner le combat du récit</button>
+                </div>
             </div>
-            
+
             <div style="display: flex; justify-content: center; gap: 20px;">
-                <button class="btn-parametres" style="background-color: #1b6e3a; border-color: #0f4021;" onclick="window.validerPopupRencontre()">Créer la rencontre</button>
-                <button class="btn-parametres" onclick="window.fermerPopupRencontre()">Annuler</button>
+                <button class="btn-parametres" onclick="window.fermerPopupRencontre()">Fermer</button>
             </div>
         </div>
     </div>
@@ -1466,6 +1479,13 @@
         <label for="cle-gemini">GEMINI_API_KEY (Google AI Studio)</label>
         <input type="password" id="cle-gemini" class="input-texte-parchemin" placeholder="AIzaSy..." autocomplete="off">
       </div>
+      <!-- LA SECONDE CLÉ (v278, cles_gemini.js) : les IA du combat. Le quota
+           gratuit est compté par projet Google : elle doit venir d'un autre
+           projet que la première. Vide, les combats prennent la première. -->
+      <div class="champ-cle-api">
+        <label for="cle-gemini-2">GEMINI_API_KEY_2 (IA du combat — un autre projet Google)</label>
+        <input type="password" id="cle-gemini-2" class="input-texte-parchemin" placeholder="AIzaSy... (facultative)" autocomplete="off">
+      </div>
       <div class="champ-cle-api">
         <label for="cle-openai">OPENAI_API_KEY</label>
         <input type="password" id="cle-openai" class="input-texte-parchemin" placeholder="sk-..." autocomplete="off">
@@ -2308,11 +2328,13 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=182"></script>
+<script src="trace_combat.js?v=183"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
 <script src="porte_joueur.js?v=1"></script>
+<!-- Les deux clés Gemini (v278) : la seconde pour les IA du combat. -->
+<script src="cles_gemini.js?v=1"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2364,8 +2386,8 @@
 <script type="module" src="pont_combat.js?v=46"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=53"></script>
-<script type="module" src="ia_master.js?v=10"></script>
-<script type="module" src="app.js?v=124"></script>
+<script type="module" src="ia_master.js?v=11"></script>
+<script type="module" src="app.js?v=125"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=2"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
@@ -2382,7 +2404,7 @@
 <script type="module" src="terrains_regionaux.js?v=1"></script>
 <script type="module" src="voyage_groupe.js?v=3"></script>
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
-<script type="module" src="environnement_mj.js?v=2"></script>
+<script type="module" src="environnement_mj.js?v=3"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->
 <script src="poi_catalogue.js?v=1"></script>
 <script type="module" src="poi_creation.js?v=1"></script>
@@ -2402,7 +2424,7 @@
 <script src="blessures.js?v=2"></script>
 <script type="module" src="creation_personnage.js?v=26"></script>
 <script type="module" src="classes.js?v=27"></script>
-<script type="module" src="recit_dynamique.js?v=4"></script>
+<script type="module" src="recit_dynamique.js?v=5"></script>
 <script type="module" src="competences.js?v=67"></script>
 <script type="module" src="talents_ui.js?v=2"></script>
 <script type="module" src="blessures_ui.js?v=5"></script>
@@ -2419,7 +2441,7 @@
 <script type="module" src="sequence_tour.js?v=25"></script>
 <script src="zombie_token.js?v=1"></script>
 <script src="murs_terre.js?v=10"></script>
-<script type="module" src="combat.js?v=155"></script>
+<script type="module" src="combat.js?v=156"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=40"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
@@ -2427,14 +2449,16 @@
 <!-- LES APPARITIONS (v268) : le tableau de Nico, son tirage, sa fenêtre de
      réglage. Avant monstres.js, qui le lit dès son chargement. -->
 <script src="apparitions.js?v=2"></script>
-<script type="module" src="monstres.js?v=42"></script>
-<script type="module" src="monstres_competences.js?v=29"></script>
+<script type="module" src="monstres.js?v=43"></script>
+<script type="module" src="monstres_competences.js?v=30"></script>
 <script type="module" src="monstres_ia.js?v=42"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=20"></script>
 <script src="variations_tenues.js?v=2"></script>
-<script type="module" src="objets_ia.js?v=17"></script>
+<script type="module" src="objets_ia.js?v=18"></script>
 <script type="module" src="loot.js?v=31"></script>
+<!-- LES COMBATS DU RÉCIT (v278) : la détection, la préparation, le retour au récit. -->
+<script type="module" src="combat_rp.js?v=1"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

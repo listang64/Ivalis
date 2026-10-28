@@ -336,6 +336,8 @@ window.ecouterMonstresPartie = function(idPartie) {
             if (brut.Repos_Long !== undefined) objet.Repos_Long = brut.Repos_Long;
             // Le compagnon du Pisteur : l'identifiant de son maître.
             objet.compagnonDe   = brut.Compagnon_De || "";
+            // Un PNJ nommé du récit (v278) : son portrait vit dans urlCloudinary.
+            objet.pnjNomme      = brut.PNJ_Nomme || "";
             objet.nomAttaque    = brut.Nom_Attaque || "";
             // Ses résistances (app.js) : tirées à sa création parmi tous les
             // états (Resistances_Etats, v260) ; une créature d'avant garde ses
@@ -1015,7 +1017,8 @@ window.nommerMonstresIA = async function(composition) {
         });
     };
 
-    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+    // Une IA du combat : la seconde clé (cles_gemini.js), à défaut la première.
+    const cleGemini = typeof window.cleGemini === "function" ? window.cleGemini("combat") : localStorage.getItem("ivalis_GEMINI_API_KEY");
     if (!cleGemini || composition.length === 0) return nommerParDefaut();
 
     const listePourIA = composition.map((m, i) =>
@@ -1048,16 +1051,15 @@ RÈGLES :
     }];
 
     try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                systemInstruction: { parts: [{ text: promptSysteme }] },
-                contents: [{ role: "user", parts: [{ text: `Voici le groupe à nommer :\n${listePourIA}` }] }],
-                tools: outils,
-                toolConfig: { functionCallingConfig: { mode: "ANY" } }
-            })
+        const corps = JSON.stringify({
+            systemInstruction: { parts: [{ text: promptSysteme }] },
+            contents: [{ role: "user", parts: [{ text: `Voici le groupe à nommer :\n${listePourIA}` }] }],
+            tools: outils,
+            toolConfig: { functionCallingConfig: { mode: "ANY" } }
         });
+        const res = typeof window.fetchGemini === "function" ? await window.fetchGemini("combat", corps)
+            : await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: corps });
 
         const data = await res.json();
         const appel = data.candidates?.[0]?.content?.parts?.find(p => p.functionCall)?.functionCall;
@@ -1141,8 +1143,12 @@ window.poserMonstreSurTerrain = async function(monstre, tokensData, options) {
         Initiative: 10,
         Critique: 5,
         Competences_Max: 4,
-        URL_Cloudinary: "",
-        URL_Token: ""
+        // LES COMBATS DU RÉCIT (v278, combat_rp.js) : son pion dessiné, et pour
+        // un PNJ nommé son portrait (la fenêtre de tour le montre en pied).
+        URL_Cloudinary: monstre.portrait || "",
+        URL_Token: monstre.token || "",
+        ...(monstre.pnj ? { PNJ_Nomme: monstre.pnj } : {}),
+        ...(monstre.description ? { Description_Physique: String(monstre.description).slice(0, 600) } : {})
     });
 
     // Une créature du DÉPART entre autour du repère des ennemis posé à la
@@ -1155,7 +1161,7 @@ window.poserMonstreSurTerrain = async function(monstre, tokensData, options) {
         ? (t) => window.trouverHexLibreAutour(t, options.autour, 1)
         : options && options.premiereArrivee ? window.casePremiereArriveeEnnemi : window.caseApparitionEnnemi;
     const hexLibre = typeof placer === "function" ? placer(tokensData) : window.trouverHexLibreVTT(tokensData);
-    tokensData[idMonstre] = { q: hexLibre.q, r: hexLibre.r, url: "", taille: 55 };
+    tokensData[idMonstre] = { q: hexLibre.q, r: hexLibre.r, url: monstre.token || "", taille: 55 };
 
     const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
     const partieSnap = await getDoc(partieRef);
@@ -1263,7 +1269,10 @@ window.champsLeader = function(gabarit) {
 //  entrent, autour du repère des ennemis (v263) ; les renforts attendent leur
 //  heure dans la réserve, et entreront par les cases d'apparition peintes. Toute la rencontre est nommée d'un seul appel,
 //  renforts compris : l'IA évite ainsi les doublons.
-window.genererRencontreMonstres = async function(choix) {
+// `options.tirage` (v278, combat_rp.js) : la rencontre d'un combat du récit,
+// déjà tirée selon les règles des apparitions et déjà habillée par MIA_ENNEMIS
+// (noms, pions) — elle n'est ni retirée, ni renommée.
+window.genererRencontreMonstres = async function(choix, options) {
     if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) {
         alert("Ouvre d'abord un combat : les monstres ont besoin d'un plateau pour apparaître.");
         return;
@@ -1280,15 +1289,17 @@ window.genererRencontreMonstres = async function(choix) {
         console.error("Relecture des gabarits impossible, on garde ceux en mémoire :", e);
     }
 
-    const tirage = window.tirerApparition(choix);
+    const tirage = options && options.tirage ? options.tirage : window.tirerApparition(choix);
     if (tirage.depart.length === 0) {
         alert("Aucun gabarit de monstre disponible : ouvre Paramètres > Outils > Monstres pour les initialiser.");
         return;
     }
 
     const tous = [...tirage.depart, ...tirage.renforts];
-    const noms = await window.nommerMonstresIA(tous);
-    tous.forEach((m, i) => { m.nom = noms[i] || "Créature"; });
+    if (!tous.every(m => m.nom)) {
+        const noms = await window.nommerMonstresIA(tous);
+        tous.forEach((m, i) => { m.nom = m.nom || noms[i] || "Créature"; });
+    }
 
     const tokensData = { ...window.TOKENS_VTT_DATA };
     const poses = [];

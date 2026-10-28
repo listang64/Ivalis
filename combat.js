@@ -423,11 +423,16 @@ window.COMBAT_PERSOS_JOUEUR = [];
 //  GESTION DU POPUP DE PRÉ-RENCONTRE
 // =========================================================================
 
+// DEUX ENCARTS (v278) : « Combat en cours », celui du récit de CETTE partie
+// (combat_rp.js), et « Arène de combat », la fenêtre de combat telle qu'on la
+// connaît. L'arène est fermée tant que le combat du récit n'est pas terminé :
+// ils partagent le même plateau.
 window.ouvrirPopupRencontre = function() {
     const modale = document.getElementById("modale-pre-combat");
     if (modale) {
         modale.style.display = "flex"; // Utilise flexbox pour centrer le contenu
     }
+    if (typeof window.actualiserEncartsCombatRP === "function") window.actualiserEncartsCombatRP();
 };
 
 window.fermerPopupRencontre = function() {
@@ -439,6 +444,7 @@ window.fermerPopupRencontre = function() {
 };
 
 window.validerPopupRencontre = function() {
+    if (typeof window.combatRPActif === "function" && window.combatRPActif()) return;
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     // 1. On ferme le popup
     window.fermerPopupRencontre();
@@ -486,6 +492,10 @@ window.ouvrirCombat = function() {
     // Nouveau combat : les deux repères d'apparition manquent, on les demande.
     window.APPARITION_REPORTEE = false;
     if (typeof window.verifierPointsApparition === "function") window.verifierPointsApparition();
+
+    // Le combat du récit en préparation : son voile d'attente et, en mode DEV,
+    // la boîte de la grille (combat_rp.js).
+    if (typeof window.actualiserCombatRPAffichage === "function") window.actualiserCombatRPAffichage();
 };
 
 window.fermerCombat = function() {
@@ -3372,8 +3382,9 @@ window.construireIndicateursEtatsToken = function(etats, taille) {
 // Elle porte maintenant une image, la même pour tous, au format et à la taille
 // de référence d'un pion de joueur (55). La constante vit ici parce que DEUX
 // endroits en ont besoin : le plateau (ci-dessous) et la piste d'initiative.
-// Les documents Monstres, eux, ne portent toujours aucune URL : ce n'est pas
-// une donnée de la créature, c'est une décision d'affichage.
+// Les documents Monstres de l'arène ne portent aucune URL : ce n'est pas une
+// donnée de la créature, c'est une décision d'affichage. Ceux des combats du
+// récit (v278) portent leur pion (URL_Token), qui passe avant.
 window.IMAGE_TOKEN_ENNEMI = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309136/IMG_2137_mxyexl.png";
 
 // L'IMAGE DU PION D'UNE CRÉATURE, TELLE QUE LE PLATEAU LA MONTRE. La piste
@@ -3386,7 +3397,8 @@ window.IMAGE_TOKEN_ENNEMI = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q
 // est appelé une fois, quand il l'est.
 window.imagePionCreature = function(perso, rappel) {
     perso = perso || {};
-    const brute = (perso.compagnonDe && (perso.urlToken || perso.urlCloudinary)) || window.IMAGE_TOKEN_ENNEMI;
+    // Une créature des combats du récit a son propre pion (v278).
+    const brute = (perso.compagnonDe && (perso.urlToken || perso.urlCloudinary)) || perso.urlToken || window.IMAGE_TOKEN_ENNEMI;
     // La même URL que le plateau (taille 700) : c'est la clé du cache zombie.
     const source = typeof window.redimensionnerImageCloudinary === "function"
         ? window.redimensionnerImageCloudinary(brute, 700) : brute;
@@ -3881,7 +3893,9 @@ window.appliquerTokensVTT = function(tokensMap) {
             imgEnnemi.className = "token-img-main";
             // LE COMPAGNON DU PISTEUR porte son propre pion (généré à la
             // création du héros) ; à défaut, l'image commune.
-            const imageDuPion = (pData.compagnonDe && (pData.urlToken || pData.urlCloudinary)) || window.IMAGE_TOKEN_ENNEMI;
+            // UNE CRÉATURE DES COMBATS DU RÉCIT (v278) porte son pion, dessiné
+            // d'après son apparence.
+            const imageDuPion = (pData.compagnonDe && (pData.urlToken || pData.urlCloudinary)) || pData.urlToken || window.IMAGE_TOKEN_ENNEMI;
             if (pData.compagnonDe) divToken.classList.add("token-compagnon");
             // LE LEADER (v262) : une aura rouge autour du pion, sous son image —
             // un anneau organique qui ondule doucement (v265, auraLeader).
@@ -6643,7 +6657,11 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
         // comme un héros — pas son pion rond (Nico). Elle est en paysage : la
         // disposition la pose un peu plus bas (hud_disposition.js).
         const estCompagnon = !!perso.compagnonDe && !!perso.urlCloudinary;
-        const enPied = (!estCreature || estCompagnon) && !!perso.urlCloudinary;
+        // UN PNJ NOMMÉ DU RÉCIT qu'on affronte (v278) montre son avatar, comme
+        // un héros (Nico : « il faudra utiliser cet avatar dans le récap de la
+        // compétence qui va être jouée dans le bandeau »).
+        const pnjEnPied = estCreature && !estCompagnon && !!perso.pnjNomme && !!perso.urlCloudinary;
+        const enPied = ((!estCreature || estCompagnon) && !!perso.urlCloudinary) || pnjEnPied;
         const boitePion = document.getElementById("voile-tour-pion-boite");
         if (boitePion && (boitePion.dataset.compagnon === "1") !== estCompagnon) {
             boitePion.dataset.compagnon = estCompagnon ? "1" : "";
@@ -6661,10 +6679,10 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
         // garde « a-t-elle changé ? » comparait undefined à undefined, l'image
         // n'était jamais posée, et le pion restait vide sans un mot.
         // Une créature : l'image de SON pion — un zombie y est un zombie.
-        const pionCreature = estCreature && !estCompagnon && typeof window.imagePionCreature === "function"
+        const pionCreature = estCreature && !estCompagnon && !pnjEnPied && typeof window.imagePionCreature === "function"
             ? window.imagePionCreature(perso, () => window.rafraichirVoileTour(queueParam, phaseParam))
             : null;
-        const url = (estCreature && !estCompagnon
+        const url = (estCreature && !estCompagnon && !pnjEnPied
             ? (pionCreature ? pionCreature.url : window.IMAGE_TOKEN_ENNEMI)
             : perso.urlCloudinary)
             || "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png";
@@ -7011,6 +7029,9 @@ window.DERNIER_TOUR_AFFICHE = 0; // Mémoire locale pour ne pas rejouer l'animat
 window.verifierChangementTour = function(nouveauTour) {
     const fenetreCombat = document.getElementById("fenetre-combat");
     if (!fenetreCombat || fenetreCombat.style.display !== "block") return;
+    // Le combat du récit se prépare encore (v278) : le « Tour 1 » attendra que
+    // tout soit en place (combat_rp.js le rejoue alors).
+    if (typeof window.combatRPEnPreparation === "function" && window.combatRPEnPreparation()) return;
     
     // Au lancement du combat (Tour 1) ou si le tour change
     if (window.DERNIER_TOUR_AFFICHE !== nouveauTour) {
@@ -7110,10 +7131,13 @@ window.verifierNettoyageFinCombat = function(partie) {
     return true;
 };
 
+// `options.rp` (v278) : un combat du récit prend le plateau (combat_rp.js) —
+// sans question, et sans demander les repères : MIA_SPAWN les posera.
 window.reinitialiserCombat = async function(options) {
     const finDeCombat = !!(options && options.finDeCombat);
-    if (!finDeCombat && !confirm("Voulez-vous vraiment réinitialiser ce combat ? Tous les PV et la Fatigue seront restaurés, et le combat repassera au Tour 1.")) return;
-    if (!finDeCombat && typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const pourLeRecit = !!(options && options.rp);
+    if (!finDeCombat && !pourLeRecit && !confirm("Voulez-vous vraiment réinitialiser ce combat ? Tous les PV et la Fatigue seront restaurés, et le combat repassera au Tour 1.")) return;
+    if (!finDeCombat && !pourLeRecit && typeof window.jouerSonClic === "function") window.jouerSonClic();
 
     // PENDANT TOUT CE QUI SUIT, ON NE JUGE PERSONNE À TERRE. Les fiches vont
     // traverser un instant à zéro point de vie avant de recevoir leurs valeurs
@@ -7371,7 +7395,7 @@ window.reinitialiserCombat = async function(options) {
         // Réinitialiser, c'est repartir pour un combat : une fois les deux
         // repères posés, on enchaîne tout seul sur le déploiement des héros
         // puis sur la rencontre. Le MJ n'a plus qu'à choisir la difficulté.
-        window.DEPLOIEMENT_APRES_REPERES = true;
+        window.DEPLOIEMENT_APRES_REPERES = !pourLeRecit;
         if (typeof window.verifierPointsApparition === "function") window.verifierPointsApparition();
 
         // Le ménage est fini : les butins redeviennent possibles.
@@ -7803,7 +7827,9 @@ window.reporterPointsApparition = function() {
 // arrivent — y compris quand c'est un autre poste qui les a posés.
 window.verifierPointsApparition = function() {
     const enCombat = document.getElementById("fenetre-combat")?.style.display === "block";
-    if (!enCombat) {
+    // Un combat du récit en préparation : MIA_SPAWN pose les repères.
+    const recitPrepare = typeof window.combatRPEnPreparation === "function" && window.combatRPEnPreparation();
+    if (!enCombat || recitPrepare) {
         window.arreterPlacementApparition();
         return;
     }

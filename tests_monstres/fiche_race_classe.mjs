@@ -116,7 +116,10 @@ console.log("\n2. LES PORTRAITS : LUMIÈRE DU SOLEIL, JAMAIS DE REFLET VIOLACÉ"
   verifier("le portrait du héros", regle(portrait));
   verifier("le portrait d'un PNJ", regle(pnj));
   verifier("l'avatar habillé d'une armure", regle(hab));
-  const pion = app.slice(app.indexOf("async function genererEtStockerTokenBackground"), app.indexOf("const modelesCandidats"));
+  // (v278 : le texte du médaillon vit dans promptPionMedaillon, partagé avec
+  // les pions des ennemis des combats du récit.)
+  const debutPion = app.indexOf("function promptPionMedaillon") >= 0 ? app.indexOf("function promptPionMedaillon") : app.indexOf("async function genererEtStockerTokenBackground");
+  const pion = app.slice(debutPion, app.indexOf("const modelesCandidats"));
   verifier("le pion en médaillon : soleil, et aucun reflet magenta ou violet",
            /natural sunlight/.test(pion) && /no purple, violet, pink or magenta/.test(pion));
   verifier("le fond magenta reste exigé partout (il sert au détourage)",

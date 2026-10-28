@@ -5919,3 +5919,157 @@ textarea.input-texte-parchemin {
 .apercu-lieu-cadre figcaption { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 10px 16px; color: #f3dfa6; }
 .apercu-lieu-nom { font-size: 22px; font-weight: bold; letter-spacing: 0.04em; }
 .apercu-lieu-type { font-size: 15px; font-style: italic; opacity: 0.85; }
+
+/* =========================================================================
+   LES COMBATS DU RÉCIT (v278, combat_rp.js)
+   ========================================================================= */
+/* Les deux encarts du bouton de combat. */
+.carte-encarts-combat {
+    background: rgba(20, 15, 10, 0.95); border: 2px solid #c2a878; border-radius: 12px;
+    padding: 28px 30px; width: min(520px, 92vw); box-sizing: border-box; text-align: center;
+    box-shadow: 0 0 30px rgba(0,0,0,1);
+}
+.encarts-combat-titre {
+    font-family: 'Cinzel', serif; color: #e8d5a5; font-size: 26px; margin: 0 0 20px 0;
+    text-shadow: 2px 2px 4px black; letter-spacing: 2px; text-transform: uppercase;
+}
+.encarts-combat { display: flex; flex-direction: column; gap: 14px; margin-bottom: 22px; }
+.encart-combat {
+    position: relative; padding: 16px 18px; border-radius: 10px; cursor: pointer; text-align: left;
+    border: 2px solid #5c3a21; background: linear-gradient(160deg, #2a1a10 0%, #17100a 100%);
+    transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+.encart-combat:hover { transform: translateY(-2px); box-shadow: 0 6px 22px rgba(0,0,0,0.7); border-color: #c2a878; }
+.encart-combat-titre { font-family: 'Cinzel', serif; font-size: 19px; font-weight: bold; color: #e8d5a5; letter-spacing: 1px; margin-bottom: 6px; }
+.encart-combat-texte { font-family: 'Almendra', serif; font-size: 16px; color: #c2a878; line-height: 1.35; }
+.encart-combat-texte strong { color: #ffb3b3; font-family: 'Cinzel', serif; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; }
+.encart-combat-note:empty { display: none; }
+.encart-combat-note { font-family: 'Almendra', serif; font-style: italic; font-size: 14px; color: #ff8b8b; margin-top: 6px; }
+.encart-en-cours { border-color: #8b1c1c; background: linear-gradient(160deg, #3a1210 0%, #1a0907 100%); }
+.encart-en-cours .encart-combat-titre { color: #ff8b8b; text-shadow: 0 0 12px rgba(255, 76, 76, 0.45); }
+.encart-en-cours.en-preparation { animation: encart-combat-pouls 2.2s ease-in-out infinite; }
+@keyframes encart-combat-pouls { 0%, 100% { box-shadow: 0 0 0 rgba(255, 60, 60, 0); } 50% { box-shadow: 0 0 22px rgba(255, 60, 60, 0.45); } }
+.encart-combat.inactif { opacity: 0.45; cursor: default; pointer-events: none; filter: grayscale(0.6); animation: none; }
+.encart-combat-dev { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.encart-combat-dev .btn-combat-switch { font-size: 12px; padding: 6px 12px; border-color: #ff4c4c; color: #ff8b8b; }
+
+/* Le chat pendant un combat : un bandeau à la place de la saisie. */
+.bandeau-combat-chat {
+    display: none; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap;
+    padding: 12px 18px; margin: 6px 10px 10px 10px; border-radius: 10px;
+    border: 2px solid #8b1c1c; background: linear-gradient(180deg, rgba(70, 12, 10, 0.96), rgba(30, 6, 6, 0.96));
+    box-shadow: 0 0 18px rgba(160, 20, 20, 0.45);
+}
+.bandeau-combat-mot { font-family: 'Cinzel', serif; font-size: 20px; font-weight: bold; color: #ffb3b3; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 0 10px rgba(255, 60, 60, 0.6); }
+.bandeau-combat-sous { font-family: 'Almendra', serif; font-style: italic; font-size: 16px; color: #e8d5a5; }
+.bandeau-combat-bouton {
+    font-family: 'Cinzel', serif; font-size: 14px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase;
+    color: #fff3f3; background: linear-gradient(180deg, #b3191c, #6e0b0d); border: 2px solid #ff6b6b;
+    border-radius: 6px; padding: 8px 16px; cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,0.6);
+}
+
+/* La fin du parchemin : « Le destin hésite… », puis COMBATTRE. */
+.fin-recit-combat {
+    position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); z-index: 20;
+    display: flex; flex-direction: column; align-items: center; gap: 26px; cursor: default;
+}
+.destin-hesite {
+    font-family: 'Almendra', serif; font-style: italic; font-size: 3vw; color: #4a2511;
+    text-shadow: 0 0 1px rgba(0,0,0,0.3); animation: destin-hesite 2.4s ease-in-out infinite;
+}
+@keyframes destin-hesite { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+.fin-recit-combat-titre {
+    font-family: 'Cinzel', serif; font-size: 2.1vw; font-weight: bold; color: #5c1210; text-align: center;
+    max-width: 60vw; text-shadow: 0 2px 6px rgba(0,0,0,0.25); animation: combattre-apparait 0.9s ease-out both;
+}
+.bouton-combattre {
+    position: relative; overflow: visible; cursor: pointer;
+    padding: 2.2vh 5.5vw; border-radius: 14px;
+    font-family: 'Cinzel', serif; font-weight: bold; font-size: 3.4vw; letter-spacing: 0.5vw; text-transform: uppercase;
+    color: #fff0e8; text-shadow: 0 2px 0 #3a0605, 0 0 18px rgba(255, 80, 60, 0.75);
+    border: 3px solid #2a0403;
+    background:
+        radial-gradient(ellipse at 22% 30%, rgba(255, 120, 100, 0.35), transparent 45%),
+        radial-gradient(ellipse at 78% 75%, rgba(40, 0, 0, 0.55), transparent 50%),
+        linear-gradient(180deg, #c3161a 0%, #8a0b0e 48%, #4c0406 100%);
+    box-shadow: 0 0 0 4px rgba(120, 10, 10, 0.35), 0 12px 30px rgba(60, 0, 0, 0.65), inset 0 2px 0 rgba(255, 170, 150, 0.4), inset 0 -6px 14px rgba(0,0,0,0.5);
+    animation: combattre-apparait 0.9s ease-out both, combattre-pouls 2.6s ease-in-out 0.9s infinite;
+}
+.bouton-combattre:hover { filter: brightness(1.12); }
+.bouton-combattre:active { transform: scale(0.97); }
+.bouton-combattre-mot { position: relative; z-index: 2; }
+/* Des éclaboussures sombres sur le métal du bouton. */
+.bouton-combattre-eclats {
+    position: absolute; inset: 0; border-radius: 12px; pointer-events: none; z-index: 1; opacity: 0.55;
+    background:
+        radial-gradient(circle at 12% 70%, #3a0303 0 6px, transparent 7px),
+        radial-gradient(circle at 16% 62%, #3a0303 0 3px, transparent 4px),
+        radial-gradient(circle at 88% 25%, #3a0303 0 7px, transparent 8px),
+        radial-gradient(circle at 83% 34%, #3a0303 0 3px, transparent 4px),
+        radial-gradient(circle at 64% 82%, #3a0303 0 4px, transparent 5px);
+}
+/* Les gouttes de sang qui perlent sous le bouton. */
+.goutte-sang {
+    position: absolute; top: 100%; width: 9px; height: var(--h, 18px); margin-left: -4px; z-index: 0;
+    background: linear-gradient(180deg, #4c0406, #9b0d10 70%, #c3161a);
+    border-radius: 0 0 50% 50% / 0 0 70% 70%; transform-origin: top center;
+    animation: goutte-sang 2.6s ease-in infinite;
+}
+.goutte-sang::after {
+    content: ""; position: absolute; left: 50%; bottom: -7px; width: 11px; height: 11px; margin-left: -5.5px;
+    border-radius: 50%; background: #9b0d10; box-shadow: inset -2px -2px 3px rgba(0,0,0,0.35);
+}
+@keyframes goutte-sang {
+    0% { transform: scaleY(0.2); opacity: 0; }
+    25% { opacity: 1; }
+    70% { transform: scaleY(1); opacity: 1; }
+    100% { transform: scaleY(1) translateY(36px); opacity: 0; }
+}
+@keyframes combattre-apparait { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+@keyframes combattre-pouls {
+    0%, 100% { box-shadow: 0 0 0 4px rgba(120, 10, 10, 0.35), 0 12px 30px rgba(60, 0, 0, 0.65), inset 0 2px 0 rgba(255, 170, 150, 0.4), inset 0 -6px 14px rgba(0,0,0,0.5); }
+    50% { box-shadow: 0 0 0 8px rgba(160, 15, 15, 0.25), 0 0 46px rgba(200, 20, 20, 0.55), inset 0 2px 0 rgba(255, 170, 150, 0.4), inset 0 -6px 14px rgba(0,0,0,0.5); }
+}
+
+/* La fenêtre de combat pendant la préparation. */
+.voile-combat-rp {
+    position: absolute; z-index: 30; display: none; flex-direction: column; align-items: center; gap: 12px;
+    pointer-events: none; text-align: center; box-sizing: border-box;
+}
+.voile-combat-rp.plein {
+    inset: 0; justify-content: center; pointer-events: auto;
+    background: radial-gradient(ellipse at center, rgba(40, 16, 10, 0.94) 0%, rgba(8, 4, 3, 0.98) 75%);
+}
+.voile-combat-rp.bandeau {
+    top: 12px; left: 50%; transform: translateX(-50%); width: min(720px, 92vw); padding: 12px 22px; border-radius: 12px;
+    background: rgba(20, 8, 6, 0.86); border: 2px solid #8b1c1c; box-shadow: 0 8px 26px rgba(0,0,0,0.7);
+}
+.voile-combat-rp-titre { font-family: 'Cinzel', serif; font-weight: bold; color: #ffb3b3; letter-spacing: 2px; text-shadow: 0 0 14px rgba(255, 60, 60, 0.55); }
+.voile-combat-rp.plein .voile-combat-rp-titre { font-size: 38px; animation: destin-hesite 2.6s ease-in-out infinite; }
+.voile-combat-rp.bandeau .voile-combat-rp-titre { font-size: 20px; }
+.voile-combat-rp-sous { font-family: 'Almendra', serif; font-style: italic; color: #e8d5a5; font-size: 18px; }
+.voile-combat-rp-etapes { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; font-family: 'Almendra', serif; font-size: 15px; color: #8a7a64; }
+.voile-combat-rp-etapes .fait { color: #9fe3a6; }
+
+/* La boîte de la grille (mode DEV). */
+.boite-grille-rp {
+    position: absolute; z-index: 35; left: 50%; bottom: 4vh; transform: translateX(-50%);
+    display: none; flex-direction: column; align-items: center; gap: 10px; width: min(460px, 92vw); box-sizing: border-box;
+    padding: 18px 22px; border-radius: 12px; background: linear-gradient(160deg, #2a1a10 0%, #17100a 100%);
+    border: 2px solid #c2a878; box-shadow: 0 12px 34px rgba(0,0,0,0.85); text-align: center;
+}
+.boite-grille-titre { font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; color: #e8d5a5; letter-spacing: 1px; }
+.boite-grille-aide { font-family: 'Almendra', serif; font-size: 14px; color: #c2a878; }
+.boite-grille-reglage { display: flex; align-items: center; gap: 8px; }
+.boite-grille-reglage button {
+    font-family: 'Cinzel', serif; font-size: 15px; min-width: 44px; padding: 6px 10px; cursor: pointer;
+    color: #e8d5a5; background: rgba(0,0,0,0.35); border: 1px solid #c2a878; border-radius: 6px;
+}
+.boite-grille-valeur { font-family: 'Cinzel', serif; font-size: 22px; color: #fff; min-width: 54px; }
+.boite-grille-qui { font-family: 'Almendra', serif; font-style: italic; font-size: 14px; color: #9fe3a6; }
+.boite-grille-rp.en-lecture .boite-grille-qui { color: #ffb36b; }
+.boite-grille-valider {
+    font-family: 'Cinzel', serif; font-size: 15px; font-weight: bold; letter-spacing: 1px; cursor: pointer;
+    padding: 9px 22px; color: #fff; background: linear-gradient(180deg, #1f8a4a, #0f4021); border: 2px solid #9fe3a6; border-radius: 8px;
+}
+.boite-grille-rp button:disabled { opacity: 0.4; cursor: default; }
