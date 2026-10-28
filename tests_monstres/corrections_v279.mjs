@@ -388,8 +388,9 @@ await section(async () => {
   };
   const s1 = coeur && stats(coeur);
   verifier("le moteur WebGL dessine les nuages de la carte", !!coeur, coeur ? `${coeur.l}×${coeur.h}` : "aucune lecture");
-  verifier("au cœur : bien couvert, mais PAS une masse opaque (des endroits minces, la carte transparaît)",
-           !!s1 && s1.alpha > 0.45 && s1.alpha < 0.95 && s1.minces > 0.05 && s1.epais > 0.25, JSON.stringify(s1 && { alpha: s1.alpha.toFixed(2), minces: s1.minces.toFixed(2), epais: s1.epais.toFixed(2) }));
+  // v280 (Nico : « ça ne couvre pas des masses ») : le cœur est couvert ; son relief fait le contraste.
+  verifier("au cœur : bien couvert",
+           !!s1 && s1.alpha > 0.85 && s1.epais > 0.8, JSON.stringify(s1 && { alpha: s1.alpha.toFixed(2), epais: s1.epais.toFixed(2) }));
   verifier("du contraste à l'intérieur (sommets clairs, creux gris-bleu)", !!s1 && s1.contraste > 10, s1 && `écart-type ${s1.contraste.toFixed(1)}`);
   // Les couleurs : blanc-gris, jamais beige.
   const couleur = (r) => { let R = 0, G = 0, B = 0, n = 0; for (let i = 0; i < r.d.length; i += 4) { const al = r.d[i + 3]; if (al < 200) continue; R += r.d[i] / al * 255; G += r.d[i + 1] / al * 255; B += r.d[i + 2] / al * 255; n++; } return n ? [R / n, G / n, B / n].map(Math.round) : null; };

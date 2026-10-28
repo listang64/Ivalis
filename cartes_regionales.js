@@ -845,18 +845,22 @@ window.annulerNuagesRegion = function() {
 //  dispersés sur les bords et pas de bord net » ; « quitte à voir par endroits
 //  la map en dessous, ce n'est pas bien grave ».
 //
-//  La carte graphique les calcule (nuages_realistes.js) : la ZONE peinte en DEV
-//  (sa distance au bord, sur une bande de BANDE_NUAGES cases) dose la quantité
-//  de nuages — nombreux et épais au cœur, de plus en plus rares vers le dehors
-//  — et la matière fractale décide où ils sont, les éclaire et les fait
-//  dériver au vent.
+//  La carte graphique les calcule (nuages_realistes.js). La ZONE peinte en DEV
+//  (sa distance au bord : BANDE_NUAGES cases vers le cœur, BANDE_NUAGES_DEHORS
+//  vers le dehors) décide de la couverture — Nico : « regarde où j'ai peint et
+//  regarde les nuages que ça me met, ça ne couvre pas des masses » — : ce qui
+//  est peint est couvert ; autour du bord, le nuage se défait en bouffées et
+//  en petits nuages épars ; plus loin, rien. La matière fractale sculpte le
+//  relief, l'éclaire et dérive au vent. Une zone peinte jusqu'au bord de
+//  l'image y va jusqu'au bout (v279 : elle s'arrêtait net, en biais, avant).
 //
 //  LA TOILE COUVRE L'ÉCRAN, PAS LA CARTE : posée dans la carte (pour garder
 //  sa place parmi les calques), elle est recalée à chaque image sur la partie
 //  visible (plus une marge), à la résolution de l'écran — nets même au zoom
 //  ×4, et le coût suit l'écran, pas la carte.
 //  Sans WebGL (très rare), un rendu fixe tiré du même principe.
-const BANDE_NUAGES = 18;
+const BANDE_NUAGES = 9;               // du bord peint au cœur couvert (en cases)
+const BANDE_NUAGES_DEHORS = 14;       // du bord peint aux derniers nuages épars
 const RESOLUTION_NUAGES = 0.6;        // pixels de la toile par pixel d'écran
 const PIXELS_NUAGES_MAX = 900000;
 const MARGE_NUAGES = 0.12;            // la toile déborde de l'écran (glisser la carte)
@@ -896,7 +900,7 @@ function preparerNuages() {
     toile.dataset.vide = "0";
     toile.style.display = "block";
     const zone = window.NuagesRealistes
-        ? window.NuagesRealistes.zoneDouce(grille, colonnes, lignes, BANDE_NUAGES)
+        ? window.NuagesRealistes.zoneDouce(grille, colonnes, lignes, BANDE_NUAGES, BANDE_NUAGES_DEHORS)
         : Float32Array.from(grille);
     const graine = (Number(etat.ouverte) * 7.31) % 50;
     const moteur = moteurNuages(toile);

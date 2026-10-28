@@ -8698,3 +8698,50 @@ sur l'ancien code (14 échecs).
 corrections_v272.mjs lit la traversée par SONDE_TRAVERSEE et les nuages par
 pixelsNuagesEcran ; corrections_v278.mjs fait revenir Ben (Sortis) et valide
 la grille en DEV.
+
+## v280 — Les nuages là où on a peint, jusqu'au bord de l'image
+
+Nico, captures à l'appui : « les nuages font des trucs bizarres sur les bords
+de l'image et n'y vont pas jusqu'au bout » ; « regarde où j'ai peint et
+regarde les nuages que ça me met, ça ne couvre pas des masses ».
+
+LES CAUSES (nuages_realistes.js, v279) :
+  · masque() valait 0 hors de l'image, et le bord de la zone ondulait de
+    ±6 % de la carte : la lecture sortait de l'image avant son bord → une
+    coupure nette, en biais, un bon centimètre avant le bord ;
+  · la zone ne faisait que doser une quantité (30 à 70 % du ciel) : là où la
+    matière fractale creusait, une zone peinte restait à moitié vide ;
+  · les parties minces étaient grises et l'ombre au sol noire (0,30) : sur le
+    parchemin, un voile brun qui brouille la carte.
+
+LA NAPPE (nuages_realistes.js) :
+  · la zone est lue en bornant la coordonnée (texture2D(clamp(uv))) : hors de
+    l'image, elle garde la valeur de son bord ; zoneDouce ne traite pas le bord
+    de la grille comme un bord ; le bord de la zone n'ondule plus que de
+    ±1,5 % (ONDULATION) ;
+  · deux bandes (zoneDouce(grille, colonnes, lignes, bande, bandeDehors)) :
+    9 cases du bord peint au cœur (BANDE_NUAGES), 14 du bord aux derniers
+    nuages épars (BANDE_NUAGES_DEHORS) ;
+  · la densité : socle(zone) — -1 loin, +0,55 sur le bord peint, +1,6 au cœur
+    — plus les masses (atténuées au cœur quand elles creusent : une petite
+    zone tombée dans un creux restait vide), le grain, et sur la frange des
+    BOUFFÉES (un bruit « gonflé », sommets ronds et plis, d'une dizaine de
+    cases) : baies et petits nuages détachés autour du bord ;
+  · la lumière : le relief des masses éclairé du nord-ouest, l'épaisseur tirée
+    de la matière (pas de la zone : le cœur, tout couvert, garde ses
+    contrastes), les plis du grain en gris-bleu ; le mince est blanc (une
+    brume) ; l'ombre au sol (0,16) ne vient que des nuages épais.
+
+Banc de réglage (hors suite) : la scène de Nico — ses zones peintes sur le
+désert d'Etheria, 1920 × 1080 — rendue avant / après, avec la couverture des
+cases peintes (v279 : 44 à 75 % selon l'instant ; v280 : 98 %).
+
+corrections_v280.mjs (dans la suite) : zoneDouce à deux bandes, le bord de la
+grille qui n'en est pas un ; sur la vraie page, lus pixel par pixel : le cœur
+couvert, son relief, la couleur, le bord sans saut, les nuages épars au-delà,
+rien au loin, une zone peinte contre le bord haut de l'image couverte jusqu'à
+la dernière ligne, un petit coup de pinceau couvert, pas de voile brun (la
+brume claire, l'ombre légère), la fluidité, la dérive, le zoom, l'ordre des
+calques ; les versions. Il mord sur l'ancien code (7 échecs).
+corrections_v279.mjs : son cœur « pas une masse opaque » devient « bien
+couvert ».

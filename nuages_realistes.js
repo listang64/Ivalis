@@ -72,13 +72,21 @@ float fbm6(vec2 p) {
     // largeur / hauteur de la carte ; u_t : le temps (s) ; u_graine : une
     // graine par carte.
     //
-    // UN CUMULUS VU DU CIEL : une ENVELOPPE (la zone peinte, très adoucie, son
-    // bord déformé par un bruit large) et une MATIÈRE fractale douce (bruit à
-    // six octaves, à peine déformé — une déformation forte donnait des stries).
-    // Au cœur, l'enveloppe est haute : tout est couvert, en volutes. Au bord,
-    // seuls les reliefs les plus hauts dépassent : le nuage se casse en
-    // lambeaux et en petits nuages, translucides. Le relief est éclairé sur une
-    // version lissée de la matière (une lumière douce, sans grain).
+    // LA ZONE PEINTE DÉCIDE DE LA COUVERTURE (Nico, v279 : « regarde où j'ai
+    // peint et regarde les nuages que ça me met, ça ne couvre pas des masses ») :
+    // ce qui est peint est couvert ; autour du bord peint, des bouffées
+    // arrondies font des baies et des petits nuages détachés ; plus loin, rien.
+    // La MATIÈRE fractale (qui dérive au vent) sculpte : bourrelets et plis au
+    // cœur, découpe des bords. Le bord de la zone ondule à peine (±1,5 % de la
+    // carte) : les nuages restent là où on a peint.
+    //
+    // Hors de l'image, la zone garde la valeur de son bord (une zone peinte
+    // jusqu'au bord de la carte y va jusqu'au bout, sans coupure nette).
+    //
+    // LA LUMIÈRE : le relief des masses, éclairé du nord-ouest — sommets
+    // blancs, creux gris-bleu clair. Les parties minces sont BLANCHES (un
+    // voile de brume), jamais grises : un gris translucide salit la carte.
+    // L'ombre portée, légère, ne tombe que sous les nuages épais.
     const NAPPE = BRUIT + `
 uniform sampler2D u_masque;
 uniform vec4 u_vue;
@@ -88,19 +96,26 @@ uniform float u_graine;
 uniform float u_detail;        // 0 vue entière, 1 au zoom fort : le grain fin apparaît
 varying vec2 v_uv;
 
-float masque(vec2 uv) {
-    if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return 0.0;
-    return texture2D(u_masque, uv).r;
-}
+const float ECHELLE = 4.6;     // les masses : un peu moins d'un quart de la carte
+const float ONDULATION = 0.03; // le bord de la zone ondule de ±1,5 % de la carte
+const float OMBRE_SOL = 0.16;
+const float MASSES = 4.2;      // l'étirement des masses (amas et trouées)
+const float GRAIN = 0.35;      // ce que le grain fin ajoute ou retire
+const float FRANGE = 1.0;      // le grain de plus sur la frange du bord
+const float BOUFFEES = 2.0;    // les bouffées sur la frange du bord
+const float RELIEF = 13.0;     // la force de l'éclairage des masses
+const float RELIEF_PAS = 0.04; // vers le soleil, de combien on regarde
+
+float masque(vec2 uv) { return texture2D(u_masque, clamp(uv, 0.0, 1.0)).r; }
 float fbm4(vec2 p) {
     float v = 0.0, a = 0.5;
     for (int i = 0; i < 4; i++) { v += a * bruit(p); p = TOURNE * p * 2.03 + vec2(1.7, 9.2); a *= 0.5; }
     return v / 0.9375;
 }
-// L'enveloppe, lente : la zone peinte, son bord qui ondule.
+// La zone peinte, son bord qui ondule lentement.
 float enveloppe(vec2 uv, vec2 p) {
-    vec2 q = vec2(fbm3(p * 0.30 + vec2(0.0, u_t * 0.010)), fbm3(p * 0.30 + vec2(5.2, 1.3) - vec2(u_t * 0.008, 0.0)));
-    return masque(uv + (q - 0.5) * 0.12);
+    vec2 q = vec2(fbm3(p * 0.55 + vec2(0.0, u_t * 0.010)), fbm3(p * 0.55 + vec2(5.2, 1.3) - vec2(u_t * 0.008, 0.0)));
+    return masque(uv + (q - 0.5) * ONDULATION);
 }
 // La matière, qui dérive avec le vent : la douce sans les plus fines octaves
 // (pour la lumière), la fine avec (pour la forme).
@@ -116,51 +131,67 @@ float matiere(vec2 p) {
     float crete = 1.0 - abs(2.0 * fbm4(q * 0.8 + 11.0) - 1.0);
     return fbm6(q) * 0.72 + crete * 0.28;
 }
-// La quantité de nuages selon la zone : jamais tout le ciel, même au cœur
-// (des trouées où la carte transparaît), et encore quelques nuages épars
-// juste au-delà du bord peint.
-float quantiteDe(float zone) { return mix(0.30, 0.70, zone); }
+// Ce que la zone apporte à la densité : 0 (loin) → -1 (rien) ; 0,2 → -0,38
+// (quelques petits nuages épars) ; 0,35 → 0,09 (en lambeaux) ; 0,5 (le bord
+// peint) → +0,55 (presque couvert : le nuage épouse ce qu'on a peint) ; 1 (le
+// cœur) → +1,6 (couvert, du relief mais pas de trou).
+float socle(float zone) {
+    return zone < 0.5 ? -1.0 + zone * 3.1 : 0.55 + (zone - 0.5) * 2.1;
+}
+// La densité : la zone, puis les masses (moyennes échelles, étirées : les
+// amas et les trouées) et leur grain (les fines). Au cœur, un creux des masses
+// ne fait que creuser le relief : il ne vide pas la zone (une petite zone
+// peinte tombée dans un creux restait vide). C'est au bord qu'il découpe.
+// Des bouffées arrondies (un bruit « gonflé » : sommets ronds, plis entre
+// eux), d'une dizaine de cases : elles font le bord du nuage.
+float bouffees(vec2 p) {
+    float v = 0.0, a = 0.5;
+    for (int i = 0; i < 3; i++) { v += a * abs(2.0 * bruit(p) - 1.0); p = TOURNE * p * 2.03 + vec2(4.3, 2.9); a *= 0.5; }
+    return v / 0.875;
+}
+// Sur la frange (autour du bord peint), les bouffées et le grain pèsent
+// plus : des petits nuages s'en détachent, des baies s'y creusent — le bord
+// se disperse au lieu de suivre le trait du pinceau.
+float densite(float zone, float d0, float grain, float bouffee) {
+    float masses = clamp((d0 - 0.5) * MASSES, -1.0, 1.0) * 0.6;
+    if (masses < 0.0) masses *= mix(1.0, 0.45, smoothstep(0.4, 0.95, zone));
+    float frange = smoothstep(0.04, 0.24, zone) * (1.0 - smoothstep(0.5, 0.78, zone));
+    return socle(zone) + masses + grain * GRAIN * (1.0 + FRANGE * frange) + (bouffee - 0.42) * BOUFFEES * frange;
+}
 void main() {
     vec2 uv = u_vue.xy + v_uv * u_vue.zw;
-    vec2 p = vec2(uv.x * u_aspect, uv.y) * 4.2 + vec2(u_graine, u_graine * 0.61);
+    vec2 p = vec2(uv.x * u_aspect, uv.y) * ECHELLE + vec2(u_graine, u_graine * 0.61);
     vec2 soleil = normalize(vec2(-0.62, -0.78));
-    // LA ZONE ne fait que doser LA QUANTITÉ de nuages (Nico : « pas des nuages
-    // en masse opaque… des nuages dispersés sur les bords et pas de bord
-    // net ») : nombreux et épais au cœur, de plus en plus rares vers le dehors.
-    // C'est la matière qui décide OÙ ils sont.
+    // L'OMBRE PORTÉE : la densité un peu plus loin vers le soleil.
+    vec2 decalage = soleil * 0.022;
+    vec2 pO = p + vec2(decalage.x * u_aspect, decalage.y) * ECHELLE;
+    float zoneOmbre = enveloppe(uv + decalage, pO);
+    float ombreSol = 0.0;
+    if (zoneOmbre > 0.05) ombreSol = smoothstep(0.3, 1.0, densite(zoneOmbre, matiereDouce(pO), 0.0, 0.42)) * OMBRE_SOL;
     float zone = enveloppe(uv, p);
-    float zoneOmbre = enveloppe(uv + soleil * 0.032, p + soleil * 0.032 * 4.2);
-    float dO = matiereDouce(p + soleil * 0.032 * 4.2);
-    float hO = clamp((dO - 0.5) * 4.2, -1.0, 1.0) + (quantiteDe(zoneOmbre) - 0.5) * 2.4;
-    float ombreSol = smoothstep(0.0, 0.7, hO) * smoothstep(0.0, 0.12, zoneOmbre) * 0.30;
-    if (zone < 0.005) { gl_FragColor = vec4(0.0, 0.0, 0.0, ombreSol); return; }
+    if (zone < 0.04) { gl_FragColor = vec4(0.0, 0.0, 0.0, ombreSol); return; }
     float m = matiere(p);
     float d0 = matiereDouce(p);
-    // La densité : les masses (moyennes échelles) et leur grain (fines), étirés.
-    float masses = clamp((d0 - 0.5) * 4.2, -1.0, 1.0);
     float grain = clamp((m - d0) * 3.0, -1.0, 1.0);
     // De près, le grain le plus fin (des octaves de plus, au zoom).
-    if (u_detail > 0.01) {
-        vec2 qf = p * 9.0 + ventDe(u_t) * 9.0;
-        grain = clamp(grain + (fbm3(qf) - 0.5) * 1.1 * u_detail, -1.0, 1.0);
-    }
-    float h = masses + grain * 0.30 + (quantiteDe(zone) - 0.5) * 2.4;
-    // Épais là où la densité est forte, mince et translucide ailleurs : la
-    // carte transparaît entre les masses, même au cœur (Nico : « quitte à voir
-    // par endroits la map en dessous »).
+    if (u_detail > 0.01) grain = clamp(grain + (fbm3(p * 6.0 + ventDe(u_t) * 6.0) - 0.5) * 1.1 * u_detail, -1.0, 1.0);
+    float bouffee = bouffees(p * 2.4 + ventDe(u_t) * 2.4 + 17.0);
+    float h = densite(zone, d0, grain, bouffee);
     float masse = smoothstep(0.0, 0.70, h);
-    float couverture = masse * smoothstep(0.0, 0.12, zone);
+    float couverture = masse * smoothstep(0.04, 0.16, zone);
     // LA LUMIÈRE : le relief des masses, éclairé du nord-ouest — sommets
-    // blancs, flancs et creux gris-bleu.
-    float d1 = matiereDouce(p + soleil * 0.035);
-    float relief = clamp((d0 - d1) * 13.0, -1.0, 1.0);
-    float epaisseur = smoothstep(0.0, 1.3, h);
-    float lumiere = clamp(0.50 + relief * 0.48 + epaisseur * 0.24 + grain * 0.10 * u_detail, 0.0, 1.0);
-    vec3 ombre = vec3(0.44, 0.49, 0.60);
-    vec3 clair = vec3(1.0, 0.993, 0.972);
-    vec3 couleur = mix(ombre, clair, lumiere);
-    // Les voiles minces sont plus gris ; le grain fin nuance à peine la teinte.
-    couleur = mix(couleur * vec3(0.86, 0.88, 0.92), couleur, smoothstep(0.1, 0.8, masse)) * (1.0 + grain * 0.05);
+    // blancs, flancs et creux gris-bleu ; l'épaisseur vient de la matière (pas
+    // de la zone) : le cœur, tout couvert, garde ses contrastes ; les plis du
+    // grain s'y creusent en gris.
+    float d1 = matiereDouce(p + vec2(soleil.x * u_aspect, soleil.y) * RELIEF_PAS);
+    float relief = clamp((d0 - d1) * RELIEF, -1.0, 1.0);
+    float epaisseur = smoothstep(-0.7, 0.7, (d0 - 0.5) * MASSES * 0.6 + grain * 0.6 + (bouffee - 0.42) * 0.8);
+    float lumiere = clamp(0.52 + relief * 0.42 + (epaisseur - 0.5) * 0.42 + grain * (0.12 + 0.08 * u_detail), 0.0, 1.0);
+    vec3 ombre = vec3(0.50, 0.55, 0.66);
+    vec3 clair = vec3(1.0, 0.994, 0.976);
+    vec3 couleur = mix(ombre, clair, lumiere) * (1.0 + grain * 0.05);
+    // Les parties minces : un voile blanc (la brume), pas du gris.
+    couleur = mix(vec3(0.95, 0.965, 0.985), couleur, smoothstep(0.15, 0.75, masse));
     gl_FragColor = vec4(couleur * couverture, couverture + ombreSol * (1.0 - couverture));
 }`;
 
@@ -334,7 +365,7 @@ void main() {
     // sur une bande de ± `bande` cases autour du bord. Un flou ferait fondre
     // les petites zones peintes ; la distance les garde, et donne au bord la
     // place de s'effilocher.
-    function zoneDouce(grille, colonnes, lignes, bande) {
+    function zoneDouce(grille, colonnes, lignes, bande, bandeDehors) {
         const INF = 1e6, n = colonnes * lignes;
         const distance = (dedans) => {
             const d = new Float32Array(n);
@@ -355,13 +386,17 @@ void main() {
             return d;
         };
         // Pour une case peinte : sa distance au dehors ; pour une case vide :
-        // sa distance au dedans.
+        // sa distance au dedans. `bande` cases dedans pour monter de 0,5 (le
+        // bord) à 1 (le cœur) ; `bandeDehors` cases dehors pour descendre à 0
+        // (la même que dedans si on ne la donne pas). Le bord de la grille
+        // n'est pas un bord : une zone peinte jusqu'au bord de la carte y
+        // reste pleine.
         const versDehors = distance(true), versDedans = distance(false);
-        const B = Math.max(1, bande || 12);
+        const Bi = Math.max(1, bande || 12), Bo = Math.max(1, bandeDehors || Bi);
         const zone = new Float32Array(n);
         for (let i = 0; i < n; i++) {
-            const signe = grille[i] ? (versDehors[i] - 0.5) : -(versDedans[i] - 0.5);
-            zone[i] = Math.max(0, Math.min(1, 0.5 + signe / (2 * B)));
+            zone[i] = grille[i] ? Math.min(1, 0.5 + (versDehors[i] - 0.5) / (2 * Bi))
+                                : Math.max(0, 0.5 - (versDedans[i] - 0.5) / (2 * Bo));
         }
         return zone;
     }
