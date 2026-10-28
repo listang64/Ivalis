@@ -7,8 +7,8 @@
 // zoome (molette, doigts) sans descendre sous la hauteur de l'écran. Le menu se
 // range ; un bouton beige à flèche, à gauche de celui du menu, ramène au monde.
 // En DEV : un pinceau peint des zones rouges provisoires, une gomme les
-// efface, « Valider » les change en nuages procéduraux beige foncé qui
-// bougent ; le titre doré se déplace et se redimensionne, enregistré en
+// efface, « Valider » les change en nuages qui bougent (v279 : réalistes,
+// blanc-gris, dispersés — les vérifications de couleur ont suivi) ; le titre doré se déplace et se redimensionne, enregistré en
 // sortant du mode. Une fiche par carte en base (Cartes_Regionales/{numéro}).
 //
 // Sur la VRAIE page (index.html, cartes_regionales.js, regions_carte.js,
@@ -131,9 +131,9 @@ await section(async () => {
     const pas = () => {
       if (!window.__sondeActive) return;
       const monde = new DOMMatrix(getComputedStyle(document.getElementById("carte-fond-jeu")).transform).a;
-      const toile = document.getElementById("traversee-nuages");
-      let couverture = null;
-      if (toile && toile.width) { const d = toile.getContext("2d").getImageData(toile.width >> 1, toile.height >> 1, 1, 1).data; couverture = d[3]; }
+      // (v279 : la traversée est dessinée en WebGL ; sa sonde dit ce qu'elle montre.)
+      const sonde = window.SONDE_TRAVERSEE;
+      const couverture = document.getElementById("traversee-nuages") && sonde ? Math.round(255 * Math.max(sonde.voile, 0)) : null;
       const vue = document.getElementById("vue-carte-region");
       const echelle = vue && vue.style.display !== "none" ? new DOMMatrix(getComputedStyle(vue).transform).a : null;
       window.__sonde.push({ t: performance.now(), monde, couverture, echelle, ouverte: window.carteRegionaleOuverte() });
@@ -262,24 +262,27 @@ await section(async () => {
   verifier("« Valider » écrit la grille dans la fiche (Cartes_Regionales/1, en fusion)", r4.ecrit && r4.fusion && r4.nuages && r4.nuages.colonnes === 240 && r4.nuages.lignes === 150, JSON.stringify(r4.nuages));
   verifier("…exactement ce qui était peint (relue depuis la base)", r4.relu === peintes, `${r4.relu} / ${peintes}`);
   verifier("le rouge disparaît, les nuages paraissent, le pinceau se repose", r4.rouge === "none" && r4.visibles === "visible" && !r4.outil);
-  const pixels = async () => p.evaluate(() => {
-    const t = document.getElementById("carte-region-nuages"), ctx = t.getContext("2d"), c = window.cadrageCarteRegion();
-    const vers = (x, y) => [Math.floor((x - c.panX) / c.zoom / c.largeur * t.width), Math.floor((y - c.panY) / c.zoom / c.hauteur * t.height)];
-    const zone = (x0, y0, x1, y1) => { const [a, b] = vers(x0, y0), [e, f] = vers(x1, y1); return ctx.getImageData(a, b, Math.max(1, e - a), Math.max(1, f - b)).data; };
-    const dedans = zone(380, 320, 620, 380), dehors = zone(900, 650, 1100, 750);
-    let n = 0, r = 0, g = 0, bl = 0, opaques = 0, somme = 0;
-    for (let i = 0; i < dedans.length; i += 4) { if (dedans[i + 3] > 200) { opaques++; r += dedans[i]; g += dedans[i + 1]; bl += dedans[i + 2]; } n++; somme += dedans[i] + dedans[i + 3]; }
-    let dehorsOpaques = 0; for (let i = 3; i < dehors.length; i += 4) if (dehors[i] > 10) dehorsOpaques++;
-    return { part: opaques / n, couleur: opaques ? [r / opaques, g / opaques, bl / opaques].map(Math.round) : null, dehorsOpaques, somme, brut: Array.from(dedans.slice(0, 400)) };
-  });
-  const v1 = await pixels();
-  await p.waitForTimeout(1300);
-  const v2 = await pixels();
-  verifier("des nuages couvrent la zone peinte", v1.part > 0.7, `${(v1.part * 100).toFixed(0)} %`);
-  verifier("beige foncé : ni blancs, ni gris (rouge > vert > bleu, pas trop clairs)", !!v1.couleur && v1.couleur[0] > v1.couleur[1] && v1.couleur[1] > v1.couleur[2] && v1.couleur[0] < 215 && v1.couleur[0] - v1.couleur[2] > 25,
-           JSON.stringify(v1.couleur));
-  verifier("rien hors des zones peintes", v1.dehorsOpaques === 0, `${v1.dehorsOpaques}`);
-  const ecart = v1.brut.reduce((s, x, i) => s + Math.abs(x - v2.brut[i]), 0) / v1.brut.length;
+  // (v279 : les nuages sont calculés en WebGL ; pixelsNuagesEcran les lit.)
+  const pixels = async (t) => p.evaluate((t) => {
+    const lu = (x0, y0, x1, y1) => window.pixelsNuagesEcran(x0, y0, x1, y1, t);
+    const dedans = lu(380, 320, 620, 380), dehors = lu(900, 650, 1100, 750);
+    if (!dedans || !dehors) return null;
+    let n = 0, r = 0, g = 0, bl = 0, opaques = 0, alpha = 0;
+    const d = dedans.data;
+    for (let i = 0; i < d.length; i += 4) {
+      n++; alpha += d[i + 3];
+      if (d[i + 3] > 128) { opaques++; r += d[i] / d[i + 3] * 255; g += d[i + 1] / d[i + 3] * 255; bl += d[i + 2] / d[i + 3] * 255; }
+    }
+    let dehorsNuages = 0; for (let i = 0; i < dehors.data.length; i += 4) if (dehors.data[i + 3] > 10 && dehors.data[i] > 30) dehorsNuages++;
+    return { part: opaques / n, alpha: alpha / n / 255, couleur: opaques ? [r / opaques, g / opaques, bl / opaques].map(Math.round) : null, dehorsNuages, brut: Array.from(d.slice(0, 4000)) };
+  }, t);
+  const v1 = await pixels(20);
+  const v2 = await pixels(21.3);
+  verifier("des nuages couvrent la zone peinte (dispersés, translucides par endroits)", !!v1 && v1.alpha > 0.35 && v1.part > 0.25, v1 && `${(v1.part * 100).toFixed(0)} % épais, alpha moyen ${v1.alpha.toFixed(2)}`);
+  verifier("blanc-gris, jamais beige (le bleu tient le rouge)", !!v1 && !!v1.couleur && v1.couleur[2] >= v1.couleur[0] - 12 && v1.couleur[0] > 150,
+           JSON.stringify(v1 && v1.couleur));
+  verifier("rien hors des zones peintes", !!v1 && v1.dehorsNuages === 0, `${v1 && v1.dehorsNuages}`);
+  const ecart = v1 && v2 ? v1.brut.reduce((s, x, i) => s + Math.abs(x - v2.brut[i]), 0) / v1.brut.length : 0;
   verifier("ils bougent : 1,3 s plus tard, la matière a changé", ecart > 1, `écart ${ecart.toFixed(2)}`);
   // Un autre poste : la fiche relue de la base porte les mêmes nuages.
   const r5 = await p.evaluate(() => {

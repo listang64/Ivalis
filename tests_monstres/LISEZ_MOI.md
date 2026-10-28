@@ -8633,3 +8633,68 @@ victoire (retour, Destin, MJ, arène rendue) ; la défaite (blessures, mort,
 retour, MJ) ; le relais et les replis ; les versions. Il mord sur l'ancien
 code (45 échecs). fiche_race_classe.mjs lit le médaillon dans
 promptPionMedaillon.
+
+## v279 — Le butin attend tout le monde ; la grille sans minuteur ; des nuages réalistes
+
+LE BUTIN (combat_rp.js) : plus de minuteur. Le récit reprend quand CHAQUE
+joueur du combat a quitté sa fenêtre de butin (ou son « Défaite ») ; tant
+qu'un seul y est encore, le récit reste en pause. Les joueurs attendus
+(joueursAttendusCombatRP) : ceux des héros du combat (fin.participants →
+PERSOS_JOUEURS_PARTIE), à défaut ceux des héros actifs. Chacun qui revient
+écrit Combat_RP.Sortis.{idJoueur}. « Fermer » (fermerFenetreButin) ne
+referme le butin que pour soi ; c'est le poste qui raconte la fin qui le
+referme pour de bon, une fois tout le monde revenu. Le DEV « Abandonner »
+reste l'échappatoire si un joueur a quitté la partie.
+
+LA GRILLE : plus de minuteur non plus. Elle attend qu'un joueur passe en mode
+DEV (la main à P_01, puis P_02, sinon au premier arrivé) et valide. Les
+réglages grilleSansRegleurMs et butinOublieMs ont disparu.
+
+LA TRAVERSÉE DES NUAGES au clic sur une région : elle était sautée quand le
+navigateur demandait de réduire les animations (prefers-reduced-motion,
+réglage d'accessibilité de l'iPad). Elle se joue désormais toujours (seul
+{ sansTransition: true } la saute). Refaite en WebGL
+(NuagesRealistes.creerTraversee) : sept couches de nuages qui foncent vers la
+caméra, éclairées et voilées de brume ; entrée 1150 ms (elles s'épaississent),
+cœur 520 ms (l'écran blanc : la carte régionale prend la place dessous),
+sortie 1250 ms (elles se dissipent). Sans WebGL : un voile blanc. Le bouton
+de retour (fixe, au-dessus de tout) n'apparaît qu'une fois les nuages
+dissipés. Sonde : window.SONDE_TRAVERSEE (phase, couverture, voile).
+
+LES NUAGES DES CARTES RÉGIONALES, refaits de zéro (nuages_realistes.js,
+script simple chargé avant cartes_regionales.js) : un shader WebGL.
+  · la zone peinte (DEV pinceau) devient une distance au bord
+    (NuagesRealistes.zoneDouce : chanfrein 1 / √2, bande de 18 cases de
+    chaque côté) — 1 au cœur, 0,5 sur le bord, 0 au-delà. Un trait fin reste
+    une zone ; il n'y a plus de bord net ;
+  · la zone ne fait que doser LA QUANTITÉ de nuages (quantiteDe : 30 % à 70 %
+    du ciel) ; c'est la matière — un bruit fractal déformé, avec des cellules
+    « en crête » — qui décide OÙ ils sont : des amas au cœur avec des trouées
+    où la carte transparaît, des nuages épars au-delà du bord ;
+  · la lumière : le relief des masses éclairé du nord-ouest (sommets blancs,
+    flancs gris-bleu), les voiles minces plus gris, une ombre portée au sol ;
+    jamais beige ;
+  · le vent : la matière dérive lentement, l'enveloppe ondule plus lentement
+    encore ;
+  · l'écran : la toile ne couvre que la partie visible de la carte (plus 12 %
+    de marge), à 0,6 × la résolution de l'écran, 900 000 pixels au plus,
+    25 images par seconde ; zoomée, le grain fin arrive (u_detail) ;
+  · une perte du contexte WebGL refait la toile ; sans WebGL, l'ancien rendu
+    2D fixe.
+Sondes : dessinerNuagesRegionMaintenant(t), pixelsNuagesEcran(x0, y0, x1, y1, t).
+
+corrections_v279.mjs (dans la suite ; le navigateur demande de réduire les
+animations, comme l'iPad) : la victoire (chacun revient, la pause, aucun
+minuteur, « Fermer » pour soi, le MJ une fois tous revenus, le butin refermé) ;
+la défaite (pareil) ; la grille sans minuteur (elle attend, un joueur en DEV
+valide) ; zoneDouce (cœur, bord, bande, trait fin) ; les nuages lus à l'écran
+(couverture du cœur sans masse opaque, contraste, couleur, profil du bord sans
+saut, nuages épars au-delà, rien loin des zones, fluidité, dérive, couverture
+stable, toile au zoom, ordre des calques) ; la traversée, lue à horloge
+pilotée (page.clock : les mêmes images quelle que soit la vitesse du banc) —
+phases, couverture qui monte puis descend, la carte qui change sous l'écran
+blanc, le bouton de retour après, la toile retirée ; les versions. Il mord
+sur l'ancien code (14 échecs).
+corrections_v272.mjs lit la traversée par SONDE_TRAVERSEE et les nuages par
+pixelsNuagesEcran ; corrections_v278.mjs fait revenir Ben (Sortis) et valide
+la grille en DEV.

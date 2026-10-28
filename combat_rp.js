@@ -31,7 +31,7 @@
 //         depuis son portrait pour un PNJ nommé qui en a un ;
 //       · la grille : une boîte pour les joueurs en mode DEV, la main à Nico
 //         puis à Ben s'ils sont là (« 4. Tous ceux en mode dev la voient,
-//         priorité à Nico et Ben ») ;
+//         priorité à Nico et Ben ») ; elle les attend, sans minuteur (v279) ;
 //       · MIA_PEINTURE_MURS, _INACCESSIBLE, _DIFFICILE : la carte avec sa
 //         grille numérotée, et les numéros de ce qu'elles y voient ;
 //       · MIA_SPAWN : la même image et les 6 derniers messages → les repères
@@ -42,9 +42,10 @@
 //  3. LE COMBAT : celui de l'arène, tel quel. Le chat ne s'écrit plus et le
 //     MJ se tait (« 3. Ok ») ; un bandeau « Combat en cours » y mène.
 //
-//  4. LA FIN : victoire, la dernière fenêtre de butin refermée ; défaite, le
-//     grand « Défaite » passé. Chacun revient au récit, et UN poste réveille
-//     le MJ avec l'issue, les blessures des héros, le lieu saccagé.
+//  4. LA FIN : victoire, sa dernière fenêtre de butin quittée ; défaite, son
+//     grand « Défaite » passé. Chacun revient au récit ; quand TOUS les
+//     joueurs du combat sont revenus (v279 : sinon, le récit reste en pause),
+//     UN poste réveille le MJ avec l'issue, les blessures, le lieu saccagé.
 //
 //  Toutes les IA de texte prennent la seconde clé Gemini (cles_gemini.js).
 // =========================================================================
@@ -82,10 +83,8 @@ const R = window.REGLAGES_COMBAT_RP = {
     battementMs: 15000,        // le poste qui prépare dit qu'il est là
     relaisMs: 60000,           // au-delà, un autre poste reprend
     regleurFraisMs: 20000,     // un joueur DEV devant la boîte de la grille
-    grilleSansRegleurMs: 60000,// personne en DEV : la grille garde sa taille
     prioritaires: ["P_01", "P_02"], // Nico, puis Ben
-    narrationApresMs: { victoire: 2500, defaite: 12000 },
-    butinOublieMs: 60000,      // un butin réparti resté ouvert : on le referme
+    narrationApresMs: { victoire: 1500, defaite: 1500 },
     abandonMs: 20000,          // le combat a disparu du plateau (réinitialisé)
     narrationBloqueeMs: 180000
 };
@@ -351,7 +350,8 @@ function poursuivre() {
     if (!c.Carte && !fait("carte")) return lancer("carte", dessinerLaCarte);
     if (!c.Ennemis && !fait("ennemis")) lancer("ennemis", composerLesEnnemis);
     else if (c.Ennemis && !pionsPrets(c)) lancer("pions", dessinerLesPions);
-    if (!c.Grille) { grilleSansRegleur(c); return; }
+    // LA GRILLE ATTEND UN JOUEUR EN MODE DEV, sans minuteur (Nico, v279).
+    if (!c.Grille) return;
     if (!c.Peint && !fait("peinture")) return lancer("peinture", peindreLeTerrain);
     if (c.Ennemis && pionsPrets(c) && c.Peint && !c.Deploye) lancer("deploiement", deployer);
 }
@@ -645,18 +645,9 @@ async function dessinerLesPions() {
 }
 
 // --- 4.6 LA GRILLE --------------------------------------------------------
-// Personne en mode DEV devant la boîte : la grille garde la taille de l'arène.
-let minuteurGrille = null;
-function grilleSansRegleur(c) {
-    if (!c || !c.Carte || c.Grille) return;
-    if (!minuteurGrille) minuteurGrille = setTimeout(() => { minuteurGrille = null; poursuivre(); }, Math.min(5000, R.grilleSansRegleurMs));
-    if (teneurGrille(c)) return;
-    if (Date.now() - (Number(c.Carte_Le) || 0) < R.grilleSansRegleurMs) return;
-    const taille = Number(c.Apercu_Grille) || Number(c.Taille_Depart) || (window.PLATEAU_VTT && window.PLATEAU_VTT.hexSize) || 60;
-    console.log("⚔️ [Combat du récit] Aucun joueur en mode DEV pour régler la grille : elle garde sa taille.");
-    window.validerGrilleCombatRP(taille, { auto: true });
-}
-
+// Elle attend qu'un joueur en mode DEV la règle et la valide : pas de minuteur
+// (Nico, v279 : « pareil pour le mode dev pour régler la grille, pas de
+// timer »).
 function teneurGrille(c) {
     const maintenant = Date.now();
     const frais = Object.entries((c && c.Regleurs) || {}).filter(([, r]) => r && maintenant - (Number(r.t) || 0) < R.regleurFraisMs);
@@ -902,9 +893,29 @@ function retourAuRecit(idRencontre) {
     if (jeu && jeu.style.display !== "none" && typeof window.ouvrirChatbox === "function" && !(chat && chat.style.display === "flex")) {
         try { window.ouvrirChatbox(); } catch (e) { console.error(e); }
     }
+    // CE JOUEUR EST REVENU : le récit reprendra quand tous le seront.
+    const c = etat();
+    if (c && c.ID_Rencontre === idRencontre && !(c.Sortis || {})[idJoueur()]) {
+        maj({ [`Combat_RP.Sortis.${idJoueur()}`]: Date.now() }).catch(e => console.error("Retour au récit :", e));
+    }
     console.log("📜 [Combat du récit] Retour au récit.");
 }
 window.retourAuRecitCombatRP = retourAuRecit;
+
+// QUI DOIT REVENIR AVANT QUE LE RÉCIT REPRENNE (Nico, v279 : « il faut que
+// chacun quitte la fenêtre butin, sinon ça reste sur pause ») : les joueurs
+// des héros du combat ; à défaut, ceux qui ont un héros actif dans la partie.
+function joueursAttendus(fin) {
+    const heros = window.PERSOS_JOUEURS_PARTIE || [];
+    let joueurs = ((fin && fin.participants) || []).map(id => (heros.find(h => h && h.idPersonnage === id) || {}).idJoueur).filter(Boolean);
+    if (!joueurs.length) joueurs = heros.filter(h => h && h.idJoueur && !h.estIllusion && h.actif !== false && h.statut !== "Mort").map(h => h.idJoueur);
+    return [...new Set(joueurs)];
+}
+window.joueursAttendusCombatRP = joueursAttendus;
+const tousRevenus = (c, fin) => {
+    const attendus = joueursAttendus(fin), sortis = (c && c.Sortis) || {};
+    return attendus.length > 0 && attendus.every(j => sortis[j]);
+};
 
 // La défaite : chacun revient quand son grand « Défaite » (et ses blessures)
 // s'est refermé.
@@ -965,7 +976,13 @@ async function raconterLaFin(c, fin) {
         return { maj: { "Combat_RP.Etat": "narration", "Combat_RP.Narrateur": moi(), "Combat_RP.Issue": fin.issue, "Combat_RP.Narration_Le": Date.now() } };
     });
     if (!pris) return;
-    await attendre((R.narrationApresMs || {})[fin.issue === "defaite" ? "defaite" : "victoire"] || 3000);
+    // Tous sont revenus : le butin se referme pour de bon (et le ménage des
+    // objets que personne n'a pris se fait, une fois).
+    const butin = lirePartieVue().Butin;
+    if (fin.issue !== "defaite" && butin && butin.idRencontre === c.ID_Rencontre && butin.ouvert !== false && typeof fermerFenetreButinAvant === "function") {
+        try { await fermerFenetreButinAvant(); } catch (e) { console.error("Butin refermé :", e); }
+    }
+    await attendre((R.narrationApresMs || {})[fin.issue === "defaite" ? "defaite" : "victoire"] || 1500);
     const resume = window.resumeCombatPourMJ(c, fin);
     console.log("📜 [Combat du récit] Le MJ reprend :\n" + resume);
     try {
@@ -1031,38 +1048,42 @@ function suivreLaFin(c, p) {
     }
     if (fin.issue === "defaite") {
         revenirApresDefaite(idR);
-        raconterLaFin(c, fin);
-        return;
+    } else {
+        // La victoire : chacun revient en quittant sa dernière fenêtre de
+        // butin, une fois le butin réparti (la croix ou « Fermer »).
+        const butin = p.Butin && p.Butin.idRencontre === idR ? p.Butin : null;
+        if (butin && butin.ouvert === false) retourAuRecit(idR);
     }
-    const butin = p.Butin && p.Butin.idRencontre === idR ? p.Butin : null;
-    const reparti = !!butin && (butin.etape === "termine" || butin.resolu);
-    if (!reparti) return;
-    if (butin.ouvert === false) {
-        retourAuRecit(idR);
-        raconterLaFin(c, fin);
-        return;
-    }
-    // Un butin réparti que personne ne referme : on le referme pour tous.
-    if (!vuReparti[idR]) {
-        vuReparti[idR] = Date.now();
-        setTimeout(() => { const x = etat(); if (x && x.Id === c.Id) suivreLaFin(x, lirePartieVue()); }, R.butinOublieMs + 200);
-    }
-    if (Date.now() - vuReparti[idR] > R.butinOublieMs && typeof window.fermerFenetreButin === "function") window.fermerFenetreButin();
+    // TOUS REVENUS : un poste réveille le MJ.
+    if (tousRevenus(c, fin)) raconterLaFin(c, fin);
 }
-const vuReparti = {};
 
-// LA DERNIÈRE FENÊTRE DE BUTIN, refermée de la croix : ce joueur revient au
-// récit (Nico : « quand on ferme la dernière fenêtre de loot »).
+// LA DERNIÈRE FENÊTRE DE BUTIN : ce joueur revient au récit (Nico : « quand
+// on ferme la dernière fenêtre de loot »). Dans un combat du récit, « Fermer »
+// ne referme le butin que pour SOI : chacun le quitte à son tour.
+const butinRepartiDuRecit = () => {
+    const c = etat();
+    const butin = lirePartieVue().Butin;
+    return c && c.ID_Rencontre && ["en_cours", "narration"].includes(c.Etat) && butin && butin.idRencontre === c.ID_Rencontre
+        && (butin.etape === "termine" || butin.resolu) ? c : null;
+};
 const fermerButinLocalementAvant = window.fermerButinLocalement;
 if (typeof fermerButinLocalementAvant === "function") {
     window.fermerButinLocalement = function(...args) {
         const r = fermerButinLocalementAvant.apply(this, args);
-        const c = etat();
-        const butin = lirePartieVue().Butin;
-        if (c && c.ID_Rencontre && butin && butin.idRencontre === c.ID_Rencontre && (butin.etape === "termine" || butin.resolu)) {
-            retourAuRecit(c.ID_Rencontre);
-        }
+        const c = butinRepartiDuRecit();
+        if (c) retourAuRecit(c.ID_Rencontre);
         return r;
+    };
+}
+const fermerFenetreButinAvant = window.fermerFenetreButin;
+if (typeof fermerFenetreButinAvant === "function") {
+    window.fermerFenetreButin = function(...args) {
+        const c = butinRepartiDuRecit();
+        if (!c) return fermerFenetreButinAvant.apply(this, args);
+        if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+        retourAuRecit(c.ID_Rencontre);
+        return Promise.resolve(null);
     };
 }
 

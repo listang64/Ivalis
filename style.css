@@ -5631,7 +5631,9 @@ textarea.input-texte-parchemin {
 .vue-carte-region.outil-pinceau, .vue-carte-region.outil-gomme { cursor: crosshair; }
 .carte-region { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
 .carte-region-image { display: block; width: 100%; height: 100%; pointer-events: none; -webkit-user-drag: none; }
-.carte-region-nuages, .carte-region-peinture { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+/* Les nuages (v279) : la toile est recalée à chaque image sur la partie visible de la carte. */
+.carte-region-nuages { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.carte-region-peinture { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .carte-region-peinture { display: none; image-rendering: auto; }
 
 /* LE TITRE, dans l'or brossé du nom des combattants (#voile-tour-nom) — et

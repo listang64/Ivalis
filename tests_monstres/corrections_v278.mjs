@@ -640,6 +640,8 @@ await section(async () => {
   await p.waitForTimeout(300);
   const retour = await p.evaluate(() => ({ combat: document.getElementById("fenetre-combat").style.display, chat: document.getElementById("fenetre-chatbox").style.display }));
   verifier("la fenêtre de combat se ferme et le récit revient (le chat)", retour.combat === "none" && retour.chat === "flex", JSON.stringify(retour));
+  // (v279 : le récit attend que CHAQUE joueur du combat soit revenu — Lyra aussi.)
+  await p.evaluate(() => { const c = window.__docs["Systeme_Parties/P1"].Combat_RP; c.Sortis = Object.assign({}, c.Sortis, { P_02: Date.now() }); });
   await ecrirePartie({ ID_Rencontre: null });
   const fini = await attendreQue(async () => !(await crp()), 10000);
   const narr = requetes.slice(avant).find(x => x.mia === "NARRATEUR");
@@ -675,6 +677,7 @@ await section(async () => {
   await p.waitForTimeout(2000);
   const revenu = await p.evaluate(() => document.getElementById("fenetre-combat").style.display);
   verifier("le grand « Défaite » d'abord, puis le retour au récit", encore === "block" && revenu === "none", `${encore} → ${revenu}`);
+  await p.evaluate(() => { const c = window.__docs["Systeme_Parties/P1"].Combat_RP; c.Sortis = Object.assign({}, c.Sortis, { P_02: Date.now() }); });
   await ecrirePartie({ ID_Rencontre: null });
   await attendreQue(async () => !(await crp()), 8000);
   const narr = requetes.slice(avant).find(x => x.mia === "NARRATEUR");
@@ -697,10 +700,15 @@ await section(async () => {
   const carte = await attendreQue(async () => !!((await crp()) || {}).Carte, 8000);
   const c = await crp();
   verifier("sans dessin, la carte de l'arène sert de champ de bataille", carte && c.Carte === URL_ARENE, c && c.Carte);
-  // Personne en mode DEV devant la boîte : la grille garde sa taille.
-  await p.evaluate(() => { window.REGLAGES_COMBAT_RP.grilleSansRegleurMs = 300; localStorage.setItem("ivalis_DEV_MODE", "off"); window.fermerCombat(); window.poursuivreCombatRP(); });
+  // Personne en mode DEV devant la boîte : la grille attend (v279 : pas de
+  // minuteur) ; un joueur DEV la valide.
+  await p.evaluate(() => { localStorage.setItem("ivalis_DEV_MODE", "off"); window.fermerCombat(); window.poursuivreCombatRP(); });
+  await p.waitForTimeout(2500);
+  const attend = !((await crp()) || {}).Grille;
+  await p.evaluate(() => { localStorage.setItem("ivalis_DEV_MODE", "on"); return window.validerGrilleCombatRP(60); });
   const auto = await attendreQue(async () => !!((await crp()) || {}).Grille, 8000);
-  verifier("sans joueur DEV, la grille se valide seule (taille gardée)", auto && ((await crp()).Grille || {}).Par === "auto", JSON.stringify(((await crp()) || {}).Grille));
+  verifier("sans joueur DEV, la grille attend ; un joueur DEV la valide", attend && auto && ((await crp()).Grille || {}).Par === "P_01", JSON.stringify(((await crp()) || {}).Grille));
+  await p.evaluate(() => localStorage.setItem("ivalis_DEV_MODE", "off"));
   // Les MIA de peinture muettes : rien n'est peint, les positions sont posées quand même.
   const enCours = await attendreQue(async () => ((await crp()) || {}).Etat === "en_cours", 15000);
   const pt = await partie();
