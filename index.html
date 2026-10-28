@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=102">
+  <link rel="stylesheet" href="style.css?v=103">
 
  
   <!-- ===================================================================== -->
@@ -1252,15 +1252,40 @@
         </button>
         <div id="popup-regions-dev" class="popup-regions-dev" style="display: none;">
           <div class="popup-regions-tete">
-            <span>Régions de la carte</span>
+            <span id="regions-dev-titre">Régions de la carte</span>
             <button type="button" class="popup-regions-fermer" title="Fermer" aria-label="Fermer" onclick="window.basculerPopupRegions(false)">✕</button>
           </div>
+          <!-- Sur la carte du monde : ses boîtes cliquables (regions_carte.js). -->
+          <div id="regions-dev-monde">
           <label class="popup-regions-case"><input type="checkbox" id="case-regions-visibles" onchange="window.afficherRegionsDev(this.checked)"> Afficher les boîtes</label>
           <button type="button" id="btn-regions-nouvelle" class="popup-regions-bouton" onclick="jouerSonClic(); window.creerRegion()">+ Nouvelle boîte</button>
           <div id="regions-dev-selection" class="popup-regions-info">Aucune boîte sélectionnée</div>
           <button type="button" id="btn-regions-supprimer" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.supprimerRegion()" disabled>Supprimer cette boîte</button>
           <div id="regions-dev-total" class="popup-regions-total"></div>
           <p class="popup-regions-aide">Boîtes affichées, un clic ne déclenche rien : on édite. Clic maintenu sur une boîte : la déplacer. Carré d'un coin : l'étirer. Clic sur un bord : un nouveau point, à étirer. Double-clic sur un point : le retirer.</p>
+          </div>
+          <!-- Sur une carte régionale (v272, cartes_regionales.js) : peindre les
+               zones de nuages, et placer son titre. -->
+          <div id="regions-dev-carte" style="display: none;">
+            <div id="regions-dev-carte-nom" class="popup-regions-info"></div>
+            <div class="popup-regions-outils">
+              <button type="button" id="btn-region-pinceau" class="popup-regions-outil" title="Pinceau : peindre une zone de nuages"
+                      aria-label="Pinceau" onclick="jouerSonClic(); window.choisirOutilRegion('pinceau')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5 L19.5 9.5 L11 18 L6 13 Z"/><path d="M6 13 C3.5 13.5 3.5 17 2.5 20.5 C6 19.5 9.5 19.5 11 18"/></svg>
+              </button>
+              <button type="button" id="btn-region-gomme" class="popup-regions-outil" title="Gomme : effacer une zone"
+                      aria-label="Gomme" onclick="jouerSonClic(); window.choisirOutilRegion('gomme')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 15 L13 5.5 L20 12.5 L12.5 20 H7.5 Z"/><path d="M8.5 10 L15.5 17"/><path d="M12.5 20 H20.5"/></svg>
+              </button>
+              <label class="popup-regions-taille" title="Taille du pinceau et de la gomme">
+                <input type="range" id="taille-pinceau-region" min="10" max="160" value="50" oninput="window.reglerTaillePinceauRegion(this.value)">
+              </label>
+            </div>
+            <button type="button" id="btn-region-valider-nuages" class="popup-regions-bouton" onclick="jouerSonClic(); window.validerNuagesRegion()" disabled>Valider les nuages</button>
+            <button type="button" id="btn-region-annuler-nuages" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.annulerNuagesRegion()" disabled>Annuler la peinture</button>
+            <label class="popup-regions-case"><input type="checkbox" id="case-region-titre" onchange="window.basculerEditionTitreRegion(this.checked)"> Édition du titre</label>
+            <p class="popup-regions-aide">Pinceau ou gomme en main, le doigt peint (deux doigts zooment toujours). Les zones rouges restent provisoires : « Valider les nuages » les change en nuages, pour toutes les parties. Édition du titre : le glisser pour le déplacer, le carré de son coin haut droit pour sa taille ; décocher l'enregistre.</p>
+          </div>
         </div>
       </div>
       <div class="conteneur-volume-nav">
@@ -2291,6 +2316,8 @@
 <script type="module" src="comptes.js?v=2"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=2"></script>
+<!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région, ses nuages et son titre. -->
+<script type="module" src="cartes_regionales.js?v=1"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=16"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->

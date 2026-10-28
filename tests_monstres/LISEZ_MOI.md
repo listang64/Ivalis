@@ -8197,3 +8197,62 @@ quatre zooms ; les versions. Il mord sur l'ancien code (13 échecs).
 corrections_v262 et corrections_v265 regardent maintenant ce mouvement-là
 (les nappes qui tournent dans la turbulence) au lieu de l'anneau qui
 ondulait.
+
+## v272 — Les cartes régionales
+
+cartes_regionales.js (nouveau module, chargé après regions_carte.js). Les
+boîtes cliquables 1 à 13 de la carte du monde ouvrent chacune sa carte
+régionale (ACTIONS_REGIONS) ; Volcanisse (4) et Arcaï (9), sans image encore,
+annoncent « … — carte à venir ». Chacun pour soi (Nico) : ouvrir une carte ne
+bouge que l'écran de celui qui clique.
+
+L'ALLER (ouvrirCarteRegionale) : la carte du monde plonge vers le centre de la
+boîte (×2,4) ; la traversée des nuages (jouerTraverseeNuages : des couches en
+perspective, de plus en plus épaisses, et un voile qui couvre l'écran) ; au
+cœur, l'écran couvert, la carte régionale prend la place ; les nuages se
+dissipent et la carte arrive à ×1,12 pour revenir à ×1. LA BOUCLE : le cœur
+se rejoue tant que `auCoeur` n'est pas tenu (ou qu'il reste des `boucles`) —
+une seule boucle aujourd'hui, rejouée seulement si l'image n'est pas encore
+chargée ; c'est la mécanique qui masquera le chargement des icônes. LE RETOUR
+(fermerCarteRegionale, le bouton beige à flèche à gauche de celui qui rouvre
+le menu) : la carte recule, les nuages, puis la carte du monde, encore plongée
+sur la région, se dézoome jusqu'à son cadrage d'avant. Le menu se range à
+l'arrivée.
+
+LA VUE : calée sur la hauteur de l'écran (zoom = hauteur ÷ hauteur de
+l'image), centrée, glisse en largeur sans jamais montrer de vide ; molette
+(autour du pointeur) et deux doigts (autour de leur milieu) zooment, de la
+hauteur de l'écran (jamais moins) à ×4.
+
+LA BASE : Cartes_Regionales/{numéro} — Numero, Nom, Image, Description,
+Titre {x, y, taille} (en fractions de l'image), Nuages {colonnes, lignes,
+cases} (une grille de 240 colonnes, ses bits en base64). Nom et image ont
+leur valeur par défaut dans le code (CARTES_REGIONALES_DEFAUT) ; la fiche
+l'emporte. Un poste DEV crée les fiches qui manquent (jamais sur une lecture
+tirée du cache). Les nuages valent pour toutes les parties.
+
+LE DEV (popup du bouton rouge, qui montre sur une carte régionale ses outils
+à elle) : le pinceau peint en rouge semi-transparent, la gomme efface (taille
+réglable, en pixels d'écran) ; c'est provisoire jusqu'à « Valider les
+nuages », qui écrit la grille et la change en nuages ; « Annuler la
+peinture » revient à l'enregistré. LES NUAGES : un corps tiré de la grille
+adoucie, au bord rongé de bourrelets (bruit fractal et sa valeur absolue),
+éclairé d'en haut à gauche, beige foncé (ombre 112/93/66, 150/128/96, clair
+204/186/152) ; deux corps qui se fondent lentement l'un dans l'autre (le
+bord ondule) et deux textures (reflets, creux) qui dérivent par-dessus, à
+trente images par seconde. LE TITRE : le nom de la carte dans l'or brossé et
+la police du nom des combattants (#voile-tour-nom), accroché à la carte ;
+« Édition du titre » : le glisser le déplace, le carré du coin haut droit le
+grandit (vers le haut à droite) ou le rétrécit ; décocher l'enregistre.
+
+corrections_v272.mjs (dans la suite) : sur la vraie page, avec des cartes
+générées : les treize cartes et leurs boîtes ; Volcanisse à venir ; l'aller
+mesuré image par image (plongée, couverture des nuages, carte posée sous les
+nuages, ×1,12 → 1), le menu rangé, le bouton retour à sa place ; le cadrage
+(hauteur, glissement, molette autour du pointeur, ×4 au plus, jamais sous la
+hauteur, deux doigts) ; le pinceau, la gomme, l'annulation, la validation
+(grille relue de la base), les nuages aux pixels (beige foncé, nulle part
+ailleurs, en mouvement) ; le titre (police et or du nom de combattant,
+déplacé, rétréci, agrandi, enregistré en sortant, relu, zoomé) ; le retour
+mesuré (plongée puis dézoome jusqu'au cadrage d'avant) ; la réouverture ;
+les versions. Il mord sur l'ancien code (14 échecs).

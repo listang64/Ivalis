@@ -5671,3 +5671,69 @@ textarea.input-texte-parchemin {
 .butin-reg-actions { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
 .butin-reg-actions button[disabled] { opacity: 0.45; cursor: not-allowed; }
 .butin-reg-etat { font-family: 'Almendra', serif; font-size: 14px; color: #5c3a21; font-style: italic; }
+
+/* =========================================================================
+   LES CARTES RÉGIONALES (v272, cartes_regionales.js)
+   ========================================================================= */
+/* La vue couvre l'écran de jeu, au-dessus de la carte du monde (0) et sous
+   les menus (9999). La carte s'y pose par translate + scale, depuis son coin
+   haut gauche ; le petit zoom d'arrivée s'applique à la vue, depuis son centre. */
+.vue-carte-region { position: absolute; inset: 0; z-index: 5; overflow: hidden; background: #1a140c;
+  touch-action: none; transform-origin: 50% 50%; cursor: grab; user-select: none; -webkit-user-select: none; }
+.vue-carte-region:active { cursor: grabbing; }
+.vue-carte-region.outil-pinceau, .vue-carte-region.outil-gomme { cursor: crosshair; }
+.carte-region { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.carte-region-image { display: block; width: 100%; height: 100%; pointer-events: none; -webkit-user-drag: none; }
+.carte-region-nuages, .carte-region-peinture { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.carte-region-peinture { display: none; image-rendering: auto; }
+
+/* LE TITRE, dans l'or brossé du nom des combattants (#voile-tour-nom) — et
+   dans sa police : celle du jeu (Almendra, que l'étoile du haut impose
+   partout), en capitales. Accroché à la carte : sa place et sa taille sont en
+   pixels de l'image. */
+.carte-region-titre { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; pointer-events: none;
+  font-weight: bold; text-transform: uppercase; letter-spacing: 0.08em; line-height: 1.1; }
+.carte-region-titre-texte { display: block; font-weight: bold;
+  background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0.03em 0.06em 0.08em rgba(0, 0, 0, 0.95)) drop-shadow(0 0 0.25em rgba(0, 0, 0, 0.55)); }
+.carte-region-titre-poignee { display: none; }
+/* En édition (DEV) : un cadre pointillé, et le carré du coin haut droit. */
+.carte-region-titre.edition { pointer-events: auto; cursor: move;
+  outline: calc(2px / var(--zoom-region, 1)) dashed rgba(243, 210, 122, 0.95); outline-offset: 0.12em; }
+.carte-region-titre.edition .carte-region-titre-poignee { display: block; position: absolute; top: calc(-7px / var(--zoom-region, 1)); right: calc(-7px / var(--zoom-region, 1));
+  width: calc(14px / var(--zoom-region, 1)); height: calc(14px / var(--zoom-region, 1)); background: #fff;
+  border: calc(2px / var(--zoom-region, 1)) solid #a01212; box-sizing: border-box; cursor: nesw-resize; }
+
+/* LE RETOUR À LA CARTE DU MONDE : un bouton beige à flèche, à gauche de celui
+   qui rouvre le menu (même hauteur, même taille). */
+.btn-retour-monde { position: fixed; z-index: 10004; display: none; align-items: center; justify-content: center; padding: 0; cursor: pointer;
+  top: calc(env(safe-area-inset-top, 0px) + 2vh);
+  right: calc(env(safe-area-inset-right, 0px) + 1.2vw + clamp(34px, 2.8vw, 54px) + 12px);
+  width: clamp(34px, 2.8vw, 54px); height: clamp(34px, 2.8vw, 54px); border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f6ead0, #e8d5a5 55%, #c9b07e); border: 2px solid #8a6a2a;
+  box-shadow: -3px 4px 6px rgba(0, 0, 0, 0.6); transition: transform 0.2s ease, filter 0.2s ease; }
+.btn-retour-monde:hover { transform: scale(1.08); filter: brightness(1.06); }
+.btn-retour-monde:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.btn-retour-monde svg { width: 62%; height: 62%; fill: none; stroke: #5c3a21; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* « Volcanisse — carte à venir » : un bandeau de parchemin, en haut, qui s'efface. */
+.annonce-carte-region { position: absolute; left: 50%; top: 12vh; transform: translate(-50%, -8px); z-index: 9998; pointer-events: none;
+  padding: 10px 22px; border-radius: 10px; background: rgba(243, 226, 184, 0.96); border: 2px solid #8a6a2a; color: #3b2414;
+  font-family: 'Cinzel', serif; font-weight: bold; font-size: 18px; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
+  opacity: 0; transition: opacity 0.35s ease, transform 0.35s ease; }
+.annonce-carte-region.visible { opacity: 1; transform: translate(-50%, 0); }
+
+/* LA TRAVERSÉE DES NUAGES : par-dessus tout l'écran de jeu (sauf les menus),
+   et elle retient les doigts tant qu'elle dure. */
+.traversee-nuages { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 9500; pointer-events: auto; }
+
+/* Les outils de la carte régionale, dans la popup DEV. */
+.popup-regions-outils { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; }
+.popup-regions-outil { width: 40px; height: 40px; padding: 6px; border-radius: 8px; cursor: pointer; flex: none;
+  background: #fff8e6; border: 2px solid #a01212; }
+.popup-regions-outil svg { display: block; width: 100%; height: 100%; fill: none; stroke: #7a0d0d; stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; }
+.popup-regions-outil.actif { background: #a01212; }
+.popup-regions-outil.actif svg { stroke: #fff; }
+.popup-regions-taille { flex: 1; display: flex; align-items: center; }
+.popup-regions-taille input { width: 100%; accent-color: #a01212; }
