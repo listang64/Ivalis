@@ -105,8 +105,14 @@ console.log("\n1. LA CARTE DU MONDE : FIXE, HAUTEUR CALÉE, GLISSE EN LARGEUR");
       if (getComputedStyle(d).display !== "none") { window.__ecransCaches.push([d, d.style.display]); d.style.display = "none"; }
     });
     document.getElementById("ecran-jeu").style.display = "block";
+    // (v275) Le fanion et sa grille ne sont plus : une cible posée sur la
+    // carte reçoit le clic à leur place (une région, le pion du groupe).
     window.__grille = 0;
-    window.toggleGrille = () => { window.__grille++; };
+    const cible = document.createElement("div");
+    cible.id = "__cible-clic-carte";
+    cible.style.cssText = "position:absolute;left:0;top:0;width:3840px;height:2160px;";
+    cible.addEventListener("click", () => { window.__grille++; });
+    document.getElementById("carte-fond-jeu").appendChild(cible);
   });
   const lire = () => p.evaluate(() => {
     const c = typeof window.cadrageCarteMonde === "function" ? window.cadrageCarteMonde() : null;
@@ -141,7 +147,7 @@ console.log("\n1. LA CARTE DU MONDE : FIXE, HAUTEUR CALÉE, GLISSE EN LARGEUR");
         ev("touchend", []);
       }
     }
-    if (type === "clicFanion") document.getElementById("pion-groupe").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    if (type === "clicFanion") document.getElementById("__cible-clic-carte").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
   }, { type, args: args || {} });
 
   await p.evaluate(() => window.recadrerCarte());
@@ -174,13 +180,14 @@ console.log("\n1. LA CARTE DU MONDE : FIXE, HAUTEUR CALÉE, GLISSE EN LARGEUR");
   const r4 = await lire();
   verifier("trop loin à droite : le bord gauche s'arrête au bord de l'écran", r4.c && r4.c.panX === 0 && r4.gauche === 0, JSON.stringify(r4.c));
 
-  // Un glissé qui se termine sur le fanion ne vaut pas un clic.
+  // Un glissé qui se termine sur la carte (une région, le pion) ne vaut pas un clic.
   await geste("glisser", { de: 600, vers: 450 });
   await geste("clicFanion");
   const apresGlisse = await p.evaluate(() => window.__grille);
   await geste("clicFanion");
   const apresClic = await p.evaluate(() => window.__grille);
-  verifier("le clic qui finit un glissé n'ouvre pas la grille ; un vrai clic, si", apresGlisse === 0 && apresClic === 1, `${apresGlisse} / ${apresClic}`);
+  verifier("le clic qui finit un glissé ne vaut pas un clic ; un vrai clic, si", apresGlisse === 0 && apresClic === 1, `${apresGlisse} / ${apresClic}`);
+  await p.evaluate(() => document.getElementById("__cible-clic-carte").remove());
 
   await p.evaluate(() => window.recadrerCarte());
   await geste("doigts", { de: 600, vers: 450 });

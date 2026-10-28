@@ -117,12 +117,38 @@ function composerCartes() {
                 y: Number.isFinite(Number(titre.y)) ? borne(Number(titre.y), 0, 1) : TITRE_DEFAUT.y,
                 taille: Number.isFinite(Number(titre.taille)) ? borne(Number(titre.taille), 0.015, 0.4) : TITRE_DEFAUT.taille
             },
-            nuages: fiche.Nuages && fiche.Nuages.cases ? { colonnes: Number(fiche.Nuages.colonnes), lignes: Number(fiche.Nuages.lignes), cases: String(fiche.Nuages.cases) } : null
+            nuages: fiche.Nuages && fiche.Nuages.cases ? { colonnes: Number(fiche.Nuages.colonnes), lignes: Number(fiche.Nuages.lignes), cases: String(fiche.Nuages.cases) } : null,
+            // LES TERRAINS PRATICABLES (v275, terrains_regionaux.js) : des
+            // polygones en fractions de l'image, et ses proportions (largeur /
+            // hauteur) pour les calculs faits carte fermée.
+            terrains: lireTerrains(fiche.Terrains),
+            prochainTerrain: Number(fiche.Prochain_Terrain) || 1,
+            aspect: Number(fiche.Aspect) > 0 ? Number(fiche.Aspect) : null
         };
     });
     window.CARTES_REGIONALES = cartes;
     return cartes;
 }
+
+function lireTerrains(terrains) {
+    const liste = [];
+    Object.entries(terrains || {}).forEach(([cle, t]) => {
+        const numero = Number((t && t.Numero) || cle);
+        const points = Array.isArray(t && t.Points)
+            ? t.Points.map(p => ({ x: borne(Number(p.x) || 0, 0, 1), y: borne(Number(p.y) || 0, 0, 1) })) : [];
+        if (numero > 0 && points.length >= 3) liste.push({ numero, points });
+    });
+    return liste.sort((a, b) => a.numero - b.numero);
+}
+// Une fiche changée sur ce poste, tout de suite à l'écran (l'écriture en base
+// suit, faite par l'appelant) : les terrains praticables (v275).
+window.majFicheRegionaleLocale = function(numero, champs) {
+    const n = Number(numero);
+    if (!(n > 0)) return null;
+    fichesBase[n] = Object.assign({ Numero: n }, fichesBase[n], champs || {});
+    composerCartes();
+    return window.CARTES_REGIONALES[n];
+};
 
 // Les fiches telles que l'écoute les reçoit (et les bancs) : [{ id, data }].
 // `depuisCache` : une lecture tirée du cache local peut être incomplète — on
@@ -843,6 +869,7 @@ window.choisirOutilRegion = function(outil) {
     actualiserDev();
     return etat.outil;
 };
+window.outilCarteRegion = () => etat.outil;
 window.reglerTaillePinceauRegion = function(v) {
     etat.taillePinceau = borne(Number(v) || 50, 6, 200);
     return etat.taillePinceau;

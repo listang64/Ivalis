@@ -183,7 +183,8 @@ function brancherVillage(el, v) {
     // En DEV, l'appui est au village (la carte capturerait sinon le pointeur,
     // et le clic n'arriverait jamais) : relâché sans avoir bougé, il le choisit.
     el.addEventListener("pointerdown", (e) => {
-        if (!estDev() || enCours) return;
+        // Le mode voyage (ou le téléport) choisit le village : pas la sélection DEV.
+        if (!estDev() || enCours || (typeof window.modeChoixCarte === "function" && window.modeChoixCarte())) return;
         e.stopPropagation();
         appuiVillage = { id: v.id, x: e.clientX, y: e.clientY };
     });

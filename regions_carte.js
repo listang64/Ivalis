@@ -14,8 +14,7 @@
 //  rétracte. Un clic sur un bord crée un nouveau point, qu'on étire pour
 //  faire une forme sur mesure. »
 //
-//  LA FORME : un polygone, en coordonnées de la CARTE (3840 × 2160, comme la
-//  grille hexagonale) — il suit le glissement de la carte et ne dépend pas de
+//  LA FORME : un polygone, en coordonnées de la CARTE (3840 × 2160) — il suit le glissement de la carte et ne dépend pas de
 //  la taille de l'écran. Il naît rectangle (quatre points), chaque point a sa
 //  poignée, chaque bord en ajoute un.
 //
@@ -24,7 +23,7 @@
 //      se voient, se déplacent, se déforment ; un clic ne déclenche rien.
 //    - JEU : sinon. Les boîtes sont invisibles ; une boîte qui a une action
 //      (ACTIONS_REGIONS[numéro], à venir) la joue au clic. Une boîte sans
-//      action laisse passer le clic à la carte, au fanion, aux icônes.
+//      action laisse passer le clic à la carte.
 //
 //  LA BASE : un seul document, Carte_Monde/Regions — { Prochain_Numero,
 //  Regions: { "<n>": { Numero, Points: [{ x, y }, …] } } }, écouté par tous
@@ -56,7 +55,11 @@ const visiblesCoche = () => { try { return localStorage.getItem(CLE_VISIBLES) ==
 // LE MODE DESCRIPTIFS (v274, descriptifs_regions.js) prend le pas sur
 // l'édition des boîtes : un seul mode DEV à la fois.
 const modeDescriptif = () => typeof window.modeDescriptifRegions === "function" && window.modeDescriptifRegions();
-window.modeEditionRegions = () => estDev() && visiblesCoche() && !modeDescriptif();
+// LE CHOIX D'UNE DESTINATION (v275, voyage_groupe.js) : le mode voyage, ou le
+// téléport du DEV, sur la carte du monde — toute boîte se touche, et le clic
+// choisit la région au lieu d'ouvrir sa carte.
+const modeChoix = () => typeof window.modeChoixCarte === "function" && window.modeChoixCarte() === "monde";
+window.modeEditionRegions = () => estDev() && visiblesCoche() && !modeDescriptif() && !modeChoix();
 const zoomCarte = () => (typeof window.cadrageCarteMonde === "function" && window.cadrageCarteMonde().zoom) || 1;
 const borner = (v, max) => Math.max(0, Math.min(max, Math.round(v)));
 const copiePoints = (pts) => pts.map(p => ({ x: p.x, y: p.y }));
@@ -166,6 +169,7 @@ window.supprimerRegion = async function(numero, options) {
 // --- LE CLIC EN JEU --------------------------------------------------------
 // Ce que fera chaque région, à venir : ACTIONS_REGIONS[numéro] = (numero) => {…}.
 window.surClicRegion = function(numero) {
+    if (modeChoix() && typeof window.surChoixRegionCarte === "function") return window.surChoixRegionCarte(numero);
     if (window.modeEditionRegions()) return false;
     // En mode descriptifs, toute boîte ouvre son descriptif, pas sa carte.
     if (modeDescriptif() && typeof window.ouvrirDescriptifRegion === "function") {
@@ -205,6 +209,7 @@ window.dessinerRegions = function() {
     const edition = window.modeEditionRegions();
     svg.classList.toggle("edition", edition);
     svg.classList.toggle("descriptif", modeDescriptif());
+    svg.classList.toggle("choix", modeChoix());
     svg.innerHTML = "";
     const zoom = zoomCarte();
     const poignee = 14 / zoom, police = 26 / zoom;

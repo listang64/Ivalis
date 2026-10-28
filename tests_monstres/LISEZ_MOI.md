@@ -8344,3 +8344,100 @@ l'état, les mots), le maître du jeu, l'autre poste (et pas par-dessus la
 frappe), la fermeture qui enregistre, la réouverture, Échap ; Volcanisse et
 une boîte sans fiche ; la sortie (DEV éteint, bouton), la carte qui se rouvre
 hors du mode ; les versions. Il mord sur l'ancien code (11 échecs).
+
+## v275 — Le déplacement des PJ
+
+L'ANCIEN VOYAGE EST RETIRÉ : la grille hexagonale (dessin, tuiles exclues,
+distance), le fanion et son clic, la pop-up « Long Périple »
+(Proposition_Voyage, executerVoyage, deplacerPionVers), MIA_CARTO qui
+inventait un lieu à chaque arrivée (creerNouveauLieu, ia_master.js), et les
+icônes de lieux sur la carte du monde (dessinerIconesCarte). Les fiches des
+lieux restent en base (Monde_Lieux). corrections_v241 vise désormais une
+cible posée sur la carte, plus le fanion.
+
+LA POSITION (voyage_groupe.js, nouveau module) : Systeme_Parties/{partie}.
+Position_Groupe { Region, x, y } — la boîte de la carte du monde, et la place
+sur sa carte régionale (fractions de l'image). Sans position, le village du
+Lieu_Actuel la donne ; sans rien, pas d'image (le DEV téléporte). Sur le
+monde, l'image de Nico au centre de la boîte de la région ; sur la carte
+régionale ouverte, le marqueur de Nico à sa place. Les deux tailles (DEV,
+Carte_Monde/Groupe : Taille_Monde en pixels de carte, Taille_Region en part
+de la hauteur de la carte) valent pour toutes les parties.
+
+LE BOUTON VOYAGE : l'image de Nico, à gauche du bouton qui déplie le menu, la
+même taille ; il se montre avec lui (menu rangé) ; le retour au monde passe
+un cran plus à gauche. Il ouvre le mode voyage chez celui qui clique
+(bandeau en haut ; Échap ou Annuler en sortent) :
+  · MONDE : on touche une région → un pointillé rouge droit qui se dessine,
+    une croix rouge à l'arrivée ; la région ne s'ouvre pas.
+  · RÉGION (si le groupe est sur cette carte) : on touche un point du terrain
+    praticable (hors terrain : « Terrain impraticable ») ou un village (sa
+    place exacte). La route : la ligne droite déformée par des ondulations au
+    hasard, nulles aux deux bouts, tirée jusqu'à rester sur le terrain.
+    Une journée de marche = 45 % de la hauteur de la carte ; jours =
+    max(1, ⌈longueur / 0,45 − 0,1⌉), en étapes égales.
+« Valider » crée Voyage_Groupe (en transaction ; un seul voyage à la fois).
+
+LE VOTE : votent les joueurs qui ont un héros actif (ni illusion, ni mort) et
+celui qui propose (oui d'office ; seul, il part aussitôt). La boîte, en haut
+à droite, chez tous : qui propose, où, les votes ; Partir / Refuser
+(Annuler pour l'initiateur) ; « Forcer le départ (DEV) ». Un non efface le
+voyage (Voyage_Annule : chacun lit qui a refusé). Chacun est amené sur la
+carte du voyage (la carte régionale s'ouvre, ou on revient au monde),
+centrée sur le trajet à gauche de la boîte.
+
+LA MARCHE : le dernier oui passe en marche (Jour 1, Debut_Marche, durées),
+vide Lieu_Actuel, avance Voyages_Effectues. Chaque poste joue la marche
+(l'image glisse, se balance) ; le premier qui finit fait avancer le voyage
+en transaction. Un voyage laissé en marche (tous partis) s'achève au retour
+sans rejouer. MONDE : 3,5 à 9 s de route, aucun jour ; à l'arrivée, le
+groupe apparaît sur le terrain de la région d'arrivée, à son BORD, du côté
+d'où il vient (terrains_regionaux.js, pointArriveeRegion : un rayon du cœur
+du terrain vers la région quittée ; sans terrain, le bord de la carte rentré
+de 6 %). RÉGION : « JOUR k » en grand à chaque départ ; à la fin d'une étape,
+la nuit : le camp (la position est enregistrée), le voile de nuit sur la
+carte, le feu sous le groupe, le message du campement posé par le Destin (le
+texte de Nico), la boîte « Nuit k » : Repartir / Rester ici, rien ne bouge
+tant que tous ne sont pas d'accord (DEV : forcer l'un ou l'autre). La nuit
+finie, la date en jeu avance d'un jour (Date_En_Jeu, dans la même
+transaction). Rester : le voyage s'arrête au camp. À l'arrivée : la place,
+et Lieu_Actuel = le village s'il y en a un. Le narrateur n'est pas réveillé.
+
+LE CHAT (ia_master.js, nettoyerChatVoyage) : au départ de chaque voyage et à
+chaque Repartir. Sans un mot des joueurs (seulement DESTIN et
+SYSTEME_TEMPS) : pas d'IA, on efface. Sinon processusArchivageChat (la
+chronique, les souvenirs des PNJ du lieu QUITTÉ — passé en option, la partie
+ne le porte plus). Le cimetière (incinererPnjMorts, sorti de l'archivage)
+tous les 4 voyages ; le bouton « archiver » le garde toujours.
+
+LES TERRAINS PRATICABLES (terrains_regionaux.js, nouveau module) : en DEV,
+sur une carte régionale, la section « Terrains praticables » de la popup
+rouge : afficher (édition), nouveau terrain, sélection, suppression ; les
+gestes des boîtes du monde (déplacer, coins, point sur un bord, double-clic
+pour retirer), en vert. Cartes_Regionales/{n} : Terrains { k: { Numero,
+Points } } en fractions, Prochain_Terrain, Aspect. Prendre le pinceau ou le
+titre range les terrains.
+
+LE DEV (popup rouge) : « Le groupe » sur le monde et sur la carte régionale —
+la taille (curseur, enregistrée au lâcher) et « Déplacer le groupe
+(téléport) » : une région du monde (le cœur de son terrain), ou un point / un
+village d'une carte régionale (Lieu_Actuel) ; le voyage en cours est annulé.
+
+corrections_v275.mjs (dans la suite, Firestore en mémoire avec transactions) :
+l'ancien voyage retiré ; l'image du groupe (place, taille, doigts, village,
+absence) ; le bouton (image, taille, place, rangé avec le menu) ; le mode
+monde (bandeau, régions, sa propre région, trait droit pointillé rouge,
+croix, pas de carte ouverte, Échap) ; le vote (base, votants, boîte, boutons
+de chacun, bouton pris) ; le refus ; la marche du monde (départ, compteur,
+nettoyage, glissé, durée, arrivée, aucun jour, bord ouest) ; l'apparition
+(est, nord, sud-ouest, sur le terrain, sans terrain, terrain en U) ; les
+terrains DEV (section, visibilité, création, coin, bord, double-clic,
+écritures, suppression, pinceau) ; le mode régional (marqueur, taille,
+impraticable, route compliquée sur le terrain, jours, hasard, village) ; la
+marche régionale (JOUR 1, marqueur sur le pointillé, nuit et camp, message
+du Destin, voile et feu, boîte, désaccord, JOUR 2, date, nettoyage, rester) ;
+le village (Lieu_Actuel, forcer, un jour sans nuit) ; amener chacun sur la
+carte (région, monde, centrage) ; le chat (sans IA, archivage avec le lieu,
+cimetière, tous les 4 voyages) ; le DEV (tailles, base, téléports, hors
+DEV) ; le voyage laissé en marche ; les versions. Il mord sur l'ancien code
+(24 échecs).

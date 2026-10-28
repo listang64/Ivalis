@@ -1283,106 +1283,8 @@ async function genererEtStockerIconeCarte(nomLieu, descriptionLieu) {
     return "";
 }
 
-window.creerNouveauLieu = async function(idHex) {
-    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
-    if (!cleGemini) {
-        alert("Clé Gemini manquante pour cartographier !");
-        return null;
-    }
-
-    // =========================================================
-    // NOUVEAU : On récupère tous les lieux déjà existants en BDD
-    // =========================================================
-    let nomsLieuxExistants = [];
-    try {
-        const qLieux = query(collection(db, "Monde_Lieux"));
-        const snapLieux = await getDocs(qLieux);
-        snapLieux.forEach(doc => {
-            if (doc.data().Nom_Du_Lieu) nomsLieuxExistants.push(doc.data().Nom_Du_Lieu);
-        });
-    } catch (e) {
-        console.warn("[MIA_Carto] Impossible de lire la mémoire des lieux :", e);
-    }
-
-    // =========================================================
-    // NOUVEAU PROMPT : Mémoire du monde + Descriptions riches
-    // =========================================================
-    const promptSysteme = `Tu es MIA_CARTO, l'IA architecte du monde d'Ivalis. 
-Le Maître du Jeu vient d'envoyer les joueurs sur une zone inexplorée de la carte.
-Voici la liste des lieux qui existent DÉJÀ dans le monde : ${JSON.stringify(nomsLieuxExistants)}.
-
-Ta mission : Invente une NOUVELLE RÉGION d'Antique Fantastique (Mythologie, Antiquité magique) originale.
-
-RÈGLES DE CRÉATION :
-1. ORIGINALITÉ : Le nouveau lieu doit être un concept différent de ceux déjà existants. S'il y a déjà "La Grotte de Cristal", n'invente pas une autre grotte de cristal.
-2. EXCEPTION URBAINE : Les villes, bourgades, camps et villages sont la base d'un monde vivant. Tu peux (et tu dois souvent) créer de nouveaux villages ou cités, même s'il y en a déjà beaucoup.
-3. VARIÉTÉ : Varie les atmosphères (joyeux, mystique, dangereux, paisible, abandonné, très peuplé).
-
-Réponds OBLIGATOIREMENT avec un JSON valide respectant ce format exact :
-{
-    "nom": "Le Nom du Lieu",
-    "description": "Une description complète, riche et détaillée du lieu. Décris son atmosphère, son architecture, ses spécificités (géographie, culture, rumeur locale, bizarrerie). Sois exhaustif.",
-    "securite": "Faible", // Choisir parmi: Inconnue, Faible, Moyenne, Élevée, Cauchemar
-    "prompt_image": "Description visuelle très courte en ANGLAIS du paysage (UNIQUEMENT les éléments physiques. N'ajoute AUCUN mot lié à un style comme 'concept art', 'painting', 'realistic', car le style est géré ailleurs)."
-}`;
-
-    const bodyRequete = {
-        systemInstruction: { parts: [{ text: promptSysteme }] },
-        contents: [{ role: "user", parts: [{ text: "Déploie ton imagination et crée un nouveau lieu original pour cette tuile vide." }] }],
-        generationConfig: { 
-            temperature: 0.9, 
-            responseMimeType: "application/json"
-        }
-    };
-
-    try {
-        const reponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
-            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(bodyRequete)
-        });
-        const data = await reponse.json();
-        const contenu = JSON.parse(data.candidates[0].content.parts[0].text);
-
-        const numAleatoire = Math.floor(Math.random() * 100000).toString().padStart(5, "0");
-        const nomFormate = contenu.nom.replace(/[^a-zA-Z0-9]/g, "_");
-        const docId = `L_${numAleatoire}_${nomFormate}`;
-
-        console.log(`[MIA_Carto] 🌍 Nouveau lieu imaginé : ${contenu.nom}`);
-
-        // 1. Sauvegarde en BDD de la structure vierge
-        await setDoc(doc(db, "Monde_Lieux", docId), {
-            Description_Global: contenu.description,
-            Niveau_De_Securite: contenu.securite,
-            Nom_Du_Lieu: contenu.nom,
-            Reputations: {},
-            Stigmates: "",
-            Tuile_ID: idHex,
-            URL_Cloudinary: ""
-        });
-
-        // 2. Création des deux images en parallèle (Paysage + Icône de carte)
-        const [urlImage, urlIcone] = await Promise.all([
-            genererEtStockerImageLieu(contenu.prompt_image || contenu.nom),
-            genererEtStockerIconeCarte(contenu.nom, contenu.description)
-        ]);
-
-        let maj = {};
-        if (urlImage) maj.URL_Cloudinary = urlImage;
-        if (urlIcone) maj.URL_Icone_Carte = urlIcone;
-
-        if (Object.keys(maj).length > 0) {
-            await updateDoc(doc(db, "Monde_Lieux", docId), maj);
-        }
-        
-        if (typeof window.dessinerIconesCarte === "function") window.dessinerIconesCarte();
-
-        // NOUVEAU : On retourne l'ID et le Nom pour que le Narrateur sache où on est !
-        return { id: docId, nom: contenu.nom }; 
-
-    } catch (e) {
-        console.error("[MIA_Carto] Échec de l'exploration :", e);
-        return null;
-    }
-};
+// (v275) MIA_CARTO, qui inventait un lieu à chaque arrivée sur une case de la
+// grille, n'existe plus : le groupe voyage sur les cartes (voyage_groupe.js).
 
 window.regenererImagesLieuActuel = async function() {
     if (!window.ID_PARTIE_COURANTE) return alert("Aucune partie en cours.");
@@ -1442,7 +1344,6 @@ window.regenererImagesLieuActuel = async function() {
             await updateDoc(doc(db, "Monde_Lieux", idLieu), maj);
             
             // On force le rafraîchissement visuel pour les joueurs !
-            if (typeof window.dessinerIconesCarte === "function") window.dessinerIconesCarte();
             if (typeof window.mettreAJourBulleLieu === "function") window.mettreAJourBulleLieu(snapPartie.data().Lieu_Actuel);
         }
     } catch (e) {
@@ -1744,15 +1645,28 @@ window.declencherTourIA = async function() {
 // =========================================================================
 
 // Moteur silencieux : Effectue le travail sans aucune alerte (utilisé pour les voyages)
-window.processusArchivageChat = async function() {
+// Les messages du chat de la partie, dans l'ordre.
+async function lireMessagesChatPartie() {
+    const qMsg = query(collection(db, "Messages_Chat"), where("ID_Partie", "==", window.ID_PARTIE_COURANTE), orderBy("Timestamp", "asc"));
+    const snapMsg = await getDocs(qMsg);
+    const messages = [];
+    snapMsg.forEach(d => messages.push({ id: d.id, ...d.data() }));
+    return messages;
+}
+
+// `options` (v275, les voyages du groupe) :
+//   · messages : déjà lus par l'appelant ;
+//   · lieu : le lieu que le groupe QUITTE (au départ d'un voyage, la partie
+//     ne le porte déjà plus) ;
+//   · cimetiere : false pour garder les PNJ morts cette fois (le voyage ne
+//     brûle le cimetière que tous les 4 voyages). Par défaut, oui.
+window.processusArchivageChat = async function(options) {
     if (!window.ID_PARTIE_COURANTE) return false;
+    const opts = options || {};
 
     try {
         // 1. Récupération de tous les messages
-        const qMsg = query(collection(db, "Messages_Chat"), where("ID_Partie", "==", window.ID_PARTIE_COURANTE), orderBy("Timestamp", "asc"));
-        const snapMsg = await getDocs(qMsg);
-        let messages = [];
-        snapMsg.forEach(d => messages.push({ id: d.id, ...d.data() }));
+        const messages = Array.isArray(opts.messages) ? opts.messages : await lireMessagesChatPartie();
 
         if (messages.length === 0) return true; // Le chat est déjà vide, c'est bon.
 
@@ -1810,8 +1724,11 @@ Ne mentionne JAMAIS les mécaniques de jeu (jets de dés, tours de parole). Écr
             // =========================================================================
 
             // 2. Détection des PNJ présents (Cible le lieu que l'on quitte !)
-            const snapPartie = await getDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE));
-            const lieuActuel = snapPartie.exists() ? snapPartie.data().Lieu_Actuel : null;
+            let lieuActuel = opts.lieu;
+            if (lieuActuel === undefined) {
+                const snapPartie = await getDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE));
+                lieuActuel = snapPartie.exists() ? snapPartie.data().Lieu_Actuel : null;
+            }
             const env = await preparerEnvironnement(lieuActuel); 
             const nomsPnj = Object.keys(env.pnjsPresents);
 
@@ -1898,9 +1815,21 @@ Si un PNJ n'a absolument pas interagi ou n'a pas du tout été concerné par les
         }
         await batchChat.commit(); // On envoie le lot en une seule fois !
 
-        // =========================================================================
-        // --- 6. LE CIMETIÈRE (Nettoyage des PNJ morts EN LOT) ---
-        // =========================================================================
+        // 6. LE CIMETIÈRE
+        if (opts.cimetiere !== false) await window.incinererPnjMorts();
+
+        return true;
+    } catch (e) {
+        console.error("Erreur critique lors de l'archivage silencieux :", e);
+        return false;
+    }
+};
+
+// =========================================================================
+// --- LE CIMETIÈRE (Nettoyage des PNJ morts EN LOT) ---
+// =========================================================================
+window.incinererPnjMorts = async function() {
+    try {
         console.log("💀 [Cimetière] Recherche des corps à incinérer...");
         
         const qTousLesPnj = query(collection(db, "Monde_PNJ"));
@@ -1928,11 +1857,41 @@ Si un PNJ n'a absolument pas interagi ou n'a pas du tout été concerné par les
             await batchCimetiere.commit(); // On purge toute la base d'un coup
             console.log("💀 [Cimetière] Incinération terminée.");
         }
-        // =========================================================================
-
         return true;
     } catch (e) {
-        console.error("Erreur critique lors de l'archivage silencieux :", e);
+        console.error("Cimetière des PNJ :", e);
+        return false;
+    }
+};
+
+// =========================================================================
+// --- LE CHAT DES VOYAGES (v275, voyage_groupe.js) ---
+// =========================================================================
+// Nico : au départ de chaque voyage et à chaque « Repartir », le chat est
+// nettoyé (l'archivage ci-dessus : la chronique, les souvenirs des PNJ du lieu
+// quitté, puis l'effacement) — « et si rien n'est écrit pendant la nuit, on
+// n'envoie rien » : sans un mot des joueurs (seulement le Destin et le Maître
+// du Temps), pas d'IA, on efface seulement. Le cimetière, tous les 4 voyages
+// (`cimetiere`, décidé par l'appelant).
+const AUTEURS_SANS_JOUEUR = ["DESTIN", "SYSTEME_TEMPS"];
+window.chatEcritParLesJoueurs = (messages) => (messages || []).some(m => !AUTEURS_SANS_JOUEUR.includes(m.Auteur_ID));
+window.nettoyerChatVoyage = async function(options) {
+    if (!window.ID_PARTIE_COURANTE) return false;
+    const opts = options || {};
+    try {
+        const messages = await lireMessagesChatPartie();
+        if (window.chatEcritParLesJoueurs(messages)) {
+            return await window.processusArchivageChat({ messages, lieu: opts.lieu, cimetiere: !!opts.cimetiere });
+        }
+        if (messages.length > 0) {
+            const lot = writeBatch(db);
+            messages.forEach(m => lot.delete(doc(db, "Messages_Chat", m.id)));
+            await lot.commit();
+        }
+        if (opts.cimetiere) await window.incinererPnjMorts();
+        return true;
+    } catch (e) {
+        console.error("Nettoyage du chat du voyage :", e);
         return false;
     }
 };

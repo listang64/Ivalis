@@ -3615,13 +3615,11 @@ window.mettreAJourBulleLieu = async function(idLieu) {
         window.LIEU_ACTUEL_NOM = "";
         window.LIEU_ACTUEL_IMAGE = "";
         if (typeof window.afficherBulleLieuChat === "function") window.afficherBulleLieuChat();
-        window.placerPionSurHex(""); // On cache le pion
         return;
     }
 
     let nom = "Lieu Inconnu";
     let urlImage = "";
-    let idTuile = "";
 
     try {
         if (idLieu.startsWith("L")) {
@@ -3630,7 +3628,6 @@ window.mettreAJourBulleLieu = async function(idLieu) {
                 const data = snap.data();
                 nom = data.Nom_Du_Lieu || "Lieu sans nom";
                 urlImage = data.URL_Cloudinary || "";
-                idTuile = data.Tuile_ID || ""; 
             }
         } else if (idLieu.startsWith("B")) {
             const snapBat = await getDoc(doc(db, "Monde_Batiment", idLieu));
@@ -3638,14 +3635,6 @@ window.mettreAJourBulleLieu = async function(idLieu) {
                 const dataBat = snapBat.data();
                 nom = dataBat.Nom_Batiment || "Bâtiment sans nom";
                 urlImage = dataBat.URL_Cloudinary || "";
-                idTuile = dataBat.Tuile_ID || "";
-                
-                if (idTuile === "" && dataBat.ID_Lieu) {
-                    const snapLieu = await getDoc(doc(db, "Monde_Lieux", dataBat.ID_Lieu));
-                    if (snapLieu.exists()) {
-                        idTuile = snapLieu.data().Tuile_ID || "";
-                    }
-                }
             }
         }
     } catch (e) {
@@ -3654,10 +3643,8 @@ window.mettreAJourBulleLieu = async function(idLieu) {
 
     window.LIEU_ACTUEL_NOM = nom;
     window.LIEU_ACTUEL_IMAGE = urlImage;
-    window.TUILE_ACTUELLE = idTuile;
 
     if (typeof window.afficherBulleLieuChat === "function") window.afficherBulleLieuChat();
-    window.placerPionSurHex(idTuile);
 }
 
 // 1. Écoute globale (Personnages + Tour + Historique du Chat)
@@ -3705,40 +3692,13 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              if (typeof window.masquerEcranAttente === "function") window.masquerEcranAttente();
          }
 
-         // =========================================================
-         // NOUVEAU : MULTIJOUEUR - POP-UP DE VOYAGE SYNCHRONISÉ
-         // =========================================================
-         const modaleVoyage = document.getElementById("modale-voyage");
-         if (dataPartie.Proposition_Voyage) {
-             const prop = dataPartie.Proposition_Voyage;
-             document.getElementById("texte-modale-voyage").innerHTML = `Il vous faudra <strong style="color: #ff4c4c; font-size: 24px;">${prop.Jours} jours</strong> pour atteindre votre destination.<br>Êtes-vous prêts à partir ?`;
-             document.getElementById("overlay-jeu-modale").style.display = "block";
-             if (modaleVoyage) modaleVoyage.style.display = "block";
-
-             document.getElementById("btn-confirmer-voyage").onclick = () => {
-                 if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-                 updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), { Proposition_Voyage: deleteField() });
-                 window.executerVoyage(prop.Tuile_ID, prop.Jours);
-             };
-             
-             document.getElementById("btn-annuler-voyage").onclick = () => {
-                 if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-                 updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), { Proposition_Voyage: deleteField() });
-                 
-                 // NOUVEAU : On s'assure que la grille disparaît bien à l'annulation
-                 window.grilleEstVisible = false;
-                 const svg = document.getElementById("grille-hexagonale");
-                 if (svg) {
-                     svg.style.opacity = "0";
-                     svg.style.pointerEvents = "none";
-                 }
-             };
-         } else {
-             if (modaleVoyage && modaleVoyage.style.display === "block") {
-                 fermerModalesJeu();
-             }
+         // LE VOYAGE DU GROUPE (v275, voyage_groupe.js) : la position du pion,
+         // le tracé proposé, le vote, la marche, les nuits. Sous try/catch : le
+         // combat qui suit n'en dépend pas.
+         if (typeof window.appliquerVoyageDeLaPartie === "function") {
+             try { window.appliquerVoyageDeLaPartie(dataPartie); }
+             catch (e) { console.error("Voyage du groupe (le jeu continue) :", e); }
          }
-         // =========================================================
 
          // =========================================================
          // LECTURE DE LA PISTE D'INITIATIVE ET DES PHASES DE COMBAT
@@ -4622,9 +4582,7 @@ async function validerCreationGroupe() {
     document.getElementById("ecran-menu").style.display = "none";
     document.getElementById("ecran-jeu").style.display = "block";
     if (typeof window.rangerMenuALArrivee === "function") window.rangerMenuALArrivee();
-    // NOUVEAU : On trace la grille à la seconde où l'écran s'affiche
-    window.dessinerGrilleHexagonale();
-    // CORRECTION BUG DRAPEAU : On charge immédiatement les données de la partie pour placer le pion !
+    // On charge immédiatement les données de la partie pour placer le pion !
     ecouterPersonnagesDeLaPartie(window.ID_PARTIE_COURANTE);
   } catch (e) {
     console.error(e);
@@ -4715,10 +4673,8 @@ function lancerPartieChargee(idChoisi) {
   document.getElementById("ecran-menu").style.display = "none";
   document.getElementById("ecran-jeu").style.display = "block";
   if (typeof window.rangerMenuALArrivee === "function") window.rangerMenuALArrivee();
-  // NOUVEAU : On trace la grille à la seconde où l'écran s'affiche
-  window.dessinerGrilleHexagonale();
   console.log("⏱️ table de jeu dessinée en " + (Date.now() - depart) + " ms");
-  // CORRECTION BUG DRAPEAU : On charge immédiatement les données de la partie pour placer le pion !
+  // On charge immédiatement les données de la partie pour placer le pion !
   window.DEBUT_ECOUTE_PARTIE = Date.now();
   ecouterPersonnagesDeLaPartie(window.ID_PARTIE_COURANTE);
 }
@@ -4750,9 +4706,6 @@ function fermerModalesJeu() {
   document.getElementById("overlay-jeu-modale").style.display = "none";
   document.getElementById("modale-retour-menu").style.display = "none";
   document.getElementById("modale-quitter-jeu").style.display = "none";
-  // NOUVEAU : Fermer la modale de voyage
-  const modaleVoyage = document.getElementById("modale-voyage");
-  if (modaleVoyage) modaleVoyage.style.display = "none";
 }
 
 function demanderRetourMenu() {
@@ -5819,7 +5772,7 @@ function initialiserCarteInteractive() {
   window.addEventListener("mouseup", finir);
   window.addEventListener("mouseleave", finir);
 
-  // Le clic qui termine un glissé ne vaut pas clic (le fanion, une icône).
+  // Le clic qui termine un glissé ne vaut pas clic (une région, le pion).
   conteneur.addEventListener("click", function(e) {
     if (!carteVientDeGlisser) return;
     carteVientDeGlisser = false;
@@ -5846,9 +5799,6 @@ function initialiserCarteInteractive() {
   }, { passive: false });
   // Safari (iPad) : le pincement de la page elle-même.
   conteneur.addEventListener("gesturestart", function(e) { e.preventDefault(); });
-
-  // Les lieux de la carte sont en base : derrière la porte du joueur (v259).
-  quandJoueur(() => window.dessinerIconesCarte());
 }
 
 // --- CORRECTION DU BUG PLEIN ÉCRAN ---
@@ -5860,72 +5810,6 @@ window.addEventListener("resize", () => {
     setTimeout(() => window.recadrerCarte(true), 200);
   }
 });
-
-// =========================================================================
-//  GÉNÉRATEUR DE GRILLE HEXAGONALE (TUILES)
-// =========================================================================
-window.tailleHexActuelle = 102; // Taille gravée
-
-window.TUILES_EXCLUES = [
-    "hex-0-0", "hex-1-0", "hex-2-0", "hex-3-0", "hex-4-0", "hex-5-0", "hex-6-0", "hex-7-0", "hex-8-0", "hex-9-0", "hex-10-0", "hex-11-0", "hex-12-0", "hex-13-0", "hex-14-0", "hex-15-0", "hex-16-0", "hex-17-0", "hex-18-0", "hex-19-0", "hex-20-0", "hex-21-0", "hex-22-0", "hex-0-1", "hex-1-1", "hex-2-1", "hex-3-1", "hex-4-1", "hex-5-1", "hex-17-1", "hex-18-1", "hex-19-1", "hex-20-1", "hex-21-1", "hex-0-2", "hex-1-2", "hex-2-2", "hex-19-2", "hex-20-2", "hex-21-2", "hex-22-2", "hex-0-3", "hex-1-3", "hex-7-3", "hex-8-3", "hex-9-3", "hex-19-3", "hex-20-3", "hex-21-3", "hex-0-4", "hex-1-4", "hex-7-4", "hex-8-4", "hex-9-4", "hex-20-4", "hex-21-4", "hex-22-4", "hex-0-5", "hex-1-5", "hex-7-5", "hex-8-5", "hex-20-5", "hex-21-5", "hex-0-6", "hex-1-6", "hex-2-6", "hex-7-6", "hex-8-6", "hex-9-6", "hex-21-6", "hex-22-6", "hex-0-7", "hex-1-7", "hex-2-7", "hex-7-7", "hex-8-7", "hex-21-7", "hex-0-8", "hex-1-8", "hex-2-8", "hex-3-8", "hex-8-8", "hex-22-8", "hex-0-9", "hex-1-9", "hex-2-9", "hex-7-9", "hex-9-9", "hex-21-9", "hex-0-10", "hex-1-10", "hex-2-10", "hex-9-10", "hex-21-10", "hex-22-10", "hex-0-11", "hex-1-11", "hex-10-11", "hex-20-11", "hex-21-11", "hex-0-12", "hex-1-12", "hex-3-12", "hex-10-12", "hex-11-12", "hex-19-12", "hex-20-12", "hex-21-12", "hex-22-12", "hex-0-13", "hex-1-13", "hex-2-13", "hex-3-13", "hex-4-13", "hex-6-13", "hex-17-13", "hex-18-13", "hex-19-13", "hex-20-13", "hex-21-13", "hex-0-14", "hex-1-14", "hex-2-14", "hex-3-14", "hex-4-14", "hex-5-14", "hex-6-14", "hex-7-14", "hex-8-14", "hex-9-14", "hex-10-14", "hex-11-14", "hex-12-14", "hex-13-14", "hex-14-14", "hex-15-14", "hex-16-14", "hex-17-14", "hex-18-14", "hex-19-14", "hex-20-14", "hex-21-14", "hex-22-14"
-];
-
-window.dessinerGrilleHexagonale = function() {
-    const svg = document.getElementById("grille-hexagonale");
-    if (!svg) return;
-
-    const width = 3840;
-    const height = 2160;
-
-    svg.innerHTML = "";
-    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-
-    const size = window.tailleHexActuelle;
-    const hexWidth = Math.sqrt(3) * size;
-    const hexHeight = 2 * size;
-    const xOffset = hexWidth;
-    const yOffset = (3/4) * hexHeight;
-
-    const cols = Math.ceil(width / hexWidth) + 1;
-    const rows = Math.ceil(height / yOffset) + 1;
-
-    let htmlPolygons = "";
-
-    for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-            const idHex = `hex-${col}-${row}`;
-
-            if (window.TUILES_EXCLUES.includes(idHex)) {
-                continue;
-            }
-
-            let x = col * xOffset + (row % 2 === 1 ? hexWidth / 2 : 0);
-            let y = row * yOffset;
-
-            let points = "";
-            for (let i = 0; i < 6; i++) {
-                let angle_deg = 60 * i - 30;
-                let angle_rad = Math.PI / 180 * angle_deg;
-                let px = x + size * Math.cos(angle_rad);
-                let py = y + size * Math.sin(angle_rad);
-                points += `${px},${py} `;
-            }
-
-            htmlPolygons += `<polygon id="${idHex}" points="${points.trim()}" class="tuile-hex" style="pointer-events: none;"></polygon>`;
-        }
-    }
-
-    svg.innerHTML = htmlPolygons;
-};
-
-// =========================================================================
-//  PLACEMENT DU PION SUR LA GRILLE
-// =========================================================================
-window.placerPionSurHex = function(idHex) {
-    const pion = document.getElementById("pion-groupe");
-    if (!pion) return;
-    pion.style.display = "none";
-};
 
 // =========================================================================
 //  INITIALISATION (DOMContentLoaded)
@@ -7036,57 +6920,9 @@ window.toggleMicro = function() {
 };
 
 // =========================================================================
-//  INTERRUPTEUR GRILLE TACTIQUE (Lié au Fanion)
+//  LE TEMPS QUI PASSE
 // =========================================================================
-window.grilleEstVisible = false;
-
-window.toggleGrille = function() {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    
-    const svg = document.getElementById("grille-hexagonale");
-    if (!svg) return;
-    
-    window.grilleEstVisible = !window.grilleEstVisible;
-    
-    if (window.grilleEstVisible) {
-        svg.style.opacity = "1";
-    } else {
-        svg.style.opacity = "0";
-    }
-};
-
-// =========================================================================
-//  MOUVEMENT DU PION ET DÉCOUVERTE DU MONDE (BDD + IA + DISTANCE)
-// =========================================================================
-
-// 1. Mathématiques : Convertit la grille pour calculer la distance exacte
-window.calculerDistanceHex = function(hexA, hexB) {
-    if (!hexA || !hexB || hexA === "" || hexB === "") return 0;
-    
-    const parseHex = (id) => {
-        const parts = id.split('-');
-        if (parts.length !== 3) return null;
-        return { col: parseInt(parts[1]), row: parseInt(parts[2]) };
-    };
-    
-    const a = parseHex(hexA);
-    const b = parseHex(hexB);
-    if (!a || !b) return 0;
-    
-    // Algorithme de conversion vers "Cube Coordinates" pour calculer la distance
-    const toCube = (hex) => {
-        let q = hex.col - Math.floor(hex.row / 2);
-        let r = hex.row;
-        return { q: q, r: r, s: -q - r };
-    };
-    
-    const cA = toCube(a);
-    const cB = toCube(b);
-    
-    return Math.max(Math.abs(cA.q - cB.q), Math.abs(cA.r - cB.r), Math.abs(cA.s - cB.s));
-};
-
-// 2. Outil automatisé pour avancer la date d'un coup
+// Outil automatisé pour avancer la date d'un coup
 window.avancerTempsAuto = async function(joursDeVoyage) {
     if (joursDeVoyage <= 0) return;
     
@@ -7121,73 +6957,10 @@ window.avancerTempsAuto = async function(joursDeVoyage) {
 };
 
 // =========================================================================
-//  DESSINATEUR D'ICÔNES DE CARTE & INFOBULLES
+//  L'INFOBULLE DES LIEUX (les villages des cartes régionales)
 // =========================================================================
-window.dessinerIconesCarte = async function() {
-    const conteneur = document.getElementById("conteneur-icones-carte");
-    if (!conteneur) return;
-    conteneur.innerHTML = "";
-
-    const q = query(collection(db, "Monde_Lieux"));
-    const snap = await getDocs(q);
-
-    const size = window.tailleHexActuelle;
-    const hexWidth = Math.sqrt(3) * size;
-    const hexHeight = 2 * size;
-    const xOffset = hexWidth;
-    const yOffset = (3/4) * hexHeight;
-
-    const decalageX_icone = 0;  
-    const decalageY_icone = -100;  
-
-    snap.forEach(doc => {
-        const data = doc.data();
-        if (data.URL_Icone_Carte && data.Tuile_ID) {
-            const parts = data.Tuile_ID.split('-');
-            if (parts.length === 3) {
-                const col = parseInt(parts[1]);
-                const row = parseInt(parts[2]);
-                
-                let x = col * xOffset + (row % 2 === 1 ? hexWidth / 2 : 0);
-                let y = row * yOffset + size; 
-
-                const img = document.createElement("img");
-                img.src = data.URL_Icone_Carte;
-                img.className = "icone-carte-lieu";
-                img.draggable = false; // Empêche l'image de rester "collée" si on drag la carte
-                
-                img.style.left = `${x + decalageX_icone}px`;
-                img.style.top = `${y + decalageY_icone}px`;
-                
-                // --- NOUVEAU : LA GESTION DE LA SOURIS ---
-                
-                // Si on clique sur l'icône, on voyage directement
-                img.onclick = function(e) {
-                    e.stopPropagation(); 
-                    window.masquerTooltipLieu();
-                    window.deplacerPionVers(data.Tuile_ID);
-                };
-
-                // Si on entre sur l'icône
-                img.onmouseenter = function(e) {
-                    window.afficherTooltipLieu(data.Nom_Du_Lieu, data.URL_Cloudinary, e);
-                };
-                
-                // Si on bouge la souris SUR l'icône, la bulle suit le curseur
-                img.onmousemove = function(e) {
-                    window.deplacerTooltipLieu(e);
-                };
-                
-                // Si on quitte l'icône
-                img.onmouseleave = function() {
-                    window.masquerTooltipLieu();
-                };
-
-                conteneur.appendChild(img);
-            }
-        }
-    });
-};
+// (v275) Les anciennes icônes de lieux de la carte du monde ne sont plus
+// dessinées ; leurs fiches restent en base (Monde_Lieux).
 
 // --- FONCTIONS DE L'INFOBULLE ---
 
@@ -7242,99 +7015,6 @@ window.deplacerTooltipLieu = function(evenement) {
 window.masquerTooltipLieu = function() {
     const tooltip = document.getElementById("tooltip-lieu-map");
     if (tooltip) tooltip.style.display = "none";
-};
-
-// 3. Le déclencheur au clic sur la carte (POUSSE VERS FIREBASE)
-window.deplacerPionVers = async function(idHex) {
-    return;
-};
-
-// 4. L'exécution finale (Gestion du temps, IA, BDD)
-window.executerVoyage = async function(idHex, joursDeVoyage) {
-    
-    // A. LE GRAND NETTOYAGE (Pour TOUS les voyages)
-    if (joursDeVoyage > 0 && typeof window.processusArchivageChat === "function") {
-        console.log("🧹 [Voyage] Départ imminent : Archivage et nettoyage du chat...");
-        // On archive les PNJ du lieu qu'on est en train de QUITTER avant même de commencer
-        await window.processusArchivageChat();
-    }
-
-    // B. Avancer le calendrier (S'affiche dans le chat propre)
-    if (joursDeVoyage > 0) {
-        await window.avancerTempsAuto(joursDeVoyage);
-    }
-
-    // C. Vérifier le terrain et invoquer la magie
-    const qLieu = query(collection(db, "Monde_Lieux"), where("Tuile_ID", "==", idHex));
-    const snapLieux = await getDocs(qLieu);
-
-    let idLieuCible = null;
-    let nomDuLieu = "leur destination";
-
-    if (!snapLieux.empty) {
-        idLieuCible = snapLieux.docs[0].id;
-        nomDuLieu = snapLieux.docs[0].data().Nom_Du_Lieu || "ce lieu";
-        console.log("🗺️ Lieu connu détecté :", idLieuCible);
-    } else {
-        console.log("🌫️ Zone vierge ! Invocation de MIA_CARTO...");
-        const ecranCharge = document.getElementById("ecran-chargement-ia");
-        const titreCharge = document.getElementById("titre-chargement-ia");
-        const imageCharge = document.getElementById("image-chargement-ia");
-
-        if (ecranCharge && titreCharge && imageCharge) {
-            titreCharge.innerText = "Voyage en cours ...";
-            imageCharge.dataset.oldSrc = imageCharge.src;
-            imageCharge.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782857488/voyage_yhokpd.png";
-            ecranCharge.style.display = "flex";
-        }
-
-        if (typeof window.creerNouveauLieu === "function") {
-            const resultatCarto = await window.creerNouveauLieu(idHex);
-            if (resultatCarto) {
-                idLieuCible = resultatCarto.id;
-                nomDuLieu = resultatCarto.nom;
-            }
-        }
-
-        if (ecranCharge) ecranCharge.style.display = "none";
-        if (titreCharge) titreCharge.innerText = "Création de personnage en cours ...";
-        if (imageCharge && imageCharge.dataset.oldSrc) imageCharge.src = imageCharge.dataset.oldSrc;
-    }
-
-    // D. Téléporter les joueurs et écrire le message final
-    if (idLieuCible && window.ID_PARTIE_COURANTE) {
-        // Mise à jour de la position dans la base de données
-        await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), {
-            Lieu_Actuel: idLieuCible
-        });
-
-        // Le message d'arrivée silencieux pour le MJ
-        let texteArrivee = joursDeVoyage > 0 
-            ? `*Après ${joursDeVoyage} jour(s) de voyage, le groupe arrive à ${nomDuLieu}.* (Narrateur, décris de manière immersive notre arrivée, l'atmosphère des lieux et ce que l'on voit en premier)`
-            : `*Le groupe observe ${nomDuLieu}.* (Narrateur, décris de manière immersive l'atmosphère de ce lieu et ce que l'on y voit en premier)`;
-
-        const jourEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.jour : "";
-        const anEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.annee : "";
-
-        // Envoi dans la chatbox
-        await addDoc(collection(db, "Messages_Chat"), {
-            ID_Partie: window.ID_PARTIE_COURANTE,
-            Auteur_ID: "DESTIN", 
-            Auteur_Nom: "Destin",
-            Auteur_Couleur: "#c2a878", 
-            Texte: texteArrivee,
-            Date_Jour: jourEnJeu,
-            Date_An: anEnJeu,
-            Timestamp: new Date().getTime()
-        });
-
-        // E. Réveil du Narrateur
-        if (typeof window.declencherTourIA === "function") {
-            setTimeout(() => {
-                window.declencherTourIA();
-            }, 1500); 
-        }
-    }
 };
 
 // =========================================================================
@@ -7506,16 +7186,9 @@ Object.assign(window, {
   supprimerRaceLigne: window.supprimerRaceLigne,
   // Gestion de la Date
   ouvrirGestionDate, fermerGestionDate, modifierJoursAAjouter, validerChangementDate, demarrerDefilementJours, arreterDefilementJours,
-  // Grille Hexagonale & Pion
-  dessinerGrilleHexagonale: window.dessinerGrilleHexagonale,
-  placerPionSurHex: window.placerPionSurHex,
-  toggleGrille: window.toggleGrille,
-  deplacerPionVers: window.deplacerPionVers,
-  calculerDistanceHex: window.calculerDistanceHex,
+  // Le temps qui passe & le terrain de combat
   avancerTempsAuto: window.avancerTempsAuto,
-  executerVoyage: window.executerVoyage,
   ecouterTerrainVTT: window.ecouterTerrainVTT,
-  dessinerIconesCarte: window.dessinerIconesCarte,
 });
 
 // =========================================================================

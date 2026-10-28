@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=106">
+  <link rel="stylesheet" href="style.css?v=107">
 
  
   <!-- ===================================================================== -->
@@ -444,11 +444,6 @@
 
     <div id="conteneur-carte-fond">
       <div id="carte-fond-jeu">
-        <svg id="grille-hexagonale" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 0.5s ease; pointer-events: none;"></svg>
-        
-        <div id="conteneur-icones-carte" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10;"></div>
-
-        <img id="pion-groupe" src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782846500/fanion_2_sm8cnv.png" alt="Position du Groupe" onclick="window.toggleGrille()" title="Afficher/Masquer la grille tactique">
       </div>
     </div>
 
@@ -1266,6 +1261,17 @@
           <div id="regions-dev-selection" class="popup-regions-info">Aucune boîte sélectionnée</div>
           <button type="button" id="btn-regions-supprimer" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.supprimerRegion()" disabled>Supprimer cette boîte</button>
           <div id="regions-dev-total" class="popup-regions-total"></div>
+          <!-- LE GROUPE (v275, voyage_groupe.js) : la taille de son image sur la
+               carte du monde (pour toutes les parties), et le téléport. -->
+          <div id="regions-dev-groupe-monde" class="popup-regions-villages">
+            <div class="popup-regions-sous-titre">Le groupe</div>
+            <label class="popup-regions-curseur">Taille sur la carte du monde
+              <span class="popup-regions-ligne"><input type="range" id="taille-groupe-monde" min="40" max="600" step="5" value="150"
+                     oninput="window.reglerTailleGroupe('monde', this.value)" onchange="window.reglerTailleGroupe('monde', this.value, true)">
+              <span id="taille-groupe-monde-valeur" class="popup-regions-valeur"></span></span></label>
+            <button type="button" id="btn-groupe-teleport-monde" class="popup-regions-bouton" onclick="jouerSonClic(); window.basculerTeleportGroupe()">⤳ Déplacer le groupe (téléport)</button>
+            <div id="groupe-dev-monde-etat" class="popup-regions-total"></div>
+          </div>
           <p class="popup-regions-aide">Boîtes affichées, un clic ne déclenche rien : on édite. Clic maintenu sur une boîte : la déplacer. Carré d'un coin : l'étirer. Clic sur un bord : un nouveau point, à étirer. Double-clic sur un point : le retirer.</p>
           </div>
           <!-- Sur une carte régionale (v272, cartes_regionales.js) : peindre les
@@ -1306,7 +1312,27 @@
               </div>
               <div id="villages-dev-etat" class="popup-regions-total"></div>
             </div>
-            <p class="popup-regions-aide">Pinceau ou gomme en main, le doigt peint (deux doigts zooment toujours). Les zones rouges restent provisoires : « Valider les nuages » les change en nuages, pour toutes les parties. Édition du titre : le glisser pour le déplacer, le carré de son coin haut droit pour sa taille ; décocher l'enregistre.</p>
+            <!-- LES TERRAINS PRATICABLES (v275, terrains_regionaux.js) : les boîtes
+                 régionales, comme celles du monde ; elles bornent la marche. -->
+            <div id="regions-dev-terrains" class="popup-regions-villages">
+              <div class="popup-regions-sous-titre">Terrains praticables</div>
+              <label class="popup-regions-case"><input type="checkbox" id="case-terrains-visibles" onchange="window.basculerEditionTerrains(this.checked)"> Afficher les terrains</label>
+              <button type="button" id="btn-terrain-nouveau" class="popup-regions-bouton" onclick="jouerSonClic(); window.creerTerrainRegion()">+ Nouveau terrain</button>
+              <div id="terrains-dev-selection" class="popup-regions-info">Aucun terrain sélectionné</div>
+              <button type="button" id="btn-terrain-supprimer" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.supprimerTerrainRegion()" disabled>Supprimer ce terrain</button>
+              <div id="terrains-dev-total" class="popup-regions-total"></div>
+            </div>
+            <!-- LE GROUPE (v275) : sa taille sur les cartes régionales, et le téléport. -->
+            <div id="regions-dev-groupe-region" class="popup-regions-villages">
+              <div class="popup-regions-sous-titre">Le groupe</div>
+              <label class="popup-regions-curseur">Taille sur les cartes régionales
+                <span class="popup-regions-ligne"><input type="range" id="taille-groupe-region" min="0.02" max="0.25" step="0.005" value="0.07"
+                       oninput="window.reglerTailleGroupe('region', this.value)" onchange="window.reglerTailleGroupe('region', this.value, true)">
+                <span id="taille-groupe-region-valeur" class="popup-regions-valeur"></span></span></label>
+              <button type="button" id="btn-groupe-teleport-region" class="popup-regions-bouton" onclick="jouerSonClic(); window.basculerTeleportGroupe()">⤳ Déplacer le groupe (téléport)</button>
+              <div id="groupe-dev-region-etat" class="popup-regions-total"></div>
+            </div>
+            <p class="popup-regions-aide">Terrains affichés : clic maintenu sur un terrain pour le déplacer, carré d'un coin pour l'étirer, clic sur un bord pour un nouveau point, double-clic sur un point pour le retirer. Pinceau ou gomme en main, le doigt peint (deux doigts zooment toujours). Les zones rouges restent provisoires : « Valider les nuages » les change en nuages, pour toutes les parties. Édition du titre : le glisser pour le déplacer, le carré de son coin haut droit pour sa taille ; décocher l'enregistre.</p>
           </div>
         </div>
       </div>
@@ -2276,7 +2302,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=179"></script>
+<script src="trace_combat.js?v=180"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2332,19 +2358,23 @@
 <script type="module" src="pont_combat.js?v=46"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=53"></script>
-<script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=123"></script>
+<script type="module" src="ia_master.js?v=8"></script>
+<script type="module" src="app.js?v=124"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=2"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
-<script type="module" src="regions_carte.js?v=3"></script>
+<script type="module" src="regions_carte.js?v=4"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région, ses nuages et son titre. -->
-<script type="module" src="cartes_regionales.js?v=3"></script>
+<script type="module" src="cartes_regionales.js?v=4"></script>
 <!-- Le lore du monde, par région (v273), puis les villages des cartes régionales et MIA_VILLAGE. -->
 <script src="lore_ivalis.js?v=1"></script>
-<script type="module" src="villages_regionaux.js?v=1"></script>
+<script type="module" src="villages_regionaux.js?v=2"></script>
 <!-- Les descriptifs RP des régions (v274) : le mode DEV et sa fenêtre pleine page. -->
 <script type="module" src="descriptifs_regions.js?v=1"></script>
+<!-- Le déplacement des PJ (v275) : les terrains praticables des cartes régionales,
+     puis le groupe, son bouton voyage, les tracés, les votes, la marche et les nuits. -->
+<script type="module" src="terrains_regionaux.js?v=1"></script>
+<script type="module" src="voyage_groupe.js?v=1"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=16"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->
@@ -2467,15 +2497,6 @@
     <div class="groupe-boutons-jeu">
       <button class="btn-modale-jeu" onclick="jouerSonClic(); confirmerQuitterJeu()">Oui</button>
       <button class="btn-modale-jeu" onclick="jouerSonClic(); fermerModalesJeu()">Non</button>
-    </div>
-  </div>
-
-  <div id="modale-voyage" class="modale-parchemin-jeu">
-    <h2>Long Périple</h2>
-    <p id="texte-modale-voyage" style="font-size: 20px; margin-bottom: 25px; line-height: 1.4;"></p>
-    <div class="groupe-boutons-jeu">
-      <button class="btn-modale-jeu" id="btn-confirmer-voyage">Oui, partir</button>
-      <button class="btn-modale-jeu" id="btn-annuler-voyage">Annuler</button>
     </div>
   </div>
 
