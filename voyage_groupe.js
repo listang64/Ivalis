@@ -59,9 +59,10 @@ const LARGEUR_MONDE = 3840, HAUTEUR_MONDE = 2160;
 const TAILLE_MONDE_DEFAUT = 150;       // pixels de la carte du monde
 const TAILLE_REGION_DEFAUT = 0.07;     // part de la hauteur de la carte régionale
 const BORNES_MONDE = [40, 600], BORNES_REGION = [0.02, 0.25];
-// Une journée de marche : 30 % de la hauteur d'une carte régionale (Nico,
-// v276 : « réduis les distances avant chaque nuit, de 45 % mets plutôt 30 % »).
-const DISTANCE_JOUR = 0.30;
+// Une journée de marche : 20 % de la hauteur d'une carte régionale (Nico,
+// v276 : « de 45 % mets plutôt 30 % » ; v281 : « pour le temps de marche
+// avant la nuit, passe à 20 % »).
+const DISTANCE_JOUR = 0.20;
 window.DISTANCE_JOUR_VOYAGE = DISTANCE_JOUR;
 const TOLERANCE_JOUR = 0.1;            // un trajet de 1,05 jour se fait en un jour
 const MARCHE_JOUR_MS = 5200;           // le temps d'écran d'une journée de marche
@@ -110,7 +111,12 @@ let rafAnim = null;
 const vus = new Set();         // les voyages déjà montrés (on n'amène qu'une fois sur la carte)
 const etapesVues = new Set();  // « JOUR k » déjà annoncé
 const annulationsVues = new Set();
-const reglages = { tailleMonde: TAILLE_MONDE_DEFAUT, tailleRegion: TAILLE_REGION_DEFAUT, chancePoi: 0.5 };
+// decalageMonde, decalageRegion (v281) : où tombe l'image du groupe par
+// rapport à sa place exacte, en parts de sa largeur (0, 0 : centrée dessus).
+const reglages = { tailleMonde: TAILLE_MONDE_DEFAUT, tailleRegion: TAILLE_REGION_DEFAUT, chancePoi: 0.5,
+                   decalageMonde: { x: 0, y: 0 }, decalageRegion: { x: 0, y: 0 } };
+const BORNES_DECALAGE = [-1.5, 1.5];
+let reglagePion = false;       // DEV : la croix rouge et l'image qu'on glisse
 
 // --- LA POSITION DU GROUPE -------------------------------------------------
 // Ce que dit la base ; à défaut, le village où se trouve le groupe (un
@@ -282,10 +288,13 @@ function champsVoyage(champs) {
 //
 //  LES ÉTATS : marche → poi (le vote : tous oui pour y aller, un non et l'on
 //  passe son chemin) → detour (le chemin vers le POI ; le lieu se crée,
-//  poi_creation.js) → halte (le lieu ; le chat s'ouvre, le MJ parle ;
-//  « Reprendre la route » ou « Rester ici », tous d'accord) → retour (le
-//  même chemin, à l'envers) → marche (la fin de la journée : le détour compte
-//  dans la journée — s'il l'a mangée, la nuit tombe au retour sur la route).
+//  poi_creation.js) → ARRIVÉS (v281, Nico : « une fois arrivés, ils y sont :
+//  pas besoin de demander s'ils veulent rester une fois le RP lancé ») : le
+//  voyage s'achève au lieu (Voyage_Termine.Poi) ; le chat s'ouvre, le MJ
+//  parle ; pour repartir, un nouveau voyage. Tant que le lieu se révèle :
+//  halte, sans question. Un lieu qui n'a pas pu naître : halte, « Reprendre la
+//  route » (retour : le même chemin, à l'envers, puis la fin de la journée — le
+//  détour compte dans la journée) ou « Rester ici », tous d'accord.
 // =========================================================================
 const CHANCE_POI_DEFAUT = 0.5;
 const RAYON_POI = [0.10, 0.20];       // en hauteurs de carte, autour du groupe
@@ -296,6 +305,20 @@ function arretDetour(v) {
     return L > 0 ? borne(1 - (0.6 * taillePoi()) / L, 0.3, 0.95) : 0.8;
 }
 const DUREE_DETOUR_MS = [2600, 6000];
+// La place de la halte : le bord du lieu, au bout du détour.
+function placeHalte(v) {
+    const n = Number(v.Arrivee && v.Arrivee.Region);
+    return v.Poi && v.Poi.Detour ? pointA(v.Poi.Detour, aspectRegion(n), arretDetour(v)) : { x: v.Poi.x, y: v.Poi.y };
+}
+// ARRIVÉS AU LIEU (v281) : le voyage s'achève là. Chacun ouvre le chat ; le
+// poste qui a créé le lieu réveille le MJ (Voyage_Termine.Poi, arriverAuPoi).
+function arriveeAuLieu(v, place) {
+    const n = Number(v.Arrivee && v.Arrivee.Region);
+    return { Voyage_Groupe: deleteField(),
+             Voyage_Termine: { Id: v.Id, Le: Date.now(), Poi: { Id: v.Poi.Id, Lieu: v.Poi.Lieu, Nom: v.Poi.Nom || "", Type: v.Poi.Type || "" } },
+             Position_Groupe: { Region: n, x: arrondi(place.x), y: arrondi(place.y) },
+             Lieu_Actuel: v.Poi.Lieu, Situation: situationDe(v.Poi.Lieu) };
+}
 const MESSAGES_ATTENTE_POI = [
     "Vous approchez prudemment, les sens aux aguets…",
     "Les contours du lieu se précisent peu à peu devant vous…",
@@ -322,12 +345,14 @@ window.sousLesNuagesVoyage = sousLesNuages;
 // nuages, loin des lieux posés.
 function placePoiValable(n, x, y) {
     const asp = aspectRegion(n), t = taillePoi();
+    // Un lieu d'avant v281 ne montre que le centre de son carré (la moitié).
+    const cote = (v) => (Number(v.taille) || t) / (v.plein === false ? 2 : 1);
     const mx = t / (2 * asp) + 0.01, my = t / 2 + 0.01;
     if (x < mx || x > 1 - mx || y < my || y > 1 - my) return false;
     if (typeof window.terrainsDefinisRegion === "function" && window.terrainsDefinisRegion(n) && !window.pointSurTerrainRegion(n, x, y)) return false;
     if (sousLesNuages(n, x, y)) return false;
     return !Object.values(window.VILLAGES_REGIONAUX || {}).some(v => v.numero === n
-        && Math.hypot((v.x - x) * asp, v.y - y) < (t + (Number(v.taille) || t)) / 2 + t);
+        && Math.hypot((v.x - x) * asp, v.y - y) < (t + cote(v)) / 2 + t);
 }
 window.placePoiValable = placePoiValable;
 function planifierPoi(v, k) {
@@ -573,11 +598,13 @@ async function terminerEtape(id, cle) {
                      resultat: { arrivee: true, region: n } };
         }
         const n = Number(v.Arrivee.Region);
-        // Le détour s'achève : la halte au POI (le lieu, s'il est déjà né).
+        // Le détour s'achève au bord du lieu. Le lieu est né : on y est, le
+        // voyage s'achève (v281). Sinon la halte, le temps qu'il se révèle.
         if (v.Etat === "detour") {
-            const maj = { ...champsVoyage({ Etat: "halte", Choix_Halte: {} }), Position_Groupe: { Region: n, x: v.Poi.x, y: v.Poi.y } };
-            if (v.Poi.Lieu) Object.assign(maj, { Lieu_Actuel: v.Poi.Lieu, Situation: situationDe(v.Poi.Lieu), "Voyage_Groupe.Poi.Arrive": true });
-            return { maj, resultat: { halte: true, arrive: !!v.Poi.Lieu } };
+            const bord = placeHalte(v);
+            if (v.Poi.Lieu) return { maj: arriveeAuLieu(v, bord), resultat: { arriveLieu: true } };
+            return { maj: { ...champsVoyage({ Etat: "halte", Choix_Halte: {} }), Position_Groupe: { Region: n, x: arrondi(bord.x), y: arrondi(bord.y) } },
+                     resultat: { halte: true } };
         }
         // Le retour sur la route : la journée reprend (ou la nuit tombe).
         if (v.Etat === "retour") {
@@ -698,9 +725,9 @@ async function lancerCreationPoi(id, poi) {
         await transaction((data) => {
             const v = data.Voyage_Groupe;
             if (!memeVoyage(v, id) || !v.Poi || v.Poi.Id !== poi.Id) return null;
-            const maj = { "Voyage_Groupe.Poi.Lieu": lieu.id, "Voyage_Groupe.Poi.Nom": lieu.nom, "Voyage_Groupe.Poi.Type": lieu.type };
-            if (v.Etat === "halte") Object.assign(maj, { Lieu_Actuel: lieu.id, Situation: situationDe(lieu.id), "Voyage_Groupe.Poi.Arrive": true });
-            return { maj };
+            // Le groupe attendait au bord : il y est (v281), le voyage s'achève.
+            if (v.Etat === "halte") return { maj: arriveeAuLieu({ ...v, Poi: { ...v.Poi, Lieu: lieu.id, Nom: lieu.nom, Type: lieu.type } }, placeHalte(v)) };
+            return { maj: { "Voyage_Groupe.Poi.Lieu": lieu.id, "Voyage_Groupe.Poi.Nom": lieu.nom, "Voyage_Groupe.Poi.Type": lieu.type } };
         });
     } catch (e) {
         console.error("[MIA_POI] Le lieu n'a pas pu naître :", e);
@@ -728,10 +755,10 @@ async function reclamerCreationPoi(v) {
 }
 // L'arrivée au POI (chez tous) : le chat s'ouvre ; le poste qui a créé le lieu
 // pose l'arrivée et réveille le MJ (Nico : « ça ouvre la chatbox et le MJ
-// commence à parler en lui donnant les données du lieu »).
-async function arriverAuPoi(v) {
-    const poi = v.Poi;
-    if (!poi || !poi.Arrive || arriveesVues.has(poi.Id)) return;
+// commence à parler en lui donnant les données du lieu »). `poi` : celui du
+// voyage qui vient de s'achever sur lui (Voyage_Termine.Poi, v281).
+async function arriverAuPoi(poi) {
+    if (!poi || !poi.Id || arriveesVues.has(poi.Id)) return;
     arriveesVues.add(poi.Id);
     const chat = $("fenetre-chatbox");
     if (ecranJeuVisible() && typeof window.ouvrirChatbox === "function" && !(chat && chat.style.display === "flex")) {
@@ -948,7 +975,10 @@ function placerPions() {
             pm.style.width = reglages.tailleMonde + "px";
             pm.style.left = ici.x + "px";
             pm.style.top = ici.y + "px";
+            pm.style.marginLeft = (reglages.decalageMonde.x * reglages.tailleMonde) + "px";
+            pm.style.marginTop = (reglages.decalageMonde.y * reglages.tailleMonde) + "px";
         }
+        placerCroix("monde", ici, reglages.tailleMonde);
         pm.classList.toggle("en-marche", !!(voyage && voyage.Type === "monde" && voyage.Etat === "marche"));
     }
     // La carte régionale ouverte : le marqueur, s'il est dans cette région.
@@ -971,7 +1001,10 @@ function placerPions() {
             pion.style.width = cote + "px";
             pion.style.left = (ici.x * c.largeur) + "px";
             pion.style.top = (ici.y * c.hauteur) + "px";
+            pion.style.marginLeft = (reglages.decalageRegion.x * cote) + "px";
+            pion.style.marginTop = (reglages.decalageRegion.y * cote) + "px";
         }
+        placerCroix("region", ici && { x: ici.x * c.largeur, y: ici.y * c.hauteur }, reglages.tailleRegion * ((c && c.hauteur) || 0));
         const campe = !!(voyage && voyage.Etat === "nuit");
         pion.classList.toggle("campement", campe);
         pion.classList.toggle("en-marche", !!(voyage && voyage.Type === "region" && ["marche", "detour", "retour"].includes(voyage.Etat)));
@@ -980,8 +1013,89 @@ function placerPions() {
     placerPoi();
 }
 
+// LE RÉGLAGE DE L'IMAGE DU GROUPE (v281, DEV). Nico : « un outil pour
+// modifier la taille et la position de l'image du groupe sur la map, pour
+// qu'elle pointe exactement à l'endroit où il se trouve. Bouton d'édition
+// activé : une croix rouge précisément là où est le groupe. » La croix marque
+// la place exacte ; on glisse l'image (ou les curseurs) jusqu'à ce que sa
+// pointe tombe dessus. Le décalage vaut pour toutes les parties
+// (Carte_Monde/Groupe), en parts de la largeur de l'image : il suit sa taille.
+function placerCroix(vue, ici, largeurPion) {
+    const parent = vue === "monde" ? $("carte-fond-jeu") : $("carte-region");
+    const pion = vue === "monde" ? $("pion-groupe-monde") : $("pion-groupe-region");
+    if (!parent) return;
+    const id = vue === "monde" ? "croix-groupe-monde" : "croix-groupe-region";
+    let croix = $(id);
+    const visible = !!(reglagePion && estDev() && ici);
+    if (!croix) {
+        if (!visible) return;
+        croix = document.createElementNS(SVG_NS, "svg");
+        croix.id = id;
+        croix.setAttribute("class", "croix-groupe croix-groupe-" + vue);
+        croix.setAttribute("viewBox", "-10 -10 20 20");
+        croix.innerHTML = `<path d="M-8 -8 L8 8 M-8 8 L8 -8" class="croix-groupe-fond"/><path d="M-8 -8 L8 8 M-8 8 L8 -8" class="croix-groupe-trait"/>`;
+        parent.appendChild(croix);
+    }
+    croix.style.display = visible ? "block" : "none";
+    if (pion) {
+        pion.classList.toggle("reglable", visible);
+        brancherGlisserPion(pion, vue);
+    }
+    if (!visible) return;
+    croix.style.left = ici.x + "px";
+    croix.style.top = ici.y + "px";
+    // Sur le monde, la croix suit la taille de l'image (la carte du monde n'a
+    // pas de variable de zoom) ; sur la région, une taille d'écran fixe (CSS).
+    if (vue === "monde") { croix.style.width = croix.style.height = Math.max(14, largeurPion * 0.22) + "px"; }
+}
+let glissePion = null;
+function brancherGlisserPion(img, vue) {
+    if (img.__glissePion) return;
+    img.__glissePion = true;
+    img.addEventListener("pointerdown", (e) => {
+        if (!reglagePion || !estDev()) return;
+        e.stopPropagation(); e.preventDefault();
+        const c = cadrageRegion();
+        const zoom = vue === "monde" ? ((typeof window.cadrageCarteMonde === "function" && window.cadrageCarteMonde().zoom) || 1) : ((c && c.zoom) || 1);
+        const largeur = vue === "monde" ? reglages.tailleMonde : reglages.tailleRegion * ((c && c.hauteur) || 1);
+        const d = vue === "monde" ? reglages.decalageMonde : reglages.decalageRegion;
+        glissePion = { vue, x: e.clientX, y: e.clientY, zoom, largeur, depart: { ...d } };
+        try { img.setPointerCapture(e.pointerId); } catch (er) { /* vieux navigateur */ }
+    });
+    img.addEventListener("pointermove", (e) => {
+        if (!glissePion || glissePion.vue !== vue) return;
+        e.stopPropagation();
+        const g = glissePion;
+        window.reglerDecalageGroupe(vue, "x", g.depart.x + (e.clientX - g.x) / g.zoom / g.largeur);
+        window.reglerDecalageGroupe(vue, "y", g.depart.y + (e.clientY - g.y) / g.zoom / g.largeur);
+    });
+    const finir = () => { if (!glissePion || glissePion.vue !== vue) return; glissePion = null; ecrireReglages(true); };
+    img.addEventListener("pointerup", finir);
+    img.addEventListener("pointercancel", finir);
+}
+window.basculerReglagePionGroupe = function(actif) {
+    if (!estDev()) return false;
+    reglagePion = actif === undefined ? !reglagePion : !!actif;
+    placerPions();
+    actualiserDev();
+    return reglagePion;
+};
+window.reglagePionGroupeActif = () => reglagePion;
+window.reglerDecalageGroupe = function(vue, axe, valeur, enregistrer) {
+    if (!estDev()) return null;
+    const d = vue === "monde" ? reglages.decalageMonde : reglages.decalageRegion;
+    const k = axe === "y" ? "y" : "x";
+    d[k] = arrondi(borne(Number(valeur) || 0, ...BORNES_DECALAGE), 1000);
+    placerPions();
+    actualiserDev();
+    ecrireReglages(!!enregistrer);
+    return d[k];
+};
+
 // LE POINT D'EXCLAMATION DORÉ (v277) : là où le groupe a aperçu quelque
-// chose — jusqu'à ce que le lieu soit dessiné sur la carte.
+// chose — jusqu'à ce que le lieu soit dessiné sur la carte. v281 (Nico : « je
+// veux juste le ! en doré, et une petite animation qui sursaute légèrement sur
+// place ») : plus de pastille ni de halo, le signe seul.
 function placerPoi() {
     const carte = $("carte-region");
     if (!carte) return;
@@ -990,7 +1104,7 @@ function placerPoi() {
         el = document.createElement("div");
         el.id = "poi-voyage";
         el.className = "poi-voyage";
-        el.innerHTML = `<span class="poi-voyage-halo"></span><span class="poi-voyage-signe">!</span>`;
+        el.innerHTML = `<span class="poi-voyage-signe">!</span>`;
         carte.insertBefore(el, $("pion-groupe-region") || null);
     }
     const c = cadrageRegion(), n = carteOuverte();
@@ -1000,7 +1114,7 @@ function placerPoi() {
     el.style.display = visible ? "flex" : "none";
     if (!visible) return;
     const cote = 0.05 * c.hauteur;
-    Object.assign(el.style, { left: (poi.x * c.largeur) + "px", top: (poi.y * c.hauteur) + "px", width: cote + "px", height: cote + "px", fontSize: (cote * 0.72) + "px" });
+    Object.assign(el.style, { left: (poi.x * c.largeur) + "px", top: (poi.y * c.hauteur) + "px", width: cote + "px", height: cote + "px", fontSize: (cote * 0.95) + "px" });
     el.classList.toggle("en-vue", voyage.Etat === "poi");
 }
 
@@ -1352,11 +1466,22 @@ function boite() {
             if (a === "poi-oui" || a === "poi-non") window.voterPoiGroupe(a === "poi-oui" ? "oui" : "non");
             if (a === "halte-reprendre" || a === "halte-rester") window.choisirHalteGroupe(a === "halte-rester" ? "rester" : "reprendre");
             if (a === "forcer-halte-rester") window.choisirHalteGroupe("rester", { forcer: true });
+            if (a === "feu-de-camp") window.discuterAutourDuFeu();
         });
         ($("ecran-jeu") || document.body).appendChild(el);
     }
     return el;
 }
+// « Discuter autour du feu de camp » (v281) : le chat s'ouvre — le vote de la
+// nuit attend, la boîte reste là.
+window.discuterAutourDuFeu = function() {
+    clic();
+    const chat = $("fenetre-chatbox");
+    if (chat && chat.style.display === "flex") return true;
+    if (typeof window.ouvrirChatbox !== "function") return false;
+    try { window.ouvrirChatbox(); } catch (e) { console.error("Chat (le voyage continue) :", e); return false; }
+    return true;
+};
 function destinationTexte(v) {
     if (v.Type === "monde") return nomRegion(v.Arrivee.Region);
     return v.Arrivee.Nom || "un point de la carte";
@@ -1390,19 +1515,20 @@ function actualiserBoite() {
         const k = Number(voyage.Jour) || 1;
         const lignes = votants.map(x => {
             const r = (voyage.Choix_Nuit || {})[x.id];
-            return `<li class="${r ? "oui" : "attente"}"><span>${echapper(x.nom)}</span><b>${r === "repartir" ? "Repartir" : r === "rester" ? "Rester" : "…"}</b></li>`;
+            return `<li class="${r ? "oui" : "attente"}"><span>${echapper(x.nom)}</span><b>${r === "repartir" ? "À l'aube" : r === "rester" ? "Rester" : "…"}</b></li>`;
         }).join("");
         const mien = (voyage.Choix_Nuit || {})[moi];
         const choixFaits = votants.map(x => (voyage.Choix_Nuit || {})[x.id]).filter(Boolean);
         const desaccord = choixFaits.length === votants.length && new Set(choixFaits).size > 1;
         html = `<div class="boite-voyage-tete">🔥 Nuit ${k} au campement</div>
-                <div class="boite-voyage-texte">En route vers <b>${vers}</b> — jour ${k} sur ${voyage.Jours}. Demain, on repart ou on reste ici ?</div>
+                <div class="boite-voyage-texte">En route vers <b>${vers}</b> — jour ${k} sur ${voyage.Jours}. Repartir à l'aube, ou rester ici ? D'ici là, la soirée est à vous.</div>
                 <ul class="boite-voyage-votants">${lignes}</ul>
                 ${jeVote ? `<div class="boite-voyage-boutons">
-                    <button type="button" data-action="repartir"${mien === "repartir" ? " class=\"choisi\"" : ""}>Repartir</button>
+                    <button type="button" data-action="repartir"${mien === "repartir" ? " class=\"choisi\"" : ""}>Repartir à l'aube</button>
                     <button type="button" data-action="rester" class="secondaire${mien === "rester" ? " choisi" : ""}">Rester ici</button></div>` : ""}
+                <button type="button" data-action="feu-de-camp" class="boite-voyage-feu">🔥 Discuter autour du feu de camp</button>
                 <div class="boite-voyage-etat">${desaccord ? "Pas d'accord : rien ne bouge tant que tous ne choisissent pas la même chose." : "Rien ne se passe tant que tous ne sont pas d'accord."}</div>
-                ${dev ? `<div class="boite-voyage-boutons"><button type="button" data-action="forcer" class="boite-voyage-dev">Forcer : repartir</button>
+                ${dev ? `<div class="boite-voyage-boutons"><button type="button" data-action="forcer" class="boite-voyage-dev">Forcer : repartir à l'aube</button>
                     <button type="button" data-action="forcer-rester" class="boite-voyage-dev">Forcer : rester</button></div>` : ""}`;
     } else {
         const k = Number(voyage.Jour) || 1;
@@ -1428,18 +1554,19 @@ function actualiserBoite() {
                 const r = choixH[x.id];
                 return `<li class="${r ? "oui" : "attente"}"><span>${echapper(x.nom)}</span><b>${r === "reprendre" ? "Reprendre" : r === "rester" ? "Rester" : "…"}</b></li>`;
             }).join("");
-            const titreHalte = poi.Arrive ? echapper(poi.Nom || "Halte") : poi.Echec ? "Rien de net…" : "Vous approchez…";
+            // Le lieu se révèle : on attend, sans question (v281 : arrivés, ils
+            // y sont). La question ne vient que s'il n'a pas pu naître.
             const mien = choixH[moi];
-            html = `<div class="boite-voyage-tete">📍 ${titreHalte}</div>
-                <div class="boite-voyage-texte">${poi.Arrive ? `Une halte sur la route de <b>${vers}</b>. Quand vous le voudrez, reprenez la route — ou restez ici.`
-                    : poi.Echec ? `Le lieu ne s'est pas révélé (${echapper(poi.Echec)}).` : "Le lieu se révèle peu à peu…"}</div>
+            html = poi.Echec ? `<div class="boite-voyage-tete">📍 Rien de net…</div>
+                <div class="boite-voyage-texte">Le lieu ne s'est pas révélé (${echapper(poi.Echec)}). Reprendre la route de <b>${vers}</b>, ou rester ici ?</div>
                 <ul class="boite-voyage-votants">${lignes}</ul>
                 ${jeVote ? `<div class="boite-voyage-boutons">
                     <button type="button" data-action="halte-reprendre"${mien === "reprendre" ? " class=\"choisi\"" : ""}>Reprendre la route</button>
                     <button type="button" data-action="halte-rester" class="secondaire${mien === "rester" ? " choisi" : ""}">Rester ici</button></div>` : ""}
                 <div class="boite-voyage-etat">Rien ne bouge tant que tous ne sont pas d'accord.</div>
                 ${dev ? `<div class="boite-voyage-boutons"><button type="button" data-action="forcer" class="boite-voyage-dev">Forcer : reprendre</button>
-                    <button type="button" data-action="forcer-halte-rester" class="boite-voyage-dev">Forcer : rester</button></div>` : ""}`;
+                    <button type="button" data-action="forcer-halte-rester" class="boite-voyage-dev">Forcer : rester</button></div>` : ""}`
+                : `<div class="boite-voyage-tete compacte">📍 Vous approchez… le lieu se révèle peu à peu.</div>`;
         } else if (voyage.Etat === "retour") {
             html = `<div class="boite-voyage-tete compacte">🧭 Retour sur la route de <b>${vers}</b></div>`;
         } else {
@@ -1616,7 +1743,9 @@ window.appliquerVoyageDeLaPartie = function(data) {
     // Le POI (v277) : un lieu à créer (ce poste a-t-il les clés ?), l'arrivée.
     // Rejoué à chaque lecture : chaque appel ne fait son travail qu'une fois.
     if (v && v.Poi && ["detour", "halte"].includes(v.Etat)) reclamerCreationPoi(v);
-    if (v && v.Etat === "halte" && v.Poi && v.Poi.Arrive) arriverAuPoi(v);
+    // Arrivés au lieu (v281) : le voyage vient de s'achever sur lui.
+    const fin = partie.Voyage_Termine;
+    if (fin && fin.Poi && fin.Poi.Id && Date.now() - (Number(fin.Le) || 0) < 120000) arriverAuPoi(fin.Poi);
     const cle = JSON.stringify([partie.Position_Groupe || null, partie.Lieu_Actuel || "", v, partie.Voyage_Annule || null]);
     if (cle === derniereCle) return;
     derniereCle = cle;
@@ -1654,6 +1783,11 @@ window.appliquerReglagesGroupeDeLaBase = function(data) {
     if (Number(d.Taille_Monde) > 0) reglages.tailleMonde = borne(Number(d.Taille_Monde), ...BORNES_MONDE);
     if (Number(d.Taille_Region) > 0) reglages.tailleRegion = borne(Number(d.Taille_Region), ...BORNES_REGION);
     if (d.Chance_POI !== undefined && Number.isFinite(Number(d.Chance_POI))) reglages.chancePoi = borne(Number(d.Chance_POI), 0, 1);
+    // Pendant qu'on glisse l'image, ce poste a la main sur le décalage.
+    const lireDecalage = (src, dst) => { if (!src || glissePion) return;
+        ["x", "y"].forEach(k => { if (Number.isFinite(Number(src[k]))) dst[k] = borne(Number(src[k]), ...BORNES_DECALAGE); }); };
+    lireDecalage(d.Decalage_Monde, reglages.decalageMonde);
+    lireDecalage(d.Decalage_Region, reglages.decalageRegion);
     placerPions();
     actualiserDev();
 };
@@ -1665,13 +1799,19 @@ window.reglerTailleGroupe = function(vue, valeur, enregistrer) {
     else reglages.tailleRegion = borne(Number(valeur) || TAILLE_REGION_DEFAUT, ...BORNES_REGION);
     placerPions();
     actualiserDev();
-    clearTimeout(minuteurReglages);
-    const ecrire = () => setDoc(refReglages(), { Taille_Monde: reglages.tailleMonde, Taille_Region: arrondi(reglages.tailleRegion),
-                                                 Chance_POI: arrondi(reglages.chancePoi, 100) }, { merge: true })
-        .catch(e => console.error("Réglages du groupe :", e));
-    if (enregistrer) ecrire(); else minuteurReglages = setTimeout(ecrire, 500);
+    ecrireReglages(!!enregistrer);
     return vue === "monde" ? reglages.tailleMonde : vue === "poi" ? reglages.chancePoi : reglages.tailleRegion;
 };
+// Tout de suite, ou une demi-seconde après le dernier geste.
+function ecrireReglages(maintenant) {
+    clearTimeout(minuteurReglages);
+    const ecrire = () => setDoc(refReglages(), {
+        Taille_Monde: reglages.tailleMonde, Taille_Region: arrondi(reglages.tailleRegion), Chance_POI: arrondi(reglages.chancePoi, 100),
+        Decalage_Monde: { x: arrondi(reglages.decalageMonde.x, 1000), y: arrondi(reglages.decalageMonde.y, 1000) },
+        Decalage_Region: { x: arrondi(reglages.decalageRegion.x, 1000), y: arrondi(reglages.decalageRegion.y, 1000) }
+    }, { merge: true }).catch(e => console.error("Réglages du groupe :", e));
+    if (maintenant) ecrire(); else minuteurReglages = setTimeout(ecrire, 500);
+}
 function actualiserDev() {
     const tm = $("taille-groupe-monde"), tr = $("taille-groupe-region"), cp = $("chance-poi");
     if (tm && document.activeElement !== tm) tm.value = String(reglages.tailleMonde);
@@ -1682,6 +1822,18 @@ function actualiserDev() {
     const vm = $("taille-groupe-monde-valeur"), vr = $("taille-groupe-region-valeur");
     if (vm) vm.textContent = `${Math.round(reglages.tailleMonde)} px`;
     if (vr) vr.textContent = `${Math.round(reglages.tailleRegion * 1000) / 10} %`;
+    // Le réglage de l'image (v281) : le bouton, les curseurs du décalage.
+    ["monde", "region"].forEach(vue => {
+        const b = $("btn-reglage-pion-" + vue), bloc = $("reglage-pion-" + vue);
+        if (b) { b.classList.toggle("actif", reglagePion); b.textContent = reglagePion ? "✓ Terminer le réglage de l'image" : "✛ Régler l'image du groupe"; }
+        if (bloc) bloc.style.display = reglagePion ? "block" : "none";
+        const d = vue === "monde" ? reglages.decalageMonde : reglages.decalageRegion;
+        ["x", "y"].forEach(k => {
+            const curseur = $(`decalage-pion-${vue}-${k}`), valeur = $(`decalage-pion-${vue}-${k}-valeur`);
+            if (curseur && document.activeElement !== curseur) curseur.value = String(d[k]);
+            if (valeur) valeur.textContent = `${d[k] > 0 ? "+" : ""}${Math.round(d[k] * 100)} %`;
+        });
+    });
     const tele = choix && choix.type === "teleport";
     ["btn-groupe-teleport-monde", "btn-groupe-teleport-region"].forEach(id => {
         const b = $(id);

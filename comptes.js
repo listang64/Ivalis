@@ -152,6 +152,8 @@ async function demarrer() {
         const emu = window.__EMULATEURS_IVALIS;
         if (emu && emu.auth) fa.connectAuthEmulator(auth, emu.auth, { disableWarnings: true });
         sdk = { auth, fa, fs };
+        // La connexion automatique (v281) : avant de lire la session.
+        await appliquerConnexionAuto();
     } catch (e) {
         console.error("Comptes : connexion impossible", e);
         passerA("indisponible");
@@ -594,9 +596,42 @@ window.basculerMenuCompte = function (ouvrir) {
     const ouvert = ouvrir === undefined ? menu.style.display === "none" : !!ouvrir;
     menu.style.display = ouvert ? "flex" : "none";
     if (bouton) bouton.setAttribute("aria-expanded", ouvert ? "true" : "false");
+    if (ouvert) synchroniserCaseConnexionAuto();
     return ouvert;
 };
 window.fermerMenuCompte = function () { window.basculerMenuCompte(false); };
+
+// LA CONNEXION AUTOMATIQUE (v281). Nico : « dans le menu compte, une case à
+// cocher : connexion automatique ». Cochée (par défaut), la session reste sur
+// l'appareil d'un lancement à l'autre : on entre sans retaper son e-mail et son
+// mot de passe. Décochée, elle ne dure que le temps de l'application ouverte :
+// au prochain lancement, on se reconnecte. Le choix est celui de cet appareil
+// (localStorage) ; Firebase déplace la session en cours d'un stockage à
+// l'autre. Le mot de passe n'est jamais gardé par le jeu.
+const CLE_CONNEXION_AUTO = "ivalis_CONNEXION_AUTO";
+const connexionAuto = () => { try { return localStorage.getItem(CLE_CONNEXION_AUTO) !== "off"; } catch (e) { return true; } };
+window.connexionAutomatique = connexionAuto;
+async function appliquerConnexionAuto() {
+    if (!sdk || typeof sdk.fa.setPersistence !== "function") return false;
+    const { fa, auth } = sdk;
+    const choix = connexionAuto()
+        ? [fa.indexedDBLocalPersistence, fa.browserLocalPersistence]
+        : [fa.browserSessionPersistence, fa.inMemoryPersistence];
+    for (const p of choix.filter(Boolean)) {
+        try { await fa.setPersistence(auth, p); return true; }
+        catch (e) { /* ce stockage manque à l'appareil : le suivant */ }
+    }
+    return false;
+}
+window.basculerConnexionAuto = async function (coche) {
+    try { localStorage.setItem(CLE_CONNEXION_AUTO, coche ? "on" : "off"); } catch (e) { /* stockage fermé */ }
+    synchroniserCaseConnexionAuto();
+    return appliquerConnexionAuto();
+};
+function synchroniserCaseConnexionAuto() {
+    const caseAuto = document.getElementById("case-connexion-auto");
+    if (caseAuto) caseAuto.checked = connexionAuto();
+}
 if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
     document.addEventListener("click", (ev) => {
         const barre = document.getElementById("barre-compte");

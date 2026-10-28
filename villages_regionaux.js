@@ -43,12 +43,19 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 const COLLECTION_LIEUX = "Monde_Lieux";
-const TAILLE_DEFAUT = 0.08;          // le côté d'une pastille, en part de la hauteur de la carte
-const TAILLE_MIN = 0.03, TAILLE_MAX = 0.3;
+// v281 (Nico : « réduis par deux la taille des carrés des villages et POI…
+// et le dessin dans le carré doit prendre plus de place, pour ne pas perdre
+// en taille ») : 4 % au lieu de 8 %, et le dessin occupe le carré presque
+// entier (MASQUE_DESSIN) au lieu de son centre.
+const TAILLE_DEFAUT = 0.04;          // le côté d'une pastille, en part de la hauteur de la carte
+const TAILLE_MIN = 0.02, TAILLE_MAX = 0.3;
+const MASQUE_DESSIN = 0.86;          // jusqu'où le modèle peint (distance « carrée arrondie » au centre)
+const CALQUE_PLEIN = 0.8, CALQUE_FONDU = 0.97;   // le calque : plein, puis fondu vers le bord
 const MAX_PAR_LOT = 12;
 const COTE_IA = 1024;                // le carré envoyé au dessin
 const QUALITE_DESSIN = "low";        // Nico : « mets le low pour commencer »
 const DOSSIER_CLOUDINARY = "Villages_Regions";
+const SVG_NS = "http://www.w3.org/2000/svg";
 const SECURITES = ["Inconnue", "Faible", "Moyenne", "Élevée", "Cauchemar"];
 
 const $ = (id) => document.getElementById(id);
@@ -78,6 +85,8 @@ function lireVillage(id, d) {
     return { id, numero: Number(d.Carte_Regionale), nom: d.Nom_Du_Lieu || "Village", description: d.Description_Global || "",
              securite: d.Niveau_De_Securite || "Inconnue", peuple: d.Peuple_Dominant || "", visuel: d.Visuel_Village || "",
              x: Number(pos.x), y: Number(pos.y), taille: Number(pos.taille), calque: d.URL_Calque_Region || "",
+             // Un calque d'avant v281 : son dessin au milieu d'un carré deux fois plus grand.
+             plein: !!d.Calque_Plein,
              type: d.Type_Lieu || "Village", image: d.URL_Cloudinary || "" };
 }
 // Ce que l'écoute (ou un banc) reçoit : [{ id, data }].
@@ -136,9 +145,13 @@ function calques() {
     }
     return { couche, couchePastilles };
 }
-// La place d'un carré, en pixels de l'image.
+// La place d'un carré, en pixels de l'image. Un lieu d'avant v281 (plein
+// false) ne montre que le centre de son calque, à la même échelle : son carré
+// est deux fois plus petit, son dessin garde sa taille.
+const coteAffiche = (o) => (o.plein === false ? o.taille / 2 : o.taille);
+window.coteAfficheLieu = coteAffiche;
 function boite(o, c) {
-    const cote = o.taille * c.hauteur;
+    const cote = coteAffiche(o) * c.hauteur;
     return { gauche: o.x * c.largeur - cote / 2, haut: o.y * c.hauteur - cote / 2, cote };
 }
 // Un village sous les nuages validés ne se montre pas (ni son nom).
@@ -167,12 +180,13 @@ function dessiner() {
         Object.assign(el.style, { left: b.gauche + "px", top: b.haut + "px", width: b.cote + "px", height: b.cote + "px" });
         if (v.calque) {
             const img = document.createElement("img");
-            img.className = "village-calque";
+            img.className = "village-calque" + (v.plein ? "" : " ancien");
             img.alt = "";
             img.draggable = false;
             img.src = v.calque;
             el.appendChild(img);
         }
+        el.appendChild(etiquette(v, b.cote));
         brancherVillage(el, v);
         couche.appendChild(el);
     });
@@ -191,6 +205,41 @@ function dessiner() {
     actualiserDev();
 }
 window.dessinerVillagesRegion = dessiner;
+
+// LE NOM DU LIEU, sous son dessin (v281). Nico : « en écriture marron foncé,
+// style plume sur parchemin, le nom du lieu en arc de cercle inversé sur le
+// bas de l'image, en petit ; pour l'arc, des variations aléatoires, qui vont
+// jusqu'à écrire droit ». La courbure vient du nom du lieu (toujours la même
+// pour lui) : de l'arc franc à la ligne droite.
+function hacher(texte) {
+    let h = 2166136261;
+    for (const ch of String(texte)) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+}
+function courbureEtiquette(id) {
+    const u = (hacher(id) % 1000) / 1000;
+    return Math.max(0, u * 1.3 - 0.3);           // un sur quatre environ : droit
+}
+window.courbureEtiquetteLieu = courbureEtiquette;
+function etiquette(v, cote) {
+    // Assez large pour tout le nom (le long d'un chemin, ce qui dépasse ne
+    // s'écrit pas) ; le creux de l'arc, au milieu, reste mesuré.
+    const police = cote * 0.24;
+    const largeur = Math.max(cote * 2.6, police * (0.56 * Array.from(String(v.nom || "")).length + 1.4));
+    const fleche = Math.min(courbureEtiquette(v.id) * largeur * 0.16, cote * 0.42);
+    const base = police * 1.05, hauteur = base + fleche + police * 0.45;
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("class", "village-nom");
+    svg.setAttribute("viewBox", `0 0 ${largeur} ${hauteur}`);
+    svg.setAttribute("aria-hidden", "true");
+    Object.assign(svg.style, { left: ((cote - largeur) / 2) + "px", top: (cote * 0.84) + "px", width: largeur + "px", height: hauteur + "px" });
+    const idChemin = "arc-nom-" + String(v.id).replace(/[^a-zA-Z0-9_-]/g, "_");
+    // Un arc « inversé » (∪) : les bouts remontent, le milieu descend.
+    svg.innerHTML = `<defs><path id="${idChemin}" d="M ${largeur * 0.04} ${base} Q ${largeur / 2} ${base + 2 * fleche} ${largeur * 0.96} ${base}"/></defs>`
+        + `<text class="village-nom-texte" font-size="${police}"><textPath href="#${idChemin}" xlink:href="#${idChemin}" startOffset="50%" text-anchor="middle"></textPath></text>`;
+    svg.querySelector("textPath").textContent = v.nom || "";
+    return svg;
+}
 
 // Le survol dit le nom (comme les lieux de la carte du monde) ; en DEV, un
 // clic choisit le village.
@@ -420,7 +469,7 @@ function masqueCentre() {
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
         const k = (j * n + i) * 4;
         img.data[k] = img.data[k + 1] = img.data[k + 2] = 0;
-        img.data[k + 3] = distanceCentre(i, j, n) < 0.6 ? 0 : 255;
+        img.data[k + 3] = distanceCentre(i, j, n) < MASQUE_DESSIN ? 0 : 255;
     }
     ctx.putImageData(img, 0, 0);
     return toile;
@@ -434,7 +483,7 @@ function promptImage(visuel, sujet) {
         `Paint ${sujet || "a small ancient village"} in the CENTER of this image: ${visuel}. ` +
         "Match EXACTLY the existing art style of the map: the same painting technique, brush strokes, colors, lighting and texture, " +
         "and the same top-down, bird's-eye map perspective and scale as the surrounding terrain. " +
-        "It must stay small and fit in the middle of the image, leaving the outer quarter on every side untouched. " +
+        "Make it fill most of the image, as large as the picture allows, leaving only a thin margin (about one tenth of the width) untouched on every side. " +
         "Do NOT modify, redraw or recolor anything near the borders: the edges must stay identical to the input image, " +
         "because this picture will be placed back over the map at the exact same position. " +
         "Blend it naturally into the terrain. No text, no labels, no border, no frame, no compass.";
@@ -494,7 +543,7 @@ window.composerCalqueVillage = function(dessin, toileCarre, coteFinal) {
     let compte = 0;
     for (let j = 0; j < n; j += 2) for (let i = 0; i < n; i += 2) {
         const d = distanceCentre(i, j, n);
-        if (d < 0.66 || d > 0.95) continue;
+        if (d < MASQUE_DESSIN + 0.02 || d > 0.99) continue;
         const k = (j * n + i) * 4;
         for (let c = 0; c < 3; c++) { somme[0][c] += ia.data[k + c]; somme[1][c] += origine.data[k + c]; }
         compte++;
@@ -505,7 +554,7 @@ window.composerCalqueVillage = function(dessin, toileCarre, coteFinal) {
         const k = (j * n + i) * 4;
         for (let c = 0; c < 3; c++) sortie.data[k + c] = borne(Math.round(ia.data[k + c] * gain[c]), 0, 255);
         // Plein au centre, rien sur les bords : la carte d'origine y reste intacte.
-        sortie.data[k + 3] = Math.round(255 * (1 - lisse(0.58, 0.9, distanceCentre(i, j, n))));
+        sortie.data[k + 3] = Math.round(255 * (1 - lisse(CALQUE_PLEIN, CALQUE_FONDU, distanceCentre(i, j, n))));
     }
     const grand = document.createElement("canvas");
     grand.width = grand.height = n;
@@ -608,7 +657,7 @@ window.creerVillagesRegion = async function() {
                 Reputations: {}, Stigmates: "", URL_Cloudinary: "",
                 Carte_Regionale: Number(numero),
                 Position_Region: { x: Math.round(p.x * 1e5) / 1e5, y: Math.round(p.y * 1e5) / 1e5, taille: Math.round(p.taille * 1e5) / 1e5 },
-                URL_Calque_Region: calque
+                URL_Calque_Region: calque, Calque_Plein: true
             };
             await setDoc(doc(db, COLLECTION_LIEUX, id), fiche);
             villages[id] = lireVillage(id, fiche);
@@ -639,9 +688,12 @@ window.redessinerVillageRegion = async function(id) {
     actualiserDev();
     attente(true, "Création des villages… Patientez", `MIA_VILLAGE redessine « ${v.nom} »`);
     try {
-        const calque = await fabriquerCalque(cles, window.imageCarteRegionaleOuverte(), v, v.visuel || "a small ancient village");
-        await setDoc(doc(db, COLLECTION_LIEUX, v.id), { URL_Calque_Region: calque }, { merge: true });
-        v.calque = calque;
+        // Un village d'avant v281 se redessine dans son nouveau carré (la moitié).
+        const taille = Math.round(coteAffiche(v) * 1e5) / 1e5;
+        const calque = await fabriquerCalque(cles, window.imageCarteRegionaleOuverte(), { ...v, taille }, v.visuel || "a small ancient village");
+        await setDoc(doc(db, COLLECTION_LIEUX, v.id), { URL_Calque_Region: calque, Calque_Plein: true,
+                                                        Position_Region: { x: v.x, y: v.y, taille } }, { merge: true });
+        Object.assign(v, { calque, plein: true, taille });
         message(`✔️ « ${v.nom} » redessiné`);
         return true;
     } catch (e) {

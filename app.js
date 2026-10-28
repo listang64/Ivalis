@@ -4046,7 +4046,8 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
   }, (err) => console.error("onSnapshot Personnages :", err));
 }
 
-// 2. Affichage des bulles
+// 2. Affichage des bulles (les bancs l'appellent par window.afficherBullesChat)
+window.afficherBullesChat = (persos) => afficherBullesPersonnages(persos);
 function afficherBullesPersonnages(persos) {
   const conteneur = document.getElementById("zone-noms-bulles");
   if (!conteneur) return;
@@ -4061,8 +4062,9 @@ function afficherBullesPersonnages(persos) {
 
   const partie = window.PARTIE_DATA || {};
   const ordre = partie.Ordre_Initiative || [];
-  const indexTour = partie.Index_Initiative !== undefined ? partie.Index_Initiative : 999;
-  const idPersoActif = ordre[indexTour];
+  const tour = window.tourDeParole(partie, persos);
+  const indexTour = tour.index;
+  const idPersoActif = tour.id;
 
   const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
   let estMonTour = false;
@@ -4287,10 +4289,30 @@ function ajouterUnSeulMessageChat(m) {
    });
 }
 
-// 4. Mélange aléatoire
+// LE TOUR DE PAROLE EFFECTIF (v281). Nico : « quand on ouvre le chat
+// manuellement, l'avatar de celui à qui c'est le tour de parler n'est pas
+// affiché ». L'ordre pouvait désigner une créature (le mélange prenait tous
+// les combattants de la partie) ou un héros sorti du jeu : personne n'était mis
+// en avant, et personne ne pouvait plus parler. Ceux qui ne parlent pas sont
+// sautés : le tour va au héros suivant de l'ordre ; s'il n'y en a plus, au MJ.
+// `heros` : les héros qui parlent (pas de créature, pas de leurre).
+const herosQuiParlent = (liste) => (liste || []).filter(p => p && !p.estMonstre && !p.estIllusion && p.actif !== false);
+window.tourDeParole = function(partie, heros) {
+  const ordre = (partie && partie.Ordre_Initiative) || [];
+  const index = partie && partie.Index_Initiative !== undefined ? partie.Index_Initiative : 999;
+  const liste = herosQuiParlent(heros);
+  if (index === 999 || !(index >= 0) || index >= ordre.length) return { index: 999, id: null, perso: null };
+  for (let i = index; i < ordre.length; i++) {
+    const perso = liste.find(p => p.idPersonnage === ordre[i]);
+    if (perso) return { index: i, id: perso.idPersonnage, perso };
+  }
+  return { index: 999, id: null, perso: null };
+};
+
+// 4. Mélange aléatoire (les héros seulement, v281)
 window.relancerInitiativeChat = async function() {
   if (!window.ID_PARTIE_COURANTE || !window.PERSOS_PARTIE || window.PERSOS_PARTIE.length === 0) return;
-  let ids = window.PERSOS_PARTIE.map(p => p.idPersonnage);
+  let ids = herosQuiParlent(window.PERSOS_PARTIE).map(p => p.idPersonnage);
   ids = ids.sort(() => Math.random() - 0.5);
   await updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), {
     Ordre_Initiative: ids,
@@ -4313,7 +4335,7 @@ window.envoyerMessageChat = async function() {
 
    const partie = window.PARTIE_DATA || {};
    const ordre = partie.Ordre_Initiative || [];
-   const indexTour = partie.Index_Initiative !== undefined ? partie.Index_Initiative : 999;
+   const indexTour = window.tourDeParole(partie, window.PERSOS_PARTIE).index;
 
    // NOUVEAU : On identifie si c'est bien à moi de parler
    const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
@@ -6824,10 +6846,7 @@ window.lancerJetDeCaracteristique = async function(idCarac, nomCarac, valeurCara
     //  SÉCURITÉ ANTI-TRICHE (TOUR DE PAROLE)
     // =========================================================
     const partie = window.PARTIE_DATA || {};
-    const ordre = partie.Ordre_Initiative || [];
-    const indexTour = partie.Index_Initiative !== undefined ? partie.Index_Initiative : 999;
-    
-    const idPersoActif = ordre[indexTour]; 
+    const idPersoActif = window.tourDeParole(partie, window.PERSOS_PARTIE).id;
     const idPersonnageFiche = document.getElementById("champ-id-personnage").value; 
 
     if (idPersonnageFiche !== idPersoActif) {

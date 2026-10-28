@@ -34,7 +34,9 @@ import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.
 
 const COTE_DECOUPE = 0.25;           // le carré, en part de la hauteur de la carte
 const COTE_ENVOI_MAX = 768;          // pixels envoyés à l'IA (au plus)
-const PROXIMITE_JOURS = 2;           // les lieux connus plus loin ne sont pas cités
+// Les lieux connus plus loin ne sont pas cités. v281 : la journée passe de 30 %
+// à 20 % de la carte ; 3 jours gardent le même rayon (60 % de sa hauteur).
+const PROXIMITE_JOURS = 3;
 const SITUATION_NATURE = "Dans la nature";
 const DIRECTIONS = ["à l'est", "au sud-est", "au sud", "au sud-ouest", "à l'ouest", "au nord-ouest", "au nord", "au nord-est"];
 

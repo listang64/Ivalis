@@ -8745,3 +8745,92 @@ brume claire, l'ombre légère), la fluidité, la dérive, le zoom, l'ordre des
 calques ; les versions. Il mord sur l'ancien code (7 échecs).
 corrections_v279.mjs : son cœur « pas une masse opaque » devient « bien
 couvert ».
+
+## v281 — Le POI où l'on est, les carrés de moitié, le nom à la plume, le « ! » doré, l'image du groupe réglable, la connexion automatique, le feu de camp, le tour de parole, la journée à 20 %
+
+ARRIVÉS AU POI, ILS Y SONT (voyage_groupe.js). Nico : « une fois arrivés,
+ils y sont : pas besoin de demander s'ils veulent rester une fois le RP
+lancé ». Le détour fini et le lieu né, le voyage s'achève au lieu
+(arriveeAuLieu : Voyage_Groupe effacé, Voyage_Termine.Poi { Id, Lieu, Nom,
+Type }, Lieu_Actuel, Position_Groupe au bord du lieu — placeHalte). Chacun
+ouvre le chat ; le poste qui a créé le lieu pose l'arrivée (le Destin) et
+réveille le MJ (arriverAuPoi, lu sur Voyage_Termine.Poi, deux minutes au
+plus). Pour repartir : un nouveau voyage. Tant que le lieu se révèle : la
+halte, sans question (« Vous approchez… »). Un lieu qui n'a pas pu naître
+(Echec) : la halte garde « Reprendre la route » / « Rester ici ».
+
+LES CARRÉS DES VILLAGES ET DES POI (villages_regionaux.js, poi_creation.js) :
+4 % de la hauteur de la carte au lieu de 8 % ; le modèle peint jusqu'à 86 %
+du demi-côté (MASQUE_DESSIN, au lieu de 60 %), le calque est plein jusqu'à
+80 % puis fondu (CALQUE_PLEIN, CALQUE_FONDU), la consigne demande de remplir
+l'image. Les nouveaux lieux portent Calque_Plein. Un lieu d'avant (sans
+Calque_Plein) : son carré est montré à moitié (coteAffiche), et son calque à
+la même échelle — on n'en voit que le centre, fondu en disque
+(.village-calque.ancien, mask-image) : son dessin garde sa taille.
+« Redessiner » le refait dans son nouveau carré (Calque_Plein, taille /2).
+Plus de contour jaune au survol (DEV) ; la sélection garde le sien.
+
+LE NOM DE CHAQUE LIEU (villages_regionaux.js, etiquette) : sous son dessin,
+en petit (0,24 × le côté), IM Fell English en italique, marron foncé
+(#3a220f), un léger halo de parchemin ; le long d'un arc « inversé » (∪) —
+une courbe de Bézier dont le milieu descend —, assez large pour tout le nom
+(le long d'un chemin, ce qui dépasse ne s'écrirait pas). La courbure vient du nom du
+lieu (hacher → courbureEtiquetteLieu : de 0, tout droit, environ un sur
+quatre, à l'arc franc) : toujours la même pour un lieu. Caché avec le lieu
+sous les nuages. La police est chargée (Google Fonts) et passe en !important
+(la police du jeu est imposée à « * »).
+
+LE « ! » DES POI : le signe seul, sans pastille ni halo ; doré (un dégradé
+dans la lettre, background-clip: text, liseré brun) ; il se tasse, bondit un
+peu et retombe, en boucle (@keyframes poi-sursaut).
+
+L'IMAGE DU GROUPE, RÉGLABLE (DEV, les deux panneaux « Le groupe ») :
+« ✛ Régler l'image du groupe » montre une croix rouge à la place exacte du
+groupe (croix-groupe-region, d'une taille d'écran fixe ; croix-groupe-monde)
+et deux curseurs de décalage ; l'image se glisse aussi du doigt. Le décalage
+(Decalage_Region, Decalage_Monde, en parts de la largeur de l'image, ±1,5)
+s'ajoute à la taille dans Carte_Monde/Groupe, pour toutes les parties
+(ecrireReglages).
+
+LA CONNEXION AUTOMATIQUE (comptes.js, menu du compte) : une case, cochée par
+défaut (ivalis_CONNEXION_AUTO sur l'appareil). Cochée : la session Firebase
+est locale et durable (indexedDBLocalPersistence) — on entre sans retaper
+ses identifiants ; décochée : elle ne dure que le temps de l'application
+(browserSessionPersistence). Appliquée avant la lecture de la session, et à
+chaque changement (Firebase déplace la session en cours). Le mot de passe
+n'est jamais gardé par le jeu.
+
+LA NUIT EN VOYAGE : « Repartir à l'aube », « Rester ici », et « 🔥 Discuter
+autour du feu de camp » (discuterAutourDuFeu) : le chat s'ouvre (un second
+toucher ne le referme pas), le vote de la nuit attend.
+
+LE TOUR DE PAROLE (app.js, tourDeParole) : l'avatar de celui qui parle ne
+s'affichait pas quand l'ordre désignait une créature (le mélange d'après la
+réponse du MJ prenait tous les combattants de la partie) ou un héros sorti
+du jeu — et personne ne pouvait plus écrire. Ceux qui ne parlent pas sont
+sautés : le tour va au héros suivant de l'ordre, sinon au MJ ; les bulles,
+l'envoi d'un message et le jet de caractéristique lisent tous ce tour-là.
+relancerInitiativeChat ne mélange plus que les héros (ni créature, ni leurre,
+ni héros inactif). Les bancs affichent les bulles par afficherBullesChat.
+
+LA JOURNÉE DE MARCHE : 20 % de la hauteur de la carte (DISTANCE_JOUR) ; le
+MJ connaît les lieux à 3 jours (PROXIMITE_JOURS, environnement_mj.js) : le
+même rayon qu'avant (60 % de la carte).
+
+corrections_v281.mjs (dans la suite, faux Firestore à transactions, IA
+simulées) : la journée et le rayon du MJ ; le « ! » (seul, doré, son
+sursaut) ; l'arrivée au POI (la halte sans question, puis le voyage achevé,
+le chat, le Destin, le MJ, le bord du lieu) ; les carrés (4 %, plein, le
+village d'avant montré à moitié et son dessin gardé, le masque, le calque, la
+consigne, plus de contour au survol) ; le nom à la plume (le texte, la police,
+la couleur, la place, l'arc qui va jusqu'au droit, stable, inversé, caché sous
+les nuages, un nom long écrit en entier) ; la nuit (les boutons, le feu de camp qui ouvre le chat sans
+voter) ; le tour de parole (créature, leurre, absent, MJ ; le mélange ; les
+bulles et l'avatar) ; l'image du groupe (la croix, sa taille d'écran, les
+curseurs, l'enregistrement, le glisser, la base, la fin du réglage, le monde) ;
+la connexion automatique ; les versions. Mis à jour : corrections_v273
+(4 %, le redessin), v275 (le village à moins d'une journée, « Repartir à
+l'aube »), v276 (20 %, le rayon), v277 (l'arrivée sans question, le retour
+par un lieu qui n'a pas pu naître, le « ! »), v272 (5 images de la traversée
+suffisent : leur nombre suit la vitesse de la machine du banc). Il mord sur
+l'ancien code (32 échecs).

@@ -162,7 +162,8 @@ await section(async () => {
              fond: getComputedStyle(document.querySelector(".pastille-village")).backgroundColor,
              texte: document.getElementById("btn-valider-villages").textContent, actif: !document.getElementById("btn-valider-villages").disabled };
   });
-  verifier("« Générer » pose 5 pastilles carrées (8 % de la hauteur)", r.n === 5 && r.elements === 5 && r.tailles.every(t => t === 0.08));
+  // v281 : 4 % (la moitié), le dessin occupant le carré presque entier.
+  verifier("« Générer » pose 5 pastilles carrées (4 % de la hauteur)", r.n === 5 && r.elements === 5 && r.tailles.every(t => t === 0.04));
   verifier("rouges, semi-transparentes", /rgba\(214, 20, 20, 0\.35\)/.test(r.fond), r.fond);
   verifier("aucune dans les nuages, aucune sur une autre, toutes entières sur la carte", !r.dansNuages && !r.chevauche && r.dedans);
   verifier("« Créer ces 5 villages » s'allume", r.actif && /5 villages/.test(r.texte), r.texte);
@@ -176,7 +177,7 @@ await section(async () => {
   const coin = await p.evaluate(() => { const b = document.querySelector('.pastille-village .pastille-village-poignee').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
   await p.mouse.move(coin.x, coin.y); await p.mouse.down(); await p.mouse.move(coin.x + 20, coin.y - 20, { steps: 4 }); await p.mouse.up();
   const grandie = await p.evaluate(() => window.pastillesVillages()[0].taille);
-  verifier("le carré du coin l'agrandit", grandie > 0.08 + 0.02, `${grandie.toFixed(3)}`);
+  verifier("le carré du coin l'agrandit", grandie > 0.04 + 0.02, `${grandie.toFixed(3)}`);
   // Retirer, puis n'en garder que deux pour la suite.
   await p.evaluate(() => { window.retirerPastillesVillages(); });
   const vide = await p.evaluate(() => window.pastillesVillages().length);
@@ -313,7 +314,10 @@ await section(async () => {
   await p.evaluate(() => { window.__ecrits = []; return window.redessinerVillageRegion(); });
   const r2 = await p.evaluate(() => ({ e: window.__ecrits.filter(e => e.chemin === "Monde_Lieux/L_11111_Tharsys").pop(), v: window.VILLAGES_REGIONAUX["L_11111_Tharsys"] }));
   verifier("« Redessiner » : un nouveau dessin, le même village (pas de nouveau nom)", appels.openai.length === nAvant + 1 && appels.gemini.length === gAvant
-           && !!r2.e && r2.e.options && r2.e.options.merge && Object.keys(r2.e.data).join() === "URL_Calque_Region" && r2.v.calque === r2.e.data.URL_Calque_Region && r2.v.nom === "Tharsys");
+           && !!r2.e && r2.e.options && r2.e.options.merge && r2.v.calque === r2.e.data.URL_Calque_Region && r2.v.nom === "Tharsys"
+           // v281 : un village d'avant se redessine dans son nouveau carré (la moitié), le dessin le remplit.
+           && r2.e.data.Calque_Plein === true && r2.e.data.Position_Region.taille === 0.05 && r2.v.taille === 0.05 && r2.v.plein === true,
+           JSON.stringify(r2.e && r2.e.data));
   await p.evaluate(() => window.supprimerVillageRegion());
   const r3 = await p.evaluate(() => ({ s: window.__suppressions || [], reste: document.querySelectorAll('.village-region[data-id="L_11111_Tharsys"]').length }));
   verifier("« Supprimer » : il quitte la carte et la base", r3.s.includes("Monde_Lieux/L_11111_Tharsys") && r3.reste === 0);

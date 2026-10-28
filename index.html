@@ -12,8 +12,8 @@
   <!-- Un blason gravé dans la page : sans lui, le navigateur réclame un
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
-  <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=110">
+  <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=111">
 
  
   <!-- ===================================================================== -->
@@ -358,6 +358,8 @@
       <div id="menu-compte" class="menu-compte" style="display: none;">
         <button type="button" class="btn-barre-compte" id="btn-mon-compte" onclick="jouerSonClic(); fermerMenuCompte(); ouvrirMonCompte()">Mon compte</button>
         <button type="button" class="btn-barre-compte" id="btn-demandes" style="display: none;" onclick="jouerSonClic(); fermerMenuCompte(); ouvrirDemandesInscription()">Autorisation de création <span class="pastille-demandes" id="pastille-demandes" style="display: none;">0</span></button>
+        <!-- v281 : rester connecté d'un lancement à l'autre (comptes.js). -->
+        <label class="case-menu-compte" for="case-connexion-auto"><input type="checkbox" id="case-connexion-auto" onchange="jouerSonClic(); window.basculerConnexionAuto(this.checked)"> Connexion automatique</label>
         <button type="button" class="btn-barre-compte" id="btn-se-deconnecter" onclick="jouerSonClic(); fermerMenuCompte(); seDeconnecter()">Déconnexion</button>
       </div>
     </div>
@@ -1282,6 +1284,19 @@
               <span class="popup-regions-ligne"><input type="range" id="taille-groupe-monde" min="40" max="600" step="5" value="150"
                      oninput="window.reglerTailleGroupe('monde', this.value)" onchange="window.reglerTailleGroupe('monde', this.value, true)">
               <span id="taille-groupe-monde-valeur" class="popup-regions-valeur"></span></span></label>
+            <!-- Le réglage de l'image du groupe (v281) : la croix rouge marque sa place exacte. -->
+            <button type="button" id="btn-reglage-pion-monde" class="popup-regions-bouton secondaire btn-reglage-pion" onclick="jouerSonClic(); window.basculerReglagePionGroupe()">✛ Régler l'image du groupe</button>
+            <div id="reglage-pion-monde" class="reglage-pion-groupe" style="display: none;">
+              <label class="popup-regions-curseur">Décalage horizontal
+                <span class="popup-regions-ligne"><input type="range" id="decalage-pion-monde-x" min="-1.5" max="1.5" step="0.01" value="0"
+                       oninput="window.reglerDecalageGroupe('monde', 'x', this.value)" onchange="window.reglerDecalageGroupe('monde', 'x', this.value, true)">
+                <span id="decalage-pion-monde-x-valeur" class="popup-regions-valeur"></span></span></label>
+              <label class="popup-regions-curseur">Décalage vertical
+                <span class="popup-regions-ligne"><input type="range" id="decalage-pion-monde-y" min="-1.5" max="1.5" step="0.01" value="0"
+                       oninput="window.reglerDecalageGroupe('monde', 'y', this.value)" onchange="window.reglerDecalageGroupe('monde', 'y', this.value, true)">
+                <span id="decalage-pion-monde-y-valeur" class="popup-regions-valeur"></span></span></label>
+              <p class="popup-regions-aide">La croix rouge marque la place exacte du groupe : glisse l'image (ou les curseurs) pour que sa pointe tombe dessus. La taille se règle juste au-dessus.</p>
+            </div>
             <button type="button" id="btn-groupe-teleport-monde" class="popup-regions-bouton" onclick="jouerSonClic(); window.basculerTeleportGroupe()">⤳ Déplacer le groupe (téléport)</button>
             <button type="button" class="popup-regions-bouton secondaire btn-tester-environnement" onclick="jouerSonClic(); window.testerEnvironnementMJ()" title="Analyse le terrain autour du groupe et écrit dans la console ce que le maître du jeu recevrait">🔍 Ce que le MJ voit (console)</button>
             <div id="groupe-dev-monde-etat" class="popup-regions-total"></div>
@@ -1343,6 +1358,19 @@
                 <span class="popup-regions-ligne"><input type="range" id="taille-groupe-region" min="0.02" max="0.25" step="0.005" value="0.07"
                        oninput="window.reglerTailleGroupe('region', this.value)" onchange="window.reglerTailleGroupe('region', this.value, true)">
                 <span id="taille-groupe-region-valeur" class="popup-regions-valeur"></span></span></label>
+              <!-- Le réglage de l'image du groupe (v281) : la croix rouge marque sa place exacte. -->
+              <button type="button" id="btn-reglage-pion-region" class="popup-regions-bouton secondaire btn-reglage-pion" onclick="jouerSonClic(); window.basculerReglagePionGroupe()">✛ Régler l'image du groupe</button>
+              <div id="reglage-pion-region" class="reglage-pion-groupe" style="display: none;">
+                <label class="popup-regions-curseur">Décalage horizontal
+                  <span class="popup-regions-ligne"><input type="range" id="decalage-pion-region-x" min="-1.5" max="1.5" step="0.01" value="0"
+                         oninput="window.reglerDecalageGroupe('region', 'x', this.value)" onchange="window.reglerDecalageGroupe('region', 'x', this.value, true)">
+                  <span id="decalage-pion-region-x-valeur" class="popup-regions-valeur"></span></span></label>
+                <label class="popup-regions-curseur">Décalage vertical
+                  <span class="popup-regions-ligne"><input type="range" id="decalage-pion-region-y" min="-1.5" max="1.5" step="0.01" value="0"
+                         oninput="window.reglerDecalageGroupe('region', 'y', this.value)" onchange="window.reglerDecalageGroupe('region', 'y', this.value, true)">
+                  <span id="decalage-pion-region-y-valeur" class="popup-regions-valeur"></span></span></label>
+                <p class="popup-regions-aide">La croix rouge marque la place exacte du groupe : glisse l'image (ou les curseurs) pour que sa pointe tombe dessus. La taille se règle juste au-dessus.</p>
+              </div>
               <label class="popup-regions-curseur">Chance d'un point d'intérêt par journée de marche
                 <span class="popup-regions-ligne"><input type="range" id="chance-poi" min="0" max="1" step="0.05" value="0.5"
                        oninput="window.reglerTailleGroupe('poi', this.value)" onchange="window.reglerTailleGroupe('poi', this.value, true)">
@@ -2328,7 +2356,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=185"></script>
+<script src="trace_combat.js?v=186"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2387,9 +2415,9 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=53"></script>
 <script type="module" src="ia_master.js?v=11"></script>
-<script type="module" src="app.js?v=125"></script>
+<script type="module" src="app.js?v=126"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
-<script type="module" src="comptes.js?v=2"></script>
+<script type="module" src="comptes.js?v=3"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=4"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région, ses nuages et son titre. -->
@@ -2398,18 +2426,18 @@
 <script type="module" src="cartes_regionales.js?v=6"></script>
 <!-- Le lore du monde, par région (v273), puis les villages des cartes régionales et MIA_VILLAGE. -->
 <script src="lore_ivalis.js?v=1"></script>
-<script type="module" src="villages_regionaux.js?v=4"></script>
+<script type="module" src="villages_regionaux.js?v=5"></script>
 <!-- Les descriptifs RP des régions (v274) : le mode DEV et sa fenêtre pleine page. -->
 <script type="module" src="descriptifs_regions.js?v=1"></script>
 <!-- Le déplacement des PJ (v275) : les terrains praticables des cartes régionales,
      puis le groupe, son bouton voyage, les tracés, les votes, la marche et les nuits. -->
 <script type="module" src="terrains_regionaux.js?v=1"></script>
-<script type="module" src="voyage_groupe.js?v=3"></script>
+<script type="module" src="voyage_groupe.js?v=4"></script>
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
-<script type="module" src="environnement_mj.js?v=3"></script>
+<script type="module" src="environnement_mj.js?v=4"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->
 <script src="poi_catalogue.js?v=1"></script>
-<script type="module" src="poi_creation.js?v=1"></script>
+<script type="module" src="poi_creation.js?v=2"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=16"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->

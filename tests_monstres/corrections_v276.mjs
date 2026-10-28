@@ -205,14 +205,14 @@ const joueur = (id) => p.evaluate((id) => { localStorage.setItem("ID_JOUEUR_COUR
 const terrains = () => requetes.filter(q => q.image);
 
 // =========================================================================
-titre("1. LA JOURNÉE DE MARCHE : 30 % DE LA HAUTEUR DE LA CARTE (AU LIEU DE 45 %)");
+titre("1. LA JOURNÉE DE MARCHE : 20 % DE LA HAUTEUR DE LA CARTE (v281 ; 30 % en v276, 45 % avant)");
 // =========================================================================
 await section(async () => {
   const r = await p.evaluate(() => ({ d: window.DISTANCE_JOUR_VOYAGE, j: [0.25, 0.31, 0.45, 0.6, 0.9].map(l => window.joursDeMarcheVoyage(l)) }));
-  verifier("une journée = 30 % de la hauteur de la carte", r.d === 0.3, r.d);
-  verifier("les jours suivent (0,25 → 1 ; 0,31 → 1 ; 0,45 → 2 ; 0,6 → 2 ; 0,9 → 3)", JSON.stringify(r.j) === "[1,1,2,2,3]", JSON.stringify(r.j));
+  verifier("une journée = 20 % de la hauteur de la carte", r.d === 0.2, r.d);
+  verifier("les jours suivent (0,25 → 2 ; 0,31 → 2 ; 0,45 → 3 ; 0,6 → 3 ; 0,9 → 5)", JSON.stringify(r.j) === "[2,2,3,3,5]", JSON.stringify(r.j));
   const src = lire('voyage_groupe.js');
-  verifier("(et plus de 45 % dans le code)", /const DISTANCE_JOUR = 0\.30;/.test(src) && !/DISTANCE_JOUR = 0\.45/.test(src));
+  verifier("(ni 30 % ni 45 % dans le code)", /const DISTANCE_JOUR = 0\.20;/.test(src) && !/DISTANCE_JOUR = 0\.(45|30)/.test(src));
 });
 
 // =========================================================================
@@ -264,7 +264,7 @@ await section(async () => {
   verifier("le groupe s'arrête en pleine nature : l'analyse part d'elle-même", !!q && q.image && q.mime === "image/jpeg" && q.taille > 1000, q && q.mime);
   verifier("la consigne : le nord en haut, le point rouge = le groupe, ne rien inventer", q && /nord est en HAUT/.test(q.texte) && /POINT ROUGE/.test(q.texte)
            && /sans rien inventer/.test(q.texte) && /La vallée de souffre/.test(q.texte), q && q.texte.slice(0, 80));
-  verifier("elle sait l'échelle (une journée de marche) et les lieux connus proches", q && /journée\(s\) de marche/.test(q.texte) && /Brumefosse \(village\), à environ 1,5 jours de marche à l'est/.test(q.texte),
+  verifier("elle sait l'échelle (une journée de marche) et les lieux connus proches", q && /journée\(s\) de marche/.test(q.texte) && /Brumefosse \(village\), à environ 2(,5)? jours de marche à l'est/.test(q.texte),
            q && (q.texte.match(/Lieux connus[^\n]*/) || [""])[0]);
   verifier("une IA froide (température basse)", q && q.temperature <= 0.3, q && q.temperature);
   const a = (await partie()).Analyse_Terrain;
@@ -293,7 +293,7 @@ await section(async () => {
   verifier("dans la nature : la région et la situation", /Région : La vallée de souffre\. Le groupe est DANS LA NATURE/.test(blocNature), blocNature.slice(0, 120));
   verifier("le point exact où se tient le groupe", /Position exacte sur la carte de la région : x = 0\.4, y = 0\.5/.test(blocNature));
   verifier("le terrain lu sur la carte (l'analyse gardée, pas refaite)", /cendre crisse/.test(blocNature) && /Alentours : au nord/.test(blocNature) && terrains().length === n0);
-  verifier("les lieux connus à proximité, direction et temps de marche", /Lieux connus à proximité : Brumefosse \(village\), à environ 1,5 jours de marche à l'est/.test(blocNature),
+  verifier("les lieux connus à proximité, direction et temps de marche", /Lieux connus à proximité : Brumefosse \(village\), à environ 2(,5)? jours de marche à l'est/.test(blocNature),
            (blocNature.match(/Lieux connus[^\n]*/) || [""])[0]);
   verifier("la consigne : des rencontres, oui ; aucun bâtiment inventé", /des rencontres/.test(blocNature) && /AUCUN bâtiment, village, ruine ni lieu construit/.test(blocNature));
   verifier("le descriptif RP de la région", /Descriptif de La vallée de souffre : Une vallée de soufre et de forges/.test(blocNature));

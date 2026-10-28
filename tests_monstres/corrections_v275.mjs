@@ -536,7 +536,8 @@ await section(async () => {
   const r1 = await p.evaluate(() => ({ voile: document.getElementById("voile-nuit-voyage").classList.contains("visible"), camp: document.getElementById("pion-groupe-region").classList.contains("campement"),
     texte: document.getElementById("boite-voyage").textContent, boutons: [...document.querySelectorAll("#boite-voyage button")].map(b => b.textContent.trim()) }));
   verifier("la nuit sur la carte, le feu du campement sous le groupe", r1.voile && r1.camp);
-  verifier("chez tous : « Nuit 1 », Repartir / Rester ici", /Nuit 1 au campement/.test(r1.texte) && r1.boutons.includes("Repartir") && r1.boutons.includes("Rester ici"), JSON.stringify(r1.boutons));
+  // v281 : « Repartir à l'aube » (et le feu de camp, qui ouvre le chat).
+  verifier("chez tous : « Nuit 1 », Repartir à l'aube / Rester ici", /Nuit 1 au campement/.test(r1.texte) && r1.boutons.includes("Repartir à l'aube") && r1.boutons.includes("Rester ici"), JSON.stringify(r1.boutons));
   await p.screenshot({ path: "/tmp/claude-0/v275_nuit.png" });
   verifier("la date n'a pas encore bougé (la nuit n'est pas finie)", (await p.evaluate(() => window.__docs["Date_En_Jeu/actuelle"].Jour)) === "12");
   // Pas d'accord : rien ne bouge.
@@ -575,7 +576,8 @@ await section(async () => {
 titre("12. JUSQU'AU VILLAGE : LE LIEU_ACTUEL À L'ARRIVÉE ; LE DEV FORCE");
 // =========================================================================
 await section(async () => {
-  await ecrirePartie({ Position_Groupe: { Region: 2, x: 0.55, y: 0.62 } });
+  // Un village à moins d'une journée de marche (v281 : la journée fait 20 %).
+  await ecrirePartie({ Position_Groupe: { Region: 2, x: 0.635, y: 0.645 } });
   await joueur("P_01");
   await p.click("#btn-voyage");
   const v = await ecranRegion(0.7, 0.66);

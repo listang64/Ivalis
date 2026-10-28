@@ -29,7 +29,7 @@
 import { db } from "./firebase-config.js?v=2";
 import { doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-const TAILLE_POI = 0.08;          // comme un village : 8 % de la hauteur de la carte
+const TAILLE_POI = 0.04;          // comme un village : 4 % de la hauteur de la carte (v281 : la moitié)
 const SECURITES = ["Inconnue", "Faible", "Moyenne", "Élevée", "Cauchemar"];
 const MAX_BATIMENTS = 4;
 
@@ -151,7 +151,7 @@ window.creerLieuPoi = async function(options) {
         Accroche_MJ: lieu.accroche, Visuel_Village: lieu.visuel, Prompt_Image: lieu.prompt,
         Reputations: {}, Stigmates: lieu.stigmates, URL_Cloudinary: "", URL_Calque_Region: "",
         Carte_Regionale: region, Position_Region: { x: Math.round(x * 1e5) / 1e5, y: Math.round(y * 1e5) / 1e5, taille: TAILLE_POI },
-        Origine: "POI", Decouvert_Par: window.ID_PARTIE_COURANTE || "", Cree_Le: Date.now()
+        Origine: "POI", Decouvert_Par: window.ID_PARTIE_COURANTE || "", Cree_Le: Date.now(), Calque_Plein: true
     };
     await setDoc(doc(db, "Monde_Lieux", id), fiche);
     const batiments = [];

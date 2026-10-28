@@ -328,11 +328,13 @@ await section(async () => {
   verifier("le POI apparaît : la marche est en pause", v2.Etat === "poi" && v2.Poi && v2.Poi.Id === v1.Poi_Prevu.Id && !v2.Poi_Prevu
            && Math.abs(d.Position_Groupe.x - (await p.evaluate((f) => window.pointDuVoyageGroupe(f).x, v1.Poi_Prevu.f))) < 1e-3, v2.Etat);
   const r = await p.evaluate(() => { const el = document.getElementById("poi-voyage"), c = window.cadrageCarteRegion(), st = getComputedStyle(el);
-    return { d: st.display, signe: el.textContent.trim(), gauche: parseFloat(el.style.left) / c.largeur, haut: parseFloat(el.style.top) / c.hauteur, saut: el.classList.contains("en-vue"),
-             fond: st.backgroundImage, anim: window.etatVoyageGroupe().anim, boite: document.getElementById("boite-voyage").textContent,
+    const signe = getComputedStyle(el.querySelector(".poi-voyage-signe"));
+    return { d: st.display, signe: el.textContent.trim(), gauche: parseFloat(el.style.left) / c.largeur, haut: parseFloat(el.style.top) / c.hauteur, saut: signe.animationName,
+             fond: signe.backgroundImage, anim: window.etatVoyageGroupe().anim, boite: document.getElementById("boite-voyage").textContent,
              boutons: [...document.querySelectorAll("#boite-voyage button")].map(b => b.textContent.trim()) }; });
   verifier("un point d'exclamation doré, là où est le POI", r.d === "flex" && r.signe === "!" && Math.abs(r.gauche - v2.Poi.x) < 1e-3 && Math.abs(r.haut - v2.Poi.y) < 1e-3
-           && /242, 201, 76|f2c94c/i.test(r.fond) && r.saut, r.fond.slice(0, 60));
+           // v281 : le « ! » seul, doré (un dégradé dans la lettre), qui sursaute.
+           && /247, 211, 90/.test(r.fond) && r.saut === "poi-sursaut", `${r.fond.slice(0, 60)} ${r.saut}`);
   verifier("plus de marche à l'écran", r.anim === null);
   verifier("la boîte : « il vous semble apercevoir quelque chose, pas très loin »", /Il vous semble apercevoir quelque chose, pas très loin/.test(r.boite)
            && r.boutons.includes("Aller voir") && r.boutons.includes("Passer son chemin"), JSON.stringify(r.boutons));
@@ -387,7 +389,7 @@ await section(async () => {
   idLieu = w2.Poi.Lieu;
   const fiche = await p.evaluate((id) => window.__docs["Monde_Lieux/" + id], idLieu);
   verifier("le lieu naît et s'enregistre (Monde_Lieux)", ok && fiche && fiche.Nom_Du_Lieu === "Kalymnos" && fiche.Origine === "POI" && fiche.Carte_Regionale === 2
-           && Math.abs(fiche.Position_Region.x - w.Poi.x) < 1e-4 && fiche.Position_Region.taille === 0.08 && /disparu/.test(fiche.Accroche_MJ)
+           && Math.abs(fiche.Position_Region.x - w.Poi.x) < 1e-4 && fiche.Position_Region.taille === 0.04 && fiche.Calque_Plein === true && /disparu/.test(fiche.Accroche_MJ)
            && fiche.Graine_POI && fiche.Graine_POI.typeNom, idLieu);
   const bat = await p.evaluate((id) => Object.entries(window.__docs).filter(([k, d]) => k.startsWith("Monde_Batiment/") && d.ID_Lieu === id).map(([, d]) => d.Nom_Batiment), idLieu);
   verifier("…et ses bâtiments (Monde_Batiment)", bat.length === 2 && bat.includes("La meule d'Hestor"), JSON.stringify(bat));
@@ -412,14 +414,15 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("6. LA HALTE AU POI : LE LIEU, LE CHAT QUI S'OUVRE, LE MJ QUI PARLE");
+titre("6. ARRIVÉS AU POI, ILS Y SONT (v281) : LE CHAT S'OUVRE, LE MJ PARLE, AUCUNE QUESTION");
 // =========================================================================
 await section(async () => {
   await p.evaluate(() => { window.__ajouts = []; window.__tourIA = 0; const vrai = window.declencherTourIA; window.declencherTourIA = async () => { window.__tourIA++; return vrai(); }; });
   await finir();
   const d = await partie();
-  verifier("au bout du détour : la halte ; le groupe est au POI, dans le lieu", d.Voyage_Groupe.Etat === "halte" && d.Lieu_Actuel === idLieu && d.Situation === "Dans un lieu"
-           && Math.abs(d.Position_Groupe.x - d.Voyage_Groupe.Poi.x) < 1e-6 && d.Voyage_Groupe.Poi.Arrive === true);
+  // v281 (Nico : « une fois arrivés, ils y sont : pas besoin de demander s'ils veulent rester »).
+  verifier("au bout du détour : le voyage s'achève au lieu ; le groupe y est", !d.Voyage_Groupe && d.Voyage_Termine && d.Voyage_Termine.Poi
+           && d.Voyage_Termine.Poi.Lieu === idLieu && d.Lieu_Actuel === idLieu && d.Situation === "Dans un lieu" && d.Position_Groupe.Region === 2, JSON.stringify(d.Voyage_Termine));
   await p.waitForTimeout(700);
   const r = await p.evaluate(() => ({ chat: document.getElementById("fenetre-chatbox").style.display, tour: window.__tourIA,
     msg: (window.__ajouts || []).filter(a => a.col === "Messages_Chat").map(a => a.data), boite: document.getElementById("boite-voyage").textContent,
@@ -430,7 +433,7 @@ await section(async () => {
   verifier("le MJ reçoit les données du lieu (description, accroche, bâtiments)", narr && /Trois huttes de branchages/.test(narr.systeme) && /fils du charbonnier/.test(narr.systeme)
            && /La meule d'Hestor/.test(narr.systeme));
   verifier("…et le MJ parle dans le chat", r.msg.some(m => m.Auteur_ID === "MJ" && /volutes de fumée/.test(m.Texte)));
-  verifier("la boîte : « Kalymnos », Reprendre la route / Rester ici", /Kalymnos/.test(r.boite) && r.boutons.includes("Reprendre la route") && r.boutons.includes("Rester ici"), JSON.stringify(r.boutons));
+  verifier("aucune question : ni « Reprendre la route », ni « Rester ici »", r.boutons.length === 0, JSON.stringify(r.boutons));
   await p.evaluate(() => { const c = document.getElementById("fenetre-chatbox"); if (typeof window.fermerToutesLesFenetres === "function") window.fermerToutesLesFenetres(); else c.style.display = "none"; });
   await p.waitForTimeout(150);
   const lieu = await p.evaluate((id) => { const v = window.VILLAGES_REGIONAUX[id], el = document.querySelector(`.village-region[data-id="${id}"]`), img = el && el.querySelector("img");
@@ -440,9 +443,17 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("7. REPRENDRE LA ROUTE : LE RETOUR, ET LA JOURNÉE QUI CONTINUE (L'ITINÉRAIRE EST GARDÉ)");
+titre("7. UN LIEU QUI N'A PAS PU NAÎTRE : REPRENDRE LA ROUTE, LA JOURNÉE QUI CONTINUE (L'ITINÉRAIRE EST GARDÉ)");
 // =========================================================================
 await section(async () => {
+  // v281 : arrivés à un lieu, ils y sont ; la question ne vient plus que si le lieu n'a pas pu naître.
+  reglagesFaux.poiPanne = true;
+  await lancerVoyageRegional({ x: 0.25, y: 0.6 }, { x: 0.8, y: 0.3 });
+  await finir();
+  await p.evaluate(() => window.forcerVoyageGroupe());
+  await attendreQue(async () => !!(((await v()) || {}).Poi || {}).Echec, 5000);
+  await finir();
+  reglagesFaux.poiPanne = false;
   const avant = await v();
   await p.evaluate(() => { window.__nettoyages = []; });
   await joueur("P_01");
@@ -453,9 +464,9 @@ await section(async () => {
   await p.click('#boite-voyage [data-action="halte-reprendre"]');
   await p.waitForTimeout(150);
   const d = await partie();
-  verifier("tous reprennent : le retour vers la route ; on quitte le lieu", d.Voyage_Groupe.Etat === "retour" && d.Lieu_Actuel === "" && d.Situation === "Dans la nature");
+  verifier("tous reprennent : le retour vers la route", d.Voyage_Groupe.Etat === "retour" && d.Lieu_Actuel === "" && d.Situation === "Dans la nature");
   const n = await p.evaluate(() => window.__nettoyages);
-  verifier("le chat se nettoie en partant (les souvenirs des PNJ du lieu)", n.length === 1 && n[0].lieu === idLieu, JSON.stringify(n));
+  verifier("le chat se nettoie en partant", n.length === 1, JSON.stringify(n));
   await finir();
   const w = await v();
   const plan = await p.evaluate((a) => window.replanifierApresPoiVoyage(a), avant);
@@ -498,17 +509,11 @@ await section(async () => {
   const r = await p.evaluate(() => { const el = document.getElementById("attente-poi"); return { visible: el && el.classList.contains("visible"), texte: el && el.textContent.trim() }; });
   verifier("à la halte, le lieu pas encore né : un message RP fait patienter", r.visible && /Vous approchez prudemment|Les contours du lieu|Le vent porte|Quelque chose bouge|Vos pas se font/.test(r.texte), r.texte);
   await p.screenshot({ path: "/tmp/claude-0/v277_attente.png" });
-  await attendreQue(async () => !!((await v()).Poi || {}).Arrive, 8000);
+  await attendreQue(async () => !(await v()), 8000);
   await p.waitForTimeout(200);
   const r2 = await p.evaluate(() => ({ visible: document.getElementById("attente-poi").classList.contains("visible"), lieu: window.__docs["Systeme_Parties/P1"].Lieu_Actuel }));
-  verifier("le lieu né : l'attente s'efface, le groupe y est", !r2.visible && /^L_/.test(r2.lieu), r2.lieu);
+  verifier("le lieu né : l'attente s'efface, le groupe y est — le voyage s'achève là, sans question (v281)", !r2.visible && /^L_/.test(r2.lieu) && !(await v()), r2.lieu);
   reglagesFaux.poiRetard = 0;
-  // Rester ici : le voyage s'arrête au POI.
-  await joueur("P_01"); await p.evaluate(() => window.choisirHalteGroupe("rester"));
-  await joueur("P_02"); await p.evaluate(() => window.choisirHalteGroupe("rester"));
-  await p.waitForTimeout(150);
-  const d = await partie();
-  verifier("« Rester ici » (tous) : le voyage s'arrête, le groupe reste dans le lieu", !d.Voyage_Groupe && /^L_/.test(d.Lieu_Actuel));
 });
 
 // =========================================================================
