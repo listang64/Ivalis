@@ -2053,6 +2053,12 @@ textarea.input-texte-parchemin {
     overflow: hidden;
 }
 
+/* Sans image (les villages des cartes régionales, v273) : une étiquette, le nom seul. */
+#tooltip-lieu-map.sans-image { width: auto; max-width: 300px; height: auto; padding: 9px 18px; border-width: 2px;
+    background: linear-gradient(180deg, #2a1a0f, #140b05); }
+#tooltip-lieu-map.sans-image .voile-assombrissant { display: none; }
+#tooltip-lieu-map.sans-image #tooltip-lieu-nom { position: static; transform: none; width: auto; white-space: nowrap; font-size: 18px; }
+
 #tooltip-lieu-image {
     position: absolute;
     top: 0; left: 0;
@@ -5630,6 +5636,7 @@ textarea.input-texte-parchemin {
 .btn-regions-dev svg path { fill: rgba(255, 255, 255, 0.18); stroke: #fff; stroke-width: 1.6; stroke-linejoin: round; }
 .btn-regions-dev svg rect { fill: #fff; }
 .popup-regions-dev { position: absolute; right: 0; bottom: calc(100% + 12px); width: 270px; box-sizing: border-box; padding: 12px 14px 12px;
+  max-height: calc(var(--app-h, 100vh) - 90px); overflow-y: auto; -webkit-overflow-scrolling: touch;
   border-radius: 10px; color: #2a1a0f; background: #f3e2b8; border: 2px solid #8a6a2a; box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
   font-family: Georgia, serif; font-size: 14px; z-index: 10; }
 .popup-regions-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px;
@@ -5737,3 +5744,40 @@ textarea.input-texte-parchemin {
 .popup-regions-outil.actif svg { stroke: #fff; }
 .popup-regions-taille { flex: 1; display: flex; align-items: center; }
 .popup-regions-taille input { width: 100%; accent-color: #a01212; }
+
+/* =========================================================================
+   LES VILLAGES DES CARTES RÉGIONALES (v273, villages_regionaux.js)
+   ========================================================================= */
+/* Les calques des villages : sur l'image, sous les nuages. Le survol dit le nom. */
+.carte-region-villages { position: absolute; inset: 0; pointer-events: none; }
+.village-region { position: absolute; pointer-events: auto; }
+.village-region.cache { pointer-events: none; }
+.village-calque { display: block; width: 100%; height: 100%; pointer-events: none; -webkit-user-drag: none; }
+.carte-region-villages.dev .village-region { cursor: pointer; }
+.carte-region-villages.dev .village-region:hover { outline: calc(2px / var(--zoom-region, 1)) dashed rgba(243, 210, 122, 0.8); }
+.carte-region-villages.dev .village-region.selectionne { outline: calc(3px / var(--zoom-region, 1)) solid #f3d27a; }
+/* Les pastilles (DEV) : des carrés rouges à demi transparents, au-dessus des
+   nuages, qu'on glisse ; le carré du coin haut droit règle leur taille. */
+.carte-region-pastilles { position: absolute; inset: 0; pointer-events: none; }
+.pastille-village { position: absolute; box-sizing: border-box; pointer-events: auto; cursor: move; touch-action: none;
+  background: rgba(214, 20, 20, 0.35); border: calc(2px / var(--zoom-region, 1)) solid rgba(196, 20, 20, 0.95); }
+.pastille-village-poignee { position: absolute; top: calc(-7px / var(--zoom-region, 1)); right: calc(-7px / var(--zoom-region, 1));
+  width: calc(14px / var(--zoom-region, 1)); height: calc(14px / var(--zoom-region, 1)); box-sizing: border-box; background: #fff;
+  border: calc(2px / var(--zoom-region, 1)) solid #a01212; cursor: nesw-resize; }
+/* La popup DEV : la partie des villages. */
+.popup-regions-villages { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(138, 106, 42, 0.5); }
+.popup-regions-sous-titre { font-family: 'Cinzel', serif; font-weight: bold; color: #7a0d0d; margin-bottom: 6px; }
+.popup-regions-ligne { display: flex; gap: 8px; align-items: stretch; }
+.popup-regions-ligne .popup-regions-bouton { flex: 1; }
+.popup-regions-nombre { width: 54px; flex: none; margin-bottom: 8px; border-radius: 6px; border: 1px solid #8a6a2a; background: #fff8e6;
+  font-size: 15px; text-align: center; color: #2a1a0f; }
+/* LE GRAND « PATIENTEZ » : par-dessus tout l'écran, tant que MIA_VILLAGE travaille. */
+.attente-villages { position: fixed; inset: 0; z-index: 30000; display: none; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; padding: 16px; box-sizing: border-box; text-align: center; background: rgba(12, 8, 3, 0.74); cursor: progress; }
+.attente-villages-texte { font-weight: bold; font-size: clamp(28px, 5.5vw, 64px); letter-spacing: 0.04em; line-height: 1.15;
+  background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.9)); animation: attente-villages-souffle 2.4s ease-in-out infinite; }
+.attente-villages-detail { font-size: clamp(15px, 2vw, 22px); color: #e8d5a5; text-shadow: 1px 2px 4px #000; }
+@keyframes attente-villages-souffle { 0%, 100% { opacity: 0.82; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .attente-villages-texte { animation: none; } }

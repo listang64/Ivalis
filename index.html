@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=103">
+  <link rel="stylesheet" href="style.css?v=105">
 
  
   <!-- ===================================================================== -->
@@ -1284,6 +1284,24 @@
             <button type="button" id="btn-region-valider-nuages" class="popup-regions-bouton" onclick="jouerSonClic(); window.validerNuagesRegion()" disabled>Valider les nuages</button>
             <button type="button" id="btn-region-annuler-nuages" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.annulerNuagesRegion()" disabled>Annuler la peinture</button>
             <label class="popup-regions-case"><input type="checkbox" id="case-region-titre" onchange="window.basculerEditionTitreRegion(this.checked)"> Édition du titre</label>
+            <!-- LES VILLAGES (v273, villages_regionaux.js) : des pastilles à placer,
+                 puis MIA_VILLAGE les dessine sur la carte et les crée en base. -->
+            <div id="regions-dev-villages" class="popup-regions-villages" style="display: none;">
+              <div class="popup-regions-sous-titre">Villages</div>
+              <div class="popup-regions-ligne">
+                <input type="number" id="nombre-villages-region" class="popup-regions-nombre" min="1" max="12" value="3" aria-label="Nombre de villages">
+                <button type="button" id="btn-generer-villages" class="popup-regions-bouton" onclick="jouerSonClic(); window.genererPastillesVillages(document.getElementById('nombre-villages-region').value)">Générer les villages</button>
+              </div>
+              <div id="villages-dev-pastilles" class="popup-regions-total"></div>
+              <button type="button" id="btn-valider-villages" class="popup-regions-bouton" onclick="jouerSonClic(); window.creerVillagesRegion()" disabled>Créer ces villages</button>
+              <button type="button" id="btn-retirer-pastilles" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.retirerPastillesVillages()" disabled>Retirer les pastilles</button>
+              <div id="villages-dev-selection" class="popup-regions-info"></div>
+              <div class="popup-regions-ligne">
+                <button type="button" id="btn-village-redessiner" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.redessinerVillageRegion()" disabled>Redessiner</button>
+                <button type="button" id="btn-village-supprimer" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.supprimerVillageRegion()" disabled>Supprimer</button>
+              </div>
+              <div id="villages-dev-etat" class="popup-regions-total"></div>
+            </div>
             <p class="popup-regions-aide">Pinceau ou gomme en main, le doigt peint (deux doigts zooment toujours). Les zones rouges restent provisoires : « Valider les nuages » les change en nuages, pour toutes les parties. Édition du titre : le glisser pour le déplacer, le carré de son coin haut droit pour sa taille ; décocher l'enregistre.</p>
           </div>
         </div>
@@ -2311,13 +2329,16 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=53"></script>
 <script type="module" src="ia_master.js?v=7"></script>
-<script type="module" src="app.js?v=122"></script>
+<script type="module" src="app.js?v=123"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=2"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=2"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région, ses nuages et son titre. -->
-<script type="module" src="cartes_regionales.js?v=1"></script>
+<script type="module" src="cartes_regionales.js?v=2"></script>
+<!-- Le lore du monde, par région (v273), puis les villages des cartes régionales et MIA_VILLAGE. -->
+<script src="lore_ivalis.js?v=1"></script>
+<script type="module" src="villages_regionaux.js?v=1"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=16"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->

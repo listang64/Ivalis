@@ -8256,3 +8256,57 @@ ailleurs, en mouvement) ; le titre (police et or du nom de combattant,
 déplacé, rétréci, agrandi, enregistré en sortant, relu, zoomé) ; le retour
 mesuré (plongée puis dézoome jusqu'au cadrage d'avant) ; la réouverture ;
 les versions. Il mord sur l'ancien code (14 échecs).
+
+## v273 — Les villages des cartes régionales (MIA_VILLAGE)
+
+lore_ivalis.js (nouveau, script simple) : le classeur LORE_IVALIS de Nico,
+rangé par numéro de carte régionale ; Volcanisse et Arcaï ont leur fiche,
+jointe aux régions qui les abritent ; l'Ordre d'Ivalis vaut partout.
+loreDeLaRegion(n) rend le tout prêt pour un prompt.
+
+villages_regionaux.js (nouveau module). EN DEV, sur une carte régionale, la
+popup du bouton rouge a sa partie « Villages » : un nombre et « Générer les
+villages » posent des pastilles carrées rouges semi-transparentes (8 % de la
+hauteur), au hasard, hors des nuages validés, loin des bords et des autres
+carrés ; on les glisse, le carré du coin haut droit règle leur taille.
+« Créer ces villages » lance, village après village, sous un grand
+« Patientez » (le nom du village en cours) :
+  1. MIA_VILLAGE (Gemini) invente le village selon le lore de la région et
+     les noms déjà posés : nom, description, sécurité, peuple, visuel (en
+     anglais, pour le dessin) ;
+  2. le carré est découpé dans l'image de la carte (chargée en CORS), agrandi
+     à 1024 ;
+  3. MIA_VILLAGE (OpenAI, images/edits, gpt-image-2, qualité « low ») dessine
+     le village au centre, avec un masque qui lui laisse le cœur du carré
+     (sans masque si le modèle le refuse) ;
+  4. le calque ne garde que le centre du dessin, en fondu vers des bords
+     entièrement transparents (la carte d'origine y reste intacte), ses
+     couleurs accordées à la carte sur une couronne (gain par canal, borné
+     0,8–1,25) ; deux fois la finesse de la carte, 256 à 1024 px ;
+  5. Cloudinary (envoi signé, dossier Villages_Regions), puis le lieu dans
+     Monde_Lieux : Nom_Du_Lieu, Description_Global, Niveau_De_Securite,
+     Peuple_Dominant, Visuel_Village, Type_Lieu « Village », Carte_Regionale,
+     Position_Region {x, y, taille}, URL_Calque_Region, URL_Cloudinary vide
+     (pas d'image de lieu pour le RP), pas de Tuile_ID (rien sur la carte du
+     monde).
+Une panne n'arrête pas le lot (sa pastille reste à revalider) ; sans clé
+(Gemini, OpenAI, Cloudinary), rien ne part et la popup dit ce qui manque.
+EN JEU : les calques sont posés sur l'image, sous les nuages (un village sous
+les nuages est caché, sans nom) ; le survol dit le nom (l'infobulle des lieux,
+en étiquette compacte quand il n'y a pas d'image — app.js, v273). EN DEV, un
+appui relâché sans bouger choisit un village : « Redessiner » (nouveau
+dessin, même village) ou « Supprimer » (la fiche part ; le fichier Cloudinary
+reste). La popup DEV ne dépasse plus la hauteur de l'écran (elle défile).
+
+corrections_v273.mjs (dans la suite) : Gemini, OpenAI et Cloudinary sont de
+faux serveurs qui enregistrent ce qu'on leur envoie. Le lore par région ; les
+pastilles (nombre, taille, couleur, hors des nuages, sans chevauchement,
+entières, glissées sans faire glisser la carte, agrandies, retirées) ; la
+création (Patientez, deux villages, les fiches et leurs champs, la place, le
+calque) ; ce qui part aux IA (le lore et les noms à Gemini ; à OpenAI la
+retouche, le modèle, « low », 1024, le carré, le masque, la consigne) ; le
+masque ; le calque (bords transparents, centre plein, couleurs accordées,
+reposé à la place exacte) ; le survol et les nuages ; le choix, le redessin,
+la suppression, la panne, les clés manquantes, la fermeture. Il mord sur
+l'ancien code (14 échecs). corrections_v272 : la popup, plus haute, se
+referme pendant qu'on manipule le titre.

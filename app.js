@@ -7213,6 +7213,9 @@ window.afficherTooltipLieu = function(nom, urlImage, evenement) {
     } else {
         imgEl.style.display = "none";
     }
+    // Sans image (les villages des cartes régionales, v273) : une étiquette
+    // compacte, juste le nom, au lieu de la grande vignette vide.
+    tooltip.classList.toggle("sans-image", !(urlImage && urlImage !== ""));
     
     tooltip.style.display = "block";
     window.deplacerTooltipLieu(evenement);
@@ -7226,9 +7229,11 @@ window.deplacerTooltipLieu = function(evenement) {
     let x = evenement.clientX + 20;
     let y = evenement.clientY + 20;
     
-    // Système anti-débordement d'écran (pour les icônes très à droite/en bas)
-    if (x + 300 > window.innerWidth) x = evenement.clientX - 320;
-    if (y + 180 > window.innerHeight) y = evenement.clientY - 200;
+    // Système anti-débordement d'écran (pour les icônes très à droite/en bas),
+    // sur la taille réelle de la bulle (l'étiquette sans image est plus petite).
+    const largeur = tooltip.offsetWidth || 300, hauteur = tooltip.offsetHeight || 180;
+    if (x + largeur > window.innerWidth) x = evenement.clientX - largeur - 20;
+    if (y + hauteur > window.innerHeight) y = evenement.clientY - hauteur - 20;
     
     tooltip.style.left = x + "px";
     tooltip.style.top = y + "px";

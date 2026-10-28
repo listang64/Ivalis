@@ -306,7 +306,8 @@ await section(async () => {
            && r0.police === r0.policeCombat && /text/.test(r0.clip) && r0.fond === r0.fondCombat,
            JSON.stringify([r0.texte, r0.police, r0.policeCombat, r0.clip]));
   verifier("accroché à la carte (en pixels de l'image), en haut au centre par défaut", r0.dansCarte && Math.abs(r0.x - 0.5) < 0.01 && Math.abs(r0.y - 0.09) < 0.01, `${r0.x.toFixed(2)}, ${r0.y.toFixed(2)}`);
-  await p.evaluate(() => { window.__ecrits = []; document.getElementById("case-region-titre").click(); });
+  // La popup se referme pendant qu'on manipule le titre (elle pourrait le couvrir).
+  await p.evaluate(() => { window.__ecrits = []; document.getElementById("case-region-titre").click(); window.basculerPopupRegions(false); });
   const avant = await p.evaluate(() => { const el = document.getElementById("carte-region-titre"); const r = el.getBoundingClientRect(); const h = el.querySelector(".carte-region-titre-poignee").getBoundingClientRect();
     return { edition: el.classList.contains("edition"), x: r.left + r.width / 2, y: r.top + r.height / 2, poignee: { x: h.left + h.width / 2, y: h.top + h.height / 2, visible: h.width > 0 },
              titre: { ...window.CARTES_REGIONALES[1].titre } }; });
@@ -326,7 +327,7 @@ await section(async () => {
   verifier("le carré du coin le rétrécit (vers le bas à gauche) et l'agrandit (vers le haut à droite)", retreci < deplace.taille && grandi > retreci,
            `${deplace.taille} → ${retreci.toFixed(3)} → ${grandi.toFixed(3)}`);
   const ecritsPendant = await p.evaluate(() => window.__ecrits.length);
-  await p.evaluate(() => document.getElementById("case-region-titre").click());
+  await p.evaluate(() => { window.basculerPopupRegions(true); document.getElementById("case-region-titre").click(); });
   const r1 = await p.evaluate(() => { const e = window.__ecrits.filter(x => x.chemin === "Cartes_Regionales/1").pop();
     return { e: e && e.data.Titre, local: window.CARTES_REGIONALES[1].titre, edition: document.getElementById("carte-region-titre").classList.contains("edition") }; });
   verifier("rien n'est écrit pendant l'édition ; en sortant du mode, le titre s'enregistre", ecritsPendant === 0 && !!r1.e && Math.abs(r1.e.x - r1.local.x) < 1e-3 && Math.abs(r1.e.taille - r1.local.taille) < 1e-3 && !r1.edition,

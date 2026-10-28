@@ -292,6 +292,14 @@ function pointImage(clientX, clientY) {
     const vue = tailleVue();
     return { x: (clientX - vue.gauche - etat.panX) / etat.zoom, y: (clientY - vue.haut - etat.panY) / etat.zoom };
 }
+window.pointImageCarteRegion = pointImage;
+// L'URL de l'image affichée (celle que MIA_VILLAGE découpe, v273).
+window.imageCarteRegionaleOuverte = () => (etat.ouverte ? etat.urlImage || null : null);
+// La carte s'ouvre ou se ferme : les villages (villages_regionaux.js) suivent.
+function signaler(ouverte, numero) {
+    try { window.dispatchEvent(new CustomEvent("carte-regionale", { detail: { numero: ouverte ? etat.ouverte : numero, ouverte } })); }
+    catch (e) { console.error("Carte régionale :", e); }
+}
 
 // --- LES GESTES ------------------------------------------------------------
 //  Un doigt (ou la souris) : glisser la carte — ou peindre, le pinceau ou la
@@ -580,16 +588,22 @@ const animer = (el, images, duree, easing) => (el && typeof el.animate === "func
     ? el.animate(images, { duration: duree, easing, fill: "forwards" }) : null;
 const fin = (a) => (a ? a.finished.catch(() => null) : Promise.resolve());
 
-// L'image de la carte, chargée (et ses dimensions lues).
+// L'image de la carte, chargée (et ses dimensions lues). En CORS (v273) :
+// MIA_VILLAGE en découpe des carrés, ce qu'une image « opaque » interdirait.
+// Cloudinary l'autorise ; un hôte qui refuserait retombe sur un chargement
+// ordinaire (la carte s'affiche, seuls les villages ne pourront pas s'y faire).
 function chargerImage(url) {
-    return new Promise((resoudre) => {
+    const essai = (cors) => new Promise((resoudre) => {
         const img = new Image();
         img.decoding = "async";
+        if (cors) img.crossOrigin = "anonymous";
         img.onload = () => resoudre(img);
         img.onerror = () => resoudre(null);
         img.src = url;
     });
+    return essai(true).then(img => img || essai(false));
 }
+window.chargerImageCarteRegionale = chargerImage;
 
 window.ouvrirCarteRegionale = async function(numero, options) {
     const n = Number(numero);
@@ -615,7 +629,9 @@ window.ouvrirCarteRegionale = async function(numero, options) {
         etat.hauteur = (img && img.naturalHeight) || 1080;
         etat.outil = null; etat.brouillon = null; etat.brouillonModifie = false; etat.editionTitre = false;
         const imageEl = $("carte-region-image");
+        if (img && img.crossOrigin) imageEl.crossOrigin = "anonymous"; else imageEl.removeAttribute("crossorigin");
         imageEl.src = img ? img.src : url;
+        etat.urlImage = img ? img.src : url;
         const vue = $("vue-carte-region");
         vue.style.display = "block";
         vue.classList.add("arrivee");
@@ -625,6 +641,7 @@ window.ouvrirCarteRegionale = async function(numero, options) {
         dessinerPeinture();
         $("btn-retour-monde").style.display = "flex";
         actualiserDev();
+        signaler(true);
     };
 
     if (sansTransition) {
@@ -671,8 +688,10 @@ window.fermerCarteRegionale = async function(options) {
         vue.style.display = "none";
         $("btn-retour-monde").style.display = "none";
         arreterNuages();
+        const numero = etat.ouverte;
         etat.ouverte = null;
         actualiserDev();
+        signaler(false, numero);
     };
     if (sansTransition) {
         retirer();
@@ -942,6 +961,8 @@ function preparerNuages() {
     toile.width = L; toile.height = H;
     const ctx = toile.getContext("2d");
     ctx.clearRect(0, 0, L, H);
+    // Les villages suivent les nuages (un village sous les nuages se cache, v273).
+    if (typeof window.dessinerVillagesRegion === "function") window.dessinerVillagesRegion();
     if (!grille.some(v => v)) { toile.dataset.vide = "1"; return; }
     toile.dataset.vide = "0";
     const douce = grilleAdoucie(grille, colonnes, lignes);
@@ -1061,6 +1082,7 @@ function actualiserDev() {
         vue.classList.toggle("outil-pinceau", etat.outil === "pinceau");
         vue.classList.toggle("outil-gomme", etat.outil === "gomme");
     }
+    if (typeof window.actualiserDevVillages === "function") window.actualiserDevVillages();
 }
 window.actualiserDevCarteRegionale = actualiserDev;
 
