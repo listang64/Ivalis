@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=107">
+  <link rel="stylesheet" href="style.css?v=108">
 
  
   <!-- ===================================================================== -->
@@ -1330,6 +1330,10 @@
                 <span class="popup-regions-ligne"><input type="range" id="taille-groupe-region" min="0.02" max="0.25" step="0.005" value="0.07"
                        oninput="window.reglerTailleGroupe('region', this.value)" onchange="window.reglerTailleGroupe('region', this.value, true)">
                 <span id="taille-groupe-region-valeur" class="popup-regions-valeur"></span></span></label>
+              <label class="popup-regions-curseur">Chance d'un point d'intérêt par journée de marche
+                <span class="popup-regions-ligne"><input type="range" id="chance-poi" min="0" max="1" step="0.05" value="0.5"
+                       oninput="window.reglerTailleGroupe('poi', this.value)" onchange="window.reglerTailleGroupe('poi', this.value, true)">
+                <span id="chance-poi-valeur" class="popup-regions-valeur"></span></span></label>
               <button type="button" id="btn-groupe-teleport-region" class="popup-regions-bouton" onclick="jouerSonClic(); window.basculerTeleportGroupe()">⤳ Déplacer le groupe (téléport)</button>
               <button type="button" class="popup-regions-bouton secondaire btn-tester-environnement" onclick="jouerSonClic(); window.testerEnvironnementMJ()" title="Analyse le terrain autour du groupe et écrit dans la console ce que le maître du jeu recevrait">🔍 Ce que le MJ voit (console)</button>
               <div id="groupe-dev-region-etat" class="popup-regions-total"></div>
@@ -2304,7 +2308,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=181"></script>
+<script src="trace_combat.js?v=182"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2360,7 +2364,7 @@
 <script type="module" src="pont_combat.js?v=46"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=53"></script>
-<script type="module" src="ia_master.js?v=9"></script>
+<script type="module" src="ia_master.js?v=10"></script>
 <script type="module" src="app.js?v=124"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=2"></script>
@@ -2370,15 +2374,18 @@
 <script type="module" src="cartes_regionales.js?v=4"></script>
 <!-- Le lore du monde, par région (v273), puis les villages des cartes régionales et MIA_VILLAGE. -->
 <script src="lore_ivalis.js?v=1"></script>
-<script type="module" src="villages_regionaux.js?v=3"></script>
+<script type="module" src="villages_regionaux.js?v=4"></script>
 <!-- Les descriptifs RP des régions (v274) : le mode DEV et sa fenêtre pleine page. -->
 <script type="module" src="descriptifs_regions.js?v=1"></script>
 <!-- Le déplacement des PJ (v275) : les terrains praticables des cartes régionales,
      puis le groupe, son bouton voyage, les tracés, les votes, la marche et les nuits. -->
 <script type="module" src="terrains_regionaux.js?v=1"></script>
-<script type="module" src="voyage_groupe.js?v=2"></script>
+<script type="module" src="voyage_groupe.js?v=3"></script>
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
-<script type="module" src="environnement_mj.js?v=1"></script>
+<script type="module" src="environnement_mj.js?v=2"></script>
+<!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->
+<script src="poi_catalogue.js?v=1"></script>
+<script type="module" src="poi_creation.js?v=1"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=16"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->

@@ -1285,6 +1285,9 @@ async function genererEtStockerIconeCarte(nomLieu, descriptionLieu) {
 
 // (v275) MIA_CARTO, qui inventait un lieu à chaque arrivée sur une case de la
 // grille, n'existe plus : le groupe voyage sur les cartes (voyage_groupe.js).
+// Ses peintres servent aux lieux découverts en voyage (v277, poi_creation.js).
+window.genererImageLieu = genererEtStockerImageLieu;
+window.genererImageBatiment = genererEtStockerImageBatiment;
 
 window.regenererImagesLieuActuel = async function() {
     if (!window.ID_PARTIE_COURANTE) return alert("Aucune partie en cours.");

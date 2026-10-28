@@ -89,7 +89,27 @@ window.appliquerVillagesDeLaBase = function(liste) {
     });
     if (selection && !villages[selection]) selection = null;
     dessiner();
+    suivreBulleDuLieu();
 };
+// Un lieu tout juste créé sur ce poste (un POI, v277) : sur la carte sans
+// attendre l'écoute.
+window.appliquerLieuLocal = function(id, data) {
+    const v = data && lireVillage(id, data);
+    if (!v || !(v.numero > 0) || !Number.isFinite(v.x) || !(v.taille > 0)) return null;
+    villages[id] = v;
+    dessiner();
+    suivreBulleDuLieu();
+    return v;
+};
+// La bulle du chat montre l'image du lieu où est le groupe : elle suit
+// l'illustration d'un POI, qui arrive après le lieu (v277).
+function suivreBulleDuLieu() {
+    // Les lieux ont changé : qui les montre (le voyage, son POI) suit.
+    try { window.dispatchEvent(new CustomEvent("villages-regionaux-maj")); } catch (e) { /* vieux navigateur */ }
+    const lieu = window.PARTIE_DATA && window.PARTIE_DATA.Lieu_Actuel;
+    const v = lieu && villages[lieu];
+    if (v && v.image && v.image !== window.LIEU_ACTUEL_IMAGE && typeof window.mettreAJourBulleLieu === "function") window.mettreAJourBulleLieu(lieu);
+}
 const villagesDeLaCarte = (numero) => Object.values(villages).filter(v => v.numero === Number(numero));
 
 // --- LES CALQUES ET LES PASTILLES À L'ÉCRAN --------------------------------
@@ -177,7 +197,7 @@ window.dessinerVillagesRegion = dessiner;
 function brancherVillage(el, v) {
     el.addEventListener("pointerenter", (e) => {
         if (el.classList.contains("cache") || typeof window.afficherTooltipLieu !== "function") return;
-        window.afficherTooltipLieu(v.nom, "", e);
+        window.afficherTooltipLieu(v.nom, v.image || "", e);
     });
     el.addEventListener("pointermove", (e) => { if (typeof window.deplacerTooltipLieu === "function") window.deplacerTooltipLieu(e); });
     el.addEventListener("pointerleave", () => { if (typeof window.masquerTooltipLieu === "function") window.masquerTooltipLieu(); });
@@ -185,19 +205,50 @@ function brancherVillage(el, v) {
     // et le clic n'arriverait jamais) : relâché sans avoir bougé, il le choisit.
     el.addEventListener("pointerdown", (e) => {
         // Le mode voyage (ou le téléport) choisit le village : pas la sélection DEV.
-        if (!estDev() || enCours || (typeof window.modeChoixCarte === "function" && window.modeChoixCarte())) return;
+        if (enCours || (typeof window.modeChoixCarte === "function" && window.modeChoixCarte())) return;
+        if (!estDev()) {
+            // En jeu, un toucher sur un lieu qui a son image l'ouvre (v277) ; la
+            // carte glisse toujours (on ne retient pas le doigt).
+            if (v.image && !el.classList.contains("cache")) appuiApercu = { id: v.id, x: e.clientX, y: e.clientY };
+            return;
+        }
         e.stopPropagation();
         appuiVillage = { id: v.id, x: e.clientX, y: e.clientY };
     });
 }
-let appuiVillage = null;
+let appuiVillage = null, appuiApercu = null;
 window.addEventListener("pointerup", (e) => {
+    if (appuiApercu) {
+        const a = appuiApercu;
+        appuiApercu = null;
+        if (Math.hypot(e.clientX - a.x, e.clientY - a.y) <= 6 && villages[a.id]) window.afficherApercuLieu(villages[a.id]);
+    }
     if (!appuiVillage) return;
     const a = appuiVillage;
     appuiVillage = null;
     if (Math.hypot(e.clientX - a.x, e.clientY - a.y) > 6) return;
     window.selectionnerVillageRegion(selection === a.id ? null : a.id);
 });
+// L'APERÇU D'UN LIEU (v277) : son image en grand, son nom et son type ; un
+// toucher le ferme.
+window.afficherApercuLieu = function(v) {
+    let el = $("apercu-lieu");
+    if (!el) {
+        el = document.createElement("div");
+        el.id = "apercu-lieu";
+        el.className = "apercu-lieu";
+        el.innerHTML = `<figure class="apercu-lieu-cadre"><img class="apercu-lieu-image" alt=""><figcaption><span class="apercu-lieu-nom"></span><span class="apercu-lieu-type"></span></figcaption></figure>`;
+        el.addEventListener("click", () => { el.classList.remove("visible"); });
+        document.body.appendChild(el);
+    }
+    if (!v) { el.classList.remove("visible"); return false; }
+    el.querySelector(".apercu-lieu-image").src = v.image || "";
+    el.querySelector(".apercu-lieu-nom").textContent = v.nom || "";
+    el.querySelector(".apercu-lieu-type").textContent = v.type || "";
+    el.classList.add("visible");
+    if (typeof window.masquerTooltipLieu === "function") window.masquerTooltipLieu();
+    return true;
+};
 window.selectionnerVillageRegion = function(id) {
     selection = id && villages[id] ? id : null;
     dessiner();
@@ -378,18 +429,18 @@ window.masqueCentreVillage = masqueCentre;
 const enBlob = (toile) => new Promise((r) => toile.toBlob(b => r(b), "image/png"));
 
 // 3. LE DESSIN (OpenAI, en retouche).
-function promptImage(visuel) {
+function promptImage(visuel, sujet) {
     return "This image is a square crop of a hand-painted fantasy region map. " +
-        `Paint a small ancient village in the CENTER of this image: ${visuel}. ` +
+        `Paint ${sujet || "a small ancient village"} in the CENTER of this image: ${visuel}. ` +
         "Match EXACTLY the existing art style of the map: the same painting technique, brush strokes, colors, lighting and texture, " +
         "and the same top-down, bird's-eye map perspective and scale as the surrounding terrain. " +
-        "The village must stay small and fit in the middle of the image, leaving the outer quarter on every side untouched. " +
+        "It must stay small and fit in the middle of the image, leaving the outer quarter on every side untouched. " +
         "Do NOT modify, redraw or recolor anything near the borders: the edges must stay identical to the input image, " +
         "because this picture will be placed back over the map at the exact same position. " +
-        "Blend the village naturally into the terrain. No text, no labels, no border, no frame, no compass.";
+        "Blend it naturally into the terrain. No text, no labels, no border, no frame, no compass.";
 }
 window.promptImageVillage = promptImage;
-async function dessinerVillage(cles, toileCarre, visuel) {
+async function dessinerVillage(cles, toileCarre, visuel, sujet) {
     const blobCarre = await enBlob(toileCarre), blobMasque = await enBlob(masqueCentre());
     const modeles = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1"];
     const delais = [5000, 15000, 30000];
@@ -398,7 +449,7 @@ async function dessinerVillage(cles, toileCarre, visuel) {
         for (let tentative = 0; tentative < 3; tentative++) {
             const form = new FormData();
             form.append("model", modele);
-            form.append("prompt", promptImage(visuel));
+            form.append("prompt", promptImage(visuel, sujet));
             form.append("image[]", blobCarre, "carte.png");
             if (avecMasque) form.append("mask", blobMasque, "masque.png");
             form.append("n", "1");
@@ -487,14 +538,26 @@ async function heberger(cles, toile) {
 }
 
 // Le calque d'un carré : découpé, dessiné, composé, hébergé.
-async function fabriquerCalque(cles, urlImage, o, visuel) {
+async function fabriquerCalque(cles, urlImage, o, visuel, sujet) {
     const { toile, cotePixels } = await decouper(urlImage, o);
-    const dessin = await dessinerVillage(cles, toile, visuel);
+    const dessin = await dessinerVillage(cles, toile, visuel, sujet);
     // Assez fin pour le zoom ×4 de la carte, sans dépasser le dessin.
     const coteFinal = Math.round(borne(cotePixels * 2, 256, COTE_IA));
     const { toile: calque } = window.composerCalqueVillage(dessin, toile, coteFinal);
     return heberger(cles, calque);
 }
+
+// LE CALQUE D'UN LIEU QUELCONQUE (v277, les POI, poi_creation.js) : la même
+// fabrique, sur la carte d'une région qui n'est pas forcément ouverte.
+window.fabriquerCalqueLieu = async function(o, visuel, sujet) {
+    const c = lireCles();
+    const manque = clesManquantes(c).filter(k => k !== "Gemini");
+    if (manque.length) throw new Error("clés manquantes : " + manque.join(", "));
+    const carte = (window.CARTES_REGIONALES || {})[Number(o.region)];
+    if (!carte || !carte.image) throw new Error("pas d'image pour la carte " + o.region);
+    const url = typeof window.urlImageCarteRegionale === "function" ? window.urlImageCarteRegionale(carte.image) : carte.image;
+    return fabriquerCalque(c, url, o, visuel, sujet);
+};
 
 // --- LE GRAND « PATIENTEZ » ---------------------------------------------------
 function attente(visible, texte, detail) {

@@ -5876,3 +5876,46 @@ textarea.input-texte-parchemin {
 .popup-regions-curseur input[type="range"] { flex: 1; accent-color: #a01212; }
 .popup-regions-valeur { min-width: 52px; text-align: right; font-weight: bold; }
 .popup-regions-bouton.actif { background: #fff; color: #a01212; border: 2px solid #e01b1b; }
+
+/* =========================================================================
+   LES POINTS D'INTÉRÊT (v277, voyage_groupe.js, poi_creation.js)
+   ========================================================================= */
+/* Le point d'exclamation doré : là où le groupe a aperçu quelque chose. */
+.poi-voyage { position: absolute; display: none; align-items: center; justify-content: center; transform: translate(-50%, -50%);
+  pointer-events: none; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff6c8, #f2c94c 45%, #b8861b 100%);
+  border: calc(2px / var(--zoom-region, 1)) solid #fff3c4; box-shadow: 0 0 0.35em rgba(255, 210, 90, 0.95), 0 0.12em 0.3em rgba(0, 0, 0, 0.55); }
+.poi-voyage-signe { position: relative; font-weight: bold; color: #5a3608; line-height: 1; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6); }
+.poi-voyage-halo { position: absolute; inset: -40%; border-radius: 50%; border: calc(3px / var(--zoom-region, 1)) solid rgba(255, 214, 102, 0.85);
+  animation: poi-halo 1.6s ease-out infinite; }
+.poi-voyage.en-vue { animation: poi-saut 1.1s ease-in-out infinite; }
+@keyframes poi-halo { 0% { transform: scale(0.6); opacity: 0.9; } 100% { transform: scale(1.5); opacity: 0; } }
+@keyframes poi-saut { 0%, 100% { transform: translate(-50%, -50%); } 50% { transform: translate(-50%, -62%); } }
+/* Le chemin du détour : un pointillé plus discret. */
+.calque-detour .trace-voyage { stroke: #c0392b; opacity: 0.85; }
+
+/* L'attente RP, à la halte, pendant que le lieu se révèle. */
+.attente-poi { position: fixed; inset: 0; z-index: 10001; display: flex; align-items: center; justify-content: center; pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(10, 8, 4, 0.15) 0%, rgba(10, 8, 4, 0.55) 100%); opacity: 0; transition: opacity 0.6s ease; }
+.attente-poi.visible { opacity: 1; }
+.attente-poi-carte { max-width: min(86vw, 520px); padding: 18px 26px; border-radius: 14px; text-align: center;
+  background: rgba(243, 226, 184, 0.97); border: 2px solid #8a6a2a; color: #3b2414; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6); }
+.attente-poi-signe { display: inline-flex; width: 38px; height: 38px; align-items: center; justify-content: center; border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #fff6c8, #f2c94c 45%, #b8861b 100%); color: #5a3608; font-weight: bold; font-size: 24px;
+  box-shadow: 0 0 14px rgba(255, 210, 90, 0.9); margin-bottom: 8px; }
+.attente-poi-texte { font-size: 19px; font-style: italic; min-height: 2.6em; transition: opacity 0.4s ease; }
+.attente-poi-points { display: flex; gap: 6px; justify-content: center; margin-top: 8px; }
+.attente-poi-points span { width: 7px; height: 7px; border-radius: 50%; background: #8a6a2a; animation: attente-poi-point 1.2s ease-in-out infinite; }
+.attente-poi-points span:nth-child(2) { animation-delay: 0.2s; }
+.attente-poi-points span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes attente-poi-point { 0%, 100% { opacity: 0.25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-4px); } }
+
+/* L'aperçu d'un lieu découvert : son image en grand ; un toucher le ferme. */
+.apercu-lieu { position: fixed; inset: 0; z-index: 20400; display: none; align-items: center; justify-content: center; padding: 4vh 4vw;
+  background: rgba(8, 6, 3, 0.72); cursor: pointer; }
+.apercu-lieu.visible { display: flex; }
+.apercu-lieu-cadre { margin: 0; max-width: min(92vw, 1100px); border-radius: 12px; overflow: hidden; border: 3px solid #c9a24a;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7); background: #1c140b; }
+.apercu-lieu-image { display: block; width: 100%; max-height: 72vh; object-fit: cover; }
+.apercu-lieu-cadre figcaption { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 10px 16px; color: #f3dfa6; }
+.apercu-lieu-nom { font-size: 22px; font-weight: bold; letter-spacing: 0.04em; }
+.apercu-lieu-type { font-size: 15px; font-style: italic; opacity: 0.85; }

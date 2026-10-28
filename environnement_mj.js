@@ -205,6 +205,14 @@ function texteAnalyse(a) {
     return lignes.join("\n");
 }
 
+// LE TERRAIN D'UN POINT QUELCONQUE (v277 : là où naît un POI) — sans le garder.
+window.lireTerrainA = async function(pos) {
+    const p = { Region: Number(pos.Region), x: Number(pos.x), y: Number(pos.y) };
+    const decoupe = await decouper(p);
+    if (!decoupe) return null;
+    return demanderTerrain(decoupe, p, lieuxProches(p));
+};
+
 // L'ANALYSE, UNE FOIS PAR POSITION : refaite seulement si le groupe a bougé
 // (ou `forcer`). Rend la fiche gardée dans la partie.
 window.analyserTerrainGroupe = async function(options) {

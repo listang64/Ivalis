@@ -110,7 +110,7 @@ let rafAnim = null;
 const vus = new Set();         // les voyages déjà montrés (on n'amène qu'une fois sur la carte)
 const etapesVues = new Set();  // « JOUR k » déjà annoncé
 const annulationsVues = new Set();
-const reglages = { tailleMonde: TAILLE_MONDE_DEFAUT, tailleRegion: TAILLE_REGION_DEFAUT };
+const reglages = { tailleMonde: TAILLE_MONDE_DEFAUT, tailleRegion: TAILLE_REGION_DEFAUT, chancePoi: 0.5 };
 
 // --- LA POSITION DU GROUPE -------------------------------------------------
 // Ce que dit la base ; à défaut, le village où se trouve le groupe (un
@@ -219,16 +219,178 @@ function joursDeMarche(longueur) {
     return Math.max(1, Math.ceil(longueur / DISTANCE_JOUR - TOLERANCE_JOUR));
 }
 window.joursDeMarcheVoyage = joursDeMarche;
-function dureeEtape(v, k) {
+// LE TRONÇON EN COURS (v277) : la marche d'une journée peut s'arrêter en
+// chemin (un POI aperçu) et reprendre plus loin. Segment { de, a } en part de
+// la trace ; par défaut, la journée entière — jusqu'au POI prévu, s'il y en a.
+const journee = (v, k) => ({ de: k > 1 ? v.Etapes[k - 2] : 0, a: v.Etapes[k - 1] });
+function troncon(v) {
+    if (!v || v.Type !== "region") return { de: 0, a: 1 };
+    const k = Number(v.Jour) || 1, j = journee(v, k);
+    const s = v.Segment || {};
+    const de = Number.isFinite(s.de) ? s.de : j.de;
+    let a = Number.isFinite(s.a) ? s.a : j.a;
+    if (v.Poi_Prevu && v.Poi_Prevu.f > de && v.Poi_Prevu.f < a) a = v.Poi_Prevu.f;
+    return { de, a };
+}
+window.tronconVoyage = (v) => troncon(v || voyage);
+function dureeMarche(v, de, a, delai) {
     if (v.Type === "monde") {
         const A = v.Trace[0], B = v.Trace[v.Trace.length - 1];
         return { delai: DELAI_MONDE_MS, duree: DELAI_MONDE_MS + borne(2600 + Math.hypot(B.x - A.x, B.y - A.y) * 1.5, 3500, 9000) };
     }
-    const de = k > 1 ? v.Etapes[k - 2] : 0, a = v.Etapes[k - 1];
     const jours = ((a - de) * (Number(v.Longueur) || 0)) / DISTANCE_JOUR;
-    return { delai: DELAI_JOUR_MS, duree: DELAI_JOUR_MS + Math.round(MARCHE_MIN_MS + MARCHE_JOUR_MS * borne(jours, 0, 1.2)) };
+    return { delai, duree: delai + Math.round(MARCHE_MIN_MS + MARCHE_JOUR_MS * borne(jours, 0, 1.2)) };
+}
+// Le départ d'une journée k (le premier jour, ou après une nuit) : le POI de
+// la journée est tiré à ce moment (planifierPoi), et la marche s'arrêtera là.
+function lancerJournee(v, k) {
+    const poi = v.Type === "region" ? planifierPoi(v, k) : null;
+    const vv = { ...v, Jour: k, Segment: null, Poi_Prevu: poi };
+    const t = troncon(vv);
+    const { delai, duree } = dureeMarche(vv, t.de, t.a, DELAI_JOUR_MS);
+    return { Etat: "marche", Jour: k, Debut_Marche: Date.now(), Duree_Marche_Ms: duree, Delai_Depart_Ms: delai, Poi_Prevu: poi, Segment: null };
+}
+function dureeEtape(v, k) {
+    const j = v.Type === "region" ? journee(v, k) : { de: 0, a: 1 };
+    return dureeMarche(v, j.de, j.a, DELAI_JOUR_MS);
 }
 window.dureeEtapeVoyage = dureeEtape;
+// Des champs de Voyage_Groupe, à écrire en chemins pointés (null : effacé).
+function champsVoyage(champs) {
+    const maj = {};
+    Object.entries(champs).forEach(([k, v]) => { maj["Voyage_Groupe." + k] = (v === null || v === undefined) ? deleteField() : v; });
+    return maj;
+}
+
+// =========================================================================
+//  LES POINTS D'INTÉRÊT (v277)
+// =========================================================================
+//  Nico : « en cours de chemin, quand le groupe est en déplacement local, des
+//  POI peuvent apparaître (pourcentages aléatoires) : un point d'exclamation
+//  jaune/doré dans un périmètre autour d'eux. La marche se met en pause, une
+//  fenêtre propose d'aller voir (« il vous semble apercevoir quelque chose pas
+//  très loin »). S'ils refusent, ils continuent et le POI disparaît ; sinon le
+//  groupe s'y rend (un chemin aux légères ondulations), l'itinéraire initial
+//  est maintenu. Pas trop près d'un lieu déjà sur la carte. »
+//
+//  LA CHANCE : CHANCE_POI_DEFAUT par journée de marche (Nico : 50 %),
+//  réglable en DEV (Carte_Monde/Groupe.Chance_POI) ; au plus un par jour. Le
+//  tirage se fait au départ de la journée (en transaction) : le moment, et la
+//  place — dans un rayon de RAYON_POI autour du groupe, sur le terrain
+//  praticable, hors des nuages, assez loin des lieux posés pour que les
+//  dessins ne se touchent pas (une taille de marge).
+//
+//  LES ÉTATS : marche → poi (le vote : tous oui pour y aller, un non et l'on
+//  passe son chemin) → detour (le chemin vers le POI ; le lieu se crée,
+//  poi_creation.js) → halte (le lieu ; le chat s'ouvre, le MJ parle ;
+//  « Reprendre la route » ou « Rester ici », tous d'accord) → retour (le
+//  même chemin, à l'envers) → marche (la fin de la journée : le détour compte
+//  dans la journée — s'il l'a mangée, la nuit tombe au retour sur la route).
+// =========================================================================
+const CHANCE_POI_DEFAUT = 0.5;
+const RAYON_POI = [0.10, 0.20];       // en hauteurs de carte, autour du groupe
+// À la halte, le groupe s'arrête au bord du lieu (pas dessus : son dessin se
+// voit) : la part du détour où il reste un peu plus d'une demi-taille de lieu.
+function arretDetour(v) {
+    const L = Number(v && v.Poi && v.Poi.Longueur) || 0;
+    return L > 0 ? borne(1 - (0.6 * taillePoi()) / L, 0.3, 0.95) : 0.8;
+}
+const DUREE_DETOUR_MS = [2600, 6000];
+const MESSAGES_ATTENTE_POI = [
+    "Vous approchez prudemment, les sens aux aguets…",
+    "Les contours du lieu se précisent peu à peu devant vous…",
+    "Le vent porte des odeurs et des bruits encore indistincts…",
+    "Quelque chose bouge, là-bas — ou n'est-ce que l'ombre des branches ?",
+    "Vos pas se font plus lents ; chacun retient son souffle…"
+];
+const taillePoi = () => Number(window.TAILLE_POI) || 0.08;
+// La grille des nuages d'une carte (décodée une fois).
+const grillesNuages = {};
+function sousLesNuages(n, x, y) {
+    const c = (window.CARTES_REGIONALES || {})[n];
+    if (!c || !c.nuages || !c.nuages.cases || typeof window.decoderGrilleNuages !== "function") return false;
+    const cle = n + ":" + c.nuages.cases.length + ":" + c.nuages.cases.slice(0, 24);
+    if (!grillesNuages[n] || grillesNuages[n].cle !== cle) {
+        grillesNuages[n] = { cle, grille: window.decoderGrilleNuages(c.nuages.cases, c.nuages.colonnes * c.nuages.lignes) };
+    }
+    const { colonnes, lignes } = c.nuages;
+    const col = borne(Math.floor(x * colonnes), 0, colonnes - 1), lig = borne(Math.floor(y * lignes), 0, lignes - 1);
+    return !!grillesNuages[n].grille[lig * colonnes + col];
+}
+window.sousLesNuagesVoyage = sousLesNuages;
+// Une place possible pour un POI : sur la carte, sur le terrain, hors des
+// nuages, loin des lieux posés.
+function placePoiValable(n, x, y) {
+    const asp = aspectRegion(n), t = taillePoi();
+    const mx = t / (2 * asp) + 0.01, my = t / 2 + 0.01;
+    if (x < mx || x > 1 - mx || y < my || y > 1 - my) return false;
+    if (typeof window.terrainsDefinisRegion === "function" && window.terrainsDefinisRegion(n) && !window.pointSurTerrainRegion(n, x, y)) return false;
+    if (sousLesNuages(n, x, y)) return false;
+    return !Object.values(window.VILLAGES_REGIONAUX || {}).some(v => v.numero === n
+        && Math.hypot((v.x - x) * asp, v.y - y) < (t + (Number(v.taille) || t)) / 2 + t);
+}
+window.placePoiValable = placePoiValable;
+function planifierPoi(v, k) {
+    if (!v || v.Type !== "region") return null;
+    const chance = Number.isFinite(reglages.chancePoi) ? reglages.chancePoi : CHANCE_POI_DEFAUT;
+    if (!(hasard() < chance)) return null;
+    const n = Number(v.Arrivee.Region), asp = Number(v.Aspect) || aspectRegion(n), j = journee(v, k);
+    for (let essai = 0; essai < 40; essai++) {
+        const f = j.de + (j.a - j.de) * (0.2 + 0.65 * hasard());
+        const P = pointDuVoyage(v, f);
+        const r = RAYON_POI[0] + (RAYON_POI[1] - RAYON_POI[0]) * hasard(), angle = hasard() * Math.PI * 2;
+        const x = P.x + (r * Math.cos(angle)) / asp, y = P.y + r * Math.sin(angle);
+        if (placePoiValable(n, x, y)) {
+            return { Id: "P" + Date.now().toString(36) + Math.floor(hasard() * 1e5).toString(36), f: arrondi(f), x: arrondi(x), y: arrondi(y) };
+        }
+    }
+    return null;
+}
+window.planifierPoiVoyage = (v, k) => planifierPoi(v || voyage, k || (voyage && voyage.Jour) || 1);
+// Le chemin vers le POI : de légères ondulations (Nico : « pas en ligne droite »).
+function cheminDetour(v, poi) {
+    const n = Number(v.Arrivee.Region), asp = Number(v.Aspect) || aspectRegion(n);
+    const A = pointDuVoyage(v, poi.f), B = { x: poi.x, y: poi.y };
+    const a = { x: A.x * asp, y: A.y }, b = { x: B.x * asp, y: B.y };
+    const d = { x: b.x - a.x, y: b.y - a.y }, L0 = Math.hypot(d.x, d.y) || 1e-9, nrm = { x: -d.y / L0, y: d.x / L0 };
+    const ondes = [1, 2, 3].map((k, i) => ({ k, a: (hasard() * 2 - 1) * [0.09, 0.05, 0.025][i] }));
+    const pts = [];
+    const N = 24;
+    for (let i = 0; i <= N; i++) {
+        const t = i / N, e = ondes.reduce((s, o) => s + o.a * Math.sin(o.k * Math.PI * t), 0) * L0;
+        pts.push({ x: arrondi(borne((a.x + d.x * t + nrm.x * e) / asp, 0, 1)), y: arrondi(borne(a.y + d.y * t + nrm.y * e, 0, 1)) });
+    }
+    pts[0] = { x: arrondi(A.x), y: arrondi(A.y) };
+    pts[N] = { x: arrondi(B.x), y: arrondi(B.y) };
+    const cumul = longueurs(pts, asp);
+    return { trace: pts, longueur: arrondi(cumul[cumul.length - 1]) };
+}
+function dureeDetour(poi) {
+    return Math.round(borne(DUREE_DETOUR_MS[0] + (Number(poi.Longueur) || 0) / DISTANCE_JOUR * MARCHE_JOUR_MS, DUREE_DETOUR_MS[0], DUREE_DETOUR_MS[1]));
+}
+// Après le POI : la journée reprend là où le groupe a quitté sa route. Le
+// détour (aller et retour) compte dans la journée ; ce qui reste de la route
+// est redécoupé en journées.
+function replanifierApresPoi(v) {
+    const k = Number(v.Jour) || 1, j = journee(v, k), L = Number(v.Longueur) || 0, f = v.Poi.f;
+    const budget = (j.a - j.de) * L, fait = (f - j.de) * L + 2 * (Number(v.Poi.Longueur) || 0);
+    const reste = budget - fait;
+    const avant = v.Etapes.slice(0, k - 1);
+    const decouper = (de) => {
+        if (de >= 1 - 1e-6) return [];
+        const nb = joursDeMarche((1 - de) * L);
+        return Array.from({ length: nb }, (_, i) => arrondi(de + (1 - de) * (i + 1) / nb));
+    };
+    if (reste <= 0.01 * DISTANCE_JOUR) {
+        // La journée est mangée : la nuit tombe au retour sur la route.
+        const etapes = avant.concat([arrondi(f)], decouper(f));
+        return { nuit: true, Etapes: etapes, Jours: etapes.length };
+    }
+    const fin = Math.min(1, f + reste / (L || 1));
+    const etapes = avant.concat([arrondi(fin)], fin < 1 ? decouper(fin) : []);
+    return { nuit: false, fin: arrondi(fin), Etapes: etapes, Jours: etapes.length };
+}
+window.replanifierApresPoiVoyage = replanifierApresPoi;
 
 // --- LES ÉCRITURES ---------------------------------------------------------
 // Une transaction sur la partie (et la date en jeu, au besoin). `fn(data,
@@ -277,15 +439,10 @@ function nomDe(v, id) {
 // et le compteur du cimetière avance.
 function champsDepart(data, v, votes) {
     const numero = (Number(data.Voyages_Effectues) || 0) + 1;
-    const { delai, duree } = dureeEtape(v, 1);
     return {
         maj: {
             "Voyage_Groupe.Votes": votes,
-            "Voyage_Groupe.Etat": "marche",
-            "Voyage_Groupe.Jour": 1,
-            "Voyage_Groupe.Debut_Marche": Date.now(),
-            "Voyage_Groupe.Duree_Marche_Ms": duree,
-            "Voyage_Groupe.Delai_Depart_Ms": delai,
+            ...champsVoyage(lancerJournee(v, 1)),
             Voyages_Effectues: numero,
             Lieu_Actuel: "", Situation: SITUATION_NATURE
         },
@@ -333,10 +490,11 @@ window.proposerVoyageGroupe = async function(proposition) {
         if (actuel && actuel.Etat) return { resultat: { occupe: true } };
         const maj = { Voyage_Groupe: v, Voyage_Annule: deleteField() };
         if (votants.every(x => v.Votes[x.id] === "oui")) {
-            const depart = champsDepart(data, v, v.Votes);
-            const { delai, duree } = dureeEtape(v, 1);
-            Object.assign(v, { Etat: "marche", Jour: 1, Debut_Marche: Date.now(), Duree_Marche_Ms: duree, Delai_Depart_Ms: delai });
-            return { maj: { ...maj, Voyage_Groupe: v, Voyages_Effectues: depart.maj.Voyages_Effectues, Lieu_Actuel: "", Situation: SITUATION_NATURE }, resultat: depart.resultat };
+            const numero = (Number(data.Voyages_Effectues) || 0) + 1;
+            const depart = { ...v, ...lancerJournee(v, 1) };
+            Object.keys(depart).forEach(k => { if (depart[k] === null) delete depart[k]; });
+            return { maj: { ...maj, Voyage_Groupe: depart, Voyages_Effectues: numero, Lieu_Actuel: "", Situation: SITUATION_NATURE },
+                     resultat: { demarre: true, lieuQuitte: data.Lieu_Actuel || "", numero } };
         }
         return { maj, resultat: { vote: true } };
     });
@@ -372,6 +530,8 @@ window.forcerVoyageGroupe = async function() {
     const id = voyage && voyage.Id;
     if (!id || !estDev()) return null;
     if (voyage.Etat === "nuit") return window.choisirNuitVoyageGroupe("repartir", { forcer: true });
+    if (voyage.Etat === "poi") return window.voterPoiGroupe("oui", { forcer: true });
+    if (voyage.Etat === "halte") return window.choisirHalteGroupe("reprendre", { forcer: true });
     const r = await transaction((data) => {
         const v = data.Voyage_Groupe;
         if (!memeVoyage(v, id) || v.Etat !== "vote") return null;
@@ -384,12 +544,24 @@ window.forcerVoyageGroupe = async function() {
     return r;
 };
 
-// LA FIN D'UNE ÉTAPE : le premier poste qui a fini de la jouer la fait
-// avancer — le camp de la nuit, ou l'arrivée.
-async function terminerEtape(id, k) {
+// LA CLÉ DE CE QUI SE JOUE À L'ÉCRAN : un tronçon de marche, un détour, un
+// retour. Deux postes qui jouent la même chose ont la même clé.
+function cleAnimation(v) {
+    if (!v) return null;
+    if (v.Etat === "marche") { const t = troncon(v); return `${v.Id}:m:${Number(v.Jour) || 1}:${t.de}:${t.a}`; }
+    if ((v.Etat === "detour" || v.Etat === "retour") && v.Poi) return `${v.Id}:${v.Etat}:${v.Poi.Id}`;
+    return null;
+}
+window.cleAnimationVoyage = (v) => cleAnimation(v || voyage);
+
+// LA FIN D'UN TRONÇON : le premier poste qui a fini de le jouer fait avancer
+// le voyage — le POI aperçu, le camp de la nuit, l'arrivée ; la halte au POI ;
+// la reprise de la route.
+async function terminerEtape(id, cle) {
     const r = await transaction((data) => {
         const v = data.Voyage_Groupe;
-        if (!memeVoyage(v, id) || v.Etat !== "marche" || (Number(v.Jour) || 1) !== k) return null;
+        if (!memeVoyage(v, id) || cleAnimation(v) !== cle) return null;
+        const k = Number(v.Jour) || 1;
         const fini = { Voyage_Groupe: deleteField(), Voyage_Termine: { Id: id, Le: Date.now() } };
         if (v.Type === "monde") {
             const n = Number(v.Arrivee && v.Arrivee.Region);
@@ -401,10 +573,42 @@ async function terminerEtape(id, k) {
                      resultat: { arrivee: true, region: n } };
         }
         const n = Number(v.Arrivee.Region);
+        // Le détour s'achève : la halte au POI (le lieu, s'il est déjà né).
+        if (v.Etat === "detour") {
+            const maj = { ...champsVoyage({ Etat: "halte", Choix_Halte: {} }), Position_Groupe: { Region: n, x: v.Poi.x, y: v.Poi.y } };
+            if (v.Poi.Lieu) Object.assign(maj, { Lieu_Actuel: v.Poi.Lieu, Situation: situationDe(v.Poi.Lieu), "Voyage_Groupe.Poi.Arrive": true });
+            return { maj, resultat: { halte: true, arrive: !!v.Poi.Lieu } };
+        }
+        // Le retour sur la route : la journée reprend (ou la nuit tombe).
+        if (v.Etat === "retour") {
+            const plan = replanifierApresPoi(v);
+            const ici = pointDuVoyage(v, v.Poi.f);
+            const base = { Poi: null, Choix_Halte: null, Etapes: plan.Etapes, Jours: plan.Jours, Segment: null, Poi_Prevu: null };
+            if (plan.nuit) {
+                const c = { x: arrondi(ici.x), y: arrondi(ici.y) };
+                return { maj: { ...champsVoyage({ ...base, Etat: "nuit", Camp: c, Choix_Nuit: {} }), Position_Groupe: { Region: n, x: c.x, y: c.y } },
+                         resultat: { nuit: true, jour: k } };
+            }
+            const vv = { ...v, Etapes: plan.Etapes, Jours: plan.Jours, Segment: { de: v.Poi.f, a: plan.fin }, Poi_Prevu: null };
+            const { delai, duree } = dureeMarche(vv, v.Poi.f, plan.fin, 300);
+            return { maj: champsVoyage({ ...base, Etat: "marche", Segment: { de: v.Poi.f, a: plan.fin }, Debut_Marche: Date.now(),
+                                         Duree_Marche_Ms: duree, Delai_Depart_Ms: delai }),
+                     resultat: { reprise: true } };
+        }
+        // Un tronçon de marche s'achève sur le POI prévu : il apparaît.
+        const t = troncon(v);
+        if (v.Poi_Prevu && Math.abs(t.a - v.Poi_Prevu.f) < 1e-9) {
+            const ici = pointDuVoyage(v, v.Poi_Prevu.f);
+            return { maj: { ...champsVoyage({ Etat: "poi", Poi_Prevu: null, Segment: null,
+                                              Poi: { Id: v.Poi_Prevu.Id, x: v.Poi_Prevu.x, y: v.Poi_Prevu.y, f: v.Poi_Prevu.f, Votes: {} } }),
+                            Position_Groupe: { Region: n, x: arrondi(ici.x), y: arrondi(ici.y) } },
+                     resultat: { poi: true } };
+        }
+        // La journée s'achève : la nuit, ou l'arrivée.
         if (k < (Number(v.Jours) || 1)) {
             const camp = pointDuVoyage(v, v.Etapes[k - 1]);
             const c = { x: arrondi(camp.x), y: arrondi(camp.y) };
-            return { maj: { "Voyage_Groupe.Etat": "nuit", "Voyage_Groupe.Camp": c, "Voyage_Groupe.Choix_Nuit": {},
+            return { maj: { ...champsVoyage({ Etat: "nuit", Camp: c, Choix_Nuit: {}, Segment: null, Poi_Prevu: null }),
                             Position_Groupe: { Region: n, x: c.x, y: c.y } },
                      resultat: { nuit: true, jour: k } };
         }
@@ -417,6 +621,133 @@ async function terminerEtape(id, k) {
     return r;
 }
 window.terminerEtapeVoyageGroupe = terminerEtape;
+
+// LE VOTE DU POI : tous oui pour y aller ; un non, et l'on passe son chemin
+// (le POI disparaît). Le DEV force.
+window.voterPoiGroupe = async function(reponse, options) {
+    const id = voyage && voyage.Id, poiId = voyage && voyage.Poi && voyage.Poi.Id;
+    if (!id || !poiId) return null;
+    const moi = idJoueur();
+    const forcer = !!(options && options.forcer) && estDev();
+    const createur = typeof window.peutCreerPoi === "function" && window.peutCreerPoi();
+    const r = await transaction((data) => {
+        const v = data.Voyage_Groupe;
+        if (!memeVoyage(v, id) || v.Etat !== "poi" || !v.Poi || v.Poi.Id !== poiId) return null;
+        const votants = votantsDe(v);
+        if (!forcer && !votants.some(x => x.id === moi)) return null;
+        const votes = { ...(v.Poi.Votes || {}) };
+        if (forcer) votants.forEach(x => { votes[x.id] = "oui"; }); else votes[moi] = reponse === "non" ? "non" : "oui";
+        if (!forcer && votes[moi] === "non") {
+            // On passe son chemin : la fin de la journée.
+            const k = Number(v.Jour) || 1, j = journee(v, k);
+            const vv = { ...v, Segment: { de: v.Poi.f, a: j.a }, Poi_Prevu: null };
+            const { delai, duree } = dureeMarche(vv, v.Poi.f, j.a, 300);
+            return { maj: champsVoyage({ Etat: "marche", Poi: null, Segment: { de: v.Poi.f, a: j.a }, Debut_Marche: Date.now(),
+                                         Duree_Marche_Ms: duree, Delai_Depart_Ms: delai, Poi_Ignore: { Id: poiId, Par: nomDe(v, moi) } }),
+                     resultat: { ignore: true } };
+        }
+        if (!votants.every(x => votes[x.id] === "oui")) return { maj: { "Voyage_Groupe.Poi.Votes": votes }, resultat: { vote: true } };
+        const detour = cheminDetour(v, v.Poi);
+        const poi = { ...v.Poi, Votes: votes, Detour: detour.trace, Longueur: detour.longueur };
+        if (createur) poi.Createur = moi;
+        return { maj: champsVoyage({ Etat: "detour", Poi: poi, Debut_Marche: Date.now(), Duree_Marche_Ms: dureeDetour(poi), Delai_Depart_Ms: 300 }),
+                 resultat: { detour: true, poi, createur } };
+    });
+    clic();
+    if (r && r.detour && r.createur) lancerCreationPoi(id, r.poi);
+    return r;
+};
+
+// LA HALTE : « Reprendre la route » ou « Rester ici », tous d'accord.
+window.choisirHalteGroupe = async function(reponse, options) {
+    const id = voyage && voyage.Id;
+    if (!id || !voyage.Poi) return null;
+    const moi = idJoueur();
+    const forcer = !!(options && options.forcer) && estDev();
+    const voulu = reponse === "rester" ? "rester" : "reprendre";
+    const r = await transaction((data) => {
+        const v = data.Voyage_Groupe;
+        if (!memeVoyage(v, id) || v.Etat !== "halte" || !v.Poi) return null;
+        const votants = votantsDe(v);
+        if (!forcer && !votants.some(x => x.id === moi)) return null;
+        const choixHalte = { ...(v.Choix_Halte || {}) };
+        if (forcer) votants.forEach(x => { choixHalte[x.id] = voulu; }); else choixHalte[moi] = voulu;
+        const accord = votants.length > 0 && votants.every(x => choixHalte[x.id] === voulu);
+        if (!accord) return { maj: { "Voyage_Groupe.Choix_Halte": choixHalte }, resultat: { attente: true } };
+        if (voulu === "rester") {
+            return { maj: { Voyage_Groupe: deleteField(), Voyage_Termine: { Id: id, Le: Date.now() } }, resultat: { reste: true } };
+        }
+        return { maj: { ...champsVoyage({ Etat: "retour", Choix_Halte: choixHalte, Debut_Marche: Date.now(), Duree_Marche_Ms: dureeDetour(v.Poi), Delai_Depart_Ms: 300 }),
+                        Lieu_Actuel: "", Situation: SITUATION_NATURE },
+                 resultat: { reprend: true, lieu: v.Poi.Lieu || "" } };
+    });
+    clic();
+    // On quitte le lieu : le chat se nettoie (les souvenirs de ses PNJ).
+    if (r && r.reprend) nettoyerChat({ lieu: r.lieu, cimetiere: false });
+    return r;
+};
+
+// LA CRÉATION DU LIEU (poi_creation.js) : par le poste du dernier oui s'il a
+// les clés, sinon par un poste qui les a (il la réclame en transaction).
+const creationsIci = new Set(), reclamations = new Set(), arriveesVues = new Set();
+async function lancerCreationPoi(id, poi) {
+    if (!poi || creationsIci.has(poi.Id) || typeof window.creerLieuPoi !== "function") return;
+    creationsIci.add(poi.Id);
+    try {
+        const lieu = await window.creerLieuPoi({ region: Number(voyage && voyage.Arrivee ? voyage.Arrivee.Region : poi.Region), x: poi.x, y: poi.y });
+        await transaction((data) => {
+            const v = data.Voyage_Groupe;
+            if (!memeVoyage(v, id) || !v.Poi || v.Poi.Id !== poi.Id) return null;
+            const maj = { "Voyage_Groupe.Poi.Lieu": lieu.id, "Voyage_Groupe.Poi.Nom": lieu.nom, "Voyage_Groupe.Poi.Type": lieu.type };
+            if (v.Etat === "halte") Object.assign(maj, { Lieu_Actuel: lieu.id, Situation: situationDe(lieu.id), "Voyage_Groupe.Poi.Arrive": true });
+            return { maj };
+        });
+    } catch (e) {
+        console.error("[MIA_POI] Le lieu n'a pas pu naître :", e);
+        await transaction((data) => {
+            const v = data.Voyage_Groupe;
+            if (!memeVoyage(v, id) || !v.Poi || v.Poi.Id !== poi.Id) return null;
+            return { maj: { "Voyage_Groupe.Poi.Echec": String(e && e.message || e).slice(0, 200) } };
+        });
+    }
+}
+window.lancerCreationPoiVoyage = lancerCreationPoi;
+// Un POI à créer et personne pour le faire (le poste du dernier oui n'a pas
+// les clés) : ce poste, s'il les a, le réclame.
+async function reclamerCreationPoi(v) {
+    if (!v || !v.Poi || v.Poi.Createur || v.Poi.Lieu || v.Poi.Echec || reclamations.has(v.Poi.Id)) return;
+    if (!(typeof window.peutCreerPoi === "function" && window.peutCreerPoi())) return;
+    reclamations.add(v.Poi.Id);
+    const moi = idJoueur(), id = v.Id, poiId = v.Poi.Id;
+    const r = await transaction((data) => {
+        const w = data.Voyage_Groupe;
+        if (!memeVoyage(w, id) || !w.Poi || w.Poi.Id !== poiId || w.Poi.Createur) return null;
+        return { maj: { "Voyage_Groupe.Poi.Createur": moi }, resultat: { pris: true } };
+    });
+    if (r && r.pris) lancerCreationPoi(id, v.Poi);
+}
+// L'arrivée au POI (chez tous) : le chat s'ouvre ; le poste qui a créé le lieu
+// pose l'arrivée et réveille le MJ (Nico : « ça ouvre la chatbox et le MJ
+// commence à parler en lui donnant les données du lieu »).
+async function arriverAuPoi(v) {
+    const poi = v.Poi;
+    if (!poi || !poi.Arrive || arriveesVues.has(poi.Id)) return;
+    arriveesVues.add(poi.Id);
+    const chat = $("fenetre-chatbox");
+    if (ecranJeuVisible() && typeof window.ouvrirChatbox === "function" && !(chat && chat.style.display === "flex")) {
+        try { window.ouvrirChatbox(); } catch (e) { console.error("Chat (le voyage continue) :", e); }
+    }
+    if (!creationsIci.has(poi.Id)) return;
+    const date = window.DATE_EN_JEU_ACTUELLE || {};
+    try {
+        await addDoc(collection(db, "Messages_Chat"), {
+            ID_Partie: window.ID_PARTIE_COURANTE, ...AUTEUR_DESTIN,
+            Texte: `*Le groupe quitte un instant sa route et s'approche de ${poi.Nom || "ce qu'il a aperçu"}.* (Narrateur, décris de manière immersive leur arrivée en ce lieu, l'atmosphère et ce qu'ils voient en premier.)`,
+            Date_Jour: date.jour || "", Date_An: date.annee || "", Timestamp: Date.now()
+        });
+    } catch (e) { console.error("Message d'arrivée au POI :", e); }
+    if (typeof window.declencherTourIA === "function") setTimeout(() => window.declencherTourIA(), 300);
+}
 
 // LA NUIT : repartir ou rester ici. Rien ne bouge tant que tous ne sont pas
 // d'accord (Nico). La nuit finie, la date avance d'un jour.
@@ -442,10 +773,7 @@ window.choisirNuitVoyageGroupe = async function(reponse, options) {
                             Position_Groupe: { Region: Number(v.Arrivee.Region), x: arrondi(camp.x), y: arrondi(camp.y) }, Lieu_Actuel: "", Situation: SITUATION_NATURE },
                      date: lendemain(date), resultat: { reste: true } };
         }
-        const { delai, duree } = dureeEtape(v, k + 1);
-        return { maj: { "Voyage_Groupe.Etat": "marche", "Voyage_Groupe.Jour": k + 1, "Voyage_Groupe.Debut_Marche": Date.now(),
-                        "Voyage_Groupe.Duree_Marche_Ms": duree, "Voyage_Groupe.Delai_Depart_Ms": delai,
-                        "Voyage_Groupe.Choix_Nuit": {}, "Voyage_Groupe.Camp": deleteField() },
+        return { maj: champsVoyage({ ...lancerJournee(v, k + 1), Choix_Nuit: {}, Camp: null }),
                  date: lendemain(date), resultat: { repart: true, jour: k + 1 } };
     }, { avecDate: true });
     clic();
@@ -555,6 +883,19 @@ function calquesRegion() {
     }
     return { svg, pion, nuit };
 }
+function calqueDetour() {
+    const carte = $("carte-region");
+    if (!carte) return null;
+    let svg = $("carte-region-detour");
+    if (!svg) {
+        svg = document.createElementNS(SVG_NS, "svg");
+        svg.id = "carte-region-detour";
+        svg.setAttribute("class", "calque-voyage calque-detour");
+        svg.setAttribute("preserveAspectRatio", "none");
+        carte.insertBefore(svg, $("carte-region-voyage") ? $("carte-region-voyage").nextSibling : null);
+    }
+    return svg;
+}
 function calqueMonde() {
     let svg = $("calque-voyage-monde");
     if (!svg) {
@@ -570,26 +911,36 @@ function calqueMonde() {
     return svg;
 }
 
-// La part du chemin où en est le groupe, à l'écran.
-function progression() {
-    if (!voyage) return null;
-    const k = Number(voyage.Jour) || 1;
-    if (voyage.Etat === "vote") return 0;
-    if (voyage.Etat === "nuit") return voyage.Type === "region" ? voyage.Etapes[k - 1] : 0;
-    if (anim && anim.cle === cleEtape(voyage)) return anim.f;
-    return k > 1 ? voyage.Etapes[k - 2] : 0;
+// OÙ EST LE GROUPE, À L'ÉCRAN (en voyage) : sur la route, sur le chemin du
+// POI (aller ou retour), au POI, au camp.
+function placeEnVoyage(v) {
+    if (!v) return null;
+    const k = Number(v.Jour) || 1;
+    const animee = anim && anim.cle === cleAnimation(v) ? anim.f : null;
+    if (v.Type === "monde") return pointDuVoyage(v, v.Etat === "marche" && animee !== null ? animee : 0);
+    const asp = Number(v.Aspect) || 1;
+    switch (v.Etat) {
+        case "vote": return pointDuVoyage(v, 0);
+        case "marche": return pointDuVoyage(v, animee !== null ? animee : troncon(v).de);
+        case "poi": return pointDuVoyage(v, v.Poi ? v.Poi.f : troncon(v).de);
+        case "detour": return v.Poi && v.Poi.Detour ? pointA(v.Poi.Detour, asp, animee !== null ? animee : 0) : null;
+        case "retour": return v.Poi && v.Poi.Detour ? pointA(v.Poi.Detour, asp, animee !== null ? animee : arretDetour(v)) : null;
+        case "halte": return v.Poi && v.Poi.Detour ? pointA(v.Poi.Detour, asp, arretDetour(v)) : (v.Poi ? { x: v.Poi.x, y: v.Poi.y } : null);
+        case "nuit": return v.Camp || pointDuVoyage(v, v.Etapes[k - 1]);
+        default: return null;
+    }
 }
-const cleEtape = (v) => v ? `${v.Id}:${Number(v.Jour) || 1}` : null;
+window.placeEnVoyageGroupe = () => placeEnVoyage(voyage);
 
 function placerPions() {
     const enPartie = !!window.ID_PARTIE_COURANTE;
     const pos = enPartie ? positionEffective() : null;
-    const f = progression();
+    const place = placeEnVoyage(voyage);
     // Le monde : le centre de la boîte de la région (ou la route, en voyage).
     const pm = pionMonde();
     if (pm) {
         let ici = null;
-        if (voyage && voyage.Type === "monde" && f !== null) ici = pointDuVoyage(voyage, f);
+        if (voyage && voyage.Type === "monde" && place) ici = place;
         else if (voyage && voyage.Type === "region") ici = centreMonde(voyage.Arrivee.Region);
         else if (pos) ici = centreMonde(pos.Region);
         pm.style.display = ici ? "block" : "none";
@@ -607,7 +958,7 @@ function placerPions() {
         const n = carteOuverte();
         let ici = null;
         if (n && c && c.largeur) {
-            if (voyage && voyage.Type === "region" && Number(voyage.Arrivee.Region) === n && f !== null) ici = pointDuVoyage(voyage, f);
+            if (voyage && voyage.Type === "region" && Number(voyage.Arrivee.Region) === n && place) ici = place;
             else if (voyage && voyage.Type === "monde") {
                 // En route vers une autre région : on ne le voit plus partir
                 // qu'au vote (il est encore là).
@@ -623,15 +974,41 @@ function placerPions() {
         }
         const campe = !!(voyage && voyage.Etat === "nuit");
         pion.classList.toggle("campement", campe);
-        pion.classList.toggle("en-marche", !!(voyage && voyage.Type === "region" && voyage.Etat === "marche"));
+        pion.classList.toggle("en-marche", !!(voyage && voyage.Type === "region" && ["marche", "detour", "retour"].includes(voyage.Etat)));
     }
     if (nuit) nuit.classList.toggle("visible", !!(voyage && voyage.Etat === "nuit" && carteOuverte() === Number(voyage.Arrivee.Region)));
+    placerPoi();
+}
+
+// LE POINT D'EXCLAMATION DORÉ (v277) : là où le groupe a aperçu quelque
+// chose — jusqu'à ce que le lieu soit dessiné sur la carte.
+function placerPoi() {
+    const carte = $("carte-region");
+    if (!carte) return;
+    let el = $("poi-voyage");
+    if (!el) {
+        el = document.createElement("div");
+        el.id = "poi-voyage";
+        el.className = "poi-voyage";
+        el.innerHTML = `<span class="poi-voyage-halo"></span><span class="poi-voyage-signe">!</span>`;
+        carte.insertBefore(el, $("pion-groupe-region") || null);
+    }
+    const c = cadrageRegion(), n = carteOuverte();
+    const poi = voyage && voyage.Type === "region" && voyage.Poi;
+    const lieu = poi && poi.Lieu && (window.VILLAGES_REGIONAUX || {})[poi.Lieu];
+    const visible = !!(poi && n === Number(voyage.Arrivee.Region) && c && c.largeur && ["poi", "detour", "halte", "retour"].includes(voyage.Etat) && !(lieu && lieu.calque));
+    el.style.display = visible ? "flex" : "none";
+    if (!visible) return;
+    const cote = 0.05 * c.hauteur;
+    Object.assign(el.style, { left: (poi.x * c.largeur) + "px", top: (poi.y * c.hauteur) + "px", width: cote + "px", height: cote + "px", fontSize: (cote * 0.72) + "px" });
+    el.classList.toggle("en-vue", voyage.Etat === "poi");
 }
 
 // --- LE POINTILLÉ ROUGE ----------------------------------------------------
 // « Façon carte d'Indiana Jones » : un trait pointillé rouge qui se dessine,
 // puis une croix rouge à l'arrivée.
-function dessinerTraceDans(svg, points, l, h, epaisseur, cle, anime) {
+function dessinerTraceDans(svg, points, l, h, epaisseur, cle, anime, options) {
+    const sansCroix = !!(options && options.sansCroix);
     if (!svg) return;
     if (svg.dataset.cle === (cle || "")) return;
     svg.dataset.cle = cle || "";
@@ -651,7 +1028,7 @@ function dessinerTraceDans(svg, points, l, h, epaisseur, cle, anime) {
     const d = "M" + P.map(p => `${p.x} ${p.y}`).join(" L");
     const fin = P[P.length - 1], s = epaisseur * 2.4;
     const masque = "masque-" + svg.id;
-    const duree = anime && !mouvementReduit() ? (svg.id === "calque-voyage-monde" ? DESSIN_TRACE_MS.monde : DESSIN_TRACE_MS.region) : 0;
+    const duree = anime && !mouvementReduit() ? (svg.id === "calque-voyage-monde" ? DESSIN_TRACE_MS.monde : sansCroix ? 900 : DESSIN_TRACE_MS.region) : 0;
     svg.innerHTML = `
       <defs><mask id="${masque}" maskUnits="userSpaceOnUse" x="0" y="0" width="${l}" height="${h}">
         <path class="trace-voyage-masque" d="${d}" fill="none" stroke="#fff" stroke-width="${epaisseur * 4}" stroke-linecap="round" stroke-linejoin="round"
@@ -661,11 +1038,11 @@ function dessinerTraceDans(svg, points, l, h, epaisseur, cle, anime) {
         <path class="trace-voyage" d="${d}" fill="none" stroke-width="${epaisseur}" stroke-linecap="round" stroke-linejoin="round"
               stroke-dasharray="${epaisseur * 2.6} ${epaisseur * 1.9}"/>
       </g>
-      <circle class="depart-voyage" cx="${P[0].x}" cy="${P[0].y}" r="${epaisseur * 1.05}"/>
+      ${sansCroix ? "" : `<circle class="depart-voyage" cx="${P[0].x}" cy="${P[0].y}" r="${epaisseur * 1.05}"/>
       <g class="croix-voyage" transform="translate(${fin.x} ${fin.y})"><g class="croix-voyage-dessin${duree ? " a-venir" : ""}" style="${duree ? `animation-delay:${duree}ms` : ""}">
         <path class="croix-voyage-ombre" d="M${-s} ${-s} L${s} ${s} M${s} ${-s} L${-s} ${s}" stroke-width="${epaisseur * 2.2}" stroke-linecap="round"/>
         <path class="croix-voyage-trait" d="M${-s} ${-s} L${s} ${s} M${s} ${-s} L${-s} ${s}" stroke-width="${epaisseur * 1.3}" stroke-linecap="round"/>
-      </g></g>`;
+      </g></g>`}`;
     if (duree) {
         const m = svg.querySelector(".trace-voyage-masque");
         requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -701,6 +1078,18 @@ function dessinerTraces() {
             dessinerTraceDans(svg, pts, c.largeur, c.hauteur, Math.max(2, c.hauteur * 0.0065), t.cle + ":" + c.numero, t.anime);
         } else dessinerTraceDans(svg, null, 0, 0, 0, "", false);
     }
+    // Le détour vers le POI : un pointillé plus fin, sans croix.
+    const detour = calqueDetour();
+    if (detour) {
+        const poi = voyage && voyage.Type === "region" && voyage.Poi;
+        if (poi && Array.isArray(poi.Detour) && c && c.largeur && carteOuverte() === Number(voyage.Arrivee.Region)
+            && ["detour", "halte", "retour"].includes(voyage.Etat)) {
+            detour.setAttribute("viewBox", `0 0 ${c.largeur} ${c.hauteur}`);
+            const pts = poi.Detour.map(p => ({ x: p.x * c.largeur, y: p.y * c.hauteur }));
+            dessinerTraceDans(detour, pts, c.largeur, c.hauteur, Math.max(1.5, c.hauteur * 0.0045), "D:" + poi.Id + ":" + c.numero, !vus.has("detour:" + poi.Id), { sansCroix: true });
+            vus.add("detour:" + poi.Id);
+        } else dessinerTraceDans(detour, null, 0, 0, 0, "", false);
+    }
     if (t && t.cle && t.cle.startsWith("V:")) vus.add("trace:" + voyage.Id);
 }
 
@@ -710,8 +1099,34 @@ function dessinerTout() {
     actualiserBouton();
     actualiserBandeau();
     actualiserBoite();
+    actualiserAttentePoi();
     actualiserDev();
 }
+
+// L'ATTENTE DU LIEU (v277, Nico : « un message un peu plus RP pour faire
+// patienter ») : à la halte, tant que le lieu ne s'est pas révélé.
+let minuteurAttente = null;
+function actualiserAttentePoi() {
+    const attendre = !!(voyage && voyage.Etat === "halte" && voyage.Poi && !voyage.Poi.Arrive && !voyage.Poi.Echec && ecranJeuVisible());
+    let el = $("attente-poi");
+    if (!el && !attendre) return;
+    if (!el) {
+        el = document.createElement("div");
+        el.id = "attente-poi";
+        el.className = "attente-poi";
+        el.innerHTML = `<div class="attente-poi-carte"><div class="attente-poi-signe">!</div><div class="attente-poi-texte"></div><div class="attente-poi-points"><span></span><span></span><span></span></div></div>`;
+        ($("ecran-jeu") || document.body).appendChild(el);
+    }
+    el.classList.toggle("visible", attendre);
+    if (!attendre) { clearInterval(minuteurAttente); minuteurAttente = null; return; }
+    if (minuteurAttente) return;
+    let i = 0;
+    const texte = el.querySelector(".attente-poi-texte");
+    const montrer = () => { texte.textContent = MESSAGES_ATTENTE_POI[i % MESSAGES_ATTENTE_POI.length]; i++; };
+    montrer();
+    minuteurAttente = setInterval(montrer, 3200);
+}
+window.MESSAGES_ATTENTE_POI = MESSAGES_ATTENTE_POI;
 window.dessinerVoyageGroupe = dessinerTout;
 
 // --- LE BOUTON VOYAGE ------------------------------------------------------
@@ -934,6 +1349,9 @@ function boite() {
             if (a === "repartir" || a === "rester") window.choisirNuitVoyageGroupe(a);
             if (a === "forcer") window.forcerVoyageGroupe();
             if (a === "forcer-rester") window.choisirNuitVoyageGroupe("rester", { forcer: true });
+            if (a === "poi-oui" || a === "poi-non") window.voterPoiGroupe(a === "poi-oui" ? "oui" : "non");
+            if (a === "halte-reprendre" || a === "halte-rester") window.choisirHalteGroupe(a === "halte-rester" ? "rester" : "reprendre");
+            if (a === "forcer-halte-rester") window.choisirHalteGroupe("rester", { forcer: true });
         });
         ($("ecran-jeu") || document.body).appendChild(el);
     }
@@ -988,7 +1406,45 @@ function actualiserBoite() {
                     <button type="button" data-action="forcer-rester" class="boite-voyage-dev">Forcer : rester</button></div>` : ""}`;
     } else {
         const k = Number(voyage.Jour) || 1;
-        html = `<div class="boite-voyage-tete compacte">🧭 En route vers <b>${vers}</b>${voyage.Type === "region" ? ` · jour ${k} / ${voyage.Jours}` : ""}</div>`;
+        if (voyage.Etat === "poi" && voyage.Poi) {
+            // LE POI APERÇU (v277) : on va voir, ou l'on passe son chemin.
+            const votes = voyage.Poi.Votes || {};
+            const lignes = votants.map(x => {
+                const r = votes[x.id];
+                return `<li class="${r === "oui" ? "oui" : r === "non" ? "non" : "attente"}"><span>${echapper(x.nom)}</span><b>${r === "oui" ? "✔" : r === "non" ? "✖" : "…"}</b></li>`;
+            }).join("");
+            html = `<div class="boite-voyage-tete">👁 Quelque chose, là-bas…</div>
+                <div class="boite-voyage-texte">Il vous semble apercevoir quelque chose, pas très loin de la route. Faire un détour pour aller voir ?</div>
+                <ul class="boite-voyage-votants">${lignes}</ul>
+                ${jeVote ? `<div class="boite-voyage-boutons">
+                    <button type="button" data-action="poi-oui"${votes[moi] === "oui" ? " disabled" : ""}>${votes[moi] === "oui" ? "✔ Aller voir" : "Aller voir"}</button>
+                    <button type="button" data-action="poi-non" class="secondaire">Passer son chemin</button></div>` : `<div class="boite-voyage-etat">Les joueurs décident…</div>`}
+                ${dev ? `<button type="button" data-action="forcer" class="boite-voyage-dev">Forcer le détour (DEV)</button>` : ""}`;
+        } else if (voyage.Etat === "detour") {
+            html = `<div class="boite-voyage-tete compacte">👁 Vous vous écartez de la route pour aller voir…</div>`;
+        } else if (voyage.Etat === "halte" && voyage.Poi) {
+            const poi = voyage.Poi, choixH = voyage.Choix_Halte || {};
+            const lignes = votants.map(x => {
+                const r = choixH[x.id];
+                return `<li class="${r ? "oui" : "attente"}"><span>${echapper(x.nom)}</span><b>${r === "reprendre" ? "Reprendre" : r === "rester" ? "Rester" : "…"}</b></li>`;
+            }).join("");
+            const titreHalte = poi.Arrive ? echapper(poi.Nom || "Halte") : poi.Echec ? "Rien de net…" : "Vous approchez…";
+            const mien = choixH[moi];
+            html = `<div class="boite-voyage-tete">📍 ${titreHalte}</div>
+                <div class="boite-voyage-texte">${poi.Arrive ? `Une halte sur la route de <b>${vers}</b>. Quand vous le voudrez, reprenez la route — ou restez ici.`
+                    : poi.Echec ? `Le lieu ne s'est pas révélé (${echapper(poi.Echec)}).` : "Le lieu se révèle peu à peu…"}</div>
+                <ul class="boite-voyage-votants">${lignes}</ul>
+                ${jeVote ? `<div class="boite-voyage-boutons">
+                    <button type="button" data-action="halte-reprendre"${mien === "reprendre" ? " class=\"choisi\"" : ""}>Reprendre la route</button>
+                    <button type="button" data-action="halte-rester" class="secondaire${mien === "rester" ? " choisi" : ""}">Rester ici</button></div>` : ""}
+                <div class="boite-voyage-etat">Rien ne bouge tant que tous ne sont pas d'accord.</div>
+                ${dev ? `<div class="boite-voyage-boutons"><button type="button" data-action="forcer" class="boite-voyage-dev">Forcer : reprendre</button>
+                    <button type="button" data-action="forcer-halte-rester" class="boite-voyage-dev">Forcer : rester</button></div>` : ""}`;
+        } else if (voyage.Etat === "retour") {
+            html = `<div class="boite-voyage-tete compacte">🧭 Retour sur la route de <b>${vers}</b></div>`;
+        } else {
+            html = `<div class="boite-voyage-tete compacte">🧭 En route vers <b>${vers}</b>${voyage.Type === "region" ? ` · jour ${k} / ${voyage.Jours}` : ""}</div>`;
+        }
     }
     el.className = "boite-voyage etat-" + voyage.Etat;
     if (el.__html !== html) { el.innerHTML = html; el.__html = html; }
@@ -1099,8 +1555,8 @@ function arreterAnimation() {
     anim = null;
 }
 function synchroniserAnimation() {
-    if (!voyage || voyage.Etat !== "marche") { if (anim) arreterAnimation(); return; }
-    const cle = cleEtape(voyage);
+    const cle = cleAnimation(voyage);
+    if (!cle) { if (anim) arreterAnimation(); return; }
     if (anim && anim.cle === cle) return;
     arreterAnimation();
     const k = Number(voyage.Jour) || 1;
@@ -1108,13 +1564,18 @@ function synchroniserAnimation() {
     const delai = Number(voyage.Delai_Depart_Ms) || 0;
     // Un voyage laissé en marche (tous les postes fermés) : on ne le rejoue pas.
     const perime = Date.now() - (Number(voyage.Debut_Marche) || 0) > duree + 6000;
-    const de = voyage.Type === "region" ? (k > 1 ? voyage.Etapes[k - 2] : 0) : 0;
-    const a = voyage.Type === "region" ? voyage.Etapes[k - 1] : 1;
+    let de = 0, a = 1;
+    if (voyage.Etat === "marche") { const t = troncon(voyage); de = t.de; a = t.a; }
+    else if (voyage.Etat === "detour") { de = 0; a = arretDetour(voyage); }
+    else if (voyage.Etat === "retour") { de = arretDetour(voyage); a = 0; }
     anim = { cle, id: voyage.Id, k, debut: performance.now(), duree: perime ? 0 : duree, delai: perime ? 0 : delai, de, a, f: perime ? a : de };
-    if (!perime && voyage.Type === "region" && !etapesVues.has(cle)) { etapesVues.add(cle); annoncerJour(k); }
-    if (!perime && !vus.has("etape:" + cle)) {
-        vus.add("etape:" + cle);
-        // Chaque départ (et chaque reprise) ramène sur la carte du voyage.
+    // Le départ d'une journée (pas la reprise après un POI) : « JOUR k », et
+    // chacun revient sur la carte du voyage.
+    const debutDeJournee = voyage.Etat === "marche" && (voyage.Type !== "region" || Math.abs(de - journee(voyage, k).de) < 1e-9);
+    const cleJour = `${voyage.Id}:${k}`;
+    if (!perime && debutDeJournee && voyage.Type === "region" && !etapesVues.has(cleJour)) { etapesVues.add(cleJour); annoncerJour(k); }
+    if (!perime && debutDeJournee && !vus.has("etape:" + cleJour)) {
+        vus.add("etape:" + cleJour);
         amenerSurLaCarte(voyage);
     }
     const tick = () => {
@@ -1130,16 +1591,15 @@ function synchroniserAnimation() {
     // Le premier poste qui a fini fait avancer le voyage (un léger décalage
     // au hasard : ils ne se bousculent pas tous à la même milliseconde).
     const id = voyage.Id;
-    minuteurEtape = setTimeout(() => { terminerEtape(id, k); }, anim.duree + 150 + Math.floor(Math.random() * 450));
+    minuteurEtape = setTimeout(() => { terminerEtape(id, cle); }, anim.duree + 150 + Math.floor(Math.random() * 450));
 }
 window.finirMarcheVoyage = function() {
-    // Les bancs : la marche en cours se termine tout de suite.
+    // Les bancs : la marche (ou le détour) en cours se termine tout de suite.
     if (!anim) return false;
     anim.duree = 0; anim.delai = 0; anim.f = anim.a;
     placerPions();
     clearTimeout(minuteurEtape);
-    const { id, k } = anim;
-    return terminerEtape(id, k);
+    return terminerEtape(anim.id, anim.cle);
 };
 
 // --- CE QUE LA BASE DIT (app.js, l'écoute de la partie) ----------------------
@@ -1153,6 +1613,10 @@ window.appliquerVoyageDeLaPartie = function(data) {
     }
     partie = data || {};
     const v = partie.Voyage_Groupe && partie.Voyage_Groupe.Id ? partie.Voyage_Groupe : null;
+    // Le POI (v277) : un lieu à créer (ce poste a-t-il les clés ?), l'arrivée.
+    // Rejoué à chaque lecture : chaque appel ne fait son travail qu'une fois.
+    if (v && v.Poi && ["detour", "halte"].includes(v.Etat)) reclamerCreationPoi(v);
+    if (v && v.Etat === "halte" && v.Poi && v.Poi.Arrive) arriverAuPoi(v);
     const cle = JSON.stringify([partie.Position_Groupe || null, partie.Lieu_Actuel || "", v, partie.Voyage_Annule || null]);
     if (cle === derniereCle) return;
     derniereCle = cle;
@@ -1171,11 +1635,16 @@ window.appliquerVoyageDeLaPartie = function(data) {
     }
     synchroniserAnimation();
     if (typeof window.dessinerRegions === "function" && !v !== !avant) window.dessinerRegions();
+    // Le POI refusé : chacun sait qui a passé son chemin.
+    if (v && v.Poi_Ignore && v.Poi_Ignore.Id && !annulationsVues.has(v.Poi_Ignore.Id) && avant && avant.Poi && avant.Poi.Id === v.Poi_Ignore.Id) {
+        annulationsVues.add(v.Poi_Ignore.Id);
+        annoncer(`${v.Poi_Ignore.Par || "Quelqu'un"} préfère passer son chemin.`);
+    }
     dessinerTout();
 };
 window.etatVoyageGroupe = () => ({
     position: positionEffective(), voyage: voyage ? JSON.parse(JSON.stringify(voyage)) : null,
-    choix: window.choixVoyageGroupe(), anim: anim ? { cle: anim.cle, f: anim.f, duree: anim.duree, delai: anim.delai } : null,
+    choix: window.choixVoyageGroupe(), anim: anim ? { cle: anim.cle, f: anim.f, de: anim.de, a: anim.a, duree: anim.duree, delai: anim.delai } : null,
     reglages: { ...reglages }
 });
 
@@ -1184,6 +1653,7 @@ window.appliquerReglagesGroupeDeLaBase = function(data) {
     const d = data || {};
     if (Number(d.Taille_Monde) > 0) reglages.tailleMonde = borne(Number(d.Taille_Monde), ...BORNES_MONDE);
     if (Number(d.Taille_Region) > 0) reglages.tailleRegion = borne(Number(d.Taille_Region), ...BORNES_REGION);
+    if (d.Chance_POI !== undefined && Number.isFinite(Number(d.Chance_POI))) reglages.chancePoi = borne(Number(d.Chance_POI), 0, 1);
     placerPions();
     actualiserDev();
 };
@@ -1191,19 +1661,24 @@ let minuteurReglages = null;
 window.reglerTailleGroupe = function(vue, valeur, enregistrer) {
     if (!estDev()) return null;
     if (vue === "monde") reglages.tailleMonde = borne(Number(valeur) || TAILLE_MONDE_DEFAUT, ...BORNES_MONDE);
+    else if (vue === "poi") reglages.chancePoi = borne(Number(valeur), 0, 1);
     else reglages.tailleRegion = borne(Number(valeur) || TAILLE_REGION_DEFAUT, ...BORNES_REGION);
     placerPions();
     actualiserDev();
     clearTimeout(minuteurReglages);
-    const ecrire = () => setDoc(refReglages(), { Taille_Monde: reglages.tailleMonde, Taille_Region: arrondi(reglages.tailleRegion) }, { merge: true })
-        .catch(e => console.error("Taille du groupe :", e));
+    const ecrire = () => setDoc(refReglages(), { Taille_Monde: reglages.tailleMonde, Taille_Region: arrondi(reglages.tailleRegion),
+                                                 Chance_POI: arrondi(reglages.chancePoi, 100) }, { merge: true })
+        .catch(e => console.error("Réglages du groupe :", e));
     if (enregistrer) ecrire(); else minuteurReglages = setTimeout(ecrire, 500);
-    return vue === "monde" ? reglages.tailleMonde : reglages.tailleRegion;
+    return vue === "monde" ? reglages.tailleMonde : vue === "poi" ? reglages.chancePoi : reglages.tailleRegion;
 };
 function actualiserDev() {
-    const tm = $("taille-groupe-monde"), tr = $("taille-groupe-region");
+    const tm = $("taille-groupe-monde"), tr = $("taille-groupe-region"), cp = $("chance-poi");
     if (tm && document.activeElement !== tm) tm.value = String(reglages.tailleMonde);
     if (tr && document.activeElement !== tr) tr.value = String(reglages.tailleRegion);
+    if (cp && document.activeElement !== cp) cp.value = String(reglages.chancePoi);
+    const vp = $("chance-poi-valeur");
+    if (vp) vp.textContent = `${Math.round(reglages.chancePoi * 100)} %`;
     const vm = $("taille-groupe-monde-valeur"), vr = $("taille-groupe-region-valeur");
     if (vm) vm.textContent = `${Math.round(reglages.tailleMonde)} px`;
     if (vr) vr.textContent = `${Math.round(reglages.tailleRegion * 1000) / 10} %`;
@@ -1246,6 +1721,8 @@ function actualiserDev() {
         dessinerTout();
     });
     window.addEventListener("resize", () => requestAnimationFrame(dessinerTout));
+    // Un lieu dessiné sur la carte (le POI devenu lieu) : le point d'exclamation s'efface.
+    window.addEventListener("villages-regionaux-maj", () => requestAnimationFrame(placerPions));
     const lancer = () => {
         bouton();
         pionMonde();

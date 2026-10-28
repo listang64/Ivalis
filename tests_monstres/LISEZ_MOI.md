@@ -8484,3 +8484,65 @@ position, terrain, lieux proches, consigne, descriptif, lore, console, lieu
 connu) ; le tour du MJ (consigne du narrateur, pas de réputation en nature,
 analyse gardée, réponse, analyse faite d'abord, lieu connu) ; le voyage
 (analyse au camp, pas refaite) ; le bouton DEV ; les versions.
+
+## v277 — Les points d'intérêt en cours de voyage
+
+LE CATALOGUE (poi_catalogue.js, script simple) : 11 familles, 114 types, 470
+variantes, 7 états, 28 ambiances, 40 accroches (≈ 3,7 millions de graines).
+Chaque type a un poids, ses terrains (×3 s'ils vont, ×0,25 sinon), ses
+régions (le lore : nomades et Éthérés au désert d'Etheria, Gobs dans la forêt
+des murmures, pirates à la crique du Pendu, Confrérie de la Cendre vers
+Volcanisse…), 0 à 4 bâtiments. tirerGrainePoi tire famille → type → variante,
+état, ambiance, accroche ; motsTerrainPoi lit les terrains dans l'analyse.
+CATALOGUE_POI.md (le document de Nico) en est tiré :
+node tests_monstres/_catalogue_poi_md.mjs.
+
+LA CHANCE ET LA PLACE (voyage_groupe.js) : au départ de chaque journée de
+marche régionale (en transaction), planifierPoi tire le POI avec la chance
+Chance_POI (Carte_Monde/Groupe, 50 % par défaut, curseur DEV) : un moment
+entre 20 % et 85 % de la journée, une place à 0,07–0,15 hauteur de carte du
+groupe, sur le terrain praticable, hors des nuages, à plus d'une taille de
+marge de tout lieu posé (placePoiValable). Jamais sur le monde.
+
+LES ÉTATS : marche (le tronçon s'arrête au POI prévu) → poi (le point
+d'exclamation doré qui saute, la boîte « Il vous semble apercevoir quelque
+chose… » : Aller voir / Passer son chemin ; un non → la journée reprend,
+« X préfère passer son chemin » ; tous oui → detour) → detour (un chemin à
+légères ondulations, son pointillé ; le lieu se crée) → halte (le groupe au
+POI ; quand le lieu est né : Lieu_Actuel, le chat s'ouvre chez tous, le
+Destin pose l'arrivée et le poste créateur réveille le MJ ; avant : l'attente
+RP qui tourne ; Reprendre la route / Rester ici, tous d'accord) → retour (le
+même chemin à l'envers ; le chat se nettoie avec le lieu quitté) → marche
+(la journée reprend au point quitté ; le détour, aller et retour, compte
+dans la journée : replanifierApresPoi redécoupe la suite — et si le détour l'a
+mangée, la nuit tombe au retour sur la route). Les tronçons ont chacun leur
+clé (cleAnimation) ; « JOUR k » n'est annoncé qu'au départ d'une journée.
+
+LA CRÉATION (poi_creation.js, MIA_POI) : par le poste du dernier oui s'il a
+les cinq clés, sinon un poste qui les a la réclame (Poi.Createur, en
+transaction). Le terrain du point (lireTerrainA), la graine, puis Gemini à
+température tirée 0,80–1,20 avec la région, son descriptif, son lore, les
+lieux proches, la graine et les RÈGLES (Antique Fantastique, peuples
+d'Ivalis seulement, jamais de ville, rien d'anachronique, cohérence terrain
+et lore, noms antiques, originalité, sobriété). En base : Monde_Lieux
+(Origine "POI", Type_Lieu, Famille_POI, Graine_POI, Accroche_MJ, Carte_
+Regionale, Position_Region taille 0,08…) et ses Monde_Batiment. En fond :
+le calque sur la carte (la fabrique des villages, « this small landmark »),
+l'illustration (le peintre de MIA_CARTO), les images des bâtiments. Une
+panne : Poi.Echec, la halte le dit, la route reste ouverte.
+
+LA CARTE : le lieu apparaît comme un village (son calque) ; le survol montre
+son image ; un toucher (hors DEV) l'ouvre en grand (afficherApercuLieu) ; la
+bulle du chat suit l'illustration quand elle arrive.
+
+corrections_v277.mjs (dans la suite, Gemini, OpenAI et Cloudinary simulés) :
+le catalogue (taille, variantes, poids du terrain et de la région, graine,
+document) ; la place (chance, 0 %, moment, terrain, monde, lieux, nuages) ; le
+POI qui apparaît (tirage, arrêt, signe doré, boîte) ; le refus ; le détour
+(ondulations, créateur, fiche, bâtiments, prompt, règles, température,
+terrain, calque, illustration, images des bâtiments) ; la halte (lieu, chat,
+Destin, MJ et ses données, boîte, carte) ; la reprise (unanimité, chat,
+journée reprise, route gardée, redécoupage, les deux cas) ; l'attente RP et
+le poste sans clés ; la panne ; le survol et l'aperçu ; le curseur DEV ; les
+versions. Il mord sur l'ancien code (20 échecs). corrections_v275 et v276
+coupent les POI (Chance_POI 0).

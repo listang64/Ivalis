@@ -188,6 +188,8 @@ await p.evaluate(({ VILLAGE }) => {
     window.appliquerVillagesDeLaBase([{ id: VILLAGE, data: { Nom_Du_Lieu: "Brumefosse", Carte_Regionale: 2, Position_Region: { x: 0.7, y: 0.66, taille: 0.08 }, URL_Calque_Region: "" } }]);
   document.getElementById("btn-rouvrir-menu").style.display = "block";
   window.__relaisPartie = true;
+  // (v277 : pas de point d'intérêt en chemin ici — corrections_v277 les teste.)
+  if (typeof window.appliquerReglagesGroupeDeLaBase === "function") window.appliquerReglagesGroupeDeLaBase({ Chance_POI: 0 });
   if (typeof window.appliquerVoyageDeLaPartie === "function") window.appliquerVoyageDeLaPartie(JSON.parse(JSON.stringify(window.__docs["Systeme_Parties/P1"])));
 }, { VILLAGE });
 await p.waitForTimeout(400);
