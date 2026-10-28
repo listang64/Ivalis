@@ -270,6 +270,9 @@ p.on('pageerror', e => erreurs.push(e.message));
 await p.goto(base + '/index.html');
 await p.waitForTimeout(1200);
 await p.evaluate(() => { window.__poserReel = window.poserMonstreSurTerrain; });
+// Les ±5 % de la v270 (varierStatsMonstre) ont leur propre banc (corrections_v270) :
+// ici on vérifie des PV au point près, sans eux.
+await p.evaluate(() => { window.VARIATION_STATS_MONSTRE_PCT = 0; });
 await p.waitForTimeout(1500);
 
 // =========================================================================

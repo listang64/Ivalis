@@ -154,7 +154,7 @@ titre("2. CE QUI SE VOIT, AUX PIXELS");
   }, { b64, mesures });
   const R = centre.r;
   const zones = [
-    { cx: centre.x, cy: centre.y, de: R * 1.0, a: R * 1.06, n: 90 },   // l'anneau
+    { cx: centre.x, cy: centre.y, de: R * 1.025, a: R * 1.07, n: 90 }, // l'anneau (juste au-delà du bord : l'image grise couvre le dedans)
     { cx: centre.x, cy: centre.y, de: R * 1.1, a: R * 1.45, n: 90 },   // la fumée
     { cx: centre.x, cy: centre.y, de: R * 1.5, a: R * 1.75, n: 90 },   // le bout des langues
     { cx: centre.x, cy: centre.y, de: R * 2.1, a: R * 2.4, n: 90 },    // au-delà de l'aura
