@@ -8310,3 +8310,37 @@ reposé à la place exacte) ; le survol et les nuages ; le choix, le redessin,
 la suppression, la panne, les clés manquantes, la fermeture. Il mord sur
 l'ancien code (14 échecs). corrections_v272 : la popup, plus haute, se
 referme pendant qu'on manipule le titre.
+
+## v274 — Les descriptifs RP des régions
+
+descriptifs_regions.js (nouveau module). LA BASE : le descriptif RP d'une
+région vit dans la fiche de sa carte, Cartes_Regionales/{numéro de la boîte},
+champ Description (cartes_regionales.js : descriptifRegion,
+enregistrerDescriptifRegion ; descriptifRPRegionPourMJ rend le texte, le nom
+et le lore — ce que l'IA maître du jeu lira plus tard). Une boîte sans fiche
+(au-delà des treize cartes) reçoit la sienne à son premier descriptif.
+
+LE MODE (DEV, carte du monde) : le bouton « ✎ Éditer les descriptifs de
+région » de la popup du bouton rouge. Activé : un contour rouge tout autour de
+l'écran (fixe, z 29000, sans prendre le doigt) avec son étiquette ;
+l'édition des boîtes est coupée (case décochée et grisée, « Nouvelle boîte »
+et « Supprimer » grisés) ; toutes les régions prennent le clic et se
+montrent au survol. Un clic sur une région ouvre son descriptif au lieu de sa
+carte (regions_carte.js, surClicRegion) — même Volcanisse et Arcaï, qui n'ont
+pas encore de carte. Réafficher les boîtes, re-cliquer le bouton ou éteindre
+le DEV fait sortir du mode (et ferme la fenêtre).
+
+LA FENÊTRE : pleine page, le titre de la région (l'or brossé des titres), une
+grande zone de texte, un compte de mots, « ✕ » et « Fermer » (Échap aussi).
+L'enregistrement est automatique 0,9 s après la dernière frappe, et à la
+fermeture (rien ne se perd) ; un descriptif changé sur un autre poste arrive
+dans la fenêtre, jamais par-dessus ce qu'on est en train d'écrire.
+
+corrections_v274.mjs (dans la suite) : le bouton, le contour (couleur,
+épaisseur, plein écran, transparent au doigt), l'exclusion des modes ; le clic
+qui ouvre la fenêtre (titre, texte de la base, ni carte ni nuages, pleine
+page, prête à écrire) ; la frappe (rien pendant, l'écriture en fusion après,
+l'état, les mots), le maître du jeu, l'autre poste (et pas par-dessus la
+frappe), la fermeture qui enregistre, la réouverture, Échap ; Volcanisse et
+une boîte sans fiche ; la sortie (DEV éteint, bouton), la carte qui se rouvre
+hors du mode ; les versions. Il mord sur l'ancien code (11 échecs).

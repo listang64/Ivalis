@@ -148,6 +148,8 @@ window.appliquerCartesRegionalesDeLaBase = function(liste, options) {
         }
     }
     semerFichesManquantes();
+    // Un descriptif a pu changer ailleurs : sa fenêtre suit (descriptifs_regions.js).
+    try { window.dispatchEvent(new CustomEvent("cartes-regionales-maj")); } catch (e) { /* vieux navigateur */ }
 };
 
 // Un poste en DEV crée les fiches qui manquent (le numéro de la boîte, le nom,
@@ -164,6 +166,27 @@ function semerFichesManquantes() {
             .catch(e => console.error("Fiche de la carte régionale " + n + " :", e));
     });
 }
+// LE DESCRIPTIF RP D'UNE RÉGION (v274) : le texte que le maître du jeu (l'IA)
+// recevra plus tard, quand les joueurs sont dans cette région. Il vit dans la
+// fiche de la carte (champ Description). Une boîte sans carte connue reçoit
+// sa fiche à son premier descriptif.
+window.descriptifRegion = function(numero) {
+    const n = Number(numero), carte = window.CARTES_REGIONALES[n];
+    return { numero: n, nom: carte ? carte.nom : `Région ${n}`, texte: carte ? carte.description : "" };
+};
+window.enregistrerDescriptifRegion = async function(numero, texte) {
+    const n = Number(numero);
+    if (!(n > 0)) return false;
+    fichesBase[n] = Object.assign({ Numero: n }, fichesBase[n], { Description: String(texte || "") });
+    composerCartes();
+    return enregistrerFiche(n, { Description: String(texte || "") });
+};
+// Pour le maître du jeu, plus tard : tout ce qu'on sait de la région.
+window.descriptifRPRegionPourMJ = function(numero) {
+    const d = window.descriptifRegion(numero);
+    return { ...d, lore: typeof window.loreDeLaRegion === "function" ? window.loreDeLaRegion(numero) : "" };
+};
+
 async function enregistrerFiche(numero, champs) {
     const carte = window.CARTES_REGIONALES[numero];
     if (!carte) return false;

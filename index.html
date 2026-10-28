@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=105">
+  <link rel="stylesheet" href="style.css?v=106">
 
  
   <!-- ===================================================================== -->
@@ -1259,6 +1259,10 @@
           <div id="regions-dev-monde">
           <label class="popup-regions-case"><input type="checkbox" id="case-regions-visibles" onchange="window.afficherRegionsDev(this.checked)"> Afficher les boîtes</label>
           <button type="button" id="btn-regions-nouvelle" class="popup-regions-bouton" onclick="jouerSonClic(); window.creerRegion()">+ Nouvelle boîte</button>
+          <!-- LES DESCRIPTIFS RP DES RÉGIONS (v274, descriptifs_regions.js) : un clic
+               sur une région ouvre son descriptif au lieu de sa carte. -->
+          <button type="button" id="btn-mode-descriptifs" class="popup-regions-bouton bouton-descriptifs" aria-pressed="false"
+                  onclick="jouerSonClic(); window.basculerModeDescriptifRegions()">✎ Éditer les descriptifs de région</button>
           <div id="regions-dev-selection" class="popup-regions-info">Aucune boîte sélectionnée</div>
           <button type="button" id="btn-regions-supprimer" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.supprimerRegion()" disabled>Supprimer cette boîte</button>
           <div id="regions-dev-total" class="popup-regions-total"></div>
@@ -2333,12 +2337,14 @@
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=2"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
-<script type="module" src="regions_carte.js?v=2"></script>
+<script type="module" src="regions_carte.js?v=3"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région, ses nuages et son titre. -->
-<script type="module" src="cartes_regionales.js?v=2"></script>
+<script type="module" src="cartes_regionales.js?v=3"></script>
 <!-- Le lore du monde, par région (v273), puis les villages des cartes régionales et MIA_VILLAGE. -->
 <script src="lore_ivalis.js?v=1"></script>
 <script type="module" src="villages_regionaux.js?v=1"></script>
+<!-- Les descriptifs RP des régions (v274) : le mode DEV et sa fenêtre pleine page. -->
+<script type="module" src="descriptifs_regions.js?v=1"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=16"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->

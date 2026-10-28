@@ -53,7 +53,10 @@ let instantaneEnAttente = null;  // une lecture de la base arrivée pendant un g
 const ref = () => doc(db, ...CHEMIN);
 const estDev = () => { try { return localStorage.getItem("ivalis_DEV_MODE") === "on"; } catch (e) { return false; } };
 const visiblesCoche = () => { try { return localStorage.getItem(CLE_VISIBLES) === "on"; } catch (e) { return false; } };
-window.modeEditionRegions = () => estDev() && visiblesCoche();
+// LE MODE DESCRIPTIFS (v274, descriptifs_regions.js) prend le pas sur
+// l'édition des boîtes : un seul mode DEV à la fois.
+const modeDescriptif = () => typeof window.modeDescriptifRegions === "function" && window.modeDescriptifRegions();
+window.modeEditionRegions = () => estDev() && visiblesCoche() && !modeDescriptif();
 const zoomCarte = () => (typeof window.cadrageCarteMonde === "function" && window.cadrageCarteMonde().zoom) || 1;
 const borner = (v, max) => Math.max(0, Math.min(max, Math.round(v)));
 const copiePoints = (pts) => pts.map(p => ({ x: p.x, y: p.y }));
@@ -164,6 +167,11 @@ window.supprimerRegion = async function(numero, options) {
 // Ce que fera chaque région, à venir : ACTIONS_REGIONS[numéro] = (numero) => {…}.
 window.surClicRegion = function(numero) {
     if (window.modeEditionRegions()) return false;
+    // En mode descriptifs, toute boîte ouvre son descriptif, pas sa carte.
+    if (modeDescriptif() && typeof window.ouvrirDescriptifRegion === "function") {
+        window.ouvrirDescriptifRegion(numero);
+        return true;
+    }
     const action = window.ACTIONS_REGIONS[numero];
     if (typeof action !== "function") return false;
     try { action(numero); } catch (e) { console.error("Action de la région " + numero + " :", e); }
@@ -196,6 +204,7 @@ window.dessinerRegions = function() {
     if (!svg) return;
     const edition = window.modeEditionRegions();
     svg.classList.toggle("edition", edition);
+    svg.classList.toggle("descriptif", modeDescriptif());
     svg.innerHTML = "";
     const zoom = zoomCarte();
     const poignee = 14 / zoom, police = 26 / zoom;
@@ -342,9 +351,18 @@ function actualiserPopup() {
     }
     const caseVisibles = document.getElementById("case-regions-visibles");
     if (caseVisibles) caseVisibles.checked = visiblesCoche();
+    // Le mode descriptifs coupe l'édition des boîtes (v274).
+    const descriptif = modeDescriptif();
+    if (caseVisibles) caseVisibles.disabled = descriptif;
+    const nouvelle = document.getElementById("btn-regions-nouvelle");
+    if (nouvelle) nouvelle.disabled = descriptif;
+    if (suppr && descriptif) suppr.disabled = true;
 }
+window.actualiserPopupRegions = () => actualiserPopup();
 
 window.afficherRegionsDev = function(oui) {
+    // Afficher les boîtes, c'est revenir à leur édition : le mode descriptifs s'arrête.
+    if (oui && modeDescriptif() && typeof window.basculerModeDescriptifRegions === "function") window.basculerModeDescriptifRegions(false);
     try { localStorage.setItem(CLE_VISIBLES, oui ? "on" : "off"); } catch (e) { /* poste sans stockage */ }
     if (!oui) selection = null;
     window.dessinerRegions();

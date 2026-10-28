@@ -5781,3 +5781,39 @@ textarea.input-texte-parchemin {
 .attente-villages-detail { font-size: clamp(15px, 2vw, 22px); color: #e8d5a5; text-shadow: 1px 2px 4px #000; }
 @keyframes attente-villages-souffle { 0%, 100% { opacity: 0.82; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .attente-villages-texte { animation: none; } }
+
+/* =========================================================================
+   LES DESCRIPTIFS RP DES RÉGIONS (v274, descriptifs_regions.js)
+   ========================================================================= */
+/* Le mode : un contour rouge tout autour de l'écran (il ne prend aucun doigt). */
+.cadre-mode-descriptifs { position: fixed; inset: 0; z-index: 29000; display: none; pointer-events: none;
+  border: 5px solid #e01b1b; box-shadow: inset 0 0 18px rgba(224, 27, 27, 0.55); }
+.cadre-mode-descriptifs-etiquette { position: absolute; top: 0; left: 50%; transform: translateX(-50%); padding: 3px 14px 5px;
+  border-radius: 0 0 8px 8px; background: #e01b1b; color: #fff; font-weight: bold; font-size: 13px; letter-spacing: 0.05em; }
+/* Dans ce mode, toutes les régions prennent le clic, et se montrent au survol. */
+#calque-regions.descriptif .region-forme { pointer-events: fill; cursor: pointer; }
+#calque-regions.descriptif .region:hover .region-forme { fill: rgba(224, 27, 27, 0.2); stroke: #e01b1b; stroke-width: 3px; vector-effect: non-scaling-stroke; }
+.popup-regions-bouton.bouton-descriptifs.actif { background: #fff; color: #a01212; border: 2px solid #e01b1b; }
+/* La fenêtre pleine page : le titre de la région, la grande zone de texte. */
+.fenetre-descriptif-region { position: fixed; inset: 0; z-index: 20500; display: none; flex-direction: column; gap: 12px;
+  padding: calc(env(safe-area-inset-top, 0px) + 36px) calc(env(safe-area-inset-right, 0px) + 28px) calc(env(safe-area-inset-bottom, 0px) + 22px) calc(env(safe-area-inset-left, 0px) + 28px);
+  box-sizing: border-box; background: radial-gradient(ellipse at center, #2a1c0f 0%, #140b05 100%); }
+.descriptif-region-tete { display: flex; align-items: center; justify-content: center; position: relative; min-height: 56px; }
+.descriptif-region-titre { margin: 0; padding: 0 60px; text-align: center; font-weight: bold; text-transform: uppercase; letter-spacing: 0.06em;
+  font-size: clamp(26px, 4.5vw, 52px); line-height: 1.1;
+  background: linear-gradient(135deg, #fbf5bd 0%, #c2a878 25%, #5c3a21 50%, #e8d5a5 75%, #ffffff 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.9)); }
+.descriptif-region-fermer { position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 46px; height: 46px; border-radius: 50%;
+  border: 2px solid #c9a24a; background: #2a1a0f; color: #f3dfa6; font-size: 20px; cursor: pointer; }
+.descriptif-region-fermer:hover { filter: brightness(1.2); }
+.descriptif-region-texte { flex: 1; min-height: 0; width: 100%; box-sizing: border-box; resize: none; padding: 18px 22px; border-radius: 10px;
+  border: 2px solid #8a6a2a; background: #f3e6c4; color: #2a1a0f; font-size: 18px; line-height: 1.55;
+  box-shadow: inset 0 0 30px rgba(92, 58, 33, 0.25); outline: none; }
+.descriptif-region-texte:focus { border-color: #c9a24a; box-shadow: inset 0 0 30px rgba(92, 58, 33, 0.25), 0 0 0 3px rgba(201, 162, 74, 0.35); }
+.descriptif-region-pied { display: flex; align-items: center; gap: 16px; color: #e8d5a5; font-size: 15px; }
+.descriptif-region-etat { flex: 1; font-style: italic; }
+.descriptif-region-compte { opacity: 0.8; }
+.descriptif-region-bouton { padding: 9px 22px; border-radius: 8px; border: 2px solid #c9a24a; background: #5c3a21; color: #f3dfa6;
+  font-weight: bold; font-size: 15px; cursor: pointer; }
+.descriptif-region-bouton:hover { filter: brightness(1.15); }
