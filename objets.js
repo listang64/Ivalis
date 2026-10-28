@@ -108,6 +108,43 @@ window.CHANCES_BUTIN_NIVEAU = {
           Normal: { "Commun": 30, "Rare": 30, "Très rare": 25, "Épique": 15 } }
 };
 
+// Le tableau de Nico reste la référence ; Paramètres > Outils > Butin le règle
+// (v270, Monstres_Modeles/_REGLAGES, champ Butin_Niveaux) et « Rétablir »
+// y revient.
+window.CHANCES_BUTIN_NIVEAU_DEFAUT = JSON.parse(JSON.stringify(window.CHANCES_BUTIN_NIVEAU));
+
+// Borne un tableau réglé : chaque case un entier de 0 à 100 ; une ligne
+// illisible ou toute à zéro reprend celle de Nico. Les lignes n'ont pas
+// besoin de faire 100 : le tirage les lit comme des poids.
+window.normaliserTableButin = function(brut) {
+    const defaut = window.CHANCES_BUTIN_NIVEAU_DEFAUT;
+    const table = {};
+    Object.keys(defaut).forEach(n => {
+        table[n] = {};
+        ["Petit", "Normal"].forEach(st => {
+            const source = ((brut || {})[n] || {})[st] || {};
+            const ligne = {};
+            window.RARETES.forEach(r => {
+                const v = Math.round(Number(source[r]));
+                ligne[r] = Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : defaut[n][st][r];
+            });
+            const total = window.RARETES.reduce((t, r) => t + ligne[r], 0);
+            table[n][st] = total > 0 ? ligne : { ...defaut[n][st] };
+        });
+    });
+    return table;
+};
+
+// Pose le tableau réglé (ou celui de Nico quand `brut` est vide).
+window.appliquerTableButin = function(brut) {
+    window.CHANCES_BUTIN_NIVEAU = brut ? window.normaliserTableButin(brut)
+                                       : JSON.parse(JSON.stringify(window.CHANCES_BUTIN_NIVEAU_DEFAUT));
+    if (typeof window.dessinerTableButin === "function") window.dessinerTableButin();
+    return window.CHANCES_BUTIN_NIVEAU;
+};
+// Le réglage a pu arriver avant ce fichier (monstres.js le lit au démarrage).
+if (window.TABLE_BUTIN_REGLEE !== undefined) window.appliquerTableButin(window.TABLE_BUTIN_REGLEE);
+
 // La ligne du tableau d'un niveau et d'une stature. Tout ce qui n'est pas
 // « Petit » lit la ligne Normal (le Boss compris).
 window.statureDuButin = (palier) => (palier === "Petit" ? "Petit" : "Normal");

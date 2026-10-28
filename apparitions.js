@@ -32,7 +32,7 @@
 //                   siVide "avance" (elle n'attend pas) ou "annule" (elle ne
 //                   vient plus : « ou que tous les monstres soient vaincus »)
 //    pieges       { pct, possibilites, pvPct } : des cases piégées (Apparition 2)
-//    butin        { parJoueur, partage, xpPct } : butin et expérience changés
+//    butin        { parJoueur, xpPct } : butin et expérience changés
 //
 //  Les compositions : { Normal: n, Petit: p }, l'une d'elles tirée au hasard.
 // =========================================================================
@@ -138,13 +138,13 @@
               renforts: [{ quandVide: true, possibilites: [P(0, 4)], regle: "auPlusUnSoutien" }] },
             { chance: 15, nom: "La cohue (5)", leader: "aucun",
               depart: { possibilites: [P(3, 2)], regle: "auPlusUnSoutien", pvPct: -25 },
-              renforts: [], butin: { parJoueur: 2, partage: false, xpPct: -10 } },
+              renforts: [], butin: { parJoueur: 2, xpPct: -10 } },
             { chance: 15, nom: "La cohue (6)", leader: "aucun",
               depart: { possibilites: [P(3, 3)], regle: "auPlusUnSoutien", pvPct: -40 },
-              renforts: [], butin: { parJoueur: 2, partage: false, xpPct: -20 } },
+              renforts: [], butin: { parJoueur: 2, xpPct: -20 } },
             { chance: 15, nom: "La cohue (7)", leader: "aucun",
               depart: { possibilites: [P(3, 4), P(2, 5), P(1, 6), P(0, 7)], regle: "auPlusUnSoutien", pvPct: -50 },
-              renforts: [], butin: { parJoueur: 2, partage: false, xpPct: -30 } }
+              renforts: [], butin: { parJoueur: 2, xpPct: -30 } }
         ] }
     });
     window.NUMEROS_APPARITION = [1, 2, 3, 4];
@@ -388,7 +388,7 @@
                         cas.depart.fuyard ? `<li><b>Fuyards</b> : ils fuient puis tirent (ou se reposent), ${cas.depart.fuyard.esquiveOpportunite} % d'esquive des attaques d'opportunité.</li>` : "",
                         cas.depart.pvPct !== undefined ? `<li>PV du départ : ${champ(`${c}.depart.pvPct`, cas.depart.pvPct, { min: -90, max: 200 })} %</li>` : "",
                         cas.pieges ? `<li><b>Cases piégées</b> : ${champ(`${c}.pieges.pct`, cas.pieges.pct, { min: 0, max: 60 })} % du terrain ; un héros qui y marche fait surgir ${lesCompositions(`${c}.pieges.possibilites`, cas.pieges.possibilites)} à ${champ(`${c}.pieges.pvPct`, cas.pieges.pvPct, { min: -90, max: 200 })} % de PV.</li>` : "",
-                        cas.butin ? `<li><b>Butin</b> : ${champ(`${c}.butin.parJoueur`, cas.butin.parJoueur, { min: 0, max: 6 })} objet(s) au hasard par joueur, pas de partage ; expérience ${champ(`${c}.butin.xpPct`, cas.butin.xpPct, { min: -100, max: 100 })} %.</li>` : ""
+                        cas.butin ? `<li><b>Butin</b> : ${champ(`${c}.butin.parJoueur`, cas.butin.parJoueur, { min: 0, max: 6 })} objet(s) au hasard par joueur ; expérience ${champ(`${c}.butin.xpPct`, cas.butin.xpPct, { min: -100, max: 100 })} %.</li>` : ""
                     ].join("");
                     return `<div class="apparition-cas" data-apparition="${n}" data-cas="${i}">
                         <div class="apparition-cas-titre">Cas ${i + 1} — ${attr(cas.nom)} ${champ(`${c}.chance`, cas.chance, { min: 0, max: 100 })} %</div>

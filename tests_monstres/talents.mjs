@@ -73,7 +73,7 @@ console.log("\n1. LA LISTE, LES POINTS, LES PRÉREQUIS");
     verifier("Chanceux : prenable désormais (CON 10), « −5 au jet de blessure »", !w.talentParId("TAL_CHANCEUX").aVenir
              && w.etatTalent(heros(), "TAL_CHANCEUX").ok && /−5/.test(w.talentParId("TAL_CHANCEUX").texte));
     const pts = [1, 3, 5, 7, 9, 12].map(n => w.pointsTalentsGagnes(w.niveauDepuisXP(XP[n])));
-    verifier("un point aux niveaux 3, 5, 7, 9 ; plus rien ensuite", JSON.stringify(pts) === "[0,1,2,3,4,4]", JSON.stringify(pts));
+    verifier("un point aux niveaux 2, 4, 6, 8, 10 ; plus rien ensuite (v270)", JSON.stringify(pts) === "[0,1,2,3,4,5]", JSON.stringify(pts));
     const h = heros({ talents: { TAL_PREPARER: 2, TAL_PRECIS: 1 } });
     verifier("dépensés et disponibles (4 points, 3 pris → 1)", w.pointsTalentsDepenses(h) === 3 && w.pointsTalentsDisponibles(h) === 1);
     verifier("Préparer se prend 2 fois, pas 3", w.etatTalent(heros({ talents: { TAL_PREPARER: 1 } }), "TAL_PREPARER").ok

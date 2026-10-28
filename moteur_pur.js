@@ -2105,7 +2105,17 @@ export function resoudreCarte(etat, action, plateau) {
     // tiré au lancement ; on ne fait que le lire.
     if (rate) {
         etapes.push({ type: "echec", acteur: idLanceur, raison: "Étourdi" });
-        return { etat: suivant, etapes };
+        // L'ÉNERGIE EST PARTIE QUAND MÊME (v270, Nico : la zone s'était posée
+        // « et en plus sans me déduire la fatigue »). La technique ratée ne
+        // frappe rien, ne laisse rien au sol, mais son prix est payé — c'est
+        // l'énergie qui fuse et retombe que l'écran montre.
+        if (action.coutFatigue !== undefined) {
+            const avantCout = nombre(lanceur.fatigue);
+            lanceur.fatigue = Math.max(0, Math.min(lanceur.fatigueMax, lanceur.fatigue - nombre(action.coutFatigue)));
+            etapes.push({ type: "fatigue", cible: idLanceur, fatigueApres: lanceur.fatigue,
+                          ...(avantCout > lanceur.fatigue ? { depense: avantCout - lanceur.fatigue } : {}) });
+        }
+        return { etat: suivant, etapes, touchees: [], ratee: true };
     }
 
     // --- LA TRACTION : UN EFFET, PAS UN ÉTAT ------------------------------

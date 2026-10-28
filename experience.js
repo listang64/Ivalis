@@ -1,19 +1,19 @@
 // =========================================================================
 //  IVALIS — L'EXPÉRIENCE ET LES NIVEAUX
 // =========================================================================
-//  La grille de Nico (tableau 1) :
+//  La grille de Nico (tableau 1, déblocages revus en v270) :
 //
 //     Niv.  XP requis   Gain
-//      1         0      Compétences de départ + classe
-//      2       700      +1 compétence
-//      3     1 200      Talent mineur
-//      4     1 800      +1 compétence
-//      5     2 500      Talent mineur
-//      6     3 300      +1 compétence
-//      7     4 200      Talent mineur
-//      8     5 200      +1 compétence
-//      9     6 400      Talent majeur
-//     10     7 900      +1 compétence
+//      1         0      Création du personnage
+//      2       700      Talent
+//      3     1 200      +1 compétence
+//      4     1 800      Talent
+//      5     2 500      +1 compétence
+//      6     3 300      Talent
+//      7     4 200      +1 compétence
+//      8     5 200      Talent
+//      9     6 400      +1 compétence
+//     10     7 900      Talent
 //     11+   +1 500 par niveau   +1 compétence
 //
 //  Le héros garde son XP TOTALE (champ « XP » de sa fiche, Personnages) : son
@@ -22,7 +22,7 @@
 //
 //  UNE COMPÉTENCE GAGNÉE, C'EST UNE COMPÉTENCE DE PLUS À CRÉER dans la Forge.
 //  La limite en main (les cartes mémorisées pour le combat) ne bouge pas.
-//  Les talents viendront plus tard : la grille les annonce déjà.
+//  Les talents se prennent dans leur fenêtre (talents.js, NIVEAUX_TALENT).
 //
 //  L'XP se gagne à la victoire : chaque créature tombée rapporte son « XP pour
 //  le groupe » (bestiaire, XP_Groupe) à CHAQUE membre de l'équipe — voir
@@ -33,10 +33,10 @@
     const SEUILS = [0, 700, 1200, 1800, 2500, 3300, 4200, 5200, 6400, 7900];
     const PAS_APRES_10 = 1500;
     const GAINS = {
-        1: "Compétences de départ + classe",
-        2: "+1 compétence", 3: "Talent mineur", 4: "+1 compétence", 5: "Talent mineur",
-        6: "+1 compétence", 7: "Talent mineur", 8: "+1 compétence", 9: "Talent majeur",
-        10: "+1 compétence"
+        1: "Création du personnage",
+        2: "Talent", 3: "+1 compétence", 4: "Talent", 5: "+1 compétence",
+        6: "Talent", 7: "+1 compétence", 8: "Talent", 9: "+1 compétence",
+        10: "Talent"
     };
     // Si le bestiaire n'a pas de chiffre pour une créature, la grille de Nico
     // selon sa stature (tous les types rapportent la même chose).
@@ -65,11 +65,11 @@
     };
 
     // Combien de compétences EN PLUS le niveau permet de créer : une à chaque
-    // « +1 compétence » atteint (2, 4, 6, 8, 10, puis chaque niveau).
+    // « +1 compétence » atteint (3, 5, 7, 9, puis chaque niveau après le 10).
     window.competencesDeNiveau = function (niveau) {
         const n = Math.max(1, Math.floor(Number(niveau) || 1));
         let total = 0;
-        for (let k = 2; k <= n; k++) if (k > 10 || k % 2 === 0) total++;
+        for (let k = 2; k <= n; k++) if (k > 10 || k % 2 === 1) total++;
         return total;
     };
 

@@ -362,6 +362,34 @@ window.ecouterMonstresPartie = function(idPartie) {
 
 // Crée un monstre sur le plateau à partir d'un gabarit. Les chapitres suivants
 // (monstres nommés, compétences, IA) viendront enrichir ce socle.
+// CHAQUE CRÉATURE A SES PETITES DIFFÉRENCES (v270, Nico : « pour tous les
+// monstres, à leur création, un bonus / malus de + ou − 5 % dans toutes leurs
+// stats, de façon aléatoire »). Chaque stat tire son propre écart, entre −5 %
+// et +5 %, arrondi à l'unité : deux gobelins du même gabarit ne se valent
+// plus tout à fait. L'XP qu'elle rapporte et son nombre d'actions ne bougent
+// pas (ce ne sont pas des forces). Les écarts tirés restent sur la fiche
+// (Variation_Stats, en %), pour qu'on puisse les relire.
+window.VARIATION_STATS_MONSTRE_PCT = 5;
+window.STATS_VARIEES_MONSTRE = ["PV_Max", "Fatigue_Max", "Def_Physique", "Def_Magique", "Esquive", "Parade",
+                                "Regeneration", "Repos_Long", "Initiative", "Critique"];
+window.varierStatsMonstre = function(data, alea) {
+    const tirer = alea || Math.random;
+    const amplitude = window.VARIATION_STATS_MONSTRE_PCT;
+    const ecarts = {};
+    window.STATS_VARIEES_MONSTRE.forEach(cle => {
+        const v = Number(data[cle]);
+        if (!Number.isFinite(v)) return;
+        const pct = Math.round(((tirer() * 2 - 1) * amplitude) * 10) / 10;
+        ecarts[cle] = pct;
+        data[cle] = Math.max(0, Math.round(v * (1 + pct / 100)));
+    });
+    // Elle entre en pleine forme : sa vie et son énergie au plein.
+    if ("PV_Max" in ecarts) data.PV_Actuels = data.PV_Max;
+    if ("Fatigue_Max" in ecarts) data.Fatigue_Actuelle = data.Fatigue_Max;
+    data.Variation_Stats = ecarts;
+    return data;
+};
+
 window.creerMonstreDepuisGabarit = async function(idMonstre, gabarit, donneesSupplementaires = {}) {
     if (!gabarit) return null;
 
@@ -414,6 +442,8 @@ window.creerMonstreDepuisGabarit = async function(idMonstre, gabarit, donneesSup
         ...(releve ? { Resistances_En_Leader: tirees } : {}),
         ...donneesSupplementaires
     };
+    // Le leader compris : l'écart porte sur ce qu'elle est vraiment.
+    window.varierStatsMonstre(data);
 
     window.SOURCE_COMBATTANTS[idMonstre] = COLLECTION_MONSTRES;
     await setDoc(doc(db, COLLECTION_MONSTRES, idMonstre), data);
@@ -548,6 +578,11 @@ window.appliquerReglagesMonstres = function(brut) {
     if ((!brut || Object.prototype.hasOwnProperty.call(brut, "Apparitions")) && typeof window.appliquerTableApparitions === "function") {
         window.appliquerTableApparitions(brut ? brut.Apparitions : null);
     }
+    // LE TABLEAU DU BUTIN RÉGLÉ (v270, objets.js) : même règle.
+    if (!brut || Object.prototype.hasOwnProperty.call(brut, "Butin_Niveaux")) {
+        window.TABLE_BUTIN_REGLEE = brut ? (brut.Butin_Niveaux || null) : null;
+        if (typeof window.appliquerTableButin === "function") window.appliquerTableButin(window.TABLE_BUTIN_REGLEE);
+    }
     if (typeof window.dessinerReglagesMonstres === "function") window.dessinerReglagesMonstres();
     return r;
 };
@@ -555,6 +590,10 @@ window.appliquerReglagesMonstres = function(brut) {
 // Le tableau des apparitions réglé dans Paramètres > Apparitions (v268) : écrit
 // avec les autres réglages des monstres, il gagne les autres postes. `null` :
 // le tableau de Nico revient.
+// Le tableau du butin (v270, Paramètres > Outils > Butin) ; null le rétablit.
+window.enregistrerTableButin = async function(table) {
+    await setDoc(doc(db, COLLECTION_GABARITS, DOC_REGLAGES), { Butin_Niveaux: table ? JSON.parse(JSON.stringify(table)) : deleteField() }, { merge: true });
+};
 window.enregistrerTableApparitions = async function(table) {
     await setDoc(doc(db, COLLECTION_GABARITS, DOC_REGLAGES), { Apparitions: table ? JSON.parse(JSON.stringify(table)) : deleteField() }, { merge: true });
 };

@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=100">
+  <link rel="stylesheet" href="style.css?v=101">
 
  
   <!-- ===================================================================== -->
@@ -1501,6 +1501,12 @@
       </button>
       <br><br>
 
+      <!-- LE BUTIN (v270) : le tableau de Nico, niveau par niveau, se règle -->
+      <button id="btn-table-butin" class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.ouvrirTableButin()">
+        Butin
+      </button>
+      <br><br>
+
       <!-- NOUVEAU : BOUTON ARCHIVAGE -->
       <button class="btn-parametres btn-supprimer" style="width: 80%; padding: 15px; border-color: #ff4c4c;" onclick="jouerSonClic(); window.archiverSessionEtViderChat()">
         Clôturer & Vider le Chat
@@ -1722,6 +1728,21 @@
         à la fin du tour qui précède son tour d'arrivée. Toutes les valeurs ci-dessous se modifient, et valent pour tous les postes.
       </p>
       <div id="corps-rencontres-monstres" class="corps-rencontres-monstres"></div>
+    </div>
+
+    <div id="etape-table-butin" class="fenetre-volante-parchemin-large fondu-interne" style="display: none; opacity: 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #5c3a21; margin-bottom: 10px; padding-bottom: 10px;">
+        <h2 style="margin: 0; border: none; padding: 0;">Butin — la rareté de chaque objet</h2>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <button class="btn-parametres" onclick="jouerSonClic(); window.fermerTableButin()">Retour</button>
+        </div>
+      </div>
+      <p style="font-size: 13px; color: #5c3a21; margin: 0 0 10px 0; font-style: italic;">
+        Chaque créature vaincue rapporte un objet, tiré sur la ligne de sa stature (Petit ou Normal ; un Boss lit Normal) au niveau du groupe.
+        2 objets par joueur au moins (complétés au hasard), le surplus et le bonus du leader vont à la mise en commun.
+        Modifie les pourcentages puis « Mettre à jour » : le tableau vaut pour tous les postes.
+      </p>
+      <div id="corps-table-butin" class="corps-table-butin"></div>
     </div>
 
   </div>
@@ -2226,10 +2247,10 @@
 <script type="importmap">
 { "imports": {
     "./combat_etat.js": "./combat_etat.js?v=44",
-    "./moteur_pur.js": "./moteur_pur.js?v=68",
+    "./moteur_pur.js": "./moteur_pur.js?v=69",
     "./mouvement_pur.js": "./mouvement_pur.js?v=23",
     "./ia_pure.js": "./ia_pure.js?v=16",
-    "./cerveau_combat.js": "./cerveau_combat.js?v=61",
+    "./cerveau_combat.js": "./cerveau_combat.js?v=62",
     "./spectateur_combat.js": "./spectateur_combat.js?v=8",
     "./depot_firestore.js": "./depot_firestore.js?v=11",
     "./pont_combat.js": "./pont_combat.js?v=46",
@@ -2248,11 +2269,11 @@
 <script type="module" src="combat_etat.js?v=44"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=68"></script>
+<script type="module" src="moteur_pur.js?v=69"></script>
 <script type="module" src="mouvement_pur.js?v=23"></script>
 <script type="module" src="ia_pure.js?v=16"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
-<script type="module" src="cerveau_combat.js?v=61"></script>
+<script type="module" src="cerveau_combat.js?v=62"></script>
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
      la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
 <script type="module" src="spectateur_combat.js?v=8"></script>
@@ -2277,18 +2298,18 @@
 <script src="animations_catalogue.js?v=23"></script>
 <!-- …et leur branchement sur le vrai combat (les animations validées dans le Studio). -->
 <script src="animations_jeu.js?v=11"></script>
-<script src="experience.js?v=2"></script>
+<script src="experience.js?v=3"></script>
 <!-- La montée de niveau (v256) : la popup du héros qui prend un niveau. -->
 <script src="montee_niveau.js?v=1"></script>
 <!-- Les talents : les règles (script simple), puis leur fenêtre. -->
-<script src="talents.js?v=4"></script>
+<script src="talents.js?v=5"></script>
 <!-- Les blessures : la table et ses règles (script simple), puis l'écran. -->
 <script src="blessures.js?v=2"></script>
 <script type="module" src="creation_personnage.js?v=26"></script>
 <script type="module" src="classes.js?v=27"></script>
 <script type="module" src="recit_dynamique.js?v=4"></script>
 <script type="module" src="competences.js?v=67"></script>
-<script type="module" src="talents_ui.js?v=1"></script>
+<script type="module" src="talents_ui.js?v=2"></script>
 <script type="module" src="blessures_ui.js?v=5"></script>
 <!-- Les zones procédurales : le givre (v243), le brasier (v244), le poison et la foudre (v245), au Studio puis en jeu (v246) ; les gravats (v247) et les chausse-trappes (v248), au Studio puis en jeu (v249) ; la lumière du soin (v250), au Studio. -->
 <script src="zones_procedurales.js?v=6"></script>
@@ -2303,22 +2324,22 @@
 <script type="module" src="sequence_tour.js?v=25"></script>
 <script src="zombie_token.js?v=1"></script>
 <script src="murs_terre.js?v=10"></script>
-<script type="module" src="combat.js?v=153"></script>
+<script type="module" src="combat.js?v=154"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=40"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
 <script type="module" src="moteur_effets.js?v=101"></script>
 <!-- LES APPARITIONS (v268) : le tableau de Nico, son tirage, sa fenêtre de
      réglage. Avant monstres.js, qui le lit dès son chargement. -->
-<script src="apparitions.js?v=1"></script>
-<script type="module" src="monstres.js?v=41"></script>
+<script src="apparitions.js?v=2"></script>
+<script type="module" src="monstres.js?v=42"></script>
 <script type="module" src="monstres_competences.js?v=29"></script>
 <script type="module" src="monstres_ia.js?v=42"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
-<script type="module" src="objets.js?v=19"></script>
+<script type="module" src="objets.js?v=20"></script>
 <script src="variations_tenues.js?v=2"></script>
 <script type="module" src="objets_ia.js?v=17"></script>
-<script type="module" src="loot.js?v=30"></script>
+<script type="module" src="loot.js?v=31"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

@@ -217,8 +217,8 @@ console.log("\n3. LA COMPOSITION DU BUTIN (composerButin)");
   verifier("la prévision tirée d'avance est servie telle quelle",
            compter(Object.values(prevu.parPersonnage).flat().map(l => l.rarete)) === compter(["Épique", "Très rare", "Rare", "Rare", "Rare", "Rare"]));
 
-  const cohue = compo({ creatures: cr(9, "Normal", [0]), parHeros: 2, sansPartage: true });
-  verifier("la cohue : 2 chacun, ni mise en commun ni bonus", JSON.stringify(parts(cohue)) === "[2,2,2]" && cohue.commun.length === 0);
+  const cohue = compo({ creatures: cr(9, "Normal", [0]), parHeros: 2 });
+  verifier("la cohue (2 par joueur) : surplus et bonus à la mise en commun (v270)", JSON.stringify(parts(cohue)) === "[2,2,2]" && cohue.commun.length === 4);
   const deuxJoueurs = compo({ creatures: cr(1), participants: ["J1", "J2"] });
   verifier("2 joueurs, 1 créature : 4 objets (1 + 3 au hasard)",
            Object.values(deuxJoueurs.parPersonnage).flat().length === 4 && Object.values(deuxJoueurs.parPersonnage).flat().filter(l => l.origine === "hasard").length === 3);
@@ -321,18 +321,18 @@ console.log("\n6. LA PETITE RENCONTRE : 4 PETITS POUR 3 HÉROS");
 }
 
 // ==========================================================================
-console.log("\n7. LA COHUE (Apparition 4) : 2 PAR JOUEUR, PAS DE MISE EN COMMUN");
+console.log("\n7. LA COHUE (Apparition 4) : 2 PAR JOUEUR, ET LA MISE EN COMMUN (v270)");
 {
-  const partie = creerPartie({ Apparition_Butin: { parJoueur: 2, partage: false } });
+  const partie = creerPartie({ Apparition_Butin: { parJoueur: 2, xpPct: -10 } });
   const docs = creerDocuments();
   const monstres = [creature("L", "Normal", true), ...Array.from({ length: 6 }, (_, i) => creature("C" + i, "Petit"))];
   monstres.forEach(m => { m.statut = "Mort"; });
   const p = creerPoste({ partie, documents: docs, persos: heros(3), monstres });
   await p.w.demarrerButin();
   const butin = partie.partagee.doc.Butin || {};
-  verifier("2 objets par héros, aucun d'office, pas de bonus, pas de partage",
+  verifier("2 objets par héros, le surplus (1) et le bonus du leader à la mise en commun",
            ["J1", "J2", "J3"].every(id => (((butin.parPersonnage || {})[id] || {}).items || []).length === 2)
-           && Array.isArray(butin.commun) && butin.commun.length === 0 && butin.sansPartage === true);
+           && Array.isArray(butin.commun) && butin.commun.length === 2 && !("sansPartage" in butin));
 }
 
 // ==========================================================================
@@ -361,10 +361,11 @@ console.log("\n9. LES VERSIONS");
   const html = fs.readFileSync(RACINE + '/index.html', 'utf-8');
   const trace = fs.readFileSync(RACINE + '/trace_combat.js', 'utf-8');
   const version = JSON.parse(fs.readFileSync(RACINE + '/version.json', 'utf-8'));
-  verifier("version.json : 269", version.version === 269);
-  verifier("trace_combat.js : VERSION_IVALIS 269", /VERSION_IVALIS\s*=\s*269\b/.test(trace));
-  verifier("loot.js, objets.js, objets_ia.js et style.css changent de version",
-           /loot\.js\?v=30\b/.test(html) && /objets\.js\?v=19\b/.test(html) && /objets_ia\.js\?v=17\b/.test(html) && /style\.css\?v=100\b/.test(html));
+  const vTrace = Number((trace.match(/VERSION_IVALIS\s*=\s*(\d+)/) || [])[1]);
+  verifier("version 269 ou plus (trace_combat.js, version.json)", vTrace >= 269 && version.version === vTrace, `${vTrace} / ${version.version}`);
+  const v = (nom) => Number((html.match(new RegExp(nom.replace(".", "\\.") + "\\?v=(\\d+)")) || [])[1]);
+  verifier("loot.js, objets.js, objets_ia.js et style.css ont changé de version",
+           v("loot.js") >= 30 && v("objets.js") >= 19 && v("objets_ia.js") >= 17 && v("style.css") >= 100);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

@@ -1141,7 +1141,9 @@ export function appliquerIntention(etat, intention, plateau) {
         const r = resoudreCarte(etat, action, plateau);
         // CONFUS, IL NE LANCE RIEN (il fuit, ou il reste planté) : ni murs
         // frappés, ni peur, ni zone, ni bond, ni repli — la carte n'est pas partie.
-        const annulee = !!(action.confusion && action.confusion.annulee);
+        // ÉTOURDI ET RATÉE, PAREIL (v270, Nico : « ma technique ne s'est pas
+        // faite, seulement la zone s'est quand même faite ») : rien ne suit.
+        const annulee = !!(action.confusion && action.confusion.annulee) || !!r.ratee;
 
         // UNE CARTE TERMINE LE TOUR, et c'est la règle du jeu depuis toujours :
         // validerCarteCombat enchaîne sur finDeTourCombat. Le cerveau ne le
@@ -1414,8 +1416,9 @@ function actionDeCreature(etat, id, carte, plateau, des, options) {
         courant = clonerEtat(r.etat);
         etapes.push(...r.etapes);
         // Confuse, elle ne lance rien (elle fuit, ou reste plantée) : ni zone,
-        // ni peur, ni repli — la carte n'est pas partie.
-        const annulee = !!(action.confusion && action.confusion.annulee);
+        // ni peur, ni repli — la carte n'est pas partie. Ratée (l'Étourdi,
+        // v270), non plus.
+        const annulee = !!(action.confusion && action.confusion.annulee) || !!r.ratee;
 
         // LA ZONE QU'UNE CARTE DE PERSISTANCE LAISSE DERRIÈRE ELLE — même
         // raisonnement que pour un joueur (voir prochainPas plus haut) : une

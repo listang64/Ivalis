@@ -101,10 +101,14 @@ console.log("\n1. LA GRILLE DE NICO");
   verifier("le niveau change pile au seuil",
            r.bords.every(([xp, niv]) => niv === ({ 0: 1, 699: 1, 700: 2, 1199: 2, 1200: 3, 7899: 9, 7900: 10, 9399: 10, 9400: 11, 10900: 12 })[xp]),
            JSON.stringify(r.bords));
-  verifier("une compétence à créer aux niveaux 2, 4, 6, 8, 10, puis à chaque niveau",
-           JSON.stringify(r.comp) === "[[1,0],[2,1],[3,1],[4,2],[5,2],[8,4],[9,4],[10,5],[11,6],[12,7]]", JSON.stringify(r.comp));
-  verifier("les talents sont annoncés (pour plus tard)",
-           r.gains[2][1] === "Talent mineur" && r.gains[3][1] === "Talent majeur" && /compétence/.test(r.gains[6][1]), JSON.stringify(r.gains));
+  // v270 (Nico) : talent aux niveaux pairs jusqu'au 10, compétence aux
+  // impairs à partir du 3, puis une compétence par niveau après le 10.
+  verifier("une compétence à créer aux niveaux 3, 5, 7, 9, puis à chaque niveau après le 10",
+           JSON.stringify(r.comp) === "[[1,0],[2,0],[3,1],[4,1],[5,2],[8,3],[9,4],[10,4],[11,5],[12,6]]", JSON.stringify(r.comp));
+  verifier("la grille annonce : création, talent, compétence…",
+           r.gains[0][1] === "Création du personnage" && r.gains[1][1] === "Talent" && /compétence/.test(r.gains[2][1])
+           && /compétence/.test(r.gains[3][1]) && r.gains[4][1] === "Talent" && /compétence/.test(r.gains[5][1]) && /compétence/.test(r.gains[6][1]),
+           JSON.stringify(r.gains));
   verifier("sans chiffre en base, une créature rapporte la grille : 40 / 100 / 240 / 800",
            JSON.stringify(r.palier) === "[40,100,240,800]", JSON.stringify(r.palier));
 }
@@ -150,7 +154,7 @@ console.log("\n2. LA JAUGE DE LA FICHE, LE NIVEAU AU-DESSUS");
   verifier("1 450 XP : niveau 3", r.niveau === "3", r.niveau);
   verifier("la jauge est remplie à 250 / 600 du niveau (41,7 %)", Math.abs(r.largeur - 41.67) < 0.1, String(r.largeur));
   verifier("elle dit « 1 450 / 1 800 XP »", r.texte.replace(/\s/g, " ") === "1 450 / 1 800 XP", r.texte);
-  verifier("et ce qui vient ensuite", /Niveau 4 dans 350 XP : \+1 compétence/.test(r.prochain.replace(/\s/g, " ")), r.prochain);
+  verifier("et ce qui vient ensuite", /Niveau 4 dans 350 XP : Talent/.test(r.prochain.replace(/\s/g, " ")), r.prochain);
   verifier("le niveau est au-dessus de la jauge", r.niveauAuDessus);
   verifier("sous l'en-tête, au-dessus des onglets (visible sur tous)", r.avantOnglets);
   verifier("une vraie jauge, bien visible", r.jaugeVisible);
@@ -202,9 +206,9 @@ console.log("\n4. UN NIVEAU DONNE DES COMPÉTENCES À CRÉER — PAS DE LA PLACE
   }, xp);
   const n1 = await essai(0), n4 = await essai(1800), n11 = await essai(9400);
   verifier("niveau 1, six techniques forgées : plus rien à créer", n1.restantes === "0" && !n1.actif && n1.detail === "", JSON.stringify(n1));
-  verifier("niveau 4 : deux de plus à créer", n4.restantes === "2" && n4.actif && /dont 2 gagnées au niveau 4/.test(n4.detail),
+  verifier("niveau 4 : une de plus à créer (celle du niveau 3)", n4.restantes === "1" && n4.actif && /dont 1 gagnée au niveau 4/.test(n4.detail),
            JSON.stringify(n4));
-  verifier("niveau 11 : six de plus", n11.restantes === "6" && n11.creations === 12, JSON.stringify(n11));
+  verifier("niveau 11 : cinq de plus (3, 5, 7, 9, 11)", n11.restantes === "5" && n11.creations === 11, JSON.stringify(n11));
   verifier("la limite en main ne bouge pas (6 en combat)", [n1, n4, n11].every(x => x.enCombat === "6" && x.main === 6),
            JSON.stringify([n1.main, n4.main, n11.main]));
 }

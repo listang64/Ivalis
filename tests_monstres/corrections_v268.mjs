@@ -182,8 +182,8 @@ const AP = (() => {
            tous("4.1", t => ["4N0P", "3N1P", "2N2P", "0N5P"].includes(compo(t.depart)) && t.renforts.length === 0));
   verifier("4.2 LA RELÈVE : 4 Petits ; 4 Petits quand tous sont morts",
            tous("4.2", t => compo(t.depart) === "0N4P" && compo(t.renforts) === "0N4P" && t.renforts.every(m => m.quandVide)));
-  verifier("4.3 / 4.4 / 4.5 LES COHUES : 5 (3N) −25 %, 6 (3N) −40 %, 7 (3N au plus) −50 % ; 2 objets, pas de partage, −10/−20/−30 % d'XP ; pas de leader",
-           tous("4.3", t => compo(t.depart) === "3N2P" && t.depart.every(m => m.pvPct === -25 && !m.leader) && t.butin.xpPct === -10 && t.butin.parJoueur === 2 && t.butin.partage === false)
+  verifier("4.3 / 4.4 / 4.5 LES COHUES : 5 (3N) −25 %, 6 (3N) −40 %, 7 (3N au plus) −50 % ; 2 objets, −10/−20/−30 % d'XP ; pas de leader",
+           tous("4.3", t => compo(t.depart) === "3N2P" && t.depart.every(m => m.pvPct === -25 && !m.leader) && t.butin.xpPct === -10 && t.butin.parJoueur === 2 && !("partage" in t.butin))
            && tous("4.4", t => compo(t.depart) === "3N3P" && t.depart.every(m => m.pvPct === -40) && t.butin.xpPct === -20)
            && tous("4.5", t => t.depart.length === 7 && t.depart.filter(m => m.palier === "Normal").length <= 3 && t.depart.every(m => m.pvPct === -50) && t.butin.xpPct === -30));
   const possible = ["1.3", "2.1", "3.1", "4.1"].map(k => L(k).filter(t => [...t.depart, ...t.renforts].some(m => m.leader)).length / Math.max(1, L(k).length));
@@ -447,13 +447,13 @@ titre("9. LES CASES PIÉGÉES : 25 % DU TERRAIN, DEUX PETITS À −50 % QUI SURG
   verifier("le poste du cerveau les fait surgir et entrer tout de suite", /declencherPiegeApparition\(d\)[\s\S]{0,120}accueillirLesRenfortsMaintenant/.test(regime));
 }
 
-titre("10. LES COHUES : DEUX OBJETS PAR JOUEUR, SANS PARTAGE, MOINS D'EXPÉRIENCE");
+titre("10. LES COHUES : DEUX OBJETS PAR JOUEUR, MOINS D'EXPÉRIENCE (le partage reste, v270)");
 {
   const r = await p.evaluate(() => {
     window.MONSTRES_PARTIE = [{ idPersonnage: "M1", statut: "Mort", XP_Groupe: 100 }, { idPersonnage: "M2", statut: "Mort", XP_Groupe: 100 }];
     window.PARTIE_DATA = {};
     const plein = window.__ou(() => window.xpDeLaVictoire(), null);
-    window.PARTIE_DATA = { Apparition_Butin: { parJoueur: 2, partage: false, xpPct: -20 } };
+    window.PARTIE_DATA = { Apparition_Butin: { parJoueur: 2, xpPct: -20 } };
     const cohue = window.__ou(() => window.xpDeLaVictoire(), null);
     window.tirerObjetsAleatoires = (d, n) => Array.from({ length: n }, (_, i) => ({ uid: "o" + Math.random(), nom: "Objet " + i }));
     const servi = window.__ou(() => window.servirDepuisLaReserve(null, ["H1", "H2"], "Normale", 2), null);
@@ -463,8 +463,8 @@ titre("10. LES COHUES : DEUX OBJETS PAR JOUEUR, SANS PARTAGE, MOINS D'EXPÉRIENC
   verifier("−20 % d'expérience : 200 → 160", r.plein === 200 && r.cohue === 160, `${r.plein} → ${r.cohue}`);
   verifier("deux objets au hasard par joueur (le nombre suit le réglage)", JSON.stringify(r.deux) === "[2,2]" && r.trois === 3, JSON.stringify([r.deux, r.trois]));
   const loot = lire('loot.js');
-  verifier("PAS DE PARTAGE : la fenêtre personnelle validée, le butin est réparti (pas d'étape commune)",
-           /sansPartage: true/.test(loot) && /tousValides && butin\.sansPartage[\s\S]{0,300}"Butin\.etape"\] = "termine"/.test(loot));
+  verifier("LA MISE EN COMMUN RESTE (Nico, v270 : « pas de partage, ça faut l'enlever partout »)",
+           !/sansPartage/.test(loot) && !/partage === false/.test(loot));
   const monstres = lire('monstres.js');
   verifier("la rencontre écrit son butin, ses pièges et leurs renforts sur la partie", /Apparition_Butin: tirage\.butin/.test(monstres) && /Pieges_Apparition: pieges\.length/.test(monstres) && /Pieges_Renfort: tirage\.pieges/.test(monstres));
 }

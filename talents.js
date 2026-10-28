@@ -5,8 +5,8 @@
 //  Un talent sans caractéristique est « Général ». Un minimum de carac (FOR 12,
 //  INT 15…) en est le seul prérequis — valeur BONUS COMPRIS (race, objets).
 //
-//  LES POINTS (experience.js) : un point de talent aux niveaux 3, 5, 7 et 9 ;
-//  plus rien ensuite. Préparer et Formé se prennent deux fois (un point
+//  LES POINTS (experience.js) : un point de talent aux niveaux 2, 4, 6, 8 et
+//  10 (v270, Nico) ; plus rien ensuite. Préparer et Formé se prennent deux fois (un point
 //  chacun). Un talent pris ne se retire pas — seul l'onglet DEV remet à zéro.
 //
 //  LE MODIFICATEUR d'une carac est celui du jeu : arrondi inférieur de
@@ -33,7 +33,7 @@
 // =========================================================================
 
 (function () {
-    const NIVEAUX_TALENT = [3, 5, 7, 9];
+    const NIVEAUX_TALENT = [2, 4, 6, 8, 10];
 
     // Les lignes de la fenêtre, dans l'ordre : Général, puis les six caracs.
     const LIGNES = [

@@ -2728,14 +2728,19 @@ window.poserJaugesSelection = function(divToken, perso, existantes) {
     // LES CHIFFRES SUR LES JAUGES (v267, Nico : « quand on clique sur un token,
     // affiche le nombre de PV et de fatigue sur ses jauges en dessous ») :
     // « 34/50 » dans la barre de vie, « 80/120 » dans celle de la fatigue.
-    const largeurChiffres = divToken.offsetWidth || parseFloat(divToken.style.width) || 55;
+    // LA TAILLE SUIT LA JAUGE, PAS LE ZOOM (v270, Nico : « ne les fais pas
+    // rétrécir avec le zoom, juste qu'ils restent dans leur jauge, le plus
+    // grand possible sans les déformer ») : la feuille de style la tire de la
+    // hauteur et de la largeur de la barre (unités de conteneur), le nombre de
+    // caractères disant combien il en faut loger en largeur.
     [[".jauge-selection-vie", `${m.pv}/${m.pvMax}`], [".jauge-selection-fatigue", `${m.energie}/${m.energieMax}`]].forEach(([sel, texte]) => {
         const jauge = bloc.querySelector(sel);
         if (!jauge) return;
         let chiffre = jauge.querySelector(".jauge-selection-chiffre");
         if (!chiffre) { chiffre = document.createElement("span"); chiffre.className = "jauge-selection-chiffre"; jauge.appendChild(chiffre); }
         chiffre.textContent = texte;
-        chiffre.style.fontSize = Math.max(6, Math.round(largeurChiffres * 0.125)) + "px";
+        chiffre.style.fontSize = "";
+        chiffre.style.setProperty("--nb-car", String(Math.max(1, texte.length)));
     });
     // LE NOM, EN TOUT PETIT, SOUS LES JAUGES (Nico, v255), une ombre portée
     // dessous pour le relief. Sa taille suit celle du pion.
@@ -5331,6 +5336,12 @@ const PISTE_ECART = 16;
 const PISTE_PAS = PISTE_LARGEUR_TUILE + PISTE_ECART;
 // De la place sous les portraits pour les pastilles d'état, qui débordent.
 const PISTE_MARGE_ETATS = 26;
+// LA PISTE EN GRAND (v270, Nico : « double la taille de la piste d'initiative
+// par rapport à celle actuelle ») : tout son dessin (portraits, jauges,
+// chiffres, pastilles) grandit d'un bloc, ancré en haut au centre. Les
+// mesures ci-dessus restent celles du dessin ; la largeur disponible, elle,
+// se lit à cette échelle (voir largeurMax).
+window.ECHELLE_PISTE_INITIATIVE = 2;
 
 // L'ordre COMPLET de la manche en cours : { manche, ordre: [{id, initiative, idCarte}] }.
 window.PISTE_MANCHE = { manche: 0, ordre: [] };
@@ -5486,7 +5497,8 @@ window.afficherPisteInitiative = function(queue, phase) {
     //
     // Plutôt que de couper, on resserre : les portraits se chevauchent comme un
     // jeu de cartes en éventail, et tout le monde reste visible.
-    const largeurMax = Math.max(320, (window.innerWidth || 1024) * 0.92);
+    const echellePiste = Math.max(0.5, Number(window.ECHELLE_PISTE_INITIATIVE) || 1);
+    const largeurMax = Math.max(320 / echellePiste, (window.innerWidth || 1024) * 0.92 / echellePiste);
     let pas = PISTE_PAS;
     if (visibles.length > 1) {
         const besoin = (visibles.length - 1) * pas + PISTE_LARGEUR_TUILE;
@@ -5500,6 +5512,8 @@ window.afficherPisteInitiative = function(queue, phase) {
         : ((visibles.length - 1) * pas + PISTE_LARGEUR_TUILE) + "px";
     piste.style.height = (PISTE_HAUTEUR_TUILE + PISTE_MARGE_ETATS) + "px";
     piste.style.opacity = visibles.length === 0 ? "0" : "1";
+    piste.style.transformOrigin = "top center";
+    piste.style.transform = echellePiste === 1 ? "" : `scale(${echellePiste})`;
 
     // LE BANDEAU : un élément posé une fois pour toutes, jamais reconstruit. Il
     // suit la largeur de la piste sans qu'on ait à la lui dire, puisqu'il est

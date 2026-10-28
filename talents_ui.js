@@ -148,7 +148,7 @@ function fenetre() {
         <div class="talents-entete">
           <div>
             <h2 class="talents-titre">Talents</h2>
-            <p class="talents-sous-titre">Un talent aux niveaux 3, 5, 7 et 9. Choisissez ceux qui correspondent à votre style de jeu — un choix définitif.</p>
+            <p class="talents-sous-titre">Un talent aux niveaux 2, 4, 6, 8 et 10. Choisissez ceux qui correspondent à votre style de jeu — un choix définitif.</p>
           </div>
           <div class="talents-dispo">
             ${window.medaillonTalent("general", 40)}

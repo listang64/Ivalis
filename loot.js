@@ -654,7 +654,6 @@ window.statureDuBonus = function(creatures) {
 //   participants : les héros qui touchent une part
 //   prevision    : { monstres: {id: rareté}, hasard: [rareté], bonus: {stature, rarete} }
 //   parHeros     : 2 (le réglage de la cohue peut le changer)
-//   sansPartage  : la cohue (Apparition 4) — pas de mise en commun, pas de bonus
 window.composerButin = function(o) {
     const alea = o.alea || Math.random;
     const prevision = o.prevision || {};
@@ -680,7 +679,6 @@ window.composerButin = function(o) {
     }
     const parPersonnage = {};
     participants.forEach((id, i) => { parPersonnage[id] = lots.slice(i * parHeros, (i + 1) * parHeros); });
-    if (o.sansPartage) return { parPersonnage, commun: [] };
 
     const commun = lots.slice(minimum);
     const stature = window.statureDuBonus(creatures);
@@ -733,6 +731,104 @@ window.raretesManquantes = function(items, raretes) {
     const manque = [];
     (raretes || []).forEach(r => { if (dispo[r] > 0) dispo[r]--; else manque.push(r); });
     return manque;
+};
+
+// =========================================================================
+//  PARAMÈTRES > OUTILS > BUTIN (v270)
+// =========================================================================
+//  Le tableau de Nico, niveau par niveau, se règle ici. Les cases changées
+//  restent un brouillon tant qu'on n'a pas appuyé sur « Mettre à jour » :
+//  c'est alors seulement que le tableau s'écrit (monstres.js,
+//  enregistrerTableButin) et gagne tous les postes.
+window.BROUILLON_BUTIN = null;
+
+window.ouvrirTableButin = function() {
+    const menuLat = document.getElementById("menu-lateral");
+    if (menuLat) menuLat.style.display = "none";
+    window.BROUILLON_BUTIN = null;
+    if (typeof window.naviguerFenetre === "function") window.naviguerFenetre("etape-menu-outils", "etape-table-butin");
+    window.dessinerTableButin();
+};
+window.fermerTableButin = function() {
+    const menuLat = document.getElementById("menu-lateral");
+    if (menuLat) menuLat.style.display = "flex";
+    window.BROUILLON_BUTIN = null;
+    if (typeof window.naviguerFenetre === "function") window.naviguerFenetre("etape-table-butin", "etape-menu-outils");
+};
+
+window.dessinerTableButin = function(message) {
+    const hote = document.getElementById("corps-table-butin");
+    if (!hote) return;
+    const table = window.BROUILLON_BUTIN || window.CHANCES_BUTIN_NIVEAU || {};
+    const modifie = !!window.BROUILLON_BUTIN;
+    const RAR = window.RARETES || [];
+    const entete = ["Petit", "Normal"].map(st => RAR.map(r =>
+        `<th class="butin-reg-rarete" style="color:${(window.COULEUR_RARETE || {})[r] || "#5c3a21"}">${r}</th>`).join("") + `<th>Total</th>`).join("");
+    const lignes = Object.keys(table).sort((a, b) => a - b).map(n => {
+        const cases = ["Petit", "Normal"].map(st => {
+            const ligne = table[n][st] || {};
+            const total = RAR.reduce((t, r) => t + (Number(ligne[r]) || 0), 0);
+            return RAR.map(r => `<td><input type="number" class="butin-champ" min="0" max="100" step="1"
+                    data-niveau="${n}" data-stature="${st}" data-rarete="${r}" value="${Number(ligne[r]) || 0}"
+                    onchange="window.modifierCaseButin(this.dataset.niveau, this.dataset.stature, this.dataset.rarete, this.value)"></td>`).join("")
+                + `<td class="butin-reg-total${total === 100 ? "" : " faux"}">${total} %</td>`;
+        }).join("");
+        return `<tr><th>Niv. ${n}</th>${cases}</tr>`;
+    }).join("");
+    hote.innerHTML = `
+        <table class="table-butin-reglage">
+          <thead><tr><th></th><th colspan="${RAR.length + 1}">Petit</th><th colspan="${RAR.length + 1}">Normal (et Boss)</th></tr>
+                 <tr><th>Niveau</th>${entete}</tr></thead>
+          <tbody>${lignes}</tbody>
+        </table>
+        <div class="butin-reg-actions">
+          <button type="button" id="btn-maj-table-butin" class="btn-parametres" ${modifie ? "" : "disabled"}
+                  onclick="window.mettreAJourTableButin()">Mettre à jour</button>
+          <button type="button" class="btn-parametres apparition-retablir" onclick="window.retablirTableButin()">Rétablir le tableau de Nico</button>
+          <span id="butin-reg-etat" class="butin-reg-etat">${message || (modifie ? "Modifications non enregistrées" : "")}</span>
+        </div>`;
+};
+
+// Une case changée : le brouillon la retient, rien ne part encore.
+window.modifierCaseButin = function(niveau, stature, rarete, valeur) {
+    const base = window.BROUILLON_BUTIN || window.CHANCES_BUTIN_NIVEAU;
+    const brouillon = JSON.parse(JSON.stringify(base));
+    if (!brouillon[niveau] || !brouillon[niveau][stature]) return null;
+    const v = Math.round(Number(valeur));
+    brouillon[niveau][stature][rarete] = Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 0;
+    window.BROUILLON_BUTIN = brouillon;
+    window.dessinerTableButin();
+    return brouillon;
+};
+
+// « Mettre à jour » : le brouillon devient le tableau, ici et pour tous.
+window.mettreAJourTableButin = async function() {
+    if (!window.BROUILLON_BUTIN) return null;
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const table = window.appliquerTableButin(window.BROUILLON_BUTIN);
+    window.BROUILLON_BUTIN = null;
+    try {
+        if (typeof window.enregistrerTableButin === "function") await window.enregistrerTableButin(table);
+        window.dessinerTableButin("✔️ Mis à jour — en jeu tout de suite");
+    } catch (e) {
+        console.error("Tableau du butin :", e);
+        window.dessinerTableButin("⚠️ Non enregistré (connexion ?)");
+    }
+    return table;
+};
+
+window.retablirTableButin = async function() {
+    if (typeof window.confirm === "function" && !window.confirm("Rétablir le tableau de butin de Nico ? Tes réglages seront perdus.")) return null;
+    const table = window.appliquerTableButin(null);
+    window.BROUILLON_BUTIN = null;
+    try {
+        if (typeof window.enregistrerTableButin === "function") await window.enregistrerTableButin(null);
+        window.dessinerTableButin("✔️ Tableau de Nico rétabli");
+    } catch (e) {
+        console.error("Tableau du butin :", e);
+        window.dessinerTableButin("⚠️ Non enregistré (connexion ?)");
+    }
+    return table;
 };
 
 // Ce que ce poste a vu de la réserve, pour ne pas retourner la lire à chaque
@@ -1187,7 +1283,7 @@ window.demarrerButin = async function() {
         // La réserve est relue DANS la transaction, comme tout le reste : c'est
         // la seule façon d'être sûr que deux postes qui détectent la victoire au
         // même instant ne distribuent pas deux fois les mêmes objets.
-        // Le butin d'une cohue (v268) : tant d'objets par joueur, pas de partage.
+        // Le butin d'une cohue (v268) : tant d'objets par joueur.
         const butinCas = data.Apparition_Butin || null;
         // LE BUTIN PAR MONSTRE VAINCU (v269) : un objet par créature tombée,
         // complété au hasard jusqu'à deux par héros, le surplus et le bonus de
@@ -1196,8 +1292,7 @@ window.demarrerButin = async function() {
             ? reserveLue.prevision : null;
         const plan = window.composerButin({
             creatures, participants, prevision, niveau: window.niveauDuButin(),
-            parHeros: butinCas ? butinCas.parJoueur : undefined,
-            sansPartage: !!(butinCas && butinCas.partage === false)
+            parHeros: butinCas ? butinCas.parJoueur : undefined
         });
         const service = window.servirDepuisLaReserve(reserveLue, participants, difficulte, undefined, plan);
         const parPersonnage = service.parPersonnage;
@@ -1217,7 +1312,6 @@ window.demarrerButin = async function() {
             parPersonnage,
             // L'XP que chaque héros vient de gagner (annoncée dans la fenêtre).
             xp: xpVictoire,
-            ...(butinCas && butinCas.partage === false ? { sansPartage: true } : {}),
             // Ce qui part directement à la mise en commun : le surplus des
             // créatures, le bonus de leader (v269).
             commun: service.commun || [],
@@ -1975,14 +2069,7 @@ window.validerButinPersonnel = async function(idPersonnage) {
         dejaValides.add(idPersonnage);
         const tousValides = butin.participants.every(id => dejaValides.has(id));
 
-        if (tousValides && butin.sansPartage) {
-            // « Pas d'autres loots » (v268) : ce qu'on n'a pas gardé est perdu,
-            // le butin est réparti.
-            maj["Butin.pool"] = [];
-            maj["Butin.poolValides"] = [...butin.participants];
-            maj["Butin.resolu"] = true;
-            maj["Butin.etape"] = "termine";
-        } else if (tousValides) {
+        if (tousValides) {
             // Le surplus et le bonus de leader ouvrent la mise en commun (v269).
             const pool = (butin.commun || []).map(item => ({ ...item, candidats: [], gagnant: null }));
             butin.participants.forEach(id => {

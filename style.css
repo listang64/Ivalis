@@ -4342,12 +4342,18 @@ textarea.input-texte-parchemin {
     position: relative;
     height: 46%; background: #111; border: 1px solid #c2a878; border-radius: 3px;
     overflow: hidden; box-sizing: border-box;
+    /* La barre est le conteneur de ses chiffres (v270) : cqh / cqw. */
+    container-type: size;
 }
-/* Les chiffres sur les jauges (v267) : centrés dans la barre, en relief. */
+/* Les chiffres sur les jauges (v267) : centrés dans la barre, en relief.
+   v270 : le plus grand possible DANS la barre, quel que soit le zoom — la
+   hauteur (88 % de la barre) ou la largeur (≈ 0,58 em par caractère, 92 %
+   de la barre), la plus petite des deux ; jamais étirés. */
 .jauge-selection-chiffre {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
     font-family: 'Cinzel', serif; font-weight: bold; line-height: 1; letter-spacing: 0.02em;
+    font-size: min(88cqh, calc(92cqw / (0.58 * var(--nb-car, 5))));
     color: #ffffff; white-space: nowrap;
     text-shadow: 0 0 2px #000, 0 1px 1px #000, 0 0 3px rgba(0, 0, 0, 0.9);
 }
@@ -5649,3 +5655,17 @@ textarea.input-texte-parchemin {
 @media (prefers-reduced-motion: reduce) {
   .fleches-engagement .fleche-engagement, .fleches-engagement .flux-engagement { animation: none; }
 }
+
+/* v270 : Paramètres > Outils > Butin, le tableau des raretés par niveau. */
+.corps-table-butin { overflow-x: auto; max-height: 70vh; }
+.table-butin-reglage { border-collapse: collapse; margin: 0 auto; font-family: 'Almendra', serif; color: #3b2414; }
+.table-butin-reglage th, .table-butin-reglage td { padding: 3px 5px; text-align: center; border-bottom: 1px solid rgba(92, 58, 33, 0.25); }
+.table-butin-reglage thead th { font-size: 13px; }
+.butin-reg-rarete { font-size: 12px; white-space: nowrap; }
+.table-butin-reglage .butin-champ { width: 52px; font-family: inherit; font-size: 15px; text-align: center;
+    background: #f5e9cf; border: 1px solid #8b6a43; border-radius: 4px; padding: 3px 2px; }
+.butin-reg-total { font-size: 13px; color: #1b6e3a; white-space: nowrap; }
+.butin-reg-total.faux { color: #b3261e; font-weight: bold; }
+.butin-reg-actions { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+.butin-reg-actions button[disabled] { opacity: 0.45; cursor: not-allowed; }
+.butin-reg-etat { font-family: 'Almendra', serif; font-size: 14px; color: #5c3a21; font-style: italic; }

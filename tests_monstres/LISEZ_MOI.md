@@ -8106,3 +8106,59 @@ prévision (complétée, stable, renforts, combat d'avant) ; la scène réelle �
 2 chacun, 4 d'office ; le partage à 6) ; 4 Petits (4 + 2 au hasard) ; un
 renfort sans prévision ; la cohue ; ce que la fenêtre annonce ; les versions.
 Il mord sur l'ancien code (40 échecs).
+
+## v270 — Réglage du butin, déblocages par niveau, jauges, étourdi, ±5 %, piste
+
+PARAMÈTRES > OUTILS > BUTIN (loot.js, ouvrirTableButin) : les 80 cases du
+tableau de Nico (10 niveaux × Petit/Normal × 4 raretés), le total de chaque
+ligne (rouge s'il ne fait pas 100 : le tirage lit les lignes comme des
+poids). Une case changée reste un brouillon ; « Mettre à jour » l'écrit
+(Monstres_Modeles/_REGLAGES, champ Butin_Niveaux, en fusion — monstres.js,
+enregistrerTableButin) et l'applique (objets.js, appliquerTableButin, que
+appliquerReglagesMonstres rejoue sur chaque poste). « Rétablir le tableau de
+Nico » efface le champ. normaliserTableButin borne chaque case de 0 à 100 ;
+une ligne toute à zéro reprend celle de Nico.
+
+LES DÉBLOCAGES (experience.js, talents.js) : niveau 1 la création du
+personnage ; un talent aux niveaux 2, 4, 6, 8 et 10 (NIVEAUX_TALENT) ; une
+compétence à créer aux niveaux 3, 5, 7 et 9, puis à chaque niveau après le 10
+(competencesDeNiveau).
+
+LES CHIFFRES DES JAUGES (combat.js, poserJaugesSelection ; style.css) : plus
+de taille en pixels posée à la main. La barre est un conteneur
+(container-type: size) ; le chiffre prend min(88 % de sa hauteur, 92 % de sa
+largeur ÷ (0,58 × nombre de caractères)) : le plus grand possible dans la
+barre, à tout zoom, sans déformation.
+
+ÉTOURDI (moteur_pur.js, resoudreCarte ; cerveau_combat.js) : une technique
+ratée ne laisse plus sa zone persistante, ni sa Peur, son bond ou son repli
+(`ratee` rendu par resoudreCarte, traité comme une carte annulée, pour un
+héros comme pour une créature) ; sa fatigue est payée (étape fatigue, avec
+sa dépense).
+
+L'APPARITION 4 (apparitions.js, loot.js) : plus de « pas de partage » — ni
+dans le tableau, ni dans le menu, ni dans le butin (sansPartage disparu). Les
+cohues gardent 2 objets par joueur et leur XP réduite ; leur surplus et le
+bonus du leader vont à la mise en commun, comme partout.
+
+±5 % (monstres.js, varierStatsMonstre, appelée par creerMonstreDepuisGabarit) :
+PV, fatigue, résistances, esquive, parade, régénération, repos long,
+initiative et critique tirent chacun leur écart entre −5 % et +5 %, arrondi à
+l'unité, leader compris ; la créature entre au plein ; l'XP et le nombre
+d'actions ne bougent pas ; les écarts restent sur la fiche (Variation_Stats).
+
+LA PISTE D'INITIATIVE (combat.js, ECHELLE_PISTE_INITIATIVE = 2) : tout son
+dessin grandit d'un bloc (transform: scale, ancré en haut au centre) ; la
+largeur disponible se lit à cette échelle, donc elle se resserre et ne sort
+jamais de l'écran.
+
+corrections_v270.mjs (dans la suite) : l'étourdi dans le vrai cerveau
+(ratée : ni zone, ni dégâts, fatigue payée ; réussie : zone et fatigue) ; sur
+la vraie page, la fenêtre du butin (brouillon, écriture, tirage, autre poste,
+bornes, Rétablir), les déblocages, les jauges à trois zooms, l'Apparition 4,
+60 créatures à ±5 %, la piste ×2 (et à 14 combattants) ; les versions. Il
+mord sur l'ancien code (40 échecs).
+
+Les anciens bancs remis aux règles v270 : experience (la grille), talents
+(niveaux pairs), corrections_v268 et corrections_v269 (la cohue garde la
+mise en commun ; versions « ou plus »).
