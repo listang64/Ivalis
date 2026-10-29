@@ -214,7 +214,7 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("5. LE DEV : PINCEAU, GOMME, NUAGES");
+titre("5. LE DEV : PINCEAU, GOMME (v286 : ils peignent l'usure du parchemin ; plus de nuages régionaux)");
 // =========================================================================
 await section(async () => {
   await p.evaluate(() => { localStorage.setItem("ivalis_DEV_MODE", "on"); window.__ecrits = []; window.actualiserRegionsDev(); window.basculerPopupRegions(true); });
@@ -228,70 +228,48 @@ await section(async () => {
   await p.mouse.move(300, 300); await p.mouse.down(); await p.mouse.move(700, 450, { steps: 15 }); await p.mouse.up();
   await p.mouse.move(200, 600); await p.mouse.down(); await p.mouse.move(520, 620, { steps: 10 }); await p.mouse.up();
   const r1 = await p.evaluate(() => {
-    const g = window.grilleNuagesRegion(), c = window.cadrageCarteRegion();
+    const g = window.grilleUsureRegion(), c = window.cadrageCarteRegion();
     const caseEcran = (x, y) => { const cell = c.largeur / 240; return g[Math.floor(((y - c.panY) / c.zoom) / cell) * 240 + Math.floor(((x - c.panX) / c.zoom) / cell)]; };
     return { peintes: g.reduce((s, v) => s + v, 0), dedans: caseEcran(500, 375), dehors: caseEcran(900, 150),
-             rouge: getComputedStyle(document.getElementById("carte-region-peinture")).display, nuagesCaches: document.getElementById("carte-region-nuages").style.visibility,
+             rouge: getComputedStyle(document.getElementById("carte-region-peinture")).display,
              ecrits: window.__ecrits.length, valider: document.getElementById("btn-region-valider-nuages").disabled, actif: document.getElementById("btn-region-pinceau").classList.contains("actif") };
   });
   verifier("le pinceau peint des cases sous son passage, pas ailleurs", r1.peintes > 50 && r1.dedans === 1 && r1.dehors === 0, `${r1.peintes} cases`);
-  verifier("les zones rouges se voient (semi-transparentes), les nuages s'effacent pendant ce temps", r1.rouge === "block" && r1.nuagesCaches === "hidden");
+  verifier("les zones peintes se voient (semi-transparentes)", r1.rouge === "block");
   verifier("c'est provisoire : rien n'est écrit en base ; « Valider » s'allume", r1.ecrits === 0 && r1.valider === false && r1.actif === true);
   const rouge = await p.evaluate(() => { const t = document.getElementById("carte-region-peinture"); const ctx = t.getContext("2d");
     let max = 0, r = 0; const d = ctx.getImageData(0, 0, t.width, t.height).data; for (let i = 3; i < d.length; i += 4) if (d[i] > max) { max = d[i]; r = d[i - 3]; } return { max, r }; });
-  verifier("…en rouge, à demi transparent", rouge.r > 180 && rouge.max > 80 && rouge.max < 200, JSON.stringify(rouge));
+  verifier("…en orange (v283 : l'usure), à demi transparent", rouge.r > 180 && rouge.max > 80 && rouge.max < 200, JSON.stringify(rouge));
   await p.evaluate(() => window.choisirOutilRegion("gomme"));
   await p.mouse.move(480, 360); await p.mouse.down(); await p.mouse.move(540, 400, { steps: 4 }); await p.mouse.up();
-  const r2 = await p.evaluate(() => { const g = window.grilleNuagesRegion(); return g.reduce((s, v) => s + v, 0); });
+  const r2 = await p.evaluate(() => { const g = window.grilleUsureRegion(); return g.reduce((s, v) => s + v, 0); });
   verifier("la gomme efface", r2 < r1.peintes && r2 > 0, `${r1.peintes} → ${r2}`);
   // Annuler, puis repeindre et valider.
   await p.evaluate(() => window.annulerNuagesRegion());
-  const r3 = await p.evaluate(() => window.grilleNuagesRegion().reduce((s, v) => s + v, 0));
+  const r3 = await p.evaluate(() => window.grilleUsureRegion().reduce((s, v) => s + v, 0));
   verifier("« Annuler la peinture » revient à ce qui est enregistré (rien encore)", r3 === 0);
   await p.evaluate(() => window.choisirOutilRegion("pinceau"));
   for (const [x, y] of [[250, 250], [250, 330], [250, 410]]) { await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.move(x + 500, y + 40, { steps: 15 }); await p.mouse.up(); }
-  const peintes = await p.evaluate(() => window.grilleNuagesRegion().reduce((s, v) => s + v, 0));
+  const peintes = await p.evaluate(() => window.grilleUsureRegion().reduce((s, v) => s + v, 0));
   await p.evaluate(() => window.validerNuagesRegion());
   await p.waitForTimeout(700);
   const r4 = await p.evaluate(() => {
     const e = (window.__ecrits || []).filter(x => x.chemin === "Cartes_Regionales/1").pop();
-    const g = e && e.data.Nuages ? window.decoderGrilleNuages(e.data.Nuages.cases, e.data.Nuages.colonnes * e.data.Nuages.lignes) : null;
-    return { ecrit: !!e, fusion: !!(e && e.options && e.options.merge), nuages: e && e.data.Nuages && { colonnes: e.data.Nuages.colonnes, lignes: e.data.Nuages.lignes },
+    const g = e && e.data.Usure ? window.decoderGrilleNuages(e.data.Usure.cases, e.data.Usure.colonnes * e.data.Usure.lignes) : null;
+    return { ecrit: !!e, fusion: !!(e && e.options && e.options.merge), nuages: e && e.data.Usure && { colonnes: e.data.Usure.colonnes, lignes: e.data.Usure.lignes },
              relu: g ? g.reduce((s, v) => s + v, 0) : -1, rouge: getComputedStyle(document.getElementById("carte-region-peinture")).display,
-             visibles: document.getElementById("carte-region-nuages").style.visibility, outil: document.getElementById("btn-region-pinceau").classList.contains("actif") };
+             toile: !!document.getElementById("carte-region-nuages"), outil: document.getElementById("btn-region-pinceau").classList.contains("actif") };
   });
   verifier("« Valider » écrit la grille dans la fiche (Cartes_Regionales/1, en fusion)", r4.ecrit && r4.fusion && r4.nuages && r4.nuages.colonnes === 240 && r4.nuages.lignes === 150, JSON.stringify(r4.nuages));
   verifier("…exactement ce qui était peint (relue depuis la base)", r4.relu === peintes, `${r4.relu} / ${peintes}`);
-  verifier("le rouge disparaît, les nuages paraissent, le pinceau se repose", r4.rouge === "none" && r4.visibles === "visible" && !r4.outil);
-  // (v279 : les nuages sont calculés en WebGL ; pixelsNuagesEcran les lit.)
-  const pixels = async (t) => p.evaluate((t) => {
-    const lu = (x0, y0, x1, y1) => window.pixelsNuagesEcran(x0, y0, x1, y1, t);
-    const dedans = lu(380, 320, 620, 380), dehors = lu(900, 650, 1100, 750);
-    if (!dedans || !dehors) return null;
-    let n = 0, r = 0, g = 0, bl = 0, opaques = 0, alpha = 0;
-    const d = dedans.data;
-    for (let i = 0; i < d.length; i += 4) {
-      n++; alpha += d[i + 3];
-      if (d[i + 3] > 128) { opaques++; r += d[i] / d[i + 3] * 255; g += d[i + 1] / d[i + 3] * 255; bl += d[i + 2] / d[i + 3] * 255; }
-    }
-    let dehorsNuages = 0; for (let i = 0; i < dehors.data.length; i += 4) if (dehors.data[i + 3] > 10 && dehors.data[i] > 30) dehorsNuages++;
-    return { part: opaques / n, alpha: alpha / n / 255, couleur: opaques ? [r / opaques, g / opaques, bl / opaques].map(Math.round) : null, dehorsNuages, brut: Array.from(d.slice(0, 4000)) };
-  }, t);
-  const v1 = await pixels(20);
-  const v2 = await pixels(21.3);
-  verifier("des nuages couvrent la zone peinte (dispersés, translucides par endroits)", !!v1 && v1.alpha > 0.35 && v1.part > 0.25, v1 && `${(v1.part * 100).toFixed(0)} % épais, alpha moyen ${v1.alpha.toFixed(2)}`);
-  verifier("blanc-gris, jamais beige (le bleu tient le rouge)", !!v1 && !!v1.couleur && v1.couleur[2] >= v1.couleur[0] - 12 && v1.couleur[0] > 150,
-           JSON.stringify(v1 && v1.couleur));
-  verifier("rien hors des zones peintes", !!v1 && v1.dehorsNuages === 0, `${v1 && v1.dehorsNuages}`);
-  const ecart = v1 && v2 ? v1.brut.reduce((s, x, i) => s + Math.abs(x - v2.brut[i]), 0) / v1.brut.length : 0;
-  verifier("ils bougent : 1,3 s plus tard, la matière a changé", ecart > 1, `écart ${ecart.toFixed(2)}`);
-  // Un autre poste : la fiche relue de la base porte les mêmes nuages.
+  verifier("la peinture disparaît (l'usure passe sur le bord), pas de nuages, le pinceau se repose", r4.rouge === "none" && !r4.toile && !r4.outil);
+  // Un autre poste : la fiche relue de la base porte la même usure.
   const r5 = await p.evaluate(() => {
     const e = (window.__ecrits || []).filter(x => x.chemin === "Cartes_Regionales/1").pop();
-    window.appliquerCartesRegionalesDeLaBase([{ id: "1", data: { Numero: 1, Nom: "La forêt des murmures", Nuages: e.data.Nuages } }]);
-    return { a: window.CARTES_REGIONALES[1].nuages.cases === e.data.Nuages.cases };
+    window.appliquerCartesRegionalesDeLaBase([{ id: "1", data: { Numero: 1, Nom: "La forêt des murmures", Usure: e.data.Usure } }]);
+    return { a: window.CARTES_REGIONALES[1].usure.cases === e.data.Usure.cases };
   });
-  verifier("relus de la base, ce sont les mêmes nuages (pour toutes les parties)", r5.a === true);
+  verifier("relue de la base, c'est la même usure (pour toutes les parties)", r5.a === true);
 });
 
 // =========================================================================
@@ -304,11 +282,12 @@ await section(async () => {
     const nomCombat = document.getElementById("voile-tour-nom");
     const reference = nomCombat ? getComputedStyle(nomCombat) : null;
     return { texte: t.textContent, police: st.fontFamily, policeCombat: reference && reference.fontFamily, fondCombat: reference && reference.backgroundImage, clip: st.webkitBackgroundClip || st.backgroundClip, fond: st.backgroundImage,
-             dansCarte: el.parentElement.id === "carte-region", x: parseFloat(el.style.left) / c.largeur, y: parseFloat(el.style.top) / c.hauteur };
+             dansCarte: el.parentElement.id === "carte-region-dessus", x: parseFloat(el.style.left) / c.largeur, y: parseFloat(el.style.top) / c.hauteur };
   });
   verifier("le nom de la carte, dans la police et l'or brossé du nom des combattants", r0.texte === "La forêt des murmures" && !!r0.policeCombat
            && r0.police === r0.policeCombat && /text/.test(r0.clip) && r0.fond === r0.fondCombat,
            JSON.stringify([r0.texte, r0.police, r0.policeCombat, r0.clip]));
+  // (v285 : sur le calque jumeau du dessus, hors des brûlures du parchemin.)
   verifier("accroché à la carte (en pixels de l'image), en haut au centre par défaut", r0.dansCarte && Math.abs(r0.x - 0.5) < 0.01 && Math.abs(r0.y - 0.09) < 0.01, `${r0.x.toFixed(2)}, ${r0.y.toFixed(2)}`);
   // La popup se referme pendant qu'on manipule le titre (elle pourrait le couvrir).
   await p.evaluate(() => { window.__ecrits = []; document.getElementById("case-region-titre").click(); window.basculerPopupRegions(false); });
@@ -337,8 +316,8 @@ await section(async () => {
   verifier("rien n'est écrit pendant l'édition ; en sortant du mode, le titre s'enregistre", ecritsPendant === 0 && !!r1.e && Math.abs(r1.e.x - r1.local.x) < 1e-3 && Math.abs(r1.e.taille - r1.local.taille) < 1e-3 && !r1.edition,
            JSON.stringify(r1.e));
   // Relue de la base par un autre poste.
-  const r2 = await p.evaluate(() => { const nuages = window.CARTES_REGIONALES[1].nuages;
-    window.appliquerCartesRegionalesDeLaBase([{ id: "1", data: { Numero: 1, Titre: { x: 0.3, y: 0.4, taille: 0.1 }, Nuages: nuages } }]);
+  const r2 = await p.evaluate(() => { const usure = window.CARTES_REGIONALES[1].usure;
+    window.appliquerCartesRegionalesDeLaBase([{ id: "1", data: { Numero: 1, Titre: { x: 0.3, y: 0.4, taille: 0.1 }, Usure: usure } }]);
     const el = document.getElementById("carte-region-titre"), c = window.cadrageCarteRegion();
     return { x: parseFloat(el.style.left) / c.largeur, y: parseFloat(el.style.top) / c.hauteur, taille: parseFloat(el.style.fontSize) / c.hauteur }; });
   verifier("la place relue de la base s'applique", Math.abs(r2.x - 0.3) < 1e-3 && Math.abs(r2.y - 0.4) < 1e-3 && Math.abs(r2.taille - 0.1) < 1e-3, JSON.stringify(r2));
@@ -373,11 +352,11 @@ await section(async () => {
   verifier("…jusqu'à son cadrage d'avant (calée sur la hauteur, même glissement)",
            Math.abs(r.monde.zoom - cadrageMondeAvant.zoom) < 1e-9 && Math.abs(r.monde.panX - cadrageMondeAvant.panX) < 0.5, JSON.stringify(r.monde));
   verifier("la carte régionale et le bouton retour s'en vont", r.vue === "none" && r.retour === "none");
-  // Rouverte : elle reprend ses nuages et son titre.
+  // Rouverte : elle reprend son usure et son titre (v286 : plus de nuages dessus).
   await p.evaluate(() => window.ouvrirCarteRegionale(1, { sansTransition: true }));
   await p.waitForTimeout(400);
-  const r2 = await p.evaluate(() => ({ ouverte: window.carteRegionaleOuverte(), vide: document.getElementById("carte-region-nuages").dataset.vide, zoom: window.cadrageCarteRegion().zoom === window.cadrageCarteRegion().base }));
-  verifier("rouverte : ses nuages sont là, cadrée sur la hauteur", r2.ouverte === 1 && r2.vide === "0" && r2.zoom);
+  const r2 = await p.evaluate(() => ({ ouverte: window.carteRegionaleOuverte(), usure: !!window.CARTES_REGIONALES[1].usure, nuages: !!document.getElementById("carte-region-nuages"), zoom: window.cadrageCarteRegion().zoom === window.cadrageCarteRegion().base }));
+  verifier("rouverte : son usure est là, pas de nuages, cadrée sur la hauteur", r2.ouverte === 1 && r2.usure && !r2.nuages && r2.zoom, JSON.stringify(r2));
   await p.evaluate(() => window.fermerCarteRegionale({ sansTransition: true }));
 });
 

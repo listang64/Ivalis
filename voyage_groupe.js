@@ -327,22 +327,10 @@ const MESSAGES_ATTENTE_POI = [
     "Vos pas se font plus lents ; chacun retient son souffle…"
 ];
 const taillePoi = () => Number(window.TAILLE_POI) || 0.08;
-// La grille des nuages d'une carte (décodée une fois).
-const grillesNuages = {};
-function sousLesNuages(n, x, y) {
-    const c = (window.CARTES_REGIONALES || {})[n];
-    if (!c || !c.nuages || !c.nuages.cases || typeof window.decoderGrilleNuages !== "function") return false;
-    const cle = n + ":" + c.nuages.cases.length + ":" + c.nuages.cases.slice(0, 24);
-    if (!grillesNuages[n] || grillesNuages[n].cle !== cle) {
-        grillesNuages[n] = { cle, grille: window.decoderGrilleNuages(c.nuages.cases, c.nuages.colonnes * c.nuages.lignes) };
-    }
-    const { colonnes, lignes } = c.nuages;
-    const col = borne(Math.floor(x * colonnes), 0, colonnes - 1), lig = borne(Math.floor(y * lignes), 0, lignes - 1);
-    return !!grillesNuages[n].grille[lig * colonnes + col];
-}
-window.sousLesNuagesVoyage = sousLesNuages;
-// Une place possible pour un POI : sur la carte, sur le terrain, hors des
-// nuages, loin des lieux posés.
+// Plus de nuages sur les cartes régionales (v286) : rien ne s'y cache.
+window.sousLesNuagesVoyage = () => false;
+// Une place possible pour un POI : sur la carte, sur le terrain, loin des
+// lieux posés.
 function placePoiValable(n, x, y) {
     const asp = aspectRegion(n), t = taillePoi();
     // Un lieu d'avant v281 ne montre que le centre de son carré (la moitié).
@@ -350,7 +338,6 @@ function placePoiValable(n, x, y) {
     const mx = t / (2 * asp) + 0.01, my = t / 2 + 0.01;
     if (x < mx || x > 1 - mx || y < my || y > 1 - my) return false;
     if (typeof window.terrainsDefinisRegion === "function" && window.terrainsDefinisRegion(n) && !window.pointSurTerrainRegion(n, x, y)) return false;
-    if (sousLesNuages(n, x, y)) return false;
     return !Object.values(window.VILLAGES_REGIONAUX || {}).some(v => v.numero === n
         && Math.hypot((v.x - x) * asp, v.y - y) < (t + cote(v)) / 2 + t);
 }
@@ -1377,8 +1364,6 @@ function villageSous(n, fx, fy) {
         const demi = (v.taille * c.hauteur) / 2;
         const dx = Math.abs(fx * c.largeur - v.x * c.largeur), dy = Math.abs(fy * c.hauteur - v.y * c.hauteur);
         if (dx > demi || dy > demi) return;
-        const el = document.querySelector(`.village-region[data-id="${CSS && CSS.escape ? CSS.escape(v.id) : v.id}"]`);
-        if (el && el.classList.contains("cache")) return;     // sous les nuages : on ne le voit pas
         const d = Math.hypot(dx, dy);
         if (!meilleur || d < meilleur.d) meilleur = { v, d };
     });

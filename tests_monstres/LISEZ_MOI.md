@@ -9002,3 +9002,98 @@ corrections_v285.mjs (dans la suite), sur la vraie page, vérifie :
 - les versions.
 
 Il échoue sur l'ancien code (10 échecs).
+
+## v286 — Lieux entourés à la plume ; vent des nuages ; table liée à la carte ; plus de nuages régionaux
+
+Nico :
+- « sur les maps rapprochées, le nom des lieux plus vers le haut, dans la
+  partie basse du carré de découpe de l'image générée » ;
+- « la sélection d'un lieu : un rond ou un ovale imparfait rouge, comme
+  entouré à la main ; le bruit d'une plume qui entoure quelque chose sur un
+  parchemin ; un clic ailleurs, et la sélection disparaît en fondu » ;
+- « pour les transitions entre la map globale et les régionales, un bruit de
+  vent, comme si on traversait des nuages » ;
+- « les rainures entre les planches sont trop droites, trop parfaites et trop
+  noires » ;
+- « la table doit être liée à l'image : si on déplace l'image, la table bouge
+  avec, et pareil pour le zoom » ;
+- « enlève le bouton des nuages des maps régionales, et tous leurs nuages ; on
+  garde juste les nuages des transitions ».
+
+Le nom du lieu (villages_regionaux.js, etiquette) : le creux de son arc tombe
+à 93 % du carré, et l'arc est plus doux (sa flèche est limitée à 16 % du
+carré). Le nom reste donc dans le bas de l'image, quelle que soit sa courbure.
+
+La sélection (DEV), dans villages_regionaux.js :
+- cercleMain trace un trait rouge qui fait un peu plus d'un tour sans se
+  refermer. Son rayon ondule et il penche un peu. Chaque nouvelle sélection
+  donne un nouveau geste.
+- Le trait se dessine en 0,55 s, au son « plume-entoure ». Un nouveau dessin
+  de la carte reprend l'animation où elle en est, sans la recommencer.
+- Un toucher ailleurs sur la carte, sans glisser, efface la sélection en
+  fondu (0,52 s). Faire glisser la carte ne la défait pas.
+- Le carré jaune a disparu.
+
+Les sons (fabrique_sons.js, SONS_EVENEMENTS) :
+- « plume-entoure » : un grattement d'accrocs serrés, filtré, qui tourne avec
+  la main pendant 0,6 s, et un frottement sourd de papier.
+- « vent-nuages » : un bruit grave qui enfle, tient puis retombe (3,4 s), avec
+  des rafales et un sifflement d'air. Il joue au début de chaque traversée des
+  nuages (jouerTraverseeNuages), à l'aller comme au retour.
+
+La table :
+- images/table_bois.jpg est maintenant un carreau répétable, sans couture.
+  Le générateur (_fabriquer_table_bois.mjs) utilise des bruits périodiques
+  et fait passer les nœuds et les rayures de l'autre côté du bord.
+- Les joints sont ondulés, d'ouverture inégale (tantôt presque fermés, tantôt
+  ouverts), ébréchés, brun très sombre plutôt que noirs. Leurs arêtes sont
+  usées par endroits.
+- La table est un calque jumeau de la carte, posé dessous : #table-monde
+  (dans index.html) et #carte-region-table (dans la vue régionale). Elle a le
+  même coin, la même taille et le même transform que la carte.
+  - poserCarteMonde (app.js) et poserCarte règlent les deux.
+  - La plongée vers une région et la remontée animent la carte et la table
+    ensemble (animerMonde, poserTransformMonde).
+  - La table déborde de deux cartes de chaque côté. Le carreau y est posé en
+    mosaïque, à la hauteur de la carte.
+- Une ombre douce et fixe (.table-ombre) assombrit les bords de l'écran.
+
+Plus de nuages régionaux :
+- Le bouton « Nuages » et la toile #carte-region-nuages sont retirés. Le
+  pinceau ne peint plus que l'usure (« Valider l'usure »).
+- Les Nuages déjà en base sont ignorés : ni village ni POI ne s'y cachent
+  plus. grilleNuagesRegion rend null et sousLesNuagesVoyage rend false.
+- nuages_realistes.js ne garde que la traversée (creerNappe et zoneDouce
+  sont retirés).
+
+corrections_v286.mjs (dans la suite), sur la vraie page, vérifie :
+- plus de nuages régionaux : ni toile, ni bouton, des Nuages en base qui ne
+  cachent rien, « Valider » qui n'écrit que l'Usure, seule la traversée reste
+  dans le moteur ;
+- le nom dans le bas du carré, sur 10 courbures ;
+- la sélection, par de vrais clics de souris : un trait rouge sans carré
+  jaune, un ovale ouvert autour du lieu, tracé au son de la plume ; un
+  nouveau dessin ne le retrace pas ; un clic ailleurs le fait partir en
+  fondu ; un glissé de la carte ne le défait pas ;
+- les deux sons, rendus hors ligne (durée, forme, sans saturation), et le
+  vent à l'aller et au retour d'une vraie traversée ;
+- la table : le carreau se raccorde (ses bords ne font pas plus d'écart que
+  les frontières de blocs JPEG de l'intérieur), aucune rangée sombre d'un
+  bout à l'autre, pas de noir ; le calque jumeau au même cadrage ; le bois
+  qui glisse et zoome avec la carte (comparé au pixel près) ; la table du
+  monde qui suit la carte, et pendant la plongée ;
+- les versions.
+
+Il échoue sur l'ancien code (23 échecs).
+
+Tests mis à jour :
+- corrections_v272 : le pinceau peint l'usure, le titre est sur son calque.
+- corrections_v273 : les pastilles ne fuient plus de nuages, aucun village
+  n'est caché.
+- corrections_v277 : des nuages d'avant n'empêchent plus un POI.
+- corrections_v279 et v280 : les sections sur les nuages posés sur une carte
+  deviennent un contrôle « plus de nuages régionaux, la traversée reste ».
+- corrections_v281 : le nom remonte dans le bas du dessin, plus de nom caché.
+- corrections_v283 : plus de calque « Nuages ».
+- corrections_v285 : la table est un calque lié à la carte.
+- blessures : deux sons d'événement de plus.

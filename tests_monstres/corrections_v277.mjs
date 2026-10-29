@@ -309,7 +309,8 @@ await section(async () => {
     window.CARTES_REGIONALES[2].nuages = avant;
     return r;
   });
-  verifier("pas sous les nuages (son dessin y serait caché)", nuages.ouest === false && nuages.est === true, JSON.stringify(nuages));
+  // v286 : plus de nuages sur les cartes régionales — des nuages d'avant ne gênent plus.
+  verifier("(v286) plus de nuages régionaux : des nuages d'avant ne l'empêchent plus", nuages.ouest === true && nuages.est === true, JSON.stringify(nuages));
 });
 
 // =========================================================================

@@ -351,7 +351,7 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("3. LE PINCEAU DE LA CARTE RÉGIONALE : « NUAGES » OU « USURE DU PARCHEMIN »");
+titre("3. LE PINCEAU DE LA CARTE RÉGIONALE : « USURE DU PARCHEMIN » (v286 : plus de calque « Nuages »)");
 // =========================================================================
 await section(async () => {
   await attendreQue(async () => await p.evaluate(() => !!document.querySelector("#carte-region > .parchemin-usure")), 10000);
@@ -365,7 +365,7 @@ await section(async () => {
     return { calque, actif: !!(bouton && bouton.classList.contains("actif")), aide: !!(aide && aide.style.display !== "none"),
              valider: (document.getElementById("btn-region-valider-nuages") || {}).textContent };
   });
-  verifier("deux calques au pinceau ; « Usure du parchemin » choisi, son aide affichée", ui.calque === "usure" && ui.actif && ui.aide && /usure/i.test(ui.valider || ""), JSON.stringify(ui));
+  verifier("le pinceau peint « Usure du parchemin », son aide affichée", ui.calque === "usure" && ui.actif && ui.aide && /usure/i.test(ui.valider || ""), JSON.stringify(ui));
   // On peint le coin haut-gauche de la carte (à l'écran).
   const peint = await p.evaluate(() => {
     window.choisirOutilRegion("pinceau");
@@ -376,22 +376,15 @@ await section(async () => {
     const toile = document.getElementById("carte-region-peinture");
     const d = toile.getContext("2d").getImageData(0, 0, toile.width, toile.height).data;
     let orange = 0, rouge = 0; for (let i = 0; i < d.length; i += 4) { if (d[i + 3] < 40) continue; if (d[i + 1] > 80) orange++; else rouge++; }
-    const u = window.grilleUsureRegion ? window.grilleUsureRegion() : [], n = window.grilleNuagesRegion();
+    const u = window.grilleUsureRegion ? window.grilleUsureRegion() : [], n = window.grilleNuagesRegion() || [];
     return { usure: [...(u || [])].filter(x => x).length, nuages: [...n].filter(x => x).length, orange, rouge, calque: toile.dataset.calque };
   });
   verifier("le trait d'usure se peint en orange, sur la grille de l'usure (pas celle des nuages)", peint.usure > 20 && peint.nuages === 0 && peint.orange > 50 && peint.rouge === 0, JSON.stringify(peint));
   const apercu = await attendreQue(async () => (await masqueRegion()) !== avant, 8000);
   verifier("un instant après le trait : l'aperçu du bord (déchiré, brûlé là où c'est peint)", apercu);
-  // Les nuages, puis retour à l'usure : chaque calque garde son brouillon.
-  const deux = await p.evaluate(() => {
-    window.choisirCalqueRegion("nuages");
-    const c = window.cadrageCarteRegion(), e = document.getElementById("ecran-jeu").getBoundingClientRect();
-    window.peindreCarteRegion(e.left + c.panX + 0.6 * c.largeur * c.zoom, e.top + c.panY + 0.6 * c.hauteur * c.zoom);
-    const nuages = [...window.grilleNuagesRegion()].filter(x => x).length;
-    window.choisirCalqueRegion("usure");
-    return { nuages, usure: [...window.grilleUsureRegion()].filter(x => x).length };
-  });
-  verifier("chaque calque garde son brouillon (nuages et usure, côte à côte)", deux.nuages > 0 && deux.usure === peint.usure, JSON.stringify(deux));
+  // (v286) Le calque « Nuages » n'existe plus : le demander laisse l'usure en main, son brouillon intact.
+  const deux = await p.evaluate(() => ({ calque: window.choisirCalqueRegion("nuages"), usure: [...window.grilleUsureRegion()].filter(x => x).length }));
+  verifier("(v286) plus de calque « Nuages » : l'usure reste en main, son brouillon intact", deux.calque === "usure" && deux.usure === peint.usure, JSON.stringify(deux));
   const ecrits = await p.evaluate(async () => { window.__ecrits = []; await window.validerNuagesRegion(); return window.__ecrits; });
   const eU = ecrits.find(x => x.chemin === "Cartes_Regionales/2");
   verifier("« Valider l'usure » : Cartes_Regionales/2.Usure (colonnes, lignes, cases), sans toucher aux nuages",
@@ -400,10 +393,7 @@ await section(async () => {
                                           zones: !!document.getElementById("carte-region").__zonesParchemin, outil: window.outilCarteRegion() }));
   await attendreQue(async () => await p.evaluate(() => !!document.getElementById("carte-region").__zonesParchemin), 8000);
   const zonesPosees = await p.evaluate(() => !!document.getElementById("carte-region").__zonesParchemin);
-  verifier("le bord de la carte suit l'usure enregistrée ; les nuages attendent encore leur validation", apres.usure && !apres.nuages && zonesPosees && apres.outil === null, JSON.stringify([apres, zonesPosees]));
-  const nuagesValides = await p.evaluate(async () => { window.choisirCalqueRegion("nuages"); window.__ecrits = []; await window.validerNuagesRegion();
-    const e = window.__ecrits.find(x => x.chemin === "Cartes_Regionales/2"); return e ? Object.keys(e.data).filter(k => k !== "Numero" && k !== "Nom") : []; });
-  verifier("…puis « Valider les nuages » n'écrit que les nuages", nuagesValides.length === 1 && nuagesValides[0] === "Nuages", JSON.stringify(nuagesValides));
+  verifier("le bord de la carte suit l'usure enregistrée", apres.usure && !apres.nuages && zonesPosees && apres.outil === null, JSON.stringify([apres, zonesPosees]));
   await p.screenshot({ path: S + "/v283_region.png" });
   // Un autre poste DEV efface l'usure : le bord redevient fin.
   const m1 = await masqueRegion();

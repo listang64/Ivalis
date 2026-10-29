@@ -335,107 +335,15 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("4. LA ZONE DES NUAGES : UNE DISTANCE AU BORD, PAS UN FLOU");
+titre("4-5. (v286) PLUS DE NUAGES SUR LES CARTES RÉGIONALES");
 // =========================================================================
+// Nico (v286) : « enlève-moi tous les nuages des maps régionales ; en nuages,
+// on garde juste ceux des transitions ». Les nuages posés sur une carte
+// (zone, rendu, lecture) ne sont plus là ; la traversée, si.
 await section(async () => {
-  const r = await p.evaluate(() => {
-    const N = window.NuagesRealistes;
-    const col = 120, lig = 80, g = new Uint8Array(col * lig);
-    for (let l = 10; l < 70; l++) for (let k = 10; k < 60; k++) g[l * col + k] = 1;       // un grand carré
-    for (let l = 40; l < 43; l++) for (let k = 70; k < 115; k++) g[l * col + k] = 1;      // un trait de 3 cases
-    const z = N.zoneDouce(g, col, lig, 18);
-    const v = (k, l) => z[l * col + k];
-    return { coeur: v(35, 40), bord: v(10, 40), dehors: v(2, 5), loin: v(90, 10), trait: v(90, 41), juste: v(8, 40), dehors20: v(85, 70) };
-  });
-  verifier("au cœur de la zone : 1 ; loin dehors : 0", r.coeur === 1 && r.loin === 0, JSON.stringify(r));
-  verifier("au bord : 0,5 ; la bande s'étend des deux côtés (pas de bord net)", Math.abs(r.bord - 0.5) < 0.05 && r.juste > 0.35 && r.juste < 0.5, `${r.bord.toFixed(2)} / ${r.juste.toFixed(2)}`);
-  verifier("un trait fin peint reste une zone de nuages (un flou l'aurait effacé)", r.trait > 0.5, r.trait.toFixed(2));
-});
-
-// =========================================================================
-titre("5. LES NUAGES D'UNE CARTE RÉGIONALE : RÉALISTES, PAS UNE MASSE");
-// =========================================================================
-// La carte 1 (2400 × 1500, grille 240 × 150) : une grande zone peinte à gauche.
-const ZONE = { k0: 30, k1: 120, l0: 25, l1: 125 };
-await p.evaluate(({ ZONE }) => {
-  document.querySelectorAll('body > div[id^="ecran-"]').forEach(e => e.style.display = e.id === "ecran-jeu" ? "block" : "none");
-  window.fermerToutesLesFenetres && window.fermerToutesLesFenetres();
-  window.recadrerCarte && window.recadrerCarte();
-  window.appliquerRegionsDeLaBase && window.appliquerRegionsDeLaBase({ Prochain_Numero: 14, Regions: { 1: { Numero: 1, Points: [{x:850,y:620},{x:1450,y:620},{x:1450,y:1080},{x:850,y:1080}] } } });
-  const col = 240, lig = 150, g = new Uint8Array(col * lig);
-  for (let l = ZONE.l0; l < ZONE.l1; l++) for (let k = ZONE.k0; k < ZONE.k1; k++) g[l * col + k] = 1;
-  if (window.CARTES_REGIONALES && window.CARTES_REGIONALES[1]) window.CARTES_REGIONALES[1].nuages = { colonnes: col, lignes: lig, cases: window.encoderGrilleNuages(g) };
-}, { ZONE });
-await section(async () => {
-  await p.evaluate(() => window.ouvrirCarteRegionale(1, { sansTransition: true }));
-  await p.waitForTimeout(800);
-  // L'écran : la carte (2400 × 1500) calée sur 834 px de haut — une case = 834/150 px.
-  const geo = await p.evaluate(() => { const c = window.cadrageCarteRegion(); return { panX: c.panX, panY: c.panY, z: c.zoom }; });
-  const ecranDe = (k, l) => ({ x: geo.panX + k * 10 * geo.z, y: geo.panY + l * 10 * geo.z });
-  const a = ecranDe(55, 50), b = ecranDe(95, 100);       // le cœur de la zone
-  const lecture = (x0, y0, x1, y1, t) => p.evaluate(({ x0, y0, x1, y1, t }) => { const r = window.pixelsNuagesEcran(x0, y0, x1, y1, t); return r ? { l: r.largeur, h: r.hauteur, d: Array.from(r.data) } : null; }, { x0, y0, x1, y1, t });
-  const coeur = await lecture(a.x, a.y, b.x, b.y, 40);
-  const stats = (r) => {
-    let n = 0, somme = 0, minces = 0, epais = 0; const lum = [];
-    for (let i = 0; i < r.d.length; i += 4) {
-      const al = r.d[i + 3] / 255; n++; somme += al;
-      if (al < 0.5) minces++;
-      if (al > 0.8) { epais++; lum.push((r.d[i] + r.d[i + 1] + r.d[i + 2]) / 3 / al); }
-    }
-    const moy = lum.reduce((s, x) => s + x, 0) / Math.max(1, lum.length);
-    const ecart = Math.sqrt(lum.reduce((s, x) => s + (x - moy) * (x - moy), 0) / Math.max(1, lum.length));
-    return { alpha: somme / n, minces: minces / n, epais: epais / n, lumiere: moy, contraste: ecart };
-  };
-  const s1 = coeur && stats(coeur);
-  verifier("le moteur WebGL dessine les nuages de la carte", !!coeur, coeur ? `${coeur.l}×${coeur.h}` : "aucune lecture");
-  // v280 (Nico : « ça ne couvre pas des masses ») : le cœur est couvert ; son relief fait le contraste.
-  verifier("au cœur : bien couvert",
-           !!s1 && s1.alpha > 0.85 && s1.epais > 0.8, JSON.stringify(s1 && { alpha: s1.alpha.toFixed(2), epais: s1.epais.toFixed(2) }));
-  verifier("du contraste à l'intérieur (sommets clairs, creux gris-bleu)", !!s1 && s1.contraste > 10, s1 && `écart-type ${s1.contraste.toFixed(1)}`);
-  // Les couleurs : blanc-gris, jamais beige.
-  const couleur = (r) => { let R = 0, G = 0, B = 0, n = 0; for (let i = 0; i < r.d.length; i += 4) { const al = r.d[i + 3]; if (al < 200) continue; R += r.d[i] / al * 255; G += r.d[i + 1] / al * 255; B += r.d[i + 2] / al * 255; n++; } return n ? [R / n, G / n, B / n].map(Math.round) : null; };
-  const c1 = coeur && couleur(coeur);
-  verifier("blanc et gris-bleu, jamais beige (le bleu tient le rouge)", !!c1 && c1[2] >= c1[0] - 10 && c1[0] > 160, JSON.stringify(c1));
-  // Les bords : un profil horizontal qui traverse le bord droit de la zone (k = 120).
-  const g0 = ecranDe(96, 40), g1 = ecranDe(144, 110);
-  const bord = await lecture(g0.x, g0.y, g1.x, g1.y, 40);
-  const colonnes = []; if (bord) for (let x = 0; x < bord.l; x++) { let s = 0; for (let y = 0; y < bord.h; y++) s += bord.d[(y * bord.l + x) * 4 + 3]; colonnes.push(s / bord.h / 255); }
-  const saut = colonnes.slice(1).reduce((m, v, i) => Math.max(m, Math.abs(v - colonnes[i])), 0);
-  const tiers = (i) => { const n = colonnes.length; const t = colonnes.slice(Math.floor(i * n / 3), Math.floor((i + 1) * n / 3)); return t.reduce((s, x) => s + x, 0) / Math.max(1, t.length); };
-  verifier("pas de bord net : la couverture décroît par degrés en traversant le bord", colonnes.length > 20 && saut < 0.12 && tiers(0) > tiers(1) && tiers(1) > tiers(2),
-           `saut max ${saut.toFixed(3)}, tiers ${[0, 1, 2].map(i => tiers(i).toFixed(2)).join(" > ")}`);
-  // Au-delà du bord : des nuages dispersés (des amas séparés, pas une frange continue).
-  const h0 = ecranDe(122, 30), h1 = ecranDe(134, 120);
-  const dehors = await lecture(h0.x, h0.y, h1.x, h1.y, 40);
-  let presents = 0, total = 0, changements = 0;
-  if (dehors) for (let y = 0; y < dehors.h; y += 2) { let avant = null; for (let x = 0; x < dehors.l; x++) { const al = dehors.d[(y * dehors.l + x) * 4 + 3] / 255, nuage = al > 0.3 && dehors.d[(y * dehors.l + x) * 4] > 40; total++; if (nuage) presents++; if (avant !== null && nuage !== avant) changements++; avant = nuage; } }
-  verifier("juste au-delà du bord : des nuages dispersés (ni rien, ni un mur)", total > 0 && presents / total > 0.02 && presents / total < 0.6, `${(presents / Math.max(1, total) * 100).toFixed(0)} % de nuages`);
-  // Loin de la zone : rien (seule une ombre peut tomber près des nuages).
-  const l0 = ecranDe(200, 100), l1 = ecranDe(230, 140);
-  const loin = await lecture(l0.x, l0.y, l1.x, l1.y, 40);
-  let loinNuages = 0; if (loin) for (let i = 0; i < loin.d.length; i += 4) if (loin.d[i + 3] > 10 && loin.d[i] > 30) loinNuages++;
-  verifier("loin des zones peintes : aucun nuage", !!loin && loinNuages === 0, `${loinNuages}`);
-  // L'ANIMATION : fluide d'une image à l'autre, et la matière dérive au vent.
-  const im1 = await lecture(a.x, a.y, b.x, b.y, 40), im2 = await lecture(a.x, a.y, b.x, b.y, 40.04), im3 = await lecture(a.x, a.y, b.x, b.y, 48);
-  const diff = (u, v) => u.d.reduce((s, x, i) => s + Math.abs(x - v.d[i]), 0) / u.d.length;
-  const dPas = diff(im1, im2), dLoin = diff(im1, im3);
-  verifier("d'une image à la suivante : presque rien ne change (pas de saut, pas de clignotement)", dPas < 1.5, dPas.toFixed(2));
-  verifier("en huit secondes : les nuages ont dérivé", dLoin > 6, dLoin.toFixed(2));
-  const s3 = stats(im3);
-  verifier("la zone reste couverte autant (le vent déplace, il ne vide pas)", Math.abs(s3.alpha - s1.alpha) < 0.15, `${s1.alpha.toFixed(2)} → ${s3.alpha.toFixed(2)}`);
-  await p.screenshot({ path: '/tmp/claude-0/-home-user-Ivalis/3718c626-55b5-577c-9b4f-a49012fd3784/scratchpad/v279_carte_nuages.png' }).catch(() => {});
-  // LE ZOOM : la toile suit la partie visible, à la résolution de l'écran ; le grain fin vient.
-  await p.evaluate(() => window.zoomerCarteRegion(3, 300, 420));
-  await p.waitForTimeout(300);
-  const z = await p.evaluate(() => { window.dessinerNuagesRegionMaintenant(40); const t = document.getElementById("carte-region-nuages"), c = window.cadrageCarteRegion();
-    return { styleL: parseFloat(t.style.width), visible: 1194 / c.zoom, pixels: t.width * t.height, ecran: t.width / (parseFloat(t.style.width) * c.zoom) }; });
-  verifier("zoomée ×3 : la toile ne couvre que ce qu'on voit (plus une marge), nette à l'écran",
-           z.styleL < z.visible * 1.3 && z.styleL > z.visible * 0.9 && z.pixels <= 900000 && z.ecran > 0.5, JSON.stringify(z));
-  await p.evaluate(() => window.zoomerCarteRegion(1 / 3, 300, 420));
-  // L'ordre des calques : le titre et la peinture DEV au-dessus des nuages.
-  const ordre = await p.evaluate(() => [...document.getElementById("carte-region").children].map(e => e.id));
-  verifier("le titre reste au-dessus des nuages", ordre.indexOf("carte-region-nuages") < ordre.indexOf("carte-region-titre"), ordre.join(","));
-  await p.evaluate(() => window.fermerCarteRegionale({ sansTransition: true }));
+  const r = await p.evaluate(() => ({ zone: !!(window.NuagesRealistes && window.NuagesRealistes.zoneDouce), nappe: !!(window.NuagesRealistes && window.NuagesRealistes.creerNappe),
+    lecture: typeof window.pixelsNuagesEcran === "function", traversee: !!(window.NuagesRealistes && window.NuagesRealistes.creerTraversee) }));
+  verifier("(v286) plus de nuages posés sur les cartes régionales ; la traversée reste", !r.zone && !r.nappe && !r.lecture && r.traversee, JSON.stringify(r));
 });
 
 // =========================================================================

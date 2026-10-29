@@ -35,17 +35,17 @@
 //  celui qui l'a ouverte ; aucun autre poste ne bouge.
 //
 //  LA BASE : une fiche par carte, Cartes_Regionales/{numéro de la boîte} —
-//  { Numero, Nom, Image, Description, Titre: {x, y, taille}, Nuages:
+//  { Numero, Nom, Image, Description, Titre: {x, y, taille}, Usure:
 //  {colonnes, lignes, cases} }. Le nom et l'image ont une valeur par défaut
 //  ici (la liste de Nico) ; la fiche l'emporte quand elle en porte une. Un
-//  poste en DEV crée les fiches qui manquent. Les nuages valent pour TOUTES
-//  les parties (Nico) : ils font partie de la carte.
+//  poste en DEV crée les fiches qui manquent. L'usure vaut pour TOUTES les
+//  parties : elle fait partie de la carte. (Les Nuages peints avant v286
+//  restent en base, ignorés : plus de nuages sur les cartes régionales.)
 //
 //  LE DEV (le bouton rouge du bas, popup des régions) : sur une carte
-//  régionale, un pinceau peint des zones rouges semi-transparentes,
-//  provisoires ; une gomme les efface ; « Valider les nuages » les enregistre
-//  et les change en nuages réalistes (v279, nuages_realistes.js) : épais au
-//  cœur, dispersés vers les bords, éclairés par le soleil, poussés par le vent.
+//  régionale, un pinceau peint en orange, provisoirement, où le parchemin peut
+//  brûler, se déchirer, se percer (v283) ; une gomme l'efface ; « Valider
+//  l'usure » l'enregistre.
 //  Une case « Édition du titre » : le titre se déplace, le carré de son coin
 //  haut droit l'agrandit ou le rétrécit ; décocher l'enregistre.
 // =========================================================================
@@ -117,7 +117,6 @@ function composerCartes() {
                 y: Number.isFinite(Number(titre.y)) ? borne(Number(titre.y), 0, 1) : TITRE_DEFAUT.y,
                 taille: Number.isFinite(Number(titre.taille)) ? borne(Number(titre.taille), 0.015, 0.4) : TITRE_DEFAUT.taille
             },
-            nuages: fiche.Nuages && fiche.Nuages.cases ? { colonnes: Number(fiche.Nuages.colonnes), lignes: Number(fiche.Nuages.lignes), cases: String(fiche.Nuages.cases) } : null,
             // L'USURE DU PARCHEMIN (v283, bords_parchemin.js) : là où le DEV a
             // peint que le bord peut brûler, se déchirer, se percer (même codage).
             usure: fiche.Usure && fiche.Usure.cases ? { colonnes: Number(fiche.Usure.colonnes), lignes: Number(fiche.Usure.lignes), cases: String(fiche.Usure.cases) } : null,
@@ -166,15 +165,10 @@ window.appliquerCartesRegionalesDeLaBase = function(liste, options) {
     const avant = etat.ouverte && window.CARTES_REGIONALES[etat.ouverte];
     composerCartes();
     // La carte ouverte suit ce que la base vient de dire (un autre poste DEV
-    // a peint des nuages, déplacé le titre) — sauf ce qu'on est en train d'éditer.
+    // a peint l'usure, déplacé le titre) — sauf ce qu'on est en train d'éditer.
     if (etat.ouverte && avant) {
         const apres = window.CARTES_REGIONALES[etat.ouverte];
         if (!etat.editionTitre) poserTitre();
-        if (JSON.stringify(avant.nuages) !== JSON.stringify(apres.nuages)) {
-            if (!brouillonDu("nuages").modifie) oublierBrouillon("nuages");
-            preparerNuages();
-            dessinerPeinture();
-        }
         if (JSON.stringify(avant.usure) !== JSON.stringify(apres.usure)) {
             if (!brouillonDu("usure").modifie) { oublierBrouillon("usure"); poserBord(); }
             dessinerPeinture();
@@ -242,7 +236,7 @@ const etat = {
     centreMonde: null,        // le centre de la boîte cliquée (carte du monde)
     outil: null,              // "pinceau" | "gomme" | null
     taillePinceau: 50,        // en pixels d'écran (le rayon)
-    calque: "nuages",         // ce que peint le pinceau : "nuages" | "usure" (v283)
+    calque: "usure",          // ce que peint le pinceau : l'usure du parchemin (v283 ; les nuages, retirés en v286)
     brouillon: null,          // la grille peinte du calque en main (Uint8Array), pas encore validée
     brouillonModifie: false,
     reserve: {},              // le brouillon de l'autre calque, mis de côté : { brouillon, modifie }
@@ -263,9 +257,10 @@ function construireVue() {
     vue.className = "vue-carte-region";
     vue.style.display = "none";
     vue.innerHTML = `
+        <div id="carte-region-table" class="table-bois"></div>
+        <div class="table-ombre"></div>
         <div id="carte-region" class="carte-region">
           <img id="carte-region-image" class="carte-region-image" alt="" draggable="false">
-          <canvas id="carte-region-nuages" class="carte-region-nuages"></canvas>
           <canvas id="carte-region-peinture" class="carte-region-peinture"></canvas>
         </div>
         <div id="carte-region-dessus" class="carte-region-dessus">
@@ -305,9 +300,10 @@ function bornerPan() {
     etat.panY = hauteur <= h ? (h - hauteur) / 2 : borne(etat.panY, h - hauteur, 0);
 }
 function poserCarte() {
-    // La carte, et son calque jumeau du dessus (le titre, que les brûlures
-    // du parchemin ne découpent pas — v285) : même taille, même cadrage.
-    [$("carte-region"), $("carte-region-dessus")].forEach(carte => {
+    // La carte, son calque jumeau du dessus (le titre, que les brûlures du
+    // parchemin ne découpent pas — v285) et celui du dessous (la table en
+    // bois, qui suit la carte — v286) : même taille, même cadrage.
+    [$("carte-region"), $("carte-region-dessus"), $("carte-region-table")].forEach(carte => {
         if (!carte) return;
         carte.style.width = etat.largeur + "px";
         carte.style.height = etat.hauteur + "px";
@@ -509,6 +505,8 @@ window.jouerTraverseeNuages = function(options) {
     const moteur = window.NuagesRealistes ? window.NuagesRealistes.creerTraversee(toile) : { ok: false };
     const ctx2d = moteur.ok ? null : toile.getContext("2d");
     window.TRAVERSEE_EN_COURS = true;
+    // Le vent des nuages, le temps de la traversée (v286).
+    if (typeof window.jouerSonEvenement === "function") window.jouerSonEvenement("vent-nuages");
 
     let avance = hasard(Date.now() % 100000 + 7)() * 10;
     let phase = "entree", debutPhase = performance.now(), dernier = debutPhase;
@@ -591,6 +589,16 @@ function plongeeMonde(centre) {
 }
 const animer = (el, images, duree, easing) => (el && typeof el.animate === "function")
     ? el.animate(images, { duration: duree, easing, fill: "forwards" }) : null;
+// La carte du monde, et la table en bois avec elle (v286) : la même animation,
+// annulée ensemble.
+function animerMonde(images, duree, easing) {
+    const a = animer($("carte-fond-jeu"), images, duree, easing), b = animer($("table-monde"), images, duree, easing);
+    if (a && b) a.addEventListener("cancel", () => b.cancel());
+    return a;
+}
+function poserTransformMonde(t) {
+    [$("carte-fond-jeu"), $("table-monde")].forEach(el => { if (el) el.style.transform = t; });
+}
 const fin = (a) => (a ? a.finished.catch(() => null) : Promise.resolve());
 
 // L'image de la carte, chargée (et ses dimensions lues). En CORS (v273) :
@@ -638,7 +646,7 @@ window.ouvrirCarteRegionale = async function(numero, options) {
         etat.largeur = (img && img.naturalWidth) || 1920;
         etat.hauteur = (img && img.naturalHeight) || 1080;
         etat.outil = null; etat.brouillon = null; etat.brouillonModifie = false; etat.editionTitre = false;
-        etat.calque = "nuages"; etat.reserve = {};
+        etat.calque = "usure"; etat.reserve = {};
         const imageEl = $("carte-region-image");
         if (img && img.crossOrigin) imageEl.crossOrigin = "anonymous"; else imageEl.removeAttribute("crossorigin");
         imageEl.src = img ? img.src : url;
@@ -653,7 +661,6 @@ window.ouvrirCarteRegionale = async function(numero, options) {
         vue.classList.add("arrivee");
         cadrer(false);
         poserTitre();
-        preparerNuages();
         dessinerPeinture();
         // Le bouton de retour (au-dessus de tout) attend que les nuages se
         // soient dissipés : il ne flotte pas sur l'écran blanc (v279).
@@ -669,7 +676,7 @@ window.ouvrirCarteRegionale = async function(numero, options) {
         etat.enTransition = false;
         return true;
     }
-    const plonger = animer(mondeEl, [{ transform: plongee.depart }, { transform: plongee.arrivee }], DUREE_PLONGEE_MS, "cubic-bezier(.5,0,.85,.45)");
+    const plonger = animerMonde([{ transform: plongee.depart }, { transform: plongee.arrivee }], DUREE_PLONGEE_MS, "cubic-bezier(.5,0,.85,.45)");
     await attendre(DUREE_PLONGEE_MS * 0.35);
     let arrivee = null;
     await window.jouerTraverseeNuages({
@@ -706,7 +713,6 @@ window.fermerCarteRegionale = async function(options) {
     const retirer = () => {
         vue.style.display = "none";
         $("btn-retour-monde").style.display = "none";
-        arreterNuages();
         const numero = etat.ouverte;
         etat.ouverte = null;
         actualiserDev();
@@ -725,11 +731,11 @@ window.fermerCarteRegionale = async function(options) {
             if (recul) recul.cancel();
             retirer();
             // La carte du monde attend, encore plongée sur la région…
-            if (mondeEl) mondeEl.style.transform = plongee.arrivee;
+            if (mondeEl) poserTransformMonde(plongee.arrivee);
         },
         apresCoeur: () => {
             // … et se dézoome jusqu'à son cadrage d'avant.
-            remontee = animer(mondeEl, [{ transform: plongee.arrivee }, { transform: transformMonde(cadre.panX, cadre.panY, cadre.zoom) }],
+            remontee = animerMonde([{ transform: plongee.arrivee }, { transform: transformMonde(cadre.panX, cadre.panY, cadre.zoom) }],
                               DUREE_ARRIVEE_MS, "cubic-bezier(.2,.7,.25,1)");
         }
     });
@@ -765,18 +771,18 @@ window.decoderGrilleNuages = function(texte, total) {
     for (let i = 0; i < total; i++) cases[i] = (s.charCodeAt(i >> 3) >> (i & 7)) & 1;
     return cases;
 };
-// La grille enregistrée de la carte ouverte (aux dimensions de son image),
-// pour un calque : les nuages (par défaut), ou l'usure du parchemin.
-function grilleEnregistree(calque) {
+// La grille enregistrée de la carte ouverte (aux dimensions de son image) :
+// l'usure du parchemin.
+function grilleEnregistree() {
     const { colonnes, lignes } = dimensionsGrille();
     const carte = window.CARTES_REGIONALES[etat.ouverte];
-    const n = carte && carte[calque === "usure" ? "usure" : "nuages"];
+    const n = carte && carte.usure;
     if (!n || n.colonnes !== colonnes || n.lignes !== lignes) return new Uint8Array(colonnes * lignes);
     return window.decoderGrilleNuages(n.cases, colonnes * lignes);
 }
-// LES DEUX CALQUES (v283) : le pinceau peint les nuages, ou l'usure du
-// parchemin ; le brouillon de l'autre calque attend de côté.
-const CALQUES = ["nuages", "usure"];
+// LE CALQUE DU PINCEAU : l'usure du parchemin (v283). Les nuages, l'autre
+// calque d'avant, sont retirés (v286).
+const CALQUES = ["usure"];
 function brouillonDu(calque) {
     if (calque === etat.calque) return { brouillon: etat.brouillon, modifie: etat.brouillonModifie };
     return etat.reserve[calque] || { brouillon: null, modifie: false };
@@ -785,8 +791,8 @@ function oublierBrouillon(calque) {
     if (calque === etat.calque) { etat.brouillon = null; etat.brouillonModifie = false; }
     else delete etat.reserve[calque];
 }
-window.grilleNuagesRegion = () => (etat.ouverte ? (brouillonDu("nuages").brouillon || grilleEnregistree("nuages")) : null);
-window.grilleUsureRegion = () => (etat.ouverte ? (brouillonDu("usure").brouillon || grilleEnregistree("usure")) : null);
+window.grilleNuagesRegion = () => null;      // plus de nuages régionaux (v286)
+window.grilleUsureRegion = () => (etat.ouverte ? (brouillonDu("usure").brouillon || grilleEnregistree()) : null);
 window.calqueCarteRegion = () => etat.calque;
 window.choisirCalqueRegion = function(calque) {
     if (!etat.ouverte || !estDev() || !CALQUES.includes(calque)) return etat.calque;
@@ -862,12 +868,11 @@ function dessinerPeinture() {
     toile.dataset.calque = etat.calque;
     const visible = estDev() && (!!etat.outil || etat.brouillonModifie);
     toile.style.display = visible ? "block" : "none";
-    $("carte-region-nuages").style.visibility = visible ? "hidden" : "visible";
     if (!visible) return;
     const { colonnes, lignes } = dimensionsGrille();
-    const grille = etat.brouillon || grilleEnregistree(etat.calque);
-    // Les nuages en rouge ; l'usure du parchemin en orange brûlé.
-    const teinte = etat.calque === "usure" ? [236, 118, 18] : [214, 20, 20];
+    const grille = etat.brouillon || grilleEnregistree();
+    // L'usure du parchemin, en orange brûlé.
+    const teinte = [236, 118, 18];
     const petite = document.createElement("canvas");
     petite.width = colonnes; petite.height = lignes;
     const img = petite.getContext("2d").createImageData(colonnes, lignes);
@@ -897,17 +902,17 @@ window.reglerTaillePinceauRegion = function(v) {
     etat.taillePinceau = borne(Number(v) || 50, 6, 200);
     return etat.taillePinceau;
 };
-// Valide le calque en main : les nuages (Nuages) ou l'usure (Usure).
+// Valide l'usure peinte (Usure). Le nom vient des nuages, d'avant v286.
 window.validerNuagesRegion = async function() {
     if (!etat.ouverte || !etat.brouillon) return false;
     const { colonnes, lignes } = dimensionsGrille();
     const grille = { colonnes, lignes, cases: window.encoderGrilleNuages(etat.brouillon) };
-    const calque = etat.calque, champ = calque === "usure" ? "Usure" : "Nuages";
+    const champ = "Usure";
     const carte = window.CARTES_REGIONALES[etat.ouverte];
-    carte[calque] = grille;
+    carte.usure = grille;
     fichesBase[etat.ouverte] = Object.assign({}, fichesBase[etat.ouverte], { [champ]: grille });
     etat.brouillon = null; etat.brouillonModifie = false; etat.outil = null;
-    if (calque === "usure") poserBord(); else preparerNuages();
+    poserBord();
     dessinerPeinture();
     actualiserDev();
     return enregistrerFiche(etat.ouverte, { [champ]: grille });
@@ -924,189 +929,13 @@ window.annulerNuagesRegion = function() {
 };
 
 // =========================================================================
-//  LES NUAGES (v279 — nuages_realistes.js)
+//  PLUS DE NUAGES SUR LES CARTES RÉGIONALES (v286)
 // =========================================================================
-//  Nico : « refais ça de zéro… je veux que ce soit réaliste » ; « pas des
-//  nuages en masse opaque : différents contrastes à l'intérieur, des nuages
-//  dispersés sur les bords et pas de bord net » ; « quitte à voir par endroits
-//  la map en dessous, ce n'est pas bien grave ».
-//
-//  La carte graphique les calcule (nuages_realistes.js). La ZONE peinte en DEV
-//  (sa distance au bord : BANDE_NUAGES cases vers le cœur, BANDE_NUAGES_DEHORS
-//  vers le dehors) décide de la couverture — Nico : « regarde où j'ai peint et
-//  regarde les nuages que ça me met, ça ne couvre pas des masses » — : ce qui
-//  est peint est couvert ; autour du bord, le nuage se défait en bouffées et
-//  en petits nuages épars ; plus loin, rien. La matière fractale sculpte le
-//  relief, l'éclaire et dérive au vent. Une zone peinte jusqu'au bord de
-//  l'image y va jusqu'au bout (v279 : elle s'arrêtait net, en biais, avant).
-//
-//  LA TOILE COUVRE L'ÉCRAN, PAS LA CARTE : posée dans la carte (pour garder
-//  sa place parmi les calques), elle est recalée à chaque image sur la partie
-//  visible (plus une marge), à la résolution de l'écran — nets même au zoom
-//  ×4, et le coût suit l'écran, pas la carte.
-//  Sans WebGL (très rare), un rendu fixe tiré du même principe.
-const BANDE_NUAGES = 9;               // du bord peint au cœur couvert (en cases)
-const BANDE_NUAGES_DEHORS = 14;       // du bord peint aux derniers nuages épars
-const RESOLUTION_NUAGES = 0.6;        // pixels de la toile par pixel d'écran
-const PIXELS_NUAGES_MAX = 900000;
-const MARGE_NUAGES = 0.12;            // la toile déborde de l'écran (glisser la carte)
-const IMAGE_NUAGES_MS = 40;           // vingt-cinq images par seconde
-let nuages = null;                    // { moteur, raf, dernier, debut, graine }
-
-// Le moteur de la toile, gardé avec elle (un contexte WebGL par toile). Un
-// contexte perdu (l'iPad reprend sa mémoire) : la toile est remplacée, et les
-// nuages recommencent.
-function moteurNuages(toile) {
-    if (toile.__nappe) return toile.__nappe;
-    const moteur = window.NuagesRealistes ? window.NuagesRealistes.creerNappe(toile) : { ok: false };
-    toile.__nappe = moteur;
-    if (moteur.ok && !toile.__surveillee) {
-        toile.__surveillee = true;
-        toile.addEventListener("webglcontextlost", (e) => {
-            e.preventDefault();
-            arreterNuages();
-            const neuve = toile.cloneNode(false);
-            delete neuve.__nappe; delete neuve.__surveillee;
-            toile.replaceWith(neuve);
-            setTimeout(preparerNuages, 300);
-        });
-    }
-    return moteur;
-}
-
-function preparerNuages() {
-    arreterNuages();
-    const toile = $("carte-region-nuages");
-    if (!toile || !etat.ouverte) return;
-    const { colonnes, lignes } = dimensionsGrille();
-    const grille = grilleEnregistree("nuages");
-    // Les villages suivent les nuages (un village sous les nuages se cache, v273).
-    if (typeof window.dessinerVillagesRegion === "function") window.dessinerVillagesRegion();
-    if (!grille.some(v => v)) { toile.dataset.vide = "1"; toile.style.display = "none"; return; }
-    toile.dataset.vide = "0";
-    toile.style.display = "block";
-    const zone = window.NuagesRealistes
-        ? window.NuagesRealistes.zoneDouce(grille, colonnes, lignes, BANDE_NUAGES, BANDE_NUAGES_DEHORS)
-        : Float32Array.from(grille);
-    const graine = (Number(etat.ouverte) * 7.31) % 50;
-    const moteur = moteurNuages(toile);
-    if (!moteur.ok) { dessinerNuagesFixes(toile, zone, colonnes, lignes, graine); return; }
-    moteur.poserMasque(zone, colonnes, lignes);
-    // Chaque carte commence à un autre moment du vent.
-    nuages = { moteur, raf: 0, dernier: 0, debut: performance.now() - graine * 9000, graine };
-    animerNuages(performance.now());
-}
-window.preparerNuagesRegion = preparerNuages;
-
-// La partie visible de la carte (en pixels de l'image), plus une marge.
-function cadreNuages() {
-    const { l, h } = tailleVue();
-    const z = etat.zoom || 1;
-    const vx0 = -etat.panX / z, vy0 = -etat.panY / z, vl = l / z, vh = h / z;
-    const mx = vl * MARGE_NUAGES, my = vh * MARGE_NUAGES;
-    const x0 = borne(vx0 - mx, 0, etat.largeur), y0 = borne(vy0 - my, 0, etat.hauteur);
-    const x1 = borne(vx0 + vl + mx, 0, etat.largeur), y1 = borne(vy0 + vh + my, 0, etat.hauteur);
-    return { x0, y0, l: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0), z };
-}
-function animerNuages(maintenant) {
-    if (!nuages) return;
-    nuages.raf = requestAnimationFrame(animerNuages);
-    if (maintenant - nuages.dernier < IMAGE_NUAGES_MS) return;
-    const toile = $("carte-region-nuages");
-    if (!toile || toile.style.visibility === "hidden" || document.hidden || !etat.largeur) return;
-    nuages.dernier = maintenant;
-    const c = cadreNuages();
-    toile.style.left = c.x0 + "px"; toile.style.top = c.y0 + "px";
-    toile.style.width = c.l + "px"; toile.style.height = c.h + "px";
-    // La toile à la résolution de l'écran, sans dépasser PIXELS_NUAGES_MAX.
-    let largeur = c.l * c.z * RESOLUTION_NUAGES, hauteur = c.h * c.z * RESOLUTION_NUAGES;
-    const k = Math.min(1, Math.sqrt(PIXELS_NUAGES_MAX / Math.max(1, largeur * hauteur)));
-    largeur *= k; hauteur *= k;
-    nuages.moteur.dessiner({
-        t: (maintenant - nuages.debut) / 1000,
-        vue: { x0: c.x0 / etat.largeur, y0: c.y0 / etat.hauteur, l: c.l / etat.largeur, h: c.h / etat.hauteur },
-        aspect: etat.largeur / etat.hauteur, graine: nuages.graine, largeur, hauteur,
-        // Le grain fin vient avec le zoom (×1 : rien ; ×3 et plus : tout).
-        detail: etat.base ? Math.log2(Math.max(1, c.z / etat.base)) / Math.log2(3) : 0
-    });
-}
-function arreterNuages() {
-    if (nuages && nuages.raf) cancelAnimationFrame(nuages.raf);
-    nuages = null;
-}
-// Pour les bancs : une image tout de suite, et ses pixels (x, y, l, h : dans la toile).
-window.dessinerNuagesRegionMaintenant = function(t) {
-    if (!nuages) return null;
-    nuages.dernier = 0;
-    if (t !== undefined) nuages.debut = performance.now() - t * 1000;
-    animerNuages(performance.now());
-    cancelAnimationFrame(nuages.raf);
-    nuages.raf = requestAnimationFrame(animerNuages);
-    return nuages.moteur;
-};
-
-// Pour les bancs : les pixels des nuages sous un rectangle de l'écran (RGBA,
-// prémultipliés, de haut en bas), dessinés à l'instant `t` (secondes).
-window.pixelsNuagesEcran = function(x0, y0, x1, y1, t) {
-    const moteur = window.dessinerNuagesRegionMaintenant(t);
-    const toile = $("carte-region-nuages");
-    if (!moteur || !moteur.ok || !toile) return null;
-    const c = cadreNuages(), vue = tailleVue();
-    const versToile = (x, y) => {
-        const mx = (x - vue.gauche - etat.panX) / etat.zoom, my = (y - vue.haut - etat.panY) / etat.zoom;
-        return [Math.round((mx - c.x0) / c.l * toile.width), Math.round((my - c.y0) / c.h * toile.height)];
-    };
-    const [a, b] = versToile(x0, y0), [e, f] = versToile(x1, y1);
-    const l = Math.max(1, e - a), h = Math.max(1, f - b);
-    const brut = moteur.lire(a, b, l, h);
-    // readPixels rend les lignes de bas en haut : on les remet dans l'ordre de l'écran.
-    const data = new Uint8Array(brut.length);
-    for (let j = 0; j < h; j++) data.set(brut.subarray((h - 1 - j) * l * 4, (h - j) * l * 4), j * l * 4);
-    return { data, largeur: l, hauteur: h };
-};
-
-// LE REPLI SANS WEBGL : un rendu fixe, sur toute la carte, du même principe
-// (la zone dose la quantité, un bruit fractal place les nuages).
-function bruitPeriodique(graine, periode) {
-    const h = hasard(graine);
-    const grille = Array.from({ length: periode * periode }, () => h());
-    const v = (x, y) => grille[((y % periode + periode) % periode) * periode + ((x % periode + periode) % periode)];
-    return (x, y) => {
-        const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0;
-        const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
-        const a = v(x0, y0) + (v(x0 + 1, y0) - v(x0, y0)) * sx;
-        const b = v(x0, y0 + 1) + (v(x0 + 1, y0 + 1) - v(x0, y0 + 1)) * sx;
-        return a + (b - a) * sy;
-    };
-}
-function fbm(graine, periode, octaves) {
-    const couches = Array.from({ length: octaves }, (_, i) => bruitPeriodique(graine + i * 101, periode * (1 << i)));
-    return (u, v) => {
-        let s = 0, amp = 0.5, total = 0;
-        couches.forEach((b, i) => { const f = periode * (1 << i); s += amp * b(u * f, v * f); total += amp; amp *= 0.5; });
-        return s / total;
-    };
-}
-function dessinerNuagesFixes(toile, zone, colonnes, lignes, graine) {
-    toile.style.left = "0px"; toile.style.top = "0px"; toile.style.width = "100%"; toile.style.height = "100%";
-    const L = Math.min(640, Math.max(64, etat.largeur)), H = Math.max(1, Math.round(L * etat.hauteur / etat.largeur));
-    toile.width = L; toile.height = H;
-    const ctx = toile.getContext("2d");
-    if (!ctx) return;
-    const img = ctx.createImageData(L, H);
-    const f = fbm(1000 + Math.round(graine * 37), 6, 5), r = H / L;
-    for (let j = 0; j < H; j++) for (let i = 0; i < L; i++) {
-        const z = zone[Math.min(lignes - 1, Math.floor(j / H * lignes)) * colonnes + Math.min(colonnes - 1, Math.floor(i / L * colonnes))];
-        if (z < 0.01) continue;
-        const n = Math.max(-1, Math.min(1, (f(i / L, j / H * r) - 0.5) * 3.2));
-        const hh = n + ((0.18 + 0.62 * z) - 0.5) * 2.4;
-        const a = lisse(0, 0.6, hh) * lisse(0, 0.12, z);
-        if (a <= 0) continue;
-        const lum = 0.78 + 0.22 * lisse(0, 1.2, hh), k = (j * L + i) * 4;
-        img.data[k] = 255 * lum; img.data[k + 1] = 254 * lum; img.data[k + 2] = 250 * lum; img.data[k + 3] = 255 * a;
-    }
-    ctx.putImageData(img, 0, 0);
-}
+//  Nico : « enlève-moi le bouton pour faire les nuages dans les maps
+//  régionales, et enlève-moi tous les nuages des maps régionales. En nuages,
+//  on garde juste ceux des transitions d'une map à l'autre. » Les zones
+//  peintes avant (Cartes_Regionales/{n}.Nuages) restent en base, ignorées :
+//  rien ne s'y cache plus, ni village ni lieu.
 
 // =========================================================================
 //  LE TITRE
@@ -1179,8 +1008,8 @@ function actualiserDev() {
     });
     const aide = $("aide-calque-usure");
     if (aide) aide.style.display = etat.calque === "usure" ? "block" : "none";
-    if (pinceau) pinceau.title = etat.calque === "usure" ? "Pinceau : peindre où le parchemin peut brûler, se déchirer, se percer" : "Pinceau : peindre une zone de nuages";
-    if (valider) valider.textContent = etat.calque === "usure" ? "Valider l'usure" : "Valider les nuages";
+    if (pinceau) pinceau.title = "Pinceau : peindre où le parchemin peut brûler, se déchirer, se percer";
+    if (valider) valider.textContent = "Valider l'usure";
     if (valider) valider.disabled = !etat.brouillonModifie;
     if (annuler) annuler.disabled = !etat.brouillonModifie;
     const caseTitre = $("case-region-titre");

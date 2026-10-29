@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=114">
+  <link rel="stylesheet" href="style.css?v=115">
 
  
   <!-- ===================================================================== -->
@@ -445,6 +445,9 @@
   <div id="ecran-jeu">
 
     <div id="conteneur-carte-fond">
+      <!-- v286 : la table en bois, liée à la carte (même transform) ; son ombre, fixe. -->
+      <div id="table-monde" class="table-bois"></div>
+      <div class="table-ombre"></div>
       <div id="carte-fond-jeu">
       </div>
     </div>
@@ -1324,21 +1327,19 @@
           </div>
           <p class="popup-regions-aide">Boîtes affichées, un clic ne déclenche rien : on édite. Clic maintenu sur une boîte : la déplacer. Carré d'un coin : l'étirer. Clic sur un bord : un nouveau point, à étirer. Double-clic sur un point : le retirer.</p>
           </div>
-          <!-- Sur une carte régionale (v272, cartes_regionales.js) : peindre les
-               zones de nuages, et placer son titre. -->
+          <!-- Sur une carte régionale (v272, cartes_regionales.js) : peindre
+               l'usure du parchemin, et placer son titre. -->
           <div id="regions-dev-carte" style="display: none;">
             <div id="regions-dev-carte-nom" class="popup-regions-info"></div>
-            <!-- Ce que peint le pinceau (v283) : les nuages, ou l'usure du parchemin
-                 (bords_parchemin.js : brûlé, déchiré, percé là où c'est peint). -->
+            <!-- Ce que peint le pinceau : l'usure du parchemin (v283, bords_parchemin.js :
+                 brûlé, déchiré, percé là où c'est peint). Plus de nuages régionaux (v286). -->
             <div class="popup-regions-calques" role="group" aria-label="Ce que peint le pinceau">
-              <button type="button" id="btn-region-calque-nuages" class="popup-regions-calque actif" aria-pressed="true"
-                      onclick="jouerSonClic(); window.choisirCalqueRegion('nuages')">☁ Nuages</button>
-              <button type="button" id="btn-region-calque-usure" class="popup-regions-calque" aria-pressed="false"
+              <button type="button" id="btn-region-calque-usure" class="popup-regions-calque actif" aria-pressed="true"
                       onclick="jouerSonClic(); window.choisirCalqueRegion('usure')">🔥 Usure du parchemin</button>
             </div>
-            <p id="aide-calque-usure" class="popup-regions-aide" style="display: none;">Peins les endroits où le parchemin peut s'abîmer : sur un bord, il s'y déchire et noircit ; plus loin dedans, il brûle en taches et se perce. Ailleurs, le bord reste fin. L'aperçu suit chaque trait.</p>
+            <p id="aide-calque-usure" class="popup-regions-aide">Peins les endroits où le parchemin peut s'abîmer : sur un bord, il s'y déchire et noircit ; plus loin dedans, il brûle en taches et se perce. Ailleurs, le bord reste fin. L'aperçu suit chaque trait.</p>
             <div class="popup-regions-outils">
-              <button type="button" id="btn-region-pinceau" class="popup-regions-outil" title="Pinceau : peindre une zone de nuages"
+              <button type="button" id="btn-region-pinceau" class="popup-regions-outil" title="Pinceau : peindre où le parchemin peut brûler, se déchirer, se percer"
                       aria-label="Pinceau" onclick="jouerSonClic(); window.choisirOutilRegion('pinceau')">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5 L19.5 9.5 L11 18 L6 13 Z"/><path d="M6 13 C3.5 13.5 3.5 17 2.5 20.5 C6 19.5 9.5 19.5 11 18"/></svg>
               </button>
@@ -1350,7 +1351,7 @@
                 <input type="range" id="taille-pinceau-region" min="10" max="160" value="50" oninput="window.reglerTaillePinceauRegion(this.value)">
               </label>
             </div>
-            <button type="button" id="btn-region-valider-nuages" class="popup-regions-bouton" onclick="jouerSonClic(); window.validerNuagesRegion()" disabled>Valider les nuages</button>
+            <button type="button" id="btn-region-valider-nuages" class="popup-regions-bouton" onclick="jouerSonClic(); window.validerNuagesRegion()" disabled>Valider l'usure</button>
             <button type="button" id="btn-region-annuler-nuages" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.annulerNuagesRegion()" disabled>Annuler la peinture</button>
             <label class="popup-regions-case"><input type="checkbox" id="case-region-titre" onchange="window.basculerEditionTitreRegion(this.checked)"> Édition du titre</label>
             <!-- LES VILLAGES (v273, villages_regionaux.js) : des pastilles à placer,
@@ -1409,7 +1410,7 @@
               <button type="button" class="popup-regions-bouton secondaire btn-tester-environnement" onclick="jouerSonClic(); window.testerEnvironnementMJ()" title="Analyse le terrain autour du groupe et écrit dans la console ce que le maître du jeu recevrait">🔍 Ce que le MJ voit (console)</button>
               <div id="groupe-dev-region-etat" class="popup-regions-total"></div>
             </div>
-            <p class="popup-regions-aide">Terrains affichés : clic maintenu sur un terrain pour le déplacer, carré d'un coin pour l'étirer, clic sur un bord pour un nouveau point, double-clic sur un point pour le retirer. Pinceau ou gomme en main, le doigt peint (deux doigts zooment toujours). Les zones rouges restent provisoires : « Valider les nuages » les change en nuages, pour toutes les parties. Édition du titre : le glisser pour le déplacer, le carré de son coin haut droit pour sa taille ; décocher l'enregistre.</p>
+            <p class="popup-regions-aide">Terrains affichés : clic maintenu sur un terrain pour le déplacer, carré d'un coin pour l'étirer, clic sur un bord pour un nouveau point, double-clic sur un point pour le retirer. Pinceau ou gomme en main, le doigt peint (deux doigts zooment toujours). Les zones orange restent provisoires : « Valider l'usure » les enregistre, pour toutes les parties. Édition du titre : le glisser pour le déplacer, le carré de son coin haut droit pour sa taille ; décocher l'enregistre.</p>
           </div>
         </div>
       </div>
@@ -2386,7 +2387,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=190"></script>
+<script src="trace_combat.js?v=191"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2445,35 +2446,35 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=53"></script>
 <script type="module" src="ia_master.js?v=11"></script>
-<script type="module" src="app.js?v=126"></script>
+<script type="module" src="app.js?v=127"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=3"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=4"></script>
-<!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région, ses nuages et son titre. -->
-<!-- Les nuages réalistes (v279) : la carte graphique les calcule. -->
-<script src="nuages_realistes.js?v=2"></script>
+<!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région et son titre (plus de nuages dessus, v286). -->
+<!-- Les nuages réalistes (v279) : la carte graphique les calcule (la traversée entre les cartes). -->
+<script src="nuages_realistes.js?v=3"></script>
 <!-- Les bords de parchemin des cartes (v282) : calculés à part (un Worker). -->
 <script src="bords_parchemin.js?v=4"></script>
-<script type="module" src="cartes_regionales.js?v=9"></script>
+<script type="module" src="cartes_regionales.js?v=10"></script>
 <!-- L'usure du parchemin de la carte du monde (v283) : le pinceau DEV et sa base. -->
 <script type="module" src="usure_monde.js?v=1"></script>
 <!-- Le lore du monde, par région (v273), puis les villages des cartes régionales et MIA_VILLAGE. -->
 <script src="lore_ivalis.js?v=1"></script>
-<script type="module" src="villages_regionaux.js?v=6"></script>
+<script type="module" src="villages_regionaux.js?v=7"></script>
 <!-- Les descriptifs RP des régions (v274) : le mode DEV et sa fenêtre pleine page. -->
 <script type="module" src="descriptifs_regions.js?v=1"></script>
 <!-- Le déplacement des PJ (v275) : les terrains praticables des cartes régionales,
      puis le groupe, son bouton voyage, les tracés, les votes, la marche et les nuits. -->
 <script type="module" src="terrains_regionaux.js?v=2"></script>
-<script type="module" src="voyage_groupe.js?v=6"></script>
+<script type="module" src="voyage_groupe.js?v=7"></script>
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
 <script type="module" src="environnement_mj.js?v=4"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->
 <script src="poi_catalogue.js?v=1"></script>
 <script type="module" src="poi_creation.js?v=2"></script>
 <script src="jet_d20.js?v=2"></script>
-<script src="fabrique_sons.js?v=16"></script>
+<script src="fabrique_sons.js?v=17"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->
 <script src="animations_combat.js?v=11"></script>
 <script src="animations_catalogue.js?v=23"></script>

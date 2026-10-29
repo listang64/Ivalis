@@ -138,34 +138,25 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("2. LES PASTILLES : AU HASARD, HORS DES NUAGES, DÉPLAÇABLES, RÉGLABLES");
+titre("2. LES PASTILLES : AU HASARD, DÉPLAÇABLES, RÉGLABLES (v286 : plus de nuages à éviter)");
 // =========================================================================
 await section(async () => {
-  // Des nuages sur tout le tiers gauche de la carte.
-  await p.evaluate(() => {
-    window.choisirOutilRegion("pinceau"); window.reglerTaillePinceauRegion(120);
-    const c = window.cadrageCarteRegion();
-    for (let y = 0; y < innerHeight; y += 60) window.peindreCarteRegion(c.panX + 5, y, c.panX + c.largeur * c.zoom / 3, y);
-    window.validerNuagesRegion();
-  });
   await p.waitForTimeout(500);
   const r0 = await p.evaluate(() => ({ bloc: getComputedStyle(document.getElementById("regions-dev-villages")).display }));
   verifier("la partie « Villages » de la popup DEV paraît sur une carte régionale", r0.bloc === "block");
   const r = await p.evaluate(() => {
     const posees = window.genererPastillesVillages(5);
-    const c = window.cadrageCarteRegion(), g = window.grilleNuagesRegion(), lignes = Math.round(240 * c.hauteur / c.largeur);
-    const dansNuages = posees.some(p => { const cote = p.taille * c.hauteur, x0 = p.x * c.largeur - cote / 2, y0 = p.y * c.hauteur - cote / 2, cell = c.largeur / 240;
-      for (let l = Math.floor(y0 / cell); l <= Math.floor((y0 + cote) / cell); l++) for (let k = Math.floor(x0 / cell); k <= Math.floor((x0 + cote) / cell); k++) if (g[l * 240 + k]) return true; return false; });
+    const c = window.cadrageCarteRegion();
     const chevauche = posees.some((a, i) => posees.some((b, j) => i < j && Math.abs(a.x - b.x) * c.largeur < a.taille * c.hauteur && Math.abs(a.y - b.y) * c.hauteur < a.taille * c.hauteur));
     const dedans = posees.every(p => p.x * c.largeur - p.taille * c.hauteur / 2 >= 0 && p.x * c.largeur + p.taille * c.hauteur / 2 <= c.largeur && p.y - p.taille / 2 >= 0 && p.y + p.taille / 2 <= 1);
-    return { n: posees.length, tailles: posees.map(p => p.taille), dansNuages, chevauche, dedans, elements: document.querySelectorAll(".pastille-village").length,
+    return { n: posees.length, tailles: posees.map(p => p.taille), chevauche, dedans, elements: document.querySelectorAll(".pastille-village").length,
              fond: getComputedStyle(document.querySelector(".pastille-village")).backgroundColor,
              texte: document.getElementById("btn-valider-villages").textContent, actif: !document.getElementById("btn-valider-villages").disabled };
   });
   // v281 : 4 % (la moitié), le dessin occupant le carré presque entier.
   verifier("« Générer » pose 5 pastilles carrées (4 % de la hauteur)", r.n === 5 && r.elements === 5 && r.tailles.every(t => t === 0.04));
   verifier("rouges, semi-transparentes", /rgba\(214, 20, 20, 0\.35\)/.test(r.fond), r.fond);
-  verifier("aucune dans les nuages, aucune sur une autre, toutes entières sur la carte", !r.dansNuages && !r.chevauche && r.dedans);
+  verifier("aucune sur une autre, toutes entières sur la carte", !r.chevauche && r.dedans);
   verifier("« Créer ces 5 villages » s'allume", r.actif && /5 villages/.test(r.texte), r.texte);
   // Glisser une pastille : elle bouge, la carte non.
   const avant = await p.evaluate(() => ({ p: window.pastillesVillages()[0], c: window.cadrageCarteRegion(), r: (() => { const b = document.querySelector('.pastille-village[data-id]').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })() }));
@@ -280,12 +271,12 @@ await section(async () => {
                      popup: getComputedStyle(document.getElementById("regions-dev-villages")).display };
     el.dispatchEvent(new PointerEvent("pointerleave"));
     sortie.apres = tip && tip.style.display;
-    // Un village posé sous les nuages (la base le dit) : caché, muet.
+    // Un village posé là où étaient des nuages (v286 : il n'y en a plus) : visible.
     const cache = { ...Object.values(window.VILLAGES_REGIONAUX)[0] };
     window.appliquerVillagesDeLaBase([...Object.values(window.VILLAGES_REGIONAUX).map(x => ({ id: x.id, data: { Nom_Du_Lieu: x.nom, Carte_Regionale: 1, Position_Region: { x: x.x, y: x.y, taille: x.taille }, URL_Calque_Region: x.calque } })),
       { id: "L_99999_Sous_les_nuages", data: { Nom_Du_Lieu: "Sous les nuages", Carte_Regionale: 1, Position_Region: { x: 0.08, y: 0.5, taille: 0.08 }, URL_Calque_Region: cache.calque } }]);
     const elCache = document.querySelector('.village-region[data-id="L_99999_Sous_les_nuages"]');
-    sortie.cache = elCache && elCache.classList.contains("cache") && getComputedStyle(elCache).pointerEvents === "none";
+    sortie.cache = !elCache || elCache.classList.contains("cache") || getComputedStyle(elCache).pointerEvents === "none";
     // Un village d'une autre carte ne s'affiche pas ici.
     window.appliquerVillagesDeLaBase([{ id: "L_88888_Ailleurs", data: { Nom_Du_Lieu: "Ailleurs", Carte_Regionale: 5, Position_Region: { x: 0.5, y: 0.5, taille: 0.08 }, URL_Calque_Region: "x" } }]);
     sortie.ailleurs = document.querySelectorAll(".village-region").length;
@@ -295,7 +286,7 @@ await section(async () => {
   verifier("le survol d'un village dit son nom (l'infobulle des lieux, en étiquette sans image)", r.tip === "block" && r.texte === r.nom && r.sansImage, r.texte);
   verifier("…et s'efface en partant", r.apres === "none");
   verifier("hors DEV : ni pastilles, ni outils de villages", r.pastilles === 0 && r.popup === "none");
-  verifier("un village sous les nuages est caché, sans nom au survol", r.cache === true);
+  verifier("(v286) plus de nuages régionaux : aucun village ne se cache", r.cache === false);
   verifier("le village d'une autre carte ne s'affiche pas ici", r.ailleurs === 0);
 });
 

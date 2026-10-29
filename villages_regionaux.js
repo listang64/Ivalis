@@ -12,8 +12,8 @@
 //  base, avec un nom, une description… qui respectent le lore. »
 //
 //  LES PASTILLES (DEV, popup du bouton rouge, sur une carte régionale) : un
-//  nombre, « Générer les villages » ; chaque pastille tombe au hasard, HORS des
-//  nuages, loin des bords et des autres villages ; on la déplace en la
+//  nombre, « Générer les villages » ; chaque pastille tombe au hasard, loin
+//  des bords et des autres villages ; on la déplace en la
 //  glissant, son carré du coin haut droit règle sa taille.
 //
 //  LA CRÉATION (« Valider »), village après village, sous un grand
@@ -32,10 +32,10 @@
 //    5. le calque part sur Cloudinary ; le lieu entre en base (Monde_Lieux),
 //       rattaché à sa carte et à sa place.
 //
-//  EN JEU : le calque est posé sur la carte, sous les nuages (un village sous
-//  les nuages reste caché, et son nom aussi) ; le survol dit son nom. En DEV,
-//  un clic le choisit : « Redessiner » (même village, nouveau dessin) ou
-//  « Supprimer ».
+//  EN JEU : le calque est posé sur la carte (plus de nuages régionaux pour le
+//  cacher, v286) ; le survol dit son nom. En DEV, un clic le choisit — entouré
+//  à la main, en rouge (v286) : « Redessiner » (même village, nouveau dessin)
+//  ou « Supprimer ».
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import {
@@ -130,7 +130,7 @@ function calques() {
         couche = document.createElement("div");
         couche.id = "carte-region-villages";
         couche.className = "carte-region-villages";
-        // Sur l'image, SOUS les nuages : un village sous les nuages reste caché.
+        // Sur l'image, sous tout le reste.
         const image = $("carte-region-image");
         carte.insertBefore(couche, image ? image.nextSibling : carte.firstChild);
     }
@@ -139,8 +139,8 @@ function calques() {
         couchePastilles = document.createElement("div");
         couchePastilles.id = "carte-region-pastilles";
         couchePastilles.className = "carte-region-pastilles";
-        // Au-dessus des nuages (on place les villages à vue) ; le titre est
-        // au-dessus encore, sur son propre calque (v285).
+        // Au-dessus des villages ; le titre est au-dessus encore, sur son
+        // propre calque (v285).
         carte.appendChild(couchePastilles);
     }
     return { couche, couchePastilles };
@@ -153,14 +153,6 @@ window.coteAfficheLieu = coteAffiche;
 function boite(o, c) {
     const cote = coteAffiche(o) * c.hauteur;
     return { gauche: o.x * c.largeur - cote / 2, haut: o.y * c.hauteur - cote / 2, cote };
-}
-// Un village sous les nuages validés ne se montre pas (ni son nom).
-function sousLesNuages(o, c) {
-    const grille = typeof window.grilleNuagesRegion === "function" ? window.grilleNuagesRegion() : null;
-    if (!grille || !c) return false;
-    const colonnes = 240, lignes = Math.max(1, Math.round(colonnes * c.hauteur / c.largeur));
-    const col = Math.floor(o.x * colonnes), lig = Math.floor(o.y * lignes);
-    return !!grille[borne(lig, 0, lignes - 1) * colonnes + borne(col, 0, colonnes - 1)];
 }
 function dessiner() {
     const numero = carteOuverte();
@@ -175,7 +167,7 @@ function dessiner() {
     villagesDeLaCarte(numero).forEach(v => {
         const b = boite(v, c);
         const el = document.createElement("div");
-        el.className = "village-region" + (selection === v.id ? " selectionne" : "") + (sousLesNuages(v, c) ? " cache" : "");
+        el.className = "village-region" + (selection === v.id ? " selectionne" : "");
         el.dataset.id = v.id;
         Object.assign(el.style, { left: b.gauche + "px", top: b.haut + "px", width: b.cote + "px", height: b.cote + "px" });
         if (v.calque) {
@@ -187,6 +179,9 @@ function dessiner() {
             el.appendChild(img);
         }
         el.appendChild(etiquette(v, b.cote));
+        // Entouré à la main, en rouge (v286) : en train de se tracer, tracé, ou qui s'efface.
+        if (selection === v.id) el.appendChild(cercleMain(v, b.cote, traitSelection, "trace", debutTrait));
+        else if (sortante && sortante.id === v.id) el.appendChild(cercleMain(v, b.cote, sortante.trait, "efface", sortante.debut));
         brancherVillage(el, v);
         couche.appendChild(el);
     });
@@ -226,13 +221,17 @@ function etiquette(v, cote) {
     // s'écrit pas) ; le creux de l'arc, au milieu, reste mesuré.
     const police = cote * 0.24;
     const largeur = Math.max(cote * 2.6, police * (0.56 * Array.from(String(v.nom || "")).length + 1.4));
-    const fleche = Math.min(courbureEtiquette(v.id) * largeur * 0.16, cote * 0.42);
+    // v286 — Nico : « le nom des lieux plus vers le haut, afin qu'il soit dans
+    // la partie basse du carré de découpe de l'image générée » : le creux de
+    // l'arc tombe à 93 % du carré, ses bouts restent dans le bas (arc plus doux).
+    const fleche = Math.min(courbureEtiquette(v.id) * largeur * 0.16, cote * 0.16);
     const base = police * 1.05, hauteur = base + fleche + police * 0.45;
+    const haut = cote * 0.93 - base - fleche;
     const svg = document.createElementNS(SVG_NS, "svg");
     svg.setAttribute("class", "village-nom");
     svg.setAttribute("viewBox", `0 0 ${largeur} ${hauteur}`);
     svg.setAttribute("aria-hidden", "true");
-    Object.assign(svg.style, { left: ((cote - largeur) / 2) + "px", top: (cote * 0.84) + "px", width: largeur + "px", height: hauteur + "px" });
+    Object.assign(svg.style, { left: ((cote - largeur) / 2) + "px", top: haut + "px", width: largeur + "px", height: hauteur + "px" });
     const idChemin = "arc-nom-" + String(v.id).replace(/[^a-zA-Z0-9_-]/g, "_");
     // Un arc « inversé » (∪) : les bouts remontent, le milieu descend.
     svg.innerHTML = `<defs><path id="${idChemin}" d="M ${largeur * 0.04} ${base} Q ${largeur / 2} ${base + 2 * fleche} ${largeur * 0.96} ${base}"/></defs>`
@@ -241,11 +240,53 @@ function etiquette(v, cote) {
     return svg;
 }
 
+// LA SÉLECTION D'UN LIEU (v286). Nico : « un rond, un ovale imparfait rouge,
+// comme si on avait entouré à la main sur la carte ; quand on sélectionne un
+// lieu, le bruit d'une plume qui entoure quelque chose sur un parchemin ; quand
+// on clique ailleurs sur la map, la sélection disparaît en fondu ». Le trait
+// fait un peu plus d'un tour, ne se referme pas tout à fait, son rayon ondule ;
+// il se trace à l'écran (le temps du bruit de plume), une fois.
+let traitSelection = 0;                 // change à chaque sélection : un nouveau geste
+let debutTrait = 0;                     // quand le cercle du lieu choisi a commencé à se tracer
+let sortante = null;                    // { id, trait, debut } : le cercle qui s'efface
+const DUREE_FONDU_SELECTION_MS = 520;
+// `etat` : "trace" (il se trace, puis reste) ou "efface" ; `debut` : quand ça a
+// commencé — un dessin de la carte entre-temps reprend l'animation où elle en est.
+function cercleMain(v, cote, trait, etat, debut) {
+    const h = hacher(v.id + ":" + trait);
+    const alea = (k) => ((Math.imul(h ^ (k * 2654435761), 1597334677) >>> 0) % 10000) / 10000;
+    const cx = cote / 2, cy = cote * 0.52, rx = cote * 0.68, ry = cote * 0.6;
+    const depart = -Math.PI * (0.55 + 0.3 * alea(1)), tour = Math.PI * 2 * (1.08 + 0.1 * alea(2));
+    const p1 = alea(3) * 6.3, p2 = alea(4) * 6.3, incline = (alea(5) - 0.5) * 0.25;
+    const pts = [], N = 72;
+    for (let i = 0; i <= N; i++) {
+        const f = i / N, a = depart + tour * f;
+        const r = 1 + 0.045 * Math.sin(2 * a + p1) + 0.03 * Math.sin(3 * a + p2) + 0.07 * (f - 0.5);
+        const x = Math.cos(a) * rx * r, y = Math.sin(a) * ry * r;
+        pts.push([cx + x * Math.cos(incline) - y * Math.sin(incline), cy + x * Math.sin(incline) + y * Math.cos(incline)]);
+    }
+    let longueur = 0;
+    for (let i = 1; i < pts.length; i++) longueur += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("class", "village-cercle" + (etat ? " " + etat : ""));
+    const marge = cote * 0.5;
+    svg.setAttribute("viewBox", `${-marge} ${-marge} ${cote + 2 * marge} ${cote + 2 * marge}`);
+    Object.assign(svg.style, { left: -marge + "px", top: -marge + "px", width: (cote + 2 * marge) + "px", height: (cote + 2 * marge) + "px" });
+    const chemin = document.createElementNS(SVG_NS, "path");
+    chemin.setAttribute("d", "M " + pts.map(p => p[0].toFixed(2) + " " + p[1].toFixed(2)).join(" L "));
+    chemin.setAttribute("stroke-width", (cote * 0.045).toFixed(2));
+    chemin.style.strokeDasharray = longueur.toFixed(1);
+    chemin.style.strokeDashoffset = etat === "trace" ? longueur.toFixed(1) : "0";
+    svg.style.animationDelay = chemin.style.animationDelay = (-Math.max(0, performance.now() - (debut || 0))).toFixed(0) + "ms";
+    svg.appendChild(chemin);
+    return svg;
+}
+
 // Le survol dit le nom (comme les lieux de la carte du monde) ; en DEV, un
 // clic choisit le village.
 function brancherVillage(el, v) {
     el.addEventListener("pointerenter", (e) => {
-        if (el.classList.contains("cache") || typeof window.afficherTooltipLieu !== "function") return;
+        if (typeof window.afficherTooltipLieu !== "function") return;
         window.afficherTooltipLieu(v.nom, v.image || "", e);
     });
     el.addEventListener("pointermove", (e) => { if (typeof window.deplacerTooltipLieu === "function") window.deplacerTooltipLieu(e); });
@@ -258,7 +299,7 @@ function brancherVillage(el, v) {
         if (!estDev()) {
             // En jeu, un toucher sur un lieu qui a son image l'ouvre (v277) ; la
             // carte glisse toujours (on ne retient pas le doigt).
-            if (v.image && !el.classList.contains("cache")) appuiApercu = { id: v.id, x: e.clientX, y: e.clientY };
+            if (v.image) appuiApercu = { id: v.id, x: e.clientX, y: e.clientY };
             return;
         }
         e.stopPropagation();
@@ -299,10 +340,38 @@ window.afficherApercuLieu = function(v) {
     return true;
 };
 window.selectionnerVillageRegion = function(id) {
+    const avant = selection;
     selection = id && villages[id] ? id : null;
+    if (selection === avant) { dessiner(); return selection; }
+    // L'ancien cercle s'efface en fondu ; le nouveau se trace, au bruit de la plume.
+    sortante = avant && villages[avant] ? { id: avant, trait: traitSelection, debut: performance.now() } : null;
+    if (selection) {
+        traitSelection++;
+        debutTrait = performance.now();
+        if (typeof window.jouerSonEvenement === "function") window.jouerSonEvenement("plume-entoure");
+    }
     dessiner();
+    if (sortante) {
+        const s = sortante;
+        setTimeout(() => { if (sortante === s) { sortante = null; dessiner(); } }, DUREE_FONDU_SELECTION_MS + 40);
+    }
     return selection;
 };
+// Un toucher ailleurs sur la carte (pas sur un lieu), sans glisser : la
+// sélection s'efface en fondu (v286).
+let appuiAilleurs = null;
+window.addEventListener("pointerdown", (e) => {
+    appuiAilleurs = null;
+    if (!selection || !carteOuverte()) return;
+    const vue = $("vue-carte-region");
+    if (!vue || !e.target || !vue.contains(e.target) || (e.target.closest && e.target.closest(".village-region, .pastille-village"))) return;
+    appuiAilleurs = { x: e.clientX, y: e.clientY };
+});
+window.addEventListener("pointerup", (e) => {
+    const a = appuiAilleurs;
+    appuiAilleurs = null;
+    if (a && selection && Math.hypot(e.clientX - a.x, e.clientY - a.y) <= 6) window.selectionnerVillageRegion(null);
+});
 
 // --- LES GESTES DES PASTILLES ----------------------------------------------
 //  Elles prennent le doigt avant la carte (qui glisserait sinon).
@@ -344,7 +413,7 @@ function garderDansLaCarte(p, c) {
 }
 
 // --- LE TIRAGE DES PASTILLES -------------------------------------------------
-//  Au hasard, hors des nuages, à distance des bords et des autres carrés
+//  Au hasard, à distance des bords et des autres carrés
 //  (villages et pastilles) — un carré qui n'y arrive pas en 400 essais est
 //  laissé de côté.
 window.genererPastillesVillages = function(nombre, alea) {
@@ -352,16 +421,6 @@ window.genererPastillesVillages = function(nombre, alea) {
     if (!numero || !c || !estDev() || enCours) return [];
     const tirer = alea || Math.random;
     const n = borne(Math.round(Number(nombre) || 0), 0, MAX_PAR_LOT);
-    const grille = typeof window.grilleNuagesRegion === "function" ? window.grilleNuagesRegion() : null;
-    const colonnes = 240, lignes = Math.max(1, Math.round(colonnes * c.hauteur / c.largeur));
-    const cellule = c.largeur / colonnes;
-    const dansLesNuages = (b) => {
-        if (!grille) return false;
-        const c0 = Math.max(0, Math.floor(b.gauche / cellule)), c1 = Math.min(colonnes - 1, Math.floor((b.gauche + b.cote) / cellule));
-        const l0 = Math.max(0, Math.floor(b.haut / cellule)), l1 = Math.min(lignes - 1, Math.floor((b.haut + b.cote) / cellule));
-        for (let l = l0; l <= l1; l++) for (let k = c0; k <= c1; k++) if (grille[l * colonnes + k]) return true;
-        return false;
-    };
     const occupes = () => [...villagesDeLaCarte(numero), ...pastilles].map(o => boite(o, c));
     const chevauche = (b) => occupes().some(o => b.gauche < o.gauche + o.cote * 1.15 && o.gauche < b.gauche + b.cote * 1.15
                                                 && b.haut < o.haut + o.cote * 1.15 && o.haut < b.haut + b.cote * 1.15);
@@ -372,7 +431,7 @@ window.genererPastillesVillages = function(nombre, alea) {
             const x = marge + tirer() * Math.max(0, c.largeur - 2 * marge), y = marge + tirer() * Math.max(0, c.hauteur - 2 * marge);
             const p = { id: "P" + (numeroPastille++), x: x / c.largeur, y: y / c.hauteur, taille };
             const b = boite(p, c);
-            if (dansLesNuages(b) || chevauche(b)) continue;
+            if (chevauche(b)) continue;
             pastilles.push(p);
             posees.push(p);
             break;
@@ -754,7 +813,7 @@ window.actualiserDevVillages = actualiserDev;
     // La carte s'ouvre ou se ferme : ses villages viennent avec elle ; les
     // pastilles d'une autre carte n'ont rien à faire sur celle-ci.
     window.addEventListener("carte-regionale", (e) => {
-        if (!(e.detail && e.detail.ouverte)) { pastilles = []; selection = null; }
+        if (!(e.detail && e.detail.ouverte)) { pastilles = []; selection = null; sortante = null; }
         if (typeof window.masquerTooltipLieu === "function") window.masquerTooltipLieu();
         dessiner();
     });

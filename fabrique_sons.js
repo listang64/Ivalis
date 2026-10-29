@@ -307,6 +307,81 @@
             cuivre(523.25, 0.5, 1.3, 0.06);
             cuivre(659.25, 0.5, 1.3, 0.05);
         },
+        // UNE PLUME QUI ENTOURE UN LIEU (v286) : le bec gratte la fibre du
+        // parchemin le temps d'une boucle — des accrocs serrés, le filtre qui
+        // tourne avec la main, puis la plume se lève.
+        "plume-entoure"(ctx, s) {
+            const t = ctx.currentTime, duree = 0.62;
+            const n = Math.floor(ctx.sampleRate * duree);
+            const tampon = ctx.createBuffer(1, n, ctx.sampleRate), d = tampon.getChannelData(0);
+            const pas = Math.max(1, Math.round(ctx.sampleRate / 420));
+            let accroc = 1;
+            for (let i = 0; i < n; i++) {
+                const x = i / n;
+                if (i % pas === 0) accroc = 0.3 + 0.7 * Math.random();
+                const env = Math.min(1, x / 0.05) * (1 - Math.pow(x, 5)) * (0.75 + 0.25 * Math.sin(x * Math.PI * 2.2));
+                d[i] = (Math.random() * 2 - 1) * env * accroc;
+            }
+            const src = ctx.createBufferSource();
+            src.buffer = tampon;
+            const f = ctx.createBiquadFilter();
+            f.type = "bandpass"; f.Q.value = 1.1;
+            f.frequency.setValueAtTime(2600, t);
+            f.frequency.linearRampToValueAtTime(4300, t + duree * 0.3);
+            f.frequency.linearRampToValueAtTime(2900, t + duree * 0.65);
+            f.frequency.linearRampToValueAtTime(3800, t + duree);
+            const aigu = ctx.createBiquadFilter();
+            aigu.type = "highpass"; aigu.frequency.value = 1200;
+            const g = ctx.createGain();
+            g.gain.value = 0.5;
+            src.connect(f).connect(aigu).connect(g).connect(s);
+            src.start(t);
+            // le frottement, plus sourd, du papier sous la main
+            bruit(ctx, s, { duree, filtre: "lowpass", freq: 900, q: 0.7, gain: 0.07, forme: "cloche" });
+        },
+        // LE VENT DES NUAGES (v286) : pendant la traversée entre la carte du
+        // monde et une carte régionale. Un souffle grave qui enfle à l'entrée,
+        // tient au cœur des nuages, retombe à la sortie ; des rafales le
+        // traversent, et un sifflement d'air, très bas, par-dessus.
+        "vent-nuages"(ctx, s) {
+            const t = ctx.currentTime, duree = 3.4;
+            const n = Math.floor(ctx.sampleRate * duree);
+            const tampon = ctx.createBuffer(1, n, ctx.sampleRate), d = tampon.getChannelData(0);
+            const enveloppe = (x) => {
+                const monte = x < 0.34 ? Math.pow(x / 0.34, 1.6) : 1;
+                const tombe = x > 0.52 ? Math.pow(1 - (x - 0.52) / 0.48, 1.4) : 1;
+                return monte * tombe;
+            };
+            let brun = 0;
+            for (let i = 0; i < n; i++) {
+                brun = (brun + 0.02 * (Math.random() * 2 - 1)) / 1.02;       // un bruit « brun » : grave et plein
+                d[i] = brun * 3.5 * enveloppe(i / n);
+            }
+            const src = ctx.createBufferSource();
+            src.buffer = tampon;
+            const f = ctx.createBiquadFilter();
+            f.type = "lowpass"; f.Q.value = 0.9;
+            f.frequency.setValueAtTime(380, t);
+            for (let k = 1; k <= 13; k++) f.frequency.linearRampToValueAtTime(380 + 1100 * Math.random() * enveloppe(k / 13), t + duree * k / 13);
+            const g = ctx.createGain();
+            g.gain.value = 0.9;
+            src.connect(f).connect(g).connect(s);
+            src.start(t);
+            // le sifflement de l'air
+            const blanc = ctx.createBuffer(1, n, ctx.sampleRate), b = blanc.getChannelData(0);
+            for (let i = 0; i < n; i++) b[i] = (Math.random() * 2 - 1) * enveloppe(i / n);
+            const src2 = ctx.createBufferSource();
+            src2.buffer = blanc;
+            const f2 = ctx.createBiquadFilter();
+            f2.type = "bandpass"; f2.Q.value = 5;
+            f2.frequency.setValueAtTime(520, t);
+            f2.frequency.linearRampToValueAtTime(1350, t + duree * 0.42);
+            f2.frequency.linearRampToValueAtTime(760, t + duree);
+            const g2 = ctx.createGain();
+            g2.gain.value = 0.05;
+            src2.connect(f2).connect(g2).connect(s);
+            src2.start(t);
+        },
         // La défaite : deux notes graves qui descendent, étouffées.
         "defaite"(ctx, s) {
             ding(ctx, s, { freq: 220, duree: 1.2, force: 1.3, clic: false, passeBas: 900, type: "triangle" });

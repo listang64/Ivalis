@@ -628,6 +628,8 @@ body {
 }
 
 #carte-fond-jeu {
+  /* v286 : positionnée, pour passer devant la table en bois (#table-monde). */
+  position: relative;
   /* NOUVEAU : Dimensions fixes 4K gravées dans le marbre */
   width: 3840px; 
   height: 2160px;
@@ -5639,7 +5641,6 @@ textarea.input-texte-parchemin {
 .carte-region-dessus { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
 .carte-region-image { display: block; width: 100%; height: 100%; pointer-events: none; -webkit-user-drag: none; }
 /* Les nuages (v279) : la toile est recalée à chaque image sur la partie visible de la carte. */
-.carte-region-nuages { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
 .carte-region-peinture { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .carte-region-peinture { display: none; image-rendering: auto; }
 
@@ -5709,7 +5710,6 @@ textarea.input-texte-parchemin {
 /* Les calques des villages : sur l'image, sous les nuages. Le survol dit le nom. */
 .carte-region-villages { position: absolute; inset: 0; pointer-events: none; }
 .village-region { position: absolute; pointer-events: auto; }
-.village-region.cache { pointer-events: none; }
 .village-calque { display: block; width: 100%; height: 100%; pointer-events: none; -webkit-user-drag: none; }
 /* Un calque d'avant v281 : son dessin au milieu d'un carré deux fois plus grand.
    On n'en montre que le centre, à la même échelle, fondu vers le bord. */
@@ -5720,10 +5720,15 @@ textarea.input-texte-parchemin {
 /* (!important : la police du jeu, Almendra, est imposée à tout « * ».) */
 .village-nom-texte { font-family: 'IM Fell English', 'Almendra', Georgia, serif !important; font-style: italic; fill: #3a220f;
   letter-spacing: 0.02em; paint-order: stroke; stroke: rgba(246, 232, 200, 0.55); stroke-width: 0.12em; stroke-linejoin: round; }
-.village-region.cache .village-nom { display: none; }
 .carte-region-villages.dev .village-region { cursor: pointer; }
 /* v281 : plus de carré jaune au survol (Nico) ; la sélection DEV garde le sien. */
-.carte-region-villages.dev .village-region.selectionne { outline: calc(3px / var(--zoom-region, 1)) solid #f3d27a; }
+/* v286 : la sélection d'un lieu, entourée à la main en rouge (plus le carré jaune). */
+.village-cercle { position: absolute; overflow: visible; pointer-events: none; }
+.village-cercle path { fill: none; stroke: #a5141c; stroke-linecap: round; stroke-linejoin: round; opacity: 0.9; }
+.village-cercle.trace path { animation: tracer-cercle-lieu 0.55s cubic-bezier(.45, .05, .55, .95) forwards; }
+.village-cercle.efface { animation: effacer-cercle-lieu 0.52s ease-out forwards; }
+@keyframes tracer-cercle-lieu { to { stroke-dashoffset: 0; } }
+@keyframes effacer-cercle-lieu { from { opacity: 1; } to { opacity: 0; } }
 /* Les pastilles (DEV) : des carrés rouges à demi transparents, au-dessus des
    nuages, qu'on glisse ; le carré du coin haut droit règle leur taille. */
 .carte-region-pastilles { position: absolute; inset: 0; pointer-events: none; }
@@ -6124,14 +6129,19 @@ textarea.input-texte-parchemin {
 .boite-grille-rp button:disabled { opacity: 0.4; cursor: default; }
 
 /* =========================================================================
-   v285 — LA TABLE EN BOIS sous toutes les cartes (monde et régions) : une
-   seule image (images/table_bois.jpg, fabriquée par
-   tests_monstres/_fabriquer_table_bois.mjs), qui couvre l'écran quel qu'il
-   soit, centrée ; le brun sombre d'avant en attendant qu'elle arrive.
+   v285 — LA TABLE EN BOIS sous toutes les cartes (monde et régions).
+   v286 — Nico : « la table doit être liée à l'image : si on déplace l'image,
+   la table doit bouger avec, et pareil pour le zoom ». La table est un calque
+   jumeau de la carte (#table-monde, #carte-region-table) : même coin, même
+   transform (glisse, zoom, plongée) ; elle déborde de deux cartes de chaque
+   côté. Son image (images/table_bois.jpg, un carreau répétable fabriqué par
+   tests_monstres/_fabriquer_table_bois.mjs) se pose en mosaïque, un carreau
+   de la hauteur de la carte. Par-dessus, une ombre douce, fixe, vers les
+   bords de l'écran. Le brun d'avant reste en fond, le temps qu'elle arrive.
    ========================================================================= */
-#conteneur-carte-fond, .vue-carte-region {
-  background-image: url('images/table_bois.jpg?v=1');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-}
+.table-bois { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
+.table-bois::before { content: ""; position: absolute; left: -200%; top: -200%; width: 500%; height: 500%;
+  background-image: url('images/table_bois.jpg?v=2'); background-size: auto 20%; background-repeat: repeat; }
+#table-monde { width: 3840px; height: 2160px; }
+.table-ombre { position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 75% 70% at 50% 45%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.42) 100%); }

@@ -375,12 +375,13 @@ await section(async () => {
     const t = svg && svg.querySelector("text"), tp = svg && svg.querySelector("textPath"), st = t && getComputedStyle(t), chemin = svg && svg.querySelector("path");
     const cote = el.getBoundingClientRect().height, b = svg && svg.getBoundingClientRect(), e = el.getBoundingClientRect();
     return { nom: tp && tp.textContent, police: st && st.fontFamily, style: st && st.fontStyle, couleur: st && st.fill, d: chemin && chemin.getAttribute("d"),
-             haut: b && (b.top - e.top) / cote, centre: b && Math.abs((b.left + b.width / 2) - (e.left + e.width / 2)), taille: t && parseFloat(t.getAttribute("font-size")) / parseFloat(el.style.height),
+             haut: t && (t.getBoundingClientRect().top - e.top) / cote, centre: b && Math.abs((b.left + b.width / 2) - (e.left + e.width / 2)), taille: t && parseFloat(t.getAttribute("font-size")) / parseFloat(el.style.height),
              href: tp && tp.getAttribute("href"), tous: [...document.querySelectorAll(".village-region")].every(x => x.querySelector("svg.village-nom textPath")) };
   });
   verifier("sous chaque lieu, son nom (Brumefosse)", r.nom === "Brumefosse" && r.tous && /^#arc-nom-/.test(r.href || ""), JSON.stringify([r.nom, r.href]));
   verifier("à la plume : IM Fell English, en italique, marron foncé", /IM Fell English/.test(r.police || "") && r.style === "italic" && r.couleur === "rgb(58, 34, 15)", `${r.police} ${r.style} ${r.couleur}`);
-  verifier("en petit, sous le dessin, centré", r.taille > 0.15 && r.taille < 0.35 && r.haut > 0.75 && r.haut < 0.95 && r.centre < 1.5, JSON.stringify([r.taille, r.haut, r.centre]));
+  // v286 : remonté dans le bas du carré du dessin (le haut des lettres vers 60-75 %).
+  verifier("en petit, dans le bas du dessin, centré", r.taille > 0.15 && r.taille < 0.35 && r.haut > 0.55 && r.haut < 0.85 && r.centre < 1.5, JSON.stringify([r.taille, r.haut, r.centre]));
   const c = await p.evaluate(() => {
     const k = Array.from({ length: 400 }, (_, i) => window.courbureEtiquetteLieu("L_" + i + "_Lieu"));
     const arc = (id) => { const svg = document.createElement("div"); return window.courbureEtiquetteLieu(id); };
@@ -397,9 +398,9 @@ await section(async () => {
   });
   verifier("un nom droit : la ligne est droite ; un nom en arc : le milieu descend (un arc « inversé »)",
            Math.abs(forme.droit.yControle - forme.droit.yBout) < 1e-6 && forme.courbe.yControle > forme.courbe.yBout + 1, JSON.stringify(forme));
-  const cache = await p.evaluate(() => { const el = document.querySelector('.village-region[data-id="L_00042_Brumefosse"]'); el.classList.add("cache");
-    const d = getComputedStyle(el.querySelector("svg.village-nom")).display; el.classList.remove("cache"); return d; });
-  verifier("un lieu sous les nuages : son nom aussi se cache", cache === "none", cache);
+  // (v286 : plus de nuages régionaux — aucun lieu ni nom ne se cache plus.)
+  const cache = await p.evaluate(() => [...document.querySelectorAll(".village-region")].filter(el => el.classList.contains("cache") || getComputedStyle(el.querySelector("svg.village-nom")).display === "none").length);
+  verifier("(v286) plus de nuages régionaux : aucun nom de lieu caché", cache === 0, String(cache));
   const long = await p.evaluate(() => {
     window.appliquerLieuLocal("L_09999_Long", { Nom_Du_Lieu: "Le Hameau des Charbonniers de l'Ouest", Carte_Regionale: 2, Position_Region: { x: 0.5, y: 0.2, taille: 0.04 }, Calque_Plein: true });
     const svg = document.querySelector('.village-region[data-id="L_09999_Long"] svg.village-nom'), t = svg.querySelector("text"), chemin = svg.querySelector("path");
