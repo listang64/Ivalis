@@ -8955,3 +8955,50 @@ de marqué au-delà de 2 %, ni trou ni brûlure ; un bord peint qui se déchire
 toujours ; les versions. Mis à jour : corrections_v283 (le bord ne fluctue
 presque plus), v282 (la déchirure moyenne peut descendre sous 1 %). Il mord
 sur l'ancien code (5 échecs).
+
+## v285 — Un bord un peu plus varié ; la table en bois ; le titre au-dessus des brûlures
+
+Nico : « pour l'effet parchemin de base sur tous les bords des maps, faire un
+tout petit peu plus de variation dans la taille. J'aimerais qu'en
+arrière-plan, derrière les maps globale et régionales, tu me fasses la
+texture d'une table en bois nervuré, un bois marron foncé vraiment réaliste,
+avec des nœuds. Un seul fond pour toutes les maps, qui s'adapte à tous les
+écrans. » — « et les titres des maps ne doivent pas être impactés par les
+trous des brûlures : le titre apparaît au-dessus. »
+
+bords_parchemin.js : la largeur de la déchirure de base ondule environ deux
+fois plus (longues vagues et vagues plus courtes ; écart type de 0,0005 à
+environ 0,0011 du petit côté) et le liseré bruni varie un peu en largeur.
+Le bord reste fin : moins de 0,6 % en moyenne et jamais plus de 1 %.
+
+La table : images/table_bois.jpg (2560 × 1600, 350 Ko) est fabriquée une
+fois par tests_monstres/_fabriquer_table_bois.mjs (graine 21, hors de la
+suite). On y voit des planches de noyer sombre :
+- des cernes en arches, parce que le tronc est coupé de biais et s'effile ;
+- des nœuds que le fil contourne, avec leurs propres cernes et parfois une fente ;
+- des fibres et des pores le long de la planche, et des veines de couleur ;
+- des joints entre les planches et des bouts de planche aboutés ;
+- un vernis usé, une lumière douce et le pourtour dans l'ombre.
+
+style.css pose ce même fond sous la carte du monde (#conteneur-carte-fond)
+et sous les cartes régionales (.vue-carte-region). Il est centré et couvre
+l'écran quelle que soit sa taille (cover). Le brun d'avant reste en couleur
+de fond, en attendant que l'image arrive.
+
+Le titre : il quitte #carte-region, que le masque du parchemin découpe, pour
+un calque jumeau #carte-region-dessus. Ce calque a la même taille et le même
+cadrage (poserCarte règle les deux). Les calques qui s'inséraient « avant le
+titre » s'ajoutent maintenant à la fin de la carte : les pastilles des
+villages, les terrains et ceux du voyage. Le DEV déplace toujours le titre
+à la souris.
+
+corrections_v285.mjs (dans la suite), sur la vraie page, vérifie :
+- le bord de base varie davantage tout en restant fin (6 graines, 2048 × 1280) ;
+- le titre, avec une usure peinte en plein sur lui : aucun masque au-dessus
+  de lui ; le calque jumeau à sa place ; le DEV le déplace à la souris ; il
+  suit la carte qui glisse ; les pastilles des villages sont toujours sur la carte ;
+- la table : l'image est là ; le même fond, en cover, sous les deux vues ;
+  sur un écran très large, on voit du bois sur les côtés ;
+- les versions.
+
+Il échoue sur l'ancien code (10 échecs).

@@ -241,7 +241,7 @@ function calque() {
         svg.setAttribute("class", "carte-region-terrains");
         svg.setAttribute("preserveAspectRatio", "none");
         // Au-dessus des nuages et de la peinture, sous les pastilles et le titre.
-        const avant = $("carte-region-pastilles") || $("carte-region-titre");
+        const avant = $("carte-region-pastilles");
         carte.insertBefore(svg, avant || null);
         brancherGestes(svg);
     }

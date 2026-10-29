@@ -109,9 +109,13 @@
             // v284 — Nico : « sans peinture, juste un bord fin en mode parchemin,
         // sur tout le bord, et pas épais » : une déchirure à peine marquée,
         // régulière tout autour (des fibres, une très légère ondulation).
-        let p = 0.0015
-                + 0.003 * fbm(u * 4, v * 4, g, 3)                                    // l'ondulation
+        // v285 — « un tout petit peu plus de variation dans la taille » : la
+        // largeur ondule un peu plus, en longues vagues et en plus courtes.
+        let p = 0.0034
+                + 0.0065 * (fbm(u * 4, v * 4, g, 3) - 0.5)                           // l'ondulation
+                + 0.003 * (fbm(u * 13, v * 13, g + 150, 2) - 0.5)                    // les vagues plus courtes
                 + 0.0016 * fbm(u * 70, v * 70, g + 200, 2);                          // les fibres
+            p = Math.max(0.0008, p);
             for (const c of coins) p += 0.004 * Math.exp(-Math.hypot(u - c[0], v - c[1]) / 0.02);   // les coins s'usent à peine
             if (z > 0) {
                 p += z * (0.012 + 0.03 * fbm(u * 3, v * 3, g + 50, 3)
@@ -170,7 +174,7 @@
                             const e = Math.max(0, dechire);
                             const tache = 0.8 + 0.4 * fbm(u * 24, v * 24, g + 500, 2) + z * 0.5 * (fbm(u * 24, v * 24, g + 500, 2) - 0.5);
                             // Le liseré bruni : fin et régulier tout autour (un peu plus large où c'est peint).
-                            const large = 0.003;
+                            const large = 0.003 * (0.65 + 0.7 * fbm(u * 7, v * 7, g + 700, 2));
                             const brulee = z * lisse(0.25, 0.5, fbm(u * 2.4, v * 2.4, g + 400, 3));
                             const fondu = 1 - lisse(BANDE * 0.55, BANDE * 0.95, dbord * px);
                             brun += fondu * tache * (0.55 * Math.exp(-e / large) + 0.12 * Math.exp(-e / (2.5 * large)) + z * 0.5 * Math.exp(-e / 0.016));

@@ -267,6 +267,8 @@ function construireVue() {
           <img id="carte-region-image" class="carte-region-image" alt="" draggable="false">
           <canvas id="carte-region-nuages" class="carte-region-nuages"></canvas>
           <canvas id="carte-region-peinture" class="carte-region-peinture"></canvas>
+        </div>
+        <div id="carte-region-dessus" class="carte-region-dessus">
           <div id="carte-region-titre" class="carte-region-titre"><span class="carte-region-titre-texte"></span><span class="carte-region-titre-poignee" title="Agrandir ou rétrécir"></span></div>
         </div>`;
     const fond = $("conteneur-carte-fond");
@@ -303,12 +305,15 @@ function bornerPan() {
     etat.panY = hauteur <= h ? (h - hauteur) / 2 : borne(etat.panY, h - hauteur, 0);
 }
 function poserCarte() {
-    const carte = $("carte-region");
-    if (!carte) return;
-    carte.style.width = etat.largeur + "px";
-    carte.style.height = etat.hauteur + "px";
-    carte.style.transform = `translate(${etat.panX}px, ${etat.panY}px) scale(${etat.zoom})`;
-    carte.style.setProperty("--zoom-region", String(etat.zoom));
+    // La carte, et son calque jumeau du dessus (le titre, que les brûlures
+    // du parchemin ne découpent pas — v285) : même taille, même cadrage.
+    [$("carte-region"), $("carte-region-dessus")].forEach(carte => {
+        if (!carte) return;
+        carte.style.width = etat.largeur + "px";
+        carte.style.height = etat.hauteur + "px";
+        carte.style.transform = `translate(${etat.panX}px, ${etat.panY}px) scale(${etat.zoom})`;
+        carte.style.setProperty("--zoom-region", String(etat.zoom));
+    });
 }
 // Calée sur la hauteur de l'écran, centrée en largeur ; `garder` reprend le
 // zoom relatif et le point au centre de l'écran (un iPad qu'on tourne).

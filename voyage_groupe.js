@@ -894,7 +894,7 @@ function calquesRegion() {
         nuit = document.createElement("div");
         nuit.id = "voile-nuit-voyage";
         nuit.className = "voile-nuit-voyage";
-        carte.insertBefore(nuit, $("carte-region-pastilles") || $("carte-region-titre") || null);
+        carte.insertBefore(nuit, $("carte-region-pastilles") || null);
     }
     let svg = $("carte-region-voyage");
     if (!svg) {
@@ -902,7 +902,7 @@ function calquesRegion() {
         svg.id = "carte-region-voyage";
         svg.setAttribute("class", "calque-voyage");
         svg.setAttribute("preserveAspectRatio", "none");
-        carte.insertBefore(svg, $("carte-region-pastilles") || $("carte-region-titre") || null);
+        carte.insertBefore(svg, $("carte-region-pastilles") || null);
     }
     let pion = $("pion-groupe-region");
     if (!pion) {
@@ -912,7 +912,7 @@ function calquesRegion() {
         pion.alt = "Le groupe";
         pion.draggable = false;
         pion.src = IMAGE_GROUPE_REGION;
-        carte.insertBefore(pion, $("carte-region-pastilles") || $("carte-region-titre") || null);
+        carte.insertBefore(pion, $("carte-region-pastilles") || null);
     }
     return { svg, pion, nuit };
 }

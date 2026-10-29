@@ -619,7 +619,8 @@ body {
   height: 100%;
   overflow: hidden; 
   z-index: 0;
-  /* v282 : la carte est un parchemin aux bords usés, posé sur un fond sombre. */
+  /* v282 : la carte est un parchemin aux bords usés… v285 : posé sur une
+     table de bois sombre (la même sous toutes les cartes, voir plus bas). */
   background-color: #1a140c;
   /* La carte du monde est fixe (v241) : ni pincement ni défilement du
      navigateur par-dessus — le doigt la fait seulement glisser. */
@@ -5628,11 +5629,14 @@ textarea.input-texte-parchemin {
 /* La vue couvre l'écran de jeu, au-dessus de la carte du monde (0) et sous
    les menus (9999). La carte s'y pose par translate + scale, depuis son coin
    haut gauche ; le petit zoom d'arrivée s'applique à la vue, depuis son centre. */
-.vue-carte-region { position: absolute; inset: 0; z-index: 5; overflow: hidden; background: #1a140c;
+.vue-carte-region { position: absolute; inset: 0; z-index: 5; overflow: hidden; background-color: #1a140c;
   touch-action: none; transform-origin: 50% 50%; cursor: grab; user-select: none; -webkit-user-select: none; }
 .vue-carte-region:active { cursor: grabbing; }
 .vue-carte-region.outil-pinceau, .vue-carte-region.outil-gomme { cursor: crosshair; }
 .carte-region { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+/* v285 : le titre au-dessus du parchemin — hors du calque que les brûlures
+   découpent, posé sur un calque jumeau (même taille, même cadrage). */
+.carte-region-dessus { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
 .carte-region-image { display: block; width: 100%; height: 100%; pointer-events: none; -webkit-user-drag: none; }
 /* Les nuages (v279) : la toile est recalée à chaque image sur la partie visible de la carte. */
 .carte-region-nuages { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
@@ -6118,3 +6122,16 @@ textarea.input-texte-parchemin {
     padding: 9px 22px; color: #fff; background: linear-gradient(180deg, #1f8a4a, #0f4021); border: 2px solid #9fe3a6; border-radius: 8px;
 }
 .boite-grille-rp button:disabled { opacity: 0.4; cursor: default; }
+
+/* =========================================================================
+   v285 — LA TABLE EN BOIS sous toutes les cartes (monde et régions) : une
+   seule image (images/table_bois.jpg, fabriquée par
+   tests_monstres/_fabriquer_table_bois.mjs), qui couvre l'écran quel qu'il
+   soit, centrée ; le brun sombre d'avant en attendant qu'elle arrive.
+   ========================================================================= */
+#conteneur-carte-fond, .vue-carte-region {
+  background-image: url('images/table_bois.jpg?v=1');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}

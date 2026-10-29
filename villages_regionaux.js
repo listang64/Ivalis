@@ -139,9 +139,9 @@ function calques() {
         couchePastilles = document.createElement("div");
         couchePastilles.id = "carte-region-pastilles";
         couchePastilles.className = "carte-region-pastilles";
-        // Au-dessus des nuages (on place les villages à vue), sous le titre.
-        const titre = $("carte-region-titre");
-        carte.insertBefore(couchePastilles, titre || null);
+        // Au-dessus des nuages (on place les villages à vue) ; le titre est
+        // au-dessus encore, sur son propre calque (v285).
+        carte.appendChild(couchePastilles);
     }
     return { couche, couchePastilles };
 }
