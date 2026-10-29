@@ -257,7 +257,7 @@ function construireVue() {
     vue.className = "vue-carte-region";
     vue.style.display = "none";
     vue.innerHTML = `
-        <div id="carte-region-table" class="table-bois"></div>
+        <div id="carte-region-table" class="sol-carte"></div>
         <div class="table-ombre"></div>
         <div id="carte-region" class="carte-region">
           <img id="carte-region-image" class="carte-region-image" alt="" draggable="false">
@@ -301,8 +301,8 @@ function bornerPan() {
 }
 function poserCarte() {
     // La carte, son calque jumeau du dessus (le titre, que les brûlures du
-    // parchemin ne découpent pas — v285) et celui du dessous (la table en
-    // bois, qui suit la carte — v286) : même taille, même cadrage.
+    // parchemin ne découpent pas — v285) et celui du dessous (le sol, qui suit
+    // la carte — v286 ; du sable, v288) : même taille, même cadrage.
     [$("carte-region"), $("carte-region-dessus"), $("carte-region-table")].forEach(carte => {
         if (!carte) return;
         carte.style.width = etat.largeur + "px";
@@ -589,7 +589,7 @@ function plongeeMonde(centre) {
 }
 const animer = (el, images, duree, easing) => (el && typeof el.animate === "function")
     ? el.animate(images, { duration: duree, easing, fill: "forwards" }) : null;
-// La carte du monde, et la table en bois avec elle (v286) : la même animation,
+// La carte du monde, et le sol (le sable) avec elle (v286) : la même animation,
 // annulée ensemble.
 function animerMonde(images, duree, easing) {
     const a = animer($("carte-fond-jeu"), images, duree, easing), b = animer($("table-monde"), images, duree, easing);

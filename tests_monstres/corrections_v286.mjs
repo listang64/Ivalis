@@ -418,9 +418,10 @@ await section(async () => {
     const triees = rangees.slice().sort((a, b) => a - b), mediane = triees[H >> 1];
     let noirs = 0; for (let k = 0; k < W * H * 4; k += 16) if (0.3 * d[k] + 0.59 * d[k + 1] + 0.11 * d[k + 2] < 8) noirs++;
     ok({ W, H, raccordX: bordX / voisinX, raccordY: bordY / voisinY, rangeeMin: triees[0] / mediane, noirs: noirs / (W * H / 4) }); };
-    i.onerror = () => ok(null); i.src = "images/table_bois.jpg?v=" + Date.now(); }));
-  verifier("le carreau de bois se raccorde sans couture (droite ↔ gauche, bas ↔ haut)", !!img && img.raccordX < 1.35 && img.raccordY < 1.35, JSON.stringify(img && [img.raccordX.toFixed(2), img.raccordY.toFixed(2)]));
-  verifier("les joints : irréguliers, pas noirs (aucune rangée sombre d'un bout à l'autre, pas de noir)", !!img && img.rangeeMin > 0.62 && img.noirs < 0.0005, JSON.stringify(img && [img.rangeeMin.toFixed(2), img.noirs.toFixed(5)]));
+    i.onerror = () => ok(null); i.src = "images/sable.jpg?v=" + Date.now(); }));
+  // (v288 : le bois a laissé place au sable — ses joints avec lui ; le sol se raccorde toujours.)
+  verifier("le carreau du sol se raccorde sans couture (droite ↔ gauche, bas ↔ haut)", !!img && img.raccordX < 1.35 && img.raccordY < 1.35, JSON.stringify(img && [img.raccordX.toFixed(2), img.raccordY.toFixed(2)]));
+  verifier("…sans rangée sombre d'un bout à l'autre, sans noir", !!img && img.rangeeMin > 0.62 && img.noirs < 0.0005, JSON.stringify(img && [img.rangeeMin.toFixed(2), img.noirs.toFixed(5)]));
   // Carte régionale : la table est un calque jumeau, mêmes transform, taille.
   await attendreQue(async () => await p.evaluate(() => window.carteRegionaleOuverte() === 2 && !window.TRAVERSEE_EN_COURS), 8000);
   await p.waitForTimeout(600);
@@ -428,7 +429,7 @@ await section(async () => {
     return t ? { egal: a.style.transform === t.style.transform && a.style.width === t.style.width && a.style.height === t.style.height, transform: t.style.transform,
                  fond: getComputedStyle(t, "::before").backgroundImage, avant: !!(t.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING) } : null; });
   const j0 = await jumeaux();
-  verifier("carte régionale : la table est un calque sous la carte, au même cadrage", !!j0 && j0.egal && j0.avant && /table_bois\.jpg/.test(j0.fond), JSON.stringify(j0));
+  verifier("carte régionale : la table est un calque sous la carte, au même cadrage", !!j0 && j0.egal && j0.avant && /sable\.jpg/.test(j0.fond), JSON.stringify(j0));
   // Le bois, avant et après un glissé de la carte (la carte et son titre
   // masqués le temps de la mesure, pour voir la table dessous) : il a suivi.
   await p.evaluate(() => { window.zoomerCarteRegion(1.5); ["carte-region", "carte-region-dessus"].forEach(id => document.getElementById(id).style.visibility = "hidden"); });
@@ -458,7 +459,7 @@ await section(async () => {
   await p.waitForTimeout(200);
   const monde = await p.evaluate(() => { const a = document.getElementById("carte-fond-jeu"), t = document.getElementById("table-monde");
     return t ? { egal: getComputedStyle(a).transform === getComputedStyle(t).transform, fond: getComputedStyle(t, "::before").backgroundImage } : null; });
-  verifier("carte du monde : la table suit la carte", !!monde && monde.egal && /table_bois\.jpg/.test(monde.fond), JSON.stringify(monde));
+  verifier("carte du monde : la table suit la carte", !!monde && monde.egal && /sable\.jpg/.test(monde.fond), JSON.stringify(monde));
   await p.evaluate(() => { window.__plongee = window.ouvrirCarteRegionale(2); });
   await p.waitForTimeout(400);
   const plonge = await p.evaluate(() => { const a = getComputedStyle(document.getElementById("carte-fond-jeu")).transform, t = getComputedStyle(document.getElementById("table-monde")).transform; return { a, t }; });

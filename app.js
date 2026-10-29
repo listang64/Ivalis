@@ -5837,7 +5837,7 @@ function tailleEcranCarte() {
 function poserCarteMonde() {
   const carte = document.getElementById("carte-fond-jeu");
   if (carte) carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
-  // La table en bois suit la carte (v286).
+  // Le sol (le sable, v288) suit la carte (v286).
   const table = document.getElementById("table-monde");
   if (table && carte) table.style.transform = carte.style.transform;
   const conteneur = document.getElementById("conteneur-carte-fond");

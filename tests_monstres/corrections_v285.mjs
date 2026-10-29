@@ -332,12 +332,13 @@ await section(async () => {
 titre("3. LA TABLE EN BOIS SOUS TOUTES LES CARTES");
 // =========================================================================
 await section(async () => {
-  const img = await p.evaluate(() => new Promise(ok => { const i = new Image(); i.onload = () => ok({ l: i.naturalWidth, h: i.naturalHeight }); i.onerror = () => ok(null); i.src = "images/table_bois.jpg"; }));
-  verifier("l'image de la table est là (images/table_bois.jpg, grande)", !!img && img.l >= 2000 && img.h >= 1200, JSON.stringify(img));
+  const img = await p.evaluate(() => new Promise(ok => { const i = new Image(); i.onload = () => ok({ l: i.naturalWidth, h: i.naturalHeight }); i.onerror = () => ok(null); i.src = "images/sable.jpg"; }));
+  // (v288 : la table en bois a laissé place au sable, images/sable.jpg.)
+  verifier("l'image du sol est là (v288 : images/sable.jpg, grande)", !!img && img.l >= 1500 && img.h >= 1500, JSON.stringify(img));
   // v286 : la table n'est plus le fond fixe des deux vues, mais un calque lié à
   // chaque carte (#table-monde, #carte-region-table), en mosaïque (corrections_v286).
   const fonds = await p.evaluate(() => ["table-monde", "carte-region-table"].map(id => { const el = document.getElementById(id); const st = el && getComputedStyle(el, "::before"); return { id, img: st ? st.backgroundImage : "", rep: st ? st.backgroundRepeat : "" }; }));
-  verifier("le même bois sous la carte du monde et sous les cartes régionales", fonds.every(f => /table_bois\.jpg/.test(f.img)) && fonds[0].img === fonds[1].img, JSON.stringify(fonds.map(f => f.img)));
+  verifier("le même sol sous la carte du monde et sous les cartes régionales", fonds.every(f => /sable\.jpg/.test(f.img)) && fonds[0].img === fonds[1].img, JSON.stringify(fonds.map(f => f.img)));
   verifier("…(v286) en mosaïque, liée à la carte : elle couvre tout écran", fonds.every(f => f.rep === "repeat"), JSON.stringify(fonds));
   // Un écran très large : la carte du monde ne le couvre pas, la table se voit sur les côtés.
   await p.evaluate(() => window.fermerCarteRegionale && window.fermerCarteRegionale());

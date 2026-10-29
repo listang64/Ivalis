@@ -6151,19 +6151,28 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 .boite-grille-rp button:disabled { opacity: 0.4; cursor: default; }
 
 /* =========================================================================
-   v285 — LA TABLE EN BOIS sous toutes les cartes (monde et régions).
-   v286 — Nico : « la table doit être liée à l'image : si on déplace l'image,
-   la table doit bouger avec, et pareil pour le zoom ». La table est un calque
-   jumeau de la carte (#table-monde, #carte-region-table) : même coin, même
-   transform (glisse, zoom, plongée) ; elle déborde de deux cartes de chaque
-   côté. Son image (images/table_bois.jpg, un carreau répétable fabriqué par
-   tests_monstres/_fabriquer_table_bois.mjs) se pose en mosaïque, un carreau
-   de la hauteur de la carte. Par-dessus, une ombre douce, fixe, vers les
-   bords de l'écran. Le brun d'avant reste en fond, le temps qu'elle arrive.
+   LE SOL SOUS LES CARTES (v285 : une table en bois ; v288 : du SABLE).
+   v288 — Nico : « plutôt que la table en bois, fais-moi du sable réaliste et
+   irrégulier, comme si les cartes étaient posées à même le sable ».
+   v286 : le sol est lié à la carte (« si on déplace l'image, la table doit
+   bouger avec, et pareil pour le zoom ») : un calque jumeau de la carte
+   (#table-monde, #carte-region-table — les noms d'avant), même coin, même
+   transform (glisse, zoom, plongée), qui déborde de deux cartes de chaque
+   côté. Son image (images/sable.jpg, un carreau carré répétable fabriqué par
+   tests_monstres/_fabriquer_sable.mjs) se pose en mosaïque, un carreau de la
+   hauteur de la carte. Sous le parchemin, son ombre douce sur le sable (le
+   calque a la taille de la carte) ; par-dessus tout, une ombre légère, fixe,
+   vers les bords de l'écran. Le brun d'avant reste en fond, le temps que
+   l'image arrive.
    ========================================================================= */
-.table-bois { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
-.table-bois::before { content: ""; position: absolute; left: -200%; top: -200%; width: 500%; height: 500%;
-  background-image: url('images/table_bois.jpg?v=2'); background-size: auto 20%; background-repeat: repeat; }
+.sol-carte { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
+.sol-carte::before { content: ""; position: absolute; left: -200%; top: -200%; width: 500%; height: 500%;
+  background-image: url('images/sable.jpg?v=1'); background-size: auto 20%; background-repeat: repeat; }
+/* L'ombre du parchemin posé sur le sable : un peu en retrait de son bord
+   déchiré, portée vers le bas à droite (la lumière du sable vient du haut à
+   gauche). En pixels de la carte : elle grandit et rétrécit avec elle. */
+.sol-carte::after { content: ""; position: absolute; inset: 0.4%;
+  box-shadow: 12px 24px 80px 16px rgba(60, 38, 12, 0.55), 4px 8px 18px 3px rgba(50, 30, 10, 0.5); }
 #table-monde { width: 3840px; height: 2160px; }
 .table-ombre { position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(ellipse 75% 70% at 50% 45%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.42) 100%); }
+  background: radial-gradient(ellipse 80% 75% at 50% 45%, rgba(40, 25, 5, 0) 45%, rgba(40, 25, 5, 0.3) 100%); }

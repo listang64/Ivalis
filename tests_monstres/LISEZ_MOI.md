@@ -9211,3 +9211,45 @@ Tests mis à jour :
 - corrections_v270 : piste à 1,7.
 - corrections_v271 : les langues de fumée, réduites, ne dépassent plus une
   fois et demie le rayon.
+
+## v288 — Du sable sous les cartes
+
+Nico : « pour le fond derrière les maps, plutôt que la table en bois, fais-moi
+du sable réaliste et irrégulier, comme si les cartes étaient posées à même le
+sable ».
+
+images/sable.jpg (1600 × 1600, 530 Ko) remplace images/table_bois.jpg. Il est
+fabriqué une fois par tests_monstres/_fabriquer_sable.mjs (graine 5, hors de
+la suite), qui remplace le générateur du bois. C'est un carreau carré
+répétable, sans couture : ses bruits sont périodiques dans les deux sens et
+ses cailloux passent de l'autre côté du bord. On y voit :
+- de larges ondulations ;
+- des rides de vent dissymétriques (douces au vent, raides dessous), qui se
+  tordent, s'écartent, bifurquent et s'effacent par plaques ;
+- un second réseau de rides, plus faible, et des micro-rides ;
+- des grains de toutes couleurs (sombres, quartz, roux), plus ou moins triés
+  par le vent ;
+- quelques cailloux à moitié enfouis, sous une lumière rasante venue du haut
+  à gauche.
+
+Le sol reste le calque jumeau de chaque carte (v286 : #table-monde,
+#carte-region-table, qui gardent leur nom). Sa classe devient .sol-carte, et
+il se pose toujours en mosaïque, un carreau de la hauteur de la carte. Son
+::after porte l'ombre du parchemin sur le sable : un peu en retrait du bord
+déchiré, portée vers le bas à droite, en pixels de la carte (elle zoome avec
+elle). L'ombre fixe vers les bords de l'écran est plus douce et tire sur le
+brun.
+
+corrections_v288.mjs (dans la suite) vérifie :
+- l'image : carrée et assez grande ; un beige doré clair, pas un brun de bois ;
+  des grains ; du relief irrégulier (des plaques ridées, d'autres lisses) ; un
+  raccord sans couture ; la table en bois a disparu ;
+- sous les deux cartes, le même sable en mosaïque, avec l'ombre du parchemin ;
+- sur un écran très large, le sable plus sombre au ras de la carte du monde
+  que plus loin ;
+- les versions.
+
+Il échoue sur l'ancien code (11 échecs).
+
+Tests mis à jour : corrections_v285 et v286 (le sol est le sable ; son
+raccord et l'absence de noir restent vérifiés).
