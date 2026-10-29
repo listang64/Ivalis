@@ -32,10 +32,12 @@
 //       · la grille : une boîte pour les joueurs en mode DEV, la main à Nico
 //         puis à Ben s'ils sont là (« 4. Tous ceux en mode dev la voient,
 //         priorité à Nico et Ben ») ; elle les attend, sans minuteur (v279) ;
-//       · MIA_PEINTURE_MURS, _INACCESSIBLE, _DIFFICILE : la carte avec sa
-//         grille numérotée, et les numéros de ce qu'elles y voient ;
-//       · MIA_SPAWN : la même image et les 6 derniers messages → les repères
-//         des héros et des ennemis, les cases des renforts ;
+//       · MIA_TERRAIN_COMBAT (v287) : la carte nue → des cadres autour des
+//         murs, des zones infranchissables, du terrain difficile ; le jeu les
+//         passe sur la grille (avec ses garde-fous) ;
+//       · MIA_SPAWN : la carte aux cases teintées et les 6 derniers messages →
+//         les repères des héros et des ennemis, les entrées des renforts (en
+//         coordonnées sur l'image) ;
 //       · le déploiement : les héros, puis la rencontre (son butin se prépare
 //         dès lors, comme dans l'arène).
 //
@@ -517,7 +519,12 @@ async function dessinerLaCarte() {
 const PROMPT_ENNEMIS = `Tu es MIA_ENNEMIS, l'IA qui dresse la liste des ennemis d'un combat tactique (Antique Fantastique). Un combat vient d'éclater dans le récit. Lis les messages et dis QUI affronte les héros au moment où le combat commence.
 
 - "nombre" : combien d'adversaires sont engagés contre les héros au début du combat (au moins 1). Une meute, une bande : compte-les si le récit le dit, sinon estime.
-- "ennemis" : chacun d'eux (au plus 6), avec un nom et une description physique précise pour dessiner son visage (espèce ou peuple, carrure, visage, coiffe, tenue, arme, signes distinctifs).
+- "ennemis" : chacun d'eux (au plus 6), avec un nom et une description physique précise pour dessiner son visage (son peuple d'abord, puis carrure, visage, coiffe, tenue, arme, signes distinctifs).
+
+LE MONDE (v287) — tu reçois l'univers, les peuples et la région :
+- Ce sont des gens ou des créatures de CE monde. Leur peuple vient du récit ; sinon, choisis-le parmi les peuples d'Elyria selon la région (ses peuples abondants d'abord, ceux qui y sont traqués ou absents rarement) et selon leur rôle dans l'histoire (des esclavagistes d'Arcaï sont humains, des gardes de Volcanisse ankylars ou humains de la Cendre…). Une bête ou un monstre : de la faune de la région ou de la mythologie.
+- Tout est ANTIQUE : tenues, armes, armures de l'Antiquité, jamais médiévales.
+- LE NOM DIT QUI ILS SONT DANS LE RÉCIT : le nom que le récit leur donne ; sinon leur bande, leur peuple, leur métier ou leur fonction dans l'histoire (« Contrebandier gob », « Mercenaire de la Cendre », « Garde du Concordia »), ou un vrai nom propre de leur peuple avec un surnom (« Draxos le Balafré »). Jamais un nom de bestiaire générique sans lien avec le récit (« Ombre sanglante », « Brute », « Guerrier noir »).
 - Si l'un d'eux est un des PNJ NOMMÉS listés, recopie son nom EXACT dans "pnj" (sinon laisse vide) et reprends son apparence.
 - "renforts" : 2 à 4 idées de renforts plausibles pour CET affrontement (des compagnons de la même bande, des gardes appelés, des bêtes du lieu…), chacune avec un nom et une description physique.
 
@@ -530,7 +537,10 @@ RÈGLES :
 - S'il y a plus de créatures au départ que d'ennemis dans le récit, invente des compagnons crédibles.
 - Les RENFORTS viennent des idées de renforts (ou de ton imagination) : plausibles dans ce lieu et pour cet affrontement.
 - Le rôle de combat oriente l'arme et l'allure (archer, mage, brute au contact, soigneur…) ; la stature donne la taille et la puissance (Petit = mineur, Normal = combattant ordinaire, Boss = légendaire).
+- LE MONDE (v287) : tu reçois l'univers, les peuples d'Elyria et la région. Les compagnons et les renforts sont du MÊME groupe que les ennemis du récit (même bande, même cause, même peuple le plus souvent) ; une bête vient de la faune de la région ou de la mythologie. Tout est ANTIQUE (tenues, armes, armures de l'Antiquité, jamais médiévales).
+- LE NOM DIT QUI IL EST DANS LE RÉCIT : celui que le récit lui donne ; sinon sa bande, son peuple, son métier ou sa fonction dans l'histoire (« Contrebandier gob », « Archer de la Cendre », « Esclavagiste d'Arcaï »), ou un nom propre de son peuple avec un surnom (« Draxos le Balafré »). Le leader porte un titre de chef de CETTE bande (« Capitaine des contrebandiers »). Jamais un nom de bestiaire générique sans lien avec le récit (« Ombre sanglante », « Brute », « Lame noire »).
 - Tous les noms sont différents : 1 à 4 mots, en français, sans chiffre.
+- Chaque description physique commence par le peuple ou l'espèce, et décrit une tenue et des armes antiques.
 - "visuel" : une clé courte, commune aux créatures qui se RESSEMBLENT (trois loups gris identiques partagent la même clé) ; au plus 5 visuels différents. Chaque visuel a une description physique précise de la tête et du haut du corps (elle servira à sculpter un médaillon).
 
 Réponds UNIQUEMENT en JSON : {"creatures": [{"numero": 1, "nom": "...", "visuel": "loup", "pnj": ""}], "visuels": [{"cle": "loup", "description_physique": "..."}]}`;
@@ -547,6 +557,9 @@ async function composerLesEnnemis() {
     const partie = await lirePartie();
     const [messages, lieu] = await Promise.all([lireMessages(R.messagesLieu), contexteDuLieu(partie)]);
     const pnjs = Object.values((lieu.env && lieu.env.pnjsPresents) || {}).filter(x => x && x.Nom_PNJ);
+    // L'univers, les peuples, la région du groupe (v287).
+    const region = Number(partie.Position_Groupe && partie.Position_Groupe.Region) || 0;
+    const monde = typeof window.contexteEnnemisIvalis === "function" ? window.contexteEnnemisIvalis(region) : "";
     const listePnj = pnjs.length ? pnjs.map(x => `- ${x.Nom_PNJ} (${x.Race || "?"}, ${x.Occupation || "?"}) : ${x.Description_Physique || ""}`).join("\n") : "(aucun)";
     const c = etat();
 
@@ -554,7 +567,7 @@ async function composerLesEnnemis() {
     let analyse = null;
     try {
         analyse = await demanderJSON({ systeme: PROMPT_ENNEMIS, temperature: 0.6,
-            texte: `--- CE QUI A DÉCLENCHÉ LE COMBAT ---\n${c.Raison || ""} ${c.Adversaires ? "(adversaires : " + c.Adversaires + ")" : ""}\n\n--- LES PNJ NOMMÉS PRÉSENTS ---\n${listePnj}\n\n--- LES ${R.messagesLieu} DERNIERS MESSAGES ---\n${messages}` });
+            texte: `--- LE MONDE ---\n${monde}\n\n--- CE QUI A DÉCLENCHÉ LE COMBAT ---\n${c.Raison || ""} ${c.Adversaires ? "(adversaires : " + c.Adversaires + ")" : ""}\n\n--- LES PNJ NOMMÉS PRÉSENTS ---\n${listePnj}\n\n--- LES ${R.messagesLieu} DERNIERS MESSAGES ---\n${messages}` });
     } catch (e) { console.error("[MIA_ENNEMIS] Analyse impossible :", e); }
     const apparition = Math.max(1, Math.min(4, Math.round(Number(analyse && analyse.nombre) || 1)));
 
@@ -569,7 +582,7 @@ async function composerLesEnnemis() {
         const slots = tous.map((x, i) => `${i + 1}. ${x.moment} — ${ROLES[x.m.archetype] || x.m.archetype} — stature ${x.m.palier}${x.m.leader ? " — LEADER" : ""}`).join("\n");
         try {
             habits = await demanderJSON({ systeme: PROMPT_HABILLAGE, temperature: 0.8,
-                texte: `--- LES ENNEMIS DU RÉCIT ---\n${JSON.stringify((analyse && analyse.ennemis) || [])}\n\n--- LES IDÉES DE RENFORTS ---\n${JSON.stringify((analyse && analyse.renforts) || [])}\n\n--- LES PNJ NOMMÉS PRÉSENTS ---\n${listePnj}\n\n--- LA COMPOSITION TIRÉE (${tous.length} créatures) ---\n${slots}` });
+                texte: `--- LE MONDE ---\n${monde}\n\n--- CE QUI A DÉCLENCHÉ LE COMBAT ---\n${c.Raison || ""} ${c.Adversaires ? "(adversaires : " + c.Adversaires + ")" : ""}\n\n--- LES ENNEMIS DU RÉCIT ---\n${JSON.stringify((analyse && analyse.ennemis) || [])}\n\n--- LES IDÉES DE RENFORTS ---\n${JSON.stringify((analyse && analyse.renforts) || [])}\n\n--- LES PNJ NOMMÉS PRÉSENTS ---\n${listePnj}\n\n--- LA COMPOSITION TIRÉE (${tous.length} créatures) ---\n${slots}` });
         } catch (e) { console.error("[MIA_ENNEMIS] Habillage impossible :", e); }
     }
     const { creatures, visuels } = habiller(tous, habits, analyse, pnjs);
@@ -674,7 +687,7 @@ window.validerGrilleCombatRP = async function(taille, options) {
     return !!ok;
 };
 
-// --- 4.7 LA GRILLE NUMÉROTÉE ET LES TROIS PEINTURES -------------------------
+// --- 4.7 LA GRILLE ET LES ZONES DU TERRAIN ----------------------------------
 // La géométrie du plateau (Plateau.js) : hexagones à bord plat, la case (0,0)
 // au centre de l'image. Les cases dont le centre tombe dans l'image, numérotées
 // de gauche à droite, demi-rangée par demi-rangée.
@@ -708,129 +721,187 @@ function chargerImage(url) {
 }
 const urlAffichee = (url) => typeof window.redimensionnerImageCloudinary === "function" ? window.redimensionnerImageCloudinary(url, 2200) : url;
 
-// L'image envoyée aux MIA : la carte, la grille, un petit numéro par case ;
-// les cases déjà classées teintées (noir : mur, rouge : infranchissable,
-// violet : difficile).
-window.imageGrilleNumerotee = function(img, cases, taille, deja) {
+// LES ZONES DU TERRAIN (v287). Nico : « l'IA qui génère les zones (murs,
+// terrain difficile) a fait n'importe quoi, fais un truc mieux ficelé ».
+// Avant, trois IA lisaient des centaines de petits numéros sur la grille — une
+// vision artificielle s'y perd. Maintenant UNE IA (MIA_TERRAIN_COMBAT) regarde
+// la carte nue et ENCADRE ce qu'elle voit (des rectangles, ce qu'elle sait
+// faire), et c'est le jeu qui passe ces cadres sur la grille : une case est
+// prise quand la moitié d'elle tombe dedans. Des garde-fous derrière : un cadre
+// démesuré écarté, des proportions plafonnées, et les deux camps toujours
+// reliés par un chemin praticable.
+const PROMPT_TERRAIN = `Tu es MIA_TERRAIN_COMBAT. Voici une carte de bataille vue de dessus (sans grille), et la description du lieu. Repère ce qui compte pour un combat tactique, et ENCADRE chaque élément d'un rectangle SERRÉ.
+
+Trois sortes d'éléments :
+- "mur" : ce qui BLOQUE la vue ET le passage — murs, cloisons, colonnes, piliers, gros rochers, troncs épais, falaises, bâtiments, statues massives, meubles hauts.
+- "infranchissable" : ce où l'on ne peut PAS se tenir mais qui laisse VOIR au travers — eau profonde, rivière, bassin profond, gouffre, fosse, lave, précipice.
+- "difficile" : un sol où l'on PEUT marcher, mais lentement — gravats, éboulis, caisses et tonneaux, mobilier renversé, boue, broussailles, ronces, eau peu profonde, escaliers.
+
+RÈGLES :
+- Un rectangle par élément, au plus près de ses bords. Un mur long, courbe ou en biais : PLUSIEURS petits rectangles qui le suivent — jamais un grand rectangle qui engloberait le sol autour.
+- Le sol libre (dallage, herbe, sable, plancher, tapis), les ombres, les petits objets : rien.
+- Les passages restent libres : portes, brèches, ponts, gués, escaliers praticables.
+- "box_2d" : [ymin, xmin, ymax, xmax], des entiers de 0 à 1000 (0,0 = coin haut gauche de l'image, 1000,1000 = coin bas droit).
+- Au plus 40 éléments. La plus grande partie de la carte doit rester praticable.
+
+Réponds UNIQUEMENT en JSON : {"elements": [{"sorte": "mur", "nom": "colonne du portique", "box_2d": [120, 80, 180, 130]}]}`;
+
+const PROMPT_SPAWN = `Tu es MIA_SPAWN. Voici une carte de bataille vue de dessus ; ses cases teintées sont des murs (noir), des zones infranchissables (rouge) ou du terrain difficile (violet). Voici aussi les derniers messages du récit.
+Place, en coordonnées sur l'image ([y, x], des entiers de 0 à 1000 ; 0,0 = coin haut gauche) :
+- "heros" : là où apparaissent les héros ;
+- "ennemis" : là où apparaissent les premiers ennemis ;
+- "renforts" : 2 à 8 points par où entrent les renforts ennemis — portes, fenêtres, passages, ouvertures ; en terrain ouvert, des endroits libres sur les bords ou dans les coins de la carte.
+Inspire-toi du récit (une embuscade rapproche les ennemis, une charge les met face à face, des héros acculés contre un mur…). Jamais sur une case noire ou rouge ; héros et ennemis séparés d'au moins un sixième de la carte.
+Réponds UNIQUEMENT en JSON : {"heros": [500, 200], "ennemis": [480, 780], "renforts": [[60, 900], [950, 820]], "raison": "une phrase"}`;
+
+const SORTES = { mur: "murs", infranchissable: "inaccessibles", difficile: "difficiles" };
+const PLAFONDS = { bloquees: 0.45, difficiles: 0.4 };   // en part des cases de la carte
+// Les cadres de l'IA → leurs cases (pure : les bancs l'appellent).
+// `elements` : [{ sorte, box_2d: [ymin, xmin, ymax, xmax] (0…1000) }].
+window.zonesDepuisCadres = function(elements, cases, L, H, taille) {
+    const s = Number(taille) || 60;
+    const valides = (Array.isArray(elements) ? elements : []).map(e => {
+        const b = Array.isArray(e && e.box_2d) ? e.box_2d.map(Number) : null;
+        const sorte = SORTES[String(e && e.sorte || "").toLowerCase().trim()];
+        if (!sorte || !b || b.length !== 4 || b.some(v => !Number.isFinite(v))) return null;
+        const y0 = Math.max(0, Math.min(b[0], b[2])) / 1000 * H, y1 = Math.min(1000, Math.max(b[0], b[2])) / 1000 * H;
+        const x0 = Math.max(0, Math.min(b[1], b[3])) / 1000 * L, x1 = Math.min(1000, Math.max(b[1], b[3])) / 1000 * L;
+        const aire = (x1 - x0) * (y1 - y0) / (L * H);
+        // Un cadre vide, ou qui couvre le tiers de la carte : une erreur.
+        if (aire <= 0 || aire > 0.3) return null;
+        return { sorte, x0, x1, y0, y1, aire, nom: String((e && e.nom) || "") };
+    }).filter(Boolean);
+    // Sept points par case : son centre, et six à mi-chemin de ses coins.
+    const points = (c) => [[c.x, c.y], ...Array.from({ length: 6 }, (_, i) => [c.x + 0.55 * s * Math.cos(Math.PI / 3 * i), c.y + 0.55 * s * Math.sin(Math.PI / 3 * i)])];
+    const rasteriser = (liste) => {
+        const z = { murs: [], inaccessibles: [], difficiles: [] };
+        cases.forEach(c => {
+            const pts = points(c);
+            const part = (sorte) => pts.filter(([x, y]) => liste.some(e => e.sorte === sorte && x >= e.x0 && x <= e.x1 && y >= e.y0 && y <= e.y1)).length / pts.length;
+            if (part("murs") >= 0.5) z.murs.push(c.cle);
+            else if (part("inaccessibles") >= 0.5) z.inaccessibles.push(c.cle);
+            else if (part("difficiles") >= 0.45) z.difficiles.push(c.cle);
+        });
+        return z;
+    };
+    // TROP DE CARTE PRISE : on retire les plus grands cadres de la sorte en
+    // excès, jusqu'à repasser sous le plafond.
+    let liste = valides.slice(), z = rasteriser(liste), garde = 0;
+    while (garde++ < 60) {
+        const bloquees = (z.murs.length + z.inaccessibles.length) / (cases.length || 1), lentes = z.difficiles.length / (cases.length || 1);
+        const enExces = bloquees > PLAFONDS.bloquees ? ["murs", "inaccessibles"] : lentes > PLAFONDS.difficiles ? ["difficiles"] : null;
+        if (!enExces) break;
+        const grand = liste.filter(e => enExces.includes(e.sorte)).sort((a, b) => b.aire - a.aire)[0];
+        if (!grand) break;
+        liste = liste.filter(e => e !== grand);
+        z = rasteriser(liste);
+    }
+    return { ...z, gardes: liste.length, ecartes: valides.length - liste.length, refuses: (Array.isArray(elements) ? elements.length : 0) - valides.length };
+};
+
+// L'image envoyée à MIA_SPAWN : la carte, ses cases classées teintées (sans numéros).
+function imageZones(img, cases, taille, deja) {
     const L = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
     const toile = document.createElement("canvas");
     toile.width = L; toile.height = H;
     const ctx = toile.getContext("2d");
     ctx.drawImage(img, 0, 0, L, H);
     const s = Number(taille) || 60;
-    const d = deja || {};
-    const teinte = (cle) => d.murs && d.murs.has(cle) ? "rgba(0,0,0,0.62)"
-        : d.inaccessibles && d.inaccessibles.has(cle) ? "rgba(200,20,20,0.5)"
-        : d.difficiles && d.difficiles.has(cle) ? "rgba(140,60,190,0.5)" : null;
     cases.forEach(c => {
+        const t = deja.murs.has(c.cle) ? "rgba(0,0,0,0.62)" : deja.inaccessibles.has(c.cle) ? "rgba(200,20,20,0.5)" : deja.difficiles.has(c.cle) ? "rgba(140,60,190,0.5)" : null;
+        if (!t) return;
         ctx.beginPath();
-        for (let i = 0; i < 6; i++) {
-            const a = Math.PI / 3 * i;
-            const hx = c.x + s * Math.cos(a), hy = c.y + s * Math.sin(a);
-            if (i === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
-        }
-        ctx.closePath();
-        const t = teinte(c.cle);
-        if (t) { ctx.fillStyle = t; ctx.fill(); }
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = "rgba(255,255,255,0.55)";
-        ctx.stroke();
-    });
-    // Les numéros : petits, pour ne pas masquer le terrain, mais lisibles.
-    const police = Math.max(9, Math.round(s * 0.42));
-    ctx.font = `bold ${police}px sans-serif`;
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.lineWidth = Math.max(2, police / 4);
-    ctx.lineJoin = "round"; ctx.miterLimit = 2;
-    cases.forEach(c => {
-        ctx.strokeStyle = "rgba(0,0,0,0.9)";
-        ctx.strokeText(String(c.n), c.x, c.y);
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(String(c.n), c.x, c.y);
+        for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i; const hx = c.x + s * Math.cos(a), hy = c.y + s * Math.sin(a); if (i === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy); }
+        ctx.closePath(); ctx.fillStyle = t; ctx.fill();
     });
     return toile.toDataURL("image/jpeg", 0.85).split(",")[1];
-};
+}
+function imageNue(img) {
+    const L = img.naturalWidth || img.width, H = img.naturalHeight || img.height, k = Math.min(1, 1536 / Math.max(L, H));
+    const toile = document.createElement("canvas");
+    toile.width = Math.round(L * k); toile.height = Math.round(H * k);
+    toile.getContext("2d").drawImage(img, 0, 0, toile.width, toile.height);
+    return toile.toDataURL("image/jpeg", 0.88).split(",")[1];
+}
 
-const PEINTURES = [
-    { cle: "murs", champ: "Tuiles_Murs", appliquer: "appliquerMurs", systeme: `Tu es MIA_PEINTURE_MURS. Voici une carte de bataille vue de dessus, couverte d'une grille d'hexagones NUMÉROTÉS.
-Donne les numéros des hexagones qui sont des MURS : tout ce qui BLOQUE LA LIGNE DE VUE ET DE TIR — murs, cloisons, colonnes, piliers, gros rochers, troncs épais, falaises, bâtiments, statues massives, meubles hauts.
-Un hexagone compte s'il est couvert en majeure partie par l'obstacle. Ne compte ni le sol, ni les ombres, ni les tapis, ni les petits objets.
-Les hexagones teintés sont déjà classés : ne les renvoie pas.
-Réponds UNIQUEMENT en JSON : {"cases": [12, 13, 47]} (une liste vide s'il n'y en a aucun).` },
-    { cle: "inaccessibles", champ: "Tuiles_Supprimees", appliquer: "appliquerTuilesSupprimees", systeme: `Tu es MIA_PEINTURE_INACCESSIBLE. Voici une carte de bataille vue de dessus, couverte d'une grille d'hexagones NUMÉROTÉS.
-Donne les numéros des hexagones où l'on ne peut PAS se tenir mais qui NE bloquent PAS la vue : eau profonde, rivière, lac, gouffre, fosse, vide, précipice, lave, marécage profond. Ces hexagones seront retirés de la grille.
-Ne compte pas les murs ni les obstacles qui cachent la vue. Les hexagones teintés sont déjà classés : ne les renvoie pas.
-Réponds UNIQUEMENT en JSON : {"cases": [3, 4, 5]} (une liste vide s'il n'y en a aucun).` },
-    { cle: "difficiles", champ: "Tuiles_Difficiles", appliquer: "appliquerTerrainDifficile", systeme: `Tu es MIA_PEINTURE_DIFFICILE. Voici une carte de bataille vue de dessus, couverte d'une grille d'hexagones NUMÉROTÉS.
-Donne les numéros des hexagones de sol praticable mais DIFFICILE : gravats, éboulis, caisses et tonneaux, mobilier renversé, boue, broussailles, ronces, eau peu profonde, escaliers, sol glissant, racines.
-Pas les murs, pas les zones infranchissables. Les hexagones teintés sont déjà classés : ne les renvoie pas.
-Réponds UNIQUEMENT en JSON : {"cases": [21, 22]} (une liste vide s'il n'y en a aucun).` }
-];
-
-const PROMPT_SPAWN = `Tu es MIA_SPAWN. Voici une carte de bataille vue de dessus avec sa grille d'hexagones NUMÉROTÉS ; les hexagones teintés sont des murs (noir), des zones infranchissables (rouge) ou du terrain difficile (violet). Voici aussi les derniers messages du récit.
-Place :
-- "heros" : l'hexagone où apparaissent les héros ;
-- "ennemis" : l'hexagone où apparaissent les premiers ennemis ;
-- "renforts" : 2 à 8 hexagones par où entrent les renforts ennemis — portes, fenêtres, passages, ouvertures ; en terrain ouvert, des cases libres sur les bords ou dans les coins de la carte.
-Inspire-toi du récit pour les placer au mieux (une embuscade rapproche les ennemis, une charge les met face à face, des héros acculés contre un mur…). Ces hexagones doivent être praticables (jamais teintés en noir ou en rouge) ; héros et ennemis séparés d'au moins 4 hexagones.
-Réponds UNIQUEMENT en JSON : {"heros": 31, "ennemis": 88, "renforts": [5, 120], "raison": "une phrase"}`;
+// Les cases praticables reliées entre elles (pas de mur, pas d'infranchissable).
+function composantes(cases, bloque) {
+    const parCle = new Map(cases.map(c => [c.cle, c]));
+    const voisins = (c) => [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]].map(([dq, dr]) => parCle.get(`${c.q + dq},${c.r + dr}`)).filter(Boolean);
+    const groupe = new Map();
+    let n = 0;
+    cases.forEach(c => {
+        if (bloque(c) || groupe.has(c.cle)) return;
+        n++;
+        const pile = [c];
+        groupe.set(c.cle, n);
+        while (pile.length) { const x = pile.pop(); voisins(x).forEach(v => { if (!bloque(v) && !groupe.has(v.cle)) { groupe.set(v.cle, n); pile.push(v); } }); }
+    });
+    return groupe;
+}
 
 async function peindreLeTerrain() {
     const c = etat();
     const taille = Number(c.Grille && c.Grille.Taille) || 60;
-    // UNE CARTE ILLISIBLE ICI (ses pixels refusés) : pas de peinture, mais des
+    // UNE CARTE ILLISIBLE ICI (ses pixels refusés) : pas de zones, mais des
     // positions quand même, sur les dimensions du plateau.
     const lue = await chargerImage(urlAffichee(c.Carte));
     const img = lue && lue.naturalWidth ? lue : null;
-    if (!img) console.warn("🖌️ [Combat du récit] Carte illisible : pas de peinture, positions par défaut.");
+    if (!img) console.warn("🖌️ [Combat du récit] Carte illisible : pas de zones, positions par défaut.");
     const L = img ? img.naturalWidth : ((window.PLATEAU_VTT && window.PLATEAU_VTT.largeurLogique) || 1536);
     const H = img ? img.naturalHeight : ((window.PLATEAU_VTT && window.PLATEAU_VTT.hauteurLogique) || 1024);
     const cases = window.casesGrilleCombatRP(L, H, taille);
-    const parNumero = new Map(cases.map(x => [x.n, x]));
-    const deja = { murs: new Set(), inaccessibles: new Set(), difficiles: new Set() };
-    const classee = (cle) => deja.murs.has(cle) || deja.inaccessibles.has(cle) || deja.difficiles.has(cle);
-    const compte = {};
-    for (const etape of PEINTURES) {
-        let numeros = [];
-        if (img) try {
-            const r = await demanderJSON({ systeme: etape.systeme, temperature: 0.2, image: window.imageGrilleNumerotee(img, cases, taille, deja),
-                texte: `La carte compte ${cases.length} hexagones, numérotés de 1 à ${cases.length}.` });
-            numeros = Array.isArray(r && r.cases) ? r.cases : [];
-        } catch (e) { console.error(`🖌️ [${etape.cle}] Peinture impossible :`, e); }
-        let cles = [...new Set(numeros.map(n => parNumero.get(Number(n))).filter(Boolean).map(x => x.cle))].filter(k => !classee(k));
-        // Une réponse qui couvrirait presque toute la carte est une erreur.
-        if (cles.length > cases.length * 0.75) { console.warn(`🖌️ ${etape.cle} : ${cles.length} cases sur ${cases.length}, réponse écartée.`); cles = []; }
-        deja[etape.cle] = new Set(cles);
-        compte[etape.cle] = cles.length;
-        await setDoc(refVTT(), { [etape.champ]: cles }, { merge: true });
-        if (typeof window[etape.appliquer] === "function") window[etape.appliquer](cles);
-        await maj({ [`Combat_RP.Peinture.${etape.cle}`]: cles.length });
-        console.log(`🖌️ [${etape.cle}] ${cles.length} case(s) peinte(s).`);
-    }
 
-    // LES POSITIONS (MIA_SPAWN).
-    const praticable = (x) => x && !deja.murs.has(x.cle) && !deja.inaccessibles.has(x.cle);
+    // 1. LES ZONES : la carte nue, encadrée par l'IA, passée sur la grille.
+    let elements = [];
+    if (img) try {
+        const r = await demanderJSON({ systeme: PROMPT_TERRAIN, temperature: 0.2, image: imageNue(img),
+            texte: `--- LE LIEU DU COMBAT ---\n${(c.Lieu && c.Lieu.Titre) || ""}${c.Lieu && c.Lieu.Interieur ? " (intérieur)" : ""}\n${(c.Lieu && c.Lieu.Description) || ""}` });
+        elements = Array.isArray(r && r.elements) ? r.elements : [];
+    } catch (e) { console.error("🖌️ [MIA_TERRAIN_COMBAT] Zones impossibles :", e); }
+    const z = window.zonesDepuisCadres(elements, cases, L, H, taille);
+    const deja = { murs: new Set(z.murs), inaccessibles: new Set(z.inaccessibles), difficiles: new Set(z.difficiles) };
+    const champs = { murs: ["Tuiles_Murs", "appliquerMurs"], inaccessibles: ["Tuiles_Supprimees", "appliquerTuilesSupprimees"], difficiles: ["Tuiles_Difficiles", "appliquerTerrainDifficile"] };
+    for (const [cle, [champ, appliquer]] of Object.entries(champs)) {
+        await setDoc(refVTT(), { [champ]: z[cle] }, { merge: true });
+        if (typeof window[appliquer] === "function") window[appliquer](z[cle]);
+        await maj({ [`Combat_RP.Peinture.${cle}`]: z[cle].length });
+    }
+    console.log(`🖌️ [MIA_TERRAIN_COMBAT] ${elements.length} élément(s) vu(s) (${z.refuses} illisible(s), ${z.ecartes} écarté(s)) → ${z.murs.length} mur(s), ${z.inaccessibles.length} infranchissable(s), ${z.difficiles.length} difficile(s).`,
+        elements.map(e => `${e.sorte}: ${e.nom || ""}`).join(" · "));
+
+    // 2. LES POSITIONS (MIA_SPAWN), dans la plus grande étendue praticable.
+    const bloque = (x) => deja.murs.has(x.cle) || deja.inaccessibles.has(x.cle);
+    const groupes = composantes(cases, bloque);
+    const tailles = {};
+    groupes.forEach(g => { tailles[g] = (tailles[g] || 0) + 1; });
+    const principal = Number(Object.keys(tailles).sort((a, b) => tailles[b] - tailles[a])[0]) || 0;
+    const libres = cases.filter(x => !bloque(x) && groupes.get(x.cle) === principal);
+    const auPlusPres = (cible, parmi) => (parmi || libres).slice().sort((a, b) => Math.hypot(a.x - cible.x, a.y - cible.y) - Math.hypot(b.x - cible.x, b.y - cible.y))[0] || null;
+    const point = (yx) => Array.isArray(yx) && yx.length === 2 && yx.every(v => Number.isFinite(Number(v))) ? { x: Number(yx[1]) / 1000 * L, y: Number(yx[0]) / 1000 * H } : null;
     let r = null;
     if (img) try {
-        r = await demanderJSON({ systeme: PROMPT_SPAWN, temperature: 0.4, image: window.imageGrilleNumerotee(img, cases, taille, deja),
-            texte: `La carte compte ${cases.length} hexagones.\n\n--- LES ${R.messagesSpawn} DERNIERS MESSAGES DU RÉCIT ---\n${await lireMessages(R.messagesSpawn)}` });
+        r = await demanderJSON({ systeme: PROMPT_SPAWN, temperature: 0.4, image: imageZones(img, cases, taille, deja),
+            texte: `--- LES ${R.messagesSpawn} DERNIERS MESSAGES DU RÉCIT ---\n${await lireMessages(R.messagesSpawn)}` });
     } catch (e) { console.error("[MIA_SPAWN] Placement impossible :", e); }
-    const libres = cases.filter(praticable);
-    const auPlusPres = (cible) => libres.slice().sort((a, b) => Math.hypot(a.x - cible.x, a.y - cible.y) - Math.hypot(b.x - cible.x, b.y - cible.y))[0] || null;
-    let heros = parNumero.get(Number(r && r.heros));
-    if (!praticable(heros)) heros = auPlusPres(heros || { x: L * 0.22, y: H * 0.5 });
-    let ennemis = parNumero.get(Number(r && r.ennemis));
-    if (!praticable(ennemis) || (heros && ennemis && distanceHex(heros, ennemis) < 3)) {
-        ennemis = auPlusPres(heros && heros.x < L / 2 ? { x: L * 0.78, y: H * 0.5 } : { x: L * 0.22, y: H * 0.5 });
+    const pH = point(r && r.heros), pE = point(r && r.ennemis);
+    const heros = auPlusPres(pH || { x: L * 0.22, y: H * 0.5 });
+    let ennemis = auPlusPres(pE || (heros && heros.x < L / 2 ? { x: L * 0.78, y: H * 0.5 } : { x: L * 0.22, y: H * 0.5 }));
+    if (heros && ennemis && distanceHex(heros, ennemis) < 3) {
+        ennemis = auPlusPres(heros.x < L / 2 ? { x: L * 0.78, y: H * 0.5 } : { x: L * 0.22, y: H * 0.5 }, libres.filter(x => distanceHex(x, heros) >= 3));
     }
-    let renforts = [...new Set(((r && r.renforts) || []).map(n => parNumero.get(Number(n))).filter(praticable))];
+    let renforts = [];
+    ((r && r.renforts) || []).map(point).filter(Boolean).forEach(pt => {
+        const x = auPlusPres(pt);
+        if (x && !renforts.includes(x) && (!heros || distanceHex(x, heros) >= 2)) renforts.push(x);
+    });
     if (renforts.length === 0) {
         // EN TERRAIN OUVERT : les bords, du côté des ennemis d'abord.
         const bord = libres.filter(x => x.x < taille * 1.6 || x.x > L - taille * 1.6 || x.y < taille * 1.6 || x.y > H - taille * 1.6);
         const cote = (x) => ennemis ? Math.hypot(x.x - ennemis.x, x.y - ennemis.y) : 0;
         renforts = bord.sort((a, b) => cote(a) - cote(b)).filter((x, i, l) => l.slice(0, i).every(y => distanceHex(x, y) >= 3)).slice(0, 4);
     }
-    const spawns = renforts.map(x => x.cle);
+    const spawns = renforts.slice(0, 8).map(x => x.cle);
     await setDoc(refVTT(), { Tuiles_Spawn_Ennemis: spawns }, { merge: true });
     if (typeof window.appliquerSpawnEnnemis === "function") window.appliquerSpawnEnnemis(spawns);
     const reperes = {
@@ -838,7 +909,7 @@ async function peindreLeTerrain() {
         ...(ennemis ? { Spawn_Ennemis: { q: ennemis.q, r: ennemis.r } } : {})
     };
     if (window.PARTIE_DATA) Object.assign(window.PARTIE_DATA, reperes);
-    console.log(`🚩 [MIA_SPAWN] Héros en ${heros ? heros.n : "?"}, ennemis en ${ennemis ? ennemis.n : "?"}, ${spawns.length} case(s) de renfort. ${(r && r.raison) || ""}`);
+    console.log(`🚩 [MIA_SPAWN] Héros en ${heros ? heros.cle : "?"}, ennemis en ${ennemis ? ennemis.cle : "?"}, ${spawns.length} case(s) de renfort. ${(r && r.raison) || ""}`);
     await maj({ ...reperes, "Combat_RP.Peint": true, "Combat_RP.Positions": { Heros: heros ? heros.n : 0, Ennemis: ennemis ? ennemis.n : 0, Renforts: spawns.length } });
 }
 
@@ -944,7 +1015,19 @@ window.resumeCombatPourMJ = function(c, fin) {
     const lignes = ["--- LE COMBAT QUI VIENT DE S'ACHEVER ---"];
     lignes.push(victoire ? "Issue : les héros ont REMPORTÉ la bataille." : "Issue : les héros ont PERDU la bataille — tous sont tombés.");
     if (c && c.Lieu) lignes.push(`Lieu du combat : ${c.Lieu.Titre || ""}${c.Lieu.Interieur ? " (à l'intérieur)" : ""}.`);
-    if (adversaires.length) lignes.push(`Les adversaires : ${adversaires.slice(0, 12).map(m => m.nom + (m.pnj ? " (PNJ nommé)" : "")).join(", ")}${adversaires.length > 12 ? "…" : ""}.`);
+    // LE BILAN DES PERTES, tel qu'au plateau (v287) : qui est tombé, qui est
+    // encore debout — le MJ n'invente plus d'ennemis tués.
+    const bilan = fin && fin.bilan;
+    const ennemisBilan = (bilan && Array.isArray(bilan.ennemis)) ? bilan.ennemis : null;
+    if (ennemisBilan && ennemisBilan.length) {
+        const tombes = ennemisBilan.filter(x => x.tombe);
+        lignes.push(`Les adversaires engagés (${ennemisBilan.length}) : ${tombes.length === 0 ? "AUCUN n'est tombé" : tombes.length === ennemisBilan.length ? "tous sont tombés" : `${tombes.length} tombé(s), ${ennemisBilan.length - tombes.length} encore debout`}.`);
+        ennemisBilan.slice(0, 14).forEach(x => lignes.push(`- ${x.nom} : ${x.etat}${x.pv ? ` (${x.pv})` : ""}`));
+    } else if (adversaires.length) lignes.push(`Les adversaires : ${adversaires.slice(0, 12).map(m => m.nom + (m.pnj ? " (PNJ nommé)" : "")).join(", ")}${adversaires.length > 12 ? "…" : ""}.`);
+    if (bilan && Array.isArray(bilan.heros) && bilan.heros.length) {
+        lignes.push("Les héros à la fin du combat :");
+        bilan.heros.forEach(x => lignes.push(`- ${x.nom} : ${x.etat}${x.pv ? ` (${x.pv})` : ""}`));
+    }
     const blessures = Object.values((fin && fin.blessures) || {});
     if (!victoire) {
         if (blessures.length) {
@@ -958,6 +1041,10 @@ window.resumeCombatPourMJ = function(c, fin) {
     }
     lignes.push("CONSIGNES ABSOLUES POUR TA RÉPONSE :");
     lignes.push("- Ne rejoue pas le combat coup par coup : raconte la fin de l'affrontement et ce qui suit immédiatement.");
+    if (ennemisBilan && ennemisBilan.length) {
+        lignes.push("- Respecte EXACTEMENT ce bilan : aucun adversaire tué, blessé ou en fuite au-delà de ce qu'il dit. Ceux « encore debout » le sont toujours.");
+        if (!ennemisBilan.some(x => x.tombe)) lignes.push("- Les héros n'ont abattu PERSONNE : ne raconte aucun ennemi tué ni mis à terre par eux.");
+    }
     if (victoire) lignes.push("- Les ennemis sont vaincus (morts, à terre ou en fuite, selon ce qui est crédible) ; les héros reprennent leur souffle.");
     else lignes.push("- Les héros ont perdu : compose avec leurs blessures. Pour ceux qui sont encore en vie, invente une suite crédible (capturés, laissés pour morts, dépouillés, secourus, réveillés plus tard…). Ceux qui sont morts ne reviennent pas.");
     if (c && c.Lieu && c.Lieu.Interieur) lignes.push("- Le combat a eu lieu à l'intérieur : le lieu est SACCAGÉ par la violence des combats (mobilier brisé, objets renversés, traces de lutte et de sang). Décris-le et tiens-en compte dans la suite.");

@@ -1228,6 +1228,8 @@ export const APPLICATEURS = {
 // applique, puis il passe à la suivante — pour que l'écran raconte exactement ce
 // qu'il montre, et jamais deux pas d'avance.
 export function appliquerEtape(etat, etape) {
+    // Plus d'état (le combat vient d'être effacé, v287) : rien à appliquer.
+    if (!etat) return etat;
     const suivant = clonerEtat(etat);
     const appliquer = APPLICATEURS[etape && etape.type];
     if (appliquer) appliquer(suivant, etape);

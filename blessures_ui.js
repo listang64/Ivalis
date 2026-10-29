@@ -69,6 +69,25 @@ async function ecrireFiche(id, maj) {
     appliquerLocalement(id, maj);
 }
 
+// LE BILAN DES PERTES (v287). Nico : « après avoir perdu, le RP nous dit qu'on
+// a tué des mercenaires alors que dans le combat on n'a rien tué du tout ; ça
+// serait bien d'envoyer au MJ le bilan des pertes et blessures ». Chaque
+// créature qui a pris part au combat (les renforts jamais entrés n'y sont pas)
+// et chaque héros : debout ou tombé, ses PV — tels qu'à la fin du combat.
+function bilanDuCombat(heros) {
+    const pv = (p) => {
+        const max = typeof window.pvMaxCombattant === "function" ? window.pvMaxCombattant(p) : 0;
+        return max > 0 ? `${Math.max(0, parseInt(p.PV_Actuels) || 0)}/${max} PV` : "";
+    };
+    const ennemis = (window.MONSTRES_PARTIE || []).filter(m => m && !m.compagnonDe && !m.estIllusion).map(m => {
+        const tombe = m.statut === "Mort" || !!m.zombie || estKO(m.idPersonnage);
+        return { nom: String(m.prenom || m.nom || "Une créature").trim(), tombe, etat: m.zombie ? "tombé, relevé en mort-vivant" : tombe ? "tombé (mort ou hors de combat)" : "encore debout", pv: pv(m) };
+    });
+    const lesHeros = heros.map(p => ({ nom: nomHeros(p), tombe: estKO(p.idPersonnage), etat: estKO(p.idPersonnage) ? "à terre" : "debout", pv: pv(p) }));
+    return { ennemis, heros: lesHeros };
+}
+window.bilanDuCombat = bilanDuCombat;
+
 // =========================================================================
 //  1. CLORE LE COMBAT
 // =========================================================================
@@ -123,6 +142,7 @@ window.cloturerCombat = async function (issue) {
         ts: Date.now(),
         participants: heros.map(p => p.idPersonnage),
         blessures,
+        bilan: bilanDuCombat(heros),
         ...(xpDefaite > 0 ? { xp: xpDefaite } : {})
     };
 

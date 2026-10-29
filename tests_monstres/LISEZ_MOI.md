@@ -9097,3 +9097,117 @@ Tests mis à jour :
 - corrections_v283 : plus de calque « Nuages ».
 - corrections_v285 : la table est un calque lié à la carte.
 - blessures : deux sons d'événement de plus.
+
+## v287 — Voyage plus fin ; POI près du groupe ; chat ; ennemis du monde antique ; zones ; défaite
+
+Nico :
+- « la croix rouge de déplacement et le trait pointillé, moins épais (divise
+  par trois) » ;
+- « les POI doivent être à côté du chemin, et surtout du pion là où il est, et
+  jamais après l'arrivée » ;
+- « quand le chat est ouvert, à la place du bouton déplacement, une croix pour
+  fermer le chatbox » ; « dans le chatbox, un bouton pour que ton perso passe
+  son tour, il ne dit rien » ;
+- « la génération des tokens ennemis : suivre les races et le RP, dans un
+  monde antique » ; « les noms des ennemis représentatifs du RP » ;
+- « réduis un peu la taille des tokens sur la piste d'initiative » ; « réduis
+  l'effet sous les tokens leaders » ;
+- « l'IA qui génère les zones (mur, terrain difficile) a fait n'importe quoi,
+  fais un truc mieux ficelé » ;
+- défaite : « Uncaught TypeError: Cannot set properties of null (setting
+  'file') at tour (combat_etat.js) … et ne lance pas de demande de spawn » ;
+  « le RP nous dit qu'on a tué des mercenaires alors qu'on n'a rien tué :
+  envoie au MJ le bilan des pertes et blessures ».
+
+Le voyage (voyage_groupe.js) :
+- Le pointillé, son ombre, le point de départ et les traits de la croix sont
+  trois fois plus fins. La croix garde sa taille et les tirets leur rythme.
+- Le POI se pose à côté du groupe, entre 6 et 8,5 % de la hauteur de la carte
+  (jusqu'à 13 % si le terrain l'exige ; avant, 10 à 20 %).
+- Il est sur le côté de la route, entre un peu en avant (17°) et franchement
+  en arrière (34°), jamais devant le groupe.
+- Jamais après l'arrivée : le point de la route le plus proche du POI
+  (partProcheDuVoyage) n'est pas plus loin que le groupe.
+
+Le chat :
+- Quand il est ouvert, le bouton voyage devient une croix beige qui le ferme.
+  Elle se place à gauche du bouton « Afficher l'interface » du chat, et le
+  retour au monde se décale d'une place.
+- « Passer » (app.js, passerTourChat) fait avancer le tour de parole sans
+  rien écrire, et seulement quand c'est son tour.
+
+Les ennemis :
+- lore_ivalis.js gagne les sept peuples d'Elyria et une consigne d'Antiquité
+  (armes et tenues antiques, rien de médiéval). contexteEnnemisIvalis(région)
+  les joint au lore de la région du groupe.
+- MIA_ENNEMIS et l'habillage (combat_rp.js) les reçoivent, avec leurs règles :
+  - le peuple vient du récit, sinon de la région ;
+  - compagnons et renforts appartiennent à la même bande ;
+  - tout est antique ;
+  - le nom dit qui ils sont dans le récit : leur bande, leur peuple ou leur
+    métier, ou un nom propre de leur peuple ; jamais un nom de bestiaire
+    générique.
+- MIA_BESTIAIRE (renforts, pièges, arène, monstres.js) n'est plus
+  « médiéval-fantastique sombre ». Il reçoit le monde, le combat du récit
+  et les ennemis déjà sur le terrain. Ses noms de secours sont de ce monde.
+- Le dessin du pion précise « Greco-Roman antiquity ».
+
+Combat :
+- La piste d'initiative passe de ×2 à ×1,7.
+- L'aura du leader est réduite dans son dessin (combat.js, ETENDUE_AURA =
+  0,55) : tout ce qui déborde du pion (fumée, halo, gouttelettes) va un peu
+  plus qu'à moitié moins loin. L'anneau reste collé au bord du médaillon, et
+  la boîte garde son repère (200 %).
+
+Les zones (combat_rp.js) :
+- Avant, trois IA lisaient des centaines de numéros sur la grille.
+  Maintenant, MIA_TERRAIN_COMBAT regarde la carte nue (et la description du
+  lieu) et encadre chaque mur, chaque zone infranchissable et chaque terrain
+  difficile (box_2d, de 0 à 1000).
+- zonesDepuisCadres passe ces cadres sur la grille :
+  - une case est prise quand au moins la moitié de ses sept points tombe dans
+    un cadre ; mur, puis infranchissable, puis difficile ;
+  - un cadre de plus du tiers de la carte est écarté ;
+  - plafonds : 45 % de cases bloquées et 40 % de cases difficiles, en
+    retirant les plus grands cadres.
+- MIA_SPAWN reçoit la carte aux cases teintées et répond en coordonnées. Les
+  repères et les entrées des renforts se posent sur la plus grande étendue
+  praticable, donc les deux camps sont toujours reliés.
+
+La défaite :
+- appliquerEtape ne fait plus rien sur un combat effacé. C'était le
+  « Cannot set properties of null ».
+- Le spectateur s'arrête si le combat est effacé pendant une animation.
+- Tous les héros à terre ou le combat clos : combatPerduOuClos, et plus
+  aucun renfort n'entre (prévu, de relève ou d'un piège). C'était la
+  « demande de spawn ».
+- La fin du combat garde un bilan (Fin_Combat.bilan) : chaque créature
+  engagée (debout ou tombée, avec ses PV) et chaque héros.
+- resumeCombatPourMJ le transmet au MJ, avec la consigne de le respecter
+  exactement, et de ne raconter aucun ennemi tué si personne n'est tombé.
+
+corrections_v287.mjs (dans la suite), sur la vraie page, vérifie :
+- les épaisseurs du trait et de la croix, sur un vrai voyage ;
+- 150 tirages de POI : leur distance au groupe, leur angle à la route, et
+  qu'ils ne sont jamais au-delà de l'arrivée ;
+- la croix du chat, au clic, et « Passer » (refusé hors de son tour, sans
+  message) ;
+- le contexte du monde et la consigne de MIA_BESTIAIRE, les noms de secours
+  et les consignes de combat_rp ;
+- l'échelle de la piste, l'étendue de l'aura et son anneau ;
+- zonesDepuisCadres : la couverture, le cadre démesuré, les plafonds, la
+  priorité du mur ;
+- la défaite : l'étape sur un état nul, aucun renfort, le bilan, et le
+  résumé au MJ ;
+- les versions.
+
+Il échoue sur l'ancien code (22 échecs), dont le « Cannot set properties of
+null » d'origine.
+
+Tests mis à jour :
+- corrections_v278 : la section 7 suit MIA_TERRAIN_COMBAT et les coordonnées
+  de MIA_SPAWN ; les faux Gemini de v278, v279 et v280 répondent au nouveau
+  format.
+- corrections_v270 : piste à 1,7.
+- corrections_v271 : les langues de fumée, réduites, ne dépassent plus une
+  fois et demie le rayon.

@@ -165,7 +165,8 @@ titre("2. CE QUI SE VOIT, AUX PIXELS");
   const [, f2] = await analyser(await photo(), zones);
   verifier("l'anneau est rouge tout autour du médaillon", a1.part > 0.85, `${(a1.part * 100).toFixed(0)} %`);
   verifier("la fumée rouge emplit l'essentiel de la couronne (1,1 à 1,45 rayon)", f1.part > 0.35, `${(f1.part * 100).toFixed(0)} %`);
-  verifier("les langues vont jusqu'à une fois et demie le rayon et au-delà, plus claires", bout.part > 0.05 && bout.part < f1.part, `${(bout.part * 100).toFixed(0)} %`);
+  // (v287 : l'effet réduit — les langues s'arrêtent avant une fois et demie le rayon.)
+  verifier("(v287) les langues, réduites, ne vont plus au-delà d'une fois et demie le rayon", bout.part < 0.05 && bout.part < f1.part, `${(bout.part * 100).toFixed(0)} %`);
   verifier("au-delà de deux rayons, plus rien", loin.part < 0.02, `${(loin.part * 100).toFixed(1)} %`);
   verifier("autour d'un monstre ordinaire, rien", ordinaire.part < 0.02, `${(ordinaire.part * 100).toFixed(1)} %`);
   const diff = f1.valeurs.reduce((s, v, i) => s + Math.abs(v - (f2.valeurs[i] || 0)), 0) / Math.max(1, f1.valeurs.length);

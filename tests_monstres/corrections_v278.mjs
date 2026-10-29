@@ -134,6 +134,16 @@ const faux = { verdict: { combat: true, raison: "Les gardes de Dame Koré tirent
                cle2EnPanne: false, peintures: true, nombre: 2 };
 await p.exposeFunction('__fauxGemini', (o) => Object.assign(faux, o));
 const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+// Les cadres que « voit » MIA_TERRAIN_COMBAT (v287) : deux colonnes, un bassin,
+// des gravats — et un cadre démesuré, à écarter.
+const CADRES_TERRAIN = [
+  { sorte: "mur", nom: "colonne ouest", box_2d: [60, 100, 170, 170] },
+  { sorte: "mur", nom: "colonne est", box_2d: [60, 300, 170, 370] },
+  { sorte: "infranchissable", nom: "bassin sacré", box_2d: [400, 420, 600, 580] },
+  { sorte: "difficile", nom: "gravats", box_2d: [750, 80, 950, 300] },
+  { sorte: "mur", nom: "tout le temple", box_2d: [0, 0, 900, 900] },
+  { sorte: "brouillard", nom: "inconnu", box_2d: [1, 2, 3, 4] }
+];
 await p.route('**generativelanguage.googleapis.com/**', async r => {
   const url = r.request().url();
   const cle = (url.match(/key=([^&]+)/) || [])[1] || "";
@@ -161,10 +171,9 @@ await p.route('**generativelanguage.googleapis.com/**', async r => {
   } else if (mia === "MIA_ENNEMIS") texte = JSON.stringify({ nombre: faux.nombre,
       ennemis: [{ nom: "Dame Koré", pnj: "Dame Koré", description_physique: "Une prêtresse au visage sévère" }, { nom: "Garde à la lance", pnj: "", description_physique: "Un garde casqué" }],
       renforts: [{ nom: "Archer du temple", description_physique: "Un archer tatoué" }] });
-  else if (mia === "MIA_PEINTURE_MURS") texte = JSON.stringify({ cases: faux.peintures ? [1, 2, 3, 999] : [] });
-  else if (mia === "MIA_PEINTURE_INACCESSIBLE") texte = JSON.stringify({ cases: faux.peintures ? [3, 10, 11] : [] });
-  else if (mia === "MIA_PEINTURE_DIFFICILE") texte = JSON.stringify({ cases: faux.peintures ? [20, 21] : [] });
-  else if (mia === "MIA_SPAWN") texte = JSON.stringify(faux.peintures ? { heros: 30, ennemis: 45, renforts: [2, 50, 60], raison: "Face à face dans la cour." } : {});
+  // (v287 : une seule IA encadre les zones sur la carte nue ; MIA_SPAWN répond en coordonnées.)
+  else if (mia === "MIA_TERRAIN_COMBAT") texte = JSON.stringify({ elements: faux.peintures ? CADRES_TERRAIN : [] });
+  else if (mia === "MIA_SPAWN") texte = JSON.stringify(faux.peintures ? { heros: [500, 150], ennemis: [500, 850], renforts: [[60, 960], [950, 960], [500, 500]], raison: "Face à face dans la cour." } : {});
   else if (mia === "NARRATEUR") texte = "Le silence retombe sur la cour du temple ; le sang des gardes se mêle à l'eau du bassin.";
   r.fulfill({ contentType: 'application/json', headers: {'Access-Control-Allow-Origin':'*'},
               body: JSON.stringify({ candidates: [{ content: { parts: [{ text: texte }] } }], usageMetadata: { totalTokenCount: 10 } }) });
@@ -524,41 +533,55 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("7. LA GRILLE NUMÉROTÉE, LES TROIS PEINTURES, MIA_SPAWN");
+titre("7. LA GRILLE, LES ZONES (v287 : MIA_TERRAIN_COMBAT encadre, le jeu passe sur la grille), MIA_SPAWN");
 // =========================================================================
 await section(async () => {
   const pret = await attendreQue(async () => ((await crp()) || {}).Etat === "en_cours", 15000);
-  verifier("peinture, positions, déploiement : le combat commence", pret, JSON.stringify(((await crp()) || {}).Etat));
+  verifier("zones, positions, déploiement : le combat commence", pret, JSON.stringify(((await crp()) || {}).Etat));
   const geo = await p.evaluate(() => {
     const cases = window.casesGrilleCombatRP(1536, 1024, 62);
     const P = window.PLATEAU_VTT;
     const ecarts = cases.slice(0, 40).map(c => { const px = P.hexToPixel(c.q, c.r); return Math.hypot(px.x - c.x, px.y - c.y); });
     const numeros = cases.map(c => c.n);
     return { n: cases.length, uniques: new Set(numeros).size === cases.length, de1: Math.min(...numeros) === 1 && Math.max(...numeros) === cases.length,
-             dedans: cases.every(c => c.x >= 0 && c.x <= 1536 && c.y >= 0 && c.y <= 1024), ecart: Math.max(...ecarts), plateau: [P.largeurLogique, P.hauteurLogique],
-             cle: cases[0].cle, case30: cases.find(c => c.n === 30), case45: cases.find(c => c.n === 45) };
+             dedans: cases.every(c => c.x >= 0 && c.x <= 1536 && c.y >= 0 && c.y <= 1024), ecart: Math.max(...ecarts), plateau: [P.largeurLogique, P.hauteurLogique] };
   });
   verifier("une case = un numéro, de 1 à N, toutes dans l'image", geo.n > 100 && geo.uniques && geo.de1 && geo.dedans, `${geo.n} cases`);
   verifier("la géométrie est celle du plateau (mêmes centres que Plateau.js)", geo.ecart < 0.01 && geo.plateau[0] === 1536, `écart ${geo.ecart} ${geo.plateau}`);
-  const peintures = requetes.filter(x => /^MIA_PEINTURE_/.test(x.mia));
-  verifier("trois MIA de peinture, dans l'ordre : murs, inaccessibles, difficiles", peintures.map(x => x.mia).join(",") === "MIA_PEINTURE_MURS,MIA_PEINTURE_INACCESSIBLE,MIA_PEINTURE_DIFFICILE", peintures.map(x => x.mia).join(","));
-  verifier("chacune reçoit l'image de la carte AVEC sa grille numérotée", peintures.every(x => x.image && x.imageTaille > 20000) && peintures.every(x => new RegExp(`${geo.n} hexagones`).test(x.texte)), peintures.map(x => x.imageTaille).join(","));
+  const zones = requetes.filter(x => x.mia === "MIA_TERRAIN_COMBAT");
+  verifier("UNE seule IA pour les zones (plus trois lectures de numéros)", zones.length === 1 && !requetes.some(x => /^MIA_PEINTURE_/.test(x.mia)), requetes.map(x => x.mia).filter(m => /TERRAIN|PEINTURE/.test(m)).join(","));
+  verifier("elle reçoit la carte nue et la description du lieu", zones.length === 1 && zones[0].image && zones[0].imageTaille > 2000 && /bassin sacré/.test(zones[0].texte), zones[0] && [zones[0].imageTaille, zones[0].texte.slice(0, 200)].join(" "));
   const v = await vtt();
-  const cle = (n) => { const c = geo.n && null; return c; };
-  const attendus = await p.evaluate(() => { const cases = window.casesGrilleCombatRP(1536, 1024, 62); const k = (n) => cases.find(c => c.n === n).cle;
-    return { murs: [k(1), k(2), k(3)], inacc: [k(10), k(11)], diff: [k(20), k(21)], renforts: [k(50), k(60)] }; });
-  verifier("les murs peints (un numéro inconnu écarté)", JSON.stringify(v.Tuiles_Murs) === JSON.stringify(attendus.murs), JSON.stringify(v.Tuiles_Murs));
-  verifier("les zones inaccessibles retirées (une case déjà murée n'y passe pas)", JSON.stringify(v.Tuiles_Supprimees) === JSON.stringify(attendus.inacc), JSON.stringify(v.Tuiles_Supprimees));
-  verifier("le terrain difficile peint", JSON.stringify(v.Tuiles_Difficiles) === JSON.stringify(attendus.diff), JSON.stringify(v.Tuiles_Difficiles));
+  const attendu = await p.evaluate((cadres) => {
+    const cases = window.casesGrilleCombatRP(1536, 1024, 62);
+    const z = window.zonesDepuisCadres(cadres, cases, 1536, 1024, 62);
+    const centre = (cle) => cases.find(c => c.cle === cle);
+    const dans = (cle, b) => { const c = centre(cle); return c.x >= b[1] / 1000 * 1536 - 40 && c.x <= b[3] / 1000 * 1536 + 40 && c.y >= b[0] / 1000 * 1024 - 40 && c.y <= b[2] / 1000 * 1024 + 40; };
+    return { z, mursDansColonnes: z.murs.every(k => dans(k, cadres[0].box_2d) || dans(k, cadres[1].box_2d)), bassin: z.inaccessibles.every(k => dans(k, cadres[2].box_2d)),
+             gravats: z.difficiles.every(k => dans(k, cadres[3].box_2d)) };
+  }, CADRES_TERRAIN);
+  verifier("les cadres passés sur la grille : murs, bassin infranchissable, gravats difficiles", JSON.stringify(v.Tuiles_Murs) === JSON.stringify(attendu.z.murs)
+           && JSON.stringify(v.Tuiles_Supprimees) === JSON.stringify(attendu.z.inaccessibles) && JSON.stringify(v.Tuiles_Difficiles) === JSON.stringify(attendu.z.difficiles)
+           && v.Tuiles_Murs.length > 0 && v.Tuiles_Supprimees.length > 0 && v.Tuiles_Difficiles.length > 0,
+           JSON.stringify([v.Tuiles_Murs.length, v.Tuiles_Supprimees.length, v.Tuiles_Difficiles.length]));
+  verifier("…seulement sous leurs cadres ; le cadre démesuré et la sorte inconnue écartés", attendu.mursDansColonnes && attendu.bassin && attendu.gravats && attendu.z.refuses === 2,
+           JSON.stringify([attendu.mursDansColonnes, attendu.bassin, attendu.gravats, attendu.z.refuses]));
   const spawn = requetes.find(x => x.mia === "MIA_SPAWN");
   const six = spawn ? (spawn.texte.split("DERNIERS MESSAGES DU RÉCIT ---")[1] || "").trim().split("\n").filter(Boolean) : [];
-  verifier("MIA_SPAWN : la même image (les cases déjà peintes teintées) et les 6 derniers messages", !!spawn && spawn.image && six.length === 6, `${six.length} lignes`);
+  verifier("MIA_SPAWN : la carte aux cases teintées et les 6 derniers messages", !!spawn && spawn.image && six.length === 6, `${six.length} lignes`);
   const pt = await partie();
-  verifier("les repères des héros et des ennemis posés là où MIA_SPAWN l'a dit",
-           pt.Spawn_Allies && pt.Spawn_Allies.q === geo.case30.q && pt.Spawn_Allies.r === geo.case30.r && pt.Spawn_Ennemis && pt.Spawn_Ennemis.q === geo.case45.q && pt.Spawn_Ennemis.r === geo.case45.r,
-           JSON.stringify([pt.Spawn_Allies, pt.Spawn_Ennemis]));
-  verifier("les cases des renforts (une case murée refusée)", JSON.stringify(v.Tuiles_Spawn_Ennemis) === JSON.stringify(attendus.renforts), JSON.stringify(v.Tuiles_Spawn_Ennemis));
-  await p.screenshot({ path: '/tmp/claude-0/-home-user-Ivalis/3718c626-55b5-577c-9b4f-a49012fd3784/scratchpad/v278_grille_numerotee_brut.png' }).catch(() => {});
+  const pos = await p.evaluate(({ h, e, cle }) => {
+    const cases = window.casesGrilleCombatRP(1536, 1024, 62), k = (q) => cases.find(c => c.q === q.q && c.r === q.r);
+    const ch = k(h), ce = k(e);
+    const bloquees = new Set([...(cle.m || []), ...(cle.s || [])]);
+    return { h: ch && [ch.x / 1536, ch.y / 1024], e: ce && [ce.x / 1536, ce.y / 1024], libres: ch && ce && !bloquees.has(ch.cle) && !bloquees.has(ce.cle) };
+  }, { h: pt.Spawn_Allies || {}, e: pt.Spawn_Ennemis || {}, cle: { m: v.Tuiles_Murs, s: v.Tuiles_Supprimees } });
+  verifier("les repères des héros (à gauche) et des ennemis (à droite), là où MIA_SPAWN l'a dit",
+           !!pos.h && !!pos.e && Math.abs(pos.h[0] - 0.15) < 0.06 && Math.abs(pos.h[1] - 0.5) < 0.08 && Math.abs(pos.e[0] - 0.85) < 0.06 && Math.abs(pos.e[1] - 0.5) < 0.08 && pos.libres,
+           JSON.stringify(pos));
+  verifier("les entrées des renforts : trois, sur des cases libres (le point dans le bassin ramené au bord)",
+           (v.Tuiles_Spawn_Ennemis || []).length === 3 && v.Tuiles_Spawn_Ennemis.every(k => !v.Tuiles_Murs.includes(k) && !v.Tuiles_Supprimees.includes(k)), JSON.stringify(v.Tuiles_Spawn_Ennemis));
+  await p.screenshot({ path: '/tmp/claude-0/-home-user-Ivalis/3718c626-55b5-577c-9b4f-a49012fd3784/scratchpad/v278_zones.png' }).catch(() => {});
 });
 
 // =========================================================================

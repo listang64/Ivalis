@@ -300,6 +300,8 @@ export function creerSpectateur(contexte) {
 
                 // === ON JOUE ===============================================
                 const entree = suite.entree;
+                const combatJoue = moi.combat;
+                const efface = () => moi.eteint || !moi.etat || moi.combat !== combatJoue;
                 tracer("▶️", `${entree.v} ${entree.acteur || "?"}`,
                        `(${(entree.etapes || []).length} étapes)`);
                 surRejeu(entree);
@@ -315,6 +317,7 @@ export function creerSpectateur(contexte) {
                     const groupe = regens.length > 1 ? regens : groupeDeTractions(etapes, i);
                     if (groupe.length > 1) {
                         await Promise.all(groupe.map(e => animer(e, moi.etat)));
+                        if (efface()) break;
                         groupe.forEach(e => { moi.etat = appliquerEtape(moi.etat, e); });
                         surEtat(moi.etat);
                         i += groupe.length - 1;
@@ -326,10 +329,15 @@ export function creerSpectateur(contexte) {
                     // la vie qui se retire ».
                     const etape = etapes[i];
                     await animer(etape, moi.etat);
+                    // LE COMBAT A ÉTÉ EFFACÉ PENDANT L'ANIMATION (v287 : une
+                    // défaite, puis le nettoyage de la carte) : plus rien à
+                    // appliquer — la suite de cette entrée n'existe plus.
+                    if (efface()) break;
                     moi.etat = appliquerEtape(moi.etat, etape);
                     surEtat(moi.etat);
                 }
 
+                if (efface()) { surRejeu(null); break; }
                 moi.vue = nombre(entree.v);
 
                 // L'ACQUITTEMENT NE SURVIT PAS AU TOUR QU'IL COUVRE.

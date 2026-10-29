@@ -282,9 +282,9 @@ function champsVoyage(champs) {
 //  LA CHANCE : CHANCE_POI_DEFAUT par journée de marche (Nico : 50 %),
 //  réglable en DEV (Carte_Monde/Groupe.Chance_POI) ; au plus un par jour. Le
 //  tirage se fait au départ de la journée (en transaction) : le moment, et la
-//  place — dans un rayon de RAYON_POI autour du groupe, sur le terrain
-//  praticable, hors des nuages, assez loin des lieux posés pour que les
-//  dessins ne se touchent pas (une taille de marge).
+//  place — à côté du groupe (RAYON_POI), sur le côté de la route, jamais plus
+//  loin qu'elle ne mène le groupe (v287), sur le terrain praticable, assez
+//  loin des lieux posés pour que les dessins ne se touchent pas.
 //
 //  LES ÉTATS : marche → poi (le vote : tous oui pour y aller, un non et l'on
 //  passe son chemin) → detour (le chemin vers le POI ; le lieu se crée,
@@ -297,7 +297,12 @@ function champsVoyage(champs) {
 //  détour compte dans la journée) ou « Rester ici », tous d'accord.
 // =========================================================================
 const CHANCE_POI_DEFAUT = 0.5;
-const RAYON_POI = [0.10, 0.20];       // en hauteurs de carte, autour du groupe
+// v287 — Nico : « les POI doivent être à côté du chemin, et surtout du pion là
+// où il est, et jamais après l'arrivée ». Tout près du groupe (du bord de son
+// pion au bord du lieu), d'un côté ou de l'autre de la route — pas devant lui,
+// et jamais plus loin sur la route que là où il s'arrête.
+const RAYON_POI = [0.06, 0.085];      // en hauteurs de carte, autour du groupe
+const RAYON_POI_MAX = 0.13;           // s'il faut s'écarter un peu (le terrain)
 // À la halte, le groupe s'arrête au bord du lieu (pas dessus : son dessin se
 // voit) : la part du détour où il reste un peu plus d'une demi-taille de lieu.
 function arretDetour(v) {
@@ -347,17 +352,38 @@ function planifierPoi(v, k) {
     const chance = Number.isFinite(reglages.chancePoi) ? reglages.chancePoi : CHANCE_POI_DEFAUT;
     if (!(hasard() < chance)) return null;
     const n = Number(v.Arrivee.Region), asp = Number(v.Aspect) || aspectRegion(n), j = journee(v, k);
-    for (let essai = 0; essai < 40; essai++) {
+    for (let essai = 0; essai < 60; essai++) {
         const f = j.de + (j.a - j.de) * (0.2 + 0.65 * hasard());
         const P = pointDuVoyage(v, f);
-        const r = RAYON_POI[0] + (RAYON_POI[1] - RAYON_POI[0]) * hasard(), angle = hasard() * Math.PI * 2;
-        const x = P.x + (r * Math.cos(angle)) / asp, y = P.y + r * Math.sin(angle);
-        if (placePoiValable(n, x, y)) {
-            return { Id: "P" + Date.now().toString(36) + Math.floor(hasard() * 1e5).toString(36), f: arrondi(f), x: arrondi(x), y: arrondi(y) };
-        }
+        // La route, là où est le groupe : sa direction (dans l'espace de la carte).
+        const avant = pointDuVoyage(v, Math.max(0, f - 0.02)), apres = pointDuVoyage(v, Math.min(1, f + 0.02));
+        const dx = (apres.x - avant.x) * asp, dy = apres.y - avant.y, l = Math.hypot(dx, dy) || 1;
+        const cote = hasard() < 0.5 ? 1 : -1;
+        // Sur le côté de la route : la perpendiculaire, penchée d'un peu en
+        // avant (17°) à franchement en arrière (34°).
+        const penche = hasard() * 0.9 - 0.3;
+        const angle = Math.atan2(dy, dx) + cote * (Math.PI / 2 + penche);
+        const ecart = essai < 40 ? RAYON_POI[0] + (RAYON_POI[1] - RAYON_POI[0]) * hasard() : RAYON_POI[1] + (RAYON_POI_MAX - RAYON_POI[1]) * hasard();
+        const x = P.x + (ecart * Math.cos(angle)) / asp, y = P.y + ecart * Math.sin(angle);
+        if (!placePoiValable(n, x, y)) continue;
+        // JAMAIS APRÈS L'ARRIVÉE : le point de la route le plus proche du lieu
+        // n'est pas plus loin que le groupe.
+        if (partProcheDuVoyage(v, x, y, asp) > f + 0.01) continue;
+        return { Id: "P" + Date.now().toString(36) + Math.floor(hasard() * 1e5).toString(36), f: arrondi(f), x: arrondi(x), y: arrondi(y) };
     }
     return null;
 }
+// La part de la route (0 au départ, 1 à l'arrivée) la plus proche d'un point.
+function partProcheDuVoyage(v, x, y, asp) {
+    let meilleure = 0, d = Infinity;
+    for (let i = 0; i <= 200; i++) {
+        const p = pointDuVoyage(v, i / 200), e = Math.hypot((p.x - x) * asp, p.y - y);
+        if (e < d) { d = e; meilleure = i / 200; }
+    }
+    return meilleure;
+}
+window.partProcheDuVoyage = (x, y, v) => { const w = v || voyage || {};
+    return partProcheDuVoyage(w, x, y, Number(w.Aspect) || aspectRegion(Number(w.Arrivee && w.Arrivee.Region))); };
 window.planifierPoiVoyage = (v, k) => planifierPoi(v || voyage, k || (voyage && voyage.Jour) || 1);
 // Le chemin vers le POI : de légères ondulations (Nico : « pas en ligne droite »).
 function cheminDetour(v, poi) {
@@ -1134,6 +1160,10 @@ function dessinerTraceDans(svg, points, l, h, epaisseur, cle, anime, options) {
     for (let i = 1; i < P.length; i++) total += Math.hypot(P[i].x - P[i - 1].x, P[i].y - P[i - 1].y);
     const d = "M" + P.map(p => `${p.x} ${p.y}`).join(" L");
     const fin = P[P.length - 1], s = epaisseur * 2.4;
+    // Le trait trois fois plus fin (Nico, v287 : « la croix rouge de déplacement
+    // et le trait pointillé, fais-les moins épais, divise par trois ») ; la
+    // croix garde sa taille, les tirets leur rythme.
+    const trait = epaisseur / 3;
     const masque = "masque-" + svg.id;
     const duree = anime && !mouvementReduit() ? (svg.id === "calque-voyage-monde" ? DESSIN_TRACE_MS.monde : sansCroix ? 900 : DESSIN_TRACE_MS.region) : 0;
     svg.innerHTML = `
@@ -1141,14 +1171,14 @@ function dessinerTraceDans(svg, points, l, h, epaisseur, cle, anime, options) {
         <path class="trace-voyage-masque" d="${d}" fill="none" stroke="#fff" stroke-width="${epaisseur * 4}" stroke-linecap="round" stroke-linejoin="round"
               style="stroke-dasharray:${total + 1} ${total + 1};stroke-dashoffset:${duree ? total + 1 : 0}"/></mask></defs>
       <g mask="url(#${masque})">
-        <path class="trace-voyage-ombre" d="${d}" fill="none" stroke-width="${epaisseur * 1.9}" stroke-linecap="round" stroke-linejoin="round"/>
-        <path class="trace-voyage" d="${d}" fill="none" stroke-width="${epaisseur}" stroke-linecap="round" stroke-linejoin="round"
+        <path class="trace-voyage-ombre" d="${d}" fill="none" stroke-width="${trait * 1.9}" stroke-linecap="round" stroke-linejoin="round"/>
+        <path class="trace-voyage" d="${d}" fill="none" stroke-width="${trait}" stroke-linecap="round" stroke-linejoin="round"
               stroke-dasharray="${epaisseur * 2.6} ${epaisseur * 1.9}"/>
       </g>
-      ${sansCroix ? "" : `<circle class="depart-voyage" cx="${P[0].x}" cy="${P[0].y}" r="${epaisseur * 1.05}"/>
+      ${sansCroix ? "" : `<circle class="depart-voyage" cx="${P[0].x}" cy="${P[0].y}" r="${trait * 1.6}"/>
       <g class="croix-voyage" transform="translate(${fin.x} ${fin.y})"><g class="croix-voyage-dessin${duree ? " a-venir" : ""}" style="${duree ? `animation-delay:${duree}ms` : ""}">
-        <path class="croix-voyage-ombre" d="M${-s} ${-s} L${s} ${s} M${s} ${-s} L${-s} ${s}" stroke-width="${epaisseur * 2.2}" stroke-linecap="round"/>
-        <path class="croix-voyage-trait" d="M${-s} ${-s} L${s} ${s} M${s} ${-s} L${-s} ${s}" stroke-width="${epaisseur * 1.3}" stroke-linecap="round"/>
+        <path class="croix-voyage-ombre" d="M${-s} ${-s} L${s} ${s} M${s} ${-s} L${-s} ${s}" stroke-width="${trait * 2.2}" stroke-linecap="round"/>
+        <path class="croix-voyage-trait" d="M${-s} ${-s} L${s} ${s} M${s} ${-s} L${-s} ${s}" stroke-width="${trait * 1.3}" stroke-linecap="round"/>
       </g></g>`}`;
     if (duree) {
         const m = svg.querySelector(".trace-voyage-masque");
@@ -1252,17 +1282,41 @@ function bouton() {
         b.title = "Voyager";
         b.draggable = false;
         b.style.display = "none";
-        b.addEventListener("click", () => { clic(); window.basculerModeVoyage(); });
+        // Le chat ouvert, c'est la croix qui le ferme (v287).
+        b.addEventListener("click", () => {
+            clic();
+            if (chatOuvert()) { if (typeof window.fermerChatbox === "function") window.fermerChatbox(); return; }
+            window.basculerModeVoyage();
+        });
         ecran.appendChild(b);
+        // Le chat s'ouvre ou se ferme : le bouton change de visage.
+        const chat = $("fenetre-chatbox");
+        if (chat && typeof MutationObserver === "function") new MutationObserver(actualiserBouton).observe(chat, { attributes: true, attributeFilter: ["style"] });
     }
     return b;
 }
+// v287 — Nico : « quand le chat est ouvert, à la place du bouton déplacement,
+// mets une croix pour fermer le chatbox ». Le même bouton, à la même place.
+const chatOuvert = () => { const chat = $("fenetre-chatbox"); return !!chat && chat.style.display === "flex"; };
+const IMAGE_CROIX_CHAT = "data:image/svg+xml;utf8," + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="29" fill="#e8d5a5" stroke="#5c3a21" stroke-width="4"/>`
+    + `<path d="M21 21 L43 43 M43 21 L21 43" stroke="#5c3a21" stroke-width="6" stroke-linecap="round"/></svg>`);
+window.chatOuvertVoyage = chatOuvert;
 function actualiserBouton() {
     const b = bouton();
     if (!b) return;
     const rouvrir = $("btn-rouvrir-menu");
-    const visible = !!window.ID_PARTIE_COURANTE && !!rouvrir && rouvrir.style.display !== "none";
+    const fermerChat = chatOuvert();
+    // Le chat ouvert cache le menu (et son bouton) : la croix, elle, se montre.
+    const visible = !!window.ID_PARTIE_COURANTE && (fermerChat || (!!rouvrir && rouvrir.style.display !== "none"));
     b.style.display = visible ? "block" : "none";
+    b.classList.toggle("fermer-chat", fermerChat);
+    // Les boutons voisins (le retour au monde) se poussent d'une place.
+    document.body.classList.toggle("chat-ouvert", fermerChat);
+    const image = fermerChat ? IMAGE_CROIX_CHAT : IMAGE_BOUTON_VOYAGE;
+    if (b.getAttribute("src") !== image) b.src = image;
+    if (fermerChat) { b.alt = b.title = "Fermer le chat"; b.classList.remove("occupe", "bloque", "actif"); return; }
+    b.alt = "Voyager";
     const combat = combatEnCours();
     b.classList.toggle("occupe", !!voyage);
     b.classList.toggle("bloque", combat);

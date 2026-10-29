@@ -134,6 +134,16 @@ const faux = { verdict: { combat: true, raison: "Les gardes de Dame Koré tirent
                cle2EnPanne: false, peintures: true, nombre: 2 };
 await p.exposeFunction('__fauxGemini', (o) => Object.assign(faux, o));
 const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+// Les cadres que « voit » MIA_TERRAIN_COMBAT (v287) : deux colonnes, un bassin,
+// des gravats — et un cadre démesuré, à écarter.
+const CADRES_TERRAIN = [
+  { sorte: "mur", nom: "colonne ouest", box_2d: [60, 100, 170, 170] },
+  { sorte: "mur", nom: "colonne est", box_2d: [60, 300, 170, 370] },
+  { sorte: "infranchissable", nom: "bassin sacré", box_2d: [400, 420, 600, 580] },
+  { sorte: "difficile", nom: "gravats", box_2d: [750, 80, 950, 300] },
+  { sorte: "mur", nom: "tout le temple", box_2d: [0, 0, 900, 900] },
+  { sorte: "brouillard", nom: "inconnu", box_2d: [1, 2, 3, 4] }
+];
 await p.route('**generativelanguage.googleapis.com/**', async r => {
   const url = r.request().url();
   const cle = (url.match(/key=([^&]+)/) || [])[1] || "";
@@ -161,10 +171,9 @@ await p.route('**generativelanguage.googleapis.com/**', async r => {
   } else if (mia === "MIA_ENNEMIS") texte = JSON.stringify({ nombre: faux.nombre,
       ennemis: [{ nom: "Dame Koré", pnj: "Dame Koré", description_physique: "Une prêtresse au visage sévère" }, { nom: "Garde à la lance", pnj: "", description_physique: "Un garde casqué" }],
       renforts: [{ nom: "Archer du temple", description_physique: "Un archer tatoué" }] });
-  else if (mia === "MIA_PEINTURE_MURS") texte = JSON.stringify({ cases: faux.peintures ? [1, 2, 3, 999] : [] });
-  else if (mia === "MIA_PEINTURE_INACCESSIBLE") texte = JSON.stringify({ cases: faux.peintures ? [3, 10, 11] : [] });
-  else if (mia === "MIA_PEINTURE_DIFFICILE") texte = JSON.stringify({ cases: faux.peintures ? [20, 21] : [] });
-  else if (mia === "MIA_SPAWN") texte = JSON.stringify(faux.peintures ? { heros: 30, ennemis: 45, renforts: [2, 50, 60], raison: "Face à face dans la cour." } : {});
+  // (v287 : une seule IA encadre les zones sur la carte nue ; MIA_SPAWN répond en coordonnées.)
+  else if (mia === "MIA_TERRAIN_COMBAT") texte = JSON.stringify({ elements: faux.peintures ? CADRES_TERRAIN : [] });
+  else if (mia === "MIA_SPAWN") texte = JSON.stringify(faux.peintures ? { heros: [500, 150], ennemis: [500, 850], renforts: [[60, 960], [950, 960], [500, 500]], raison: "Face à face dans la cour." } : {});
   else if (mia === "NARRATEUR") texte = "Le silence retombe sur la cour du temple ; le sang des gardes se mêle à l'eau du bassin.";
   r.fulfill({ contentType: 'application/json', headers: {'Access-Control-Allow-Origin':'*'},
               body: JSON.stringify({ candidates: [{ content: { parts: [{ text: texte }] } }], usageMetadata: { totalTokenCount: 10 } }) });

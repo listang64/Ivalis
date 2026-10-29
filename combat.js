@@ -3513,6 +3513,11 @@ window.fantomeAllieKO = function(idPerso, data, taille) {
 //  (200 % du pion, style.css). Tout est tiré d'une graine fixe : chaque
 //  leader porte la même aura, et le dessin ne change pas d'un rendu à l'autre.
 const RAYON_PION_AURA = 50;
+// v287 — Nico : « réduis en taille l'effet sous les tokens leaders ». L'anneau
+// reste collé au bord du médaillon ; tout ce qui déborde au-delà (langues de
+// fumée, halo, gouttelettes) va un peu plus qu'à moitié moins loin.
+const ETENDUE_AURA = 0.55;
+const auDelaAura = (d) => RAYON_PION_AURA + d * ETENDUE_AURA;
 function hasardAura(graine) {
     let n = graine;
     return () => { n = (n * 16807) % 2147483647; return (n - 1) / 2147483646; };
@@ -3565,13 +3570,13 @@ function gouttesAura() {
     const h = hasardAura(4242);
     const fuyantes = Array.from({ length: 12 }, () => {
         const angle = h() * 360, dur = 2.6 + h() * 2.4, debut = -h() * dur, r = 0.9 + h() * 1.1;
-        const depart = -(RAYON_PION_AURA + 6 + h() * 8), arrivee = -(RAYON_PION_AURA + 34 + h() * 14);
+        const depart = -auDelaAura(6 + h() * 8), arrivee = -auDelaAura(34 + h() * 14);
         return `<g transform="rotate(${fAura(angle)})"><circle cx="0" cy="${fAura(depart)}" r="${fAura(r)}" fill="#ff1f1f" opacity="0">
             <animate attributeName="cy" values="${fAura(depart)};${fAura(arrivee)}" dur="${fAura(dur)}s" begin="${fAura(debut)}s" repeatCount="indefinite"/>
             <animate attributeName="opacity" values="0;0.95;0.8;0" keyTimes="0;0.15;0.65;1" dur="${fAura(dur)}s" begin="${fAura(debut)}s" repeatCount="indefinite"/></circle></g>`;
     }).join("");
     const eparses = Array.from({ length: 10 }, () => {
-        const [x, y] = polaireAura(RAYON_PION_AURA + 26 + h() * 22, h() * Math.PI * 2);
+        const [x, y] = polaireAura(auDelaAura(26 + h() * 22), h() * Math.PI * 2);
         const dur = 2 + h() * 3;
         return `<circle cx="${fAura(x)}" cy="${fAura(y)}" r="${fAura(0.7 + h() * 1.2)}" fill="#e01010">
             <animate attributeName="opacity" values="0.25;0.9;0.25" dur="${fAura(dur)}s" begin="${fAura(-h() * dur)}s" repeatCount="indefinite"/></circle>`;
@@ -3580,14 +3585,14 @@ function gouttesAura() {
 }
 const SVG_AURA = `<svg viewBox="-100 -100 200 200" aria-hidden="true">
     <defs>
-      <radialGradient id="aura-feu" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="${RAYON_PION_AURA + 46}">
-        <stop offset="${fAura((RAYON_PION_AURA - 2) / (RAYON_PION_AURA + 46))}" stop-color="#ff1414" stop-opacity="0.95"/>
-        <stop offset="${fAura((RAYON_PION_AURA + 14) / (RAYON_PION_AURA + 46))}" stop-color="#ff2020" stop-opacity="0.6"/>
-        <stop offset="${fAura((RAYON_PION_AURA + 30) / (RAYON_PION_AURA + 46))}" stop-color="#ff4a4a" stop-opacity="0.25"/>
+      <radialGradient id="aura-feu" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="${auDelaAura(46)}">
+        <stop offset="${fAura((RAYON_PION_AURA - 2) / auDelaAura(46))}" stop-color="#ff1414" stop-opacity="0.95"/>
+        <stop offset="${fAura(auDelaAura(14) / auDelaAura(46))}" stop-color="#ff2020" stop-opacity="0.6"/>
+        <stop offset="${fAura(auDelaAura(30) / auDelaAura(46))}" stop-color="#ff4a4a" stop-opacity="0.25"/>
         <stop offset="1" stop-color="#ff6b6b" stop-opacity="0"/></radialGradient>
-      <radialGradient id="aura-halo-feu" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="${RAYON_PION_AURA + 30}">
-        <stop offset="${fAura((RAYON_PION_AURA - 4) / (RAYON_PION_AURA + 30))}" stop-color="#ff0000" stop-opacity="0.75"/>
-        <stop offset="${fAura((RAYON_PION_AURA + 8) / (RAYON_PION_AURA + 30))}" stop-color="#ff1a1a" stop-opacity="0.3"/>
+      <radialGradient id="aura-halo-feu" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="${auDelaAura(30)}">
+        <stop offset="${fAura((RAYON_PION_AURA - 4) / auDelaAura(30))}" stop-color="#ff0000" stop-opacity="0.75"/>
+        <stop offset="${fAura(auDelaAura(8) / auDelaAura(30))}" stop-color="#ff1a1a" stop-opacity="0.3"/>
         <stop offset="1" stop-color="#ff1a1a" stop-opacity="0"/></radialGradient>
       <radialGradient id="aura-eclat" cx="0.5" cy="0.5" r="0.5">
         <stop offset="0" stop-color="#ffffff" stop-opacity="1"/><stop offset="0.35" stop-color="#ff8080" stop-opacity="0.8"/>
@@ -3598,13 +3603,13 @@ const SVG_AURA = `<svg viewBox="-100 -100 200 200" aria-hidden="true">
         <feGaussianBlur in="tordu" stdDeviation="0.45"/></filter>
       <filter id="aura-flou" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.4"/></filter>
     </defs>
-    <circle r="${RAYON_PION_AURA + 30}" fill="url(#aura-halo-feu)">
+    <circle r="${auDelaAura(30)}" fill="url(#aura-halo-feu)">
       <animate attributeName="opacity" values="0.75;1;0.75" dur="3.2s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1"/></circle>
     <g filter="url(#aura-fumee)">
-      ${nappeTournante(nappeAura(11, 9, 50, 0.62, 0.95), "url(#aura-feu)", 0.45, 26, 1)}
-      ${nappeTournante(nappeAura(23, 12, 34, 0.42, 0.75), "url(#aura-feu)", 0.65, 19, 1)}
-      ${nappeTournante(nappeAura(37, 8, 28, 0.5, -0.6), "url(#aura-feu)", 0.4, 33, -1)}
-      ${filetsTournants(filetsAura(53, 12, 27, 0.8), "#c80000", 2.4, 0.32, 19, 1)}
+      ${nappeTournante(nappeAura(11, 9, 50 * ETENDUE_AURA, 0.62, 0.95), "url(#aura-feu)", 0.45, 26, 1)}
+      ${nappeTournante(nappeAura(23, 12, 34 * ETENDUE_AURA, 0.42, 0.75), "url(#aura-feu)", 0.65, 19, 1)}
+      ${nappeTournante(nappeAura(37, 8, 28 * ETENDUE_AURA, 0.5, -0.6), "url(#aura-feu)", 0.4, 33, -1)}
+      ${filetsTournants(filetsAura(53, 12, 27 * ETENDUE_AURA, 0.8), "#c80000", 2.4, 0.32, 19, 1)}
     </g>
     <g>
       <animate attributeName="opacity" values="0.85;1;0.85" dur="2.4s" repeatCount="indefinite"/>
@@ -5431,7 +5436,8 @@ const PISTE_MARGE_ETATS = 26;
 // chiffres, pastilles) grandit d'un bloc, ancré en haut au centre. Les
 // mesures ci-dessus restent celles du dessin ; la largeur disponible, elle,
 // se lit à cette échelle (voir largeurMax).
-window.ECHELLE_PISTE_INITIATIVE = 2;
+// v287 — Nico : « réduis un peu la taille des tokens sur la piste d'initiative » : 1,7.
+window.ECHELLE_PISTE_INITIATIVE = 1.7;
 
 // L'ordre COMPLET de la manche en cours : { manche, ordre: [{id, initiative, idCarte}] }.
 window.PISTE_MANCHE = { manche: 0, ordre: [] };

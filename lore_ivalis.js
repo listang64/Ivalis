@@ -85,8 +85,32 @@
     };
     const CITES = { "Volcanisse": VOLCANISSE, "Arcaï": ARCAI };
 
-    window.LORE_IVALIS = { ordre: ORDRE, regions: REGIONS, cites: CITES,
+    // LES PEUPLES D'ELYRIA (v287, d'après la création des personnages) : les
+    // IA qui inventent des ennemis les tirent d'ici, selon la région et le récit.
+    const PEUPLES = {
+        "Humains": "le peuple le plus répandu d'Elyria, présent partout. Ils dirigent Arcaï (le Concordia magique, raciste envers les autres races) et, avec les Ankylars, Volcanisse (la Confrérie de la Cendre, fanatique).",
+        "Ankylars": "humanoïdes reptiliens robustes, à la peau écailleuse ; guerriers endurants et maîtres de la forge, peuple dominant de Volcanisse ; honneur, discipline, combat martial ; ils rejettent la magie.",
+        "Gobs": "petits, agiles, ingénieux, bricoleurs et inventeurs ; méprisés, souvent réduits en esclavage ; leur berceau est la forêt des murmures. Il existe aussi des Gobs géants, massifs et peu intelligents.",
+        "Vargens": "peuple bestial et puissant (des traits de bête), qui vit en clans ; méfiants, adeptes de la force brute ; traqués par les humains.",
+        "Ondaris": "peuple aquatique des mers, des îles et des côtes ; navigateurs et marchands, plus rusés que forts.",
+        "Ophiors": "humanoïdes vivant en symbiose avec les champignons et la forêt, fascinants et inquiétants ; pacifiques, mais ils se défendent.",
+        "Éthérés": "nomades aveugles du désert d'Etheria, aux sens extrêmement aiguisés ; silencieux, précis, en clans."
+    };
+    // L'ANTIQUITÉ, pour habiller qui que ce soit (v287, Nico : « que ça soit
+    // bien dans un monde antique »).
+    const ANTIQUITE = "Le monde est ANTIQUE FANTASTIQUE (mythologie, Antiquité magique), pas médiéval : armes et tenues de l'Antiquité — lances, glaives, sabres courbes, haches de bronze, javelots, arcs, frondes, boucliers ronds ou de hoplite, casques à cimier ou à nasal, cuirasses de bronze ou de lin, tuniques, chitons, pagnes, capes, sandales, bijoux de bronze et d'or. Jamais de chevalier en armure de plaques, d'arbalète, d'arme à feu, de heaume médiéval ni de château. Les bêtes et les monstres viennent de la mythologie (chimères, harpies, serpents géants, bêtes des marais ou du désert…) ou de la faune de la région.";
+
+    window.LORE_IVALIS = { ordre: ORDRE, regions: REGIONS, cites: CITES, peuples: PEUPLES, antiquite: ANTIQUITE,
         univers: "Antique Fantastique : mythologie, Antiquité magique." };
+
+    // CE QU'UNE IA DOIT SAVOIR POUR INVENTER DES ENNEMIS (v287) : l'Antiquité,
+    // les peuples, et la région où l'on se trouve (s'il y en a une).
+    window.contexteEnnemisIvalis = function (numeroRegion) {
+        const morceaux = [ANTIQUITE, "Les peuples d'Elyria :\n" + Object.entries(PEUPLES).map(([n, d]) => `- ${n} : ${d}`).join("\n")];
+        if (Number(numeroRegion) > 0) morceaux.push(window.loreDeLaRegion(numeroRegion));
+        else morceaux.push("L'Ordre d'Ivalis :\n- " + ORDRE.join("\n- "));
+        return morceaux.join("\n\n");
+    };
 
     // Le lore d'une carte régionale, prêt à glisser dans un prompt : la région,
     // la cité qu'elle abrite s'il y en a une, et l'Ordre d'Ivalis.

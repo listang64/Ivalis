@@ -962,12 +962,14 @@ function limiteMonstresTerrain() {
 // Noms de repli, utilisés si la clé Gemini est absente ou si l'appel échoue :
 // jamais de monstre sans nom sur le plateau.
 const NOMS_SECOURS = {
-    "DPS CAC":           ["Loup gris", "Bandit", "Gobelin rageur", "Hyène", "Écorcheur", "Sanglier"],
-    "TANK CAC":          ["Ours brun", "Troll de pierre", "Golem d'argile", "Colosse", "Rhinox", "Gardien"],
-    "SOUTIEN":           ["Chaman gobelin", "Guérisseur maudit", "Vieux druide", "Oracle", "Fétichiste"],
-    "DPS MAGE CAC":      ["Sorcier de mêlée", "Moine des braises", "Lame runique", "Danseur de foudre"],
-    "DPS DISTANCE":      ["Archer sylvestre", "Arbalétrier", "Frondeur", "Chasseur", "Sagittaire"],
-    "DPS MAGE DISTANCE": ["Mage noir", "Nécromancien", "Invocateur", "Liche mineure", "Pyromancien"]
+    // v287 : des noms de ce monde antique (ses peuples, ses bandes), plus de
+    // gobelin ni d'arbalétrier médiévaux.
+    "DPS CAC":           ["Pillard vargen", "Mercenaire de la Cendre", "Brigand gob", "Hyène des dunes", "Écorcheur des collines", "Sanglier noir"],
+    "TANK CAC":          ["Gob géant", "Hoplite ankylar", "Colosse vargen", "Taureau d'airain", "Gardien de bronze", "Ours des cimes"],
+    "SOUTIEN":           ["Prêtresse de la Cendre", "Augure du Concordia", "Rebouteux gob", "Oracle ophior", "Chamane vargen"],
+    "DPS MAGE CAC":      ["Thaumaturge ondari", "Moine des braises", "Lame du Concordia", "Danseur de foudre"],
+    "DPS DISTANCE":      ["Frondeur gob", "Archer éthéré", "Lanceur de javelots", "Chasseur vargen", "Archer de la Cendre"],
+    "DPS MAGE DISTANCE": ["Mage du Concordia", "Nécromancien de l'Engeance", "Invocateur ondari", "Pyromancien de la Cendre"]
 };
 
 // Ambiance donnée à l'IA pour chaque archetype : c'est ce qui oriente le nom.
@@ -1025,14 +1027,27 @@ window.nommerMonstresIA = async function(composition) {
         `${i + 1}. ${m.archetype} (palier ${m.palier})${m.leader || m.releveEnLeader ? " — LEADER du groupe" : ""} — ${AMBIANCE_ARCHETYPES[m.archetype] || ""}`
     ).join("\n");
 
-    const promptSysteme = `Tu es MIA_BESTIAIRE, l'IA qui baptise les créatures d'un jeu de rôle médiéval-fantastique sombre.
+    // v287 — Nico : « assure-toi qu'il génère en suivant les races et le RP, dans
+    // un monde antique ; les noms des ennemis doivent être représentatifs du RP ».
+    const region = Number(((window.PARTIE_DATA || {}).Position_Groupe || {}).Region) || 0;
+    const monde = typeof window.contexteEnnemisIvalis === "function" ? window.contexteEnnemisIvalis(region) : "Univers : Antique Fantastique.";
+    const crp = (window.PARTIE_DATA || {}).Combat_RP;
+    const recit = crp && (crp.Raison || crp.Adversaires) ? `${crp.Raison || ""} ${crp.Adversaires ? "(adversaires : " + crp.Adversaires + ")" : ""}`.trim() : "";
+    const deja = (window.MONSTRES_PARTIE || []).filter(m => m && !m.compagnonDe).map(m => m.prenom || m.nom).filter(Boolean);
+    const promptSysteme = `Tu es MIA_BESTIAIRE, l'IA qui baptise les créatures d'un jeu de rôle ANTIQUE FANTASTIQUE (mythologie, Antiquité magique — jamais médiéval).
 On te donne la composition d'un groupe d'ennemis. Tu dois trouver UN nom court et thématique par créature.
 
+LE MONDE :
+${monde}
+${recit ? `\nLE COMBAT EN COURS, DANS LE RÉCIT : ${recit}` : ""}${deja.length ? `\nDÉJÀ SUR LE TERRAIN : ${deja.slice(0, 12).join(", ")}` : ""}
+
 RÈGLES :
-- Le nom colle au rôle indiqué (un TANK est massif : ours, golem, troll ; un DPS MAGE DISTANCE est un lanceur de sorts : mage noir, nécromancien...).
+- Ce sont des gens ou des bêtes de CE monde : un peuple d'Elyria (selon la région, et le récit s'il y en a un), ou une bête de la faune locale ou de la mythologie. S'il y a déjà des ennemis sur le terrain ou un combat du récit, les nouveaux sont de LEUR bande (même peuple, même cause).
+- Le nom dit qui il est : son peuple, sa bande ou son métier (« Frondeur gob », « Hoplite de la Cendre », « Esclavagiste d'Arcaï »), ou un nom propre de son peuple avec un surnom. Jamais de nom médiéval ou de jeu vidéo générique (gobelin, troll, arbalétrier, chevalier, « Ombre sanglante »).
+- Le nom colle au rôle indiqué (un TANK est massif ; un DPS MAGE DISTANCE est un lanceur de sorts…).
 - 1 à 3 mots maximum, en français, sans numéro ni chiffre.
 - Le palier donne la stature : "Petit" = créature mineure, "Normal" = combattant ordinaire, "Boss" = créature légendaire au nom marquant.
-- Le LEADER du groupe porte un nom de chef (chef de meute, capitaine, grand prêtre...).
+- Le LEADER du groupe porte un titre de chef de CETTE bande (chef de meute, capitaine, grand prêtre, stratège…).
 - Tous les noms doivent être DIFFÉRENTS les uns des autres.
 - Renvoie EXACTEMENT ${composition.length} nom(s), dans le même ordre que la liste.`;
 
@@ -1368,6 +1383,17 @@ window.lireReserveMonstres = async function() {
     return snap.exists() ? (snap.data().Reserve_Monstres || []) : [];
 };
 
+// LE COMBAT EST PERDU, OU CLOS (v287) : plus aucun renfort n'entre. Nico :
+// « quand le combat a été perdu… ne lance pas de demande de spawn, c'est ça qui
+// a fait bugger le truc » — tous les héros à terre, une manche s'ouvrait encore
+// et sa vague entrait sur un combat que la défaite effaçait.
+window.combatPerduOuClos = function() {
+    const p = window.PARTIE_DATA || {};
+    if (p.ID_Rencontre && p.Fin_Combat && p.Fin_Combat.idRencontre === p.ID_Rencontre) return true;
+    const heros = (window.PERSOS_PARTIE || []).filter(x => typeof window.estHerosDuButin === "function" && window.estHerosDuButin(x));
+    return heros.length > 0 && typeof window.estCombattantMort === "function" && heros.every(x => window.estCombattantMort(x.idPersonnage));
+};
+
 const estRenfortPrevu = (r) => !!(r && (r.surReleve || r.quandVide || Number(r.entreeManche) > 0));
 
 // Fait entrer une partie de la réserve, d'un coup : leurs pions sur les cases
@@ -1402,6 +1428,7 @@ async function faireEntrerRenforts(reserve, entrent, pourquoi) {
 // encore entrée dans le combat compte comme debout).
 window.entrerRenfortsPrevus = async function(manche, options) {
     if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return [];
+    if (window.combatPerduOuClos()) return [];
     const reserve = await window.lireReserveMonstres();
     const prevus = reserve.filter(r => r && !r.surReleve && (Number(r.entreeManche) > 0 || r.quandVide));
     if (prevus.length === 0) return [];
@@ -1482,6 +1509,7 @@ window.tirerCasesPiegees = function(pct, tokensData) {
 };
 window.declencherPiegeApparition = async function(hex) {
     if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT || !hex) return [];
+    if (window.combatPerduOuClos()) return [];
     const regle = ((window.PARTIE_DATA || {}).Pieges_Renfort) || { possibilites: [{ Normal: 0, Petit: 2 }], pvPct: -50 };
     const creatures = (typeof window.tirerVagueApparition === "function"
         ? window.tirerVagueApparition({ possibilites: regle.possibilites, regle: "sansSoutien" }) : [])
@@ -1507,6 +1535,7 @@ window.declencherPiegeApparition = async function(hex) {
 // relever en leader, ceux qu'elle appelle entrent.
 window.entrerRenfortsDeReleve = async function() {
     if (!window.ID_PARTIE_COURANTE || !window.PLATEAU_VTT) return [];
+    if (window.combatPerduOuClos()) return [];
     const reserve = await window.lireReserveMonstres();
     const entrent = reserve.filter(r => r && r.surReleve);
     if (entrent.length === 0) return [];

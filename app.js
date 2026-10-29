@@ -2826,7 +2826,7 @@ window.fabriquerTokenIA = async function(options) {
     const blobPortrait = o.portrait ? await portraitVersBlobPng(o.portrait).catch(() => null) : null;
     const sujet = o.sujet || (blobPortrait ? "character" : "creature");
     const prompt = blobPortrait ? promptPionMedaillon(sujet)
-        : "Universe: Mythic Ancient Fantasy. " + promptPionMedaillon(sujet, o.description || "a fearsome creature");
+        : "Universe: Mythic Ancient Fantasy (Greco-Roman antiquity with magic — bronze, leather and linen; crested helmets; never medieval plate armour). " + promptPionMedaillon(sujet, o.description || "a fearsome creature");
     const modeles = blobPortrait
         ? [{ model: "gpt-image-2" }, { model: "gpt-image-1.5", input_fidelity: "high" }, { model: "gpt-image-1", input_fidelity: "high" }]
         : [{ model: "gpt-image-2" }, { model: "gpt-image-1.5" }, { model: "gpt-image-1" }];
@@ -4395,6 +4395,31 @@ window.envoyerMessageChat = async function() {
            Index_Initiative: nouvelIndex
        });
    }
+};
+
+// 6. PASSER SON TOUR (v287). Nico : « dans le chatbox, mets un bouton pour que
+// ton perso passe son tour : il ne dit rien ». Le tour de parole avance comme
+// après un message, sans rien écrire — seulement quand c'est son tour.
+window.passerTourChat = async function() {
+   if (!window.ID_PARTIE_COURANTE) return false;
+   if (typeof window.combatRPActif === "function" && window.combatRPActif()) return false;
+   const partie = window.PARTIE_DATA || {};
+   const ordre = partie.Ordre_Initiative || [];
+   const tour = window.tourDeParole(partie, window.PERSOS_PARTIE);
+   const moi = localStorage.getItem("ID_JOUEUR_COURANT");
+   if (tour.index === 999 || !tour.perso || tour.perso.idJoueur !== moi) {
+       const btn = document.getElementById("btn-passer-tour");
+       if (btn) {
+           btn.style.transform = "translateX(5px)";
+           setTimeout(() => btn.style.transform = "translateX(-5px)", 50);
+           setTimeout(() => btn.style.transform = "translateX(0)", 100);
+       }
+       return false;
+   }
+   let nouvelIndex = tour.index + 1;
+   if (nouvelIndex >= ordre.length) nouvelIndex = 999;
+   await updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), { Index_Initiative: nouvelIndex });
+   return true;
 };
 
 // =========================================================================

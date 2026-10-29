@@ -1366,6 +1366,26 @@ textarea.input-texte-parchemin {
   transform: scale(1.05);
 }
 
+/* v287 : « Passer » — le personnage passe son tour sans rien dire. */
+#btn-passer-tour {
+  background-color: rgba(74, 46, 27, 0.75);
+  color: #e8d5a5;
+  border: 1px solid #5c3a21;
+  border-radius: 10px;
+  padding: 0 16px;
+  font-family: 'Almendra', serif;
+  font-style: italic;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+#btn-passer-tour:hover { background-color: #5c3a21; border-color: #00ffff; box-shadow: 0 0 5px rgba(0, 255, 255, 0.5); transform: scale(1.05); }
+
+/* v287 : le chat ouvert, le bouton voyage devient la croix qui le ferme. */
+.btn-voyage.fermer-chat { filter: drop-shadow(-4px 4px 6px rgba(0, 0, 0, 0.7)); opacity: 1; cursor: pointer;
+  /* à gauche du bouton « Afficher l'interface » du chat (4vw, à 1,5vw du bord) */
+  right: calc(env(safe-area-inset-right, 0px) + 5.5vw + 12px); }
+body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px) + 5.5vw + 24px + clamp(34px, 2.8vw, 54px)); }
+
 .btn-fermer-chat {
   position: absolute;
   top: -15px;
@@ -5493,6 +5513,8 @@ textarea.input-texte-parchemin {
    transform : rien ne la décale quand le pion change de taille au zoom. Tout ce
    qui bouge vit dans son SVG. Deux fois la taille du pion (les langues de
    fumée vont jusqu'à une fois et demie son rayon), SOUS son image (z 2). */
+/* (v287 : l'effet est réduit DANS son dessin, combat.js, ETENDUE_AURA — la
+   boîte garde son repère, l'anneau reste collé au bord du pion.) */
 .aura-leader { position: absolute; left: -50%; top: -50%; width: 200%; height: 200%;
   pointer-events: none; z-index: 1; }
 .aura-leader svg { display: block; width: 100%; height: 100%; overflow: visible; }
