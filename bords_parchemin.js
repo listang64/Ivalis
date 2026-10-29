@@ -1,5 +1,5 @@
 // =========================================================================
-//  IVALIS — LES BORDS DE PARCHEMIN (v282, v283)
+//  IVALIS — LES BORDS DE PARCHEMIN (v282, v283, v284)
 // =========================================================================
 //  Nico : « sur les bords de mes images de map globale et de maps régionales,
 //  un effet de bord de parchemin usé, un peu déchiré, noirci à quelques
@@ -106,11 +106,13 @@
         // ça fluctue, mais que sur les bords »). Dans une zone peinte : les
         // morsures, les grandes déchirures.
         function profondeur(u, v, g, coins, z) {
-            let p = 0.003
-                + 0.009 * fbm(u * 4, v * 4, g, 3)                                    // l'ondulation
-                + 0.0035 * Math.max(0, fbm(u * 13, v * 13, g + 100, 2) - 0.45)       // de petites morsures
-                + 0.0025 * fbm(u * 70, v * 70, g + 200, 2);                          // les fibres
-            for (const c of coins) p += 0.009 * Math.exp(-Math.hypot(u - c[0], v - c[1]) / 0.03);   // les coins s'usent
+            // v284 — Nico : « sans peinture, juste un bord fin en mode parchemin,
+        // sur tout le bord, et pas épais » : une déchirure à peine marquée,
+        // régulière tout autour (des fibres, une très légère ondulation).
+        let p = 0.0015
+                + 0.003 * fbm(u * 4, v * 4, g, 3)                                    // l'ondulation
+                + 0.0016 * fbm(u * 70, v * 70, g + 200, 2);                          // les fibres
+            for (const c of coins) p += 0.004 * Math.exp(-Math.hypot(u - c[0], v - c[1]) / 0.02);   // les coins s'usent à peine
             if (z > 0) {
                 p += z * (0.012 + 0.03 * fbm(u * 3, v * 3, g + 50, 3)
                     + 0.06 * Math.max(0, fbm(u * 11, v * 11, g + 110, 3) - 0.4)
@@ -166,13 +168,12 @@
                         alpha = Math.max(0, Math.min(1, dechire / px + 0.5));
                         if (dechire >= -px) {
                             const e = Math.max(0, dechire);
-                            const tache = 0.55 + 0.9 * fbm(u * 24, v * 24, g + 500, 2);
-                            // La largeur du liseré bruni fluctue le long du bord (mince ici, plus large là).
-                            const f = fbm(u * 3.2, v * 3.2, g + 700, 3), large = 0.003 + 0.016 * f * f;
-                            const roussi = lisse(0.56, 0.7, fbm(u * 2.4, v * 2.4, g + 400, 3));
-                            const brulee = Math.max(z * lisse(0.25, 0.5, fbm(u * 2.4, v * 2.4, g + 400, 3)), 0.22 * roussi);
+                            const tache = 0.8 + 0.4 * fbm(u * 24, v * 24, g + 500, 2) + z * 0.5 * (fbm(u * 24, v * 24, g + 500, 2) - 0.5);
+                            // Le liseré bruni : fin et régulier tout autour (un peu plus large où c'est peint).
+                            const large = 0.003;
+                            const brulee = z * lisse(0.25, 0.5, fbm(u * 2.4, v * 2.4, g + 400, 3));
                             const fondu = 1 - lisse(BANDE * 0.55, BANDE * 0.95, dbord * px);
-                            brun += fondu * tache * (0.3 * Math.exp(-e / large) + 0.1 * Math.exp(-e / (2.5 * large)) + z * 0.5 * Math.exp(-e / 0.016));
+                            brun += fondu * tache * (0.55 * Math.exp(-e / large) + 0.12 * Math.exp(-e / (2.5 * large)) + z * 0.5 * Math.exp(-e / 0.016));
                             noir += fondu * tache * brulee * (1.1 * Math.exp(-e / (0.002 + 0.004 * z + 0.4 * large)) + z * 0.5 * Math.exp(-e / 0.024));
                             frange += (1 - Math.min(1, brulee * 2)) * 0.4 * Math.exp(-e / 0.0014);
                         }

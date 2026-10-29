@@ -8934,3 +8934,24 @@ glissé de souris qui peint sans faire glisser la carte, l'aperçu, la base,
 le pinceau rangé, la carte qui glisse sans outil, l'usure effacée ailleurs,
 le DEV éteint) ; les versions. Mis à jour : corrections_v282 (sans zone
 peinte, plus de trou ni de brûlure). Il mord sur l'ancien code (20 échecs).
+
+## v284 — Sans peinture, un bord fin de parchemin, tout autour
+
+Nico : « et sans peinture, fais juste un bord fin en mode parchemin sur tout
+le bord, et pas épais ».
+
+bords_parchemin.js : sans zone peinte, la déchirure ne mord plus que 0,4 % du
+petit côté en moyenne (0,55 % au plus creux, les coins à peine plus : moins
+de 0,7 %) ; plus de petites morsures ni d'ondulation marquée, seulement des
+fibres. Le liseré bruni a la même largeur partout (0,3 % du petit côté, plus
+de largeur qui fluctue, plus de roussi par tronçons) ; il est un peu plus
+appuyé, pour se voir tout le long ; la frange claire des fibres reste. Les
+zones peintes en DEV (v283) gardent leurs déchirures, brûlures et trous.
+
+corrections_v284.mjs (dans la suite) : le bord sans peinture, mesuré à la
+taille réelle (2048 × 1280) sur 6 graines : fin en moyenne, nulle part épais
+(coins compris), un liseré sur chacun des 20 tronçons des quatre côtés, rien
+de marqué au-delà de 2 %, ni trou ni brûlure ; un bord peint qui se déchire
+toujours ; les versions. Mis à jour : corrections_v283 (le bord ne fluctue
+presque plus), v282 (la déchirure moyenne peut descendre sous 1 %). Il mord
+sur l'ancien code (5 échecs).

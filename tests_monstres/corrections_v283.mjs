@@ -288,7 +288,9 @@ await section(async () => {
   verifier("le cœur intact, les coins usés", e.length === 12 && e.every(x => x.centre === 255 && x.coin === 0), JSON.stringify(e.map(x => [x.centre, x.coin])));
   verifier("un bord fin : la déchirure mord peu (en moyenne moins de 2,5 % du petit côté)", e.length === 12 && e.every(x => x.moy > 0.003 && x.moy < 0.025), JSON.stringify(e.map(x => f(x.moy))));
   verifier("…et jamais profond (moins de 3,5 % au plus creux)", e.length === 12 && e.every(x => x.max < 0.035), JSON.stringify(e.map(x => f(x.max))));
-  verifier("il fluctue (ce n'est pas une règle)", e.length === 12 && e.every(x => x.ecart > 0.0008), JSON.stringify(e.map(x => f(x.ecart))));
+  // v284 — Nico : « sans peinture, juste un bord fin, sur tout le bord » :
+  // il ne fluctue presque plus (corrections_v284.mjs).
+  verifier("(v284) régulier tout autour", e.length === 12 && e.every(x => x.ecart < 0.003), JSON.stringify(e.map(x => f(x.ecart))));
   verifier("ni trou, ni brûlure", e.length === 12 && e.every(x => x.perces === 0 && x.noir < 200), JSON.stringify(e.map(x => [x.perces, x.noir])));
   verifier("bruni, mais seulement le long du bord (rien au-delà de 6 %)", e.length === 12 && e.every(x => x.brun > 300 && x.loin === 0), JSON.stringify(e.map(x => [x.brun, x.loin])));
 });

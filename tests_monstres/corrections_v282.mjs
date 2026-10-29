@@ -320,7 +320,8 @@ await section(async () => {
   });
   const e = r.e;
   verifier("le cœur de la carte intact ; les coins rongés", e.length === 12 && e.every(x => x.centre === 255 && x.coin === 0 && x.coeur === 0), JSON.stringify(e.map(x => [x.centre, x.coin, x.coeur])));
-  verifier("un bord déchiré : la ligne ondule et se déchiquette (pas une règle)", e.length === 12 && e.every(x => x.ecart > 0.004 && x.moy > 0.01 && x.moy < 0.08 && x.sauts >= 2),
+  // v284 : le bord sans peinture est plus fin (moins de 1 % en moyenne).
+  verifier("un bord déchiré : la ligne ondule et se déchiquette (pas une règle)", e.length === 12 && e.every(x => x.ecart > 0.004 && x.moy > 0.003 && x.moy < 0.08 && x.sauts >= 2),
            JSON.stringify(e.slice(0, 4).map(x => [x.moy.toFixed(3), x.ecart.toFixed(4), x.sauts])));
   // v283 — Nico : « que ça aille moins sur la carte » ; les trous et les
   // brûlures ne naissent plus que là où le DEV a peint l'usure
