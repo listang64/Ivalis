@@ -8834,3 +8834,44 @@ l'aube »), v276 (20 %, le rayon), v277 (l'arrivée sans question, le retour
 par un lieu qui n'a pas pu naître, le « ! »), v272 (5 images de la traversée
 suffisent : leur nombre suit la vitesse de la machine du banc). Il mord sur
 l'ancien code (32 échecs).
+
+## v282 — Pendant un combat du récit, le groupe ne bouge pas ; les bords de parchemin
+
+LE COMBAT BLOQUE LE VOYAGE (voyage_groupe.js). Nico : « quand un combat RP
+est en cours, bloque la possibilité de se déplacer sur la map ». Tant que
+combatRPActif (préparation, combat, narration) : le bouton voyage s'éteint
+(.btn-voyage.bloque, son titre le dit) ; « Voyager » ne s'ouvre pas, une
+proposition est refusée, un « oui » au vote, au POI, « Repartir à l'aube »,
+« Reprendre la route » et les « Forcer » (DEV) aussi — avec une annonce.
+Ce qui ne déplace pas reste permis (« non », « Rester ici »). Un combat qui
+commence ferme le mode voyage ouvert. Le téléport DEV reste permis (il
+répare). deplacementBloqueParCombat() le dit.
+
+LES BORDS DE PARCHEMIN (bords_parchemin.js, script simple). Nico : « sur les
+bords de mes maps globale et régionales, un bord de parchemin usé, un peu
+déchiré, noirci à quelques endroits, parfois un peu de trous, aléatoire et
+procédural ». Deux images par carte, calculées une fois, d'après sa graine
+(1 pour le monde ; graineParcheminRegion(n) = 7919 n + 13) — le même bord
+pour tous, chaque carte le sien :
+  · le MASQUE (mask-image sur #carte-fond-jeu, sur #carte-region : l'image,
+    ses nuages, ses lieux) : une déchirure — grandes ondulations, morsures,
+    fibres déchiquetées, çà et là une déchirure profonde, coins usés — et
+    zéro à trois trous près des bords (neuf cartes sur dix en ont) ;
+  · l'USURE (.parchemin-usure, juste sur l'image, sous le reste) : le bord
+    bruni partout, brûlé (presque noir) par tronçons, en taches ; une frange
+    claire de fibres là où il n'a pas brûlé ; le pourtour noirci des trous ;
+    elle s'éteint avant la limite de la bande calculée (13 % du petit côté).
+Le fond derrière (#conteneur-carte-fond) devient sombre, comme une table.
+Le calcul, pur, tourne dans un Worker (fabriqué à partir de son propre code ;
+à défaut, sur place) : la traversée des nuages ne s'arrête pas. Celui d'une
+carte régionale part dès que son image est chargée (pendant la plongée) et
+se pose à l'installation ; une autre carte retire d'abord l'ancien bord.
+
+corrections_v282.mjs (dans la suite) : le combat (bouton éteint, voyage
+refusé, proposition refusée, la nuit — repartir refusé, rester permis —, le
+retour au voyage après le combat, le mode voyage fermé par un combat qui
+commence) ; les bords, mesurés sur 12 graines (cœur intact, coins rongés,
+déchirure qui ondule et se déchiquette, des trous sur certaines cartes,
+noirci par endroits et bruni ailleurs, stable et propre à chaque carte) ; sur
+la page (le monde, la carte régionale, l'ordre des calques, le fond, le
+Worker) ; les versions. Il mord sur l'ancien code (19 échecs).

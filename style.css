@@ -619,7 +619,8 @@ body {
   height: 100%;
   overflow: hidden; 
   z-index: 0;
-  background-color: #F5F5DC;
+  /* v282 : la carte est un parchemin aux bords usés, posé sur un fond sombre. */
+  background-color: #1a140c;
   /* La carte du monde est fixe (v241) : ni pincement ni défilement du
      navigateur par-dessus — le doigt la fait seulement glisser. */
   touch-action: none;
@@ -5865,6 +5866,12 @@ textarea.input-texte-parchemin {
 .boite-voyage .boite-voyage-dev { margin-top: 8px; width: 100%; background: #fff; color: #a01212; border: 2px dashed #e01b1b; font-size: 12.5px; }
 .boite-voyage-boutons .boite-voyage-dev { width: auto; flex: 1; }
 /* « Discuter autour du feu de camp » (v281) : ouvre le chat, sans voter. */
+/* LES BORDS DE PARCHEMIN (v282, bords_parchemin.js) : la carte est découpée
+   (mask-image, posé en ligne) ; l'usure — le bruni, le brûlé, les fibres — se
+   pose sur son image, sous tout le reste. */
+.parchemin-usure { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background-size: 100% 100%; background-repeat: no-repeat; pointer-events: none; }
+/* Pendant un combat du récit, le bouton voyage est éteint (v282). */
+.btn-voyage.bloque { filter: grayscale(1) brightness(0.7); opacity: 0.6; }
 .boite-voyage .boite-voyage-feu { margin-top: 8px; width: 100%; background: linear-gradient(180deg, #7a3a12, #4a2008); color: #ffe2b0;
   border: 1px solid #c9772a; font-size: 13px; }
 

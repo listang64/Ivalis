@@ -603,6 +603,9 @@ window.ouvrirCarteRegionale = async function(numero, options) {
     etat.enTransition = true;
     const url = window.urlImageCarteRegionale(carte.image);
     const chargement = chargerImage(url);       // pendant la plongée et les nuages
+    // Le bord de parchemin (v282) se calcule pendant ce temps (à part).
+    const graineBord = typeof window.graineParcheminRegion === "function" ? window.graineParcheminRegion(n) : n;
+    chargement.then(img => { if (img && window.BordsParchemin) window.BordsParchemin.preparer({ graine: graineBord, aspect: img.naturalWidth / img.naturalHeight, cote: 2048 }); });
     const region = (window.REGIONS_CARTE || {})[n];
     etat.centreMonde = region && typeof window.centreRegion === "function" ? window.centreRegion(region.points) : { x: 1920, y: 1080 };
     if (typeof window.replierMenuLateral === "function") window.replierMenuLateral({ silencieux: true });
@@ -620,6 +623,11 @@ window.ouvrirCarteRegionale = async function(numero, options) {
         if (img && img.crossOrigin) imageEl.crossOrigin = "anonymous"; else imageEl.removeAttribute("crossorigin");
         imageEl.src = img ? img.src : url;
         etat.urlImage = img ? img.src : url;
+        // LES BORDS DE PARCHEMIN (v282, bords_parchemin.js) : la carte entière
+        // (son image, ses nuages, ses lieux) est découpée le long d'un bord usé ;
+        // l'usure se pose sur l'image, sous tout le reste.
+        if (window.BordsParchemin) window.BordsParchemin.appliquer($("carte-region"), { graine: graineBord, aspect: etat.largeur / etat.hauteur, cote: 2048, apres: imageEl })
+            .catch(e => console.error("Bord de parchemin :", e));
         const vue = $("vue-carte-region");
         vue.style.display = "block";
         vue.classList.add("arrivee");

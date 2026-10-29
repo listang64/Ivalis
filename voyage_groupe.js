@@ -497,6 +497,7 @@ window.votantsVoyageGroupe = votantsPartie;
 window.proposerVoyageGroupe = async function(proposition) {
     const prop = proposition || (choix && choix.proposition);
     if (!prop) return null;
+    if (bloqueParCombat()) { quitterChoix(); return { combat: true }; }
     const moi = idJoueur();
     const votants = votantsPartie();
     const v = {
@@ -534,6 +535,7 @@ window.proposerVoyageGroupe = async function(proposition) {
 window.voterVoyageGroupe = async function(reponse) {
     const id = voyage && voyage.Id;
     if (!id) return null;
+    if (reponse !== "non" && bloqueParCombat()) return { combat: true };
     const moi = idJoueur();
     const r = await transaction((data) => {
         const v = data.Voyage_Groupe;
@@ -554,6 +556,7 @@ window.voterVoyageGroupe = async function(reponse) {
 window.forcerVoyageGroupe = async function() {
     const id = voyage && voyage.Id;
     if (!id || !estDev()) return null;
+    if (bloqueParCombat()) return { combat: true };
     if (voyage.Etat === "nuit") return window.choisirNuitVoyageGroupe("repartir", { forcer: true });
     if (voyage.Etat === "poi") return window.voterPoiGroupe("oui", { forcer: true });
     if (voyage.Etat === "halte") return window.choisirHalteGroupe("reprendre", { forcer: true });
@@ -654,6 +657,7 @@ window.terminerEtapeVoyageGroupe = terminerEtape;
 window.voterPoiGroupe = async function(reponse, options) {
     const id = voyage && voyage.Id, poiId = voyage && voyage.Poi && voyage.Poi.Id;
     if (!id || !poiId) return null;
+    if (bloqueParCombat()) return { combat: true };
     const moi = idJoueur();
     const forcer = !!(options && options.forcer) && estDev();
     const createur = typeof window.peutCreerPoi === "function" && window.peutCreerPoi();
@@ -692,6 +696,7 @@ window.choisirHalteGroupe = async function(reponse, options) {
     const moi = idJoueur();
     const forcer = !!(options && options.forcer) && estDev();
     const voulu = reponse === "rester" ? "rester" : "reprendre";
+    if (voulu === "reprendre" && bloqueParCombat()) return { combat: true };
     const r = await transaction((data) => {
         const v = data.Voyage_Groupe;
         if (!memeVoyage(v, id) || v.Etat !== "halte" || !v.Poi) return null;
@@ -784,6 +789,7 @@ window.choisirNuitVoyageGroupe = async function(reponse, options) {
     const moi = idJoueur();
     const forcer = !!(options && options.forcer) && estDev();
     const voulu = reponse === "rester" ? "rester" : "repartir";
+    if (voulu === "repartir" && bloqueParCombat()) return { combat: true };
     const r = await transaction((data, date) => {
         const v = data.Voyage_Groupe;
         if (!memeVoyage(v, id) || v.Etat !== "nuit") return null;
@@ -1270,19 +1276,35 @@ function actualiserBouton() {
     const rouvrir = $("btn-rouvrir-menu");
     const visible = !!window.ID_PARTIE_COURANTE && !!rouvrir && rouvrir.style.display !== "none";
     b.style.display = visible ? "block" : "none";
+    const combat = combatEnCours();
     b.classList.toggle("occupe", !!voyage);
+    b.classList.toggle("bloque", combat);
     b.classList.toggle("actif", !!(choix && choix.type === "voyage"));
-    b.title = voyage ? "Un voyage est en cours" : (choix && choix.type === "voyage" ? "Annuler le voyage" : "Voyager");
+    b.title = combat ? MESSAGE_COMBAT : voyage ? "Un voyage est en cours" : (choix && choix.type === "voyage" ? "Annuler le voyage" : "Voyager");
 }
 
 // --- LE MODE VOYAGE (ce poste seulement) -----------------------------------
 window.modeChoixCarte = () => (choix ? choix.vue : null);
 window.choixVoyageGroupe = () => (choix ? { type: choix.type, vue: choix.vue, region: choix.region || null,
     proposition: choix.proposition ? JSON.parse(JSON.stringify(choix.proposition)) : null } : null);
+// PENDANT UN COMBAT DU RÉCIT, LE GROUPE NE BOUGE PAS (v282, Nico : « quand
+// un combat RP est en cours, bloque la possibilité de se déplacer sur la
+// map »). Ni nouveau voyage, ni « oui » qui ferait partir, ni reprise de la
+// route (nuit, POI, halte). Le téléport DEV reste permis (il répare).
+const combatEnCours = () => typeof window.combatRPActif === "function" && window.combatRPActif(partie);
+window.deplacementBloqueParCombat = combatEnCours;
+const MESSAGE_COMBAT = "Un combat est en cours : le groupe ne peut pas se déplacer.";
+function bloqueParCombat() {
+    if (!combatEnCours()) return false;
+    annoncer(MESSAGE_COMBAT);
+    return true;
+}
+
 window.basculerModeVoyage = function(oui) {
     const voulu = typeof oui === "boolean" ? oui : !(choix && choix.type === "voyage");
     if (!voulu) { quitterChoix(); return false; }
     if (!window.ID_PARTIE_COURANTE) return false;
+    if (bloqueParCombat()) return false;
     if (voyage) { annoncer("Un voyage est déjà en cours."); return false; }
     const pos = positionEffective();
     if (!pos) { annoncer("Le groupe n'a pas encore de place sur la carte (DEV : le téléporter)."); return false; }
@@ -1746,7 +1768,9 @@ window.appliquerVoyageDeLaPartie = function(data) {
     // Arrivés au lieu (v281) : le voyage vient de s'achever sur lui.
     const fin = partie.Voyage_Termine;
     if (fin && fin.Poi && fin.Poi.Id && Date.now() - (Number(fin.Le) || 0) < 120000) arriverAuPoi(fin.Poi);
-    const cle = JSON.stringify([partie.Position_Groupe || null, partie.Lieu_Actuel || "", v, partie.Voyage_Annule || null]);
+    // Un combat qui commence ferme le mode voyage de ce poste.
+    if (combatEnCours() && choix && choix.type === "voyage") quitterChoix();
+    const cle = JSON.stringify([partie.Position_Groupe || null, partie.Lieu_Actuel || "", v, partie.Voyage_Annule || null, combatEnCours()]);
     if (cle === derniereCle) return;
     derniereCle = cle;
     const avant = voyage;
