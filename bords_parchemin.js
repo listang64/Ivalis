@@ -316,6 +316,7 @@ self.onmessage = (e) => { const d = e.data, r = calculer(d.W, d.H, d.g, d.zones)
         st.webkitMaskImage = st.maskImage = `url("${r.masque}")`;
         st.webkitMaskSize = st.maskSize = "100% 100%";
         st.webkitMaskRepeat = st.maskRepeat = "no-repeat";
+        poserOmbre(element, r.masque);
         let couche = element.querySelector(":scope > .parchemin-usure");
         if (!couche) {
             couche = document.createElement("div");
@@ -331,12 +332,29 @@ self.onmessage = (e) => { const d = e.data, r = calculer(d.W, d.H, d.g, d.zones)
         element.__zonesParchemin = !!r.zones;
         return r;
     }
+    // L'OMBRE DU PARCHEMIN SUR LE SOL (v290). Nico : « l'ombre portée se fait
+    // sur les contours de mon image seulement ; il faudrait qu'elle prenne en
+    // compte les trous faits par les brûlures, sinon ce n'est pas réaliste ».
+    // Sa silhouette (sous la carte, dans son sol : .ombre-parchemin) porte le
+    // MÊME masque que le parchemin — bords déchirés et trous compris ; floutée
+    // et décalée, elle tombe sur le sable autour de la carte ET au fond de
+    // chaque trou.
+    function poserOmbre(element, masque) {
+        if (!element || !element.id) return;
+        document.querySelectorAll(`.ombre-parchemin[data-ombre-de="${element.id}"] .ombre-parchemin-forme`).forEach(forme => {
+            const st = forme.style;
+            st.webkitMaskImage = st.maskImage = masque ? `url("${masque}")` : "";
+            st.webkitMaskSize = st.maskSize = "100% 100%";
+            st.webkitMaskRepeat = st.maskRepeat = "no-repeat";
+        });
+    }
     function retirer(element) {
         if (!element) return;
         element.__bordParchemin = null;
         element.__graineParchemin = null;
         const st = element.style;
         st.webkitMaskImage = st.maskImage = "";
+        poserOmbre(element, null);
         const couche = element.querySelector(":scope > .parchemin-usure");
         if (couche) couche.remove();
         oublierProvisoire(element);

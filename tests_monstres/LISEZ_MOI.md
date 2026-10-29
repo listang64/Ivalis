@@ -9307,3 +9307,38 @@ Il échoue sur l'ancien code (13 échecs).
 
 Tests mis à jour : corrections_v275 (des pas marron foncé, une croix tracée à
 la plume) et corrections_v287 (sa section 1 est remplacée par ce test).
+
+## v290 — L'ombre du parchemin suit ses trous
+
+Nico, une capture à l'appui : « l'ombre portée se fait sur les contours de mon
+image seulement ; il faudrait que l'ombre portée de la carte prenne en compte
+les trous faits par les brûlures, sinon ce n'est pas réaliste ».
+
+Avant, l'ombre était un rectangle (le ::after du sol, en box-shadow) : elle
+ignorait les bords déchirés et les trous de brûlure. Maintenant :
+- Le sol de chaque carte (#table-monde, #carte-region-table) porte une
+  silhouette, .ombre-parchemin > .ombre-parchemin-forme.
+- bords_parchemin.js (poserOmbre) lui recopie le MÊME masque que le
+  parchemin, bords déchirés et trous compris, à chaque nouveau bord (aperçu
+  du pinceau compris), et l'en retire avec lui.
+- Le flou s'applique au parent, donc après la découpe. L'ombre est décalée
+  vers le bas à droite, puisque la lumière du sable vient du haut à gauche,
+  et donnée en pixels de la carte : elle glisse et zoome avec elle.
+- Elle tombe sur le sable autour de la carte ET au fond de chaque trou, au
+  pied de ses bords haut et gauche.
+- La carte du monde (3840 px, bien plus réduite à l'écran) a une ombre plus
+  grande d'autant.
+
+corrections_v290.mjs (dans la suite), sur la vraie page et avec un grand
+trou de brûlure, vérifie :
+- la silhouette porte le même masque que la carte (régionale et monde) ;
+- elle est floutée, décalée vers le bas à droite et placée sous la carte ;
+- il n'y a plus d'ombre rectangulaire ;
+- aux pixels (avec et sans l'ombre, et le sable seul pour repérer le trou) :
+  le sable des trous est assombri, et bien plus au pied des bords haut et
+  gauche qu'à l'opposé ;
+- les versions.
+
+Il échoue sur l'ancien code (8 échecs).
+
+Test mis à jour : corrections_v288 (l'ombre est la silhouette floutée).

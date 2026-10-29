@@ -257,7 +257,7 @@ function construireVue() {
     vue.className = "vue-carte-region";
     vue.style.display = "none";
     vue.innerHTML = `
-        <div id="carte-region-table" class="sol-carte"></div>
+        <div id="carte-region-table" class="sol-carte"><div class="ombre-parchemin" data-ombre-de="carte-region"><div class="ombre-parchemin-forme"></div></div></div>
         <div class="table-ombre"></div>
         <div id="carte-region" class="carte-region">
           <img id="carte-region-image" class="carte-region-image" alt="" draggable="false">

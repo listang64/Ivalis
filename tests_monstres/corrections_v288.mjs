@@ -287,11 +287,12 @@ titre("2. SOUS LES CARTES : LE SABLE, ET L'OMBRE DU PARCHEMIN POSÉ DESSUS");
 // =========================================================================
 await section(async () => {
   const fonds = await p.evaluate(() => ["table-monde", "carte-region-table"].map(id => { const el = document.getElementById(id);
-    const a = el && getComputedStyle(el, "::before"), o = el && getComputedStyle(el, "::after");
-    return { id, img: a ? a.backgroundImage : "", rep: a ? a.backgroundRepeat : "", ombre: o ? o.boxShadow : "" }; }));
+    // (v290 : l'ombre n'est plus un rectangle mais la silhouette du parchemin, floutée.)
+    const a = el && getComputedStyle(el, "::before"), o = el && el.querySelector(".ombre-parchemin");
+    return { id, img: a ? a.backgroundImage : "", rep: a ? a.backgroundRepeat : "", ombre: o ? getComputedStyle(o).filter : "" }; }));
   verifier("le même sable sous la carte du monde et sous les cartes régionales, en mosaïque", fonds.every(f => /sable\.jpg/.test(f.img) && f.rep === "repeat") && fonds[0].img === fonds[1].img,
            JSON.stringify(fonds.map(f => f.img)));
-  verifier("l'ombre du parchemin sur le sable (sous chaque carte)", fonds.every(f => f.ombre && f.ombre !== "none"), JSON.stringify(fonds.map(f => f.ombre.slice(0, 40))));
+  verifier("l'ombre du parchemin sur le sable (sous chaque carte)", fonds.every(f => /blur/.test(f.ombre)), JSON.stringify(fonds.map(f => f.ombre.slice(0, 40))));
   // Sur un écran très large, à côté de la carte du monde : le sable est plus
   // sombre au ras du parchemin (son ombre) que plus loin.
   await p.evaluate(() => window.fermerCarteRegionale && window.fermerCarteRegionale({ sansTransition: true }));

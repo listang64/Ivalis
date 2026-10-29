@@ -6169,11 +6169,17 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 .sol-carte { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
 .sol-carte::before { content: ""; position: absolute; left: -200%; top: -200%; width: 500%; height: 500%;
   background-image: url('images/sable.jpg?v=1'); background-size: auto 20%; background-repeat: repeat; }
-/* L'ombre du parchemin posé sur le sable : un peu en retrait de son bord
-   déchiré, portée vers le bas à droite (la lumière du sable vient du haut à
-   gauche). En pixels de la carte : elle grandit et rétrécit avec elle. */
-.sol-carte::after { content: ""; position: absolute; inset: 0.4%;
-  box-shadow: 12px 24px 80px 16px rgba(60, 38, 12, 0.55), 4px 8px 18px 3px rgba(50, 30, 10, 0.5); }
+/* L'ombre du parchemin posé sur le sable (v290) : sa silhouette exacte (le
+   masque du parchemin, bords déchirés et trous de brûlure compris — recopié
+   par bords_parchemin.js), floutée et portée vers le bas à droite (la
+   lumière du sable vient du haut à gauche). En pixels de la carte : elle
+   grandit et rétrécit avec elle. Le flou s'applique APRÈS la découpe (sur le
+   parent), sinon il n'adoucirait que le rectangle. */
+.ombre-parchemin { position: absolute; inset: 0; transform: translate(14px, 26px); filter: blur(22px); pointer-events: none; }
+.ombre-parchemin-forme { position: absolute; inset: 0; background: rgba(45, 28, 8, 0.6); }
+/* La carte du monde fait 3840 px et s'affiche bien plus réduite : son ombre,
+   en pixels de la carte, est plus grande d'autant. */
+#table-monde .ombre-parchemin { transform: translate(26px, 46px); filter: blur(40px); }
 #table-monde { width: 3840px; height: 2160px; }
 .table-ombre { position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(ellipse 80% 75% at 50% 45%, rgba(40, 25, 5, 0) 45%, rgba(40, 25, 5, 0.3) 100%); }
