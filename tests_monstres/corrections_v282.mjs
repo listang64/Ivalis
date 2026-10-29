@@ -322,9 +322,12 @@ await section(async () => {
   verifier("le cœur de la carte intact ; les coins rongés", e.length === 12 && e.every(x => x.centre === 255 && x.coin === 0 && x.coeur === 0), JSON.stringify(e.map(x => [x.centre, x.coin, x.coeur])));
   verifier("un bord déchiré : la ligne ondule et se déchiquette (pas une règle)", e.length === 12 && e.every(x => x.ecart > 0.004 && x.moy > 0.01 && x.moy < 0.08 && x.sauts >= 2),
            JSON.stringify(e.slice(0, 4).map(x => [x.moy.toFixed(3), x.ecart.toFixed(4), x.sauts])));
+  // v283 — Nico : « que ça aille moins sur la carte » ; les trous et les
+  // brûlures ne naissent plus que là où le DEV a peint l'usure
+  // (corrections_v283.mjs) : sans zone peinte, un bord fin et bruni.
   const troues = e.filter(x => x.perces > 20).length;
-  verifier("parfois des trous (pas sur toutes les cartes, pas jamais)", troues >= 4 && troues <= 11, `${troues} cartes trouées sur 12`);
-  verifier("noirci (brûlé) par endroits, bruni ailleurs", e.filter(x => x.noir > 200).length >= 6 && e.length === 12 && e.every(x => x.brun > 500), JSON.stringify(e.slice(0, 4).map(x => [x.noir, x.brun])));
+  verifier("(v283) sans zone peinte : aucun trou", troues === 0, `${troues} cartes trouées sur 12`);
+  verifier("(v283) sans zone peinte : bruni, pas brûlé", e.length === 12 && e.every(x => x.noir < 200 && x.brun > 300), JSON.stringify(e.slice(0, 4).map(x => [x.noir, x.brun])));
   verifier("aléatoire mais stable : une même carte a toujours le même bord, chaque carte le sien", r.meme && r.differents === 12, `${r.differents} bords différents`);
   // Sur la page : la carte du monde, la carte régionale ouverte.
   await attendreQue(async () => await p.evaluate(() => !!document.querySelector("#carte-fond-jeu > .parchemin-usure") && !!document.querySelector("#carte-region > .parchemin-usure")), 10000);

@@ -5688,6 +5688,15 @@ textarea.input-texte-parchemin {
 .popup-regions-outil.actif { background: #a01212; }
 .popup-regions-outil.actif svg { stroke: #fff; }
 .popup-regions-taille { flex: 1; display: flex; align-items: center; }
+/* v283 : le pinceau d'usure de la carte du monde (usure_monde.js) — au-dessus
+   des boîtes en édition ; il ne prend le doigt qu'avec un outil en main. */
+.carte-monde-usure-peinture { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: none; z-index: 70; pointer-events: none; }
+.carte-monde-usure-peinture.outil { pointer-events: auto; cursor: crosshair; touch-action: none; }
+/* v283 : ce que peint le pinceau (les nuages, l'usure du parchemin). */
+.popup-regions-calques { display: flex; gap: 6px; margin: 2px 0 6px; }
+.popup-regions-calque { flex: 1; padding: 6px 4px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 12px;
+  background: #fff8e6; border: 2px solid #a01212; color: #5a0a0a; }
+.popup-regions-calque.actif { background: #a01212; color: #fff; }
 .popup-regions-taille input { width: 100%; accent-color: #a01212; }
 
 /* =========================================================================

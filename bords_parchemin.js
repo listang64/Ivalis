@@ -1,5 +1,5 @@
 // =========================================================================
-//  IVALIS — LES BORDS DE PARCHEMIN (v282)
+//  IVALIS — LES BORDS DE PARCHEMIN (v282, v283)
 // =========================================================================
 //  Nico : « sur les bords de mes images de map globale et de maps régionales,
 //  un effet de bord de parchemin usé, un peu déchiré, noirci à quelques
@@ -16,6 +16,14 @@
 //      bruni partout, NOIRCI (brûlé) par endroits, en taches ; une frange claire
 //      de fibres là où le papier n'a pas brûlé ; le pourtour noirci des trous.
 //
+//  v283 — Nico : « que ça aille moins sur la carte, au risque de plus voir la
+//  carte ; que ça fluctue, mais que sur les bords… Crée-moi un pinceau dans
+//  DEV pour que je puisse peindre les zones où tu peux brûler, faire des
+//  trous ». PAR DÉFAUT, le bord est mince et léger (une fine déchirure qui
+//  ondule, un liseré bruni) ; les brûlures, les grandes déchirures et les
+//  trous ne naissent QUE dans les zones peintes en DEV (usure_parchemin.js
+//  pour la carte du monde, cartes_regionales.js pour chaque région).
+//
 //  Le calcul se fait sur une toile 2D, seulement dans la bande du bord (et
 //  autour des trous) : quelques centaines de millisecondes au plus, une fois.
 //  Les images sont gardées (une par carte) le temps de la page.
@@ -27,6 +35,8 @@
     // déchire la carte — ou, à défaut, ici même.
     function noyau() {
         const BANDE = 0.13;              // la bande travaillée, en part du petit côté
+        const SEUIL_TROU = 1.12;          // dans une zone peinte : au-delà, le papier est percé
+        const TORSION = 0.08;            // de combien la zone peinte est tordue, au plus (en part de la largeur)
 
         // --- LE BRUIT (une graine par carte) ----------------------------------
         function hachage(x, y, g) {
@@ -52,48 +62,74 @@
         }
         const lisse = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
+        // --- LES ZONES PEINTES (v282b) -------------------------------------------
+        // La grille peinte en DEV (0/1, colonnes × lignes) adoucie en un champ
+        // de 0 à 1 (deux flous en boîte), lue au point (u, v en parts de l'image).
+        function champDesZones(zones) {
+            if (!zones || !zones.cases || !(zones.colonnes > 0) || !(zones.lignes > 0)) return null;
+            const C = zones.colonnes, L = zones.lignes, R = 2;
+            let a = Float32Array.from(zones.cases, x => (x ? 1 : 0));
+            if (!a.some(x => x)) return null;
+            for (let passe = 0; passe < 2; passe++) {
+                const b = new Float32Array(C * L), c = new Float32Array(C * L);
+                for (let l = 0; l < L; l++) for (let k = 0; k < C; k++) { let t = 0, n = 0; for (let d = -R; d <= R; d++) { const kk = k + d; if (kk >= 0 && kk < C) { t += a[l * C + kk]; n++; } } b[l * C + k] = t / n; }
+                for (let l = 0; l < L; l++) for (let k = 0; k < C; k++) { let t = 0, n = 0; for (let d = -R; d <= R; d++) { const ll = l + d; if (ll >= 0 && ll < L) { t += b[ll * C + k]; n++; } } c[l * C + k] = t / n; }
+                a = c;
+            }
+            // Le plein d'une zone, même étroite, vaut 1 (le flou ne l'éteint pas).
+            for (let i = 0; i < a.length; i++) a[i] = Math.min(1, a[i] * 1.6);
+            const lire = (u, v) => {
+                const x = Math.max(0, Math.min(C - 1.001, u * C - 0.5)), y = Math.max(0, Math.min(L - 1.001, v * L - 0.5));
+                const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, i = y0 * C + x0;
+                const h = a[i] + (a[i + 1] - a[i]) * fx, b2 = a[i + C] + (a[i + C + 1] - a[i + C]) * fx;
+                return h + (b2 - h) * fy;
+            };
+            // Les cellules où il y a quelque chose, élargies de ce que la zone
+            // peut être tordue (TORSION) : on ne calcule que là.
+            const base = new Uint8Array(C * L);
+            for (let i = 0; i < a.length; i++) if (a[i] > 0.005) base[i] = 1;
+            const D = Math.ceil(TORSION * C) + 1, ligne = new Uint8Array(C * L), actif = new Uint8Array(C * L);
+            for (let l = 0; l < L; l++) for (let k = 0; k < C; k++) {
+                if (!base[l * C + k]) continue;
+                for (let kk = Math.max(0, k - D); kk <= Math.min(C - 1, k + D); kk++) ligne[l * C + kk] = 1;
+            }
+            for (let l = 0; l < L; l++) for (let k = 0; k < C; k++) {
+                if (!ligne[l * C + k]) continue;
+                for (let ll = Math.max(0, l - D); ll <= Math.min(L - 1, l + D); ll++) actif[ll * C + k] = 1;
+            }
+            return { lire, actif, C, L };
+        }
+
         // --- LE BORD ------------------------------------------------------------
-        // La profondeur de la déchirure à cet endroit (en part du petit côté).
-        function profondeur(u, v, g, coins) {
-            let p = 0.005
-                + 0.030 * fbm(u * 3, v * 3, g, 3)                                   // les grandes ondulations
-                + 0.045 * Math.max(0, fbm(u * 11, v * 11, g + 100, 3) - 0.42)      // les morsures
-                + 0.005 * fbm(u * 70, v * 70, g + 200, 2)                            // les fibres, déchiquetées
-                + 0.16 * Math.max(0, fbm(u * 1.6, v * 1.6, g + 300, 2) - 0.6);     // çà et là, une déchirure profonde
-            // Les coins s'usent plus que le reste.
-            for (const c of coins) {
-                const d = Math.hypot(u - c[0], v - c[1]);
-                p += 0.035 * Math.exp(-d / 0.05);
+        // La profondeur de la déchirure (en part du petit côté). Partout : un bord
+        // mince, léger, qui fluctue (Nico : « que ça aille moins sur la carte… que
+        // ça fluctue, mais que sur les bords »). Dans une zone peinte : les
+        // morsures, les grandes déchirures.
+        function profondeur(u, v, g, coins, z) {
+            let p = 0.003
+                + 0.009 * fbm(u * 4, v * 4, g, 3)                                    // l'ondulation
+                + 0.0035 * Math.max(0, fbm(u * 13, v * 13, g + 100, 2) - 0.45)       // de petites morsures
+                + 0.0025 * fbm(u * 70, v * 70, g + 200, 2);                          // les fibres
+            for (const c of coins) p += 0.009 * Math.exp(-Math.hypot(u - c[0], v - c[1]) / 0.03);   // les coins s'usent
+            if (z > 0) {
+                p += z * (0.012 + 0.03 * fbm(u * 3, v * 3, g + 50, 3)
+                    + 0.06 * Math.max(0, fbm(u * 11, v * 11, g + 110, 3) - 0.4)
+                    + 0.006 * fbm(u * 70, v * 70, g + 250, 2)
+                    + 0.14 * Math.max(0, fbm(u * 1.6, v * 1.6, g + 300, 2) - 0.5));
             }
             return p;
         }
 
-        // Les trous : zéro à trois, près d'un bord, d'une forme irrégulière.
-        function trous(W, H, s, g) {
-            const n = Math.floor(hachage(7, 11, g) * 3.6 + 0.4);       // un sur dix sans trou
-            const liste = [];
-            for (let i = 0; i < n; i++) {
-                const h = (k) => hachage(i * 13 + k, i * 7 + 3 * k, g + 900);
-                const cote = Math.floor(h(1) * 4), long = 0.12 + 0.76 * h(2), retrait = (0.035 + 0.075 * h(3)) * s;
-                const r = (0.008 + 0.016 * h(4)) * s;
-                let x, y;
-                if (cote === 0) { x = long * W; y = retrait; }
-                else if (cote === 1) { x = W - retrait; y = long * H; }
-                else if (cote === 2) { x = long * W; y = H - retrait; }
-                else { x = retrait; y = long * H; }
-                liste.push({ x, y, r, g: g + 1000 + i * 17 });
-            }
-            return liste;
-        }
-
         // Calcule les deux images d'une carte (largeur × hauteur en pixels de
-        // calcul). Rend { masque, usure } : deux tableaux RGBA.
-        function calculer(W, H, graine) {
+        // calcul) ; `zones` : la grille peinte en DEV ({ colonnes, lignes, cases }),
+        // ou rien. Rend { masque, usure } : deux tableaux RGBA.
+        function calculer(W, H, graine, zones) {
             const s = Math.min(W, H), px = 1 / s, bande = BANDE * s;
             const m = new Uint8ClampedArray(W * H * 4), o = new Uint8ClampedArray(W * H * 4);
             for (let i = 0; i < W * H; i++) { m[i * 4] = m[i * 4 + 1] = m[i * 4 + 2] = 255; m[i * 4 + 3] = 255; }
             const coins = [[0, 0], [W / s, 0], [0, H / s], [W / s, H / s]];
             const g = graine | 0;
+            const champ = champDesZones(zones);
             // Ce que la couche d'usure reçoit en un point : du brun, du noir, de la frange.
             const brunR = 98, brunV = 62, brunB = 26, noirR = 24, noirV = 12, noirB = 4, clairR = 236, clairV = 222, clairB = 188;
             const poser = (k, brun, noir, frange) => {
@@ -110,45 +146,52 @@
                 o[k + 2] = Math.round((pb + o[k + 2] * ao * (1 - a)) / af);
                 o[k + 3] = Math.round(af * 255);
             };
-            // 1. LA BANDE DU BORD : la déchirure, le bruni, le noirci, la frange.
             for (let y = 0; y < H; y++) {
-                const dy = Math.min(y, H - 1 - y);
+                const dy = Math.min(y, H - 1 - y), v = y * px;
+                const ligneZone = champ ? Math.max(0, Math.min(champ.L - 1, Math.floor(y / H * champ.L))) : 0;
                 for (let x = 0; x < W; x++) {
                     const dbord = Math.min(x, W - 1 - x, dy);
-                    if (dbord > bande) { if (x < W - 1 - bande) x = Math.max(x, Math.floor(W - 1 - bande) - 1); continue; }
-                    const u = x * px, v = y * px;
-                    const dechire = dbord * px - profondeur(u, v, g, coins);
+                    const prochesDuBord = dbord <= bande;
+                    const dansZone = !!champ && champ.actif[ligneZone * champ.C + Math.min(champ.C - 1, Math.floor(x / W * champ.C))] === 1;
+                    if (!prochesDuBord && !dansZone) continue;
+                    const u = x * px;
+                    // La zone est lue un peu de travers (un champ de bruit la tord) :
+                    // ni rond de pinceau, ni escalier de cases ne se voient.
+                    const z = champ ? champ.lire(x / W + 2 * TORSION * (fbm(u * 4, v * 4, g + 800, 3) - 0.5), y / H + 2 * TORSION * (fbm(u * 4, v * 4, g + 850, 3) - 0.5) * W / H) : 0;
                     const k = (y * W + x) * 4;
-                    m[k + 3] = Math.round(255 * Math.max(0, Math.min(1, dechire / px + 0.5)));
-                    if (dechire < -px) continue;
-                    const e = Math.max(0, dechire);
-                    const brulee = lisse(0.44, 0.62, fbm(u * 2.4, v * 2.4, g + 400, 3));     // des tronçons brûlés
-                    const tache = 0.55 + 0.9 * fbm(u * 24, v * 24, g + 500, 2);               // en taches
-                    const brun = 0.62 * Math.exp(-e / 0.016) * tache + 0.12 * Math.exp(-e / 0.05);
-                    const noir = brulee * (1.1 * Math.exp(-e / 0.006) + 0.5 * Math.exp(-e / 0.024)) * tache;
-                    const frange = (1 - brulee) * 0.55 * Math.exp(-e / 0.0016);
-                    // L'usure s'éteint avant la limite de la bande (pas de cadre visible).
-                    const fondu = 1 - lisse(BANDE * 0.55, BANDE * 0.95, dbord * px);
-                    poser(k, brun * fondu, noir * fondu, frange);
+                    let alpha = 1, brun = 0, noir = 0, frange = 0;
+                    // 1. LE BORD : partout mince et léger ; brûlé et déchiré dans les zones peintes.
+                    if (prochesDuBord) {
+                        const dechire = dbord * px - profondeur(u, v, g, coins, z);
+                        alpha = Math.max(0, Math.min(1, dechire / px + 0.5));
+                        if (dechire >= -px) {
+                            const e = Math.max(0, dechire);
+                            const tache = 0.55 + 0.9 * fbm(u * 24, v * 24, g + 500, 2);
+                            // La largeur du liseré bruni fluctue le long du bord (mince ici, plus large là).
+                            const f = fbm(u * 3.2, v * 3.2, g + 700, 3), large = 0.003 + 0.016 * f * f;
+                            const roussi = lisse(0.56, 0.7, fbm(u * 2.4, v * 2.4, g + 400, 3));
+                            const brulee = Math.max(z * lisse(0.25, 0.5, fbm(u * 2.4, v * 2.4, g + 400, 3)), 0.22 * roussi);
+                            const fondu = 1 - lisse(BANDE * 0.55, BANDE * 0.95, dbord * px);
+                            brun += fondu * tache * (0.3 * Math.exp(-e / large) + 0.1 * Math.exp(-e / (2.5 * large)) + z * 0.5 * Math.exp(-e / 0.016));
+                            noir += fondu * tache * brulee * (1.1 * Math.exp(-e / (0.002 + 0.004 * z + 0.4 * large)) + z * 0.5 * Math.exp(-e / 0.024));
+                            frange += (1 - Math.min(1, brulee * 2)) * 0.4 * Math.exp(-e / 0.0014);
+                        }
+                    }
+                    // 2. DANS LES ZONES PEINTES : la brûlure gagne le cœur de la zone,
+                    //    en taches irrégulières ; le plus brûlé se perce.
+                    if (z > 0.02) {
+                        const q = z + 2.4 * (fbm(u * 6.5, v * 6.5, g + 600, 4) - 0.5) + 0.3 * (bruit(u * 30, v * 30, g + 620) - 0.5);
+                        const grain = 0.75 + 0.45 * bruit(u * 40, v * 40, g + 650);
+                        // Le noir serre le bord du trou ; le roussi s'étend autour, en taches.
+                        const charbon = Math.pow(lisse(SEUIL_TROU - 0.5, SEUIL_TROU - 0.01, q), 1.5);
+                        noir += grain * charbon;
+                        brun += 0.55 * (0.55 + 0.9 * fbm(u * 24, v * 24, g + 500, 2)) * lisse(SEUIL_TROU - 1.0, SEUIL_TROU - 0.35, q) * (1 - 0.6 * charbon);
+                        if (q > SEUIL_TROU) alpha = Math.min(alpha, 1 - lisse(SEUIL_TROU, SEUIL_TROU + 0.03, q));
+                    }
+                    m[k + 3] = Math.round(255 * alpha);
+                    if (alpha > 0) poser(k, brun, noir, frange);
                 }
             }
-            // 2. LES TROUS : percés, le pourtour noirci.
-            trous(W, H, s, g).forEach(t => {
-                const R = Math.ceil(t.r * 4.5);
-                const x0 = Math.max(0, Math.floor(t.x - R)), x1 = Math.min(W - 1, Math.ceil(t.x + R));
-                const y0 = Math.max(0, Math.floor(t.y - R)), y1 = Math.min(H - 1, Math.ceil(t.y + R));
-                for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-                    const d = Math.hypot(x - t.x, y - t.y);
-                    const rayon = t.r * (1 + 1.1 * (fbm(x / (t.r * 0.8), y / (t.r * 0.8), t.g, 4) - 0.5));
-                    const dedans = d - rayon;                                            // < 0 : le trou
-                    const k = (y * W + x) * 4;
-                    m[k + 3] = Math.min(m[k + 3], Math.round(255 * Math.max(0, Math.min(1, dedans + 0.5))));
-                    if (dedans < -1) continue;
-                    const e = Math.max(0, dedans) / t.r;
-                    const tache = 0.7 + 0.6 * bruit(x / (t.r * 0.35), y / (t.r * 0.35), t.g + 5);
-                    poser(k, 0.55 * Math.exp(-e / 1.5) * tache, (0.9 * Math.exp(-e / 0.25) + 0.35 * Math.exp(-e / 0.8)) * tache, 0);
-                }
-            });
             return { masque: m, usure: o };
         }
 
@@ -164,22 +207,22 @@
         if (travailleur !== null) return travailleur;
         try {
             const source = `const calculer = (${noyau.toString()})();
-self.onmessage = (e) => { const d = e.data, r = calculer(d.W, d.H, d.g);
+self.onmessage = (e) => { const d = e.data, r = calculer(d.W, d.H, d.g, d.zones);
   self.postMessage({ id: d.id, masque: r.masque, usure: r.usure }, [r.masque.buffer, r.usure.buffer]); };`;
             travailleur = new Worker(URL.createObjectURL(new Blob([source], { type: "text/javascript" })));
             travailleur.onmessage = (e) => { const t = attente.get(e.data.id); attente.delete(e.data.id); if (t) t.resoudre(e.data); };
             travailleur.onerror = () => {
                 travailleur = false;
-                attente.forEach((t) => t.resoudre(calculer(t.W, t.H, t.g)));
+                attente.forEach((t) => t.resoudre(calculer(t.W, t.H, t.g, t.zones)));
                 attente.clear();
             };
         } catch (e) { travailleur = false; }
         return travailleur;
     }
-    function tableaux(W, H, g) {
+    function tableaux(W, H, g, zones) {
         const w = ouvrier();
-        if (!w) return Promise.resolve(calculer(W, H, g));
-        return new Promise((resoudre) => { const id = ++numero; attente.set(id, { resoudre, W, H, g }); w.postMessage({ id, W, H, g }); });
+        if (!w) return Promise.resolve(calculer(W, H, g, zones));
+        return new Promise((resoudre) => { const id = ++numero; attente.set(id, { resoudre, W, H, g, zones }); w.postMessage({ id, W, H, g, zones }); });
     }
 
     const enUrl = (toile) => new Promise((resoudre) => {
@@ -187,32 +230,69 @@ self.onmessage = (e) => { const d = e.data, r = calculer(d.W, d.H, d.g);
         else resoudre(toile.toDataURL("image/png"));
     });
 
-    // Les deux images d'une carte, en adresses (gardées).
-    function fabriquer(largeur, hauteur, graine) {
-        const cle = `${graine}:${largeur}x${hauteur}`;
-        if (!cache.has(cle)) {
-            cache.set(cle, (async () => {
-                const t0 = performance.now();
-                const r = await tableaux(largeur, hauteur, graine | 0);
-                const toile = (donnees) => { const c = document.createElement("canvas"); c.width = largeur; c.height = hauteur;
-                    c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(donnees.buffer || donnees), largeur, hauteur), 0, 0); return c; };
-                const [m, u] = await Promise.all([enUrl(toile(r.masque)), enUrl(toile(r.usure))]);
-                const ms = Math.round(performance.now() - t0);
-                return { masque: m, usure: u, largeur, hauteur, graine, ms };
-            })());
-        }
+    // LES ZONES PEINTES, sous une forme unique : { colonnes, lignes, cases
+    // (Uint8Array), signature } — la grille arrive en base64 (la base) ou en
+    // cases (le brouillon du pinceau). Les bits en base64 : le même codage que
+    // les zones de nuages (cartes_regionales.js).
+    function encoder(cases) {
+        const octets = new Uint8Array(Math.ceil(cases.length / 8));
+        for (let i = 0; i < cases.length; i++) if (cases[i]) octets[i >> 3] |= (1 << (i & 7));
+        let s = "";
+        for (let i = 0; i < octets.length; i++) s += String.fromCharCode(octets[i]);
+        return btoa(s);
+    }
+    function decoder(texte, total) {
+        const cases = new Uint8Array(total);
+        let s = "";
+        try { s = atob(texte || ""); } catch (e) { return cases; }
+        for (let i = 0; i < total; i++) cases[i] = (s.charCodeAt(i >> 3) >> (i & 7)) & 1;
+        return cases;
+    }
+    function normaliserZones(zones) {
+        if (!zones || !zones.cases) return null;
+        const colonnes = Number(zones.colonnes) | 0, lignes = Number(zones.lignes) | 0;
+        if (!(colonnes > 0) || !(lignes > 0)) return null;
+        const total = colonnes * lignes;
+        let cases, texte;
+        if (typeof zones.cases === "string") { texte = zones.cases; cases = decoder(texte, total); }
+        else { cases = Uint8Array.from({ length: total }, (_, i) => (zones.cases[i] ? 1 : 0)); texte = encoder(cases); }
+        if (!cases.some(x => x)) return null;
+        return { colonnes, lignes, cases, signature: `${colonnes}x${lignes}:${texte}` };
+    }
+
+    // Les deux images d'une carte, en adresses. Gardées (une par carte et par
+    // peinture) ; `provisoire` (l'aperçu pendant que le DEV peint) : pas gardées.
+    function fabriquer(largeur, hauteur, graine, zones, provisoire) {
+        const z = normaliserZones(zones);
+        const cle = `${graine}:${largeur}x${hauteur}:${z ? z.signature : "-"}`;
+        const calcul = async () => {
+            const t0 = performance.now();
+            const r = await tableaux(largeur, hauteur, graine | 0, z ? { colonnes: z.colonnes, lignes: z.lignes, cases: z.cases } : null);
+            const toile = (donnees) => { const c = document.createElement("canvas"); c.width = largeur; c.height = hauteur;
+                c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(donnees.buffer || donnees), largeur, hauteur), 0, 0); return c; };
+            const [m, u] = await Promise.all([enUrl(toile(r.masque)), enUrl(toile(r.usure))]);
+            const ms = Math.round(performance.now() - t0);
+            return { masque: m, usure: u, largeur, hauteur, graine, zones: !!z, provisoire: !!provisoire, ms };
+        };
+        if (provisoire && !cache.has(cle)) return calcul();
+        if (!cache.has(cle)) cache.set(cle, calcul());
         return cache.get(cle);
     }
 
     // Pose le bord sur `element` : son masque, et la couche d'usure (insérée
     // juste après `apres`, ou en premier enfant). `aspect` = largeur / hauteur
-    // de l'élément ; le calcul se fait sur `cote` pixels pour le grand côté.
+    // de l'élément ; le calcul se fait sur `cote` pixels pour le grand côté ;
+    // `zones` : là où le DEV a peint l'usure (brûlures, déchirures, trous).
     const dimensions = (aspect, cote) => ({ largeur: Math.round(aspect >= 1 ? cote : cote * aspect), hauteur: Math.round(aspect >= 1 ? cote / aspect : cote) });
     // Lancer le calcul d'avance (la carte s'ouvre : il tourne pendant la plongée).
     function preparer(options) {
         const o = options || {}, d = dimensions(o.aspect || 1, o.cote || 2048);
-        return fabriquer(d.largeur, d.hauteur, o.graine || 1);
+        return fabriquer(d.largeur, d.hauteur, o.graine || 1, o.zones || null);
     }
+    const oublierProvisoire = (element) => {
+        (element.__urlsProvisoires || []).forEach(u => { try { if (String(u).startsWith("blob:")) URL.revokeObjectURL(u); } catch (e) { /* déjà libérée */ } });
+        element.__urlsProvisoires = null;
+    };
     async function appliquer(element, options) {
         if (!element) return null;
         const o = options || {};
@@ -222,8 +302,11 @@ self.onmessage = (e) => { const d = e.data, r = calculer(d.W, d.H, d.g);
         if (element.__graineParchemin !== (o.graine || 1)) retirer(element);
         element.__bordParchemin = jeton;
         element.__graineParchemin = o.graine || 1;
-        const r = await fabriquer(largeur, hauteur, o.graine || 1);
-        if (element.__bordParchemin !== jeton) return null;     // une autre carte entre-temps
+        const r = await fabriquer(largeur, hauteur, o.graine || 1, o.zones || null, !!o.provisoire);
+        if (element.__bordParchemin !== jeton) {               // une autre carte (ou peinture) entre-temps
+            if (r.provisoire) [r.masque, r.usure].forEach(u => { try { URL.revokeObjectURL(u); } catch (e) { /* rien */ } });
+            return null;
+        }
         const st = element.style;
         st.webkitMaskImage = st.maskImage = `url("${r.masque}")`;
         st.webkitMaskSize = st.maskSize = "100% 100%";
@@ -236,7 +319,11 @@ self.onmessage = (e) => { const d = e.data, r = calculer(d.W, d.H, d.g);
             element.insertBefore(couche, apres ? apres.nextSibling : element.firstChild);
         }
         couche.style.backgroundImage = `url("${r.usure}")`;
+        // L'aperçu d'avant (pas gardé) est libéré une fois remplacé à l'écran.
+        oublierProvisoire(element);
+        if (r.provisoire) element.__urlsProvisoires = [r.masque, r.usure];
         element.classList.add("bord-parchemin");
+        element.__zonesParchemin = !!r.zones;
         return r;
     }
     function retirer(element) {
@@ -247,10 +334,12 @@ self.onmessage = (e) => { const d = e.data, r = calculer(d.W, d.H, d.g);
         st.webkitMaskImage = st.maskImage = "";
         const couche = element.querySelector(":scope > .parchemin-usure");
         if (couche) couche.remove();
+        oublierProvisoire(element);
         element.classList.remove("bord-parchemin");
     }
 
-    window.BordsParchemin = { fabriquer, preparer, appliquer, retirer, calculer, ouvrier: () => !!ouvrier() };
+    window.BordsParchemin = { fabriquer, preparer, appliquer, retirer, calculer, encoder, decoder, normaliserZones, dimensions,
+                              ouvrier: () => !!ouvrier() };
     // Les graines : la carte du monde, et chaque carte régionale (la sienne).
     window.graineParcheminRegion = (n) => 7919 * Number(n) + 13;
 
@@ -258,7 +347,9 @@ self.onmessage = (e) => { const d = e.data, r = calculer(d.W, d.H, d.g);
     const ASPECT_MONDE = 3840 / 2160;
     function poserSurLeMonde() {
         const monde = document.getElementById("carte-fond-jeu");
-        if (monde) appliquer(monde, { graine: 1, aspect: ASPECT_MONDE, cote: 2048 }).catch(e => console.error("Bord de parchemin (monde) :", e));
+        // L'usure peinte en DEV (usure_parchemin.js) a pu arriver d'abord : on la garde.
+        if (monde && !monde.__bordParchemin) appliquer(monde, { graine: 1, aspect: ASPECT_MONDE, cote: 2048, zones: window.ZONES_USURE_MONDE || null })
+            .catch(e => console.error("Bord de parchemin (monde) :", e));
     }
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", poserSurLeMonde);
     else setTimeout(poserSurLeMonde, 0);

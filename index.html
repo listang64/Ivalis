@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=112">
+  <link rel="stylesheet" href="style.css?v=113">
 
  
   <!-- ===================================================================== -->
@@ -1276,6 +1276,27 @@
           <div id="regions-dev-selection" class="popup-regions-info">Aucune boîte sélectionnée</div>
           <button type="button" id="btn-regions-supprimer" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.supprimerRegion()" disabled>Supprimer cette boîte</button>
           <div id="regions-dev-total" class="popup-regions-total"></div>
+          <!-- L'USURE DU PARCHEMIN (v283, usure_monde.js) : peindre où le bord de la
+               carte peut brûler, se déchirer, se percer (bords_parchemin.js). -->
+          <div id="regions-dev-usure-monde" class="popup-regions-villages">
+            <div class="popup-regions-sous-titre">🔥 L'usure du parchemin</div>
+            <div class="popup-regions-outils">
+              <button type="button" id="btn-monde-usure-pinceau" class="popup-regions-outil" title="Pinceau : peindre où le parchemin peut brûler, se déchirer, se percer"
+                      aria-label="Pinceau" onclick="jouerSonClic(); window.choisirOutilUsureMonde('pinceau')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5 L19.5 9.5 L11 18 L6 13 Z"/><path d="M6 13 C3.5 13.5 3.5 17 2.5 20.5 C6 19.5 9.5 19.5 11 18"/></svg>
+              </button>
+              <button type="button" id="btn-monde-usure-gomme" class="popup-regions-outil" title="Gomme : effacer une zone"
+                      aria-label="Gomme" onclick="jouerSonClic(); window.choisirOutilUsureMonde('gomme')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 15 L13 5.5 L20 12.5 L12.5 20 H7.5 Z"/><path d="M8.5 10 L15.5 17"/><path d="M12.5 20 H20.5"/></svg>
+              </button>
+              <label class="popup-regions-taille" title="Taille du pinceau et de la gomme">
+                <input type="range" id="taille-pinceau-monde-usure" min="10" max="240" value="60" oninput="window.reglerTaillePinceauUsureMonde(this.value)">
+              </label>
+            </div>
+            <button type="button" id="btn-monde-usure-valider" class="popup-regions-bouton" onclick="jouerSonClic(); window.validerUsureMonde()" disabled>Valider l'usure</button>
+            <button type="button" id="btn-monde-usure-annuler" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.annulerUsureMonde()" disabled>Annuler la peinture</button>
+            <p class="popup-regions-aide">Peins en orange les endroits où le parchemin peut s'abîmer : sur un bord, il s'y déchire et noircit ; plus loin dedans, il brûle en taches et se perce. Ailleurs, le bord reste fin. L'aperçu suit chaque trait.</p>
+          </div>
           <!-- LE GROUPE (v275, voyage_groupe.js) : la taille de son image sur la
                carte du monde (pour toutes les parties), et le téléport. -->
           <div id="regions-dev-groupe-monde" class="popup-regions-villages">
@@ -1307,6 +1328,15 @@
                zones de nuages, et placer son titre. -->
           <div id="regions-dev-carte" style="display: none;">
             <div id="regions-dev-carte-nom" class="popup-regions-info"></div>
+            <!-- Ce que peint le pinceau (v283) : les nuages, ou l'usure du parchemin
+                 (bords_parchemin.js : brûlé, déchiré, percé là où c'est peint). -->
+            <div class="popup-regions-calques" role="group" aria-label="Ce que peint le pinceau">
+              <button type="button" id="btn-region-calque-nuages" class="popup-regions-calque actif" aria-pressed="true"
+                      onclick="jouerSonClic(); window.choisirCalqueRegion('nuages')">☁ Nuages</button>
+              <button type="button" id="btn-region-calque-usure" class="popup-regions-calque" aria-pressed="false"
+                      onclick="jouerSonClic(); window.choisirCalqueRegion('usure')">🔥 Usure du parchemin</button>
+            </div>
+            <p id="aide-calque-usure" class="popup-regions-aide" style="display: none;">Peins les endroits où le parchemin peut s'abîmer : sur un bord, il s'y déchire et noircit ; plus loin dedans, il brûle en taches et se perce. Ailleurs, le bord reste fin. L'aperçu suit chaque trait.</p>
             <div class="popup-regions-outils">
               <button type="button" id="btn-region-pinceau" class="popup-regions-outil" title="Pinceau : peindre une zone de nuages"
                       aria-label="Pinceau" onclick="jouerSonClic(); window.choisirOutilRegion('pinceau')">
@@ -2356,7 +2386,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=187"></script>
+<script src="trace_combat.js?v=188"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2424,8 +2454,10 @@
 <!-- Les nuages réalistes (v279) : la carte graphique les calcule. -->
 <script src="nuages_realistes.js?v=2"></script>
 <!-- Les bords de parchemin des cartes (v282) : calculés à part (un Worker). -->
-<script src="bords_parchemin.js?v=1"></script>
-<script type="module" src="cartes_regionales.js?v=7"></script>
+<script src="bords_parchemin.js?v=2"></script>
+<script type="module" src="cartes_regionales.js?v=8"></script>
+<!-- L'usure du parchemin de la carte du monde (v283) : le pinceau DEV et sa base. -->
+<script type="module" src="usure_monde.js?v=1"></script>
 <!-- Le lore du monde, par région (v273), puis les villages des cartes régionales et MIA_VILLAGE. -->
 <script src="lore_ivalis.js?v=1"></script>
 <script type="module" src="villages_regionaux.js?v=5"></script>

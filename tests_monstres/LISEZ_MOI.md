@@ -8875,3 +8875,62 @@ déchirure qui ondule et se déchiquette, des trous sur certaines cartes,
 noirci par endroits et bruni ailleurs, stable et propre à chaque carte) ; sur
 la page (le monde, la carte régionale, l'ordre des calques, le fond, le
 Worker) ; les versions. Il mord sur l'ancien code (19 échecs).
+
+## v283 — Le bord de parchemin plus discret ; le pinceau d'usure (DEV)
+
+Nico : « rends la carte usée sur les bords, que ça aille moins sur la carte,
+au risque de plus voir la carte ; que ça fluctue, mais que sur les bords.
+Attends, encore mieux : crée-moi un pinceau dans DEV pour que je puisse
+peindre les zones où tu peux brûler, faire des trous, etc. »
+
+PAR DÉFAUT, UN BORD FIN (bords_parchemin.js). La déchirure mord en moyenne
+1 % du petit côté (1,5 % au plus creux, un peu plus aux coins) et ondule ;
+le liseré bruni change de largeur le long du bord et ne passe jamais 6 % ;
+un léger roussi par tronçons. Ni trou, ni brûlure, ni grande déchirure.
+
+LES ZONES PEINTES. calculer(W, H, graine, zones) reçoit une grille
+{ colonnes, lignes, cases } : adoucie (deux flous), lue de travers (un champ
+de bruit la tord : ni rond de pinceau, ni escalier de cases). Là où c'est
+peint :
+  · sur un bord, la déchirure plonge (de 3 à 15 % du petit côté), brûlée et
+    déchiquetée ;
+  · plus loin dedans, la brûlure gagne le cœur de la zone en taches
+    (roussi autour, charbon serré au bord du trou), et le plus brûlé se perce
+    (neuf cartes sur douze pour un petit disque).
+Loin de ce qui est peint, le bord est pixel pour pixel celui par défaut. Les
+images sont gardées par carte ET par peinture ; un aperçu (provisoire) ne
+l'est pas, et ses adresses sont libérées une fois remplacé. La grille arrive
+en cases ou en base64 (même codage que les nuages : BordsParchemin.encoder /
+decoder / normaliserZones).
+
+LE PINCEAU DES CARTES RÉGIONALES (cartes_regionales.js). Dans la popup DEV,
+deux calques : « ☁ Nuages » et « 🔥 Usure du parchemin » (choisirCalqueRegion).
+Le même pinceau, la même gomme ; l'usure se peint en orange. Chaque calque
+garde son brouillon (l'autre attend de côté). Un instant après chaque trait
+d'usure, le bord est recalculé en aperçu. « Valider l'usure » écrit
+Cartes_Regionales/{n}.Usure { colonnes, lignes, cases } (et seulement elle) ;
+« Annuler la peinture » rend le bord enregistré. Une usure changée ailleurs
+(la base) se pose aussitôt. grilleNuagesRegion() ne rend que les nuages ;
+grilleUsureRegion() l'usure.
+
+LE PINCEAU DE LA CARTE DU MONDE (usure_monde.js, nouveau module). Dans la
+popup DEV de la carte du monde, « 🔥 L'usure du parchemin » : pinceau, gomme,
+taille, « Valider l'usure », « Annuler la peinture ». Une grille de 240 × 135
+cases (16 pixels de carte). Une toile orange au-dessus des boîtes ; elle ne
+prend la souris et le doigt qu'avec un outil en main (la carte ne glisse
+pas pendant qu'on peint ; sans outil, elle glisse comme avant). Aperçu après
+chaque trait. Enregistré dans Carte_Monde/Parchemin.Usure, écouté par tous
+(derrière la porte du joueur) ; le pinceau se lâche quand le DEV s'éteint ou
+qu'une carte régionale s'ouvre.
+
+corrections_v283.mjs (dans la suite) : le bord par défaut mesuré sur 12
+graines (fin, jamais profond, qui fluctue, ni trou ni brûlure, bruni
+seulement le long du bord) ; les zones peintes (déchirure qui plonge et
+noircit sur un bord, brûlé et souvent percé au milieu, intact ailleurs, la
+grille en base64) ; le pinceau régional (les calques, l'orange, l'aperçu,
+les brouillons côte à côte, Usure puis Nuages écrits séparément, l'usure
+effacée ailleurs, l'annulation) ; le pinceau du monde (la popup, un vrai
+glissé de souris qui peint sans faire glisser la carte, l'aperçu, la base,
+le pinceau rangé, la carte qui glisse sans outil, l'usure effacée ailleurs,
+le DEV éteint) ; les versions. Mis à jour : corrections_v282 (sans zone
+peinte, plus de trou ni de brûlure). Il mord sur l'ancien code (20 échecs).
