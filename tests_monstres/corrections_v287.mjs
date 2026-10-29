@@ -253,25 +253,15 @@ await p.waitForTimeout(400);
 const S = '/tmp/claude-0/-home-user-Ivalis/3718c626-55b5-577c-9b4f-a49012fd3784/scratchpad';
 
 // =========================================================================
-titre("1. LE TRAIT POINTILLÉ ET LA CROIX DU VOYAGE : TROIS FOIS PLUS FINS");
+titre("1. LE TRACÉ DU VOYAGE (v289 : des pas et une croix à la plume, voir corrections_v289)");
 // =========================================================================
 await section(async () => {
   await lancerVoyageRegional({ x: 0.3, y: 0.5 }, { x: 0.75, y: 0.4 });
   await p.waitForTimeout(400);
-  const r = await p.evaluate(() => {
-    const svg = document.getElementById("carte-region-voyage"), c = window.cadrageCarteRegion();
-    const e = Math.max(2, c.hauteur * 0.0065);
-    const w = (sel) => { const el = svg && svg.querySelector(sel); return el ? Number(el.getAttribute("stroke-width")) : null; };
-    const croix = svg && svg.querySelector(".croix-voyage-trait");
-    const d = croix ? croix.getAttribute("d").match(/-?[\d.]+/g).map(Number) : [];
-    return { e, trace: w(".trace-voyage"), ombre: w(".trace-voyage-ombre"), croix: w(".croix-voyage-trait"), croixOmbre: w(".croix-voyage-ombre"),
-             branche: d.length ? Math.abs(d[2] - d[0]) : 0, tirets: svg && svg.querySelector(".trace-voyage") ? svg.querySelector(".trace-voyage").getAttribute("stroke-dasharray") : "" };
-  });
-  const pres = (a, b) => a !== null && Math.abs(a - b) < 0.02;
-  verifier("le pointillé : trois fois plus fin (et son ombre)", pres(r.trace, r.e / 3) && pres(r.ombre, r.e / 3 * 1.9), JSON.stringify([r.e.toFixed(2), r.trace, r.ombre]));
-  verifier("la croix d'arrivée : traits trois fois plus fins, même taille", pres(r.croix, r.e / 3 * 1.3) && pres(r.croixOmbre, r.e / 3 * 2.2) && Math.abs(r.branche - r.e * 4.8) < 0.05,
-           JSON.stringify([r.croix, r.croixOmbre, r.branche]));
-  verifier("les tirets gardent leur rythme", r.tirets === `${r.e * 2.6} ${r.e * 1.9}`, r.tirets);
+  const r = await p.evaluate(() => { const svg = document.getElementById("carte-region-voyage");
+    return { pas: svg.querySelectorAll(".pas-voyage").length, croix: svg.querySelectorAll(".croix-voyage-trait").length }; });
+  // (v287 divisait par trois le pointillé et la croix ; v289 les remplace.)
+  verifier("(v289) le pointillé est devenu des pas, la croix deux traits de plume", r.pas > 5 && r.croix === 2, JSON.stringify(r));
   await p.screenshot({ path: S + "/v287_trace.png" });
 });
 

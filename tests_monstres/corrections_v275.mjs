@@ -277,14 +277,16 @@ await section(async () => {
   await p.waitForTimeout(1700);
   const r = await p.evaluate(() => { const svg = document.getElementById("calque-voyage-monde"), t = svg.querySelector(".trace-voyage"), x = svg.querySelector(".croix-voyage");
     const st = t && getComputedStyle(t); const e = window.etatVoyageGroupe();
-    return { d: t && t.getAttribute("d"), tirets: t && t.getAttribute("stroke-dasharray"), couleur: st && st.stroke, croix: x && x.getAttribute("transform"),
-             croixVisible: x && getComputedStyle(x.querySelector(".croix-voyage-dessin")).opacity, prop: e.choix && e.choix.proposition, carte: window.carteRegionaleOuverte(),
+    const pas = svg.querySelector(".pas-voyage"), trait = x && x.querySelector(".croix-voyage-trait");
+    return { d: t && t.getAttribute("d"), pas: svg.querySelectorAll(".pas-voyage").length, couleur: pas && getComputedStyle(pas).fill, croix: x && x.getAttribute("transform"),
+             croixVisible: trait ? getComputedStyle(trait).fillOpacity : 0, prop: e.choix && e.choix.proposition, carte: window.carteRegionaleOuverte(),
              nuages: !!document.getElementById("traversee-nuages"), texte: document.getElementById("bandeau-voyage").textContent }; });
   const c = await p.evaluate(() => [window.centreRegion(window.REGIONS_CARTE[1].points), window.centreRegion(window.REGIONS_CARTE[2].points)]);
   const pts = (r.d || "").replace(/[ML]/g, " ").trim().split(/\s+/).map(Number);
   verifier("un trait droit, du groupe au centre de la région touchée", pts.length === 4 && Math.abs(pts[0] - c[0].x) < 1 && Math.abs(pts[2] - c[1].x) < 1 && Math.abs(pts[3] - c[1].y) < 1, r.d);
-  verifier("pointillé, rouge", !!r.tirets && /rgb\(179, 18, 26\)/.test(r.couleur), `${r.tirets} ${r.couleur}`);
-  verifier("une croix rouge à l'arrivée (dessinée une fois le trait tracé)", r.croix === `translate(${Math.round(c[1].x)} ${Math.round(c[1].y)})` && Number(r.croixVisible) > 0.9, r.croix);
+  // (v289 : des pas marron foncé à la place du pointillé rouge ; la croix tracée à la plume, un peu penchée.)
+  verifier("(v289) des pas, marron foncé", r.pas > 5 && /rgb\(58, 34, 15\)/.test(r.couleur), `${r.pas} ${r.couleur}`);
+  verifier("une croix à l'arrivée (tracée à la plume une fois les pas faits)", (r.croix || "").startsWith(`translate(${Math.round(c[1].x)} ${Math.round(c[1].y)})`) && Number(r.croixVisible) > 0.85, r.croix);
   verifier("la région touchée ne s'ouvre pas (ni carte, ni nuages)", r.carte === null && !r.nuages);
   verifier("le bandeau propose : « Vers La vallée de souffre », Valider", /Vers La vallée de souffre/.test(r.texte) && /Valider le voyage/.test(r.texte), r.texte.slice(0, 60));
   await p.screenshot({ path: "/tmp/claude-0/v275_monde_trace.png" });

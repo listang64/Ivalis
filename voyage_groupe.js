@@ -1137,9 +1137,72 @@ function placerPoi() {
     el.classList.toggle("en-vue", voyage.Etat === "poi");
 }
 
-// --- LE POINTILLÉ ROUGE ----------------------------------------------------
-// « Façon carte d'Indiana Jones » : un trait pointillé rouge qui se dessine,
-// puis une croix rouge à l'arrivée.
+// --- LES PAS ET LA CROIX À LA PLUME (v289) --------------------------------
+// v275 : « façon carte d'Indiana Jones », un pointillé rouge et une croix.
+// v289 — Nico : « garde l'animation progressive, et à la place du pointillé,
+// mets des petits pas qui avancent vers la destination, un peu comme la carte
+// du Maraudeur dans Harry Potter. Pour la croix, plus en mode manuscrite,
+// comme si c'était une plume qui dessinait, mais pas trop épaisse. Pour la
+// couleur des pas et de la croix : du marron foncé. »
+// Les pas : pied gauche, pied droit, de part et d'autre de la route, tournés
+// dans le sens de la marche ; ils paraissent un à un, au pas, jusqu'à la croix.
+// La croix : deux traits de plume effilés (fins aux bouts, pleins au milieu),
+// un peu courbes, que la plume trace l'un après l'autre une fois arrivée.
+// (La route elle-même reste dans le dessin, invisible : .trace-voyage.)
+// Un hasard fixe par tracé : la même main, d'un dessin à l'autre.
+function hasardTrace(cle) {
+    let h = 2166136261;
+    for (const ch of String(cle || "")) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); }
+    return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+}
+// Les pas le long de la route : { x, y, angle (degrés), gauche }.
+function pasLeLong(P, longueurPied) {
+    const cumul = [0];
+    for (let i = 1; i < P.length; i++) cumul.push(cumul[i - 1] + Math.hypot(P[i].x - P[i - 1].x, P[i].y - P[i - 1].y));
+    const total = cumul[cumul.length - 1];
+    const enjambee = longueurPied * 1.45, ecart = longueurPied * 0.3;
+    const pas = [];
+    let j = 1;
+    for (let k = 0, d = enjambee * 0.6; d < total - longueurPied * 1.6; k++, d += enjambee) {
+        while (j < cumul.length - 1 && cumul[j] < d) j++;
+        const a = P[j - 1], b = P[j], l = (cumul[j] - cumul[j - 1]) || 1, t = (d - cumul[j - 1]) / l;
+        const ux = (b.x - a.x) / l, uy = (b.y - a.y) / l, gauche = k % 2 === 0, cote = gauche ? -1 : 1;
+        pas.push({ x: a.x + (b.x - a.x) * t - uy * ecart * cote, y: a.y + (b.y - a.y) * t + ux * ecart * cote,
+                   angle: Math.atan2(uy, ux) * 180 / Math.PI + (gauche ? -7 : 7), gauche, d });
+    }
+    return { pas, total };
+}
+// Un pied (une semelle et un talon), la pointe vers +x.
+function dessinPied(L, gauche) {
+    const m = gauche ? -1 : 1;
+    return `<ellipse cx="${arrondi(L * 0.17, 100)}" cy="${arrondi(m * L * 0.03, 100)}" rx="${arrondi(L * 0.3, 100)}" ry="${arrondi(L * 0.17, 100)}"/>`
+         + `<ellipse cx="${arrondi(-L * 0.3, 100)}" cy="0" rx="${arrondi(L * 0.16, 100)}" ry="${arrondi(L * 0.13, 100)}"/>`;
+}
+// Un trait de plume, de A à B, un peu courbe : une forme pleine, effilée aux
+// deux bouts (la plume se pose, appuie, se relève), et sa ligne médiane (pour
+// le tracer à l'écran).
+function traitDePlume(A, B, courbe, largeur, alea) {
+    const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l;
+    const C = { x: (A.x + B.x) / 2 + nx * courbe * l, y: (A.y + B.y) / 2 + ny * courbe * l };
+    const N = 18, gauche = [], droite = [], milieu = [];
+    const appui = 0.35 + alea() * 0.3;                  // où la plume appuie le plus
+    for (let i = 0; i <= N; i++) {
+        const t = i / N, u = 1 - t;
+        const x = u * u * A.x + 2 * u * t * C.x + t * t * B.x, y = u * u * A.y + 2 * u * t * C.y + t * t * B.y;
+        const tx = 2 * u * (C.x - A.x) + 2 * t * (B.x - C.x), ty = 2 * u * (C.y - A.y) + 2 * t * (B.y - C.y), tl = Math.hypot(tx, ty) || 1;
+        // la pression : monte jusqu'à l'appui, puis retombe jusqu'au levé
+        const profil = t < appui ? Math.sin(Math.PI / 2 * t / appui) : Math.cos(Math.PI / 2 * (t - appui) / (1 - appui));
+        const w = largeur * (0.12 + 0.88 * Math.pow(Math.max(0, profil), 0.7)) / 2;
+        gauche.push([x - ty / tl * w, y + tx / tl * w]);
+        droite.push([x + ty / tl * w, y - tx / tl * w]);
+        milieu.push([x, y]);
+    }
+    const f = (p) => `${arrondi(p[0], 100)} ${arrondi(p[1], 100)}`;
+    const forme = "M" + gauche.map(f).join(" L") + " L" + droite.reverse().map(f).join(" L") + "Z";
+    let longueur = 0;
+    for (let i = 1; i < milieu.length; i++) longueur += Math.hypot(milieu[i][0] - milieu[i - 1][0], milieu[i][1] - milieu[i - 1][1]);
+    return { forme, ligne: "M" + milieu.map(f).join(" L"), longueur };
+}
 function dessinerTraceDans(svg, points, l, h, epaisseur, cle, anime, options) {
     const sansCroix = !!(options && options.sansCroix);
     if (!svg) return;
@@ -1156,37 +1219,30 @@ function dessinerTraceDans(svg, points, l, h, epaisseur, cle, anime, options) {
     }
     svg.classList.remove("efface");
     const P = points.map(p => ({ x: arrondi(p.x, 10), y: arrondi(p.y, 10) }));
-    let total = 0;
-    for (let i = 1; i < P.length; i++) total += Math.hypot(P[i].x - P[i - 1].x, P[i].y - P[i - 1].y);
     const d = "M" + P.map(p => `${p.x} ${p.y}`).join(" L");
-    const fin = P[P.length - 1], s = epaisseur * 2.4;
-    // Le trait trois fois plus fin (Nico, v287 : « la croix rouge de déplacement
-    // et le trait pointillé, fais-les moins épais, divise par trois ») ; la
-    // croix garde sa taille, les tirets leur rythme.
-    const trait = epaisseur / 3;
-    const masque = "masque-" + svg.id;
+    const fin = P[P.length - 1];
     const duree = anime && !mouvementReduit() ? (svg.id === "calque-voyage-monde" ? DESSIN_TRACE_MS.monde : sansCroix ? 900 : DESSIN_TRACE_MS.region) : 0;
-    svg.innerHTML = `
-      <defs><mask id="${masque}" maskUnits="userSpaceOnUse" x="0" y="0" width="${l}" height="${h}">
-        <path class="trace-voyage-masque" d="${d}" fill="none" stroke="#fff" stroke-width="${epaisseur * 4}" stroke-linecap="round" stroke-linejoin="round"
-              style="stroke-dasharray:${total + 1} ${total + 1};stroke-dashoffset:${duree ? total + 1 : 0}"/></mask></defs>
-      <g mask="url(#${masque})">
-        <path class="trace-voyage-ombre" d="${d}" fill="none" stroke-width="${trait * 1.9}" stroke-linecap="round" stroke-linejoin="round"/>
-        <path class="trace-voyage" d="${d}" fill="none" stroke-width="${trait}" stroke-linecap="round" stroke-linejoin="round"
-              stroke-dasharray="${epaisseur * 2.6} ${epaisseur * 1.9}"/>
-      </g>
-      ${sansCroix ? "" : `<circle class="depart-voyage" cx="${P[0].x}" cy="${P[0].y}" r="${trait * 1.6}"/>
-      <g class="croix-voyage" transform="translate(${fin.x} ${fin.y})"><g class="croix-voyage-dessin${duree ? " a-venir" : ""}" style="${duree ? `animation-delay:${duree}ms` : ""}">
-        <path class="croix-voyage-ombre" d="M${-s} ${-s} L${s} ${s} M${s} ${-s} L${-s} ${s}" stroke-width="${trait * 2.2}" stroke-linecap="round"/>
-        <path class="croix-voyage-trait" d="M${-s} ${-s} L${s} ${s} M${s} ${-s} L${-s} ${s}" stroke-width="${trait * 1.3}" stroke-linecap="round"/>
-      </g></g>`}`;
-    if (duree) {
-        const m = svg.querySelector(".trace-voyage-masque");
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-            m.style.transition = `stroke-dashoffset ${duree}ms cubic-bezier(.45,.05,.4,1)`;
-            m.style.strokeDashoffset = "0";
-        }));
+    // LES PAS, chacun à son heure (la marche avance d'un pas régulier).
+    const longueurPied = epaisseur * 2.5;
+    const { pas, total } = pasLeLong(P, longueurPied);
+    const pieds = pas.map(q => `<g class="pas-voyage" transform="translate(${arrondi(q.x, 100)} ${arrondi(q.y, 100)}) rotate(${arrondi(q.angle, 10)})">`
+        + `<g class="pas-voyage-dessin${duree ? " a-venir" : ""}"${duree ? ` style="animation-delay:${Math.round(duree * q.d / (total || 1))}ms"` : ""}>${dessinPied(longueurPied, q.gauche)}</g></g>`).join("");
+    // LA CROIX À LA PLUME : deux traits, tracés l'un après l'autre, une fois arrivé.
+    let croix = "";
+    if (!sansCroix) {
+        const alea = hasardTrace(cle), s = epaisseur * 2.3, largeur = epaisseur * 0.42;
+        const j = () => (alea() - 0.5) * s * 0.18;
+        const t1 = traitDePlume({ x: -s + j(), y: -s + j() }, { x: s + j(), y: s * 0.92 + j() }, (alea() - 0.5) * 0.16, largeur, alea);
+        const t2 = traitDePlume({ x: s * 0.95 + j(), y: -s * 1.05 + j() }, { x: -s * 0.9 + j(), y: s + j() }, (alea() - 0.5) * 0.16, largeur, alea);
+        const id = "plume-" + svg.id;
+        const trait = (t, n, retard) => `<mask id="${id}-${n}" maskUnits="userSpaceOnUse" x="${-3 * s}" y="${-3 * s}" width="${6 * s}" height="${6 * s}">`
+            + `<path class="croix-plume-masque${duree ? " a-venir" : ""}" d="${t.ligne}" fill="none" stroke="#fff" stroke-width="${arrondi(largeur * 2.4, 100)}" stroke-linecap="round"`
+            + ` style="stroke-dasharray:${arrondi(t.longueur + 1, 10)};stroke-dashoffset:${duree ? arrondi(t.longueur + 1, 10) : 0};${duree ? `animation-delay:${retard}ms` : ""}"/></mask>`
+            + `<path class="croix-voyage-trait" d="${t.forme}" mask="url(#${id}-${n})"/>`;
+        croix = `<g class="croix-voyage" transform="translate(${fin.x} ${fin.y}) rotate(${arrondi((alea() - 0.5) * 14, 10)})">`
+            + trait(t1, 1, duree + 120) + trait(t2, 2, duree + 120 + 340) + `</g>`;
     }
+    svg.innerHTML = `<path class="trace-voyage" d="${d}" fill="none" stroke="none"/>${pieds}${croix}`;
 }
 // Le tracé à montrer : la proposition de ce poste, ou le voyage en cours.
 function traceAffichee() {

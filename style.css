@@ -5849,14 +5849,15 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 .calque-voyage { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; transition: opacity 0.8s ease; }
 #calque-voyage-monde { z-index: 6; }
 .calque-voyage.efface { opacity: 0; }
-.trace-voyage { stroke: #b3121a; }
-.trace-voyage-ombre { stroke: rgba(70, 12, 6, 0.2); }
-.depart-voyage { fill: #b3121a; stroke: rgba(243, 226, 184, 0.9); stroke-width: 2px; vector-effect: non-scaling-stroke; }
-.croix-voyage-trait { stroke: #b3121a; fill: none; }
-.croix-voyage-ombre { stroke: rgba(60, 8, 4, 0.32); fill: none; }
-.croix-voyage-dessin { transform-box: fill-box; transform-origin: center; }
-.croix-voyage-dessin.a-venir { animation: croix-voyage 0.5s cubic-bezier(.2, .9, .3, 1.4) both; }
-@keyframes croix-voyage { from { opacity: 0; transform: scale(0.1) rotate(-25deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
+/* v289 : des pas, à l'encre marron foncé, qui paraissent un à un (« comme la
+   carte du Maraudeur ») ; la croix, deux traits de plume tracés à la main. */
+.pas-voyage { fill: #3a220f; fill-opacity: 0.82; }
+.pas-voyage-dessin { transform-box: fill-box; transform-origin: center; }
+.pas-voyage-dessin.a-venir { animation: pas-voyage 0.32s ease-out both; }
+@keyframes pas-voyage { from { opacity: 0; transform: scale(0.55); } 60% { opacity: 1; transform: scale(1.12); } to { opacity: 1; transform: scale(1); } }
+.croix-voyage-trait { fill: #3a220f; fill-opacity: 0.92; stroke: none; }
+.croix-plume-masque.a-venir { animation: croix-plume 0.3s cubic-bezier(.4, 0, .6, 1) forwards; }
+@keyframes croix-plume { to { stroke-dashoffset: 0; } }
 
 /* Le choix d'une destination : toute région se touche, et se montre au survol. */
 #calque-regions.choix .region-forme { pointer-events: fill; cursor: crosshair; }
@@ -5967,7 +5968,7 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
   76% { transform: translateY(-16%) scale(0.95, 1.06); }
   88% { transform: translateY(0) scale(1.05, 0.95); } }
 /* Le chemin du détour : un pointillé plus discret. */
-.calque-detour .trace-voyage { stroke: #c0392b; opacity: 0.85; }
+.calque-detour .pas-voyage { fill-opacity: 0.6; }
 
 /* L'attente RP, à la halte, pendant que le lieu se révèle. */
 .attente-poi { position: fixed; inset: 0; z-index: 10001; display: flex; align-items: center; justify-content: center; pointer-events: none;

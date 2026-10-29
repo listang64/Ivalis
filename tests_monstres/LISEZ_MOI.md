@@ -9253,3 +9253,57 @@ Il échoue sur l'ancien code (11 échecs).
 
 Tests mis à jour : corrections_v285 et v286 (le sol est le sable ; son
 raccord et l'absence de noir restent vérifiés).
+
+## v289 — Les pas du Maraudeur et la croix à la plume
+
+Nico : « on va changer la croix rouge et le trait pointillé des déplacements.
+Garde l'animation progressive, et à la place du pointillé, mets des petits pas
+qui avancent vers la destination, un peu comme la carte du Maraudeur dans
+Harry Potter. La croix, plus en mode manuscrite, comme si c'était une plume
+qui dessinait, mais pas trop épaisse. Pour la couleur des pas et de la croix,
+du marron foncé. »
+
+voyage_groupe.js (dessinerTraceDans), sur la carte du monde, sur les cartes
+régionales et pour le chemin vers un POI :
+
+Les pas (pasLeLong, dessinPied) :
+- Pied gauche et pied droit alternent, de part et d'autre de la route et tout
+  près d'elle. Chacun est fait d'une semelle et d'un talon, tourné dans le
+  sens de la marche (un peu ouvert vers l'extérieur).
+- Ils se suivent d'un pas régulier (1,45 longueur de pied) et s'arrêtent
+  avant la croix.
+- Ils paraissent un à un, chacun quand la marche l'atteint : c'est
+  l'animation progressive d'avant, au même rythme (1,4 s sur le monde, 1,8 s
+  sur une région).
+
+La croix (traitDePlume) :
+- Deux traits de plume pleins, effilés (la plume se pose, appuie puis se
+  relève), un peu courbes, la croix un peu penchée.
+- La plume les trace l'un après l'autre, une fois les pas arrivés.
+- Le geste est tiré du tracé lui-même : la même croix d'un dessin à l'autre.
+- L'épaisseur reste au plus 0,42 fois l'épaisseur de référence.
+
+Le reste :
+- Tout est en marron foncé, #3a220f (l'encre des noms de lieux). Le chemin
+  vers un POI a des pas plus pâles et pas de croix.
+- Avec « réduire les animations », tout paraît d'un coup.
+- La route reste dans le dessin, invisible (.trace-voyage), pour qui veut sa
+  géométrie.
+
+corrections_v289.mjs (dans la suite), sur la vraie page, vérifie :
+- les pas à la place du pointillé, qui avancent : une partie seulement à
+  mi-chemin, tous à la fin ;
+- la croix, rien à mi-chemin puis tracée ;
+- les pieds qui alternent de part et d'autre, près de la route, tournés dans
+  le sens de la marche, réguliers, s'arrêtant avant la croix, en deux formes
+  marron foncé ;
+- la croix : deux traits effilés, pas trop épais, courbes et penchés,
+  marron foncé, avec le même geste quand on la redessine ;
+- la carte du monde ;
+- « réduire les animations » ;
+- les versions.
+
+Il échoue sur l'ancien code (13 échecs).
+
+Tests mis à jour : corrections_v275 (des pas marron foncé, une croix tracée à
+la plume) et corrections_v287 (sa section 1 est remplacée par ce test).
