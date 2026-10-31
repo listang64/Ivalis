@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=119">
+  <link rel="stylesheet" href="style.css?v=120">
 
  
   <!-- ===================================================================== -->
@@ -1619,7 +1619,7 @@
       <p style="font-size: 14px; margin-top: -10px; color: #5c3a21;">Configuration avancée du cerveau d'Ivalis</p>
       
       <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); naviguerFenetre('etape-menu-outils', 'etape-ia-parametre')">
-        Température de l'IA
+        Réglages du narrateur
       </button>
       <br><br>
       
@@ -1701,10 +1701,28 @@
 
     <!-- NOUVEAU : Paramètre Température -->
     <div id="etape-ia-parametre" class="fenetre-volante-parchemin fondu-interne" style="display: none; opacity: 0;">
-      <h2>Température de l'IA</h2>
-      <p style="font-size: 14px; margin-top: -10px; color: #5c3a21;">Règle la créativité et l'imprévisibilité du narrateur.</p>
+      <h2>Réglages du narrateur</h2>
+      <p style="font-size: 14px; margin-top: -10px; color: #5c3a21;">Le modèle du Maître du Jeu, sa réflexion et sa créativité.</p>
+
+      <div class="champ-cle-api" style="margin: 20px 0 10px;">
+        <label for="mj-modele" style="display: block; margin-bottom: 8px; font-family: 'Almendra', serif; font-size: 16px;">Modèle du narrateur</label>
+        <select id="mj-modele" class="input-texte-parchemin" style="width: 100%; padding: 6px; border-radius: 5px;">
+          <option value="gemini-3.8-flash">Gemini 3.8 Flash (conseillé)</option>
+          <option value="gemini-4-argon">Gemini 4 Argon (plus beau style, payant, plus lent)</option>
+          <option value="gemini-flash-lite-latest">Gemini Flash-Lite (l'ancien, le plus rapide)</option>
+        </select>
+      </div>
+
+      <div class="champ-cle-api" style="margin: 10px 0;">
+        <label for="mj-reflexion" style="display: block; margin-bottom: 8px; font-family: 'Almendra', serif; font-size: 16px;">Réflexion avant de répondre</label>
+        <select id="mj-reflexion" class="input-texte-parchemin" style="width: 100%; padding: 6px; border-radius: 5px;">
+          <option value="medium">Moyenne (conseillée)</option>
+          <option value="low">Basse (plus rapide)</option>
+        </select>
+        <p style="font-size: 12px; margin: 6px 0 0; color: #5c3a21;">Sans effet sur Flash-Lite, qui ne réfléchit pas.</p>
+      </div>
       
-      <div class="champ-cle-api" style="margin: 30px 0;">
+      <div class="champ-cle-api" style="margin: 20px 0 30px;">
         <label for="temp-range" style="display: block; margin-bottom: 10px; font-family: 'Almendra', serif; font-size: 16px;">Température (0.0 = Précis, 2.0 = Créatif)</label>
         <div style="display: flex; align-items: center; gap: 15px;">
           <input type="range" id="temp-range" min="0" max="2" step="0.1" value="1.0" style="flex-grow: 1; accent-color: #8c6a45;" oninput="syncTemperature('range')">
@@ -2389,7 +2407,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=195"></script>
+<script src="trace_combat.js?v=196"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2447,8 +2465,8 @@
 <script type="module" src="pont_combat.js?v=46"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=53"></script>
-<script type="module" src="ia_master.js?v=11"></script>
-<script type="module" src="app.js?v=129"></script>
+<script type="module" src="ia_master.js?v=12"></script>
+<script type="module" src="app.js?v=130"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=3"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
@@ -2491,7 +2509,7 @@
 <script src="blessures.js?v=2"></script>
 <script type="module" src="creation_personnage.js?v=26"></script>
 <script type="module" src="classes.js?v=27"></script>
-<script type="module" src="recit_dynamique.js?v=5"></script>
+<script type="module" src="recit_dynamique.js?v=6"></script>
 <script type="module" src="competences.js?v=67"></script>
 <script type="module" src="talents_ui.js?v=2"></script>
 <script type="module" src="blessures_ui.js?v=6"></script>

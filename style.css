@@ -6183,3 +6183,13 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 #table-monde { width: 3840px; height: 2160px; }
 .table-ombre { position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(ellipse 80% 75% at 50% 45%, rgba(40, 25, 5, 0) 45%, rgba(40, 25, 5, 0.3) 100%); }
+
+/* L'ATTENTE DU PARCHEMIN (v291) : le MJ écrit encore, ou le portrait d'un
+   nouveau venu se dessine. Une ligne à la plume qui respire, sous le texte. */
+.attente-recit {
+  position: absolute; left: 50%; bottom: 14vh; transform: translateX(-50%);
+  font-family: 'Almendra', serif; font-style: italic; font-size: 1.6vw; color: #4a2511;
+  opacity: 0; pointer-events: none; transition: opacity 0.6s ease-in-out; white-space: nowrap; z-index: 11;
+}
+.attente-recit.visible { opacity: 1; animation: attente-recit-souffle 1.8s ease-in-out infinite; }
+@keyframes attente-recit-souffle { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }

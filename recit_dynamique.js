@@ -14,6 +14,16 @@ let currentTimer = null;
 // est là, un toucher sur le parchemin ne fait rien.
 let optionsRecit = {};
 let finRecitEnCours = false;
+// LE RÉCIT QUI S'ÉCRIT ENCORE (v291) : le parchemin s'ouvre dès le premier
+// paragraphe du MJ. `enCours` : d'autres paragraphes arrivent ;
+// `pnjAttendus` : les nouveaux venus du récit (null tant qu'on les cherche) ;
+// `pnjPrets` : tous les portraits sont là (ou ne viendront pas). Quand un
+// nouveau venu prend la parole avant son portrait, son nom s'affiche et le
+// parchemin attend (un toucher passe l'attente, et elle a une limite).
+let etatRecit = { enCours: false, pnjAttendus: null, pnjPrets: true };
+let attenteRecit = null;
+let attentesPassees = {};
+const DELAI_ATTENTE_RECIT = { ecriture: 120000, noms: 15000, portrait: 45000 };
 
 // 1. Initialisation de l'interface graphique (Créée dynamiquement)
 function initInterfaceRecit() {
@@ -58,7 +68,12 @@ function initInterfaceRecit() {
         pointer-events: none;
     `;
 
+    const attente = document.createElement("div");
+    attente.id = "attente-recit-dynamique";
+    attente.className = "attente-recit";
+
     overlay.appendChild(nomContainer);
+    overlay.appendChild(attente);
     texteContainer.appendChild(contenuTexte);
     overlay.appendChild(texteContainer);
     overlay.appendChild(portrait);
@@ -69,11 +84,22 @@ function initInterfaceRecit() {
 
 // 2. Point d'entrée : Lancement de la scène
 // `options.ts` : l'horodatage du message du MJ (c'est lui que juge MIA_COMBAT).
+// `options.enCours`, `options.pnjAttendus`, `options.pnjPrets` (v291) : l'état
+// du message du MJ quand il arrive (voir etatRecit).
+const decouperRecit = (texteHtml) => String(texteHtml || "").split(/<br\s*\/?>/i).filter(p => p.trim() !== "");
+const lireEtatRecit = (o) => ({
+    enCours: !!(o && o.enCours),
+    pnjAttendus: o && Array.isArray(o.pnjAttendus) ? o.pnjAttendus : null,
+    pnjPrets: !(o && o.pnjPrets === false)
+});
 window.lancerRecitDynamique = function(texteHtml, options) {
     initInterfaceRecit();
+    finirAttenteRecit();
     optionsRecit = options || {};
+    etatRecit = lireEtatRecit(optionsRecit);
+    attentesPassees = {};
     finRecitEnCours = false;
-    paragraphesRecit = texteHtml.split(/<br\s*\/?>/i).filter(p => p.trim() !== "");
+    paragraphesRecit = decouperRecit(texteHtml);
     indexParagraphe = 0;
 
     const overlay = document.getElementById("ecran-recit-dynamique");
@@ -85,14 +111,106 @@ window.lancerRecitDynamique = function(texteHtml, options) {
     }, 50);
 };
 
+// LE MESSAGE DU MJ A CHANGÉ (v291) : un paragraphe de plus, un portrait posé,
+// la liste des nouveaux venus. Les paragraphes déjà lus ne bougent pas ; une
+// attente en cours se réévalue.
+window.majRecitDynamique = function(ts, texteHtml, options) {
+    const overlay = document.getElementById("ecran-recit-dynamique");
+    if (!overlay || overlay.style.display === "none" || Number(ts) !== Number(optionsRecit.ts)) return;
+    paragraphesRecit = decouperRecit(texteHtml);
+    etatRecit = lireEtatRecit(options);
+    if (attenteRecit) {
+        const reprendre = attenteRecit.reprendre;
+        finirAttenteRecit();
+        reprendre();
+    }
+};
+
+const sansAccent = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const nomDans = (nom, texte) => {
+    const n = sansAccent(nom).trim();
+    if (!n) return false;
+    return new RegExp("(^|[^a-z0-9])" + n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([^a-z0-9]|$)").test(sansAccent(texte));
+};
+
+// Ce paragraphe doit-il attendre un portrait ? Seulement un dialogue, et
+// seulement tant que les portraits du récit ne sont pas tous là.
+function portraitAttenduRecit(html) {
+    if (etatRecit.pnjPrets) return null;
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    const texte = tmp.textContent || "";
+    if (!/["«»]/.test(texte)) return null;
+    const avecPortrait = Array.from(tmp.querySelectorAll("span.pnj-chat-hover strong")).map(st => sansAccent(st.textContent).trim());
+    if (Array.isArray(etatRecit.pnjAttendus)) {
+        const nom = etatRecit.pnjAttendus.find(n => n && nomDans(n, texte) && !avecPortrait.includes(sansAccent(n).trim()));
+        return nom ? { type: "portrait", nom } : null;
+    }
+    // Les nouveaux venus ne sont pas encore connus : un dialogue sans
+    // portrait, qui n'est pas celui d'un héros, attend leur liste.
+    if (tmp.querySelector("img.pnj-hover-img")) return null;
+    const heros = (window.PERSOS_PARTIE || []).map(p => p && p.prenom).filter(Boolean);
+    if (heros.some(h => nomDans(h, texte))) return null;
+    return { type: "noms", nom: "" };
+}
+
+// L'ATTENTE : le nom de celui qui va parler (s'il est connu) et une ligne à
+// la plume. Elle se montre après un court instant (pas de clignotement pour
+// une attente brève).
+function attendreRecit(type, nom, reprendre) {
+    finirAttenteRecit();
+    const index = indexParagraphe;
+    const nomContainer = document.getElementById("nom-recit-dynamique");
+    const bandeau = document.getElementById("attente-recit-dynamique");
+    const imgElement = document.getElementById("portrait-recit-dynamique");
+    attenteRecit = { type, nom, index, reprendre };
+    attenteRecit.montrer = setTimeout(() => {
+        if (!attenteRecit) return;
+        if (bandeau) {
+            bandeau.textContent = type === "portrait" ? "Le portrait se dessine…" : type === "noms" ? "La plume hésite…" : "Le Maître du Jeu écrit…";
+            bandeau.classList.add("visible");
+        }
+        if (nom && nomContainer) {
+            if (imgElement) imgElement.style.opacity = "0";
+            nomContainer.innerHTML = nom;
+            nomContainer.style.display = "block";
+            setTimeout(() => { nomContainer.style.opacity = "1"; }, 50);
+        }
+    }, 500);
+    attenteRecit.limite = setTimeout(() => passerAttenteRecit(), DELAI_ATTENTE_RECIT[type] || 30000);
+}
+
+function finirAttenteRecit() {
+    if (!attenteRecit) return;
+    clearTimeout(attenteRecit.montrer);
+    clearTimeout(attenteRecit.limite);
+    attenteRecit = null;
+    const bandeau = document.getElementById("attente-recit-dynamique");
+    if (bandeau) bandeau.classList.remove("visible");
+}
+
+// L'attente est passée (limite atteinte, ou un toucher) : la réplique
+// s'écrit sans portrait ; la fin d'un récit qui ne vient plus se referme.
+function passerAttenteRecit() {
+    if (!attenteRecit) return;
+    const { type, index, reprendre } = attenteRecit;
+    finirAttenteRecit();
+    if (type === "ecriture") etatRecit.enCours = false;
+    else attentesPassees[index] = true;
+    reprendre();
+}
+
 // 3. Jouer un paragraphe
 function jouerParagrapheCourant() {
     if (indexParagraphe >= paragraphesRecit.length) {
+        if (etatRecit.enCours) { attendreRecit("ecriture", "", jouerParagrapheCourant); return; }
         terminerRecit();
         return;
     }
 
     let texteBrut = paragraphesRecit[indexParagraphe];
+    const besoin = attentesPassees[indexParagraphe] ? null : portraitAttenduRecit(texteBrut);
+    if (besoin) { attendreRecit(besoin.type, besoin.nom, jouerParagrapheCourant); return; }
     let imageUrl = null;
     let nomPnjActif = "";
 
@@ -236,6 +354,7 @@ function terminerRecit() {
 // 6. Gestionnaire de clic (CORRECTION DU FONDU DE TRANSITION)
 function gererClicRecit() {
     if (finRecitEnCours) return;
+    if (attenteRecit) { if (attenteRecit.type !== "ecriture") passerAttenteRecit(); return; }
     if (isTyping) {
         skipTyping = true;
         clearTimeout(currentTimer);
@@ -281,6 +400,7 @@ function gererClicRecit() {
 // 7. Fin de la scène
 function fermerRecitDynamique() {
     finRecitEnCours = false;
+    finirAttenteRecit();
     const overlay = document.getElementById("ecran-recit-dynamique");
     overlay.style.opacity = "0"; 
     setTimeout(() => {

@@ -544,11 +544,17 @@ async function genererEtStockerImagePNJ(descriptionPhysique, racePNJ = "Humain")
 //  MIA_PNJ (Création procédurale de PNJ nommés avec Détourage)
 // =========================================================================
 
-async function analyserNouveauxPNJ(idLieuActuel, nomsPnjExistants, nomsHeros, texteMJ) {
+// `lieu` : l'identifiant du lieu, ou la promesse de celui que MIA_Batiment
+// est en train de trancher (v291 : la recherche des noms n'attend pas le
+// bâtiment). `suivi.surNoms(noms)` : les nouveaux venus dès qu'ils sont
+// connus ; `suivi.surPortrait(pnj)` : chaque portrait dès qu'il est peint —
+// le parchemin attend ces deux signaux quand un nouveau venu prend la parole.
+async function analyserNouveauxPNJ(lieu, nomsPnjExistants, nomsHeros, texteMJ, suivi = {}) {
     const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
     let listePNJCrees = []; 
+    const signaler = (f, ...args) => { try { if (typeof f === "function") return f(...args); } catch (e) { console.warn("[MIA_PNJ] Suivi :", e); } };
     
-    if (!cleGemini || !idLieuActuel) return listePNJCrees;
+    if (!cleGemini || !lieu) { signaler(suivi.surNoms, []); return listePNJCrees; }
 
     // =========================================================
     // ÉTAPE 1 : LE DÉTECTEUR (Froid, Rapide et Précis à 0.0)
@@ -593,15 +599,20 @@ Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste 
         if (appelsDet && appelsDet.length > 0 && appelsDet[0].name === "signalerNoms") {
             nouveauxNomsDetectes = appelsDet[0].args.noms || [];
         }
-    } catch (e) { console.error("Erreur Détection PNJ:", e); return listePNJCrees; }
+    } catch (e) { console.error("Erreur Détection PNJ:", e); signaler(suivi.surNoms, []); return listePNJCrees; }
 
     // Filtrage de sécurité (au cas où il remet un héros ou un PNJ déjà connu)
     nouveauxNomsDetectes = nouveauxNomsDetectes.filter(nom => !nomsHeros.includes(nom) && !nomsPnjExistants.includes(nom));
+    signaler(suivi.surNoms, nouveauxNomsDetectes.slice());
 
     // 🛑 SI AUCUN NOUVEAU PNJ N'EST DÉTECTÉ, ON S'ARRÊTE ICI ! 🛑
     if (nouveauxNomsDetectes.length === 0) {
         return listePNJCrees;
     }
+
+    // Le lieu où ranger leurs fiches (MIA_Batiment a pu les faire entrer quelque part).
+    const idLieuActuel = await Promise.resolve(lieu).catch(() => null);
+    if (!idLieuActuel) return listePNJCrees;
 
     // =========================================================
     // NOUVEAU : On récupère les races connues d'Ivalis
@@ -676,8 +687,10 @@ Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
         if (appelsCrea && appelsCrea.length > 0 && appelsCrea[0].name === "creerNouveauxPNJ") {
             const nouveauxPNJs = appelsCrea[0].args.pnjs || [];
             
-            for (const pnj of nouveauxPNJs) {
-                if (nomsHeros.includes(pnj.nom)) continue; 
+            // Les portraits se peignent EN MÊME TEMPS (v291) : chacun est posé
+            // dans le récit dès qu'il est prêt.
+            await Promise.all(nouveauxPNJs.map(async (pnj) => {
+                if (!pnj || !pnj.nom || nomsHeros.includes(pnj.nom)) return; 
 
                 // =========================================================
                 // 🛡️ SÉCURITÉ ANTI-HALLUCINATION (Le Videur)
@@ -728,8 +741,10 @@ Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
                     await updateDoc(doc(db, "Monde_PNJ", docId), { URL_Cloudinary: urlImage });
                 }
                 
-                listePNJCrees.push({ Nom_PNJ: pnj.nom, URL_Cloudinary: urlImage });
-            }
+                const cree = { Nom_PNJ: pnj.nom, URL_Cloudinary: urlImage || "" };
+                listePNJCrees.push(cree);
+                if (urlImage) await signaler(suivi.surPortrait, cree);
+            }));
         }
     } catch (e) { console.error("Erreur Création PNJ:", e); }
     
@@ -1388,7 +1403,99 @@ window.masquerEcranAttente = function() {
     if (overlay) overlay.remove();
 };
 
-async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTentatives = 3) {
+// LE CERVEAU DU NARRATEUR (v291). Nico : « met moi Gemini 3.8 Flash en
+// réflexion moyenne, avec possibilité dans paramètre de mettre en low la
+// réflexion. Ou de changer pour essayer Argon. » Les deux réglages vivent dans
+// Paramètres > Outils > Réglages du narrateur. Flash-Lite (l'ancien narrateur)
+// reste au choix, et c'est lui qui reprend la main si le modèle choisi est
+// refusé (nom inconnu, pas de forfait payant pour Argon…) : la partie ne
+// reste jamais muette.
+const MODELE_NARRATEUR_DEFAUT = "gemini-3.8-flash";
+const MODELE_NARRATEUR_SECOURS = "gemini-flash-lite-latest";
+window.MODELES_NARRATEUR = [
+    { id: "gemini-3.8-flash", nom: "Gemini 3.8 Flash (conseillé)", reflexion: true },
+    { id: "gemini-4-argon", nom: "Gemini 4 Argon (plus beau style, payant, plus lent)", reflexion: true },
+    { id: "gemini-flash-lite-latest", nom: "Gemini Flash-Lite (l'ancien, le plus rapide)", reflexion: false }
+];
+window.reglagesNarrateur = function () {
+    let modele = "", reflexion = "";
+    try { modele = localStorage.getItem("ivalis_MJ_MODELE") || ""; reflexion = localStorage.getItem("ivalis_MJ_REFLEXION") || ""; } catch (e) {}
+    if (!window.MODELES_NARRATEUR.some(m => m.id === modele)) modele = MODELE_NARRATEUR_DEFAUT;
+    if (reflexion !== "low") reflexion = "medium";
+    return { modele, reflexion };
+};
+
+// Le corps de la requête pour un modèle : la réflexion n'est demandée qu'aux
+// modèles qui en ont une (Flash-Lite n'en a pas).
+function corpsNarrateur(base, modele, reflexion) {
+    const fiche = window.MODELES_NARRATEUR.find(m => m.id === modele);
+    const generationConfig = { ...base.generationConfig };
+    if (fiche && fiche.reflexion) generationConfig.thinkingConfig = { thinkingLevel: reflexion };
+    return JSON.stringify({ ...base, generationConfig });
+}
+
+// Le texte d'un morceau de réponse, sans les pensées du modèle.
+const texteDesParts = (data) => ((data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [])
+    .filter(p => typeof p.text === "string" && !p.thought).map(p => p.text).join("");
+
+// UN APPEL EN FLUX : la réponse arrive morceau par morceau (`alt=sse`) et
+// `surTexte(texteJusquIci)` est appelé à chaque morceau. Une réponse d'un seul
+// bloc (JSON) est acceptée aussi. Rend { texte, tokens } ; une erreur HTTP
+// porte son statut (`e.statut`).
+async function appelNarrateurEnFlux(modele, corps, cle, surTexte) {
+    const reponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modele}:streamGenerateContent?alt=sse&key=${cle}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: corps
+    });
+    if (!reponse.ok) {
+        let message = `Erreur: ${reponse.status}`;
+        try { const d = await reponse.json(); if (d && d.error && d.error.message) message = d.error.message; } catch (e) {}
+        const err = new Error(message); err.statut = reponse.status; throw err;
+    }
+    let texte = "", tokens = 0;
+    const lireMorceau = (data) => {
+        if (!data) return;
+        if (data.error) { const err = new Error(data.error.message || "Erreur"); err.statut = data.error.code; throw err; }
+        const t = texteDesParts(data);
+        if (data.usageMetadata && data.usageMetadata.totalTokenCount) tokens = data.usageMetadata.totalTokenCount;
+        if (t) { texte += t; if (surTexte) surTexte(texte); }
+    };
+    const type = reponse.headers.get("content-type") || "";
+    if (!/event-stream/.test(type) || !reponse.body || !reponse.body.getReader) {
+        const brut = await reponse.text();
+        let data = null;
+        try { data = JSON.parse(brut); } catch (e) {
+            brut.split(/\r?\n/).filter(l => l.startsWith("data:")).forEach(l => { try { lireMorceau(JSON.parse(l.slice(5))); } catch (err) { if (err.statut) throw err; } });
+            return { texte, tokens };
+        }
+        (Array.isArray(data) ? data : [data]).forEach(lireMorceau);
+        return { texte, tokens };
+    }
+    const lecteur = reponse.body.getReader();
+    const decodeur = new TextDecoder();
+    let tampon = "";
+    for (;;) {
+        const { done, value } = await lecteur.read();
+        if (value) tampon += decodeur.decode(value, { stream: true });
+        let fin;
+        while ((fin = tampon.indexOf("\n")) >= 0) {
+            const ligne = tampon.slice(0, fin).trim();
+            tampon = tampon.slice(fin + 1);
+            if (ligne.startsWith("data:")) {
+                let data = null;
+                try { data = JSON.parse(ligne.slice(5)); } catch (e) {}
+                lireMorceau(data);
+            }
+        }
+        if (done) break;
+    }
+    if (tampon.trim().startsWith("data:")) { try { lireMorceau(JSON.parse(tampon.trim().slice(5))); } catch (e) { if (e.statut) throw e; } }
+    return { texte, tokens };
+}
+
+// `surTexte(texteJusquIci)` (v291) : le texte du MJ au fil de son écriture,
+// pour ouvrir le parchemin avant la fin. Une fois qu'un morceau est parti, on
+// ne recommence plus : en cas de coupure, le récit s'arrête là où il en est.
+async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTentatives = 3, surTexte = null) {
     const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
     if (!cleGemini) return null;
 
@@ -1411,26 +1518,58 @@ async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTe
         ]
     };
 
+    const reglages = window.reglagesNarrateur();
+    let modele = reglages.modele;
+    let dejaEnvoye = false, texteRecu = "";
+    const relais = surTexte ? (t) => { dejaEnvoye = true; texteRecu = t; surTexte(t); } : null;
+
     for (let tentative = 1; tentative <= maxTentatives; tentative++) {
         try {
-            console.log(`✍️ [Narrateur] Génération en cours... (Tentative ${tentative}/${maxTentatives})`);
-            
-            const reponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
-                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(bodyRequete)
-            });
-            const data = await reponse.json();
-            if (!reponse.ok || data.error) throw new Error(data.error?.message || `Erreur: ${reponse.status}`);
-
-            const tokensUtilises = data.usageMetadata?.totalTokenCount || 0;
-            if (typeof window.ajouterTokens === "function") window.ajouterTokens(tokensUtilises);
-
-            return data.candidates[0].content.parts[0].text;
+            console.log(`✍️ [Narrateur] ${modele} (réflexion ${reglages.reflexion}) — tentative ${tentative}/${maxTentatives}`);
+            const { texte, tokens } = await appelNarrateurEnFlux(modele, corpsNarrateur(bodyRequete, modele, reglages.reflexion), cleGemini, relais);
+            if (!texte.trim()) throw new Error("réponse vide");
+            if (typeof window.ajouterTokens === "function") window.ajouterTokens(tokens);
+            return texte;
         } catch (erreur) {
-            console.warn(`⚠️ [Narrateur] Échec tentative ${tentative} :`, erreur.message);
+            console.warn(`⚠️ [Narrateur] Échec tentative ${tentative} (${modele}) :`, erreur.message);
+            // Le modèle choisi est refusé (inconnu, réservé au forfait payant,
+            // quota épuisé) : Flash-Lite prend le relais, sans attendre.
+            if (!dejaEnvoye && modele !== MODELE_NARRATEUR_SECOURS && [400, 403, 404, 429].includes(erreur.statut)) {
+                console.warn(`[Narrateur] ${modele} refusé (${erreur.statut}) : ${MODELE_NARRATEUR_SECOURS} prend le relais.`);
+                modele = MODELE_NARRATEUR_SECOURS;
+                tentative--;
+                continue;
+            }
+            if (dejaEnvoye) return texteRecu;
             if (tentative < maxTentatives) await new Promise(resolve => setTimeout(resolve, 4000));
             else return `*Le grimoire refuse de s'ouvrir... (${erreur.message}).*`;
         }
     }
+}
+
+// LE TEXTE DU MJ TEL QU'IL S'AFFICHE : les noms des PNJ connus deviennent
+// des étiquettes (avec leur portrait au survol, et dans le parchemin quand ils
+// parlent). `pnjs` : nom -> fiche (URL_Cloudinary). Les plus longs d'abord.
+function formaterTexteMJ(texteBrut, pnjs) {
+    let texteAffiche = String(texteBrut || "").replace(/\*\*/g, "");
+    const regexSansAccent = (texte) => {
+        return texte.replace(/[aAàâäÀÂÄ]/g, '[aAàâäÀÂÄ]').replace(/[eEéèêëÉÈÊË]/g, '[eEéèêëÉÈÊË]')
+                    .replace(/[iIîïÎÏ]/g, '[iIîïÎÏ]').replace(/[oOôöÔÖ]/g, '[oOôöÔÖ]')
+                    .replace(/[uUùûüÙÛÜ]/g, '[uUùûüÙÛÜ]').replace(/[cCçÇ]/g, '[cCçÇ]');
+    };
+    Object.keys(pnjs || {}).sort((a, b) => b.length - a.length).forEach(nom => {
+        const pnj = pnjs[nom];
+        if (!pnj) return;
+        let safeNom = nom.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        safeNom = regexSansAccent(safeNom);
+        const regex = new RegExp("(?<=^|[^a-zA-ZÀ-ÿ])" + safeNom + "(?=[^a-zA-ZÀ-ÿ]|$)(?![^<]*>)", "gi");
+        if (pnj.URL_Cloudinary && pnj.URL_Cloudinary !== "") {
+            texteAffiche = texteAffiche.replace(regex, `<span class="pnj-chat-hover"><strong>$&</strong><img src="${pnj.URL_Cloudinary}" class="pnj-hover-img"></span>`);
+        } else {
+            texteAffiche = texteAffiche.replace(regex, `<strong style="color: #e8d5a5;">$&</strong>`);
+        }
+    });
+    return texteAffiche.replace(/\n/g, "<br>");
 }
 
 // --- 4. LA BOUCLE GLOBALE (Bouton MJ) ---
@@ -1577,77 +1716,56 @@ window.declencherTourIA = async function(options) {
 
         if (issueCombat) contexte += `\n${issueCombat}\n`;
 
-        const reponseTexte = await genererReponseNarrateur(contexte, historiqueComplet);
+        // LE PARCHEMIN S'OUVRE PENDANT QUE LE MJ ÉCRIT (v291). Nico : « on peut
+        // lancer le rp avec l'animation parchemin narrateur et quand c'est au
+        // moment du pnj de parler on affiche son nom ; si l'image n'est pas
+        // finie d'être créée ça se met en attente ». Le message part dès le
+        // premier paragraphe complet et grandit à chaque paragraphe
+        // (`Recit_En_Cours`). Une fois le texte fini, les nouveaux PNJ sont
+        // cherchés (`PNJ_Attendus` : leurs noms), puis peints pendant la
+        // lecture : chaque portrait est posé dans le message dès qu'il est là.
+        // `PNJ_Prets` : tout est là (ou la peinture a échoué), plus d'attente.
+        const horodatage = new Date().getTime();
+        const pnjAffiches = { ...env.pnjsPresents };
+        const etatMessage = {};
+        let idMessage = null, detecter = false, file = Promise.resolve(), texteCourant = "";
+        const ecrireMessage = (texteBrut, champs) => {
+            if (texteBrut) texteCourant = texteBrut;
+            Object.assign(etatMessage, champs || {});
+            file = file.then(async () => {
+                const Texte = formaterTexteMJ(texteCourant, pnjAffiches);
+                if (!idMessage) {
+                    // La partie dit qu'un verdict est attendu AVANT que le
+                    // message n'arrive (v278) : la fin du parchemin saura
+                    // qu'elle doit l'attendre (« Le destin hésite… »).
+                    detecter = !issueCombat && typeof window.annoncerDetectionCombat === "function"
+                        && await window.annoncerDetectionCombat(horodatage).catch(e => { console.error("Détection du combat :", e); return false; });
+                    // ENVOI DU MESSAGE : c'est lui qui ouvre le parchemin chez tout le monde.
+                    const ref = await addDoc(collection(db, "Messages_Chat"), {
+                        ID_Partie: window.ID_PARTIE_COURANTE,
+                        Auteur_ID: "MJ", Auteur_Nom: "MJ", Auteur_Couleur: "#ffffff",
+                        Texte,
+                        Est_Narration_IA: true, // 🔻 C'EST CETTE LIGNE QUI DÉCLENCHE LE VISUAL NOVEL 🔻
+                        Timestamp: horodatage,
+                        ...etatMessage
+                    });
+                    idMessage = ref.id;
+                } else {
+                    await updateDoc(doc(db, "Messages_Chat", idMessage), { Texte, ...etatMessage });
+                }
+            }).catch(e => console.error("[Narrateur] Écriture du message :", e));
+            return file;
+        };
+        // Seuls les paragraphes finis partent (le dernier peut être coupé en plein mot).
+        const paragraphesFinis = (t) => { const i = t.lastIndexOf("\n"); return i > 0 ? t.slice(0, i) : ""; };
+        let dernierEnvoi = "";
+        const reponseTexte = await genererReponseNarrateur(contexte, historiqueComplet, 3, (texte) => {
+            const pret = paragraphesFinis(texte);
+            if (pret.trim() && pret !== dernierEnvoi) { dernierEnvoi = pret; ecrireMessage(pret, { Recit_En_Cours: true }); }
+        });
 
         if (reponseTexte) {
-            
-            // =====================================================================
-            // 1. ON ATTEND QUE L'IA SCULPTE LE DÉCOR ET PEIGNE LES NOUVEAUX VISAGES
-            // =====================================================================
-            const lieuFinal = await analyserDeplacementBatiment(window.ID_PARTIE_COURANTE, lieuActuel, reponseTexte);
-            const nomsHeros = window.PERSOS_PARTIE ? window.PERSOS_PARTIE.map(p => p.prenom) : [];
-            let nouveauxPnj = [];
-
-            if (lieuFinal) {
-                const contexteEtNarration = historique4 + "\n\n--- SUITE DE L'HISTOIRE (MJ) ---\n" + reponseTexte;
-                // On met l'application en pause TOTALE tant que les images ne sont pas créées !
-                nouveauxPnj = await analyserNouveauxPNJ(lieuFinal, nomsPnjPresents, nomsHeros, contexteEtNarration) || [];
-            }
-
-            // On ajoute virtuellement les nouveaux venus pour que le code ci-dessous puisse trouver leurs images
-            nouveauxPnj.forEach(p => {
-                nomsPnjPresents.push(p.Nom_PNJ);
-                env.pnjsPresents[p.Nom_PNJ] = p;
-            });
-
-            // =====================================================================
-            // 2. ON FORMATTE LE TEXTE (Insertion des images)
-            // =====================================================================
-            let texteAffiche = reponseTexte.replace(/\*\*/g, "");
-            const nomsTries = [...nomsPnjPresents].sort((a, b) => b.length - a.length);
-
-            const regexSansAccent = (texte) => {
-                return texte.replace(/[aAàâäÀÂÄ]/g, '[aAàâäÀÂÄ]').replace(/[eEéèêëÉÈÊË]/g, '[eEéèêëÉÈÊË]')
-                            .replace(/[iIîïÎÏ]/g, '[iIîïÎÏ]').replace(/[oOôöÔÖ]/g, '[oOôöÔÖ]')
-                            .replace(/[uUùûüÙÛÜ]/g, '[uUùûüÙÛÜ]').replace(/[cCçÇ]/g, '[cCçÇ]');
-            };
-
-            nomsTries.forEach(nom => {
-                const pnj = env.pnjsPresents[nom];
-                if (pnj) {
-                    let safeNom = nom.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    safeNom = regexSansAccent(safeNom);
-                    const regex = new RegExp("(?<=^|[^a-zA-ZÀ-ÿ])" + safeNom + "(?=[^a-zA-ZÀ-ÿ]|$)(?![^<]*>)", "gi");
-                    
-                    if (pnj.URL_Cloudinary && pnj.URL_Cloudinary !== "") {
-                        const remplacement = `<span class="pnj-chat-hover"><strong>$&</strong><img src="${pnj.URL_Cloudinary}" class="pnj-hover-img"></span>`;
-                        texteAffiche = texteAffiche.replace(regex, remplacement);
-                    } else {
-                        texteAffiche = texteAffiche.replace(regex, `<strong style="color: #e8d5a5;">$&</strong>`);
-                    }
-                }
-            });
-
-            texteAffiche = texteAffiche.replace(/\n/g, "<br>");
-
-            // LE COMBAT EST-IL LANCÉ ? (v278, combat_rp.js). La partie dit qu'un
-            // verdict est attendu AVANT que le message n'arrive : la fin du
-            // parchemin sait ainsi qu'elle doit l'attendre (« Le destin
-            // hésite… ») au lieu de se refermer.
-            const horodatage = new Date().getTime();
-            const detecter = !issueCombat && typeof window.annoncerDetectionCombat === "function"
-                && await window.annoncerDetectionCombat(horodatage).catch(e => { console.error("Détection du combat :", e); return false; });
-
-            // =====================================================================
-            // 3. ENVOI DU MESSAGE (CE QUI VA DÉCLENCHER LE RÉCIT DYNAMIQUE CHEZ TOUT LE MONDE)
-            // =====================================================================
-            await addDoc(collection(db, "Messages_Chat"), {
-                ID_Partie: window.ID_PARTIE_COURANTE,
-                Auteur_ID: "MJ", Auteur_Nom: "MJ", Auteur_Couleur: "#ffffff",
-                Texte: texteAffiche,
-                Est_Narration_IA: true, // 🔻 C'EST CETTE LIGNE QUI DÉCLENCHE LE VISUAL NOVEL 🔻
-                Timestamp: horodatage
-            });
+            await ecrireMessage(reponseTexte, { Recit_En_Cours: false });
 
             // MIA_COMBAT tourne pendant que les joueurs lisent, EN MÊME TEMPS
             // que les IA d'arrière-plan ci-dessous (Nico : « 2. Ok ») : elle n'a
@@ -1656,7 +1774,7 @@ window.declencherTourIA = async function(options) {
                 window.detecterCombatRP({ ts: horodatage, texteMJ: reponseTexte, messages: historiqueReduit })
                     .catch(e => console.error("Détection du combat :", e));
             }
-            
+
             if (typeof window.relancerInitiativeChat === "function") {
                 await window.relancerInitiativeChat();
             } else {
@@ -1664,7 +1782,27 @@ window.declencherTourIA = async function(options) {
             }
 
             // =====================================================================
-            // 4. LE RESTE TOURNE EN ARRIÈRE-PLAN PENDANT QUE LES JOUEURS LISENT
+            // LE DÉCOR ET LES NOUVEAUX VISAGES, PENDANT LA LECTURE
+            // =====================================================================
+            // Le bâtiment et la recherche des nouveaux PNJ partent ensemble : la
+            // fiche d'un PNJ n'attend le lieu qu'au moment d'être rangée.
+            const nomsHeros = window.PERSOS_PARTIE ? window.PERSOS_PARTIE.map(p => p.prenom) : [];
+            const promesseLieu = analyserDeplacementBatiment(window.ID_PARTIE_COURANTE, lieuActuel, reponseTexte);
+            let nouveauxPnj = [];
+            if (lieuActuel) {
+                const contexteEtNarration = historique4 + "\n\n--- SUITE DE L'HISTOIRE (MJ) ---\n" + reponseTexte;
+                nouveauxPnj = await analyserNouveauxPNJ(promesseLieu, nomsPnjPresents, nomsHeros, contexteEtNarration, {
+                    surNoms: (noms) => ecrireMessage(null, { PNJ_Attendus: noms }),
+                    surPortrait: (pnj) => { pnjAffiches[pnj.Nom_PNJ] = pnj; return ecrireMessage(null, {}); }
+                }).catch(e => { console.error("[MIA_PNJ] Erreur :", e); return []; }) || [];
+            }
+            await ecrireMessage(null, { PNJ_Prets: true });
+            const lieuFinal = await promesseLieu;
+
+            nouveauxPnj.forEach(p => { if (!nomsPnjPresents.includes(p.Nom_PNJ)) nomsPnjPresents.push(p.Nom_PNJ); });
+
+            // =====================================================================
+            // LE RESTE TOURNE EN ARRIÈRE-PLAN PENDANT QUE LES JOUEURS LISENT
             // =====================================================================
             setTimeout(async () => {
                 if (lieuFinal) {

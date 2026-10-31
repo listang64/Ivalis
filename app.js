@@ -3909,6 +3909,14 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
      }
   });
 
+  // L'état d'un message du MJ pour le parchemin (v291). Un message d'avant
+  // (sans `Recit_En_Cours`) est complet, portraits compris.
+  const etatRecitDuMessage = (m) => {
+      const nouveauFormat = Object.prototype.hasOwnProperty.call(m, "Recit_En_Cours");
+      return { enCours: m.Recit_En_Cours === true, pnjAttendus: Array.isArray(m.PNJ_Attendus) ? m.PNJ_Attendus : null,
+               pnjPrets: !nouveauFormat || m.PNJ_Prets === true };
+  };
+
   // B. Écoute de l'historique du Chat
   const qMsg = query(collection(db, COL.MESSAGES), where("ID_Partie", "==", idPartie), orderBy("Timestamp", "asc"));
   
@@ -3922,6 +3930,7 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
   window.unsubscribeMessages = onSnapshot(qMsg, (snap) => {
       let recitDeclenche = null; 
       let recitHorodatage = 0;
+      let recitEtat = {};
 
       // On analyse chirurgicalement chaque changement (Ajout ou Suppression)
       snap.docChanges().forEach(change => {
@@ -3932,9 +3941,24 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
               if (window.INITIAL_CHAT_LOADED && data.Est_Narration_IA && data.Timestamp >= (timestampChargement - 1000)) {
                   recitDeclenche = data.Texte;
                   recitHorodatage = data.Timestamp;
+                  recitEtat = etatRecitDuMessage(data);
               }
               // 🔻 NOUVEAU : On injecte uniquement ce nouveau message !
               ajouterUnSeulMessageChat(data);
+          }
+
+          // LE MESSAGE DU MJ GRANDIT (v291) : un paragraphe de plus, un
+          // portrait posé. Le chat le redessine à sa place, le parchemin suit.
+          if (change.type === "modified") {
+              const ancien = document.getElementById("msg-" + data.idDoc);
+              const suivant = ancien ? ancien.nextSibling : null;
+              if (ancien) ancien.remove();
+              ajouterUnSeulMessageChat(data);
+              const nouveau = document.getElementById("msg-" + data.idDoc);
+              if (ancien && nouveau && suivant && zoneChat) zoneChat.insertBefore(nouveau, suivant);
+              if (data.Est_Narration_IA && typeof window.majRecitDynamique === "function") {
+                  window.majRecitDynamique(data.Timestamp, data.Texte, etatRecitDuMessage(data));
+              }
           }
           
           if (change.type === "removed") {
@@ -3950,7 +3974,7 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
       if (zoneChat) zoneChat.scrollTop = zoneChat.scrollHeight;
 
       if (recitDeclenche && typeof window.lancerRecitDynamique === "function") {
-          window.lancerRecitDynamique(recitDeclenche, { ts: recitHorodatage });
+          window.lancerRecitDynamique(recitDeclenche, { ts: recitHorodatage, ...recitEtat });
       }
   });
 
@@ -5986,6 +6010,13 @@ document.addEventListener("DOMContentLoaded", function () {
   // Initialisation Outils IA
   document.getElementById("temp-range").value = localStorage.getItem("ivalis_IA_TEMPERATURE") || "1.0";
   document.getElementById("temp-input").value = localStorage.getItem("ivalis_IA_TEMPERATURE") || "1.0";
+  // Le modèle et la réflexion du narrateur (v291, ia_master.js).
+  if (typeof window.reglagesNarrateur === "function") {
+      const reglages = window.reglagesNarrateur();
+      const selModele = document.getElementById("mj-modele"), selReflexion = document.getElementById("mj-reflexion");
+      if (selModele) selModele.value = reglages.modele;
+      if (selReflexion) selReflexion.value = reglages.reflexion;
+  }
   document.getElementById("toggle-tokens").checked = localStorage.getItem("ivalis_SHOW_TOKENS") === "on";
   window.actualiserAffichageTokens();
 
@@ -6304,6 +6335,9 @@ window.syncTemperature = function(source) {
 window.sauvegarderTemperature = function() {
     const val = document.getElementById("temp-input").value;
     localStorage.setItem("ivalis_IA_TEMPERATURE", val);
+    const selModele = document.getElementById("mj-modele"), selReflexion = document.getElementById("mj-reflexion");
+    if (selModele && selModele.value) localStorage.setItem("ivalis_MJ_MODELE", selModele.value);
+    if (selReflexion && selReflexion.value) localStorage.setItem("ivalis_MJ_REFLEXION", selReflexion.value);
     naviguerFenetre('etape-ia-parametre', 'etape-menu-outils');
 };
 

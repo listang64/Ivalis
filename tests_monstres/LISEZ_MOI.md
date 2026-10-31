@@ -9342,3 +9342,59 @@ trou de brûlure, vérifie :
 Il échoue sur l'ancien code (8 échecs).
 
 Test mis à jour : corrections_v288 (l'ombre est la silhouette floutée).
+
+## v291 — Le narrateur plus vif : Gemini 3.8 Flash, le parchemin qui s'ouvre pendant que le MJ écrit
+
+Nico : « met moi Gemini 3.8 Flash en réflexion moyenne, avec possibilité
+dans paramètre de mettre en low la réflexion. Ou de changer pour essayer
+Argon. » Et, pour les PNJ : lancer le parchemin tout de suite ; quand un
+nouveau venu parle, afficher son nom et attendre son portrait s'il n'est
+pas fini.
+
+- Le narrateur (ia_master.js) parle à `gemini-3.8-flash`, réflexion
+  moyenne (`thinkingConfig.thinkingLevel`). Paramètres > Outils > « Réglages
+  du narrateur » : le modèle (3.8 Flash, 4 Argon, Flash-Lite) et la réflexion
+  (moyenne, basse), à côté de la température. Les filtres restent coupés
+  (BLOCK_NONE). Si le modèle choisi est refusé (400, 403, 404, 429 : nom
+  inconnu, Argon sans forfait payant, quota épuisé), Flash-Lite prend le
+  relais aussitôt.
+- La réponse arrive en flux (`streamGenerateContent?alt=sse`). Le message
+  du MJ part dès le premier paragraphe fini (`Recit_En_Cours: true`) et
+  grandit à chaque paragraphe : le parchemin s'ouvre pendant que le MJ
+  écrit. Les pensées du modèle ne s'écrivent pas.
+- Une fois le texte fini, le bâtiment (MIA_Batiment) et la recherche des
+  nouveaux PNJ partent ensemble. Les noms trouvés sont annoncés dans le
+  message (`PNJ_Attendus`). Les portraits se peignent en même temps, et
+  chacun est posé dans le texte dès qu'il est prêt. `PNJ_Prets` : tout est là.
+- Le chat redessine un message modifié à sa place, et passe chaque version
+  au parchemin (`majRecitDynamique`).
+- Le parchemin (recit_dynamique.js) :
+  - au bout du texte reçu, il affiche « Le Maître du Jeu écrit… » au lieu
+    de se fermer ;
+  - quand un nouveau venu parle avant son portrait, son nom s'affiche avec
+    « Le portrait se dessine… », puis la réplique s'écrit à l'arrivée du
+    portrait ;
+  - un toucher passe l'attente, qui a aussi une limite (45 s pour un
+    portrait, 15 s pour la liste des noms, 2 min pour l'écriture) ;
+  - les répliques des héros et les anciens messages n'attendent jamais.
+
+corrections_v291.mjs (dans la suite), sur la vraie page, avec un Gemini
+simulé qui répond en flux (trois morceaux espacés d'une demi-seconde),
+vérifie :
+- les réglages : par défaut, dans la fenêtre, sauvegardés, et le repli
+  d'un réglage inconnu ;
+- la requête : le modèle, le flux, la réflexion, les filtres coupés ;
+- le message : parti dès le premier paragraphe (1,5 s d'avance), puis
+  complet, sans les pensées ;
+- les PNJ : la recherche et la peinture après l'ouverture ; Myrto annoncée,
+  puis son portrait posé, puis « prêts » ; la fiche rangée au bon lieu ; le
+  verrou relâché ;
+- les modèles : réflexion basse, Flash-Lite sans réflexion, Argon refusé
+  puis relayé par Flash-Lite, Argon accepté ;
+- le parchemin : le nom et l'attente du portrait, l'arrivée du portrait, un
+  toucher qui passe l'attente, un héros qui n'attend pas, un ancien
+  message, le MJ qui écrit encore, la mise à jour d'un autre message ignorée,
+  la fermeture à la fin ;
+- le chat qui suit le message, et les versions.
+
+Il échoue sur l'ancien code (28 échecs).
