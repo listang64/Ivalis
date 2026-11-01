@@ -412,8 +412,10 @@ await section(async () => {
   verifier("et passe chaque version au parchemin (majRecitDynamique), avec son état", /majRecitDynamique\(data\.Timestamp, data\.Texte, etatRecitDuMessage\(data\)\)/.test(app)
            && /lancerRecitDynamique\(recitDeclenche, \{ ts: recitHorodatage, \.\.\.recitEtat \}\)/.test(app));
   const index = lire("index.html");
-  verifier("versions : ia_master, recit_dynamique, app, style, trace du combat", /ia_master\.js\?v=12"/.test(index) && /recit_dynamique\.js\?v=6"/.test(index) && /app\.js\?v=130"/.test(index) && /style\.css\?v=120"/.test(index) && /trace_combat\.js\?v=196"/.test(index)
-           && /VERSION_IVALIS = 291/.test(lire("trace_combat.js")) && /"version": 291/.test(lire("version.json")));
+  const v = (re) => Number((index.match(re) || [])[1] || 0);
+  verifier("versions : ia_master, recit_dynamique, app, style, trace du combat", v(/ia_master\.js\?v=(\d+)"/) >= 12 && v(/recit_dynamique\.js\?v=(\d+)"/) >= 6 && v(/app\.js\?v=(\d+)"/) >= 130
+           && v(/style\.css\?v=(\d+)"/) >= 120 && v(/trace_combat\.js\?v=(\d+)"/) >= 196
+           && Number((lire("trace_combat.js").match(/VERSION_IVALIS = (\d+)/) || [])[1]) >= 291 && Number((lire("version.json").match(/"version": (\d+)/) || [])[1]) >= 291);
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

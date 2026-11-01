@@ -87,9 +87,12 @@ function initInterfaceRecit() {
 // `options.enCours`, `options.pnjAttendus`, `options.pnjPrets` (v291) : l'état
 // du message du MJ quand il arrive (voir etatRecit).
 const decouperRecit = (texteHtml) => String(texteHtml || "").split(/<br\s*\/?>/i).filter(p => p.trim() !== "");
+// `pnjAnnonces` (v292) : les visages préparés que le MJ vient de citer,
+// connus avant la liste complète des nouveaux venus.
 const lireEtatRecit = (o) => ({
     enCours: !!(o && o.enCours),
     pnjAttendus: o && Array.isArray(o.pnjAttendus) ? o.pnjAttendus : null,
+    pnjAnnonces: o && Array.isArray(o.pnjAnnonces) ? o.pnjAnnonces : [],
     pnjPrets: !(o && o.pnjPrets === false)
 });
 window.lancerRecitDynamique = function(texteHtml, options) {
@@ -142,10 +145,13 @@ function portraitAttenduRecit(html) {
     const texte = tmp.textContent || "";
     if (!/["«»]/.test(texte)) return null;
     const avecPortrait = Array.from(tmp.querySelectorAll("span.pnj-chat-hover strong")).map(st => sansAccent(st.textContent).trim());
+    const sansSonPortrait = (liste) => liste.find(n => n && nomDans(n, texte) && !avecPortrait.includes(sansAccent(n).trim()));
     if (Array.isArray(etatRecit.pnjAttendus)) {
-        const nom = etatRecit.pnjAttendus.find(n => n && nomDans(n, texte) && !avecPortrait.includes(sansAccent(n).trim()));
+        const nom = sansSonPortrait(etatRecit.pnjAttendus);
         return nom ? { type: "portrait", nom } : null;
     }
+    const annonce = sansSonPortrait(etatRecit.pnjAnnonces || []);
+    if (annonce) return { type: "portrait", nom: annonce };
     // Les nouveaux venus ne sont pas encore connus : un dialogue sans
     // portrait, qui n'est pas celui d'un héros, attend leur liste.
     if (tmp.querySelector("img.pnj-hover-img")) return null;

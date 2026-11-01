@@ -3914,6 +3914,7 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
   const etatRecitDuMessage = (m) => {
       const nouveauFormat = Object.prototype.hasOwnProperty.call(m, "Recit_En_Cours");
       return { enCours: m.Recit_En_Cours === true, pnjAttendus: Array.isArray(m.PNJ_Attendus) ? m.PNJ_Attendus : null,
+               pnjAnnonces: Array.isArray(m.PNJ_Annonces) ? m.PNJ_Annonces : [],
                pnjPrets: !nouveauFormat || m.PNJ_Prets === true };
   };
 

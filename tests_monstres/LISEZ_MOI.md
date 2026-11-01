@@ -9398,3 +9398,48 @@ vérifie :
 - le chat qui suit le message, et les versions.
 
 Il échoue sur l'ancien code (28 échecs).
+
+## v292 — Les visages préparés avant le MJ, peints seulement s'il les cite
+
+Nico : « les pnj doivent être créés avant que le mj réponde car il les
+intègre au rp » ; « créer l'image que si le pnj créé est utilisé sinon trop
+de frais » ; « créer que les pnj qui ont un nom ».
+
+- Avant le MJ, MIA_CASTING (Flash-Lite, ia_master.js `preparerNouveauxPNJ`)
+  lit la scène et les dernières actions. Elle prépare au plus deux fiches,
+  seulement pour un personnage nommé que les joueurs vont aborder (jamais
+  un figurant, un héros ni un PNJ connu ; race validée sur le Grimoire).
+  Elle tourne en même temps que Mia (les PNJ sollicités). Rien n'est rangé
+  ni peint.
+- Le MJ reçoit ces fiches (« PERSONNAGES PRÊTS À ENTRER EN SCÈNE ») avec la
+  consigne de garder le nom, le physique et le caractère.
+- Pendant le flux, dès que le MJ cite un visage préparé (nom complet ou
+  prénom), son portrait est lancé, le message l'annonce (`PNJ_Annonces`), et
+  sa fiche est rangée au lieu tranché par MIA_Batiment (dans le bâtiment où
+  le MJ a fait entrer les héros). Un visage non cité : ni fiche, ni image.
+- Le rattrapage d'après (les noms que le MJ invente quand même) ne prend que
+  les vrais noms propres, trois au plus. La forge ne peut rien ajouter, et
+  les visages adoptés ne sont pas recréés. `PNJ_Attendus` réunit les deux.
+- Le parchemin attend aussi le portrait d'un visage annoncé.
+- Fonctions communes : `lireRacesConnues`, `validerRacePNJ`,
+  `enregistrerFichePNJ`, `memeNomPNJ`, `nomCiteDans`.
+
+corrections_v292.mjs (dans la suite), sur la vraie page et deux tours de MJ
+complets (flux en morceaux espacés d'une demi-seconde), vérifie :
+- MIA_CASTING consultée avant le narrateur, en même temps que Mia, avec la
+  scène, les actions, les races, les connus, et sa consigne ;
+- les fiches remises au MJ ;
+- Myrto citée : portrait lancé pendant l'écriture, annoncée au parchemin,
+  fiche rangée dans la nouvelle taverne, conforme et avec son portrait ;
+  Damon, non cité : ni portrait ni fiche ;
+- le rattrapage : vrais noms, trois au plus (4 détectés → 3), pas de
+  « bonus » de la forge, pas de seconde Myrto, 4 portraits en tout ;
+  `PNJ_Attendus`, `PNJ_Prets`, le verrou ;
+- le tour suivant : Myrto parmi les PNJ présents (MJ, Mia, MIA_CASTING),
+  aucun portrait de plus ;
+- les garde-fous : MIA_CASTING en panne, cinq fiches réduites à deux (sans
+  héros ni PNJ connu), races corrigées ;
+- le parchemin qui attend un visage annoncé, et les versions.
+
+Il échoue sur l'ancien code (26 échecs). Test mis à jour : corrections_v291
+(versions en minimum).

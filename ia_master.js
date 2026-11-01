@@ -544,6 +544,160 @@ async function genererEtStockerImagePNJ(descriptionPhysique, racePNJ = "Humain")
 //  MIA_PNJ (Création procédurale de PNJ nommés avec Détourage)
 // =========================================================================
 
+// =========================================================================
+//  LES FICHES DES PNJ (v292) : partagées par la préparation d'avant le MJ et
+//  le rattrapage d'après (les noms qu'il a inventés lui-même).
+// =========================================================================
+const MAX_PNJ_PREPARES = 2;   // fiches préparées avant le MJ (sans image)
+const MAX_PNJ_RATTRAPES = 3;  // nouveaux noms rattrapés dans sa réponse
+
+// Le même PNJ ? Sans accents ni majuscules ; « Myrto » est « Myrto la Porteuse ».
+const sansAccentPNJ = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+function memeNomPNJ(a, b) {
+    const x = sansAccentPNJ(a), y = sansAccentPNJ(b);
+    if (!x || !y) return false;
+    return x === y || x.split(/\s+/)[0] === y.split(/\s+/)[0];
+}
+// Le nom (ou son prénom, le premier mot) apparaît-il dans le texte, en mot entier ?
+function nomCiteDans(nom, texte) {
+    const t = sansAccentPNJ(texte);
+    const n = sansAccentPNJ(nom);
+    if (!n) return false;
+    const cherche = (m) => m.length >= 3 && new RegExp("(^|[^a-z0-9])" + m.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([^a-z0-9]|$)").test(t);
+    return cherche(n) || cherche(n.split(/\s+/)[0]);
+}
+
+// Les races du Grimoire (Monde_Races), Humain en premier.
+async function lireRacesConnues() {
+    const racesConnues = ["Humain"];
+    try {
+        const snapRaces = await getDocs(query(collection(db, "Monde_Races")));
+        snapRaces.forEach(docSnap => { if (docSnap.data().Nom) racesConnues.push(docSnap.data().Nom); });
+    } catch (e) {
+        console.warn("[MIA_PNJ] Impossible de lire le Grimoire des Races :", e);
+    }
+    return racesConnues;
+}
+
+// 🛡️ SÉCURITÉ ANTI-HALLUCINATION (Le Videur) : la race choisie par l'IA doit
+// exister VRAIMENT, avec l'orthographe exacte du Grimoire ; sinon Humain.
+function validerRacePNJ(race, racesConnues) {
+    if (!race) return "Humain";
+    const trouvee = racesConnues.find(r => sansAccentPNJ(r) === sansAccentPNJ(race));
+    if (!trouvee) console.warn(`[MIA_PNJ] L'IA a tenté d'inventer la race '${race}'. Remplacement forcé par 'Humain'.`);
+    return trouvee || "Humain";
+}
+
+// Range la fiche dans Monde_PNJ, au lieu (ou dans le bâtiment) où elle
+// apparaît. Rend son identifiant.
+async function enregistrerFichePNJ(pnj, idLieuActuel) {
+    const numAleatoire = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
+    const nomFormate = pnj.nom.replace(/[^a-zA-Z0-9]/g, "_");
+    const docId = `PNJ_${numAleatoire}_${nomFormate}`;
+    let idLieuGlobal = ""; let idBatimentGlobal = "";
+    if (idLieuActuel && idLieuActuel.startsWith("L")) idLieuGlobal = idLieuActuel;
+    else if (idLieuActuel && idLieuActuel.startsWith("B")) {
+        idBatimentGlobal = idLieuActuel;
+        const bSnap = await getDoc(doc(db, "Monde_Batiment", idLieuActuel));
+        if (bSnap.exists()) idLieuGlobal = bSnap.data().ID_Lieu;
+    }
+    await setDoc(doc(db, "Monde_PNJ", docId), {
+        Description_Physique: pnj.physique || "", ID_Batiment: idBatimentGlobal, ID_Lieu: idLieuGlobal,
+        Nom_PNJ: pnj.nom, Occupation: pnj.occupation || "", Race: pnj.race || "Humain", Secret_Mental: pnj.secret || "",
+        Statut: "Vivant", Style_De_Parole: pnj.style_parole || "", URL_Cloudinary: ""
+    });
+    return docId;
+}
+
+// =========================================================================
+//  MIA_CASTING (v292) : AVANT LE MJ, LES VISAGES DONT LA SCÈNE A BESOIN
+// =========================================================================
+// Nico : « les pnj doivent être créés avant que le mj réponde car il les
+// intègre au rp » ; « créer l'image que si le pnj créé est utilisé » ;
+// « créer que les pnj qui ont un nom ». Deux fiches au plus, seulement pour
+// un personnage NOMMÉ que les joueurs vont aborder. Rien n'est rangé ni peint
+// ici : la fiche part au MJ, et elle ne devient un vrai PNJ (fiche en base,
+// portrait) que si le MJ cite son nom.
+async function preparerNouveauxPNJ(contexteScene, historique4, nomsPnjExistants, nomsHeros) {
+    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+    if (!cleGemini) return [];
+    const racesConnues = await lireRacesConnues();
+    const promptSysteme = `Tu es MIA_CASTING, la directrice de casting d'Ivalis (Antiquité magique, mythologie).
+Le Maître du Jeu va répondre aux dernières actions des joueurs. Avant qu'il écrive, décide si la scène a besoin d'un NOUVEAU personnage NOMMÉ.
+
+Prépare une fiche SEULEMENT pour un personnage que les joueurs vont aborder en personne : quelqu'un à qui ils parlent, qu'ils interpellent, qu'ils viennent voir, chez qui ils entrent (l'aubergiste de la taverne où ils entrent, le garde qu'ils questionnent, le marchand dont ils poussent la porte).
+JAMAIS de figurants anonymes, de foules, de passants, de groupes. JAMAIS un personnage déjà connu ni un Héros. Deux fiches AU PLUS ; le plus souvent, AUCUNE (liste vide).
+Chaque personnage a un VRAI nom propre, court, antique (un prénom, éventuellement un surnom).
+RACES OBLIGATOIRES : ${racesConnues.join(", ")}.
+
+Personnages DÉJÀ connus : ${JSON.stringify(nomsPnjExistants)}.
+Héros : ${JSON.stringify(nomsHeros)}.
+
+${contexteScene}`;
+    const outils = [{
+        functionDeclarations: [{
+            name: "preparerPNJ",
+            description: "Les fiches des nouveaux personnages nommés dont la scène a besoin (liste vide sinon).",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    pnjs: {
+                        type: "ARRAY",
+                        items: {
+                            type: "OBJECT",
+                            properties: {
+                                nom: { type: "STRING" },
+                                physique: { type: "STRING", description: "Haut du corps : sexe, âge, visage, coiffure, expression, tenue (textures, couleurs), objets portés." },
+                                occupation: { type: "STRING" },
+                                race: { type: "STRING" },
+                                secret: { type: "STRING" },
+                                style_parole: { type: "STRING" },
+                                raison: { type: "STRING", description: "Pourquoi les joueurs vont l'aborder maintenant." }
+                            }, required: ["nom", "physique", "occupation", "race", "secret", "style_parole"]
+                        }
+                    }
+                }, required: ["pnjs"]
+            }
+        }]
+    }];
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                systemInstruction: { parts: [{ text: promptSysteme }] },
+                contents: [{ role: "user", parts: [{ text: historique4 }] }],
+                tools: outils, toolConfig: { functionCallingConfig: { mode: "ANY" } },
+                generationConfig: { temperature: 0.9 }
+            })
+        });
+        const data = await res.json();
+        const appel = (data.candidates?.[0]?.content?.parts || []).find(p => p.functionCall && p.functionCall.name === "preparerPNJ");
+        const fiches = [];
+        ((appel && appel.functionCall.args && appel.functionCall.args.pnjs) || []).forEach(f => {
+            const nom = String((f && f.nom) || "").trim();
+            if (!nom || nomsHeros.some(h => memeNomPNJ(h, nom)) || nomsPnjExistants.some(n => memeNomPNJ(n, nom))) return;
+            if (fiches.some(x => memeNomPNJ(x.nom, nom)) || fiches.length >= MAX_PNJ_PREPARES) return;
+            fiches.push({ ...f, nom, race: validerRacePNJ(f.race, racesConnues) });
+        });
+        if (fiches.length) console.log(`[MIA_CASTING] 🎭 ${fiches.map(f => f.nom).join(", ")} prêt(s) à entrer en scène (sans portrait tant que le MJ ne les cite pas).`);
+        return fiches;
+    } catch (e) {
+        console.warn("[MIA_CASTING] Préparation impossible (le MJ improvisera) :", e);
+        return [];
+    }
+}
+
+// Ce que le MJ lit des fiches préparées.
+function contexteFichesPreparees(fiches) {
+    if (!fiches || !fiches.length) return "";
+    let t = `\n--- PERSONNAGES PRÊTS À ENTRER EN SCÈNE ---\n`;
+    t += `Si la scène en a besoin, fais-les apparaître avec CE nom exact, ce physique, ce métier et cette façon de parler. N'invente pas un autre nom pour le même rôle. Leur secret guide leur comportement : ne le révèle pas.\n`;
+    fiches.forEach(f => {
+        t += `- ${f.nom} (${f.race}, ${f.occupation}) — Apparence : ${f.physique} — Parole : ${f.style_parole} — Secret : ${f.secret}\n`;
+    });
+    return t;
+}
+
 // `lieu` : l'identifiant du lieu, ou la promesse de celui que MIA_Batiment
 // est en train de trancher (v291 : la recherche des noms n'attend pas le
 // bâtiment). `suivi.surNoms(noms)` : les nouveaux venus dès qu'ils sont
@@ -563,8 +717,8 @@ async function analyserNouveauxPNJ(lieu, nomsPnjExistants, nomsHeros, texteMJ, s
 Voici les personnages DEJA connus : ${JSON.stringify(nomsPnjExistants)}.
 Voici les Héros : ${JSON.stringify(nomsHeros)}.
 
-Lis le texte du Maître du Jeu. Y a-t-il de NOUVEAUX personnages expressément NOMMÉS (VRAI prénom) qui viennent d'apparaître ?
-Règles : Ignore les descriptions génériques ("un garde", "le tavernier"). Ne liste JAMAIS les Héros.
+Lis le texte du Maître du Jeu. Y a-t-il de NOUVEAUX personnages expressément NOMMÉS (VRAI prénom ou nom propre de personne) qui viennent d'apparaître ?
+Règles : Ignore les descriptions génériques ("un garde", "le tavernier", "la prêtresse"), les titres seuls, les foules, les dieux et les lieux. Ne liste JAMAIS les Héros. Trois noms au plus.
 Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste vide.`;
 
     const outilsDetection = [{
@@ -601,8 +755,11 @@ Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste 
         }
     } catch (e) { console.error("Erreur Détection PNJ:", e); signaler(suivi.surNoms, []); return listePNJCrees; }
 
-    // Filtrage de sécurité (au cas où il remet un héros ou un PNJ déjà connu)
-    nouveauxNomsDetectes = nouveauxNomsDetectes.filter(nom => !nomsHeros.includes(nom) && !nomsPnjExistants.includes(nom));
+    // Filtrage de sécurité (au cas où il remet un héros ou un PNJ déjà connu).
+    // Trois nouveaux venus au plus par réponse (v292 : chacun coûte un portrait).
+    const dejaConnu = (nom) => nomsHeros.includes(nom) || nomsPnjExistants.some(n => memeNomPNJ(n, nom));
+    nouveauxNomsDetectes = [...new Set(nouveauxNomsDetectes.map(n => String(n || "").trim()).filter(Boolean))]
+        .filter(nom => !dejaConnu(nom)).slice(0, MAX_PNJ_RATTRAPES);
     signaler(suivi.surNoms, nouveauxNomsDetectes.slice());
 
     // 🛑 SI AUCUN NOUVEAU PNJ N'EST DÉTECTÉ, ON S'ARRÊTE ICI ! 🛑
@@ -614,19 +771,7 @@ Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste 
     const idLieuActuel = await Promise.resolve(lieu).catch(() => null);
     if (!idLieuActuel) return listePNJCrees;
 
-    // =========================================================
-    // NOUVEAU : On récupère les races connues d'Ivalis
-    // =========================================================
-    let racesConnues = ["Humain"]; // Par défaut
-    try {
-        const qRaces = query(collection(db, "Monde_Races"));
-        const snapRaces = await getDocs(qRaces);
-        snapRaces.forEach(docSnap => {
-            if (docSnap.data().Nom) racesConnues.push(docSnap.data().Nom);
-        });
-    } catch (e) {
-        console.warn("[MIA_PNJ] Impossible de lire le Grimoire des Races :", e);
-    }
+    const racesConnues = await lireRacesConnues();
 
     // =========================================================
     // ÉTAPE 2 : LE CRÉATEUR (Chaud, Aléatoire et Créatif)
@@ -685,62 +830,23 @@ Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
         const appelsCrea = dataCrea.candidates?.[0]?.content?.parts?.filter(p => p.functionCall).map(p => p.functionCall);
         
         if (appelsCrea && appelsCrea.length > 0 && appelsCrea[0].name === "creerNouveauxPNJ") {
-            const nouveauxPNJs = appelsCrea[0].args.pnjs || [];
+            // Seulement les noms détectés, trois au plus (pas de bonus inventé par la forge).
+            const nouveauxPNJs = (appelsCrea[0].args.pnjs || [])
+                .filter(pnj => pnj && pnj.nom && nouveauxNomsDetectes.some(n => memeNomPNJ(n, pnj.nom)))
+                .slice(0, MAX_PNJ_RATTRAPES);
             
             // Les portraits se peignent EN MÊME TEMPS (v291) : chacun est posé
             // dans le récit dès qu'il est prêt.
             await Promise.all(nouveauxPNJs.map(async (pnj) => {
                 if (!pnj || !pnj.nom || nomsHeros.includes(pnj.nom)) return; 
 
-                // =========================================================
-                // 🛡️ SÉCURITÉ ANTI-HALLUCINATION (Le Videur)
-                // On vérifie que la race choisie par l'IA existe VRAIMENT.
-                // =========================================================
-                let raceValidee = "Humain"; // Valeur de repli par défaut (lore-friendly)
-                if (pnj.race) {
-                    const normaliser = (str) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                    const raceTrouvee = racesConnues.find(r => normaliser(r) === normaliser(pnj.race));
-                    
-                    if (raceTrouvee) {
-                        raceValidee = raceTrouvee; // On sécurise avec l'orthographe exacte de la BDD
-                    } else {
-                        console.warn(`[MIA_PNJ] L'IA a tenté d'inventer la race '${pnj.race}'. Remplacement forcé par 'Humain'.`);
-                    }
-                }
-                pnj.race = raceValidee; // On écrase la donnée de l'IA par la donnée sécurisée
-                // =========================================================
-
-                const numAleatoire = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
-                const nomFormate = pnj.nom.replace(/[^a-zA-Z0-9]/g, "_");
-                const docId = `PNJ_${numAleatoire}_${nomFormate}`;
-                let idLieuGlobal = ""; let idBatimentGlobal = "";
-                
-                if (idLieuActuel.startsWith("L")) idLieuGlobal = idLieuActuel;
-                else if (idLieuActuel.startsWith("B")) {
-                    idBatimentGlobal = idLieuActuel;
-                    const bSnap = await getDoc(doc(db, "Monde_Batiment", idLieuActuel));
-                    if (bSnap.exists()) idLieuGlobal = bSnap.data().ID_Lieu;
-                }
-
-                await updateDoc(doc(db, "Monde_PNJ", docId), {
-                    Description_Physique: pnj.physique, ID_Batiment: idBatimentGlobal, ID_Lieu: idLieuGlobal,
-                    Nom_PNJ: pnj.nom, Occupation: pnj.occupation, Race: pnj.race, Secret_Mental: pnj.secret,
-                    Statut: "Vivant", Style_De_Parole: pnj.style_parole, URL_Cloudinary: ""
-                }).catch(async () => {
-                     await setDoc(doc(db, "Monde_PNJ", docId), {
-                        Description_Physique: pnj.physique, ID_Batiment: idBatimentGlobal, ID_Lieu: idLieuGlobal,
-                        Nom_PNJ: pnj.nom, Occupation: pnj.occupation, Race: pnj.race, Secret_Mental: pnj.secret,
-                        Statut: "Vivant", Style_De_Parole: pnj.style_parole, URL_Cloudinary: ""
-                    });
-                });
+                pnj.race = validerRacePNJ(pnj.race, racesConnues);
+                const docId = await enregistrerFichePNJ(pnj, idLieuActuel);
 
                 // On transmet la race (maintenant 100% sécurisée) au générateur d'image !
                 const urlImage = await genererEtStockerImagePNJ(pnj.physique, pnj.race);
-                
-                if (urlImage) {
-                    await updateDoc(doc(db, "Monde_PNJ", docId), { URL_Cloudinary: urlImage });
-                }
-                
+                if (urlImage) await updateDoc(doc(db, "Monde_PNJ", docId), { URL_Cloudinary: urlImage });
+
                 const cree = { Nom_PNJ: pnj.nom, URL_Cloudinary: urlImage || "" };
                 listePNJCrees.push(cree);
                 if (urlImage) await signaler(suivi.surPortrait, cree);
@@ -1661,10 +1767,11 @@ window.declencherTourIA = async function(options) {
         const env = await preparerEnvironnement(lieuActuel);
         const nomsPnjPresents = Object.keys(env.pnjsPresents);
 
-        let pnjCibles = [];
-        if (nomsPnjPresents.length > 0) {
-            pnjCibles = await filtrerPNJAvecMia(historique4, nomsPnjPresents);
-        }
+        // Mia (les PNJ sollicités) part tout de suite ; MIA_CASTING la rejoindra
+        // une fois la scène décrite (v292) : on les attend ensemble.
+        const promessePnjCibles = nomsPnjPresents.length > 0
+            ? filtrerPNJAvecMia(historique4, nomsPnjPresents).catch(() => []) : Promise.resolve([]);
+        const nomsHeros = window.PERSOS_PARTIE ? window.PERSOS_PARTIE.map(p => p.prenom) : [];
 
         // NOUVEAU : Récupération de la date in-game
         const jourActuel = window.DATE_EN_JEU_ACTUELLE?.jour || "?";
@@ -1707,12 +1814,23 @@ window.declencherTourIA = async function(options) {
             });
         }
 
+        // LES VISAGES PRÉPARÉS (v292) : MIA_CASTING lit la scène telle que le MJ
+        // la lira et prépare, au plus, deux personnages nommés que les joueurs
+        // vont aborder. Le MJ reçoit leurs fiches ; rien n'est rangé ni peint
+        // tant qu'il ne les cite pas.
+        const [pnjCibles, fichesPreparees] = await Promise.all([
+            promessePnjCibles,
+            lieuActuel && !issueCombat ? preparerNouveauxPNJ(contexte, historique4, nomsPnjPresents, nomsHeros) : Promise.resolve([])
+        ]);
+
         if (pnjCibles.length > 0) {
             contexte += `\n--- FICHES DÉTAILLÉES DES PNJ SOLLICITÉS ---\n`;
             pnjCibles.forEach(nom => {
                 if (env.pnjsPresents[nom]) contexte += `Fiche complète de ${nom} : ${JSON.stringify(env.pnjsPresents[nom])}\n`;
             });
         }
+
+        contexte += contexteFichesPreparees(fichesPreparees);
 
         if (issueCombat) contexte += `\n${issueCombat}\n`;
 
@@ -1756,13 +1874,52 @@ window.declencherTourIA = async function(options) {
             }).catch(e => console.error("[Narrateur] Écriture du message :", e));
             return file;
         };
+        // L'ADOPTION D'UN VISAGE PRÉPARÉ (v292) : dès que le MJ cite son nom
+        // (même au milieu d'un paragraphe), son portrait est lancé, et le
+        // parchemin le sait (`PNJ_Annonces`). Sa fiche n'est rangée qu'une
+        // fois le lieu tranché (MIA_Batiment, après le texte). Un visage
+        // préparé que le MJ ne cite pas n'est ni rangé ni peint.
+        let resoudreLieu = () => {};
+        const lieuDuRecit = new Promise(r => { resoudreLieu = r; });
+        const adoptes = [];
+        const adopterCites = (texte) => {
+            let nouveau = false;
+            fichesPreparees.forEach(f => {
+                if (adoptes.some(a => a.fiche === f) || !nomCiteDans(f.nom, texte)) return;
+                // Le nom tel que le MJ l'écrit : complet, ou son seul prénom.
+                const cle = nomCiteDans(f.nom.split(/\s+/)[0], texte) && !new RegExp("(^|[^\\p{L}])" + f.nom.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([^\\p{L}]|$)", "iu").test(texte)
+                    ? f.nom.split(/\s+/)[0] : f.nom;
+                const entree = { fiche: f, cle };
+                adoptes.push(entree);
+                nouveau = true;
+                pnjAffiches[cle] = { Nom_PNJ: f.nom, URL_Cloudinary: "" };
+                console.log(`[MIA_CASTING] ✅ Le MJ fait entrer ${f.nom} : sa fiche sera rangée, son portrait se peint.`);
+                entree.promesse = (async () => {
+                    const promesseUrl = genererEtStockerImagePNJ(f.physique, f.race).catch(e => { console.error("[MIA_CASTING] Portrait :", e); return ""; });
+                    const lieu = await lieuDuRecit;
+                    const docId = lieu ? await enregistrerFichePNJ(f, lieu) : null;
+                    const url = await promesseUrl;
+                    if (url && docId) await updateDoc(doc(db, "Monde_PNJ", docId), { URL_Cloudinary: url });
+                    const cree = { Nom_PNJ: f.nom, URL_Cloudinary: url || "" };
+                    if (url) { pnjAffiches[cle] = cree; await ecrireMessage(null, {}); }
+                    return docId ? cree : null;
+                })().catch(e => { console.error("[MIA_CASTING] Adoption :", e); return null; });
+            });
+            if (nouveau) ecrireMessage(null, { PNJ_Annonces: adoptes.map(a => a.cle) });
+        };
+
         // Seuls les paragraphes finis partent (le dernier peut être coupé en plein mot).
         const paragraphesFinis = (t) => { const i = t.lastIndexOf("\n"); return i > 0 ? t.slice(0, i) : ""; };
         let dernierEnvoi = "";
         const reponseTexte = await genererReponseNarrateur(contexte, historiqueComplet, 3, (texte) => {
+            adopterCites(texte);
             const pret = paragraphesFinis(texte);
             if (pret.trim() && pret !== dernierEnvoi) { dernierEnvoi = pret; ecrireMessage(pret, { Recit_En_Cours: true }); }
         });
+        if (reponseTexte) adopterCites(reponseTexte);
+        fichesPreparees.filter(f => !adoptes.some(a => a.fiche === f))
+            .forEach(f => console.log(`[MIA_CASTING] ${f.nom} n'est pas entré(e) en scène : rien n'est créé.`));
+        if (!reponseTexte) resoudreLieu(lieuActuel);
 
         if (reponseTexte) {
             await ecrireMessage(reponseTexte, { Recit_En_Cours: false });
@@ -1786,16 +1943,22 @@ window.declencherTourIA = async function(options) {
             // =====================================================================
             // Le bâtiment et la recherche des nouveaux PNJ partent ensemble : la
             // fiche d'un PNJ n'attend le lieu qu'au moment d'être rangée.
-            const nomsHeros = window.PERSOS_PARTIE ? window.PERSOS_PARTIE.map(p => p.prenom) : [];
+            // Les visages préparés et cités ne sont pas recherchés une seconde
+            // fois ; le rattrapage ne prend que les autres noms propres.
             const promesseLieu = analyserDeplacementBatiment(window.ID_PARTIE_COURANTE, lieuActuel, reponseTexte);
-            let nouveauxPnj = [];
+            promesseLieu.then(resoudreLieu, () => resoudreLieu(lieuActuel));
+            const nomsAnnonces = adoptes.map(a => a.cle);
+            const nomsConnus = [...nomsPnjPresents, ...adoptes.map(a => a.fiche.nom)];
+            let rattrapes = [];
+            const promesseAdoptes = Promise.all(adoptes.map(a => a.promesse));
             if (lieuActuel) {
                 const contexteEtNarration = historique4 + "\n\n--- SUITE DE L'HISTOIRE (MJ) ---\n" + reponseTexte;
-                nouveauxPnj = await analyserNouveauxPNJ(promesseLieu, nomsPnjPresents, nomsHeros, contexteEtNarration, {
-                    surNoms: (noms) => ecrireMessage(null, { PNJ_Attendus: noms }),
+                rattrapes = await analyserNouveauxPNJ(promesseLieu, nomsConnus, nomsHeros, contexteEtNarration, {
+                    surNoms: (noms) => ecrireMessage(null, { PNJ_Attendus: [...new Set([...nomsAnnonces, ...noms])] }),
                     surPortrait: (pnj) => { pnjAffiches[pnj.Nom_PNJ] = pnj; return ecrireMessage(null, {}); }
                 }).catch(e => { console.error("[MIA_PNJ] Erreur :", e); return []; }) || [];
             }
+            const nouveauxPnj = [...(await promesseAdoptes).filter(Boolean), ...rattrapes];
             await ecrireMessage(null, { PNJ_Prets: true });
             const lieuFinal = await promesseLieu;
 
