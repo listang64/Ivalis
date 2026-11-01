@@ -1,13 +1,17 @@
-// v293 — LES DÉPENSES DU MJ : CHAQUE RÉPONSE, SES TOKENS, SON COÛT EN EUROS.
+// v294 (et v293) — LES DÉPENSES DU MJ : CHAQUE RÉPONSE, SES TOKENS, SON COÛT
+// EN EUROS, LE MÊME COMPTEUR POUR TOUT LE MONDE.
 //
-// Nico : « dans paramètre outils j'aimerais que tu me mettes un bouton pour
-// dedans voir toutes les dépenses à chaque réponse de mon IA MJ. J'aimerais
-// le nb de tokens envoyés, et si possible le coût en euros de cet envoi. »
+// Nico (v293) : « dans paramètre outils j'aimerais un bouton pour voir toutes
+// les dépenses à chaque réponse de mon IA MJ : le nb de tokens envoyés, et si
+// possible le coût en euros de cet envoi. »
+// Nico (v294) : « il faut que les coûts soient pour tout le monde peu importe
+// qui clique sur MJ. Même compteur pour tout le monde. »
 //
-// Sur la VRAIE page, Firestore en mémoire, Gemini (en flux, avec ses
-// comptes de tokens), OpenAI, Cloudinary et la BCE simulés : un tour de MJ
-// complet, puis la fenêtre. Se charge sur l'ancien code (IVALIS_RACINE) : il
-// y échoue, sans planter.
+// Sur la VRAIE page, Firestore en mémoire (avec de vrais increment), Gemini
+// (en flux, avec ses comptes de tokens), OpenAI, Cloudinary et la BCE
+// simulés : des tours de MJ lancés par Nico puis par Ben, un autre appareil,
+// une panne de Firestore. Se charge sur l'ancien code (IVALIS_RACINE) : il y
+// échoue, sans planter.
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -40,6 +44,7 @@ const FAUX_FIRESTORE = `
   const estMap = (v) => v && typeof v === "object" && !Array.isArray(v) && !v.__supprimer;
   function fusionner(cible, src) {
     Object.entries(src).forEach(([k, v]) => {
+      if (v && v.__increment !== undefined) { cible[k] = (Number(cible[k]) || 0) + v.__increment; return; }
       if (v && v.__supprimer) { delete cible[k]; return; }
       if (estMap(v)) { if (!estMap(cible[k])) cible[k] = {}; fusionner(cible[k], v); return; }
       cible[k] = cloner(v);
@@ -48,7 +53,7 @@ const FAUX_FIRESTORE = `
   function nettoyer(v) { if (estMap(v)) { Object.keys(v).forEach(k => { if (v[k] && v[k].__supprimer) delete v[k]; else nettoyer(v[k]); }); } return v; }
   function ecrire(chemin, data, mode) {
     const d = docs();
-    if (mode === "set") d[chemin] = nettoyer(cloner(Object.fromEntries(Object.entries(data).filter(([k, v]) => !(v && v.__supprimer)))));
+    if (mode === "set") d[chemin] = nettoyer(cloner(Object.fromEntries(Object.entries(data).filter(([k, v]) => !(v && v.__supprimer)).map(([k, v]) => [k, v && v.__increment !== undefined ? v.__increment : v]))));
     else if (mode === "merge") { d[chemin] = d[chemin] || {}; fusionner(d[chemin], data); }
     else if (mode === "update") {
       if (!d[chemin]) throw new Error("document absent : " + chemin);
@@ -84,7 +89,7 @@ const FAUX_FIRESTORE = `
   export const addDoc = async (c, data) => { const id = "m" + (++n) + "_" + Date.now(); docs()[c.col + "/" + id] = cloner(data); (window.__ajouts = window.__ajouts || []).push({ col: c.col, id, t: Date.now(), data: cloner(data) }); return { id }; };
   export const deleteField = () => SUPPR; export class FieldPath { constructor(...s){this.s=s;} }
   export const arrayUnion = (...v) => v; export const arrayRemove = (...v) => v;
-  export const increment = (k) => k; export const serverTimestamp = () => Date.now();
+  export const increment = (k) => ({ __increment: k }); export const serverTimestamp = () => Date.now();
   export const onSnapshot = () => () => {};
   export const writeBatch = () => { const ops = []; return { set(r, d, o){ ops.push(() => ecrire(r.chemin, d, o && o.merge ? "merge" : "set")); }, update(r, d){ ops.push(() => ecrire(r.chemin, d, "update")); },
     delete(r){ ops.push(() => { delete docs()[r.chemin]; }); }, commit: async () => { ops.forEach(f => f()); } }; };
@@ -181,7 +186,9 @@ const preparerTable = () => p.evaluate((URL_PORTRAIT_KORE) => {
   window.__ajouts = []; window.__journal = [];
 }, URL_PORTRAIT_KORE);
 const attendreQue = async (f, ms = 8000) => { for (let i = 0; i < ms / 100; i++) { if (await f()) return true; await p.waitForTimeout(100); } return false; };
-const releves = () => p.evaluate(() => JSON.parse(localStorage.getItem("ivalis_DEPENSES_MJ") || "[]"));
+// Les dépenses de toute la table, telles que Firestore les garde.
+const releves = () => p.evaluate(() => Object.entries(window.__docs || {}).filter(([k]) => k.startsWith("Depenses_MJ/")).map(([, v]) => v).sort((a, b) => a.Timestamp - b.Timestamp));
+const compteur = () => p.evaluate(() => (window.__docs || {})["Depenses_MJ_Compteur/global"] || null);
 const proche = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol;
 
 // =========================================================================
@@ -224,7 +231,7 @@ titre("3. UN TOUR DU MJ EST RELEVÉ : NARRATEUR, IA D'APPOINT, IMAGES, COÛT EN 
 let ligne = null;
 await section(async () => {
   await preparerTable();
-  await p.evaluate(() => { localStorage.removeItem("ivalis_DEPENSES_MJ"); localStorage.removeItem("ivalis_TAUX_USD_EUR"); });
+  await p.evaluate(() => { localStorage.removeItem("ivalis_DEPENSES_MJ_ATTENTE"); localStorage.removeItem("ivalis_TAUX_USD_EUR"); window.COMPTE_JOUEUR = { nom: "Nico" }; });
   const avant = requetes.length;
   await p.evaluate(() => { window.declencherTourIA(); });
   await attendreQue(async () => (await releves()).length > 0, 25000);
@@ -250,12 +257,17 @@ await section(async () => {
   verifier("converti au taux de la BCE du jour (1 $ = 0,90 €, 31/10/2026)", ligne.taux === 0.9 && ligne.tauxDate === "2026-10-31" && !ligne.tauxSecours && proche(ligne.totalEUR, totalUSD * 0.9, 1e-9),
            `${ligne.totalEUR} €`);
   verifier("avec un extrait de la réponse du MJ", /La porte de la taverne/.test(ligne.extrait || ""), ligne.extrait);
+  verifier("rangé dans Firestore, avec qui l'a lancé (Nico) et la partie", ligne.lancePar === "Nico" && ligne.ID_Partie === "P1" && ligne.Timestamp > 0, `${ligne.lancePar} ${ligne.ID_Partie}`);
+  const c = await compteur();
+  verifier("le compteur commun compte ce tour (1 tour, son coût, ses tokens, son image)", !!c && c.tours === 1 && proche(c.totalEUR, ligne.totalEUR, 1e-12) && proche(c.totalUSD, ligne.totalUSD, 1e-12)
+           && c.tokensEnvoyes === ligne.narrateur.envoyes + ligne.aides.envoyes && c.images === 1, JSON.stringify(c));
+  verifier("rien ne reste en attente sur l'appareil", (await p.evaluate(() => JSON.parse(localStorage.getItem("ivalis_DEPENSES_MJ_ATTENTE") || "[]").length)) === 0);
 });
 
 // =========================================================================
 titre("4. LA FENÊTRE : LES CUMULS, UNE LIGNE PAR RÉPONSE, LE DÉTAIL AU TOUCHER");
 // =========================================================================
-const espaces = (t) => String(t || "").replace(/[  ]/g, " ");
+const espaces = (t) => String(t || "").replace(/[\u202f\u00a0]/g, " ");
 await section(async () => {
   await p.evaluate(() => window.ouvrirDepensesMJ());
   await p.waitForTimeout(900);
@@ -274,12 +286,12 @@ await section(async () => {
   verifier("quatre cumuls : dernière réponse, aujourd'hui, 30 jours, depuis le début", r.cartes.length === 4 && /Dernière réponse/.test(r.cartes[0]) && /Aujourd'hui/.test(r.cartes[1]) && /30 derniers jours/.test(r.cartes[2]) && /Depuis le début/.test(r.cartes[3]));
   const euros = (v) => espaces(v.toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })) + " €";
   verifier("la dernière réponse : son coût en euros et ses tokens envoyés", !!ligne && espaces(r.cartes[0]).includes(euros(ligne.totalEUR)) && /tokens envoyés/.test(r.cartes[0]), espaces(r.cartes[0]));
-  verifier("une ligne : date, modèle (réflexion), tokens envoyés, reçus (dont réflexion), appoint, images, coût", r.nbLignes === 1 && /Gemini 3\.8 Flash/.test(r.cellules[1]) && /réflexion moyenne/.test(r.cellules[1])
-           && espaces(r.cellules[2]) === "12 000" && espaces(r.cellules[3]).startsWith("1 000") && /\(400\)/.test(r.cellules[3]) && /appels/.test(r.cellules[4]) && r.cellules[5] === "1" && espaces(r.cellules[6]) === euros(ligne.totalEUR),
+  verifier("une ligne : date, lancé par, modèle (réflexion), tokens envoyés, reçus (dont réflexion), appoint, images, coût", r.nbLignes === 1 && r.cellules[1] === "Nico" && /Gemini 3\.8 Flash/.test(r.cellules[2]) && /réflexion moyenne/.test(r.cellules[2])
+           && espaces(r.cellules[3]) === "12 000" && espaces(r.cellules[4]).startsWith("1 000") && /\(400\)/.test(r.cellules[4]) && /appels/.test(r.cellules[5]) && r.cellules[6] === "1" && espaces(r.cellules[7]) === euros(ligne.totalEUR),
            JSON.stringify(r.cellules.map(espaces)));
   verifier("le détail s'ouvre au toucher : narrateur, appoint, images, taux", r.avant === "none" && r.apres !== "none" && /Narrateur : 12/.test(espaces(r.detail)) && /IA d'appoint/.test(r.detail) && /Images OpenAI : 1/.test(r.detail) && /1 \$ = 0,9 € \(BCE, 2026-10-31\)/.test(r.detail),
            espaces(r.detail).slice(0, 160));
-  verifier("la note dit d'où viennent les prix et que l'historique est celui de l'appareil", /tarifs publiés de Google/.test(r.note) && /appareil/.test(r.note));
+  verifier("la note dit d'où viennent les prix, et que le compteur est le même pour toute la table", /tarifs publiés de Google/.test(r.note) && /même compteur pour toute la table/.test(r.note));
   if (process.env.V293_CAPTURES) {
     await p.evaluate(() => {
       document.querySelectorAll('body > div[id^="ecran-"]').forEach(e => e.style.display = e.id === "ecran-jeu" ? "block" : "none");
@@ -294,39 +306,69 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("5. LES GARDE-FOUS : BCE MUETTE, TOUR SANS APPEL, 300 LIGNES AU PLUS, EFFACER");
+titre("5. LE MÊME COMPTEUR POUR TOUT LE MONDE : BEN LANCE LE MJ, UN AUTRE APPAREIL REGARDE");
+// =========================================================================
+await section(async () => {
+  // Ben, sur sa tablette, lance le tour suivant.
+  await p.evaluate(() => {
+    window.COMPTE_JOUEUR = { nom: "Ben" }; localStorage.setItem("ID_JOUEUR_COURANT", "P_02");
+    window.__docs["Messages_Chat/c2"] = { ID_Partie: "P1", Auteur_ID: "H2", Auteur_Nom: "Lyra", Texte: "Je commande une coupe de vin.", Timestamp: Date.now() };
+  });
+  await p.evaluate(() => { window.declencherTourIA(); });
+  await attendreQue(async () => (await releves()).length >= 2, 25000);
+  const liste = await releves(), c = await compteur();
+  verifier("le tour de Ben s'ajoute au même historique (Nico puis Ben)", liste.length === 2 && liste[0].lancePar === "Nico" && liste[1].lancePar === "Ben", liste.map(l => l.lancePar).join(", "));
+  verifier("le compteur commun additionne les deux tours", !!c && c.tours === 2 && proche(c.totalEUR, liste[0].totalEUR + liste[1].totalEUR, 1e-9), JSON.stringify(c));
+  // Adrien ouvre la fenêtre sur un autre appareil : rien en local.
+  await p.evaluate(() => { window.COMPTE_JOUEUR = { nom: "Adrien" }; localStorage.removeItem("ivalis_DEPENSES_MJ_ATTENTE"); localStorage.removeItem("ivalis_DEPENSES_MJ"); });
+  await p.evaluate(() => window.afficherDepensesMJ());
+  await p.waitForTimeout(400);
+  const r = await p.evaluate(() => ({ lignes: Array.from(document.querySelectorAll(".depenses-ligne")).map(l => l.children[1].textContent),
+    total: (document.querySelectorAll(".depenses-carte")[3] || {}).textContent || "" }));
+  const tot = (liste[0].totalEUR + liste[1].totalEUR);
+  verifier("sur un autre appareil, la fenêtre montre les deux tours (le plus récent en haut)", r.lignes.join(",") === "Ben,Nico", r.lignes.join(","));
+  verifier("« Depuis le début » = le compteur commun (2 réponses)", /2 réponses/.test(r.total) && espaces(r.total).includes(espaces(tot.toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }))), espaces(r.total));
+});
+
+// =========================================================================
+titre("6. LES GARDE-FOUS : FIRESTORE EN PANNE, BCE MUETTE, TOUR SANS APPEL, EFFACER POUR TOUS");
 // =========================================================================
 await section(async () => {
   await p.evaluate((o) => window.__faux(o), { bceEnPanne: true });
   const r = await p.evaluate(async () => {
     localStorage.removeItem("ivalis_TAUX_USD_EUR");
+    const vrai = window.DEPOT_DEPENSES_MJ.ecrire;
+    window.DEPOT_DEPENSES_MJ.ecrire = async () => { throw new Error("hors ligne"); };
     const t = window.DEPENSES_IA.debutTour({ modele: "gemini-3.8-flash", reflexion: "low" });
     window.DEPENSES_IA.noterNarrateur(t, "gemini-3.8-flash", { promptTokenCount: 2000, candidatesTokenCount: 200 });
-    const l = await window.DEPENSES_IA.finTour(t, { extrait: "Test" });
+    const l = await window.DEPENSES_IA.finTour(t, { extrait: "Hors ligne" });
+    const attente = JSON.parse(localStorage.getItem("ivalis_DEPENSES_MJ_ATTENTE") || "[]").length;
+    window.DEPOT_DEPENSES_MJ.ecrire = vrai;
+    const t2 = window.DEPENSES_IA.debutTour({ modele: "gemini-3.8-flash" });
+    window.DEPENSES_IA.noterNarrateur(t2, "gemini-3.8-flash", { promptTokenCount: 100, candidatesTokenCount: 10 });
+    await window.DEPENSES_IA.finTour(t2, {});
+    const apres = JSON.parse(localStorage.getItem("ivalis_DEPENSES_MJ_ATTENTE") || "[]").length;
     const vide = await window.DEPENSES_IA.finTour(window.DEPENSES_IA.debutTour({ modele: "gemini-3.8-flash" }), {});
-    return { l, vide };
+    return { l, attente, apres, vide };
   });
+  verifier("Firestore en panne : le tour attend sur l'appareil…", !!r.l && r.attente === 1, String(r.attente));
+  verifier("… et repart avec le tour suivant (rien ne se perd)", r.apres === 0 && (await releves()).length === 4 && (await compteur()).tours === 4, `${(await releves()).length} lignes, ${(await compteur()).tours} tours`);
   verifier("la BCE ne répond pas : taux de secours (0,87), signalé", !!r.l && r.l.tauxSecours === true && r.l.taux === 0.87, r.l && `${r.l.taux} ${r.l.tauxSecours}`);
-  verifier("un tour sans aucun appel n'ajoute rien", r.vide === null);
-  const n = await p.evaluate(async () => {
-    const l = JSON.parse(localStorage.getItem("ivalis_DEPENSES_MJ") || "[]");
-    while (l.length < 300) l.push({ ...l[0], id: "X" + l.length });
-    localStorage.setItem("ivalis_DEPENSES_MJ", JSON.stringify(l));
-    const t = window.DEPENSES_IA.debutTour({ modele: "gemini-3.8-flash" });
-    window.DEPENSES_IA.noterNarrateur(t, "gemini-3.8-flash", { promptTokenCount: 10, candidatesTokenCount: 1 });
-    await window.DEPENSES_IA.finTour(t, {});
-    return JSON.parse(localStorage.getItem("ivalis_DEPENSES_MJ")).length;
+  verifier("un tour sans aucun appel n'ajoute rien", r.vide === null && (await releves()).length === 4);
+  const e = await p.evaluate(async () => {
+    let question = "";
+    window.confirm = (q) => { question = q; return true; };
+    await window.effacerDepensesMJ();
+    return { n: Object.keys(window.__docs).filter(k => k.startsWith("Depenses_MJ/")).length, compteur: !!window.__docs["Depenses_MJ_Compteur/global"], vide: !!document.querySelector(".depenses-vide"), question };
   });
-  verifier("300 lignes au plus (les plus anciennes s'en vont)", n === 300, String(n));
-  const e = await p.evaluate(() => { window.confirm = () => true; window.effacerDepensesMJ(); return { n: JSON.parse(localStorage.getItem("ivalis_DEPENSES_MJ") || "[]").length, vide: !!document.querySelector(".depenses-vide") }; });
-  verifier("« Effacer l'historique » vide la liste (après confirmation)", e.n === 0 && e.vide, JSON.stringify(e));
+  verifier("« Effacer l'historique » efface pour tout le monde et remet le compteur à zéro (après confirmation)", e.n === 0 && !e.compteur && e.vide && /POUR TOUT LE MONDE/.test(e.question), JSON.stringify(e));
 });
 
 await section(async () => {
   const index = lire("index.html");
   const v = (re) => Number((index.match(re) || [])[1] || 0);
-  verifier("versions : depenses_ia, ia_master, style, trace du combat", /depenses_ia\.js\?v=\d+"/.test(index) && v(/ia_master\.js\?v=(\d+)"/) >= 14 && v(/style\.css\?v=(\d+)"/) >= 121 && v(/trace_combat\.js\?v=(\d+)"/) >= 198
-           && Number((lire("trace_combat.js").match(/VERSION_IVALIS = (\d+)/) || [])[1]) >= 293 && Number((lire("version.json").match(/"version": (\d+)/) || [])[1]) >= 293);
+  verifier("versions : depenses_ia, ia_master, style, trace du combat", /depenses_ia\.js\?v=\d+"/.test(index) && v(/ia_master\.js\?v=(\d+)"/) >= 15 && v(/depenses_ia\.js\?v=(\d+)"/) >= 2 && v(/style\.css\?v=(\d+)"/) >= 121 && v(/trace_combat\.js\?v=(\d+)"/) >= 199
+           && Number((lire("trace_combat.js").match(/VERSION_IVALIS = (\d+)/) || [])[1]) >= 294 && Number((lire("version.json").match(/"version": (\d+)/) || [])[1]) >= 294);
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

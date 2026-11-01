@@ -16,14 +16,20 @@
 //
 //  Le coût est calculé aux tarifs publiés (dollars par million de tokens,
 //  la réflexion facturée comme la sortie), puis converti en euros au taux du
-//  jour de la BCE (api.frankfurter.dev), relevé au moment du tour. Le relevé
-//  vit dans ce navigateur (localStorage), 300 tours au plus.
+//  jour de la BCE (api.frankfurter.dev), relevé au moment du tour.
+//
+//  LE MÊME COMPTEUR POUR TOUT LE MONDE (v294). Nico : « il faut que les coûts
+//  soient pour tout le monde peu importe qui clique sur MJ ». Chaque tour est
+//  rangé dans Firestore (Depenses_MJ, avec qui l'a lancé) et ajouté au
+//  compteur commun (Depenses_MJ_Compteur/global) ; la fenêtre lit les deux.
+//  Le dépôt Firestore est fourni par ia_master.js (DEPOT_DEPENSES_MJ). Un
+//  tour qui n'a pas pu être rangé attend sur l'appareil et repart au suivant.
 //  Script simple (pas un module) : chargé avant tous les modules.
 // =========================================================================
 (function () {
-    const CLE_RELEVES = "ivalis_DEPENSES_MJ";
+    const CLE_ATTENTE = "ivalis_DEPENSES_MJ_ATTENTE";  // tours pas encore rangés dans Firestore
     const CLE_TAUX = "ivalis_TAUX_USD_EUR";
-    const MAX_RELEVES = 300;
+    const MAX_LIGNES = 300;                 // lignes affichées (les plus récentes)
     const TAUX_SECOURS = 0.87;              // si la BCE ne répond pas
     const FRAICHEUR_TAUX_MS = 12 * 3600 * 1000;
 
@@ -104,11 +110,36 @@
     // ---------------------------------------------------------------------
     //  LES RELEVÉS
     // ---------------------------------------------------------------------
-    window.lireDepensesMJ = function () {
-        try { const l = JSON.parse(localStorage.getItem(CLE_RELEVES) || "[]"); return Array.isArray(l) ? l : []; } catch (e) { return []; }
-    };
-    const ecrireReleves = (liste) => {
-        try { localStorage.setItem(CLE_RELEVES, JSON.stringify(liste.slice(-MAX_RELEVES))); } catch (e) { console.warn("[Dépenses] Relevé non gardé :", e); }
+    const lireAttente = () => { try { const l = JSON.parse(localStorage.getItem(CLE_ATTENTE) || "[]"); return Array.isArray(l) ? l : []; } catch (e) { return []; } };
+    const ecrireAttente = (l) => { try { localStorage.setItem(CLE_ATTENTE, JSON.stringify(l.slice(-MAX_LIGNES))); } catch (e) {} };
+    const depot = () => window.DEPOT_DEPENSES_MJ || null;
+
+    // Range un tour (et ceux restés en attente) dans Firestore.
+    async function ranger(ligne) {
+        const aRanger = [...lireAttente(), ...(ligne ? [ligne] : [])];
+        if (!aRanger.length) return;
+        const restants = [];
+        for (const l of aRanger) {
+            try { if (!depot()) throw new Error("dépôt absent"); await depot().ecrire(l); }
+            catch (e) { console.warn("[Dépenses] Tour gardé sur l'appareil, il repartira au prochain :", e && e.message || e); restants.push(l); }
+        }
+        ecrireAttente(restants);
+    }
+
+    // Les dépenses de tout le monde : les lignes les plus récentes et le
+    // compteur commun. Sans Firestore, ce qui attend sur l'appareil.
+    window.lireDepensesMJ = async function () {
+        const attente = lireAttente();
+        try {
+            if (!depot()) throw new Error("dépôt absent");
+            const { lignes, compteur } = await depot().lire(MAX_LIGNES);
+            const ids = new Set(lignes.map(l => l.id));
+            const toutes = [...lignes, ...attente.filter(l => !ids.has(l.id))].sort((a, b) => (a.Timestamp || 0) - (b.Timestamp || 0));
+            return { lignes: toutes, compteur, commun: true };
+        } catch (e) {
+            console.warn("[Dépenses] Lecture du compteur commun impossible :", e && e.message || e);
+            return { lignes: attente, compteur: null, commun: false };
+        }
     };
 
     const ouverts = [];
@@ -155,15 +186,17 @@
             if (!narrateur.appels && !aides.appels && !images.nombre) return null;
             const taux = await window.rafraichirTauxDollarEuro();
             const totalUSD = narrateur.coutUSD + aides.coutUSD + images.coutUSD;
+            const compte = window.COMPTE_JOUEUR || {};
+            let joueur = "";
+            try { joueur = localStorage.getItem("ID_JOUEUR_COURANT") || ""; } catch (e) {}
             const ligne = {
-                id: releve.id, date: date.toISOString(), modele: releve.modele, reflexion: releve.reflexion,
+                id: releve.id, date: date.toISOString(), Timestamp: releve.debut, modele: releve.modele, reflexion: releve.reflexion,
+                ID_Partie: window.ID_PARTIE_COURANTE || "", lancePar: compte.nom || joueur || "?",
                 extrait: String((extra && extra.extrait) || "").replace(/\s+/g, " ").trim().slice(0, 90),
                 narrateur, aides, images, totalUSD, taux: taux.taux, tauxDate: taux.date || "", tauxSecours: !!taux.secours,
                 totalEUR: totalUSD * taux.taux
             };
-            const liste = window.lireDepensesMJ();
-            liste.push(ligne);
-            ecrireReleves(liste);
+            await ranger(ligne);
             console.log(`[Dépenses] Tour du MJ : ${narrateur.envoyes + aides.envoyes} tokens envoyés, ${(ligne.totalEUR).toFixed(4)} €.`);
             if (document.getElementById("etape-depenses-mj")?.style.display === "block") window.afficherDepensesMJ();
             return ligne;
@@ -229,10 +262,15 @@
         window.rafraichirTauxDollarEuro().then(() => window.afficherDepensesMJ());
     };
 
-    window.afficherDepensesMJ = function () {
+    let affichage = 0;
+    window.afficherDepensesMJ = async function () {
         const zone = document.getElementById("depenses-mj-contenu");
         if (!zone) return;
-        const liste = window.lireDepensesMJ().slice().reverse();
+        const numero = ++affichage;
+        if (!zone.innerHTML) zone.innerHTML = `<p class="depenses-vide">Lecture du compteur commun…</p>`;
+        const { lignes, compteur, commun } = await window.lireDepensesMJ();
+        if (numero !== affichage) return;   // un affichage plus récent est parti
+        const liste = lignes.slice().reverse();
         const maintenant = Date.now();
         const aujourdhui = jour();
         const cumul = (filtre) => liste.filter(filtre).reduce((a, l) => ({ eur: a.eur + (l.totalEUR || 0), tokens: a.tokens + (l.narrateur.envoyes + l.aides.envoyes), tours: a.tours + 1 }), { eur: 0, tokens: 0, tours: 0 });
@@ -243,26 +281,27 @@
             + carte("Dernière réponse", derniere ? { eur: derniere.totalEUR, tokens: derniere.narrateur.envoyes + derniere.aides.envoyes, tours: 1 } : { eur: 0, tokens: 0, tours: 0 })
             + carte("Aujourd'hui", cumul(l => jour(l.date) === aujourdhui))
             + carte("30 derniers jours", cumul(l => maintenant - new Date(l.date).getTime() < 30 * 86400000))
-            + carte("Depuis le début", cumul(() => true))
+            + carte("Depuis le début", compteur ? { eur: compteur.totalEUR || 0, tokens: compteur.tokensEnvoyes || 0, tours: compteur.tours || 0 } : cumul(() => true))
             + `</div>`;
+        if (!commun) html += `<p class="depenses-alerte">Le compteur commun n'a pas pu être lu : seuls les tours gardés sur cet appareil s'affichent.</p>`;
         if (!liste.length) {
             html += `<p class="depenses-vide">Aucune réponse du MJ relevée sur cet appareil pour l'instant.</p>`;
         } else {
             html += `<div class="depenses-tableau-cadre"><table class="depenses-tableau"><thead><tr>`
-                + `<th>Date</th><th>Modèle</th><th>Tokens envoyés<br><small>(narrateur)</small></th><th>Tokens reçus<br><small>(narrateur, dont réflexion)</small></th><th>IA d'appoint</th><th>Images</th><th>Coût du tour</th>`
+                + `<th>Date</th><th>Lancé par</th><th>Modèle</th><th>Tokens envoyés<br><small>(narrateur)</small></th><th>Tokens reçus<br><small>(narrateur, dont réflexion)</small></th><th>IA d'appoint</th><th>Images</th><th>Coût du tour</th>`
                 + `</tr></thead><tbody>`;
             liste.forEach(l => {
                 const d = new Date(l.date);
                 const quand = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
                 const inconnus = [...new Set([...(l.narrateur.inconnus || []), ...(l.aides.inconnus || [])])];
                 html += `<tr class="depenses-ligne" data-id="${echapper(l.id)}" onclick="this.nextElementSibling.classList.toggle('ouvert')">`
-                    + `<td>${quand}</td><td>${echapper(nomModele(l.modele))}${reflexionFr(l.reflexion) ? `<br><small>réflexion ${reflexionFr(l.reflexion)}</small>` : ""}</td>`
+                    + `<td>${quand}</td><td>${echapper(l.lancePar || "?")}</td><td>${echapper(nomModele(l.modele))}${reflexionFr(l.reflexion) ? `<br><small>réflexion ${reflexionFr(l.reflexion)}</small>` : ""}</td>`
                     + `<td class="depenses-nombre">${nb(l.narrateur.envoyes)}</td>`
                     + `<td class="depenses-nombre">${nb(l.narrateur.recus + l.narrateur.reflexion)}${l.narrateur.reflexion ? `<br><small>(${nb(l.narrateur.reflexion)})</small>` : ""}</td>`
                     + `<td class="depenses-nombre">${l.aides.appels} appel${l.aides.appels > 1 ? "s" : ""}<br><small>${nb(l.aides.envoyes + l.aides.recus + l.aides.reflexion)} tokens</small></td>`
                     + `<td class="depenses-nombre">${l.images.nombre}</td>`
                     + `<td class="depenses-cout">${euros(l.totalEUR)}</td></tr>`
-                    + `<tr class="depenses-detail"><td colspan="7">`
+                    + `<tr class="depenses-detail"><td colspan="8">`
                     + (l.extrait ? `<div class="depenses-extrait">« ${echapper(l.extrait)}… »</div>` : "")
                     + `<div>Narrateur : ${nb(l.narrateur.envoyes)} envoyés, ${nb(l.narrateur.recus)} reçus, ${nb(l.narrateur.reflexion)} de réflexion${l.narrateur.cache ? ` (${nb(l.narrateur.cache)} déjà en cache)` : ""} → ${euros(l.narrateur.coutUSD * l.taux)} (${dollars(l.narrateur.coutUSD)})</div>`
                     + `<div>IA d'appoint (casting, PNJ, bâtiments, réputation…) : ${l.aides.appels} appel(s), ${nb(l.aides.envoyes)} envoyés, ${nb(l.aides.recus + l.aides.reflexion)} reçus → ${euros(l.aides.coutUSD * l.taux)} (${dollars(l.aides.coutUSD)})</div>`
@@ -275,13 +314,14 @@
         }
         const t = window.tauxDollarEuro();
         html += `<p class="depenses-note">Coûts calculés aux tarifs publiés de Google (Gemini) et d'OpenAI (images, estimation selon la qualité et la taille), convertis au taux de la BCE `
-            + `(aujourd'hui 1 $ = ${String(t.taux).replace(".", ",")} €${t.secours ? ", taux de secours" : t.date ? `, ${t.date}` : ""}). Historique de cet appareil seulement. Touchez une ligne pour le détail.</p>`;
+            + `(aujourd'hui 1 $ = ${String(t.taux).replace(".", ",")} €${t.secours ? ", taux de secours" : t.date ? `, ${t.date}` : ""}). Le même compteur pour toute la table, quel que soit celui qui lance le MJ. Touchez une ligne pour le détail.</p>`;
         zone.innerHTML = html;
     };
 
-    window.effacerDepensesMJ = function () {
-        if (!window.confirm("Effacer tout l'historique des dépenses du MJ sur cet appareil ?")) return;
-        ecrireReleves([]);
-        window.afficherDepensesMJ();
+    window.effacerDepensesMJ = async function () {
+        if (!window.confirm("Effacer l'historique des dépenses du MJ POUR TOUT LE MONDE (et remettre le compteur commun à zéro) ?")) return;
+        ecrireAttente([]);
+        try { if (depot()) await depot().effacer(); } catch (e) { console.error("[Dépenses] Effacement :", e); }
+        await window.afficherDepensesMJ();
     };
 })();

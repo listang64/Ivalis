@@ -3,7 +3,42 @@
 // =========================================================================
 
 import { db } from "./firebase-config.js?v=2";
-import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch, increment } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+// LE DÉPÔT DES DÉPENSES DU MJ (v294, depenses_ia.js) : une fiche par tour
+// (Depenses_MJ) et le compteur commun (Depenses_MJ_Compteur/global), le même
+// pour toute la table, quel que soit celui qui lance le MJ.
+window.DEPOT_DEPENSES_MJ = {
+    async ecrire(ligne) {
+        const lot = writeBatch(db);
+        lot.set(doc(db, "Depenses_MJ", ligne.id), ligne);
+        lot.set(doc(db, "Depenses_MJ_Compteur", "global"), {
+            tours: increment(1), totalUSD: increment(ligne.totalUSD || 0), totalEUR: increment(ligne.totalEUR || 0),
+            tokensEnvoyes: increment((ligne.narrateur.envoyes || 0) + (ligne.aides.envoyes || 0)),
+            images: increment(ligne.images.nombre || 0), Derniere_Maj: ligne.Timestamp || Date.now()
+        }, { merge: true });
+        await lot.commit();
+    },
+    async lire(n) {
+        const snap = await getDocs(query(collection(db, "Depenses_MJ"), orderBy("Timestamp", "desc"), limit(n)));
+        const lignes = [];
+        snap.forEach(d => lignes.push(d.data()));
+        lignes.sort((a, b) => (a.Timestamp || 0) - (b.Timestamp || 0));
+        const c = await getDoc(doc(db, "Depenses_MJ_Compteur", "global"));
+        return { lignes, compteur: c.exists() ? c.data() : { tours: 0, totalUSD: 0, totalEUR: 0, tokensEnvoyes: 0, images: 0 } };
+    },
+    async effacer() {
+        const snap = await getDocs(query(collection(db, "Depenses_MJ")));
+        const refs = [];
+        snap.forEach(d => refs.push(doc(db, "Depenses_MJ", d.id)));
+        for (let i = 0; i < refs.length; i += 400) {
+            const lot = writeBatch(db);
+            refs.slice(i, i + 400).forEach(r => lot.delete(r));
+            await lot.commit();
+        }
+        await deleteDoc(doc(db, "Depenses_MJ_Compteur", "global"));
+    }
+};
 
 // --- 1. LE BACKEND (Le radar qui scanne la zone avant l'IA) ---
 

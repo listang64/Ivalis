@@ -9479,7 +9479,7 @@ possible le coût en euros de cet envoi ».
   - « Effacer l'historique ».
   L'historique (300 lignes au plus) vit sur l'appareil.
 
-corrections_v293.mjs (dans la suite), sur la vraie page avec Gemini, OpenAI
+corrections_v293.mjs (devenu corrections_v294.mjs en v294), sur la vraie page avec Gemini, OpenAI
 et la BCE simulés, vérifie :
 - le bouton et la fenêtre ;
 - les tarifs selon la date, la réflexion, les images ;
@@ -9491,3 +9491,35 @@ et la BCE simulés, vérifie :
 - les versions.
 
 Il échoue sur l'ancien code (8 échecs).
+
+## v294 — Les dépenses du MJ : le même compteur pour tout le monde
+
+Nico : « il faut que les coûts soient pour tout le monde peu importe qui
+clique sur MJ. Même compteur pour tout le monde. »
+
+- Chaque tour est rangé dans Firestore (Depenses_MJ/{id}) avec qui l'a lancé
+  (`lancePar` : le nom du compte) et la partie. Un même lot ajoute le tour au
+  compteur commun (Depenses_MJ_Compteur/global, par increment : tours,
+  dollars, euros, tokens envoyés, images). Les règles Firestore l'autorisent
+  déjà (toute collection pour un compte validé).
+- Le dépôt Firestore (`DEPOT_DEPENSES_MJ` : ecrire, lire, effacer) est fourni
+  par ia_master.js. depenses_ia.js ne garde plus rien en local, sauf un tour
+  qui n'a pas pu être rangé : il attend sur l'appareil
+  (`ivalis_DEPENSES_MJ_ATTENTE`) et repart avec le tour suivant.
+- La fenêtre lit les 300 tours les plus récents et le compteur commun
+  (« Depuis le début ») ; une colonne « Lancé par ». Si Firestore ne répond
+  pas, elle le dit et montre ce qui attend sur l'appareil.
+- « Effacer l'historique » efface pour tout le monde et remet le compteur
+  à zéro (la confirmation le dit).
+
+corrections_v294.mjs (dans la suite) remplace corrections_v293. Firestore en
+mémoire, avec de vrais increment. En plus de tout ce que vérifiait v293, il
+vérifie :
+- le tour de Nico rangé dans Firestore, avec son nom et la partie ;
+- le compteur commun, et rien en attente ;
+- Ben lance le tour suivant : même historique, compteur additionné ;
+- un autre appareil (rien en local) voit les deux tours et le total ;
+- Firestore en panne : le tour attend puis repart, rien ne se perd ;
+- « Effacer » pour tous.
+
+Il échoue sur la v293 (9 échecs).
