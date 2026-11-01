@@ -6193,3 +6193,28 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 }
 .attente-recit.visible { opacity: 1; animation: attente-recit-souffle 1.8s ease-in-out infinite; }
 @keyframes attente-recit-souffle { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+
+/* LES DÉPENSES DU MJ (v293, depenses_ia.js) : quatre cartes de cumul, puis
+   une ligne par réponse (un toucher ouvre le détail). */
+#etape-depenses-mj { max-height: calc(var(--app-h, 100vh) - 40px); overflow-y: auto; box-sizing: border-box; }
+.depenses-cartes { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 10px 0 16px; }
+.depenses-carte { background: rgba(255, 248, 225, 0.6); border: 2px solid #8c6a45; border-radius: 8px; padding: 10px; }
+.depenses-carte-titre { font-family: 'Cinzel', serif; font-size: 14px; color: #5c3a21; }
+.depenses-carte-euros { font-family: 'Almendra', serif; font-size: 26px; font-weight: bold; color: #2c1e16; margin: 4px 0; }
+.depenses-carte-detail { font-size: 12px; color: #5c3a21; }
+.depenses-tableau-cadre { overflow-x: auto; max-height: 50vh; overflow-y: auto; border: 2px solid #8c6a45; border-radius: 8px; }
+.depenses-tableau { width: 100%; border-collapse: collapse; font-size: 14px; }
+.depenses-tableau th { position: sticky; top: 0; background: #d9c08e; color: #2c1e16; padding: 6px 8px; font-family: 'Cinzel', serif; font-size: 12px; }
+.depenses-tableau td { padding: 6px 8px; border-top: 1px solid rgba(92, 58, 33, 0.25); text-align: left; }
+.depenses-tableau small { color: #5c3a21; }
+.depenses-ligne { cursor: pointer; }
+.depenses-ligne:hover { background: rgba(140, 106, 69, 0.15); }
+.depenses-nombre { text-align: right !important; font-variant-numeric: tabular-nums; }
+.depenses-cout { text-align: right !important; font-weight: bold; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.depenses-detail { display: none; }
+.depenses-detail.ouvert { display: table-row; }
+.depenses-detail td { background: rgba(255, 248, 225, 0.5); font-size: 13px; line-height: 1.5; }
+.depenses-extrait { font-style: italic; color: #5c3a21; margin-bottom: 4px; }
+.depenses-alerte { color: #8b1a1a; }
+.depenses-taux, .depenses-note { font-size: 12px; color: #5c3a21; }
+.depenses-vide { font-style: italic; color: #5c3a21; margin: 20px 0; }

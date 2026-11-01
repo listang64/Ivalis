@@ -9443,3 +9443,51 @@ complets (flux en morceaux espacés d'une demi-seconde), vérifie :
 
 Il échoue sur l'ancien code (26 échecs). Test mis à jour : corrections_v291
 (versions en minimum).
+
+## v293 — Les dépenses du MJ : chaque réponse, ses tokens, son coût en euros
+
+Nico : « dans paramètre outils j'aimerais un bouton pour voir toutes les
+dépenses à chaque réponse de mon IA MJ : le nb de tokens envoyés, et si
+possible le coût en euros de cet envoi ».
+
+- depenses_ia.js (script simple, chargé avant les modules). Chaque tour du
+  MJ ouvre un relevé (`DEPENSES_IA.debutTour`), refermé une fois les IA
+  d'arrière-plan finies (`finTour`), ou aussitôt s'il n'y a pas de réponse.
+  Il compte :
+  - le narrateur : il note lui-même son usage, arrivé avec le dernier
+    morceau du flux (envoyés, reçus, réflexion, cache) ;
+  - les IA d'appoint du tour, relevées au passage sur les réponses de
+    Gemini (`usageMetadata`). Les appels de la seconde clé (le combat) ne
+    comptent pas ;
+  - les images d'OpenAI, comptées sur leur demande (qualité, taille).
+- Les tarifs (dollars par million de tokens, la réflexion payée comme la
+  sortie, selon la date) :
+  - 3.8 Flash : 0,75 / 3,75 jusqu'au 31/12/2026, puis 1,50 / 7,50 ;
+  - Argon : 2 / 10 jusqu'au 30/11/2026, puis 4 / 20 ;
+  - Flash-Lite : 0,30 / 2,50 ;
+  - images gpt-image-2 (estimation) : 1024² à 0,006 / 0,053 / 0,211 selon
+    la qualité, au prorata de la surface.
+  Un modèle inconnu : tokens comptés, coût non compté (signalé).
+- Les euros : taux de la BCE (api.frankfurter.dev, gardé 12 h), noté sur
+  chaque ligne ; taux de secours 0,87 si la BCE ne répond pas (signalé).
+- Paramètres > Outils > « Dépenses du MJ » ouvre la fenêtre :
+  - quatre cumuls (dernière réponse, aujourd'hui, 30 jours, depuis le
+    début) ;
+  - une ligne par réponse (date, modèle et réflexion, tokens du narrateur,
+    IA d'appoint, images, coût) ;
+  - le détail au toucher (extrait, narrateur, appoint, images, taux) ;
+  - « Effacer l'historique ».
+  L'historique (300 lignes au plus) vit sur l'appareil.
+
+corrections_v293.mjs (dans la suite), sur la vraie page avec Gemini, OpenAI
+et la BCE simulés, vérifie :
+- le bouton et la fenêtre ;
+- les tarifs selon la date, la réflexion, les images ;
+- un tour complet : le narrateur (12 000 / 600 / 400), les 8 IA d'appoint
+  (sans la seconde clé), le portrait, les totaux en dollars et en euros,
+  l'extrait ;
+- la fenêtre : cumuls, ligne, détail, note ;
+- les garde-fous : BCE muette, tour sans appel, 300 lignes, effacer ;
+- les versions.
+
+Il échoue sur l'ancien code (8 échecs).

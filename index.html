@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=120">
+  <link rel="stylesheet" href="style.css?v=121">
 
  
   <!-- ===================================================================== -->
@@ -1623,6 +1623,12 @@
       </button>
       <br><br>
       
+      <!-- LES DÉPENSES DU MJ (v293, depenses_ia.js) -->
+      <button id="btn-depenses-mj" class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.ouvrirDepensesMJ()">
+        Dépenses du MJ
+      </button>
+      <br><br>
+
       <!-- LE NOUVEAU BOUTON DE RÉGÉNÉRATION -->
       <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.regenererImagesLieuActuel()">
         Régénérer Images du Lieu Actuel
@@ -1696,6 +1702,17 @@
       
       <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
         <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-regeneration-token', 'etape-menu-outils')">Retour</button>
+      </div>
+    </div>
+
+    <!-- LES DÉPENSES DU MJ (v293) : chaque réponse, ses tokens, son coût -->
+    <div id="etape-depenses-mj" class="fenetre-volante-parchemin-large fondu-interne" style="display: none; opacity: 0;">
+      <h2>Dépenses du Maître du Jeu</h2>
+      <p style="font-size: 14px; margin-top: -10px; color: #5c3a21;">Chaque réponse du MJ : les tokens envoyés et reçus, et ce qu'elle a coûté.</p>
+      <div id="depenses-mj-contenu"></div>
+      <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
+        <button class="btn-parametres btn-supprimer" onclick="jouerSonClic(); window.effacerDepensesMJ()">Effacer l'historique</button>
+        <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-depenses-mj', 'etape-menu-outils')">Retour</button>
       </div>
     </div>
 
@@ -2407,13 +2424,15 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=197"></script>
+<script src="trace_combat.js?v=198"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
 <script src="porte_joueur.js?v=1"></script>
 <!-- Les deux clés Gemini (v278) : la seconde pour les IA du combat. -->
 <script src="cles_gemini.js?v=1"></script>
+<!-- LES DÉPENSES DU MJ (v293) : tokens et coût en euros de chaque réponse -->
+<script src="depenses_ia.js?v=1"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
      Les modules s'importent entre eux sans numéro (`from './moteur_pur.js'`).
      Sans cette carte, le navigateur les chargeait à part, à une adresse SANS
@@ -2465,7 +2484,7 @@
 <script type="module" src="pont_combat.js?v=46"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=53"></script>
-<script type="module" src="ia_master.js?v=13"></script>
+<script type="module" src="ia_master.js?v=14"></script>
 <script type="module" src="app.js?v=131"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=3"></script>

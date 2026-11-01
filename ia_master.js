@@ -1557,11 +1557,12 @@ async function appelNarrateurEnFlux(modele, corps, cle, surTexte) {
         try { const d = await reponse.json(); if (d && d.error && d.error.message) message = d.error.message; } catch (e) {}
         const err = new Error(message); err.statut = reponse.status; throw err;
     }
-    let texte = "", tokens = 0;
+    let texte = "", tokens = 0, usage = null;
     const lireMorceau = (data) => {
         if (!data) return;
         if (data.error) { const err = new Error(data.error.message || "Erreur"); err.statut = data.error.code; throw err; }
         const t = texteDesParts(data);
+        if (data.usageMetadata) usage = data.usageMetadata;
         if (data.usageMetadata && data.usageMetadata.totalTokenCount) tokens = data.usageMetadata.totalTokenCount;
         if (t) { texte += t; if (surTexte) surTexte(texte); }
     };
@@ -1571,10 +1572,10 @@ async function appelNarrateurEnFlux(modele, corps, cle, surTexte) {
         let data = null;
         try { data = JSON.parse(brut); } catch (e) {
             brut.split(/\r?\n/).filter(l => l.startsWith("data:")).forEach(l => { try { lireMorceau(JSON.parse(l.slice(5))); } catch (err) { if (err.statut) throw err; } });
-            return { texte, tokens };
+            return { texte, tokens, usage };
         }
         (Array.isArray(data) ? data : [data]).forEach(lireMorceau);
-        return { texte, tokens };
+        return { texte, tokens, usage };
     }
     const lecteur = reponse.body.getReader();
     const decodeur = new TextDecoder();
@@ -1595,7 +1596,7 @@ async function appelNarrateurEnFlux(modele, corps, cle, surTexte) {
         if (done) break;
     }
     if (tampon.trim().startsWith("data:")) { try { lireMorceau(JSON.parse(tampon.trim().slice(5))); } catch (e) { if (e.statut) throw e; } }
-    return { texte, tokens };
+    return { texte, tokens, usage };
 }
 
 // `surTexte(texteJusquIci)` (v291) : le texte du MJ au fil de son écriture,
@@ -1632,7 +1633,9 @@ async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTe
     for (let tentative = 1; tentative <= maxTentatives; tentative++) {
         try {
             console.log(`✍️ [Narrateur] ${modele} (réflexion ${reglages.reflexion}) — tentative ${tentative}/${maxTentatives}`);
-            const { texte, tokens } = await appelNarrateurEnFlux(modele, corpsNarrateur(bodyRequete, modele, reglages.reflexion), cleGemini, relais);
+            const { texte, tokens, usage } = await appelNarrateurEnFlux(modele, corpsNarrateur(bodyRequete, modele, reglages.reflexion), cleGemini, relais);
+            // Les dépenses du tour (v293, depenses_ia.js) : ce que le narrateur a lu et écrit.
+            if (usage && window.DEPENSES_IA) window.DEPENSES_IA.noterNarrateur(null, modele, usage);
             if (!texte.trim()) throw new Error("réponse vide");
             if (typeof window.ajouterTokens === "function") window.ajouterTokens(tokens);
             return texte;
@@ -1719,6 +1722,12 @@ window.declencherTourIA = async function(options) {
 
     // 2. VERROUILLAGE GLOBAL : On dit à Firebase de bloquer tous les joueurs
     await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { IA_En_Cours: true });
+
+    // LE RELEVÉ DES DÉPENSES DU TOUR (v293, depenses_ia.js) : il se referme
+    // une fois les IA d'arrière-plan finies (ou tout de suite, sans réponse).
+    const releveDepenses = window.DEPENSES_IA ? window.DEPENSES_IA.debutTour(window.reglagesNarrateur()) : null;
+    let extraitDepenses = "", depensesConfiees = false;
+    const fermerDepenses = () => { if (releveDepenses) window.DEPENSES_IA.finTour(releveDepenses, { extrait: extraitDepenses }); };
 
     // Reset du compteur de tokens local
     localStorage.setItem("ivalis_TOTAL_TOKENS", "0");
@@ -1967,18 +1976,23 @@ window.declencherTourIA = async function(options) {
             // =====================================================================
             // LE RESTE TOURNE EN ARRIÈRE-PLAN PENDANT QUE LES JOUEURS LISENT
             // =====================================================================
+            extraitDepenses = reponseTexte;
+            depensesConfiees = true;
             setTimeout(async () => {
-                if (lieuFinal) {
-                    await analyserDeplacementPNJ(lieuFinal, nomsHeros, reponseTexte);
-                    await analyserMortsPNJ(nomsPnjPresents, reponseTexte);
-                    await analyserStigmates(lieuFinal, reponseTexte);
-                    await analyserReputation(window.ID_PARTIE_COURANTE, lieuFinal, reponseTexte);
-                }
+                try {
+                    if (lieuFinal) {
+                        await analyserDeplacementPNJ(lieuFinal, nomsHeros, reponseTexte);
+                        await analyserMortsPNJ(nomsPnjPresents, reponseTexte);
+                        await analyserStigmates(lieuFinal, reponseTexte);
+                        await analyserReputation(window.ID_PARTIE_COURANTE, lieuFinal, reponseTexte);
+                    }
+                } finally { fermerDepenses(); }
             }, 0);
         }
     } catch (erreurFatale) {
         console.error("❌ [Tour IA] Erreur fatale :", erreurFatale);
     } finally {
+        if (!depensesConfiees) fermerDepenses();
         // 3. DÉVERROUILLAGE GLOBAL : On libère la partie pour tout le monde
         if (window.ID_PARTIE_COURANTE) {
             await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { IA_En_Cours: false });
