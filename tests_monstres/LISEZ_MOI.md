@@ -9523,3 +9523,51 @@ vérifie :
 - « Effacer » pour tous.
 
 Il échoue sur la v293 (9 échecs).
+
+## v295 — L'Arbitre des dés : avant le MJ, une IA rapide dit s'il faut un jet
+
+Nico : « quand on cliquera sur MJ, une IA hyper rapide analyse juste les
+derniers messages des joueurs et dit si oui ou non il faut un lancer de dés.
+Si non, ça lance le MJ narrateur. Si oui, elle dit aux joueurs concernés
+quel lancer faire. Ça doit être rapide. »
+
+Au début du tour du MJ (ia_master.js, `arbitrerAvantLeMJ`), sauf après un
+combat :
+1. Un jet demandé et pas encore lancé ? Un avertissement (« En attente : le
+   jet de Thorin (Force) ») ; « Lancer le MJ quand même » ou rien.
+2. Les actions des héros écrites depuis la dernière demande de jets (ou la
+   dernière narration), hors jets de dés, partent à MIA_DES : Flash-Lite,
+   sans réflexion, température 0, 12 s au plus. Elle reçoit la dernière
+   narration et les jets déjà demandés.
+3. Des jets à faire : « Arbitre des dés » les écrit dans le chat (une ligne
+   par jet : « 🎲 Thorin : jet de Force — difficulté difficile (…) », et
+   `Jets_Demandes`), le tour de parole repart, le MJ ne parle pas. Un
+   bandeau doré l'annonce à toute la table (« À toi… » pour le joueur
+   concerné). Dans la fiche, le d20 de la bonne caractéristique brille tant
+   que le jet n'est pas lancé (`JETS_DEMANDES`, suivi par le chat).
+   Aucun jet : le narrateur part aussitôt, sans rien écrire.
+
+Le prompt de MIA_DES couvre :
+- les six caractéristiques et leurs usages ;
+- la manière qui change la caractéristique ;
+- les trois conditions d'un jet (tenté, incertain, conséquence) ;
+- les cas sans jet (banal, impossible, combat, déjà arbitré) ;
+- un jet par héros, et les cinq difficultés expliquées.
+Ses réponses sont filtrées : héros réel et auteur d'une action, carac qui
+existe, difficulté connue, pas de doublon. En cas de panne, le MJ raconte
+directement.
+
+corrections_v295.mjs (dans la suite), sur la vraie page, vérifie :
+- MIA_DES en premier, rapide, avec ce qu'elle lit ;
+- la demande dans le chat, les jets filtrés, le tour de parole relancé, le
+  verrou relâché ;
+- son prompt ;
+- le bandeau, le d20 qui brille (et lui seul) ;
+- l'avertissement sans jet (non, puis oui) ;
+- le jet lancé, puis le narrateur qui lit la demande et le résultat ;
+- un tour sans jet (narrateur dans le même clic) ;
+- la panne, l'absence d'action, l'après-combat, la même demande jamais
+  refaite ;
+- les versions.
+
+Il échoue sur l'ancien code (20 échecs).

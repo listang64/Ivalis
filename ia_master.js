@@ -1716,6 +1716,215 @@ function formaterTexteMJ(texteBrut, pnjs) {
     return texteAffiche.replace(/\n/g, "<br>");
 }
 
+// =========================================================================
+//  L'ARBITRE DES DÉS (v295) — MIA_DES
+// =========================================================================
+// Nico : « quand on cliquera sur MJ, une IA hyper rapide analyse juste les
+// derniers messages des joueurs et dit si oui ou non il faut un lancer de
+// dés suite à l'action d'un joueur. Si non, ça lance le MJ narrateur. Si
+// oui, elle dit aux joueurs concernés quel lancer faire. »
+//
+// Au clic sur MJ, avant tout le reste :
+//   1. un jet demandé et pas encore lancé ? on prévient (et on peut lancer
+//      le MJ quand même) ;
+//   2. les actions des héros écrites depuis la dernière demande de jets (ou
+//      la dernière narration) partent à MIA_DES (Flash-Lite, sans réflexion,
+//      température 0) ;
+//   3. des jets à faire : « l'Arbitre des dés » les annonce dans le chat
+//      (Jets_Demandes), le tour de parole repart, et le MJ ne parle pas ;
+//      aucun jet : le narrateur part aussitôt, sans rien écrire.
+// Le narrateur lit ensuite les demandes et les résultats dans l'historique.
+const AUTEUR_ARBITRE = { Auteur_ID: "ARBITRE_DES", Auteur_Nom: "Arbitre des dés", Auteur_Couleur: "#d4af37" };
+const CARACS_ARBITRE = [
+    { nom: "FORCE", usage: "soulever, pousser, enfoncer, briser, escalader, nager, porter, retenir, bras de fer" },
+    { nom: "DEXTÉRITÉ", usage: "sauter, esquiver un piège, acrobaties, équilibre, discrétion, se cacher, crocheter, escamoter, voler à la tire, viser juste hors combat" },
+    { nom: "CONSTITUTION", usage: "endurance, marche forcée, retenir son souffle, résister au poison, à la maladie, au froid, à la faim, à l'alcool, à la douleur" },
+    { nom: "INTELLIGENCE", usage: "se souvenir, arcanes et magie, histoire, religion, nature, enquêter, fouiller avec méthode, déchiffrer, résoudre une énigme" },
+    { nom: "SAGESSE", usage: "percevoir (voir, entendre, repérer), deviner une intention ou un mensonge, soigner, survivre dans la nature, pister, calmer ou dresser un animal" },
+    { nom: "CHARISME", usage: "persuader, intimider, mentir, bluffer, séduire, marchander, se produire en public, mener une foule" }
+];
+const DIFFICULTES_ARBITRE = ["facile", "moyenne", "difficile", "très difficile", "héroïque"];
+const DELAI_ARBITRE_MS = 12000;
+
+const sansBalises = (t) => String(t || "").replace(/<[^>]+>/g, "").replace(/\*\*/g, "").replace(/\s+/g, " ").trim();
+const estJetDeDes = (m) => /^🎲 Jet de /.test(sansBalises(m.Texte));
+const caracDuJet = (m) => ((sansBalises(m.Texte).match(/^🎲 Jet de (.+?) pour /) || [])[1] || "").trim();
+const normCarac = (c) => String(c || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim();
+
+// Où en est le tour : les messages depuis la dernière narration, les jets
+// demandés par l'Arbitre, ceux qui ont été lancés, ceux qui manquent, et les
+// actions des héros pas encore arbitrées.
+function etatDesJets(messages, heros) {
+    const liste = (messages || []).slice().sort((a, b) => (a.Timestamp || 0) - (b.Timestamp || 0));
+    let debut = -1;
+    liste.forEach((m, i) => { if (m.Est_Narration_IA) debut = i; });
+    const depuis = liste.slice(debut + 1);
+    const idsHeros = new Set((heros || []).map(h => h.idPersonnage));
+    const demandes = [];
+    let derniereDemande = -1;
+    depuis.forEach((m, i) => {
+        if (m.Auteur_ID === AUTEUR_ARBITRE.Auteur_ID) {
+            derniereDemande = i;
+            (m.Jets_Demandes || []).forEach(j => demandes.push({ ...j, t: m.Timestamp || 0 }));
+        }
+    });
+    const jets = depuis.filter(m => idsHeros.has(m.Auteur_ID) && estJetDeDes(m));
+    const manquants = demandes.filter(d => !jets.some(j => j.Auteur_ID === d.idPerso && (j.Timestamp || 0) >= d.t
+        && (!d.caracteristique || normCarac(caracDuJet(j)) === normCarac(d.caracteristique))));
+    const actions = depuis.slice(derniereDemande + 1).filter(m => idsHeros.has(m.Auteur_ID) && !estJetDeDes(m) && sansBalises(m.Texte));
+    const narration = debut >= 0 ? liste[debut] : null;
+    return { demandes, jets, manquants, actions, narration };
+}
+
+// MIA_DES : faut-il un jet de dé pour une de ces actions ?
+async function demanderArbitreDes(etat, heros) {
+    const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
+    if (!cleGemini) return [];
+    const promptSysteme = `Tu es MIA_DES, l'arbitre des dés d'Ivalis, un jeu de rôle d'Antiquité fantastique. Tu ne racontes rien : tu décides seulement si les actions que les joueurs viennent d'écrire demandent un jet de caractéristique (1d20 + modificateur), et lequel.
+
+LES SIX CARACTÉRISTIQUES ET CE QU'ELLES COUVRENT :
+${CARACS_ARBITRE.map(c => `- ${c.nom} : ${c.usage}.`).join("\n")}
+Une même intention passe par des caractéristiques différentes selon la MANIÈRE : forcer une porte = FORCE ; la crocheter = DEXTÉRITÉ ; convaincre le garde de l'ouvrir = CHARISME ; trouver le mécanisme caché = INTELLIGENCE (fouille méthodique) ou SAGESSE (repérer d'un coup d'œil).
+
+DEMANDE UN JET SEULEMENT SI les trois conditions sont réunies :
+1. le héros TENTE quelque chose maintenant (pas une intention vague, pas une question au MJ, pas une simple description, pas une réplique ordinaire) ;
+2. la réussite est INCERTAINE : quelqu'un d'ordinaire pourrait échouer ;
+3. l'échec aurait une CONSÉQUENCE intéressante (danger, temps perdu, être repéré, offenser quelqu'un, se blesser…).
+PAS DE JET : marcher, parler normalement, poser une question, acheter au prix affiché, observer sans enjeu, ouvrir une porte non verrouillée, tout ce qui est facile ou banal (ça réussit) ; tout ce qui est impossible (ça échoue, le MJ le racontera).
+JAMAIS DE JET POUR UN COMBAT : si un héros attaque, frappe, tire sur quelqu'un ou lance un sort offensif, ne demande rien (le jeu a son combat tactique).
+JAMAIS DEUX FOIS : une action déjà arbitrée ou un jet déjà lancé ne redemande rien.
+Un seul jet par héros, et seulement pour les héros qui ont écrit une action.
+
+LA DIFFICULTÉ (dis le mot) :
+- facile : à la portée de presque tous, mais un échec est possible (escalader un muret, convaincre un ami).
+- moyenne : il faut du savoir-faire (crocheter une serrure simple, passer devant un garde distrait).
+- difficile : un vrai défi (escalader une falaise humide, mentir à un juge soupçonneux).
+- très difficile : seuls les meilleurs y parviennent (crocheter le coffre d'un archimage, nager dans un torrent en crue).
+- héroïque : à la limite du possible (sauter d'un toit à l'autre au-dessus d'une rue large).
+Tiens compte du contexte : la réputation, l'état des lieux, l'aide d'un autre héros (une difficulté de moins), la précipitation ou le danger (une de plus).
+
+Réponds avec l'outil 'deciderJets'. Liste vide s'il n'y a aucun jet à faire (le cas le plus fréquent).`;
+    const nomsHeros = heros.map(h => h.prenom);
+    const texte = [
+        etat.narration ? `DERNIÈRE NARRATION DU MAÎTRE DU JEU :\n${sansBalises(etat.narration.Texte).slice(-1500)}` : "DERNIÈRE NARRATION DU MAÎTRE DU JEU : (aucune)",
+        etat.demandes.length ? `JETS DÉJÀ DEMANDÉS CE TOUR (ne pas redemander) :\n${etat.demandes.map(d => `- ${d.heros} : ${d.caracteristique} (${d.action || ""})`).join("\n")}` : "",
+        `HÉROS : ${nomsHeros.join(", ")}`,
+        `ACTIONS DES JOUEURS À ARBITRER :\n${etat.actions.map(m => `${m.Auteur_Nom} : ${sansBalises(m.Texte)}`).join("\n")}`
+    ].filter(Boolean).join("\n\n");
+    const outils = [{
+        functionDeclarations: [{
+            name: "deciderJets",
+            description: "Les jets de caractéristique à faire (liste vide si aucun).",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    jets: {
+                        type: "ARRAY",
+                        items: {
+                            type: "OBJECT",
+                            properties: {
+                                heros: { type: "STRING", description: "Le prénom du héros, tel qu'il est écrit dans la liste des héros." },
+                                caracteristique: { type: "STRING", description: "FORCE, DEXTÉRITÉ, CONSTITUTION, INTELLIGENCE, SAGESSE ou CHARISME." },
+                                difficulte: { type: "STRING", description: "facile, moyenne, difficile, très difficile ou héroïque." },
+                                action: { type: "STRING", description: "Ce qu'il tente, en quelques mots (« enfoncer la porte »)." }
+                            }, required: ["heros", "caracteristique", "difficulte", "action"]
+                        }
+                    }
+                }, required: ["jets"]
+            }
+        }]
+    }];
+    const controle = typeof AbortController === "function" ? new AbortController() : null;
+    const minuteur = controle ? setTimeout(() => controle.abort(), DELAI_ARBITRE_MS) : null;
+    try {
+        const rep = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
+            method: "POST", headers: { "Content-Type": "application/json" }, signal: controle ? controle.signal : undefined,
+            body: JSON.stringify({
+                systemInstruction: { parts: [{ text: promptSysteme }] },
+                contents: [{ role: "user", parts: [{ text: texte }] }],
+                tools: outils, toolConfig: { functionCallingConfig: { mode: "ANY" } },
+                generationConfig: { temperature: 0 }
+            })
+        });
+        if (!rep.ok) throw new Error("statut " + rep.status);
+        const data = await rep.json();
+        const appel = (data.candidates?.[0]?.content?.parts || []).find(p => p.functionCall && p.functionCall.name === "deciderJets");
+        const bruts = (appel && appel.functionCall.args && appel.functionCall.args.jets) || [];
+        // Seulement des héros qui ont agi, des caractéristiques qui existent,
+        // une difficulté connue, un jet par héros.
+        const auteurs = new Set(etat.actions.map(m => m.Auteur_ID));
+        const jets = [];
+        bruts.forEach(j => {
+            const h = heros.find(x => x.prenom && j && sansAccentPNJ(x.prenom) === sansAccentPNJ(String(j.heros || "").split(/\s+/)[0]));
+            const carac = CARACS_ARBITRE.find(c => normCarac(c.nom) === normCarac(j && j.caracteristique));
+            if (!h || !carac || !auteurs.has(h.idPersonnage) || jets.some(x => x.idPerso === h.idPersonnage)) return;
+            if (etat.demandes.some(d => d.idPerso === h.idPersonnage && normCarac(d.caracteristique) === normCarac(carac.nom))) return;
+            const difficulte = DIFFICULTES_ARBITRE.includes(String(j.difficulte || "").toLowerCase().trim()) ? String(j.difficulte).toLowerCase().trim() : "moyenne";
+            jets.push({ idPerso: h.idPersonnage, heros: h.prenom, caracteristique: carac.nom, difficulte, action: String(j.action || "").trim().slice(0, 120) });
+        });
+        return jets;
+    } catch (e) {
+        console.warn("[MIA_DES] Arbitrage impossible, le MJ raconte directement :", e && e.message || e);
+        return [];
+    } finally { if (minuteur) clearTimeout(minuteur); }
+}
+
+const nomCaracJoli = (nom) => nom.charAt(0) + nom.slice(1).toLowerCase();
+
+// L'arbitrage du tour. Rend true si le narrateur doit parler maintenant.
+async function arbitrerAvantLeMJ(messages) {
+    const heros = (window.PERSOS_PARTIE || []).filter(p => p && !p.estMonstre && !p.estIllusion && p.actif !== false && p.idPersonnage);
+    if (!heros.length) return true;
+    const etat = etatDesJets(messages, heros);
+    if (etat.manquants.length) {
+        const liste = etat.manquants.map(d => `${d.heros} (${nomCaracJoli(d.caracteristique)})`).join(", ");
+        const quandMeme = typeof window.confirm === "function"
+            ? window.confirm(`🎲 En attente : le jet de ${liste}.\n\nLancer le Maître du Jeu quand même ?`) : true;
+        if (!quandMeme) return false;
+        return true;
+    }
+    if (!etat.actions.length) return true;
+    const t0 = Date.now();
+    const jets = await demanderArbitreDes(etat, heros);
+    console.log(`[MIA_DES] ${jets.length ? jets.map(j => `${j.heros} : ${j.caracteristique} (${j.difficulte})`).join(", ") : "aucun jet"} — ${Date.now() - t0} ms`);
+    if (!jets.length) return true;
+    const date = window.DATE_EN_JEU_ACTUELLE || {};
+    const lignes = jets.map(j => `🎲 ${j.heros} : jet de ${nomCaracJoli(j.caracteristique)} — difficulté ${j.difficulte}${j.action ? ` (${j.action})` : ""}`);
+    await addDoc(collection(db, "Messages_Chat"), {
+        ID_Partie: window.ID_PARTIE_COURANTE, ...AUTEUR_ARBITRE,
+        Texte: lignes.join("<br>"), Jets_Demandes: jets,
+        Date_Jour: date.jour || "", Date_An: date.annee || "", Timestamp: Date.now()
+    });
+    if (typeof window.relancerInitiativeChat === "function") await window.relancerInitiativeChat();
+    return false;
+}
+
+// L'ANNONCE À LA TABLE : quand l'Arbitre demande des jets, un bandeau doré
+// le dit à tout le monde, quelques secondes (app.js l'appelle à l'arrivée du
+// message).
+window.annoncerJetsDemandes = function (message) {
+    const jets = (message && message.Jets_Demandes) || [];
+    if (!jets.length) return;
+    let bandeau = document.getElementById("bandeau-jets-demandes");
+    if (!bandeau) {
+        bandeau = document.createElement("div");
+        bandeau.id = "bandeau-jets-demandes";
+        bandeau.className = "bandeau-jets-demandes";
+        document.body.appendChild(bandeau);
+    }
+    const moi = localStorage.getItem("ID_JOUEUR_COURANT");
+    bandeau.innerHTML = `<div class="bandeau-jets-titre">🎲 Les dés vont parler</div>` + jets.map(j => {
+        const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === j.idPerso);
+        const aMoi = perso && perso.idJoueur === moi;
+        return `<div class="bandeau-jets-ligne${aMoi ? " a-moi" : ""}"><strong>${sansBalises(j.heros)}</strong> : jet de ${nomCaracJoli(j.caracteristique)} — ${j.difficulte}`
+            + `${j.action ? `<br><small>${sansBalises(j.action)}</small>` : ""}${aMoi ? `<br><small>À toi : ouvre ta fiche et touche le d20 de ${nomCaracJoli(j.caracteristique)} à ton tour de parole.</small>` : ""}</div>`;
+    }).join("");
+    bandeau.classList.add("visible");
+    clearTimeout(bandeau.minuteur);
+    bandeau.minuteur = setTimeout(() => bandeau.classList.remove("visible"), 9000);
+    bandeau.onclick = () => bandeau.classList.remove("visible");
+};
+
 // --- 4. LA BOUCLE GLOBALE (Bouton MJ) ---
 
 // `options.issueCombat` (v278, combat_rp.js) : le récit d'après un combat du
@@ -1780,6 +1989,11 @@ window.declencherTourIA = async function(options) {
         let messages = [];
         snapMsgAll.forEach(d => messages.push(d.data()));
         if (messages.length === 0) return;
+
+        // L'ARBITRE DES DÉS (v295) : un jet à faire ? Il l'annonce, et le MJ
+        // attend les dés. Aucun ? Le narrateur part aussitôt. (Pas après un
+        // combat : son issue est déjà jouée.)
+        if (!issueCombat && !(await arbitrerAvantLeMJ(messages))) return;
 
         // =========================================================================
         //  FILTRAGE ET BRIDAGE DES TOKENS (Seulement les 30 derniers messages)

@@ -6218,3 +6218,22 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 .depenses-alerte { color: #8b1a1a; }
 .depenses-taux, .depenses-note { font-size: 12px; color: #5c3a21; }
 .depenses-vide { font-style: italic; color: #5c3a21; margin: 20px 0; }
+
+/* L'ARBITRE DES DÉS (v295, ia_master.js) : le bandeau doré qui annonce les
+   jets à toute la table, et le d20 qui brille dans la fiche du héros. */
+.bandeau-jets-demandes {
+  position: fixed; left: 50%; top: 14%; transform: translate(-50%, -10px); z-index: 9500;
+  min-width: min(420px, calc(100vw - 32px)); max-width: calc(100vw - 32px); box-sizing: border-box;
+  background: rgba(30, 20, 10, 0.94); border: 2px solid #d4af37; border-radius: 12px; padding: 14px 20px;
+  color: #f3e3b5; font-family: 'Almendra', serif; font-size: 20px; text-align: center;
+  box-shadow: 0 0 30px rgba(212, 175, 55, 0.45); opacity: 0; pointer-events: none;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.bandeau-jets-demandes.visible { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.bandeau-jets-titre { font-family: 'Cinzel', serif; color: #d4af37; font-size: 16px; letter-spacing: 1px; margin-bottom: 6px; }
+.bandeau-jets-ligne { margin: 6px 0; }
+.bandeau-jets-ligne small { font-size: 15px; color: #c9b38a; }
+.bandeau-jets-ligne.a-moi { color: #ffe08a; }
+.bloc-stat-final.jet-demande .icone-d20-stat { animation: jet-demande-lueur 1.4s ease-in-out infinite; border-radius: 50%; }
+.bloc-stat-final.jet-demande .titre-stat-final { color: #8a5a00; }
+@keyframes jet-demande-lueur { 0%, 100% { filter: drop-shadow(0 0 2px #d4af37); } 50% { filter: drop-shadow(0 0 12px #ffcc33); } }

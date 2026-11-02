@@ -3909,6 +3909,22 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
      }
   });
 
+  // LES JETS DEMANDÉS PAR L'ARBITRE (v295, ia_master.js) : tant qu'ils ne
+  // sont pas lancés, le d20 de la bonne caractéristique brille dans la fiche
+  // du héros. Une narration du MJ les efface ; un jet lancé efface le sien.
+  window.JETS_DEMANDES = [];
+  const suivreJetsDemandes = (m) => {
+      if (!m) return;
+      if (m.Est_Narration_IA) { window.JETS_DEMANDES = []; return; }
+      if (m.Auteur_ID === "ARBITRE_DES") { window.JETS_DEMANDES = (m.Jets_Demandes || []).slice(); return; }
+      const jet = String(m.Texte || "").replace(/<[^>]+>|\*\*/g, "").match(/^🎲 Jet de (.+?) pour /);
+      if (jet) {
+          const carac = jet[1].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+          window.JETS_DEMANDES = window.JETS_DEMANDES.filter(j => !(j.idPerso === m.Auteur_ID
+              && String(j.caracteristique || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim() === carac));
+      }
+  };
+
   // L'état d'un message du MJ pour le parchemin (v291). Un message d'avant
   // (sans `Recit_En_Cours`) est complet, portraits compris.
   const etatRecitDuMessage = (m) => {
@@ -3939,6 +3955,10 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
           data.idDoc = change.doc.id; // On récupère l'ID exact de Firebase
 
           if (change.type === "added") {
+              suivreJetsDemandes(data);
+              if (window.INITIAL_CHAT_LOADED && data.Auteur_ID === "ARBITRE_DES" && typeof window.annoncerJetsDemandes === "function") {
+                  window.annoncerJetsDemandes(data);
+              }
               if (window.INITIAL_CHAT_LOADED && data.Est_Narration_IA && data.Timestamp >= (timestampChargement - 1000)) {
                   recitDeclenche = data.Texte;
                   recitHorodatage = data.Timestamp;
@@ -6724,14 +6744,19 @@ window.afficherStatsFinales = function(dataStats, idPersonnage) {
   }
   // =========================================================
 
+  // Le jet que l'Arbitre des dés attend de ce héros (v295) : son d20 brille.
+  const sansAcc = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+  const jetsAttendus = (window.JETS_DEMANDES || []).filter(j => j.idPerso === idPersonnage);
+
   NOMS_CARACS.forEach(c => {
     const val = valeurDe(c);
     const mod = getModificateur(val);
     const modAff = mod >= 0 ? "+" + mod : mod;
+    const attendu = jetsAttendus.find(j => sansAcc(j.caracteristique) === sansAcc(c.nom));
     
     // NOUVEAU : Structure avec l'image du D20 à gauche
     let html = `
-      <div class="bloc-stat-final" style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
+      <div class="bloc-stat-final${attendu ? " jet-demande" : ""}" data-carac="${c.id}"${attendu ? ` title="L'Arbitre des dés attend ce jet (difficulté ${attendu.difficulte})"` : ""} style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
         
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782422251/IMG_1714_l0bco5.png" class="icone-d20-stat" alt="D20" onclick="jouerSonClic(); lancerJetDeCaracteristique('${c.id}', '${c.nom}', ${val}, ${mod})">
         
