@@ -1731,8 +1731,9 @@ function formaterTexteMJ(texteBrut, pnjs) {
 //      la dernière narration) partent à MIA_DES (Flash-Lite, sans réflexion,
 //      température 0) ;
 //   3. des jets à faire : « l'Arbitre des dés » les annonce dans le chat
-//      (Jets_Demandes), le tour de parole repart, et le MJ ne parle pas ;
-//      aucun jet : le narrateur part aussitôt, sans rien écrire.
+//      (Jets_Demandes), et le MJ ne parle pas ; les joueurs lancent leurs
+//      dés quand ils veulent (pas de nouveau tour de parole, v296), puis
+//      relancent le MJ ; aucun jet : le narrateur part aussitôt.
 // Le narrateur lit ensuite les demandes et les résultats dans l'historique.
 const AUTEUR_ARBITRE = { Auteur_ID: "ARBITRE_DES", Auteur_Nom: "Arbitre des dés", Auteur_Couleur: "#d4af37" };
 const CARACS_ARBITRE = [
@@ -1895,7 +1896,6 @@ async function arbitrerAvantLeMJ(messages) {
         Texte: lignes.join("<br>"), Jets_Demandes: jets,
         Date_Jour: date.jour || "", Date_An: date.annee || "", Timestamp: Date.now()
     });
-    if (typeof window.relancerInitiativeChat === "function") await window.relancerInitiativeChat();
     return false;
 }
 
@@ -1917,7 +1917,7 @@ window.annoncerJetsDemandes = function (message) {
         const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === j.idPerso);
         const aMoi = perso && perso.idJoueur === moi;
         return `<div class="bandeau-jets-ligne${aMoi ? " a-moi" : ""}"><strong>${sansBalises(j.heros)}</strong> : jet de ${nomCaracJoli(j.caracteristique)} — ${j.difficulte}`
-            + `${j.action ? `<br><small>${sansBalises(j.action)}</small>` : ""}${aMoi ? `<br><small>À toi : ouvre ta fiche et touche le d20 de ${nomCaracJoli(j.caracteristique)} à ton tour de parole.</small>` : ""}</div>`;
+            + `${j.action ? `<br><small>${sansBalises(j.action)}</small>` : ""}${aMoi ? `<br><small>À toi : ouvre ta fiche et touche le d20 de ${nomCaracJoli(j.caracteristique)}.</small>` : ""}</div>`;
     }).join("");
     bandeau.classList.add("visible");
     clearTimeout(bandeau.minuteur);

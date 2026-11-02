@@ -9571,3 +9571,25 @@ corrections_v295.mjs (dans la suite), sur la vraie page, vérifie :
 - les versions.
 
 Il échoue sur l'ancien code (20 échecs).
+
+## v296 — Les dés se lancent à tout moment, l'Arbitre ne relance pas le tour
+
+Nico : « il faut que les joueurs puissent faire leurs lancers de dés peu
+importe à qui c'est de parler. Quand l'arbitre demande des lancers de dés,
+on ne refait pas un tour de parole. Une fois les lancers faits, les joueurs
+relancent le MJ et basta. »
+
+- `lancerJetDeCaracteristique` (app.js) ne consulte plus le tour de parole :
+  plus de « Action impossible : c'est à … de parler ». Le tour de parole ne
+  règle plus que le chat.
+- `arbitrerAvantLeMJ` (ia_master.js) n'appelle plus `relancerInitiativeChat`
+  après sa demande de jets. Le bandeau dit « À toi : ouvre ta fiche et
+  touche le d20 de … », sans parler du tour de parole.
+
+corrections_v296.mjs (dans la suite) : Lyra a la parole, Thorin lance quand
+même son jet de Force depuis sa fiche (Action_Des écrit, pas de refus) ;
+l'Arbitre ne relance pas le tour ; le lancer ne consulte plus le tour ; les
+versions. Il échoue sur l'ancien code (5 échecs).
+
+Test mis à jour : corrections_v295 (le tour de parole ne repart plus ; le
+bandeau ne parle plus du tour de parole).

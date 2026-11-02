@@ -6930,48 +6930,12 @@ window.ID_MON_LANCER = "";
 window.lancerJetDeCaracteristique = async function(idCarac, nomCarac, valeurCarac, modCarac) {
     if (!window.ID_PARTIE_COURANTE) return;
 
-    // =========================================================
-    //  SÉCURITÉ ANTI-TRICHE (TOUR DE PAROLE)
-    // =========================================================
-    const partie = window.PARTIE_DATA || {};
-    const idPersoActif = window.tourDeParole(partie, window.PERSOS_PARTIE).id;
-    const idPersonnageFiche = document.getElementById("champ-id-personnage").value; 
+    // LES DÉS SE LANCENT À TOUT MOMENT (v296). Nico : « il faut que les
+    // joueurs puissent faire leurs lancers de dés peu importe à qui c'est de
+    // parler ». Le tour de parole ne règle plus que le chat.
+    const idPersonnageFiche = document.getElementById("champ-id-personnage").value;
 
-    if (idPersonnageFiche !== idPersoActif) {
-        let nomActif = "au Maître du Jeu";
-        
-        if (idPersoActif && window.PERSOS_PARTIE) {
-            const persoInfo = window.PERSOS_PARTIE.find(p => p.idPersonnage === idPersoActif);
-            if (persoInfo) nomActif = `à ${persoInfo.prenom}`;
-        }
-        
-        // --- NOUVEAU : Le message immersif au lieu du alert() ---
-        const fiche = document.getElementById("fenetre-fiche-perso");
-        let msgErreur = document.getElementById("erreur-jet-immersif");
-
-        // Si le bloc n'existe pas encore, on le crée
-        if (!msgErreur) {
-            msgErreur = document.createElement("div");
-            msgErreur.id = "erreur-jet-immersif";
-            msgErreur.style.cssText = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(40, 10, 10, 0.95); color: #ff4c4c; padding: 20px 40px; border: 2px solid #ff4c4c; border-radius: 12px; font-weight: bold; font-size: 24px; text-shadow: 0 0 10px red; box-shadow: 0 0 40px rgba(255, 0, 0, 0.9); z-index: 2000; text-align: center; pointer-events: none; opacity: 0; transition: opacity 0.3s ease;";
-            fiche.appendChild(msgErreur);
-        }
-
-        // On injecte le texte et on l'affiche
-        if (typeof window.jouerSonClic === "function") window.jouerSonClic(); // Petit bruit d'erreur optionnel
-        msgErreur.innerHTML = `Action impossible<br><span style="font-size: 18px; color: #e8d5a5;">C'est ${nomActif} de parler.</span>`;
-        msgErreur.style.opacity = "1";
-
-        // On le fait disparaître en fondu 2.5 secondes plus tard
-        setTimeout(() => { 
-            if (msgErreur) msgErreur.style.opacity = "0"; 
-        }, 2500);
-
-        return; // On bloque le jet de dé
-    }
-    // =========================================================
-
-    // Si la sécurité est passée, on lance le dé normalement
+    // On lance le dé
     const nomPersonnage = document.getElementById("titre-nom-personnage").innerText;
     
     const resultatD20 = Math.floor(Math.random() * 20) + 1;

@@ -1,4 +1,4 @@
-// v295 — L'ARBITRE DES DÉS : AVANT LE MJ, UNE IA RAPIDE DIT S'IL FAUT UN JET.
+// v295 (et v296) — L'ARBITRE DES DÉS : AVANT LE MJ, UNE IA RAPIDE DIT S'IL FAUT UN JET.
 //
 // Nico : « quand on cliquera sur MJ, une IA hyper rapide analyse juste les
 // derniers messages des joueurs et dit si oui ou non il faut un lancer de
@@ -202,7 +202,9 @@ await section(async () => {
   verifier("seulement les jets valables : pas de carac inventée, pas de héros inconnu", !!msg && msg.Jets_Demandes.length === 1 && msg.Jets_Demandes[0].idPerso === "H1" && msg.Jets_Demandes[0].caracteristique === "FORCE",
            msg && JSON.stringify(msg.Jets_Demandes));
   const partie = await p.evaluate(() => window.__docs["Systeme_Parties/P1"]);
-  verifier("le tour de parole repart (pour que Thorin lance à son tour)", partie.Index_Initiative === 0 && partie.IA_En_Cours === false, JSON.stringify({ i: partie.Index_Initiative, verrou: partie.IA_En_Cours }));
+  // v296 : pas de nouveau tour de parole ; les dés se lancent à tout moment.
+  verifier("le tour de parole ne repart PAS (v296 : les dés se lancent à tout moment)", partie.Index_Initiative === 999 && JSON.stringify(partie.Ordre_Initiative) === '["H1","H2"]' && partie.IA_En_Cours === false,
+           JSON.stringify({ i: partie.Index_Initiative, ordre: partie.Ordre_Initiative, verrou: partie.IA_En_Cours }));
 });
 
 await section(async () => {
@@ -236,7 +238,7 @@ await section(async () => {
     await p.screenshot({ path: process.env.V295_CAPTURES + "/v295_bandeau.png" });
   }
   verifier("un bandeau doré l'annonce à toute la table", r.visible && /Thorin/.test(r.texte) && /jet de Force — difficile/.test(r.texte), r.texte.slice(0, 120));
-  verifier("le joueur de Thorin lit « À toi : ouvre ta fiche… »", r.aMoi && /À toi : ouvre ta fiche et touche le d20 de Force/.test(r.texte));
+  verifier("le joueur de Thorin lit « À toi : ouvre ta fiche… » (sans attendre son tour de parole)", r.aMoi && /À toi : ouvre ta fiche et touche le d20 de Force/.test(r.texte) && !/tour de parole/.test(r.texte));
   verifier("dans la fiche de Thorin, le d20 de Force brille (et lui seul)", r.brille.join(",") === "force", r.brille.join(","));
   verifier("rien ne brille dans la fiche de Lyra", r.brilleLyra === 0);
   const app = lire("app.js");
