@@ -1,0 +1,155 @@
+/* =========================================================================
+   IVALIS — LE GRIMOIRE (v297, grimoire.js)
+   =========================================================================
+   Le fond beige, le livre (fermé puis ouvert), les pages de parchemin, la
+   plume. Les tailles du texte suivent la page : --u vaut 1 % de la largeur
+   d'une page (grimoire.js, poser).
+   ========================================================================= */
+#ecran-grimoire {
+  position: fixed; inset: 0; z-index: 80; display: none; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 40%, #f1e6cf 0%, #e6d5b3 60%, #d6c19a 100%);
+  opacity: 0; transition: opacity 1s ease;
+  -webkit-user-select: none; user-select: none;
+}
+#ecran-grimoire.visible { opacity: 1; }
+#ecran-grimoire.disparait { opacity: 0; transition: opacity 0.9s ease; }
+
+.grimoire-scene {
+  position: absolute; transform-origin: 0 0;
+  transition: transform 1.25s cubic-bezier(0.45, 0.05, 0.25, 1);
+}
+.grimoire-scene.ferme { transform: var(--transform-ferme, none); }
+.grimoire-scene.ouvert { transform: none; }
+
+/* Le livre ouvert : derrière les pages, il n'apparaît qu'à l'ouverture. */
+.grimoire-fond-livre {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; opacity: 0; transition: opacity 0.7s ease 0.35s;
+  filter: drop-shadow(0 calc(var(--u) * 1.2) calc(var(--u) * 2.4) rgba(60, 35, 15, 0.45));
+  /* Les deux dernières colonnes de l'image sont opaques (un liseré sombre) : rognées. */
+  clip-path: inset(-5% 0.12% -5% -5%);
+}
+.grimoire-scene.ouvert .grimoire-fond-livre { opacity: 1; }
+.grimoire-scene.ferme .grimoire-fond-livre { transition-delay: 0s; }
+
+.grimoire-livre { position: absolute; }
+/* La taille du livre, c'est grimoire.js qui la pose (autoSize coupé) : son
+   enveloppe et son bloc remplissent la zone des deux pages. */
+.grimoire-livre .stf__wrapper { position: relative; width: 100%; height: 100%; }
+.grimoire-livre .stf__block { inset: 0; }
+.grimoire-attrape { position: absolute; inset: 0; cursor: pointer; z-index: 5; }
+.grimoire-invite {
+  position: absolute; left: 0; right: 0; bottom: 5vh; margin: 0; text-align: center;
+  font-family: 'IM Fell English', 'Almendra', serif; font-style: italic; font-size: clamp(14px, 1.6vw, 22px);
+  color: rgba(74, 46, 27, 0.75); opacity: 0; transition: opacity 0.8s ease; pointer-events: none;
+}
+.grimoire-invite.visible { opacity: 1; transition-delay: 2.5s; }
+
+/* LES PAGES */
+.page-grimoire { overflow: hidden; }
+.page-couverture { background: transparent; }
+.page-couverture img {
+  position: absolute; left: 0; top: 0; height: 100%; width: auto; max-width: none;
+  filter: drop-shadow(0 calc(var(--u) * 1.5) calc(var(--u) * 2.5) rgba(40, 20, 8, 0.55));
+}
+.page-dos { background: #2a1a12; }
+.page-papier { background: transparent; }
+.page-papier::before {
+  content: ""; position: absolute; inset: 0;
+  background: url('images/grimoire/page.webp?v=1') center / 100% 100% no-repeat;
+}
+/* La texture a son bord lisse à gauche (le dos) : à gauche du livre, on la retourne. */
+.page-papier.gauche::before { transform: scaleX(-1); }
+
+.contenu-page {
+  position: absolute; inset: 0; box-sizing: border-box;
+  padding: calc(var(--u) * 11) calc(var(--u) * 11);
+  display: flex; flex-direction: column; align-items: center;
+  color: #2b1a0e; font-family: 'IM Fell English', 'Almendra', serif;
+  font-size: calc(var(--u) * 3.6); line-height: 1.35;
+}
+
+/* Page de gauche : le titre. */
+.page-titre { justify-content: center; text-align: center; gap: calc(var(--u) * 1.5); }
+.titre-haut { font-family: 'Cinzel', serif; font-size: calc(var(--u) * 4); letter-spacing: 0.25em; color: #6b4a2b; }
+.titre-ivalis {
+  margin: 0; font-family: 'Cinzel', serif; font-weight: 700; font-size: calc(var(--u) * 15);
+  letter-spacing: 0.06em; line-height: 1; color: #3a2210;
+  text-shadow: 0 0.04em 0 rgba(255, 240, 210, 0.5), 0 -0.02em 0.03em rgba(60, 30, 10, 0.35);
+}
+.titre-sous { font-family: 'Almendra', serif; font-style: italic; font-size: calc(var(--u) * 6); color: #4a2e1b; }
+.fleuron { width: calc(var(--u) * 46); height: auto; margin: calc(var(--u) * 3) 0; }
+.fleuron path { fill: none; stroke: #4a2e1b; stroke-width: 1.4; stroke-linecap: round; }
+.fleuron circle { fill: #4a2e1b; }
+.titre-auteurs { margin-top: calc(var(--u) * 10); font-size: calc(var(--u) * 3.4); color: #5c3a21; font-style: italic; }
+.titre-auteurs span { font-style: normal; font-family: 'Almendra', serif; font-size: calc(var(--u) * 4.2); color: #3a2210; }
+
+/* Page de droite : le journal, bordé à la plume. */
+.bordure-plume, .cadre-main, .surligneur { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.bordure-plume path { fill: none; stroke: #120b06; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.bordure-plume .trait-1 { stroke-width: calc(var(--u) * 0.55); opacity: 0.9; }
+.bordure-plume .trait-2 { stroke-width: calc(var(--u) * 0.25); opacity: 0.55; }
+.bordure-plume .trait-coin { stroke-width: calc(var(--u) * 0.3); opacity: 0.7; }
+.page-journal { padding-top: calc(var(--u) * 16); gap: calc(var(--u) * 5); }
+.journal-entete { font-size: calc(var(--u) * 5); font-style: italic; color: #2b1a0e; text-align: center; }
+.nom-surligne { position: relative; display: inline-block; padding: 0 calc(var(--u) * 1.2); font-style: normal; }
+.nom-surligne b { position: relative; font-family: 'Almendra', serif; font-weight: 700; }
+.surligneur { inset: 10% -4% -6% -4%; width: 108%; height: 96%; }
+.surligneur path { fill: rgba(236, 190, 60, 0.7); }
+.journal-entrees { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 5.5); margin-top: calc(var(--u) * 6); width: 100%; }
+
+/* Les cadres tracés à la main : les entrées du journal et les boutons. */
+.bouton-grimoire {
+  position: relative; border: 0; background: transparent; cursor: pointer;
+  min-width: calc(var(--u) * 52); padding: calc(var(--u) * 3) calc(var(--u) * 6);
+  font-family: 'Almendra', serif; font-size: calc(var(--u) * 5.2); color: #24150a;
+  transition: transform 0.25s ease, color 0.25s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.bouton-grimoire span { position: relative; }
+.cadre-main path { fill: none; stroke: #1b1009; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.cadre-main .trait-1 { stroke-width: calc(var(--u) * 0.45); opacity: 0.85; }
+.cadre-main .trait-2 { stroke-width: calc(var(--u) * 0.22); opacity: 0.5; }
+.bouton-grimoire:hover, .bouton-grimoire:focus-visible { transform: rotate(-0.8deg) scale(1.03); color: #000; outline: none; }
+.bouton-grimoire:hover .cadre-main .trait-1 { opacity: 1; }
+.bouton-grimoire:active { transform: scale(0.98); }
+.bouton-grimoire[disabled] { opacity: 0.6; cursor: default; }
+.bouton-grimoire.choisi { color: #000; }
+.bouton-grimoire.choisi .cadre-main path { stroke: #6b1a10; }
+
+/* Les doubles pages des chapitres. */
+.page-chapitre { justify-content: flex-start; text-align: center; gap: calc(var(--u) * 3); }
+.page-chapitre h2 { margin: 0 0 calc(var(--u) * 2); font-family: 'Cinzel', serif; font-size: calc(var(--u) * 7); color: #3a2210; }
+.page-chapitre h3 { margin: 0 0 calc(var(--u) * 1); font-family: 'Cinzel', serif; font-size: calc(var(--u) * 5); color: #3a2210; }
+.texte-plume { margin: 0; font-size: calc(var(--u) * 4); }
+.texte-plume.attente { font-style: italic; color: #6b4a2b; margin-top: calc(var(--u) * 20); }
+.page-formulaire { justify-content: center; }
+.form-grimoire { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 4); width: 100%; }
+.form-grimoire[hidden] { display: none; }
+.champ-grimoire { display: flex; flex-direction: column; align-items: stretch; width: 82%; font-size: calc(var(--u) * 3.6); font-style: italic; color: #4a2e1b; text-align: left; }
+.champ-grimoire input {
+  margin-top: calc(var(--u) * 1); padding: calc(var(--u) * 1) calc(var(--u) * 1.2);
+  border: 0; border-bottom: calc(var(--u) * 0.35) solid rgba(27, 16, 9, 0.75); border-radius: 0;
+  background: rgba(255, 248, 230, 0.25); color: #1b1009;
+  font-family: 'Almendra', serif; font-size: calc(var(--u) * 4.4); outline: none;
+  -webkit-user-select: text; user-select: text;
+}
+.champ-grimoire input:focus { background: rgba(255, 248, 230, 0.55); border-bottom-color: #000; }
+.message-grimoire { margin: 0; min-height: calc(var(--u) * 4); font-size: calc(var(--u) * 3.4); font-weight: bold; color: #7a1a10; }
+.message-grimoire.ok { color: #2f5d1e; }
+.lien-grimoire {
+  margin-top: auto; border: 0; background: transparent; cursor: pointer; padding: calc(var(--u) * 1);
+  font-family: 'IM Fell English', serif; font-style: italic; font-size: calc(var(--u) * 3.4); color: #5c3a21;
+  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.2em;
+}
+.liste-parties-grimoire {
+  display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 3.5);
+  width: 100%; max-height: 62%; overflow-y: auto; padding: calc(var(--u) * 1.5) 0;
+  -webkit-overflow-scrolling: touch;
+}
+.liste-parties-grimoire .bouton-grimoire { min-width: calc(var(--u) * 58); font-size: calc(var(--u) * 4.4); padding: calc(var(--u) * 2.2) calc(var(--u) * 5); }
+.ligne-compte { display: flex; justify-content: space-between; gap: calc(var(--u) * 3); width: 90%; margin: 0; font-size: calc(var(--u) * 3.8); border-bottom: 1px dotted rgba(43, 26, 14, 0.4); }
+.ligne-compte span { font-style: italic; color: #6b4a2b; }
+.case-grimoire { display: flex; align-items: center; gap: calc(var(--u) * 1.5); font-size: calc(var(--u) * 3.8); cursor: pointer; margin: calc(var(--u) * 2) 0; }
+.case-grimoire input { width: calc(var(--u) * 3.6); height: calc(var(--u) * 3.6); accent-color: #4a2e1b; }
+.page-chapitre .bouton-grimoire { font-size: calc(var(--u) * 4.4); min-width: calc(var(--u) * 46); padding: calc(var(--u) * 2.2) calc(var(--u) * 5); }

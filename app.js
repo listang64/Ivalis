@@ -3631,6 +3631,8 @@ function ecouterPartiesEnCours() {
       parties.push({ id, nom: d.Nom_Du_Groupe || "" });
     });
     window.LISTE_PARTIES_CACHE = parties;
+    // Le grimoire ouvert sur les archives suit la liste (v297).
+    if (typeof window.grimoirePartiesMaj === "function") window.grimoirePartiesMaj(parties);
   }, (err) => console.error("onSnapshot Parties :", err));
 }
 
@@ -4849,6 +4851,15 @@ async function validerMdpPartie() {
   }
 }
 
+// LES PORTES DU GRIMOIRE (v297, grimoire.js) : ses pages appellent les mêmes
+// vérifications et la même entrée en partie que les anciennes modales.
+window.PORTES_GRIMOIRE = {
+  verifierCle: (saisie) => verifierMotDePasse(saisie),
+  creerPartie: (nom, mdp) => creerNouvellePartie(nom, mdp),
+  verifierMdpPartie: (id, saisie) => verifierMotDePassePartie(id, saisie),
+  entrerDansPartie: (id) => lancerPartieChargee(id)
+};
+
 function lancerPartieChargee(idChoisi) {
   const depart = Date.now();
   window.ID_PARTIE_COURANTE = idChoisi;
@@ -4913,7 +4924,10 @@ function confirmerRetourMenu() {
   }
   fermerModalesJeu();
   document.getElementById("ecran-jeu").style.display = "none";
-  document.getElementById("ecran-menu").style.display = "block";
+  // Le menu, c'est le grimoire (v297), rouvert sur le journal du joueur.
+  if (!(typeof window.afficherGrimoire === "function" && window.afficherGrimoire({ ouvert: true }))) {
+    document.getElementById("ecran-menu").style.display = "block";
+  }
   window.ID_PARTIE_COURANTE = null;
   if (unsubscribePersonnages) { unsubscribePersonnages(); unsubscribePersonnages = null; }
   // De retour au menu : la liste des parties redevient utile.

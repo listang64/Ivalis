@@ -263,9 +263,12 @@ function accueillir() {
     const panneau = document.getElementById("panneau-connexion");
     if (panneau) panneau.classList.remove("visible");
     if (!ecran) return;
-    // Le temps de lire « Bienvenue », puis le menu.
+    // Le temps de lire « Bienvenue », puis le menu — le grimoire (v297), qui
+    // apparaît sous l'écran noir pendant qu'il s'efface.
     setTimeout(() => {
+        if (typeof window.afficherGrimoire === "function") window.afficherGrimoire();
         ecran.style.opacity = "0";
+        ecran.style.pointerEvents = "none";   // le grimoire dessous prend déjà le doigt
         setTimeout(() => { ecran.style.display = "none"; }, 1500);
     }, 1400);
 }
@@ -671,24 +674,34 @@ window.ouvrirMonCompte = function () {
     ouvrirModale("modale-compte");
 };
 
-async function changerMotDePasse(form) {
-    const msg = document.getElementById("message-compte");
-    const dire = (t, ok) => { if (msg) { msg.textContent = t; msg.classList.toggle("ok", !!ok); } };
-    if (!sdk || !sdk.auth.currentUser) return;
-    const actuel = valeur("compte-mdp-actuel"), nouveau = valeur("compte-mdp-nouveau"), confirme = valeur("compte-mdp-confirmer");
-    if (!actuel) { dire("Entre ton mot de passe actuel."); return; }
-    if (nouveau.length < 6) { dire("Le nouveau mot de passe doit faire au moins 6 caractères."); return; }
-    if (nouveau !== confirme) { dire("Les deux nouveaux mots de passe ne sont pas identiques."); return; }
-    occupe(form, true);
+// Changer de mot de passe : rend { ok, texte }. La fenêtre « Mon compte » et
+// la page Compte du grimoire (v297, changerMotDePasseCompte) s'en servent.
+async function changerMdp(actuel, nouveau, confirme) {
+    if (!sdk || !sdk.auth.currentUser) return { ok: false, texte: "Aucun compte connecté." };
+    if (!actuel) return { ok: false, texte: "Entre ton mot de passe actuel." };
+    if (nouveau.length < 6) return { ok: false, texte: "Le nouveau mot de passe doit faire au moins 6 caractères." };
+    if (nouveau !== confirme) return { ok: false, texte: "Les deux nouveaux mots de passe ne sont pas identiques." };
     try {
         const user = sdk.auth.currentUser;
         await sdk.fa.reauthenticateWithCredential(user, sdk.fa.EmailAuthProvider.credential(user.email, actuel));
         await sdk.fa.updatePassword(user, nouveau);
-        form.reset();
-        dire("Ton mot de passe est changé.", true);
+        return { ok: true, texte: "Ton mot de passe est changé." };
     } catch (e) {
-        dire(e && (e.code === "auth/wrong-password" || e.code === "auth/invalid-credential" || e.code === "auth/invalid-login-credentials")
-            ? "Ton mot de passe actuel est incorrect." : messageErreur(e));
+        return { ok: false, texte: e && (e.code === "auth/wrong-password" || e.code === "auth/invalid-credential" || e.code === "auth/invalid-login-credentials")
+            ? "Ton mot de passe actuel est incorrect." : messageErreur(e) };
+    }
+}
+window.changerMotDePasseCompte = changerMdp;
+
+async function changerMotDePasse(form) {
+    const msg = document.getElementById("message-compte");
+    const dire = (t, ok) => { if (msg) { msg.textContent = t; msg.classList.toggle("ok", !!ok); } };
+    if (!sdk || !sdk.auth.currentUser) return;
+    occupe(form, true);
+    try {
+        const r = await changerMdp(valeur("compte-mdp-actuel"), valeur("compte-mdp-nouveau"), valeur("compte-mdp-confirmer"));
+        if (r.ok) form.reset();
+        dire(r.texte, r.ok);
     } finally {
         occupe(form, false);
     }

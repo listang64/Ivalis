@@ -9593,3 +9593,71 @@ versions. Il échoue sur l'ancien code (5 échecs).
 
 Test mis à jour : corrections_v295 (le tour de parole ne repart plus ; le
 bandeau ne parle plus du tour de parole).
+
+## v297 — Le grimoire : l'accueil devient un vieux livre (StPageFlip)
+
+Nico : « tout le jeu aura comme interface un vieux grimoire : on l'ouvre au
+début et on navigue à travers ses pages, avec StPageFlip pour l'animation
+des pages sur PC et iPad ». Première partie : l'accueil.
+
+- StPageFlip 2.0.7 (MIT) est dans le dépôt (vendor/page-flip : le script,
+  sa CSS, sa licence). Le grimoire s'ouvre donc sans CDN, et dans les bancs.
+- Les images de Nico sont dans images/grimoire : la couverture, le livre
+  ouvert (2000 × 1117, les deux pages en x 251 → 1765, y 62 → 1046, le dos à
+  x 1008) et la texture de page. La texture a son bord lisse à gauche : elle
+  est retournée en CSS pour la page de gauche. Les deux dernières colonnes
+  du livre ouvert (un liseré opaque) sont rognées en CSS.
+- grimoire.js / grimoire.css, #ecran-grimoire. Après l'écran noir de
+  connexion (comptes.js, accueillir), le grimoire remplace l'ancien menu
+  (#ecran-menu, gardé dans la page) :
+  - sur fond beige, le livre fermé, couverture seule, centrée et un peu plus
+    petite ;
+  - un toucher : la couverture tourne, le livre ouvert apparaît et grossit,
+    une petite marge en haut ;
+  - page de gauche : « Les Chroniques — Ivalis — le jeu de rôle », « Imaginé
+    par Benjamin et Nicolas Duval » ;
+  - page de droite, bordée à la plume noire : « Journal de » et le nom du
+    compte surligné, puis Nouvelle partie, Charger partie et Compte dans des
+    cadres tracés à la main (SVG, tracés irréguliers fixés par une graine).
+- Les pages : 0 couverture (rigide), 1-2 titre et journal, 3-4 la double
+  page du chapitre choisi (remplie au clic, le livre y tourne tout seul),
+  5 quatrième de couverture (jamais atteinte : le livre revient au
+  chapitre). Tourner en arrière (glisser, ou « ← Revenir au journal »)
+  ramène au journal. Jusqu'à la couverture, le livre se referme.
+- Les chapitres :
+  - Nouvelle partie : la Clé de Rune, puis le nom du groupe et son mot de
+    passe ;
+  - Charger partie : les sessions en cours (la liste suit Firestore), puis
+    le sceau (mot de passe) ;
+  - Compte : nom, e-mail, rôle, connexion automatique, demandes
+    d'inscription (Nico et Ben, l'ancienne fenêtre), déconnexion, et le
+    changement de mot de passe (comptes.js, `changerMotDePasseCompte`).
+- Les pages passent par `PORTES_GRIMOIRE` (app.js), les mêmes vérifications
+  que les anciennes modales. Une partie fondée ou réveillée appelle
+  `lancerPartieChargee` : l'ancienne interface, et le grimoire s'efface par
+  fondu. « Retour au menu » rouvre le grimoire sur le journal.
+- Les champs, cases et boutons des pages arrêtent le doigt et la souris :
+  StPageFlip n'y voit pas une page à tourner, et le clavier y écrit.
+- La mise en page : le livre est posé en pixels (`autoSize` coupé). --u vaut
+  1 % de la largeur d'une page, pour que le texte suive. Double page sur
+  tous les écrans, au redimensionnement aussi.
+- L'écran noir de connexion ne prend plus le doigt pendant son fondu.
+
+corrections_v297.mjs (dans la suite), sur la vraie page (banc), vérifie :
+- après la connexion, le grimoire (pas l'ancien menu), fond beige, livre
+  fermé et couverture centrée ;
+- l'ouverture (StPageFlip, zoom levé, marge en haut, pages posées au pixel
+  sur le livre dessiné) ;
+- la texture retournée à gauche, le titre, les auteurs, le journal (nom
+  surligné, bordure à la plume, trois cadres) ;
+- Charger partie : la page tourne seule, la liste en direct, le sceau, le
+  champ tapé au clavier sans tourner la page, le mauvais puis le bon mot de
+  passe, l'entrée en partie ;
+- le retour au menu sur le journal ;
+- Nouvelle partie : clé, groupe, fondation ;
+- Compte : la case, le mot de passe, les demandes ;
+- glisser en arrière jusqu'au journal, pas au-delà du chapitre, « Revenir »,
+  refermer ;
+- trois tailles d'écran ; les portes ; les fichiers.
+
+Il échoue sur l'ancien code (8 échecs).

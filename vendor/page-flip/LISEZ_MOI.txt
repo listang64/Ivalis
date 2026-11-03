@@ -1,0 +1,3 @@
+StPageFlip (paquet npm « page-flip ») version 2.0.7, licence MIT (voir LICENSE).
+Source : https://github.com/Nodlik/StPageFlip — copié depuis le paquet npm (dist/js/page-flip.browser.js, src/Style/stPageFlip.css).
+Gardé dans le dépôt pour que le grimoire s'ouvre sans dépendre d'un CDN (et dans les bancs de test).
