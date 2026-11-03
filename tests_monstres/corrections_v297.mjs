@@ -74,7 +74,7 @@ await section(async () => {
   await p.waitForTimeout(1300);
   const r = await p.evaluate(() => {
     const ecran = document.getElementById("ecran-grimoire"), scene = document.getElementById("grimoire-scene");
-    const fond = getComputedStyle(ecran).backgroundImage, couv = document.querySelector(".page-couverture img");
+    const fond = getComputedStyle(ecran).backgroundImage + getComputedStyle(ecran, "::before").backgroundImage /* v299 : le fond sur ::before */, couv = document.querySelector(".page-couverture img");
     const rc = couv.getBoundingClientRect();
     return { menu: getComputedStyle(document.getElementById("ecran-menu")).display, ferme: scene.classList.contains("ferme"),
              fondBeige: /radial-gradient/.test(fond) && /241, 230, 207|rgb\(241/.test(fond), couverture: couv.complete && couv.naturalWidth === 1344 && /couverture\.webp/.test(couv.src),
@@ -93,7 +93,7 @@ titre("2. UN TOUCHER : LA COUVERTURE TOURNE, LE LIVRE S'OUVRE ET GROSSIT");
 // =========================================================================
 await section(async () => {
   await p.mouse.click(597, 417);
-  await p.waitForTimeout(400);
+  await p.waitForTimeout(150);                 // v299 : la page tourne en 0,5 s
   const pendant = await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.getState());
   await p.waitForTimeout(1400);
   const r = await p.evaluate(() => {
@@ -173,8 +173,9 @@ await section(async () => {
   await p.fill("#grimoire-mdp-partie", "sel");
   await cliquer("#grimoire-valider-partie");
   await p.waitForTimeout(1200);
-  r = await p.evaluate(() => ({ appels: window.__appels.slice(-1), ecran: getComputedStyle(document.getElementById("ecran-grimoire")).display }));
-  verifier("le bon : on entre dans la partie (l'ancienne interface), le grimoire s'efface", JSON.stringify(r.appels) === '[["entrer","P2"]]' && r.ecran === "none", JSON.stringify(r));
+  r = await p.evaluate(() => ({ appels: window.__appels.slice(-1), ecran: getComputedStyle(document.getElementById("ecran-grimoire")).display, enPartie: window.grimoireEtat().enPartie }));
+  // v299 : le grimoire ne s'efface plus, il se pose sur la carte, ouvert à l'index (corrections_v299).
+  verifier("le bon : on entre dans la partie (v299 : le livre reste, par-dessus la carte)", JSON.stringify(r.appels) === '[["entrer","P2"]]' && r.ecran === "block" && r.enPartie === true, JSON.stringify(r));
 });
 
 // =========================================================================
@@ -215,8 +216,8 @@ await section(async () => {
   await p.fill("#grimoire-mdp-groupe", "nuit");
   await cliquer("#grimoire-creer-groupe");
   await p.waitForTimeout(1200);
-  r = await p.evaluate(() => ({ appels: window.__appels.slice(), ecran: getComputedStyle(document.getElementById("ecran-grimoire")).display }));
-  verifier("le groupe est fondé, et l'on entre dans la nouvelle partie", JSON.stringify(r.appels.slice(-2)) === '[["creer","Les Veilleurs","nuit"],["entrer","P_NEUVE"]]' && r.ecran === "none", JSON.stringify(r.appels));
+  r = await p.evaluate(() => ({ appels: window.__appels.slice(), enPartie: window.grimoireEtat().enPartie }));
+  verifier("le groupe est fondé, et l'on entre dans la nouvelle partie", JSON.stringify(r.appels.slice(-2)) === '[["creer","Les Veilleurs","nuit"],["entrer","P_NEUVE"]]' && r.enPartie === true, JSON.stringify(r.appels));
 });
 
 // =========================================================================

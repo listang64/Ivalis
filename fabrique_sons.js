@@ -224,10 +224,60 @@
     function audio() {
         const Ctx = window.AudioContext || window.webkitAudioContext;
         if (!Ctx) return null;
-        if (!contexte) { try { contexte = new Ctx(); } catch (e) { return null; } }
+        if (!contexte) { try { contexte = new Ctx(); } catch (e) { return null; } decoderEchantillons(); }
         if (contexte.state === "suspended") contexte.resume().catch(() => {});
         return contexte;
     }
+
+    // --- LES ÉCHANTILLONS (v299) ---------------------------------------------
+    //  Quelques sons enregistrés, joués par la Fabrique comme ses fabrications
+    //  (même volume, même contexte). Le fichier se télécharge dès la page
+    //  prête, il se décode quand le son s'ouvre (au premier geste) ; tant qu'il
+    //  n'est pas prêt (ou s'il ne vient pas), la fabrication de secours joue.
+    //  Nico : « pour le bruit de posage, tu peux récupérer mon vieux son de
+    //  bruit de parchemin ? » — la page du grimoire qui se pose.
+    const SOURCES_ECHANTILLONS = {
+        "page-tourne": "https://res.cloudinary.com/dlkjq4kvg/video/upload/v1781420565/clik_bouton_aniy88.mp3"
+    };
+    const ECHANTILLONS = {};          // id → AudioBuffer décodé
+    const BRUTS = {};                 // id → ArrayBuffer téléchargé, en attente du contexte
+    function decoderEchantillons() {
+        if (!contexte) return;
+        Object.keys(BRUTS).forEach(id => {
+            const brut = BRUTS[id];
+            delete BRUTS[id];
+            const fini = (b) => { if (b) ECHANTILLONS[id] = b; };
+            const rate = (e) => console.warn("La Fabrique : l'échantillon « " + id + " » ne se décode pas", e);
+            try {
+                const p = contexte.decodeAudioData(brut, fini, rate);    // la forme à rappels : le vieux Safari
+                if (p && typeof p.catch === "function") p.catch(() => {});
+            } catch (e) { rate(e); }
+        });
+    }
+    function telechargerEchantillons() {
+        if (typeof fetch !== "function") return;
+        Object.entries(SOURCES_ECHANTILLONS).forEach(([id, url]) => {
+            fetch(url).then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.arrayBuffer(); })
+                .then(brut => { BRUTS[id] = brut; decoderEchantillons(); })
+                .catch(e => console.warn("La Fabrique : l'échantillon « " + id + " » n'arrive pas", e));
+        });
+    }
+    if (document.readyState === "complete") setTimeout(telechargerEchantillons, 0);
+    else window.addEventListener("load", telechargerEchantillons);
+    // Joue l'échantillon s'il est prêt ; sinon, rend la main à la fabrication.
+    function jouerEchantillon(ctx, sortie, id, gain) {
+        const b = ECHANTILLONS[id];
+        if (!b) return false;
+        const src = ctx.createBufferSource();
+        src.buffer = b;
+        const g = ctx.createGain();
+        g.gain.value = gain === undefined ? 1 : gain;
+        src.connect(g).connect(sortie);
+        src.start(ctx.currentTime);
+        return true;
+    }
+    window.ECHANTILLONS_FABRIQUE = ECHANTILLONS;
+    window.echantillonPret = (id) => !!ECHANTILLONS[id];
     function volume() {
         const r = window.PARAMETRES_AUDIO || { interface: 1, general: 1 };
         const v = (Number(r.interface) || 0) * (Number(r.general) || 0);
@@ -367,35 +417,15 @@
             src.connect(f).connect(aigu).connect(g).connect(s);
             src.start(t);
         },
-        // La page qui tourne : un souffle de papier qui monte avec la page,
-        // traversé de froissements, puis la page qui retombe à plat (un « flap »
-        // sourd). Sa durée suit l'animation du livre (0,7 s).
+        // La page qui se pose (v299) : elle joue quand la page a fini de
+        // tourner, et c'est le vieux bruit de parchemin de Nico
+        // (clik_bouton_aniy88.mp3, l'échantillon). En attendant qu'il arrive :
+        // un bref froissement, puis la page qui retombe à plat (un « flap »).
         "page-tourne"(ctx, s) {
-            const t = ctx.currentTime, duree = 0.72;
-            const n = Math.floor(ctx.sampleRate * duree);
-            const tampon = ctx.createBuffer(1, n, ctx.sampleRate), d = tampon.getChannelData(0);
-            let craque = 0;
-            for (let i = 0; i < n; i++) {
-                const x = i / n;
-                if (Math.random() < 0.0012 * (0.3 + x)) craque = 0.5 + 0.5 * Math.random();
-                craque *= 0.997;
-                const env = x < 0.78 ? Math.pow(x / 0.78, 1.3) : Math.pow(1 - (x - 0.78) / 0.22, 2.2);
-                d[i] = (Math.random() * 2 - 1) * env * (0.55 + craque * 0.9);
-            }
-            const src = ctx.createBufferSource();
-            src.buffer = tampon;
-            const f = ctx.createBiquadFilter();
-            f.type = "bandpass"; f.Q.value = 0.7;
-            f.frequency.setValueAtTime(900, t);
-            f.frequency.exponentialRampToValueAtTime(2600, t + duree * 0.7);
-            f.frequency.exponentialRampToValueAtTime(1300, t + duree);
-            const g = ctx.createGain();
-            g.gain.value = 0.42;
-            src.connect(f).connect(g).connect(s);
-            src.start(t);
-            // la page retombe : un coup d'air grave, bref
-            bruit(ctx, s, { debut: duree * 0.8, duree: 0.13, filtre: "lowpass", freq: 520, q: 0.9, gain: 0.55, forme: "chute" });
-            bruit(ctx, s, { debut: duree * 0.8, duree: 0.07, filtre: "bandpass", freq: 1800, q: 1.2, gain: 0.12, forme: "chute" });
+            if (jouerEchantillon(ctx, s, "page-tourne", 1)) return;
+            bruit(ctx, s, { duree: 0.16, filtre: "bandpass", q: 0.8, balayage: [2600, 1200], gain: 0.22, forme: "cloche" });
+            bruit(ctx, s, { debut: 0.1, duree: 0.13, filtre: "lowpass", freq: 520, q: 0.9, gain: 0.55, forme: "chute" });
+            bruit(ctx, s, { debut: 0.1, duree: 0.07, filtre: "bandpass", freq: 1800, q: 1.2, gain: 0.12, forme: "chute" });
         },
         // LE VENT DES NUAGES (v286) : pendant la traversée entre la carte du
         // monde et une carte régionale. Un souffle grave qui enfle à l'entrée,

@@ -12,11 +12,11 @@
   <!-- Un blason gravé dans la page : sans lui, le navigateur réclame un
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
-  <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=122">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
-  <link rel="stylesheet" href="grimoire.css?v=2">
+  <link rel="stylesheet" href="grimoire.css?v=3">
 
  
   <!-- ===================================================================== -->
@@ -2436,7 +2436,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=203"></script>
+<script src="trace_combat.js?v=204"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2445,7 +2445,7 @@
 <script src="cles_gemini.js?v=1"></script>
 <!-- LE GRIMOIRE (v297) : StPageFlip 2.0.7 (MIT, dans vendor/), puis le livre -->
 <script src="vendor/page-flip/page-flip.browser.js?v=2.0.7"></script>
-<script src="grimoire.js?v=2"></script>
+<script src="grimoire.js?v=3"></script>
 <!-- LES DÉPENSES DU MJ (v293) : tokens et coût en euros de chaque réponse -->
 <script src="depenses_ia.js?v=2"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
@@ -2500,7 +2500,7 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=53"></script>
 <script type="module" src="ia_master.js?v=17"></script>
-<script type="module" src="app.js?v=134"></script>
+<script type="module" src="app.js?v=135"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=4"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
@@ -2528,7 +2528,7 @@
 <script src="poi_catalogue.js?v=1"></script>
 <script type="module" src="poi_creation.js?v=2"></script>
 <script src="jet_d20.js?v=2"></script>
-<script src="fabrique_sons.js?v=18"></script>
+<script src="fabrique_sons.js?v=19"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->
 <script src="animations_combat.js?v=11"></script>
 <script src="animations_catalogue.js?v=23"></script>

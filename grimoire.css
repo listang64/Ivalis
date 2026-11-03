@@ -7,16 +7,33 @@
    ========================================================================= */
 #ecran-grimoire {
   position: fixed; inset: 0; z-index: 80; display: none; overflow: hidden;
-  background: radial-gradient(ellipse at 50% 40%, #f1e6cf 0%, #e6d5b3 60%, #d6c19a 100%);
   opacity: 0; transition: opacity 1s ease;
   -webkit-user-select: none; user-select: none;
+}
+/* Le fond beige : en partie, il s'efface sur la carte du jeu (v299). */
+#ecran-grimoire::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 40%, #f1e6cf 0%, #e6d5b3 60%, #d6c19a 100%);
+  transition: opacity 1.1s ease;
 }
 #ecran-grimoire.visible { opacity: 1; }
 #ecran-grimoire.disparait { opacity: 0; transition: opacity 0.9s ease; }
 
+/* EN PARTIE (v299) : le livre est dans l'écran de jeu, au-dessus de la carte,
+   sous les fenêtres et les menus. Seuls le livre et son marque-page prennent
+   le doigt ; rangé, il ne reste que le marque-page. */
+#ecran-grimoire.en-partie { z-index: 30; pointer-events: none; }
+#ecran-grimoire.en-partie::before { opacity: 0; }
+#ecran-grimoire.en-partie .grimoire-scene { pointer-events: auto; }
+#ecran-grimoire.en-partie .grimoire-invite { display: none; }
+#ecran-grimoire.range .grimoire-scene { transform: var(--transform-range, none); pointer-events: none; }
+#ecran-grimoire.range .marque-page { pointer-events: auto; }
+/* Le livre levé cache les boutons posés sur la carte (le voyage, le retour au monde). */
+#ecran-jeu.livre-leve .btn-voyage, #ecran-jeu.livre-leve .btn-retour-monde { visibility: hidden; }
+
 .grimoire-scene {
   position: absolute; transform-origin: 0 0;
-  transition: transform 0.85s cubic-bezier(0.45, 0.05, 0.25, 1);
+  transition: transform 0.75s cubic-bezier(0.45, 0.05, 0.25, 1);
 }
 .grimoire-scene.ferme { transform: var(--transform-ferme, none); }
 .grimoire-scene.ouvert { transform: none; }
@@ -32,7 +49,12 @@
 .grimoire-scene.ouvert .grimoire-fond-livre { opacity: 1; }
 .grimoire-scene.ferme .grimoire-fond-livre { transition-delay: 0s; }
 
-.grimoire-livre { position: absolute; }
+/* Le doigt tourne les pages (v299, grimoire.js brancherPrise) : sur le livre,
+   le navigateur ne fait ni défiler ni zoomer ; les listes défilent encore. */
+/* (StPageFlip glisse sa propre feuille après celle-ci : .stf__parent y veut
+   position: relative et touch-action: pan-y — l'identifiant de l'écran passe devant.) */
+#ecran-grimoire .grimoire-livre { position: absolute; touch-action: none; }
+.liste-parties-grimoire { touch-action: pan-y; }
 /* La taille du livre, c'est grimoire.js qui la pose (autoSize coupé) : son
    enveloppe et son bloc remplissent la zone des deux pages. */
 .grimoire-livre .stf__wrapper { position: relative; width: 100%; height: 100%; }
@@ -170,3 +192,70 @@
 .case-grimoire { display: flex; align-items: center; gap: calc(var(--u) * 1.5); font-size: calc(var(--u) * 3.8); cursor: pointer; margin: calc(var(--u) * 2) 0; }
 .case-grimoire input { width: calc(var(--u) * 3.6); height: calc(var(--u) * 3.6); accent-color: #4a2e1b; }
 .page-chapitre .bouton-grimoire { font-size: calc(var(--u) * 4.4); min-width: calc(var(--u) * 46); padding: calc(var(--u) * 2.2) calc(var(--u) * 5); }
+
+/* LE MARQUE-PAGE (v299). Nico : « au-dessus du livre côté gauche, et sous les
+   pages, un petit marque-page texture parchemin, un dessin à la plume noire
+   d'une feuille avec des lignes manuscrites, penché légèrement ; il tourne les
+   pages jusqu'à l'index (désactivé tant que pas rentré dans une partie) ».
+   Glissé sous les pages (entre le livre et elles), il dépasse en haut. Ses
+   mesures sont celles de l'image du livre (--s, grimoire.js). */
+.marque-page {
+  position: absolute; left: calc(360px * var(--s, 1)); top: calc(-36px * var(--s, 1));
+  width: calc(92px * var(--s, 1)); height: calc(250px * var(--s, 1));
+  padding: 0; border: 0; background: transparent; cursor: pointer;
+  transform-origin: 50% 85%; transform: rotate(-6deg);
+  filter: drop-shadow(calc(var(--u) * 0.25) calc(var(--u) * 0.5) calc(var(--u) * 0.6) rgba(40, 20, 6, 0.55));
+  transition: transform 0.3s ease, filter 0.4s ease, opacity 0.5s ease 0.15s;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.marque-papier {
+  position: absolute; inset: 0; display: block;
+  background: url('images/grimoire/page.webp?v=1') 30% 20% / 420% auto, #e2cfa4;
+  box-shadow: inset 0 0 calc(var(--u) * 1.2) rgba(92, 54, 18, 0.55), inset calc(var(--u) * -0.4) 0 calc(var(--u) * 0.6) rgba(92, 54, 18, 0.3);
+  /* le bout taillé en queue d'aronde */
+  clip-path: polygon(0 0, 50% 9%, 100% 0, 100% 100%, 0 100%);
+}
+.dessin-marque { position: absolute; left: 6%; top: 11%; width: 88%; height: auto; overflow: visible; }
+.dessin-marque path { fill: none; stroke: #120b06; stroke-linecap: round; stroke-linejoin: round; }
+.dessin-marque .feuille { stroke-width: 2.1; fill: rgba(255, 246, 222, 0.35); }
+.dessin-marque .coin { stroke-width: 1.6; }
+.dessin-marque .ligne { stroke-width: 1.25; opacity: 0.85; }
+.marque-page:not(.inactif):hover, .marque-page:not(.inactif):focus-visible { transform: rotate(-4deg) translateY(-6%); outline: none; }
+.marque-page:not(.inactif):active { transform: rotate(-5deg) translateY(-3%) scale(0.98); }
+/* Éteint hors partie : pâli, il ne réagit pas. */
+.marque-page.inactif { cursor: default; filter: grayscale(0.75) brightness(0.92) drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.4) rgba(40, 20, 6, 0.35)); }
+.marque-page.inactif .marque-papier { opacity: 0.7; }
+/* Livre fermé : on ne voit que la couverture. */
+.grimoire-scene.ferme .marque-page { opacity: 0; pointer-events: none; transition-delay: 0s; }
+
+/* L'INDEX (v299) : les chapitres, écrits gros à la main, penchés, surlignés. */
+.page-index { justify-content: flex-start; padding-top: calc(var(--u) * 12); }
+.page-index.droite { justify-content: flex-start; }
+.entete-index { font-family: 'Cinzel', serif; font-weight: 700; font-size: calc(var(--u) * 6); letter-spacing: 0.3em; color: #3a2210; margin-left: 0.3em; }
+.fleuron-index { width: calc(var(--u) * 36); margin: calc(var(--u) * 1) 0 calc(var(--u) * 2); }
+.entrees-index { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; width: 100%; }
+.page-index.droite .entrees-index { padding-top: calc(var(--u) * 8); }
+.entree-index {
+  position: relative; border: 0; background: transparent; cursor: pointer; padding: calc(var(--u) * 1) calc(var(--u) * 2);
+  max-width: 100%; color: #1a0f07; text-align: center;
+  font-family: 'Almendra', serif; font-weight: 700; font-style: italic; font-size: calc(var(--u) * 7.6); line-height: 1.25;
+  transform: translateX(calc(var(--u) * var(--decale, 0))) rotate(var(--penche, 0deg));
+  transition: transform 0.25s ease, color 0.25s ease;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  text-shadow: 0 0 0.02em rgba(18, 11, 6, 0.6);
+}
+.entree-index-texte {
+  padding: 0 0.18em; background-repeat: no-repeat; background-size: 100% 72%; background-position: 0 88%;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
+.entree-index:hover, .entree-index:focus-visible {
+  transform: translateX(calc(var(--u) * var(--decale, 0))) rotate(calc(var(--penche, 0deg) * 0.4)) scale(1.05); color: #000; outline: none;
+}
+.entree-index:active { transform: translateX(calc(var(--u) * var(--decale, 0))) rotate(var(--penche, 0deg)) scale(0.97); }
+.note-index {
+  margin: 0 0 calc(var(--u) * 4); min-height: calc(var(--u) * 5); font-style: italic; font-size: calc(var(--u) * 3.8); color: #5c3a21;
+  opacity: 0; transition: opacity 0.4s ease;
+}
+.note-index.visible { opacity: 1; }
+/* Dans le livre, le menu du bas garde sa place (en bas à droite). */
+#ecran-grimoire > #menu-navigation-bas { position: absolute; }

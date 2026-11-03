@@ -4903,6 +4903,10 @@ function fermerModalesJeu() {
 }
 
 function demanderRetourMenu() {
+  // Hors partie, la maison ramène le grimoire à son journal (v299, Nico : « le
+  // bouton pour revenir au menu principal fera revenir à la page principale
+  // du livre »). En partie, on demande d'abord s'il faut quitter la partie.
+  if (!window.ID_PARTIE_COURANTE && typeof window.grimoireAllerAuJournal === "function" && window.grimoireAllerAuJournal()) return;
   if (typeof window.fermerToutesLesFenetres === "function") {
     window.fermerToutesLesFenetres();
   }

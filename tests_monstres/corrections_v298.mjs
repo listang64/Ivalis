@@ -99,8 +99,9 @@ await section(async () => {
     return { temps: window.GRIMOIRE_PAGEFLIP.getSettings().flippingTime, bas: innerHeight - f.bottom, haut: f.top, largeur: f.width, vw: innerWidth, vh: innerHeight,
              zoom: getComputedStyle(document.getElementById("grimoire-scene")).transitionDuration };
   });
-  verifier("une page tourne en 0,7 s (au lieu de 1,1 s)", r.temps === 700 && duree < 1100, `${r.temps} ms réglés, ouverture faite en ${duree} ms`);
-  verifier("le zoom d'ouverture suit (0,85 s)", /0\.85s/.test(r.zoom), r.zoom);
+  // v299 : « accélère encore » — 0,5 s et un zoom de 0,75 s (corrections_v299) ; ici, au plus ceux de v298.
+  verifier("une page tourne en 0,7 s au plus (au lieu de 1,1 s)", r.temps <= 700 && duree < 1100, `${r.temps} ms réglés, ouverture faite en ${duree} ms`);
+  verifier("le zoom d'ouverture suit (0,85 s au plus)", parseFloat(r.zoom) <= 0.85, r.zoom);
   // Même taille qu'en v297 : le livre entier tient (2 % de marge sur les côtés, 2,5 % en haut et 1,2 % en bas au plus).
   const s = Math.min(r.vw * 0.96 / 2000, r.vh * (1 - 0.025 - 0.012) / 1117);
   verifier("pas agrandi : tout le livre tient à l'écran, à sa taille d'avant", Math.abs(r.largeur - 2000 * s) < 2 && r.largeur <= r.vw, `${r.largeur.toFixed(0)} px pour ${(2000 * s).toFixed(0)}`);
@@ -172,7 +173,9 @@ await section(async () => {
     return { prise: await mesure("page-prise"), tourne: await mesure("page-tourne") };
   });
   verifier("« page-prise » : un froissement bref (moins de 0,25 s)", rendu.prise.rms > 0.004 && rendu.prise.fin < 0.25, JSON.stringify(rendu.prise));
-  verifier("« page-tourne » : un souffle de papier qui dure le temps de la page (≈ 0,7 s), puis le flap", rendu.tourne.rms > 0.01 && rendu.tourne.fin > 0.6 && rendu.tourne.fin < 1, JSON.stringify(rendu.tourne));
+  // v299 : « page-tourne » joue quand la page s'est posée — le vieux parchemin de Nico, ou, en
+  // attendant qu'il arrive, un froissement bref et le « flap » (corrections_v299).
+  verifier("« page-tourne » : le bruit de la page qui se pose, bref", rendu.tourne.rms > 0.01 && rendu.tourne.fin < 0.5, JSON.stringify(rendu.tourne));
 });
 
 // =========================================================================

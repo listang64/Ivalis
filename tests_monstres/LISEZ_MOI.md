@@ -9709,3 +9709,70 @@ corrections_v298.mjs (dans la suite), sur la vraie page (banc), vérifie :
 
 Il échoue sur l'ancien code (14 échecs). Test mis à jour : corrections_v297
 (posé en bas au lieu d'une marge en haut).
+
+## v299 — Le grimoire, partie 2 : la page prise par le bord, le vieux parchemin, les boutons du bas, l'index, le marque-page, le livre sur la carte
+
+Nico : « je ne peux saisir la page que par les coins » ; « accélère encore » ;
+« pour le bruit de posage, récupère mon vieux son de parchemin » ; « les
+boutons du bas dès que l'on voit le livre » ; « la maison fera revenir à la
+page principale du livre » ; « l'index : Carte du monde, Le récit, Les fiches
+personnages, Les combats, Le village, Les paramètres, écrits gros, pas bien
+droits, à la main, en gras, surlignés » ; « garde la map en dessous du livre,
+une fois la partie chargée le livre se met par-dessus ; les boutons menu
+restent en doublon à droite » ; « un petit marque-page parchemin, au-dessus du
+livre à gauche, sous les pages, une feuille à lignes manuscrites dessinée à la
+plume, penché ; il tourne jusqu'à l'index (éteint hors partie) ».
+
+- La prise (grimoire.js, brancherPrise) : le grimoire suit lui-même la souris
+  et le doigt (useMouseEvents coupé). Posé n'importe où dans la moitié
+  extérieure d'une page puis glissé de 8 px, le geste est rejoué à StPageFlip
+  (startUserTouch / userMove / userStop) comme s'il tenait le coin de ce
+  côté. Un simple toucher ne tourne rien ; boutons, champs et listes gardent
+  le doigt. touch-action: none sur le livre (les listes : pan-y). La feuille
+  que StPageFlip injecte (.stf__parent, pan-y) est battue par l'identifiant.
+- 0,5 s par page (0,7 s), zoom d'ouverture 0,75 s.
+- Le parchemin (fabrique_sons.js) : clik_bouton_aniy88.mp3 se télécharge à la
+  page prête et se décode à l'ouverture du son ; « page-tourne » le joue quand
+  la page s'est posée (l'événement flip). Tant qu'il n'est pas là : un
+  froissement bref et le « flap ». La prise reste un son fabriqué.
+- Les boutons du bas (#menu-navigation-bas) : hors partie dans le grimoire,
+  en partie dans l'écran de jeu. La maison, hors partie, tourne le livre
+  jusqu'au journal (ou l'ouvre dessus) ; en partie, elle demande comme avant
+  s'il faut quitter, puis rouvre le livre au journal.
+- La partie chargée : le grimoire entre dans #ecran-jeu (z 30 : sur la carte,
+  sous les fenêtres et les menus), le fond beige s'efface, la double page
+  devient l'index. Les boutons du voyage se cachent sous le livre levé.
+  « Nouvelle / Charger partie » du journal, en partie, posent d'abord la
+  question de la maison.
+- L'index : trois chapitres par page, Almendra gras italique, chacun penché et
+  décalé à sa façon, surligné ligne par ligne (un trait SVG en fond,
+  box-decoration-break: clone). Carte du monde : le livre se range (il descend,
+  il n'en reste que le marque-page et un liseré). Récit, fiches, combats,
+  paramètres : il se range et ouvre l'ancienne fenêtre. Le village : une note,
+  « ce chapitre s'écrira bientôt ».
+- Le marque-page : entre le livre et les pages, il dépasse au-dessus, à
+  gauche, penché de 6°, texture des pages, bout en queue d'aronde, dessin SVG à
+  la plume. Éteint (pâli, sans effet) hors partie, invisible livre fermé. Le
+  livre rapetisse un peu sur un écran très large pour qu'il reste visible.
+
+corrections_v299.mjs (dans la suite), sur la vraie page (banc), vérifie :
+- le parchemin demandé à son adresse, décodé, joué par « page-tourne » (un la
+  à 440 Hz servi à sa place), la fabrication de secours ;
+- 0,5 s, zoom 0,75 s, le parchemin à la fin de la tourne ;
+- la prise au milieu du bord droit, au tiers du bord gauche, au doigt ; rien
+  près du dos ni sur un simple toucher ; touch-action ;
+- les boutons du bas dans le grimoire, le DEV rouge, la maison (chapitre →
+  journal, fermé → ouvert), le volume, la porte ;
+- le marque-page : position, penche, texture, dessin, sous les pages, éteint,
+  caché livre fermé ;
+- la partie : livre dans l'écran de jeu, fond effacé, index, menu de droite
+  au-dessus, boutons du bas, marque-page allumé, voyage caché ;
+- l'index (textes, taille, police, penches, surligneur, titre), chaque
+  chapitre, le livre rangé et le marque-page qui le ramène (depuis rangé, le
+  journal, « Compte »), « Nouvelle partie » en partie ;
+- la maison en partie, puis le retour au journal sur fond beige ;
+- six tailles d'écran (marque-page dans l'écran, pages au pixel) ; versions.
+
+Il échoue sur l'ancien code (28 échecs). Tests mis à jour : corrections_v297
+(la partie ne cache plus le livre ; le fond beige sur ::before ; tourne plus
+rapide), corrections_v298 (au plus 0,7 s et 0,85 s ; « page-tourne » bref).

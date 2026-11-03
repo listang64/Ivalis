@@ -41,12 +41,30 @@
     // pas, juste descends-le ». Même taille qu'avant (tout le livre tient à
     // l'écran), mais posé en bas, un filet de marge sous lui.
     const MARGE_HAUT = 0.025, MARGE_BAS = 0.012, MARGE_COTE = 0.02;
-    // v298 : Nico, « fais un peu plus rapide l'animation de tourner la page ».
-    const DUREE_TOURNE = 700;
+    // v298 : Nico, « fais un peu plus rapide l'animation de tourner la page » ;
+    // v299 : « accélère encore ».
+    const DUREE_TOURNE = 500;
+    // v299 : Nico, « je ne peux saisir la page que par les coins ». Une page se
+    // prend n'importe où dans sa moitié extérieure (le bord, le milieu, les
+    // coins) : le doigt y tire le coin du même côté, à sa hauteur.
+    const ZONE_PRISE = 0.5;
+    // LE MARQUE-PAGE (v299), en unités de l'image du livre : glissé sous les
+    // pages de gauche, il dépasse au-dessus du livre (le bord du livre est à
+    // y 44, celui des pages à y 62). Assez de place est gardée en haut pour lui.
+    const MARQUE = { x: 360, y: -36, w: 92, h: 250, penche: -6 };
+    const BORD_LIVRE = 44;
+    // Rangé (en partie), le livre descend : il n'en reste qu'un liseré en bas
+    // de l'écran, et le marque-page qui dépasse.
+    const LISERE_RANGE = 12;
+    // L'INDEX (v299) : les chapitres du jeu, trois par page.
+    const ENTREES_INDEX = [
+        ["carte", "Carte du monde"], ["recit", "Le récit"], ["fiches", "Les fiches personnages"],
+        ["combats", "Les combats"], ["village", "Le village"], ["parametres", "Les paramètres"]
+    ];
 
     let ecran = null, scene = null, livre = null, pageFlip = null, attrape = null;
     let ouvert = false, chapitre = "", initialise = false, departEnCours = false;
-    let partieChoisie = null;
+    let partieChoisie = null, enPartie = false, origine = null;
     const pages = {};
 
     // ---------------------------------------------------------------------
@@ -140,8 +158,60 @@
           </div>`;
     }
 
+    // Le trait de surligneur d'une entrée de l'index : une traînée irrégulière,
+    // posée derrière chaque ligne du texte (box-decoration-break), en SVG.
+    function surligneurFond(graine) {
+        const r = hasard(graine);
+        const v = (a, b) => (a + r() * (b - a)).toFixed(1);
+        const d = `M ${v(0, 3)} ${v(18, 30)} C ${v(25, 35)} ${v(8, 20)} ${v(60, 70)} ${v(14, 26)} ${v(97, 100)} ${v(10, 24)} `
+                + `L ${v(96, 100)} ${v(80, 92)} C ${v(65, 75)} ${v(88, 98)} ${v(30, 40)} ${v(82, 94)} ${v(1, 4)} ${v(86, 96)} Z`;
+        const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'><path d='${d}' fill='rgba(236,190,60,0.72)'/></svg>`;
+        // (les apostrophes encodées aussi : l'attribut style est entre apostrophes)
+        return `url("data:image/svg+xml,${encodeURIComponent(svg).replace(/'/g, "%27")}")`;
+    }
+    function entreeIndex(id, texte) {
+        const r = hasard("index-" + id);
+        const penche = ((r() * 2 - 1) * 3.4).toFixed(2), decale = ((r() * 2 - 1) * 7).toFixed(1);
+        return `<button type="button" class="entree-index" id="grimoire-index-${id}" data-action="index" data-entree="${id}"
+                   style="--penche:${penche}deg; --decale:${decale}"><span class="entree-index-texte" style='background-image:${surligneurFond("fond-" + id)}'>${texte}</span></button>`;
+    }
+    function indexHtml() {
+        const entrees = (a, b) => ENTREES_INDEX.slice(a, b).map(([id, t]) => entreeIndex(id, t)).join("");
+        return [
+            `<div class="contenu-page page-index">
+               <div class="entete-index">Index</div>
+               <svg class="fleuron fleuron-index" viewBox="0 0 200 24" aria-hidden="true">
+                 <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/>
+                 <circle cx="100" cy="12" r="2.2"/></svg>
+               <div class="entrees-index">${entrees(0, 3)}</div>
+             </div>`,
+            `<div class="contenu-page page-index droite">
+               <div class="entrees-index">${entrees(3, 6)}</div>
+               <p class="note-index" id="grimoire-note-index" aria-live="polite"></p>
+             </div>`
+        ];
+    }
+    // Le dessin du marque-page, à la plume : une feuille au coin corné,
+    // couverte de lignes manuscrites — l'index du livre.
+    function dessinMarque() {
+        const r = hasard("marque-page");
+        const j = (a) => ((r() - 0.5) * 2 * a).toFixed(2);
+        let lignes = "";
+        for (let i = 0; i < 6; i++) {
+            const y = 25 + i * 8.2, fin = 41 - (i === 5 ? 12 : r() * 7);
+            let d = `M ${16 + +j(0.6)} ${y + +j(0.5)}`;
+            for (let x = 16; x < fin; x += 4) d += ` q 1 ${j(1.4)} 2 ${j(0.5)} t 2 ${j(0.6)}`;
+            lignes += `<path class="ligne" d="${d}"/>`;
+        }
+        return `<svg class="dessin-marque" viewBox="0 0 60 80" aria-hidden="true">
+                  <path class="feuille" d="M 11 8.5 C 20 7.6 31 8.4 40.5 7.8 L 49.5 17 C 49 34 50.2 53 49.3 72.4 C 37 73.2 23 71.8 10.6 72.8 C 11.6 51 10.2 29 11 8.5 Z"/>
+                  <path class="coin" d="M 40.5 7.8 C 41.2 11 40.6 14 41 17.3 C 44 16.8 46.6 17.4 49.5 17"/>
+                  ${lignes}</svg>`;
+    }
+
     // La double page d'un chapitre : [gauche, droite].
     function chapitreHtml(nom) {
+        if (nom === "index") return indexHtml();
         const revenir = `<button type="button" class="lien-grimoire revenir" data-action="revenir">← Revenir au journal</button>`;
         if (nom === "nouvelle") return [
             `<div class="contenu-page page-chapitre">
@@ -219,13 +289,18 @@
     // ---------------------------------------------------------------------
     function mesurer() {
         const vw = window.innerWidth, vh = window.innerHeight;
-        const s = Math.min(vw * (1 - 2 * MARGE_COTE) / LIVRE.w, vh * (1 - MARGE_HAUT - MARGE_BAS) / LIVRE.h);
+        let s = Math.min(vw * (1 - 2 * MARGE_COTE) / LIVRE.w, vh * (1 - MARGE_HAUT - MARGE_BAS) / LIVRE.h);
+        // Le marque-page dépasse au-dessus du livre : sur un écran très large,
+        // le livre perd juste ce qu'il faut pour qu'il reste visible.
+        const place = vh * (1 - MARGE_BAS) - 4;
+        if (place - LIVRE.h * s < -MARQUE.y * s) s = place / (LIVRE.h - MARQUE.y);
         const gauche = (vw - LIVRE.w * s) / 2, haut = vh * (1 - MARGE_BAS) - LIVRE.h * s;
         // La couverture fermée : à droite du dos, sa hauteur celle d'une page.
         const largeurCouv = PAGE.h * COUVERTURE.w / COUVERTURE.h;
         const cx = (ZONE.x + PAGE.w + largeurCouv / 2) * s, cy = (ZONE.y + PAGE.h / 2) * s;
         const tx = vw / 2 - gauche - ZOOM_FERME * cx, ty = vh / 2 - haut - ZOOM_FERME * cy;
-        return { s, gauche, haut, tx, ty, vw, vh };
+        const descente = Math.max(0, vh - LISERE_RANGE - (haut + BORD_LIVRE * s));
+        return { s, gauche, haut, tx, ty, vw, vh, descente };
     }
     function poser() {
         if (!scene) return;
@@ -236,6 +311,8 @@
         scene.style.height = LIVRE.h * m.s + "px";
         scene.style.setProperty("--u", (PAGE.w * m.s / 100) + "px");   // 1 % de la largeur d'une page
         scene.style.setProperty("--transform-ferme", `translate(${m.tx}px, ${m.ty}px) scale(${ZOOM_FERME})`);
+        scene.style.setProperty("--transform-range", `translateY(${m.descente}px)`);
+        scene.style.setProperty("--s", String(m.s));
         livre.style.left = ZONE.x * m.s + "px";
         livre.style.top = ZONE.y * m.s + "px";
         livre.style.width = ZONE.w * m.s + "px";
@@ -250,9 +327,13 @@
         if (initialise) return true;
         ecran = document.getElementById("ecran-grimoire");
         if (!ecran) return false;
+        origine = { parent: ecran.parentNode, suivant: ecran.nextSibling };
         ecran.innerHTML = `
           <div class="grimoire-scene ferme" id="grimoire-scene">
             <img class="grimoire-fond-livre" src="${IMAGES.livre}" alt="" draggable="false">
+            <button type="button" class="marque-page inactif" id="grimoire-marque-page" data-action="marque-page"
+                    aria-label="Aller à l'index" aria-disabled="true" title="L'index (en partie)">
+              <span class="marque-papier">${dessinMarque()}</span></button>
             <div class="grimoire-livre" id="grimoire-livre">
               <div class="page-grimoire page-couverture" data-density="hard" id="grimoire-page-0">
                 <img src="${IMAGES.couverture}" alt="Les Chroniques d'Ivalis" draggable="false"></div>
@@ -327,32 +408,69 @@
             minWidth: 40, maxWidth: 4000, minHeight: 50, maxHeight: 5000,
             showCover: true, usePortrait: false, autoSize: false,
             drawShadow: true, maxShadowOpacity: 0.45, flippingTime: DUREE_TOURNE,
-            mobileScrollSupport: false, clickEventForward: true, useMouseEvents: true,
+            // La souris et le doigt, c'est le grimoire qui les suit (brancherPrise).
+            mobileScrollSupport: false, clickEventForward: true, useMouseEvents: false,
             disableFlipByClick: true, showPageCorners: false, swipeDistance: 30,
             startPage: pageDepart || 0
         });
         pageFlip.loadFromHTML(livre.querySelectorAll(".page-grimoire"));
         pageFlip.on("flip", (e) => surTourne(Number(e.data)));
-        // LES BRUITS DE PAGES (v298, fabrique_sons.js) : le doigt qui saisit le
-        // coin d'une page, puis la page qui tourne (à la main ou toute seule)
-        // et retombe.
-        // Tournée à la main, la page reste « user_fold » jusqu'au bout : le bruit
-        // part quand le doigt se lève au-delà du dos du livre (c'est là que
-        // StPageFlip la finit) ; relâchée avant, elle retombe sans lui.
-        let etatAvant = "read", coteDepart = 0;
-        const cote = (x) => { const r = livre.getBoundingClientRect(); return x < r.left + r.width / 2 ? -1 : 1; };
-        livre.addEventListener("pointerdown", (ev) => { coteDepart = cote(ev.clientX); }, true);
-        window.addEventListener("pointerup", (ev) => {
-            if (etatAvant === "user_fold" && coteDepart && cote(ev.clientX) !== coteDepart) bruitPage("page-tourne");
-            coteDepart = 0;
-        }, true);
+        // LES BRUITS DE PAGES (fabrique_sons.js) : le doigt qui saisit une page
+        // (v298), puis la page qui se pose de l'autre côté — le vieux bruit de
+        // parchemin de Nico (v299 : « pour le bruit de posage, récupère mon vieux
+        // son de parchemin »). Une page relâchée qui retombe ne se pose pas.
+        let etatAvant = "read";
         pageFlip.on("changeState", (e) => {
             const etat = String(e.data);
             if (etat === "user_fold" && etatAvant !== "user_fold" && etatAvant !== "flipping") bruitPage("page-prise");
-            if (etat === "flipping" && etatAvant !== "flipping") bruitPage("page-tourne");
             etatAvant = etat;
         });
+        pageFlip.on("flip", () => bruitPage("page-tourne"));
+        brancherPrise();
         window.GRIMOIRE_PAGEFLIP = pageFlip;
+    }
+
+    // LA PRISE DES PAGES (v299). Un doigt (ou la souris) posé dans la moitié
+    // extérieure d'une page, puis qui glisse : StPageFlip reçoit le geste comme
+    // si le doigt tenait le coin de ce côté-là (même mouvement, décalé à la
+    // hauteur du coin). Un simple toucher ne tourne rien ; les champs, les
+    // boutons et les listes gardent le doigt.
+    function brancherPrise() {
+        let prise = null;
+        const pos = (ev) => { const r = livre.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top, r }; };
+        livre.addEventListener("pointerdown", (ev) => {
+            if (!pageFlip || !ouvert || ecran.classList.contains("range")) return;
+            if (ev.pointerType === "mouse" && ev.button !== 0) return;
+            if (ev.target && ev.target.closest && ev.target.closest("input, label, button, select, textarea, a, [data-action], .liste-parties-grimoire")) return;
+            if (pageFlip.getState() !== "read") return;
+            const p = pos(ev), pw = p.r.width / 2, h = p.r.height;
+            const aGauche = p.x < pw, xp = aGauche ? p.x : p.x - pw;
+            if (aGauche ? xp > pw * ZONE_PRISE : xp < pw * (1 - ZONE_PRISE)) return;
+            const coinY = p.y >= h / 2 ? h - 1 : 1;
+            prise = { id: ev.pointerId, x0: p.x, y0: p.y, dy: coinY - p.y, partie: false };
+            try { livre.setPointerCapture(ev.pointerId); } catch (e) {}
+        });
+        livre.addEventListener("pointermove", (ev) => {
+            if (!prise || ev.pointerId !== prise.id) return;
+            const p = pos(ev);
+            if (!prise.partie) {
+                if (Math.hypot(p.x - prise.x0, p.y - prise.y0) < 8) return;
+                prise.partie = true;
+                pageFlip.startUserTouch({ x: prise.x0, y: prise.y0 + prise.dy });
+            }
+            pageFlip.userMove({ x: p.x, y: p.y + prise.dy }, false);
+            if (ev.cancelable) ev.preventDefault();
+        });
+        const lacher = (ev) => {
+            if (!prise || ev.pointerId !== prise.id) return;
+            const a = prise;
+            prise = null;
+            if (!a.partie) return;
+            const p = pos(ev);
+            pageFlip.userStop({ x: p.x, y: p.y + a.dy });
+        };
+        livre.addEventListener("pointerup", lacher);
+        livre.addEventListener("pointercancel", lacher);
     }
 
     // ---------------------------------------------------------------------
@@ -504,26 +622,143 @@
         if (r && r.ok) ["grimoire-mdp-actuel", "grimoire-mdp-nouveau", "grimoire-mdp-confirmer"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
     }
 
-    // Une partie fondée ou réveillée : l'ancienne interface prend le relais,
-    // et le grimoire s'efface par-dessus.
+    // Une partie fondée ou réveillée (v299) : la carte du jeu s'installe sous
+    // le livre, le fond beige s'efface, et la double page devient l'index.
+    // Nico : « garde la map en dessous du livre, une fois la partie chargée le
+    // livre se met par-dessus ; on laisse pour l'instant les boutons menu en
+    // doublon sur la droite ». Le livre entre donc dans l'écran de jeu, sous
+    // ses fenêtres et ses menus, au-dessus de la carte.
     function entrerDansLaPartie(id) {
         if (departEnCours) return;
         departEnCours = true;
         const entrer = portes().entrerDansPartie;
-        if (typeof entrer === "function") entrer(id);
-        ecran.classList.add("disparait");
-        setTimeout(() => {
-            ecran.style.display = "none";
-            ecran.classList.remove("disparait");
-            departEnCours = false;
-        }, 900);
+        try { if (typeof entrer === "function") entrer(id); } catch (e) { console.error("Grimoire : entrée en partie", e); }
+        passerEnPartie();
+        setTimeout(() => { departEnCours = false; }, 900);
     }
+    function passerEnPartie() {
+        const jeu = document.getElementById("ecran-jeu");
+        enPartie = true;
+        if (jeu && ecran.parentNode !== jeu) {
+            jeu.appendChild(ecran);
+            void ecran.offsetWidth;              // déplacé : le fondu part de l'écran beige
+        }
+        ecran.style.display = "block";
+        ecran.classList.add("visible", "en-partie");
+        ecran.classList.remove("range", "disparait");
+        remplirChapitre("index");
+        majMarquePage();
+        placerNavigation();
+        poser();
+        if (!pageFlip) return;
+        if (!ouvert) etatOuvert(true);
+        const ici = pageFlip.getCurrentPageIndex();
+        if (ici < 3) { try { pageFlip.flip(3, "top"); } catch (e) { try { pageFlip.turnToPage(3); } catch (e2) {} } }
+    }
+    // De retour au journal (« Retour au menu ») : le livre ressort de l'écran
+    // de jeu, retrouve son fond beige, et le marque-page s'éteint.
+    function quitterLaPartie() {
+        enPartie = false;
+        if (origine && origine.parent && ecran.parentNode !== origine.parent) {
+            const suivant = origine.suivant && origine.suivant.parentNode === origine.parent ? origine.suivant : null;
+            origine.parent.insertBefore(ecran, suivant);
+        }
+        ecran.classList.remove("en-partie", "range");
+        majMarquePage();
+        placerNavigation();
+    }
+    // Le marque-page n'est actif qu'en partie (Nico : « désactivé tant que pas
+    // rentré dans une partie »).
+    function majMarquePage() {
+        const m = document.getElementById("grimoire-marque-page");
+        if (m) {
+            m.classList.toggle("inactif", !enPartie);
+            m.setAttribute("aria-disabled", enPartie ? "false" : "true");
+        }
+        const jeu = document.getElementById("ecran-jeu");
+        if (jeu) jeu.classList.toggle("livre-leve", enPartie && !ecran.classList.contains("range"));
+    }
+    // LES BOUTONS DU BAS (v299) : le DEV rouge, le volume, la maison, la porte.
+    // Nico : « les trois petits boutons (quatre avec le petit dev rouge) du bas
+    // de l'écran dès que l'on voit le livre ». Hors partie, ils suivent le
+    // grimoire ; en partie, ils retrouvent l'écran de jeu (le livre y est).
+    function placerNavigation() {
+        const nav = document.getElementById("menu-navigation-bas");
+        const jeu = document.getElementById("ecran-jeu");
+        if (!nav) return;
+        const cible = enPartie ? jeu : ecran;
+        if (cible && nav.parentNode !== cible) cible.appendChild(nav);
+    }
+
+    // RANGER LE LIVRE (en partie) : il descend sous le bord de l'écran, il
+    // n'en dépasse que le marque-page. Le marque-page le remonte, à l'index.
+    function rangerLivre() {
+        if (!enPartie) return;
+        if (!ouvert && pageFlip) { etatOuvert(true); try { pageFlip.turnToPage(3); } catch (e) {} }
+        ecran.classList.add("range");
+        majMarquePage();
+    }
+    function allerIndex() {
+        if (!enPartie || !pageFlip) return;
+        ecran.classList.remove("range");
+        majMarquePage();
+        const ici = pageFlip.getCurrentPageIndex();
+        if (chapitre !== "index" || ici < 3) remplirChapitre("index");
+        if (!ouvert) etatOuvert(true);
+        if (ici < 3) { try { pageFlip.flip(3, "top"); } catch (e) { try { pageFlip.turnToPage(3); } catch (e2) {} } }
+    }
+    // Les chapitres de l'index : pour l'instant, ils ouvrent l'ancienne
+    // interface (le livre se range pour lui laisser la place) ; le village
+    // n'existe pas encore.
+    const OUVRIR_INDEX = {
+        carte: null,
+        recit: () => window.ouvrirChatbox && window.ouvrirChatbox(),
+        fiches: () => window.ouvrirMenuPersonnages && window.ouvrirMenuPersonnages(),
+        combats: () => window.ouvrirPopupRencontre && window.ouvrirPopupRencontre(),
+        parametres: () => window.ouvrirParametres && window.ouvrirParametres()
+    };
+    function choisirIndex(id) {
+        if (!enPartie) return;
+        if (id === "village") {
+            const note = document.getElementById("grimoire-note-index");
+            if (note) {
+                note.textContent = "Le village : ce chapitre s'écrira bientôt.";
+                note.classList.add("visible");
+                clearTimeout(choisirIndex.minuteur);
+                choisirIndex.minuteur = setTimeout(() => note.classList.remove("visible"), 2800);
+            }
+            return;
+        }
+        if (!(id in OUVRIR_INDEX)) return;
+        rangerLivre();
+        const ouvrir = OUVRIR_INDEX[id];
+        if (ouvrir) { try { ouvrir(); } catch (e) { console.error("Grimoire : chapitre « " + id + " »", e); } }
+    }
+    // LA MAISON hors partie (v299) : Nico, « le bouton pour revenir au menu
+    // principal fera revenir à la page principale du livre ». Le livre tourne
+    // jusqu'au journal (ou s'ouvre dessus). En partie, c'est app.js qui
+    // demande d'abord s'il faut quitter la partie.
+    window.grimoireAllerAuJournal = function () {
+        if (!initialise || enPartie || ecran.style.display === "none" || !pageFlip) return false;
+        if (!ouvert) { ouvrirLivre(); return true; }
+        const ici = pageFlip.getCurrentPageIndex();
+        if (ici > 2) { try { pageFlip.flip(1, "top"); } catch (e) { try { pageFlip.turnToPage(1); } catch (e2) {} } }
+        return true;
+    };
 
     function agir(cible) {
         if (!cible || cible.disabled) return;
         const action = cible.dataset.action;
+        if (action === "marque-page") {
+            if (!enPartie) return;               // éteint hors partie : rien, pas même le clic
+            son(); allerIndex(); return;
+        }
         son();
-        if (action === "nouvelle" || action === "charger" || action === "compte") allerAuChapitre(action);
+        if (action === "index") choisirIndex(cible.dataset.entree);
+        // En partie, fonder ou réveiller un autre groupe, c'est d'abord quitter
+        // celle-ci : la question de la maison (app.js) est posée.
+        else if (enPartie && (action === "nouvelle" || action === "charger")) { if (typeof window.demanderRetourMenu === "function") window.demanderRetourMenu(); }
+        else if (action === "nouvelle" || action === "charger" || action === "compte") allerAuChapitre(action);
         else if (action === "revenir") { try { pageFlip.flipPrev("top"); } catch (e) {} }
         else if (action === "valider-cle") validerCle();
         else if (action === "creer-groupe") creerGroupe();
@@ -553,6 +788,7 @@
         if (menu) menu.style.display = "none";
         const nom = document.getElementById("grimoire-nom-joueur");
         if (nom) nom.textContent = nomJoueur();
+        quitterLaPartie();
         ecran.style.display = "block";
         void ecran.offsetWidth;
         ecran.classList.add("visible");
@@ -575,5 +811,8 @@
     window.ouvrirGrimoire = ouvrirLivre;
     window.allerChapitreGrimoire = allerAuChapitre;
     window.grimoireEtat = () => ({ ouvert, chapitre, page: pageFlip ? pageFlip.getCurrentPageIndex() : -1,
-                                   visible: !!ecran && ecran.style.display !== "none" });
+                                   visible: !!ecran && ecran.style.display !== "none",
+                                   enPartie, range: !!ecran && ecran.classList.contains("range") });
+    window.grimoireRanger = rangerLivre;
+    window.grimoireAllerIndex = allerIndex;
 })();
