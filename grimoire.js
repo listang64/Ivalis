@@ -40,7 +40,10 @@
     // v298 : Nico, « le livre, descends-le au max sur l'écran — ne l'agrandis
     // pas, juste descends-le ». Même taille qu'avant (tout le livre tient à
     // l'écran), mais posé en bas, un filet de marge sous lui.
-    const MARGE_HAUT = 0.025, MARGE_BAS = 0.012, MARGE_COTE = 0.02;
+    // v300 : Nico, « sur iPad il y a une marge au-dessus, c'est bien, mais sur
+    // PC il prend toute la fenêtre : réduis le livre pour laisser une marge
+    // raisonnable au-dessus, pour pouvoir afficher des trucs ». 12 % en haut.
+    const MARGE_HAUT = 0.12, MARGE_BAS = 0.012, MARGE_COTE = 0.02;
     // v298 : Nico, « fais un peu plus rapide l'animation de tourner la page » ;
     // v299 : « accélère encore ».
     const DUREE_TOURNE = 500;
@@ -51,11 +54,9 @@
     // LE MARQUE-PAGE (v299), en unités de l'image du livre : glissé sous les
     // pages de gauche, il dépasse au-dessus du livre (le bord du livre est à
     // y 44, celui des pages à y 62). Assez de place est gardée en haut pour lui.
-    const MARQUE = { x: 360, y: -36, w: 92, h: 250, penche: -6 };
-    const BORD_LIVRE = 44;
-    // Rangé (en partie), le livre descend : il n'en reste qu'un liseré en bas
-    // de l'écran, et le marque-page qui dépasse.
-    const LISERE_RANGE = 12;
+    // v300 : « le marque-page index, réduis sa taille ». À côté, le marque-page
+    // du récit (une plume), un peu décalé.
+    const MARQUE = { x: 360, y: -30, w: 66, h: 200, penche: -6 };
     // L'INDEX (v299) : les chapitres du jeu, trois par page.
     const ENTREES_INDEX = [
         ["carte", "Carte du monde"], ["recit", "Le récit"], ["fiches", "Les fiches personnages"],
@@ -65,6 +66,11 @@
     let ecran = null, scene = null, livre = null, pageFlip = null, attrape = null;
     let ouvert = false, chapitre = "", initialise = false, departEnCours = false;
     let partieChoisie = null, enPartie = false, origine = null;
+    // LES PAGES QUI SUIVENT L'INDEX (v300, grimoire_recit.js) : le sommaire du
+    // récit et les pages du chapitre. Le livre compte alors 0 couverture,
+    // 1-2 titre et journal, 3-4 index ou chapitre, les pages de la suite, et
+    // la quatrième de couverture (`dos`), toujours la dernière.
+    let dos = null, suite = [], nbPages = 6;
     const pages = {};
 
     // ---------------------------------------------------------------------
@@ -113,13 +119,6 @@
                   <path d="M ${g + 2} ${g + 2} L ${g + 2 + 4} ${g + 2} M ${g + 2} ${g + 2} L ${g + 2} ${g + 2 + 3}" class="trait-coin"/>
                   <path d="M ${dr - 2} ${dr - 2} L ${dr - 6} ${dr - 2} M ${dr - 2} ${dr - 2} L ${dr - 2} ${dr - 5}" class="trait-coin"/></svg>`;
     }
-    // Le trait de surligneur derrière le nom du joueur.
-    function surligneur(graine) {
-        const r = hasard(graine);
-        const y = () => (40 + (r() - 0.5) * 14).toFixed(1);
-        return `<svg class="surligneur" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-                  <path d="M 1 ${y()} C 30 ${y()} 70 ${y()} 99 ${y()} L 98 ${(78 + (r() - 0.5) * 10).toFixed(1)} C 70 ${y() * 1 + 36} 30 ${y() * 1 + 40} 2 ${(80 + (r() - 0.5) * 10).toFixed(1)} Z"/></svg>`;
-    }
     const echapper = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const bouton = (id, texte, action, graine) =>
         `<button type="button" class="bouton-grimoire" id="${id}" data-action="${action}">${cadreMain(graine || id)}<span>${texte}</span></button>`;
@@ -149,7 +148,7 @@
     function pageJournal() {
         return `<div class="contenu-page page-journal">
             ${bordurePlume("bordure-journal")}
-            <div class="journal-entete">Journal de <span class="nom-surligne">${surligneur("nom")}<b id="grimoire-nom-joueur">${echapper(nomJoueur())}</b></span></div>
+            <div class="journal-entete">Journal d'un aventurier</div>
             <div class="journal-entrees">
               ${bouton("grimoire-btn-nouvelle", "Nouvelle partie", "nouvelle")}
               ${bouton("grimoire-btn-charger", "Charger partie", "charger")}
@@ -158,14 +157,18 @@
           </div>`;
     }
 
-    // Le trait de surligneur d'une entrée de l'index : une traînée irrégulière,
-    // posée derrière chaque ligne du texte (box-decoration-break), en SVG.
-    function surligneurFond(graine) {
+    // LE SOULIGNÉ À LA PLUME (v300). Nico : « enlève le surlignage jaune sur
+    // l'index, et fais genre un trait grossier écrit à la plume dessous de
+    // chaque ligne ». Un trait d'encre épais au milieu, effilé aux bouts, qui
+    // ondule un peu, doublé d'un second plus léger ; posé sous chaque ligne du
+    // texte (box-decoration-break), en SVG.
+    function souligneFond(graine) {
         const r = hasard(graine);
-        const v = (a, b) => (a + r() * (b - a)).toFixed(1);
-        const d = `M ${v(0, 3)} ${v(18, 30)} C ${v(25, 35)} ${v(8, 20)} ${v(60, 70)} ${v(14, 26)} ${v(97, 100)} ${v(10, 24)} `
-                + `L ${v(96, 100)} ${v(80, 92)} C ${v(65, 75)} ${v(88, 98)} ${v(30, 40)} ${v(82, 94)} ${v(1, 4)} ${v(86, 96)} Z`;
-        const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'><path d='${d}' fill='rgba(236,190,60,0.72)'/></svg>`;
+        const v = (a, b) => (a + r() * (b - a)).toFixed(2);
+        const trait = (y, e) => `M ${v(0, 2)} ${v(y - 0.4, y + 0.4)} C ${v(20, 35)} ${v(y - 1.4, y)} ${v(55, 70)} ${v(y, y + 1.2)} ${v(97, 100)} ${v(y - 1, y + 0.2)} `
+                + `L ${v(97, 100)} ${v(y + e * 0.3, y + e * 0.6)} C ${v(60, 72)} ${v(y + e * 1.4, y + e * 1.9)} ${v(25, 40)} ${v(y + e * 1.2, y + e * 1.8)} ${v(1, 3)} ${v(y + e * 0.4, y + e * 0.8)} Z`;
+        const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'>`
+                  + `<path d='${trait(4.2, 2.6)}' fill='rgba(20,12,6,0.9)'/><path d='${trait(6.4, 1.1)}' fill='rgba(20,12,6,0.45)'/></svg>`;
         // (les apostrophes encodées aussi : l'attribut style est entre apostrophes)
         return `url("data:image/svg+xml,${encodeURIComponent(svg).replace(/'/g, "%27")}")`;
     }
@@ -173,7 +176,7 @@
         const r = hasard("index-" + id);
         const penche = ((r() * 2 - 1) * 3.4).toFixed(2), decale = ((r() * 2 - 1) * 7).toFixed(1);
         return `<button type="button" class="entree-index" id="grimoire-index-${id}" data-action="index" data-entree="${id}"
-                   style="--penche:${penche}deg; --decale:${decale}"><span class="entree-index-texte" style='background-image:${surligneurFond("fond-" + id)}'>${texte}</span></button>`;
+                   style="--penche:${penche}deg; --decale:${decale}"><span class="entree-index-texte" style='background-image:${souligneFond("trait-" + id)}'>${texte}</span></button>`;
     }
     function indexHtml() {
         const entrees = (a, b) => ENTREES_INDEX.slice(a, b).map(([id, t]) => entreeIndex(id, t)).join("");
@@ -207,6 +210,22 @@
                   <path class="feuille" d="M 11 8.5 C 20 7.6 31 8.4 40.5 7.8 L 49.5 17 C 49 34 50.2 53 49.3 72.4 C 37 73.2 23 71.8 10.6 72.8 C 11.6 51 10.2 29 11 8.5 Z"/>
                   <path class="coin" d="M 40.5 7.8 C 41.2 11 40.6 14 41 17.3 C 44 16.8 46.6 17.4 49.5 17"/>
                   ${lignes}</svg>`;
+    }
+
+    // Le dessin du marque-page du récit (v300) : une plume d'oie, à l'encre.
+    function dessinPlume() {
+        const r = hasard("marque-plume");
+        let barbes = "";
+        for (let i = 0; i < 9; i++) {
+            const t = 0.12 + i * 0.085, x = 44 - t * 30, y = 10 + t * 56;
+            barbes += `<path class="ligne" d="M ${x.toFixed(1)} ${y.toFixed(1)} q ${(-7 - r() * 3).toFixed(1)} ${(2 + r() * 2).toFixed(1)} ${(-10 - r() * 3).toFixed(1)} ${(7 + r() * 2).toFixed(1)}"/>`;
+            barbes += `<path class="ligne" d="M ${x.toFixed(1)} ${y.toFixed(1)} q ${(5 + r() * 2).toFixed(1)} ${(1 + r()).toFixed(1)} ${(7 + r() * 2).toFixed(1)} ${(5 + r() * 2).toFixed(1)}"/>`;
+        }
+        return `<svg class="dessin-marque" viewBox="0 0 60 80" aria-hidden="true">
+                  <path class="feuille" d="M 46 6 C 33 14 22 34 17 62 C 27 50 40 30 46 6 Z"/>
+                  <path class="coin" d="M 46 6 C 36 26 26 46 13 74"/>
+                  ${barbes}
+                  <path class="coin" d="M 13 74 l -2.5 3.5"/></svg>`;
     }
 
     // La double page d'un chapitre : [gauche, droite].
@@ -299,8 +318,7 @@
         const largeurCouv = PAGE.h * COUVERTURE.w / COUVERTURE.h;
         const cx = (ZONE.x + PAGE.w + largeurCouv / 2) * s, cy = (ZONE.y + PAGE.h / 2) * s;
         const tx = vw / 2 - gauche - ZOOM_FERME * cx, ty = vh / 2 - haut - ZOOM_FERME * cy;
-        const descente = Math.max(0, vh - LISERE_RANGE - (haut + BORD_LIVRE * s));
-        return { s, gauche, haut, tx, ty, vw, vh, descente };
+        return { s, gauche, haut, tx, ty, vw, vh };
     }
     function poser() {
         if (!scene) return;
@@ -311,7 +329,6 @@
         scene.style.height = LIVRE.h * m.s + "px";
         scene.style.setProperty("--u", (PAGE.w * m.s / 100) + "px");   // 1 % de la largeur d'une page
         scene.style.setProperty("--transform-ferme", `translate(${m.tx}px, ${m.ty}px) scale(${ZOOM_FERME})`);
-        scene.style.setProperty("--transform-range", `translateY(${m.descente}px)`);
         scene.style.setProperty("--s", String(m.s));
         livre.style.left = ZONE.x * m.s + "px";
         livre.style.top = ZONE.y * m.s + "px";
@@ -334,6 +351,9 @@
             <button type="button" class="marque-page inactif" id="grimoire-marque-page" data-action="marque-page"
                     aria-label="Aller à l'index" aria-disabled="true" title="L'index (en partie)">
               <span class="marque-papier">${dessinMarque()}</span></button>
+            <button type="button" class="marque-page marque-plume inactif" id="grimoire-marque-recit" data-action="marque-recit"
+                    aria-label="Aller au récit" aria-disabled="true" title="Le récit (en partie)">
+              <span class="marque-papier">${dessinPlume()}</span></button>
             <div class="grimoire-livre" id="grimoire-livre">
               <div class="page-grimoire page-couverture" data-density="hard" id="grimoire-page-0">
                 <img src="${IMAGES.couverture}" alt="Les Chroniques d'Ivalis" draggable="false"></div>
@@ -350,6 +370,7 @@
         livre = document.getElementById("grimoire-livre");
         attrape = document.getElementById("grimoire-attrape");
         for (let i = 0; i <= 5; i++) pages[i] = document.getElementById("grimoire-page-" + i);
+        dos = pages[5];
         pages[1].innerHTML = pageTitre();
         pages[2].innerHTML = pageJournal();
         remplirChapitre("");
@@ -439,7 +460,7 @@
         let prise = null;
         const pos = (ev) => { const r = livre.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top, r }; };
         livre.addEventListener("pointerdown", (ev) => {
-            if (!pageFlip || !ouvert || ecran.classList.contains("range")) return;
+            if (!pageFlip || !ouvert) return;
             if (ev.pointerType === "mouse" && ev.button !== 0) return;
             if (ev.target && ev.target.closest && ev.target.closest("input, label, button, select, textarea, a, [data-action], .liste-parties-grimoire")) return;
             if (pageFlip.getState() !== "read") return;
@@ -490,10 +511,11 @@
         try { pageFlip.flipNext("top"); } catch (e) { try { pageFlip.turnToPage(1); } catch (e2) {} }
     }
     function surTourne(index) {
-        if (index >= 5) {                       // la quatrième de couverture : on revient au chapitre
-            setTimeout(() => { try { pageFlip.flip(3, "top"); } catch (e) {} }, 60);
+        if (index >= nbPages - 1) {             // la quatrième de couverture : on revient à la dernière double page
+            setTimeout(() => { try { pageFlip.flip(nbPages - 3, "top"); } catch (e) {} }, 60);
             return;
         }
+        try { ecran.dispatchEvent(new CustomEvent("grimoire-page", { detail: { index } })); } catch (e) {}
         if (index === 0 && ouvert) etatOuvert(false);   // tourné jusqu'à la couverture : le livre se referme
         else if (index > 0 && !ouvert) etatOuvert(true);
     }
@@ -622,115 +644,133 @@
         if (r && r.ok) ["grimoire-mdp-actuel", "grimoire-mdp-nouveau", "grimoire-mdp-confirmer"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
     }
 
-    // Une partie fondée ou réveillée (v299) : la carte du jeu s'installe sous
-    // le livre, le fond beige s'efface, et la double page devient l'index.
-    // Nico : « garde la map en dessous du livre, une fois la partie chargée le
-    // livre se met par-dessus ; on laisse pour l'instant les boutons menu en
-    // doublon sur la droite ». Le livre entre donc dans l'écran de jeu, sous
-    // ses fenêtres et ses menus, au-dessus de la carte.
+    // Une partie fondée ou réveillée : le livre s'ouvre à l'index.
+    // v300 : Nico, « le livre, une fois la partie chargée, laisse-le à la même
+    // place que dans le menu principal ; il masque l'ancienne interface, ce
+    // n'est pas grave, on va tout intégrer au livre. Masque la map globale et
+    // laisse le fond beige ». Le livre entre dans l'écran de jeu (z 30), son
+    // fond beige reste : la carte et l'ancien menu disparaissent dessous, les
+    // anciennes fenêtres (fiches, paramètres, combat…) s'ouvrent par-dessus.
     function entrerDansLaPartie(id) {
         if (departEnCours) return;
         departEnCours = true;
         const entrer = portes().entrerDansPartie;
         try { if (typeof entrer === "function") entrer(id); } catch (e) { console.error("Grimoire : entrée en partie", e); }
-        passerEnPartie();
+        passerEnPartie(id);
         setTimeout(() => { departEnCours = false; }, 900);
     }
-    function passerEnPartie() {
+    function passerEnPartie(id) {
         const jeu = document.getElementById("ecran-jeu");
         enPartie = true;
-        if (jeu && ecran.parentNode !== jeu) {
-            jeu.appendChild(ecran);
-            void ecran.offsetWidth;              // déplacé : le fondu part de l'écran beige
-        }
+        if (jeu && ecran.parentNode !== jeu) jeu.appendChild(ecran);
         ecran.style.display = "block";
         ecran.classList.add("visible", "en-partie");
-        ecran.classList.remove("range", "disparait");
+        ecran.classList.remove("disparait");
         remplirChapitre("index");
         majMarquePage();
         placerNavigation();
         poser();
+        try { if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.entrer(id || window.ID_PARTIE_COURANTE); }
+        catch (e) { console.error("Grimoire : le récit", e); }
         if (!pageFlip) return;
         if (!ouvert) etatOuvert(true);
         const ici = pageFlip.getCurrentPageIndex();
-        if (ici < 3) { try { pageFlip.flip(3, "top"); } catch (e) { try { pageFlip.turnToPage(3); } catch (e2) {} } }
+        if (ici !== 3 && ici !== 4) { try { pageFlip.flip(3, "top"); } catch (e) { try { pageFlip.turnToPage(3); } catch (e2) {} } }
     }
     // De retour au journal (« Retour au menu ») : le livre ressort de l'écran
-    // de jeu, retrouve son fond beige, et le marque-page s'éteint.
+    // de jeu, perd les pages du récit, et les marque-pages s'éteignent.
     function quitterLaPartie() {
+        const etait = enPartie;
         enPartie = false;
+        if (etait) { try { if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.sortir(); } catch (e) { console.error("Grimoire : le récit", e); } }
+        if (suite.length) definirSuite([]);
         if (origine && origine.parent && ecran.parentNode !== origine.parent) {
             const suivant = origine.suivant && origine.suivant.parentNode === origine.parent ? origine.suivant : null;
             origine.parent.insertBefore(ecran, suivant);
         }
-        ecran.classList.remove("en-partie", "range");
+        ecran.classList.remove("en-partie");
         majMarquePage();
         placerNavigation();
     }
-    // Le marque-page n'est actif qu'en partie (Nico : « désactivé tant que pas
-    // rentré dans une partie »).
+    // Les marque-pages ne servent qu'en partie (Nico : « désactivé tant que pas
+    // rentré dans une partie »). Le livre levé cache l'ancienne interface.
     function majMarquePage() {
-        const m = document.getElementById("grimoire-marque-page");
-        if (m) {
+        ["grimoire-marque-page", "grimoire-marque-recit"].forEach(idm => {
+            const m = document.getElementById(idm);
+            if (!m) return;
             m.classList.toggle("inactif", !enPartie);
             m.setAttribute("aria-disabled", enPartie ? "false" : "true");
-        }
+        });
         const jeu = document.getElementById("ecran-jeu");
-        if (jeu) jeu.classList.toggle("livre-leve", enPartie && !ecran.classList.contains("range"));
+        if (jeu) jeu.classList.toggle("livre-leve", enPartie);
     }
-    // LES BOUTONS DU BAS (v299) : le DEV rouge, le volume, la maison, la porte.
-    // Nico : « les trois petits boutons (quatre avec le petit dev rouge) du bas
-    // de l'écran dès que l'on voit le livre ». Hors partie, ils suivent le
-    // grimoire ; en partie, ils retrouvent l'écran de jeu (le livre y est).
+    // LES PETITS BOUTONS (v299, v300) : le DEV rouge, le volume, la maison, la
+    // porte. Nico : « dès que l'on voit le livre » ; v300 : « finalement, mets-
+    // les en haut à droite ». Ils vivent dans le grimoire, en partie aussi.
     function placerNavigation() {
         const nav = document.getElementById("menu-navigation-bas");
-        const jeu = document.getElementById("ecran-jeu");
-        if (!nav) return;
-        const cible = enPartie ? jeu : ecran;
-        if (cible && nav.parentNode !== cible) cible.appendChild(nav);
+        if (!nav || !ecran) return;
+        nav.classList.add("nav-livre");
+        if (nav.parentNode !== ecran) ecran.appendChild(nav);
     }
 
-    // RANGER LE LIVRE (en partie) : il descend sous le bord de l'écran, il
-    // n'en dépasse que le marque-page. Le marque-page le remonte, à l'index.
-    function rangerLivre() {
-        if (!enPartie) return;
-        if (!ouvert && pageFlip) { etatOuvert(true); try { pageFlip.turnToPage(3); } catch (e) {} }
-        ecran.classList.add("range");
-        majMarquePage();
+    // LA SUITE DU LIVRE (v300) : les pages après l'index (un nombre pair),
+    // posées avant la quatrième de couverture. StPageFlip relit ses pages ;
+    // pendant qu'une page tourne, on attend qu'elle se pose.
+    function definirSuite(elements) {
+        suite = (elements || []).slice();
+        if (!pageFlip) return;
+        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...suite, dos];
+        const generation = ++definirSuite.generation;      // seule la dernière demande s'applique
+        const appliquer = () => {
+            if (generation !== definirSuite.generation) return;
+            if (pageFlip.getState() !== "read") { setTimeout(appliquer, 80); return; }
+            const ici = pageFlip.getCurrentPageIndex();
+            liste.forEach(el => { if (el.parentNode !== livre) livre.appendChild(el); });
+            nbPages = liste.length;
+            try { pageFlip.updateFromHtml(liste); } catch (e) { console.error("Grimoire : les pages", e); }
+            if (ici >= nbPages - 1) { try { pageFlip.turnToPage(Math.max(0, nbPages - 3)); } catch (e) {} }
+            poser();
+        };
+        appliquer();
+    }
+    definirSuite.generation = 0;
+    // Aller à une page, en la tournant (le livre s'ouvre s'il est fermé).
+    function allerALaPage(n) {
+        if (!pageFlip) return;
+        if (!ouvert) etatOuvert(true);
+        const ici = pageFlip.getCurrentPageIndex();
+        const cible = Math.max(1, Math.min(n, nbPages - 2));
+        if (ici === cible || (cible % 2 === 0 ? ici === cible - 1 : ici === cible + 1)) return;
+        try { pageFlip.flip(cible, "top"); } catch (e) { try { pageFlip.turnToPage(cible); } catch (e2) {} }
     }
     function allerIndex() {
         if (!enPartie || !pageFlip) return;
-        ecran.classList.remove("range");
-        majMarquePage();
-        const ici = pageFlip.getCurrentPageIndex();
-        if (chapitre !== "index" || ici < 3) remplirChapitre("index");
-        if (!ouvert) etatOuvert(true);
-        if (ici < 3) { try { pageFlip.flip(3, "top"); } catch (e) { try { pageFlip.turnToPage(3); } catch (e2) {} } }
+        if (chapitre !== "index") remplirChapitre("index");
+        allerALaPage(3);
     }
-    // Les chapitres de l'index : pour l'instant, ils ouvrent l'ancienne
-    // interface (le livre se range pour lui laisser la place) ; le village
-    // n'existe pas encore.
+    // Les chapitres de l'index. Le récit est dans le livre (v300) ; les
+    // autres ouvrent encore l'ancienne fenêtre, par-dessus le livre ; la
+    // carte et le village viendront.
     const OUVRIR_INDEX = {
-        carte: null,
-        recit: () => window.ouvrirChatbox && window.ouvrirChatbox(),
+        recit: () => window.GRIMOIRE_RECIT && window.GRIMOIRE_RECIT.allerAuRecit(),
         fiches: () => window.ouvrirMenuPersonnages && window.ouvrirMenuPersonnages(),
         combats: () => window.ouvrirPopupRencontre && window.ouvrirPopupRencontre(),
         parametres: () => window.ouvrirParametres && window.ouvrirParametres()
     };
+    const BIENTOT = { carte: "La carte du monde : bientôt dans le livre.", village: "Le village : ce chapitre s'écrira bientôt." };
     function choisirIndex(id) {
         if (!enPartie) return;
-        if (id === "village") {
+        if (BIENTOT[id]) {
             const note = document.getElementById("grimoire-note-index");
             if (note) {
-                note.textContent = "Le village : ce chapitre s'écrira bientôt.";
+                note.textContent = BIENTOT[id];
                 note.classList.add("visible");
                 clearTimeout(choisirIndex.minuteur);
                 choisirIndex.minuteur = setTimeout(() => note.classList.remove("visible"), 2800);
             }
             return;
         }
-        if (!(id in OUVRIR_INDEX)) return;
-        rangerLivre();
         const ouvrir = OUVRIR_INDEX[id];
         if (ouvrir) { try { ouvrir(); } catch (e) { console.error("Grimoire : chapitre « " + id + " »", e); } }
     }
@@ -749,9 +789,12 @@
     function agir(cible) {
         if (!cible || cible.disabled) return;
         const action = cible.dataset.action;
-        if (action === "marque-page") {
-            if (!enPartie) return;               // éteint hors partie : rien, pas même le clic
-            son(); allerIndex(); return;
+        if (action === "marque-page" || action === "marque-recit") {
+            if (!enPartie) return;               // éteints hors partie : rien, pas même le clic
+            son();
+            if (action === "marque-page") allerIndex();
+            else if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.allerAuRecit();
+            return;
         }
         son();
         if (action === "index") choisirIndex(cible.dataset.entree);
@@ -812,7 +855,12 @@
     window.allerChapitreGrimoire = allerAuChapitre;
     window.grimoireEtat = () => ({ ouvert, chapitre, page: pageFlip ? pageFlip.getCurrentPageIndex() : -1,
                                    visible: !!ecran && ecran.style.display !== "none",
-                                   enPartie, range: !!ecran && ecran.classList.contains("range") });
-    window.grimoireRanger = rangerLivre;
+                                   enPartie, nbPages });
     window.grimoireAllerIndex = allerIndex;
+    // Pour le récit (grimoire_recit.js) : la scène, les pages, la suite.
+    window.GRIMOIRE = {
+        ecran: () => ecran, scene: () => scene, livre: () => livre, pageFlip: () => pageFlip,
+        enPartie: () => enPartie, ouvert: () => ouvert, nbPages: () => nbPages,
+        premiereDeLaSuite: 5, definirSuite, allerALaPage, unite: () => (scene ? parseFloat(scene.style.getPropertyValue("--u")) || 0 : 0)
+    };
 })();

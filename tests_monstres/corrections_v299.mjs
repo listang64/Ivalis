@@ -291,32 +291,24 @@ await section(async () => {
   await p.waitForTimeout(150);
   await p.fill("#grimoire-mdp-partie", "sel");
   await cliquer("#grimoire-valider-partie");
-  await p.waitForTimeout(400);
-  await attendreQue(() => p.evaluate(() => getComputedStyle(document.getElementById("ecran-grimoire"), "::before").opacity === "0"), 3000);
+  await p.waitForTimeout(1300);
   const r = await p.evaluate(() => {
     const ecran = document.getElementById("ecran-grimoire");
     return { entrees: window.__entrees.slice(), e: window.grimoireEtat(), parent: ecran.parentNode.id, jeu: getComputedStyle(document.getElementById("ecran-jeu")).display,
              fond: getComputedStyle(ecran, "::before").opacity, z: getComputedStyle(ecran).zIndex, nav: document.getElementById("menu-navigation-bas").parentNode.id,
-             marque: document.getElementById("grimoire-marque-page").classList.contains("inactif"), voyage: getComputedStyle(document.getElementById("btn-voyage-essai")).visibility };
+             marque: document.getElementById("grimoire-marque-page").classList.contains("inactif"), voyage: getComputedStyle(document.getElementById("btn-voyage-essai")).display,
+             menu: getComputedStyle(document.getElementById("menu-lateral")).display };
   });
   verifier("on entre dans la partie (la carte du jeu s'installe)", r.entrees.join(",") === "P1" && r.jeu === "block", JSON.stringify(r.entrees));
   verifier("le livre reste, posé dans l'écran de jeu, au-dessus de la carte", r.e.visible && r.e.enPartie && r.parent === "ecran-jeu" && Number(r.z) > 5 && Number(r.z) < 40, `${r.parent}, z ${r.z}`);
-  verifier("le fond beige s'efface : la carte se voit (et se touche) autour du livre", r.fond === "0" && await dans(6, 6, "#conteneur-carte-fond"), `opacité ${r.fond}, ${await dessus(6, 6)}`);
+  // v300 : Nico, « laisse le livre à la même place que dans le menu principal ; il masque l'ancienne
+  // interface ; masque la map globale et laisse le fond beige ».
+  verifier("v300 : le fond beige reste, la carte est masquée sous le livre", r.fond === "1" && await dans(6, 6, "#ecran-grimoire"), `opacité ${r.fond}, ${await dessus(6, 6)}`);
   verifier("le livre, ouvert sur l'index (la double page des chapitres)", r.e.ouvert && r.e.page === 3 && r.e.chapitre === "index", JSON.stringify(r.e));
-  // Les images des boutons ne se chargent pas ici (pas d'Internet) : on donne au menu la hauteur de l'écran,
-  // et là où il croise le livre, c'est lui que le doigt touche.
-  const lat = await p.evaluate(() => {
-    const m = document.getElementById("menu-lateral"), b = m.querySelector(".conteneur-bouton-lateral");
-    m.classList.remove("menu-replie");                // déplié (le banc le garde rangé)
-    b.style.height = "60vh";
-    const r = b.getBoundingClientRect(), sc = document.getElementById("grimoire-scene").getBoundingClientRect();
-    return { x: Math.max(r.left, sc.left) + 10, y: Math.max(r.top, sc.top + sc.height * 0.3), vue: getComputedStyle(m).display !== "none", croise: r.left < sc.right && r.bottom > sc.top };
-  });
-  verifier("les boutons menu de droite restent, au-dessus du livre (en doublon)", lat.vue && lat.croise && await dans(lat.x, lat.y, "#menu-lateral"), await dessus(lat.x, lat.y));
-  await p.evaluate(() => { document.querySelector("#menu-lateral .conteneur-bouton-lateral").style.height = ""; });
-  verifier("les boutons du bas suivent l'écran de jeu", r.nav === "ecran-jeu");
+  verifier("v300 : l'ancien menu de droite se cache sous le livre", r.menu === "none", r.menu);
+  verifier("v300 : les petits boutons restent dans le livre (en haut à droite)", r.nav === "ecran-grimoire");
   verifier("en partie, le marque-page s'allume", r.marque === false);
-  verifier("les boutons posés sur la carte (le voyage) se cachent sous le livre levé", r.voyage === "hidden", r.voyage);
+  verifier("les boutons posés sur la carte (le voyage) se cachent sous le livre levé", r.voyage === "none", r.voyage);
 });
 
 // =========================================================================
@@ -327,7 +319,7 @@ await section(async () => {
     const lis = (n) => [...document.querySelectorAll(`#grimoire-page-${n} .entree-index`)].map(b => {
       const st = getComputedStyle(b), t = b.querySelector(".entree-index-texte"), ts = getComputedStyle(t);
       return { texte: b.innerText.trim(), poids: st.fontWeight, style: st.fontStyle, police: st.fontFamily, taille: parseFloat(st.fontSize), transform: st.transform,
-               surligne: /data:image\/svg\+xml/.test(ts.backgroundImage) && /236%2C190%2C60|236,190,60/.test(decodeURIComponent(ts.backgroundImage)), clone: ts.boxDecorationBreak || ts.webkitBoxDecorationBreak };
+               surligne: /data:image\/svg\+xml/.test(ts.backgroundImage) && /rgba\(20,12,6/.test(decodeURIComponent(ts.backgroundImage)) && !/236,190,60/.test(decodeURIComponent(ts.backgroundImage)), clone: ts.boxDecorationBreak || ts.webkitBoxDecorationBreak };
     });
     const u = parseFloat(document.getElementById("grimoire-scene").style.getPropertyValue("--u"));
     return { g: lis(3), d: lis(4), u, entete: (document.querySelector("#grimoire-page-3 .entete-index") || {}).textContent };
@@ -339,7 +331,7 @@ await section(async () => {
   verifier("à la main, en gras (Almendra, gras, penché d'écriture)", tout.every(x => /Almendra/.test(x.police) && Number(x.poids) >= 700 && x.style === "italic"));
   const angles = tout.map(x => { const m = /matrix\(([-\d.e]+), ([-\d.e]+)/.exec(x.transform); return m ? Math.atan2(Number(m[2]), Number(m[1])) * 180 / Math.PI : 0; });
   verifier("pas bien droit : chaque ligne penche un peu, chacune à sa façon", angles.every(a => Math.abs(a) > 0.2 && Math.abs(a) < 4) && new Set(angles.map(a => a.toFixed(1))).size >= 5, angles.map(a => a.toFixed(1)).join(" "));
-  verifier("surligné (le jaune du surligneur, ligne par ligne)", tout.every(x => x.surligne && x.clone === "clone"));
+  verifier("v300 : souligné d'un trait de plume (plus de jaune), ligne par ligne", tout.every(x => x.surligne && x.clone === "clone"));
   verifier("un petit titre « Index »", r.entete === "Index", r.entete);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v299_index.png" });
 });
@@ -350,30 +342,30 @@ titre("8. LES CHAPITRES DE L'INDEX ; LE MARQUE-PAGE RAMÈNE À L'INDEX");
 await section(async () => {
   const lisRange = () => p.evaluate(() => {
     const fond = document.querySelector(".grimoire-fond-livre").getBoundingClientRect(), k = fond.width / 2000, m = document.getElementById("grimoire-marque-page").getBoundingClientRect();
-    return { range: window.grimoireEtat().range, bordLivre: fond.top + 44 * k, vh: innerHeight, marqueHaut: m.top, page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), chapitre: window.grimoireEtat().chapitre,
-             voyage: getComputedStyle(document.getElementById("btn-voyage-essai")).visibility };
+    return { page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), chapitre: window.grimoireEtat().chapitre };
   });
+  // v300 : le livre ne se range plus ; la carte attend son tour, le récit est dans le livre,
+  // les autres chapitres ouvrent l'ancienne fenêtre par-dessus le livre.
   await cliquer("#grimoire-index-carte");
-  await p.waitForTimeout(1300);
+  await p.waitForTimeout(400);
   let r = await lisRange();
-  verifier("« Carte du monde » : le livre se range en bas, la carte est libre", r.range && r.bordLivre > r.vh - 30 && r.bordLivre < r.vh && await dans(r.vh * 0.6, r.vh * 0.5, "#ecran-jeu") && !(await dans(600, r.vh * 0.5, "#ecran-grimoire")), JSON.stringify(r));
-  verifier("… il n'en dépasse que le marque-page (et un liseré)", r.marqueHaut > r.vh * 0.8 && r.marqueHaut < r.vh - 40, `${r.marqueHaut.toFixed(0)} px sur ${r.vh}`);
-  verifier("… et les boutons de la carte reviennent", r.voyage === "visible", r.voyage);
-  if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v299_range.png" });
+  const noteCarte = await p.evaluate(() => document.getElementById("grimoire-note-index").textContent);
+  verifier("v300 : « Carte du monde » : bientôt dans le livre (le livre reste ouvert à l'index)", /bientôt/.test(noteCarte) && r.page === 3, noteCarte);
   const mp = await p.evaluate(() => { const r = document.getElementById("grimoire-marque-page").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 20 }; });
-  verifier("le marque-page rangé se touche", await dans(mp.x, mp.y, "#grimoire-marque-page"), await dessus(mp.x, mp.y));
+  verifier("le marque-page se touche", await dans(mp.x, mp.y, "#grimoire-marque-page"), await dessus(mp.x, mp.y));
+  await cliquer("#grimoire-index-recit");
+  await p.waitForTimeout(1000);
+  verifier("v300 : « Le récit » tourne les pages jusqu'au récit, dans le livre", (await page()) >= 7, String(await page()));
   await p.mouse.click(mp.x, mp.y);
   await p.waitForTimeout(1000);
   r = await lisRange();
-  verifier("un toucher sur le marque-page : le livre remonte, à l'index", !r.range && r.page === 3 && r.chapitre === "index" && r.bordLivre < r.vh * 0.5, JSON.stringify(r));
-  for (const [id, appel] of [["recit", "ouvrirChatbox"], ["fiches", "ouvrirMenuPersonnages"], ["combats", "ouvrirPopupRencontre"], ["parametres", "ouvrirParametres"]]) {
+  verifier("un toucher sur le marque-page : retour à l'index", r.page === 3 && r.chapitre === "index", JSON.stringify(r));
+  for (const [id, appel] of [["fiches", "ouvrirMenuPersonnages"], ["combats", "ouvrirPopupRencontre"], ["parametres", "ouvrirParametres"]]) {
     await p.evaluate(() => { window.__appels = []; });
     await cliquer("#grimoire-index-" + id);
     await p.waitForTimeout(300);
-    const a = await p.evaluate(() => ({ appels: window.__appels.slice(), range: window.grimoireEtat().range }));
-    verifier(`« ${id} » : le livre se range et ouvre l'ancienne fenêtre (${appel})`, a.range && a.appels.join(",") === appel, JSON.stringify(a));
-    await p.evaluate(() => window.grimoireAllerIndex());
-    await p.waitForTimeout(800);
+    const a = await p.evaluate(() => ({ appels: window.__appels.slice(), page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() }));
+    verifier(`« ${id} » : l'ancienne fenêtre s'ouvre (${appel}), par-dessus le livre`, a.appels.join(",") === appel && a.page === 3, JSON.stringify(a));
   }
   await cliquer("#grimoire-index-village");
   await p.waitForTimeout(300);

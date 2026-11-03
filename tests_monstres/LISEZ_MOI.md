@@ -9776,3 +9776,84 @@ corrections_v299.mjs (dans la suite), sur la vraie page (banc), vérifie :
 Il échoue sur l'ancien code (28 échecs). Tests mis à jour : corrections_v297
 (la partie ne cache plus le livre ; le fond beige sur ::before ; tourne plus
 rapide), corrections_v298 (au plus 0,7 s et 0,85 s ; « page-tourne » bref).
+
+## v300 — Le grimoire : retouches, puis le récit dans le livre (partie 3)
+
+Retouches. Nico : « Journal d'un aventurier, sans surlignage, un peu plus
+gros » ; « l'index : plus de jaune, un trait grossier à la plume sous chaque
+ligne » ; « les 4 petits boutons en haut à droite » ; « le marque-page index,
+plus petit » ; « en partie, le livre à la même place que dans le menu, sur le
+fond beige ; il masque la carte et l'ancienne interface » ; « sur PC, une marge
+raisonnable au-dessus » ; « les anciennes fenêtres s'ouvrent au-dessus ».
+
+- Marge du haut 12 % (le livre ne rapetisse que sur un écran large).
+- En partie, le grimoire entre dans #ecran-jeu (z 30) avec son fond : la carte,
+  le menu de droite, les jetons, le chat et les boutons du voyage se cachent
+  (#ecran-jeu.livre-leve) ; les fenêtres de z > 30 (fiches, paramètres,
+  combat…) passent devant. Plus de livre « rangé » (v299).
+- Index : « Le récit » va au récit ; fiches, combats, paramètres ouvrent
+  l'ancienne fenêtre ; carte et village : « bientôt ».
+
+Partie 3 (grimoire_recit.js, grimoire_recit.css, module à part) :
+- Pages du livre : 3-4 l'index, 5-6 le sommaire du récit, 7… le chapitre (pair),
+  puis la quatrième de couverture. grimoire.js expose window.GRIMOIRE
+  (definirSuite, allerALaPage…) ; une seule mise à jour des pages s'applique
+  (compteur de génération) quand plusieurs attendent la fin d'une tourne.
+- Un second marque-page, une plume, décalé et penché de l'autre côté : il va
+  au chapitre en cours.
+- Les messages de la partie (Messages_Chat) sont relayés par app.js
+  (livreRecitMessages, livreRecitPartie) sans nouvelle lecture. Le livre en
+  fait des entrées : la narration (formaterTexteMJ → paragraphes, PNJ et héros
+  en noms touchables), la ligne d'un joueur (Texte_Livre), l'ancienne ligne
+  (« Nom : « … » »), le Destin et le Maître du Temps (récrits par un seul poste,
+  réservés par transaction). L'Arbitre ne s'écrit pas ; un jet se range dans
+  la marge de l'action de son héros (un petit d20 et le total, rouge sur un 1,
+  violet sur un 20).
+- Mise en pages : un mesureur caché de la taille d'une page ; un paragraphe
+  qui déborde est coupé au mot et continue (« suite ») ; la ponctuation reste
+  collée au mot ; la page de droite garde 27 % en bas pour le parchemin.
+- L'encre : ce qui était là à l'arrivée est posé d'un coup ; le texte nouveau
+  s'écrit à 17 mots/s (fondu d'encre), avec le grattement de la plume
+  (« plume-ecrit », Fabrique) ; le lecteur sur la dernière double page suit.
+- Le parchemin d'écriture sort du livre côté droit (sur les pages du
+  chapitre, pour mes héros, choix si j'en ai plusieurs) ; Entrée ou la plume :
+  les lettres partent en poussière vers la fin du récit (« poussiere-envol »)
+  pendant que le Narrateur lite (Flash-Lite, les 4 dernières lignes du livre,
+  consigne dans le code) récrit la ligne à la première personne ; la ligne
+  part avec Texte (les mots du joueur, pour l'Arbitre) et Texte_Livre (pour le
+  livre et le Narrateur). Sans réponse : « Nom : « mots » ».
+- Le post-it « Narrateur » (côté droit) lance declencherTourIA (l'Arbitre
+  d'abord). Pendant qu'il écrit (IA_En_Cours), que des dés attendent ou qu'un
+  combat du récit est en cours, le parchemin rentre et le post-it s'éteint.
+  L'ancien parchemin du MJ, l'écran d'attente et le bandeau des dés se taisent.
+- Une note par jet demandé sort du haut du livre, penchée ; le joueur du héros
+  touche son d20 → window.lancerJetPourHeros (app.js : le même jet que la
+  fiche, Action_Des, la scène du dé) ; le jet tombé, la note rentre. Le dernier
+  dé lancé par un de mes héros : le Narrateur repart tout seul.
+- Le combat du récit (combat_rp.js) : sa note rouge sort du livre (« Le destin
+  hésite… », puis « Combattre » / « Rejoindre le combat »).
+- Un nom touché : une bande de papier sort à gauche avec le portrait (héros)
+  ou une silhouette (PNJ sans portrait) ; un toucher ailleurs la rentre.
+- Les chapitres : l'archivage du chat (ia_master.js) appelle archiverChapitre
+  avant d'effacer : titre par Flash-Lite, Recits_Chapitres (numéro, titre) et
+  Recits_Textes (les entrées) ; le sommaire les liste, un chapitre ne se charge
+  qu'ouvert, en lecture seule. Rien ne clôt un chapitre pour l'instant (Nico).
+- ia_master.js : PROMPT_NARRATEUR_LIVRE par défaut (INST_10895 en base passe
+  devant) ; ligneDuLivre (le Narrateur lit Texte_Livre) ; portraits des PNJ en
+  pause (PORTRAITS_PNJ_EN_PAUSE).
+
+corrections_v300.mjs (dans la suite), sur la vraie page (banc, base en
+mémoire, Gemini simulé), vérifie les retouches (journal, soulignés, boutons,
+marque-page, marges à trois tailles, livre à sa place, fond, fenêtres
+par-dessus), le récit (marque-page plume, index, sommaire, prose, noms, ancien
+chat muet), l'encre (vitesse, texte qui grandit, plume), le parchemin
+(position, poussière, Narrateur lite et ses 4 lignes, panne, post-it, verrou),
+les dés (notes, propriétaire, verrou, lancer, marge, relance automatique, 1
+naturel), le combat, le portrait, la mise en pages (pair, sans débord, sans
+ponctuation orpheline, le lecteur suit), les chapitres (archive, titre,
+sommaire, relecture), le Maître du Temps récrit, le prompt, le vrai lancer, le
+retour au menu.
+
+Il échoue sur l'ancien code (27 échecs). Tests mis à jour : corrections_v297
+(« Journal d'un aventurier »), corrections_v299 (fond gardé, menu caché,
+boutons dans le livre, souligné, plus de livre rangé), blessures (deux sons).

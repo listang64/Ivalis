@@ -1,0 +1,200 @@
+/* =========================================================================
+   IVALIS — LE RÉCIT DANS LE GRIMOIRE (v300, grimoire_recit.js)
+   =========================================================================
+   Les pages du récit et du sommaire ; autour du livre : le parchemin
+   d'écriture (côté droit), le post-it du Narrateur, les notes des dés (en
+   haut), la bande du portrait (côté gauche), la poussière. Les mesures en
+   « px × --s » sont celles de l'image du livre (2000 × 1117) ; --u vaut 1 %
+   de la largeur d'une page (grimoire.js).
+   ========================================================================= */
+
+/* LES PAGES DU RÉCIT */
+.page-recit {
+  justify-content: flex-start; align-items: stretch; text-align: justify;
+  padding: calc(var(--u) * 9.5) calc(var(--u) * 9) calc(var(--u) * 9) calc(var(--u) * 10.5);
+  font-family: 'IM Fell English', 'Almendra', serif; font-size: calc(var(--u) * 3.75); line-height: 1.42;
+  color: #24160b; overflow: hidden; hyphens: auto; -webkit-hyphens: auto;
+}
+/* Une page de droite garde sa marge basse : le parchemin d'écriture y sort. */
+.page-papier.droite > .page-recit, .recit-mesureur.droite > .page-recit { padding-bottom: calc(var(--u) * 37); }
+.recit-mesureur { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: none; overflow: hidden; }
+.recit-mesureur::before, .recit-mesureur::after { display: none; }
+.recit-mesureur > .contenu-page { position: absolute; inset: 0; }
+
+.entete-recit { display: flex; flex-direction: column; align-items: center; margin-bottom: calc(var(--u) * 3); text-align: center; }
+.numero-chapitre { font-family: 'Cinzel', serif; font-weight: 700; font-size: calc(var(--u) * 4.4); letter-spacing: 0.22em; color: #3a2210; }
+.titre-chapitre { font-family: 'Almendra', serif; font-style: italic; font-size: calc(var(--u) * 4.6); color: #3a2210; margin-top: calc(var(--u) * 0.6); }
+.titre-chapitre.en-cours { font-size: calc(var(--u) * 3.2); color: #7a5a3a; }
+.lien-recit, .ligne-sommaire, .heros-choix { cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.lien-recit { margin-top: calc(var(--u) * 1.2); font-style: italic; font-size: calc(var(--u) * 3); color: #5c3a21; text-decoration: underline; }
+
+.para-recit { position: relative; margin: 0 0 calc(var(--u) * 1.6); text-indent: 1.3em; }
+.para-recit.suite { text-indent: 0; }
+.para-recit.type-temps, .para-recit.type-note { text-align: center; text-indent: 0; font-style: italic; color: #5c3a21; font-size: 0.92em; }
+.para-recit.type-ancien { font-style: italic; }
+.page-blanche { margin: 0; }
+
+/* Les mots : l'encre les écrit un à un. */
+.mot.a-ecrire { opacity: 0; }
+.mot.ecrit { animation: encre-mot 0.38s ease-out both; }
+@keyframes encre-mot {
+  from { opacity: 0; filter: blur(1.2px); color: #6b4a2b; }
+  to { opacity: 1; filter: blur(0); }
+}
+/* Un nom qui se touche : son portrait sort du livre. */
+.nom-livre { color: #4a1f0c; font-weight: bold; text-decoration: none; border-bottom: 1px dotted rgba(74, 31, 12, 0.55); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.nom-livre:hover { color: #000; border-bottom-style: solid; }
+
+/* Le petit dé dans la marge, à côté de l'action. */
+.de-marge { position: absolute; left: calc(var(--u) * -8.2); top: calc(var(--u) * -0.2); width: calc(var(--u) * 6.2); height: calc(var(--u) * 6.2); text-indent: 0; }
+.de-marge + .de-marge { top: calc(var(--u) * 6.4); }
+.de-marge-svg { width: 100%; height: 100%; overflow: visible; }
+.de-marge-svg path { fill: rgba(255, 246, 222, 0.6); stroke: #2a170b; stroke-width: 2.2; stroke-linejoin: round; }
+.de-marge-svg path.facette { fill: none; stroke-width: 1; opacity: 0.55; }
+.de-marge-svg text { font-family: 'Cinzel', serif; font-weight: 700; font-size: 15px; text-anchor: middle; fill: #2a170b; }
+.de-marge.critique .de-marge-svg path { stroke: #5b2a86; } .de-marge.critique .de-marge-svg text { fill: #5b2a86; }
+.de-marge.fumble .de-marge-svg path { stroke: #8b1a10; } .de-marge.fumble .de-marge-svg text { fill: #8b1a10; }
+
+/* LE SOMMAIRE DU RÉCIT */
+.page-sommaire { justify-content: flex-start; padding-top: calc(var(--u) * 12); }
+.titre-sommaire { margin: 0; font-family: 'Cinzel', serif; font-size: calc(var(--u) * 7); color: #3a2210; }
+.liste-sommaire { display: flex; flex-direction: column; gap: calc(var(--u) * 2.6); width: 100%; margin-top: calc(var(--u) * 3); }
+.ligne-sommaire { display: flex; align-items: baseline; gap: calc(var(--u) * 2); color: #24150a; text-decoration: none; font-size: calc(var(--u) * 4.4); }
+.ligne-sommaire .num { font-family: 'Cinzel', serif; font-weight: 700; min-width: calc(var(--u) * 9); text-align: right; color: #5c3a21; }
+.ligne-sommaire .tit { font-family: 'Almendra', serif; font-style: italic; border-bottom: 1px dotted rgba(43, 26, 14, 0.4); flex: 1; }
+.ligne-sommaire.courant .tit { font-weight: 700; }
+.ligne-sommaire:hover .tit { color: #000; border-bottom-style: solid; }
+.note-sommaire { margin-top: auto; margin-bottom: calc(var(--u) * 6); font-style: italic; font-size: calc(var(--u) * 3.2); color: #6b4a2b; text-align: center; }
+
+/* LE PARCHEMIN D'ÉCRITURE : il sort du livre côté droit (bas de la page). */
+.recit-ecriture {
+  position: absolute; left: calc(1235px * var(--s, 1)); top: calc(782px * var(--s, 1));
+  width: calc(575px * var(--s, 1)); height: calc(250px * var(--s, 1));
+  overflow: hidden; pointer-events: none; z-index: 6;
+}
+.papier-ecriture {
+  position: absolute; inset: 4% 3% 4% 2%; box-sizing: border-box; margin: 0;
+  display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto 1fr; gap: calc(var(--u) * 0.8) calc(var(--u) * 1.2);
+  padding: calc(var(--u) * 1.8) calc(var(--u) * 2.2);
+  background: url('images/grimoire/page.webp?v=1') 60% 70% / 260% auto, #ead9b0;
+  box-shadow: 0 calc(var(--u) * 0.6) calc(var(--u) * 1.6) rgba(40, 20, 6, 0.5), inset 0 0 calc(var(--u) * 1.5) rgba(92, 54, 18, 0.45);
+  border-radius: calc(var(--u) * 0.4) 0 0 calc(var(--u) * 0.4);
+  transform: translateX(108%) rotate(0deg); transition: transform 0.55s cubic-bezier(0.45, 0.05, 0.25, 1);
+  pointer-events: auto;
+}
+.recit-ecriture.sortie .papier-ecriture { transform: translateX(0) rotate(-1.2deg); }
+.choix-heros { grid-column: 1 / 3; display: flex; gap: calc(var(--u) * 1.6); font-family: 'Almendra', serif; font-size: calc(var(--u) * 3); color: #5c3a21; min-height: calc(var(--u) * 3.4); }
+.heros-choix { text-decoration: none; color: #6b4a2b; }
+.heros-choix.choisi { color: #1b1009; font-weight: 700; border-bottom: 1px solid #1b1009; }
+.papier-ecriture textarea {
+  grid-column: 1; grid-row: 2; resize: none; border: 0; outline: none; background: transparent; min-height: 0;
+  font-family: 'IM Fell English', serif; font-style: italic; font-size: calc(var(--u) * 3.4); line-height: 1.35; color: #1b1009;
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(1.35em - 1px), rgba(60, 35, 15, 0.28) calc(1.35em - 1px), rgba(60, 35, 15, 0.28) 1.35em);
+  -webkit-user-select: text; user-select: text;
+}
+.ecriture-plume {
+  grid-column: 2; grid-row: 2; align-self: end; width: calc(var(--u) * 7.5); height: calc(var(--u) * 7.5);
+  border: 0; padding: 0; background: transparent; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.ecriture-plume svg, .papier-postit svg { width: 100%; height: 100%; overflow: visible; }
+.ecriture-plume svg path, .papier-postit svg path { fill: none; stroke: #120b06; stroke-width: 1.6; stroke-linecap: round; }
+.ecriture-plume svg path.plein, .papier-postit svg path.plein { fill: rgba(18, 11, 6, 0.12); }
+.ecriture-plume:hover { transform: rotate(-8deg) scale(1.08); }
+
+/* LE POST-IT DU NARRATEUR : il dépasse du côté droit du livre. */
+.recit-postit {
+  position: absolute; left: calc(1690px * var(--s, 1)); top: calc(150px * var(--s, 1));
+  width: calc(190px * var(--s, 1)); height: calc(150px * var(--s, 1));
+  padding: 0; border: 0; background: transparent; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transform: translateX(-62%) rotate(4deg); transition: transform 0.5s cubic-bezier(0.45, 0.05, 0.25, 1), filter 0.4s ease;
+  filter: drop-shadow(calc(var(--u) * 0.3) calc(var(--u) * 0.5) calc(var(--u) * 0.6) rgba(40, 20, 6, 0.5));
+}
+.papier-postit {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; gap: calc(var(--u) * 0.6);
+  padding-right: calc(var(--u) * 1.4); box-sizing: border-box;
+  background: url('images/grimoire/page.webp?v=1') 20% 30% / 500% auto, #e6d3a6;
+  font-family: 'Almendra', serif; font-weight: 700; font-size: calc(var(--u) * 2.9); color: #24150a;
+  clip-path: polygon(0 3%, 97% 0, 100% 96%, 2% 100%);
+}
+.papier-postit svg { width: calc(var(--u) * 4); height: calc(var(--u) * 4); flex: none; }
+.recit-postit.sortie { transform: translateX(0) rotate(4deg); }
+.recit-postit.sortie:not(.eteint):hover { transform: translateX(4%) rotate(2deg); }
+.recit-postit.appuye { transform: translateX(-4%) rotate(5deg) scale(0.97); }
+.recit-postit.eteint { filter: grayscale(0.7) brightness(0.92) drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.4) rgba(40, 20, 6, 0.3)); cursor: default; }
+.recit-postit.eteint.sortie { transform: translateX(-35%) rotate(4deg); }
+
+/* LES NOTES DES DÉS : une par jet demandé, elles sortent du haut du livre. */
+.recit-notes {
+  position: absolute; left: calc(1060px * var(--s, 1)); top: calc(-178px * var(--s, 1));
+  width: calc(700px * var(--s, 1)); height: calc(260px * var(--s, 1));
+  display: flex; justify-content: center; align-items: flex-end; gap: calc(var(--u) * 1.5);
+  pointer-events: none; opacity: 0; transition: opacity 0.4s ease;
+}
+.recit-notes.visible { opacity: 1; }
+.note-de {
+  position: relative; width: calc(250px * var(--s, 1)); height: calc(230px * var(--s, 1)); flex: none;
+  transform: translateY(80%) translateX(calc(var(--u) * var(--decale, 0))) rotate(var(--penche, 0deg));
+  transition: transform 0.6s cubic-bezier(0.45, 0.05, 0.25, 1);
+  filter: drop-shadow(calc(var(--u) * 0.2) calc(var(--u) * 0.4) calc(var(--u) * 0.5) rgba(40, 20, 6, 0.5));
+  pointer-events: auto;
+}
+.note-de.sortie { transform: translateY(0) translateX(calc(var(--u) * var(--decale, 0))) rotate(var(--penche, 0deg)); }
+.papier-note {
+  position: absolute; inset: 0; box-sizing: border-box; padding: calc(var(--u) * 1.5) calc(var(--u) * 7.2) calc(var(--u) * 1.5) calc(var(--u) * 1.6);
+  background: url('images/grimoire/page.webp?v=1') 40% 50% / 420% auto, #e9d7ab;
+  clip-path: polygon(2% 0, 98% 3%, 100% 100%, 0 98%);
+  font-family: 'IM Fell English', serif; color: #24150a; text-align: center; line-height: 1.15;
+}
+.note-heros { font-family: 'Almendra', serif; font-weight: 700; font-size: calc(var(--u) * 3.2); }
+.note-jet { font-size: calc(var(--u) * 2.5); }
+.note-action { font-size: calc(var(--u) * 2.1); font-style: italic; color: #5c3a21; margin-top: calc(var(--u) * 0.3); }
+.note-lancer {
+  position: absolute; right: calc(var(--u) * 0.8); top: calc(var(--u) * 0.6); width: calc(var(--u) * 6.4); height: calc(var(--u) * 6.4);
+  padding: 0; border: 0; background: transparent; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.note-lancer[disabled] { cursor: default; opacity: 0.55; }
+.note-de-svg { width: 100%; height: 100%; overflow: visible; }
+.note-de-svg path { fill: rgba(255, 246, 222, 0.85); stroke: #2a170b; stroke-width: 2.2; stroke-linejoin: round; }
+.note-de-svg path.facette { fill: none; stroke-width: 1; }
+.note-de-svg text { font-family: 'Cinzel', serif; font-weight: 700; font-size: 13px; text-anchor: middle; fill: #2a170b; }
+.note-de.a-moi .note-lancer { animation: de-appelle 1.6s ease-in-out infinite; }
+.note-de.a-moi .note-de-svg path:first-child { stroke: #8a5a10; }
+.note-de.lance .note-lancer { animation: de-roule 0.6s linear infinite; }
+@keyframes de-appelle { 0%, 100% { transform: rotate(0) scale(1); } 50% { transform: rotate(-12deg) scale(1.12); } }
+@keyframes de-roule { to { transform: rotate(360deg); } }
+
+/* LA BANDE DU PORTRAIT : elle sort du livre côté gauche. */
+.recit-portrait {
+  position: absolute; left: calc(-70px * var(--s, 1)); top: calc(110px * var(--s, 1));
+  width: calc(340px * var(--s, 1)); height: calc(780px * var(--s, 1)); pointer-events: none;
+}
+.bande-portrait {
+  position: absolute; inset: 0; box-sizing: border-box; padding: calc(var(--u) * 2); display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 1.4);
+  background: url('images/grimoire/page.webp?v=1') 50% 40% / 300% auto, #e8d5a8;
+  clip-path: polygon(3% 1%, 100% 0, 99% 100%, 0 99%);
+  filter: drop-shadow(calc(var(--u) * -0.4) calc(var(--u) * 0.5) calc(var(--u) * 0.8) rgba(40, 20, 6, 0.55));
+  transform: translateX(80%) rotate(0deg); opacity: 0; transition: transform 0.5s cubic-bezier(0.45, 0.05, 0.25, 1), opacity 0.3s ease;
+}
+.recit-portrait.sortie { pointer-events: auto; }
+.recit-portrait.sortie .bande-portrait { transform: translateX(0) rotate(-1.5deg); opacity: 1; }
+.cadre-portrait { width: 100%; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  box-shadow: inset 0 0 calc(var(--u) * 1) rgba(60, 35, 15, 0.5); }
+.cadre-portrait img { width: 100%; height: 100%; object-fit: cover; object-position: top; filter: sepia(0.25) contrast(1.05); }
+.cadre-portrait .silhouette { width: 70%; height: auto; }
+.cadre-portrait .silhouette path { fill: none; stroke: #1b1009; stroke-width: 2.4; stroke-linecap: round; opacity: 0.75; }
+.nom-portrait { font-family: 'Almendra', serif; font-weight: 700; font-size: calc(var(--u) * 3.4); color: #24150a; text-align: center; }
+
+/* LA POUSSIÈRE : les lettres s'envolent vers le livre. */
+.recit-poussiere { position: absolute; inset: 0; pointer-events: none; z-index: 60; overflow: hidden; }
+.poussiere-texte { position: absolute; box-sizing: border-box; white-space: pre-wrap; word-wrap: break-word; font-style: italic; }
+.poussiere-texte span { display: inline-block; }
+.grain-poussiere { position: absolute; width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%; background: rgba(40, 22, 8, 0.75); }
+
+/* La note du combat (v278, combat_rp.js) : rouge sang, avec son bouton. */
+.note-combat .papier-note { padding-right: calc(var(--u) * 1.6); background: url('images/grimoire/page.webp?v=1') 40% 50% / 420% auto, #e2c49a; box-shadow: inset 0 0 calc(var(--u) * 2) rgba(120, 20, 10, 0.45); }
+.note-combat .note-heros { color: #6b120a; }
+.note-combattre {
+  margin-top: calc(var(--u) * 1.4); padding: calc(var(--u) * 0.8) calc(var(--u) * 2); border: calc(var(--u) * 0.3) solid #6b120a; border-radius: calc(var(--u) * 0.5);
+  background: rgba(139, 26, 16, 0.12); color: #6b120a; font-family: 'Cinzel', serif; font-weight: 700; font-size: calc(var(--u) * 2.8); letter-spacing: 0.08em;
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; animation: de-appelle 1.8s ease-in-out infinite;
+}

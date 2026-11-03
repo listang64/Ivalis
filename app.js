@@ -3797,6 +3797,10 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
          }
 
          window.PARTIE_DATA = dataPartie;
+         // LE RÉCIT DU LIVRE (v300, grimoire_recit.js) : le Narrateur qui écrit.
+         if (typeof window.livreRecitPartie === "function") {
+             try { window.livreRecitPartie(dataPartie); } catch (e) { console.error("Le récit du livre (le jeu continue) :", e); }
+         }
 
          // Le butin de fin de combat : personnel, puis partagé. Rejoué à chaque
          // notification, comme la piste d'initiative.
@@ -3990,6 +3994,13 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
               if (msgDiv) msgDiv.remove();
           }
       });
+
+      // LE RÉCIT DU LIVRE (v300, grimoire_recit.js) : les mêmes messages, sans
+      // nouvelle lecture de la base ; `initial` : ceux d'avant l'arrivée.
+      if (typeof window.livreRecitMessages === "function") {
+          try { window.livreRecitMessages(snap.docs.map(d => ({ idDoc: d.id, ...d.data() })), { initial: !window.INITIAL_CHAT_LOADED }); }
+          catch (e) { console.error("Le récit du livre (le jeu continue) :", e); }
+      }
 
       window.INITIAL_CHAT_LOADED = true;
 
@@ -6981,6 +6992,33 @@ window.lancerJetDeCaracteristique = async function(idCarac, nomCarac, valeurCara
     });
     
     fermerFichePerso();
+};
+
+// LE DÉ DEPUIS LE LIVRE (v300, grimoire_recit.js) : la note de l'Arbitre qui
+// sort du livre lance le jet demandé, sans ouvrir la fiche. Le même jet que le
+// d20 de la fiche (la valeur et ses bonus, le +2 du talent), la même scène.
+window.lancerJetPourHeros = async function(idPerso, nomCarac) {
+    if (!window.ID_PARTIE_COURANTE) return false;
+    const sansAcc = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+    const carac = NOMS_CARACS.find(c => sansAcc(c.nom) === sansAcc(nomCarac));
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPerso);
+    if (!carac || !perso) return false;
+    if (!(idPerso in (window.CARACS_PARTIE || {})) || !window.CARACS_PARTIE[idPerso]) await chargerCaracsPartie([idPerso]);
+    const stats = (window.CARACS_PARTIE || {})[idPerso] || {};
+    const val = window.caracAvecBonus(perso, carac.id, stats[carac.id] || 8);
+    const resultatD20 = Math.floor(Math.random() * 20) + 1;
+    const atout = (typeof window.atoutRace === "function" ? window.atoutRace(perso) : null) || {};
+    const bonusTalent = parseInt((atout.testsCarac || {})[carac.id]) || 0;
+    const mod = getModificateur(val) + bonusTalent;
+    window.ID_MON_LANCER = Math.random().toString(36).substring(2, 10);
+    await updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), {
+        Action_Des: {
+            idLancer: window.ID_MON_LANCER, idPerso, nomPerso: `${perso.prenom} ${perso.nom}`.trim() || perso.prenom,
+            caract: carac.nom, resultatBrut: resultatD20, modificateur: mod, totalFinal: resultatD20 + mod,
+            timestamp: new Date().getTime()
+        }
+    });
+    return true;
 };
 
 // LA SCÈNE DU DÉ vit dans jet_d20.js (window.jouerAnimationDesGlobal) : le

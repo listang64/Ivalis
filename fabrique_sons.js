@@ -427,6 +427,36 @@
             bruit(ctx, s, { debut: 0.1, duree: 0.13, filtre: "lowpass", freq: 520, q: 0.9, gain: 0.55, forme: "chute" });
             bruit(ctx, s, { debut: 0.1, duree: 0.07, filtre: "bandpass", freq: 1800, q: 1.2, gain: 0.12, forme: "chute" });
         },
+        // LE RÉCIT DU LIVRE (v300). La plume qui écrit sur le parchemin : un
+        // grattement bref (le livre en enchaîne pendant que le texte s'écrit,
+        // grimoire_recit.js) — un frottement aigu, granuleux, qui accroche.
+        "plume-ecrit"(ctx, s) {
+            const t = ctx.currentTime, duree = 0.07 + Math.random() * 0.09;
+            const n = Math.floor(ctx.sampleRate * duree);
+            const tampon = ctx.createBuffer(1, n, ctx.sampleRate), d = tampon.getChannelData(0);
+            let accroche = 0;
+            for (let i = 0; i < n; i++) {
+                const x = i / n;
+                if (Math.random() < 0.01) accroche = 0.5 + Math.random() * 0.5;
+                accroche *= 0.985;
+                const env = Math.min(1, x / 0.15) * Math.pow(1 - x, 1.2);
+                d[i] = (Math.random() * 2 - 1) * env * (0.35 + accroche);
+            }
+            const src = ctx.createBufferSource();
+            src.buffer = tampon;
+            const f = ctx.createBiquadFilter();
+            f.type = "bandpass"; f.Q.value = 1.6; f.frequency.value = 4200 + Math.random() * 1800;
+            const g = ctx.createGain();
+            g.gain.value = 0.16;
+            src.connect(f).connect(g).connect(s);
+            src.start(t);
+        },
+        // Le texte du joueur qui part en poussière vers le livre : un souffle
+        // léger qui monte puis s'éloigne, semé de grains.
+        "poussiere-envol"(ctx, s) {
+            bruit(ctx, s, { duree: 1.1, filtre: "bandpass", q: 0.9, balayage: [700, 3800], gain: 0.16, forme: "cloche" });
+            bruit(ctx, s, { debut: 0.15, duree: 0.8, filtre: "highpass", freq: 5200, q: 0.7, gain: 0.05, forme: "cloche" });
+        },
         // LE VENT DES NUAGES (v286) : pendant la traversée entre la carte du
         // monde et une carte régionale. Un souffle grave qui enfle à l'entrée,
         // tient au cœur des nuages, retombe à la sortie ; des rafales le

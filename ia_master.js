@@ -439,7 +439,12 @@ async function detourerFondMagentaPNJ(imageSource) {
 // =========================================================================
 //  NOUVEAU : MIA_PNJ (Création procédurale de PNJ nommés avec Détourage)
 // =========================================================================
+// LES PORTRAITS DES PNJ EN PAUSE (v300). Nico : « mets en stand-by les
+// créations d'images de PNJ pour le moment, ça va revenir après ». Les fiches
+// des PNJ se créent toujours ; seul le portrait attend (false le rallume).
+window.PORTRAITS_PNJ_EN_PAUSE = true;
 async function genererEtStockerImagePNJ(descriptionPhysique, racePNJ = "Humain") {
+    if (window.PORTRAITS_PNJ_EN_PAUSE !== false) return "";
     const cles = {
         openai: localStorage.getItem("ivalis_OPENAI_API_KEY")?.trim(),
         cloudName: localStorage.getItem("ivalis_CLOUDINARY_CLOUD_NAME")?.trim(),
@@ -1643,7 +1648,9 @@ async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTe
 
     const temperatureIA = parseFloat(localStorage.getItem("ivalis_IA_TEMPERATURE")) || 1.0;
 
-    let instructionMJ = "Tu es le Maître du Jeu.";
+    // Le cerveau du Narrateur : celui de la base (Paramètres, INST_10895) s'il
+    // existe, sinon celui du livre (v300, PROMPT_NARRATEUR_LIVRE).
+    let instructionMJ = PROMPT_NARRATEUR_LIVRE;
     const snapInst = await getDoc(doc(db, "Cerveau_IA", "INST_10895"));
     if (snapInst.exists() && snapInst.data().Contenu_Direct) instructionMJ = snapInst.data().Contenu_Direct;
 
@@ -1925,6 +1932,63 @@ window.annoncerJetsDemandes = function (message) {
     bandeau.onclick = () => bandeau.classList.remove("visible");
 };
 
+// LE NARRATEUR NE LIT QUE LE LIVRE (v300). Nico : « le narrateur ne lit que
+// le livre ; de toute façon il va marquer ce que font et disent les joueurs ».
+// Une ligne écrite par un joueur dans le grimoire part telle que le livre la
+// raconte (Texte_Livre, récrite par le Narrateur lite) ; le reste (les
+// narrations, l'Arbitre, les dés) part comme avant.
+function ligneDuLivre(m) {
+    if (m && m.Texte_Livre) return `Le livre (${m.Auteur_Nom}) : ${m.Texte_Livre}`;
+    return `${m.Auteur_Nom} : ${m.Texte}`;
+}
+
+// LE CERVEAU DU NARRATEUR (v300), par défaut. Nico : « le MJ, que l'on va
+// nommer maintenant Narrateur, parlera comme si c'était un personnage du groupe
+// d'aventuriers qui suit les aventuriers dans leurs aventures. Il écrira à la
+// première personne, il sera drôle et léger » ; « il reste juste le témoin qui
+// raconte ; le ton peut être également sombre et épique, il faut un bon
+// mélange et varier ». Celui de la base (INST_10895) passe devant.
+const PROMPT_NARRATEUR_LIVRE = `Tu es le Narrateur d'Ivalis, un jeu de rôle entre amis dans un monde d'Antiquité fantastique : cités de marbre et de bronze, dieux capricieux, magie vénérée à Arcaï et punie de mort à Volcanisse, races anciennes (humains, Ankylars, Gobs, Éthérés, Ophiors…), et l'Ordre d'Ivalis, qui combat une Engeance à laquelle plus personne ne croit.
+Tu accompagnes le groupe d'aventuriers partout où il va, et tu écris le livre de leurs aventures. Tu ES un compagnon de route : tu dis « je », tu vois, tu entends, tu as froid, tu as peur, tu ris. Mais tu restes un témoin : tu ne combats pas, tu ne décides rien, tu ne parles jamais à la place des héros. Qui tu es exactement reste volontairement flou : ne te donne ni nom, ni race, ni passé.
+
+1. TON RÔLE
+- Tu racontes ce qui arrive : le monde, ses habitants, les conséquences logiques de ce que les héros ont tenté. Tu fais vivre les PNJ et leurs répliques.
+- Les dernières lignes du livre (« Le livre (Thorin) : … ») racontent déjà ce que les héros viennent de faire ou de dire, dans ta voix. Ne les répète pas : enchaîne directement sur ce qui se passe ENSUITE, la réaction du monde, le résultat.
+- Ne décide JAMAIS à la place d'un héros : ni ses actes, ni ses paroles, ni ses pensées, ni ses sentiments. Tu peux donner ton avis sur eux (amusé, admiratif, inquiet, exaspéré), c'est ton droit de témoin.
+- Réponds à tout ce que les héros ont fait depuis ta dernière page ; un héros silencieux reste en retrait.
+- Termine sur une situation ouverte qui appelle une réaction (un PNJ qui attend une réponse, un bruit, une porte entrouverte, une menace qui approche). Ne propose jamais de liste de choix.
+
+2. LE TON : VARIE-LE
+Mélange et alterne : de l'humour léger (tes remarques, l'absurde d'une situation, les travers des héros) ; puis, quand il le faut, du sombre et de l'épique (la peur, la violence, la grandeur, la cruauté du monde). Ni farce permanente, ni noirceur sans répit : un bon livre fait rire puis frissonner. Reste cohérent avec tout ce qui a déjà été écrit.
+
+3. LE CONTEXTE QUE TU REÇOIS (à la suite de ces consignes) : sers-t'en, ne le recopie pas.
+- La date, le lieu, la région et son lore ; dans la nature, le terrain autour du groupe.
+- La réputation du groupe DANS CE LIEU : les PNJ d'ici réagissent en conséquence et ignorent ce que le groupe a fait ailleurs.
+- Les PNJ présents et leurs fiches : garde leur nom exact, leur caractère, leur façon de parler. Leur secret guide leur comportement ; ne le révèle pas sans raison.
+- « PERSONNAGES PRÊTS À ENTRER EN SCÈNE » : si la scène en a besoin, fais-les entrer avec CE nom, ce physique et ce caractère.
+- Seul un personnage important reçoit un nom propre ; un figurant reste « un garde », « une vieille marchande ».
+- Dans la nature, n'invente ni village ni bâtiment. Les longs voyages se font sur la carte : ne déplace pas le groupe vers une autre région de toi-même ; à l'intérieur d'un lieu (entrer dans une taverne, traverser le marché), tu peux. Ne fais pas sauter plusieurs jours.
+
+4. LES DÉS : C'EST L'ARBITRE QUI LES DEMANDE, TOI TU RACONTES
+Avant ta page, l'Arbitre des dés a peut-être demandé des jets, sous cette forme :
+Arbitre des dés : 🎲 Thorin : jet de Force — difficulté difficile (enfoncer la porte)
+puis le joueur a lancé son dé :
+🎲 Jet de FORCE pour Thorin : Résultat : 13 +2 = 15
+(13 est le dé, +2 le modificateur, 15 le total.)
+- Ne demande JAMAIS de jet toi-même.
+- Sans jet : l'action était sans risque (elle réussit si elle est raisonnable) ou impossible (elle échoue, et tu dis pourquoi).
+- Avec un jet : compare le total à la difficulté (facile 8 · moyenne 12 · difficile 15 · très difficile 18 · héroïque 22). Au moins la difficulté : réussite ; la difficulté + 5 : réussite brillante, avec un petit avantage. En dessous : échec, mais l'histoire avance (une complication, un prix à payer, un danger qui approche). Dé à 20 : réussite éclatante. Dé à 1 : échec critique et marquant, sans tuer le héros.
+- Raconte ce qui arrive, jamais les chiffres.
+
+5. LES COMBATS
+Le jeu a son propre combat tactique. Si les héros attaquent ou sont attaqués : ne résous pas le combat ; décris la tension, l'instant où les armes sortent, qui se dresse contre eux (combien, à quoi ils ressemblent), puis arrête-toi. Après un combat, le contexte te donne son issue : raconte la suite en la respectant à la lettre. Ne gère jamais les points de vie, l'expérience, l'or ni le butin chiffré.
+
+6. LA FORME (essentiel : ta page s'écrit dans un livre)
+- De la prose, au présent, à la première personne (« je »), en français. Des paragraphes de 2 à 4 phrases, séparés par un retour à la ligne ; 3 à 6 paragraphes en tout, moins s'il se passe peu de chose.
+- Les répliques des PNJ restent dans le récit, entre guillemets « », avec le nom exact de celui qui parle dans la phrase (« Pas un pas de plus », gronde Varos).
+- Nomme les héros par leur prénom, et adresse-toi parfois au lecteur ou aux héros si ça sert le récit.
+- Aucune mise en forme : pas de titres, pas de listes, pas de gras, pas d'astérisques, pas d'emojis.`;
+
 // --- 4. LA BOUCLE GLOBALE (Bouton MJ) ---
 
 // `options.issueCombat` (v278, combat_rp.js) : le récit d'après un combat du
@@ -2018,8 +2082,8 @@ window.declencherTourIA = async function(options) {
         // On ne garde que les 30 dernières répliques pour ne pas exploser la facture
         const historiqueReduit = messagesFiltres.slice(-30);
 
-        const historiqueComplet = historiqueReduit.map(m => `${m.Auteur_Nom} : ${m.Texte}`).join("\n");
-        const historique4 = historiqueReduit.slice(-4).map(m => `${m.Auteur_Nom} : ${m.Texte}`).join("\n");
+        const historiqueComplet = historiqueReduit.map(ligneDuLivre).join("\n");
+        const historique4 = historiqueReduit.slice(-4).map(ligneDuLivre).join("\n");
         // =========================================================================
 
         const env = await preparerEnvironnement(lieuActuel);
@@ -2282,7 +2346,7 @@ window.processusArchivageChat = async function(options) {
         // NOUVEAU FILTRE : On ignore SEULEMENT le compteur de temps pur (SYSTEME_TEMPS). 
         // On GARDE le Destin (pour les voyages) et le MJ (pour la narration) !
         const historiqueFiltre = messages.filter(m => m.Auteur_ID !== "SYSTEME_TEMPS");
-        const historiqueComplet = historiqueFiltre.map(m => `${m.Auteur_Nom} : ${m.Texte}`).join("\n");
+        const historiqueComplet = historiqueFiltre.map(ligneDuLivre).join("\n");
 
         if (historiqueFiltre.length > 0) {
             
@@ -2414,6 +2478,13 @@ Si un PNJ n'a absolument pas interagi ou n'a pas du tout été concerné par les
                     }
                 }
             }
+        }
+
+        // 4 bis. LE CHAPITRE SE RANGE DANS LE LIVRE (v300, grimoire_recit.js) :
+        // ses pages et son titre, avant que le chat ne se vide.
+        if (window.GRIMOIRE_RECIT && typeof window.GRIMOIRE_RECIT.archiverChapitre === "function") {
+            try { await window.GRIMOIRE_RECIT.archiverChapitre(messages); }
+            catch (e) { console.error("Le chapitre du livre (l'archivage continue) :", e); }
         }
 
         // 5. Autodestruction du chat (EN LOT)

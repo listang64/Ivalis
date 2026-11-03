@@ -159,6 +159,8 @@ await p.route('**api.cloudinary.com/**', async r => {
 });
 const erreurs = []; p.on('pageerror', e => erreurs.push(e.message));
 await p.goto(base + '/index.html'); await p.waitForTimeout(1500);
+// v300 : les portraits des PNJ sont en pause (ia_master.js) ; ce banc les rallume pour les vérifier.
+await p.evaluate(() => { window.PORTRAITS_PNJ_EN_PAUSE = false; });
 // Un vrai flux : la réponse du narrateur arrive morceau par morceau, une
 // demi-seconde entre chaque (la route la livrerait d'un bloc).
 await p.evaluate(() => {

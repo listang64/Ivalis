@@ -168,6 +168,8 @@ await p.route('**api.cloudinary.com/**', r => r.fulfill({ contentType: 'applicat
   body: JSON.stringify({ secure_url: `https://res.cloudinary.com/dlkjq4kvg/image/upload/v1/PNJ/portrait_${Date.now()}.png` }) }));
 const erreurs = []; p.on('pageerror', e => erreurs.push(e.message));
 await p.goto(base + '/index.html'); await p.waitForTimeout(1500);
+// v300 : les portraits des PNJ sont en pause (ia_master.js) ; ce banc les rallume pour les vérifier.
+await p.evaluate(() => { window.PORTRAITS_PNJ_EN_PAUSE = false; });
 
 const preparerTable = () => p.evaluate((URL_PORTRAIT_KORE) => {
   window.jouerSonClic = () => {}; window.confirm = () => true; window.alert = () => {};
