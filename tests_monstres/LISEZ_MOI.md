@@ -9661,3 +9661,51 @@ corrections_v297.mjs (dans la suite), sur la vraie page (banc), vérifie :
 - trois tailles d'écran ; les portes ; les fichiers.
 
 Il échoue sur l'ancien code (8 échecs).
+
+## v298 — Le grimoire, retouches : plus vif, la pliure, les bruits de pages, posé en bas, le doigt sans délai
+
+Nico : « quand on clique, fais un peu plus rapide l'animation de tourner la
+page » ; « il n'y a pas d'ombrage au centre du livre au niveau de la
+pliure » ; « des bruits de pages tournées, quand on commence à prendre un
+bout de page et quand la page se tourne complètement » ; « le livre,
+descends-le au max — ne l'agrandis pas, juste descends-le » ; « sur iPad le
+toucher ne se déclenche pas tout de suite, il y a un décalage ».
+
+- Une page tourne en 0,7 s (`flippingTime`, au lieu de 1,1 s). Le zoom
+  d'ouverture passe à 0,85 s, et le livre ouvert apparaît plus tôt.
+- La pliure : chaque page de papier porte une ombre (::after) qui monte vers
+  le dos — un creux sombre, puis la lumière qui revient — et elle tourne avec
+  la page.
+- Les bruits (fabrique_sons.js, sons d'événement, volume Interface ×
+  Général) :
+  - « page-prise » : un froissement sec de 0,2 s, quand le doigt saisit le
+    coin (StPageFlip passe en user_fold) ;
+  - « page-tourne » : un souffle de papier de 0,7 s qui monte avec la page,
+    puis la page qui retombe (un flap sourd). Il part quand une page tourne
+    toute seule (état flipping), ou, à la main, quand le doigt se lève
+    au-delà du dos (c'est là que StPageFlip finit la page). Relâchée avant,
+    elle retombe sans lui.
+  - La couverture ne joue plus le son de clic : le bruit de page suffit.
+- Même taille qu'en v297 (tout le livre tient à l'écran), mais posé en bas :
+  1,2 % de marge dessous.
+- Au doigt, tout de suite : les boutons et la couverture agissent au
+  pointerup (posé et levé sur la même cible, sans glisser), sans attendre le
+  « click » que Safari retarde. Le « click » qui suit est ignoré ; seul (souris,
+  clavier), il agit. touch-action: manipulation sur la couverture et les
+  boutons.
+
+corrections_v298.mjs (dans la suite), sur la vraie page (banc), vérifie :
+- 0,7 s par page, le zoom à 0,85 s ;
+- la même taille qu'avant, posé en bas, les pages toujours au pixel ;
+- l'ombre de pliure (styles, puis pixels : creux sombre et lumière qui
+  revient) ;
+- les bruits : la prise, la tourne à la main, la page relâchée qui retombe
+  sans tourne, la tourne au clic, et le rendu des deux sons (durée,
+  énergie) ;
+- le toucher : action sans « click », pas de doublon, un click seul agit, un
+  glissé n'agit pas, la couverture s'ouvre aussitôt et sans son de clic,
+  touch-action ;
+- les versions.
+
+Il échoue sur l'ancien code (14 échecs). Test mis à jour : corrections_v297
+(posé en bas au lieu d'une marge en haut).

@@ -339,6 +339,64 @@
             // le frottement, plus sourd, du papier sous la main
             bruit(ctx, s, { duree, filtre: "lowpass", freq: 900, q: 0.7, gain: 0.07, forme: "cloche" });
         },
+        // LE GRIMOIRE (v298) : Nico, « des bruits de pages tournées, pour quand
+        // on commence à prendre un bout de page et quand la page se tourne
+        // complètement ». Deux bruits de papier, fabriqués ici.
+        // La prise : les doigts saisissent le coin — un froissement bref et
+        // sec, fait de petits craquements serrés.
+        "page-prise"(ctx, s) {
+            const t = ctx.currentTime, duree = 0.2;
+            const n = Math.floor(ctx.sampleRate * duree);
+            const tampon = ctx.createBuffer(1, n, ctx.sampleRate), d = tampon.getChannelData(0);
+            let craque = 0;
+            for (let i = 0; i < n; i++) {
+                const x = i / n;
+                if (Math.random() < 0.004) craque = 0.6 + 0.4 * Math.random();    // un craquement
+                craque *= 0.996;
+                const env = Math.min(1, x / 0.04) * Math.pow(1 - x, 1.6);
+                d[i] = (Math.random() * 2 - 1) * env * (0.25 + craque);
+            }
+            const src = ctx.createBufferSource();
+            src.buffer = tampon;
+            const f = ctx.createBiquadFilter();
+            f.type = "bandpass"; f.Q.value = 0.8; f.frequency.value = 3200;
+            const aigu = ctx.createBiquadFilter();
+            aigu.type = "highpass"; aigu.frequency.value = 1100;
+            const g = ctx.createGain();
+            g.gain.value = 0.55;
+            src.connect(f).connect(aigu).connect(g).connect(s);
+            src.start(t);
+        },
+        // La page qui tourne : un souffle de papier qui monte avec la page,
+        // traversé de froissements, puis la page qui retombe à plat (un « flap »
+        // sourd). Sa durée suit l'animation du livre (0,7 s).
+        "page-tourne"(ctx, s) {
+            const t = ctx.currentTime, duree = 0.72;
+            const n = Math.floor(ctx.sampleRate * duree);
+            const tampon = ctx.createBuffer(1, n, ctx.sampleRate), d = tampon.getChannelData(0);
+            let craque = 0;
+            for (let i = 0; i < n; i++) {
+                const x = i / n;
+                if (Math.random() < 0.0012 * (0.3 + x)) craque = 0.5 + 0.5 * Math.random();
+                craque *= 0.997;
+                const env = x < 0.78 ? Math.pow(x / 0.78, 1.3) : Math.pow(1 - (x - 0.78) / 0.22, 2.2);
+                d[i] = (Math.random() * 2 - 1) * env * (0.55 + craque * 0.9);
+            }
+            const src = ctx.createBufferSource();
+            src.buffer = tampon;
+            const f = ctx.createBiquadFilter();
+            f.type = "bandpass"; f.Q.value = 0.7;
+            f.frequency.setValueAtTime(900, t);
+            f.frequency.exponentialRampToValueAtTime(2600, t + duree * 0.7);
+            f.frequency.exponentialRampToValueAtTime(1300, t + duree);
+            const g = ctx.createGain();
+            g.gain.value = 0.42;
+            src.connect(f).connect(g).connect(s);
+            src.start(t);
+            // la page retombe : un coup d'air grave, bref
+            bruit(ctx, s, { debut: duree * 0.8, duree: 0.13, filtre: "lowpass", freq: 520, q: 0.9, gain: 0.55, forme: "chute" });
+            bruit(ctx, s, { debut: duree * 0.8, duree: 0.07, filtre: "bandpass", freq: 1800, q: 1.2, gain: 0.12, forme: "chute" });
+        },
         // LE VENT DES NUAGES (v286) : pendant la traversée entre la carte du
         // monde et une carte régionale. Un souffle grave qui enfle à l'entrée,
         // tient au cœur des nuages, retombe à la sortie ; des rafales le

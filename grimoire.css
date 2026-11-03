@@ -16,7 +16,7 @@
 
 .grimoire-scene {
   position: absolute; transform-origin: 0 0;
-  transition: transform 1.25s cubic-bezier(0.45, 0.05, 0.25, 1);
+  transition: transform 0.85s cubic-bezier(0.45, 0.05, 0.25, 1);
 }
 .grimoire-scene.ferme { transform: var(--transform-ferme, none); }
 .grimoire-scene.ouvert { transform: none; }
@@ -24,7 +24,7 @@
 /* Le livre ouvert : derrière les pages, il n'apparaît qu'à l'ouverture. */
 .grimoire-fond-livre {
   position: absolute; inset: 0; width: 100%; height: 100%;
-  pointer-events: none; opacity: 0; transition: opacity 0.7s ease 0.35s;
+  pointer-events: none; opacity: 0; transition: opacity 0.5s ease 0.15s;
   filter: drop-shadow(0 calc(var(--u) * 1.2) calc(var(--u) * 2.4) rgba(60, 35, 15, 0.45));
   /* Les deux dernières colonnes de l'image sont opaques (un liseré sombre) : rognées. */
   clip-path: inset(-5% 0.12% -5% -5%);
@@ -37,7 +37,8 @@
    enveloppe et son bloc remplissent la zone des deux pages. */
 .grimoire-livre .stf__wrapper { position: relative; width: 100%; height: 100%; }
 .grimoire-livre .stf__block { inset: 0; }
-.grimoire-attrape { position: absolute; inset: 0; cursor: pointer; z-index: 5; }
+.grimoire-attrape { position: absolute; inset: 0; cursor: pointer; z-index: 5; touch-action: manipulation; }
+.bouton-grimoire, .lien-grimoire, .case-grimoire { touch-action: manipulation; }
 .grimoire-invite {
   position: absolute; left: 0; right: 0; bottom: 5vh; margin: 0; text-align: center;
   font-family: 'IM Fell English', 'Almendra', serif; font-style: italic; font-size: clamp(14px, 1.6vw, 22px);
@@ -60,6 +61,22 @@
 }
 /* La texture a son bord lisse à gauche (le dos) : à gauche du livre, on la retourne. */
 .page-papier.gauche::before { transform: scaleX(-1); }
+/* LA PLIURE (v298). Nico : « il n'y a pas d'ombrage au centre du livre au
+   niveau de la pliure ». Chaque page s'assombrit en approchant du dos — un
+   creux, puis la lumière revient — et l'ombre tourne avec la page. */
+.page-papier::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 40%; pointer-events: none; z-index: 2;
+}
+.page-papier.gauche::after {
+  right: 0;
+  background: linear-gradient(to left, rgba(36, 18, 3, 0.72) 0%, rgba(44, 22, 5, 0.52) 4%, rgba(54, 28, 7, 0.34) 12%,
+                                       rgba(64, 36, 10, 0.2) 25%, rgba(70, 40, 12, 0.08) 50%, rgba(70, 40, 12, 0) 100%);
+}
+.page-papier.droite::after {
+  left: 0;
+  background: linear-gradient(to right, rgba(36, 18, 3, 0.72) 0%, rgba(44, 22, 5, 0.52) 4%, rgba(54, 28, 7, 0.34) 12%,
+                                        rgba(64, 36, 10, 0.2) 25%, rgba(70, 40, 12, 0.08) 50%, rgba(70, 40, 12, 0) 100%);
+}
 
 .contenu-page {
   position: absolute; inset: 0; box-sizing: border-box;

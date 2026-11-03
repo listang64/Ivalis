@@ -99,12 +99,13 @@ await section(async () => {
   const r = await p.evaluate(() => {
     const scene = document.getElementById("grimoire-scene"), fond = document.querySelector(".grimoire-fond-livre").getBoundingClientRect();
     return { page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), ouvert: scene.classList.contains("ouvert"), zoom: getComputedStyle(scene).transform,
-             livreVisible: getComputedStyle(document.querySelector(".grimoire-fond-livre")).opacity === "1", haut: fond.top, largeur: fond.width, vw: innerWidth,
+             livreVisible: getComputedStyle(document.querySelector(".grimoire-fond-livre")).opacity === "1", haut: fond.top, bas: innerHeight - fond.bottom, largeur: fond.width, vw: innerWidth,
              image: /livre_ouvert\.webp/.test(document.querySelector(".grimoire-fond-livre").src) };
   });
   verifier("la couverture tourne avec StPageFlip (animation de page)", pendant === "flipping" || pendant === "fold_corner", pendant);
   verifier("le livre ouvert apparaît, sur la double page titre + journal", r.page === 1 && r.ouvert && r.livreVisible && r.image, JSON.stringify({ page: r.page, ouvert: r.ouvert }));
-  verifier("il grossit (zoom levé) et remplit l'écran avec une petite marge en haut", r.zoom === "none" && r.haut > 5 && r.haut < 40 && r.largeur > r.vw * 0.9, `haut ${r.haut.toFixed(0)} px, largeur ${r.largeur.toFixed(0)}/${r.vw}`);
+  // v298 : « ne l'agrandis pas, juste descends-le » : tout le livre tient à l'écran, posé en bas.
+  verifier("il grossit (zoom levé), tout entier à l'écran, posé en bas (v298)", r.zoom === "none" && r.bas >= 0 && r.bas < 20 && r.largeur > r.vw * 0.9 && r.largeur <= r.vw, `bas ${r.bas.toFixed(0)} px, haut ${r.haut.toFixed(0)} px, largeur ${r.largeur.toFixed(0)}/${r.vw}`);
   const a = await alignement();
   verifier("les deux pages se posent exactement sur celles du livre dessiné", a.ecart < 3, `${a.ecart.toFixed(1)} px`);
 });

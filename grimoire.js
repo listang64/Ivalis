@@ -37,8 +37,12 @@
     const PAGE = { w: ZONE.w / 2, h: ZONE.h };
     const COUVERTURE = { w: 1344, h: 2000 };               // l'image de la couverture
     const ZOOM_FERME = 0.82;                                // le livre fermé, un peu plus petit
-    const MARGE_HAUT = 0.025, MARGE_BAS = 0.02, MARGE_COTE = 0.02;
-    const DUREE_TOURNE = 1100;
+    // v298 : Nico, « le livre, descends-le au max sur l'écran — ne l'agrandis
+    // pas, juste descends-le ». Même taille qu'avant (tout le livre tient à
+    // l'écran), mais posé en bas, un filet de marge sous lui.
+    const MARGE_HAUT = 0.025, MARGE_BAS = 0.012, MARGE_COTE = 0.02;
+    // v298 : Nico, « fais un peu plus rapide l'animation de tourner la page ».
+    const DUREE_TOURNE = 700;
 
     let ecran = null, scene = null, livre = null, pageFlip = null, attrape = null;
     let ouvert = false, chapitre = "", initialise = false, departEnCours = false;
@@ -102,6 +106,7 @@
     const bouton = (id, texte, action, graine) =>
         `<button type="button" class="bouton-grimoire" id="${id}" data-action="${action}">${cadreMain(graine || id)}<span>${texte}</span></button>`;
     const son = () => { try { if (typeof window.jouerSonClic === "function") window.jouerSonClic(); } catch (e) {} };
+    const bruitPage = (id) => { try { if (typeof window.jouerSonEvenement === "function") window.jouerSonEvenement(id); } catch (e) {} };
 
     // ---------------------------------------------------------------------
     //  LES PAGES
@@ -215,7 +220,7 @@
     function mesurer() {
         const vw = window.innerWidth, vh = window.innerHeight;
         const s = Math.min(vw * (1 - 2 * MARGE_COTE) / LIVRE.w, vh * (1 - MARGE_HAUT - MARGE_BAS) / LIVRE.h);
-        const gauche = (vw - LIVRE.w * s) / 2, haut = vh * MARGE_HAUT;
+        const gauche = (vw - LIVRE.w * s) / 2, haut = vh * (1 - MARGE_BAS) - LIVRE.h * s;
         // La couverture fermée : à droite du dos, sa hauteur celle d'une page.
         const largeurCouv = PAGE.h * COUVERTURE.w / COUVERTURE.h;
         const cx = (ZONE.x + PAGE.w + largeurCouv / 2) * s, cy = (ZONE.y + PAGE.h / 2) * s;
@@ -267,13 +272,42 @@
         pages[1].innerHTML = pageTitre();
         pages[2].innerHTML = pageJournal();
         remplirChapitre("");
-        attrape.addEventListener("click", () => ouvrirLivre());
+        // AU DOIGT, TOUT DE SUITE (v298). Nico : « sur iPad le toucher ne se
+        // déclenche pas tout de suite, il y a un décalage ». Safari attend
+        // avant d'envoyer un « click » ; le grimoire agit dès que le doigt se
+        // lève (pointerup), sur la cible où il s'était posé, sans glisser. Le
+        // « click » qui suit est ignoré ; seul (le clavier), il agit.
+        let appui = null, dernier = null;
+        const cibleDe = (el) => {
+            if (!el || !el.closest) return null;
+            if (el.closest("#grimoire-attrape")) return attrape;
+            const c = el.closest("[data-action]");
+            return c && ecran.contains(c) && !c.disabled ? c : null;
+        };
+        const declencher = (c) => { if (c === attrape) ouvrirLivre(); else agir(c); };
+        ecran.addEventListener("pointerdown", (ev) => {
+            const c = cibleDe(ev.target);
+            appui = c ? { c, x: ev.clientX, y: ev.clientY, t: Date.now() } : null;
+        }, true);
+        ecran.addEventListener("pointerup", (ev) => {
+            const a = appui;
+            appui = null;
+            if (!a || cibleDe(ev.target) !== a.c || Date.now() - a.t > 900 || Math.hypot(ev.clientX - a.x, ev.clientY - a.y) > 14) return;
+            dernier = { c: a.c, t: Date.now() };
+            declencher(a.c);
+        }, true);
+        ecran.addEventListener("pointercancel", () => { appui = null; }, true);
+        ecran.addEventListener("click", (ev) => {
+            const c = cibleDe(ev.target);
+            if (!c) return;
+            if (dernier && dernier.c === c && Date.now() - dernier.t < 1000) { dernier = null; return; }
+            declencher(c);
+        });
         // Les champs, les cases et les boutons des pages gardent le doigt et
         // la souris : StPageFlip ne doit pas y voir un début de page tournée.
         ["mousedown", "touchstart"].forEach(type => ecran.addEventListener(type, (ev) => {
             if (ev.target && ev.target.closest && ev.target.closest("input, label, button, select, textarea, .liste-parties-grimoire, .message-grimoire")) ev.stopPropagation();
         }, true));
-        ecran.addEventListener("click", surClic);
         ecran.addEventListener("submit", (ev) => { ev.preventDefault(); surEnvoi(ev.target); });
         ecran.addEventListener("change", (ev) => {
             if (ev.target && ev.target.id === "grimoire-connexion-auto" && typeof window.basculerConnexionAuto === "function") {
@@ -299,6 +333,25 @@
         });
         pageFlip.loadFromHTML(livre.querySelectorAll(".page-grimoire"));
         pageFlip.on("flip", (e) => surTourne(Number(e.data)));
+        // LES BRUITS DE PAGES (v298, fabrique_sons.js) : le doigt qui saisit le
+        // coin d'une page, puis la page qui tourne (à la main ou toute seule)
+        // et retombe.
+        // Tournée à la main, la page reste « user_fold » jusqu'au bout : le bruit
+        // part quand le doigt se lève au-delà du dos du livre (c'est là que
+        // StPageFlip la finit) ; relâchée avant, elle retombe sans lui.
+        let etatAvant = "read", coteDepart = 0;
+        const cote = (x) => { const r = livre.getBoundingClientRect(); return x < r.left + r.width / 2 ? -1 : 1; };
+        livre.addEventListener("pointerdown", (ev) => { coteDepart = cote(ev.clientX); }, true);
+        window.addEventListener("pointerup", (ev) => {
+            if (etatAvant === "user_fold" && coteDepart && cote(ev.clientX) !== coteDepart) bruitPage("page-tourne");
+            coteDepart = 0;
+        }, true);
+        pageFlip.on("changeState", (e) => {
+            const etat = String(e.data);
+            if (etat === "user_fold" && etatAvant !== "user_fold" && etatAvant !== "flipping") bruitPage("page-prise");
+            if (etat === "flipping" && etatAvant !== "flipping") bruitPage("page-tourne");
+            etatAvant = etat;
+        });
         window.GRIMOIRE_PAGEFLIP = pageFlip;
     }
 
@@ -315,8 +368,7 @@
     }
     function ouvrirLivre() {
         if (ouvert || !pageFlip) return;
-        son();
-        etatOuvert(true);
+        etatOuvert(true);                       // le bruit de la couverture qui tourne suffit (v298)
         try { pageFlip.flipNext("top"); } catch (e) { try { pageFlip.turnToPage(1); } catch (e2) {} }
     }
     function surTourne(index) {
@@ -467,9 +519,8 @@
         }, 900);
     }
 
-    function surClic(ev) {
-        const cible = ev.target && ev.target.closest ? ev.target.closest("[data-action]") : null;
-        if (!cible || !ecran.contains(cible) || cible.disabled) return;
+    function agir(cible) {
+        if (!cible || cible.disabled) return;
         const action = cible.dataset.action;
         son();
         if (action === "nouvelle" || action === "charger" || action === "compte") allerAuChapitre(action);
