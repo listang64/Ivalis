@@ -6312,3 +6312,11 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
   color: #2b1a0e; cursor: pointer; }
 .boutons-feuille-ennemis .valider-ennemis { border-color: #6b120a; color: #6b120a; font-weight: 700; }
 .boutons-feuille-ennemis button:hover { background: rgba(255, 248, 230, 0.4); }
+
+/* v314 : la page des ennemis, en simple liste à décocher. */
+.liste-ennemis-valider { list-style: none; padding-left: 0; }
+.ennemi-a-valider { flex-direction: row !important; align-items: baseline; gap: 10px; cursor: pointer; }
+.garder-ennemi { width: 18px; height: 18px; accent-color: #6b120a; flex: none; transform: translateY(2px); }
+.ennemi-a-valider .nom-ennemi-valider { border: 0; font-size: 18px; font-weight: 700; color: #1b1009; }
+.ennemi-a-valider:has(.garder-ennemi:not(:checked)) .nom-ennemi-valider { text-decoration: line-through; color: #8a6a4a; }
+.note-feuille-ennemis { min-height: 1.2em; margin: 8px 0 0; text-align: center; color: #6b120a; font-style: italic; }

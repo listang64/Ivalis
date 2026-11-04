@@ -10471,3 +10471,37 @@ carte), v310 (le papier d'avatar), v287 et v270 (la piste ×1,14).
 corrections_v313.mjs vérifie tout cela (16 échecs sur la v312). Tests mis à jour :
 v278, v279 (grille, ennemis), v299, v300, v302, v304, v308, v310, v311, v312 (ouverture
 sur le sommaire, écriture, Aventuriers, récit), v309 (validation des ennemis).
+
+## v314 — Le livre retouché, MIA_ILLUSTRATEUR, les ennemis à décocher, les images des combats effacées
+
+- Le marque-page du Narrateur : moins large (150 au lieu de 190), le coin du haut
+  arraché (déchirure en dents de scie, liseré bruni) ; l'icône au-dessus du mot.
+- Le papier où l'on écrit et le papier de l'avatar : vieillis (bords roussis, anneaux
+  et auréoles de café, en gradients CSS par-dessus la feuille).
+- Les taches de café du récit (grimoire_recit.js, tacheDeCafe) : une page sur quatre
+  environ, légères (opacité 0,13 à 0,25), taille et place au hasard, stables d'un
+  affichage à l'autre (graine = partie + page, mélangée FNV-1a + mulberry32 : le
+  petit hasard du récit donnait des suites voisines pour des graines voisines).
+- La couverture : l'image de Nico (IMG_2214) ; ses proportions sont relues au
+  chargement (la place du livre fermé sur la table en dépend).
+- Le combat : la page « Qui vous fait face ? » n'est plus qu'une liste à décocher
+  (un décoché quitte le combat, son pion n'est pas dessiné ; au moins un adversaire au
+  départ). À toute fin d'un combat du récit (gagné, perdu, passé ou abandonné en DEV),
+  la carte dessinée (Combats/Cartes) et les pions des ennemis (Tokens/Ennemis)
+  s'effacent de Cloudinary (effacerImagesDuCombat ; jamais l'arène ni le portrait
+  d'un PNJ ; oublierImages accepte seulementHeros).
+- MIA_ILLUSTRATEUR (illustrations_recit.js) : après chaque réponse du Narrateur (le
+  poste qui l'a fait parler), Gemini lit les derniers messages des joueurs et la
+  réponse : un moment drôle, dramatique, attachant ou un lieu saisissant ? Si oui (et
+  au plus une fois toutes les deux réponses), un croquis à la plume sur fond magenta
+  (gpt-image, qualité « low » comme les pions ; les portraits des héros présents — et
+  des PNJ connus — en références nommées, comme pour les avatars ; détouré par
+  televerserImageDetouree), rangé sur le message (Illustration : Url, Ratio, Taille au
+  hasard 0,42-0,82). Le livre le pose après les paragraphes, à gauche, au milieu ou à
+  droite, et il monte à l'encre la première fois. Les PNJ nommés de la réponse sans
+  portrait (deux au plus) : leur croquis en pied (1024 × 1536), rangé dans leur fiche
+  Monde_PNJ (créée s'il le faut), et posé en pleine page (Portraits_PNJ), leur nom
+  dessous. window.REGLAGES_ILLUSTRATIONS (actif, ecart, qualite, tailles).
+
+corrections_v314.mjs vérifie tout cela (9 échecs sur la v313). Tests mis à jour :
+v278 (la liste à cocher), v297 (la nouvelle couverture, servie en local par le banc).

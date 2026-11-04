@@ -41,6 +41,8 @@ const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1194, height: 834 } });
 await p.route('**', r => r.request().url().startsWith(base) ? r.continue() : r.abort());
+// v314 : la couverture de Nico (Cloudinary, hors d'atteinte du banc) : l'ancienne image locale la remplace ici.
+await p.route(/IMG_2214_etfv11\.png/, r => r.fulfill({ status: 200, contentType: 'image/webp', body: fs.readFileSync(path.join(RACINE, "images/grimoire/couverture.webp")) }));
 await p.route('**/firebase-app.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_APP }));
 await p.route('**/firebase-firestore.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_FIRESTORE }));
 const erreurs = []; p.on('pageerror', e => erreurs.push(e.message));
@@ -77,7 +79,7 @@ await section(async () => {
     const fond = getComputedStyle(ecran).backgroundImage + getComputedStyle(ecran, "::before").backgroundImage /* v299 : le fond sur ::before */, couv = document.querySelector(".page-couverture img");
     const rc = couv.getBoundingClientRect();
     return { menu: getComputedStyle(document.getElementById("ecran-menu")).display, ferme: scene.classList.contains("ferme"),
-             fondBeige: !!document.getElementById("grimoire-table") /* v305 : la table de bois remplace le beige */, couverture: couv.complete && couv.naturalWidth === 1344 && /couverture\.webp/.test(couv.src),
+             fondBeige: !!document.getElementById("grimoire-table") /* v305 : la table de bois remplace le beige */, couverture: couv.complete && couv.naturalWidth === 1344 && /IMG_2214_etfv11/.test(couv.src),
              couvCentre: Math.abs((rc.left + rc.right) / 2 - innerWidth / 2), livreOuvertCache: getComputedStyle(document.querySelector(".grimoire-fond-livre")).opacity === "0",
              pf: !!window.GRIMOIRE_PAGEFLIP, page: window.GRIMOIRE_PAGEFLIP ? window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() : -1, zoom: getComputedStyle(scene).transform };
   });

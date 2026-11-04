@@ -40,7 +40,9 @@ window.imagesEncoreUtilisees = function(options) {
     // `saufPersonnage` : ce héros-là ne compte plus. C'est le cas quand on
     // l'efface — sa fiche part, mais il est encore dans la liste en mémoire au
     // moment du ménage, et ses images se protégeraient elles-mêmes.
-    const { avecButin = true, avecReserve = true, saufPersonnage = null } = options || {};
+    // `seulementHeros` (v314) : les créatures d'un combat qui s'achève ne protègent
+    // plus leurs pions (combat_rp.js, effacerImagesDuCombat).
+    const { avecButin = true, avecReserve = true, saufPersonnage = null, seulementHeros = false } = options || {};
     const vivantes = new Set();
     // Les URL voyagent parfois avec des transformations (`q_auto,f_auto`) :
     // c'est le même fichier hébergé. On compare donc sur l'identifiant public,
@@ -53,6 +55,7 @@ window.imagesEncoreUtilisees = function(options) {
 
     (window.PERSOS_PARTIE || []).forEach(p => {
         if (!p || (saufPersonnage && p.idPersonnage === saufPersonnage)) return;
+        if (seulementHeros && p.camp && p.camp !== "Allié") return;
         ajouter(p.urlCloudinary); ajouter(p.urlPortraitReference);
         ajouter(p.urlAvatarEquipe); ajouter(p.urlToken);
         [p.equipArmure, p.equipMainDroite, p.equipMainGauche].forEach(ajouterObjet);

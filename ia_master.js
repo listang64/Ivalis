@@ -2360,6 +2360,15 @@ window.declencherTourIA = async function(options) {
             }
             const nouveauxPnj = [...(await promesseAdoptes).filter(Boolean), ...rattrapes];
             await ecrireMessage(null, { PNJ_Prets: true });
+
+            // MIA_ILLUSTRATEUR (v314, illustrations_recit.js) : un croquis à la plume
+            // quand le moment le mérite, et le portrait en pied des PNJ nommés qui
+            // n'en ont pas. Pendant la lecture, sans rien retenir.
+            if (typeof window.illustrerLeRecit === "function" && idMessage) {
+                window.illustrerLeRecit({ idMessage, texteMJ: reponseTexte, texteJoueurs: historique4,
+                                          pnjConnus: { ...pnjAffiches, ...Object.fromEntries(nouveauxPnj.map(p => [p.Nom_PNJ, p])) } })
+                    .catch(e => console.error("[MIA_ILLUSTRATEUR] :", e));
+            }
             const lieuFinal = await promesseLieu;
 
             nouveauxPnj.forEach(p => { if (!nomsPnjPresents.includes(p.Nom_PNJ)) nomsPnjPresents.push(p.Nom_PNJ); });

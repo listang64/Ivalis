@@ -111,7 +111,7 @@
 /* LE POST-IT DU NARRATEUR : il dépasse du côté droit du livre. */
 .recit-postit {
   position: absolute; left: calc(1690px * var(--s, 1)); top: calc(150px * var(--s, 1));
-  width: calc(190px * var(--s, 1)); height: calc(150px * var(--s, 1));
+  width: calc(150px * var(--s, 1)); height: calc(150px * var(--s, 1));   /* v314 : moins large (190 avant) */
   padding: 0; border: 0; background: transparent; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   transform: translateX(-62%) rotate(4deg); transition: transform 0.5s cubic-bezier(0.45, 0.05, 0.25, 1), filter 0.4s ease;
   filter: drop-shadow(calc(var(--u) * 0.3) calc(var(--u) * 0.5) calc(var(--u) * 0.6) rgba(40, 20, 6, 0.5));
@@ -121,8 +121,12 @@
   padding-right: calc(var(--u) * 1.4); box-sizing: border-box;
   background: url('images/grimoire/page.webp?v=1') 20% 30% / 500% auto, #e6d3a6;
   font-family: 'Almendra', serif; font-weight: 700; font-size: calc(var(--u) * 2.9); color: #24150a;
-  clip-path: polygon(0 3%, 97% 0, 100% 96%, 2% 100%);
+  /* v314 : Nico, « le coin du haut comme arraché dans l'angle ». */
+  clip-path: polygon(0 3%, 70% 1%, 73% 5%, 76% 2.5%, 79% 9%, 83% 7%, 86% 15%, 90% 13%, 93% 22%, 97% 21%, 100% 30%, 100% 96%, 2% 100%);
 }
+/* La déchirure : un liseré plus sombre le long de l'angle arraché. */
+.papier-postit::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(225deg, rgba(110, 70, 30, 0.55) 0, rgba(110, 70, 30, 0.25) 17%, transparent 24%); }
 .papier-postit svg { width: calc(var(--u) * 4); height: calc(var(--u) * 4); flex: none; }
 .recit-postit.sortie { transform: translateX(0) rotate(4deg); }
 .recit-postit.sortie:not(.eteint):hover { transform: translateX(4%) rotate(2deg); }
@@ -305,3 +309,56 @@
 .trait-combattre .leger { fill: none; stroke-width: 0.8; opacity: 0.5; }
 .cire-combattre { position: absolute; right: calc(var(--u) * -1.2); top: 50%; width: calc(var(--u) * 3.2); height: calc(var(--u) * 3.2); transform: translateY(-50%) rotate(-12deg);
   border-radius: 46% 54% 50% 48%; background: radial-gradient(circle at 38% 32%, #c0473a, #7a1610 68%, #5a0e08); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); }
+
+/* =========================================================================
+   v314 — LES PAPIERS VIEILLIS ET LES TACHES DE CAFÉ. Nico : « le post-it où les
+   joueurs écrivent : une texture un peu plus vieillie, avec des taches comme de
+   café ; pareil pour celui de l'avatar ». Des anneaux et des auréoles brunes,
+   les bords roussis, par-dessus la feuille.
+   ========================================================================= */
+.papier-ecriture {
+  background:
+    radial-gradient(circle at 84% 38%, transparent 0 10.5%, rgba(120, 70, 25, 0.22) 11%, rgba(120, 70, 25, 0.09) 12.6%, transparent 14%),
+    radial-gradient(ellipse 16% 22% at 84% 38%, rgba(140, 90, 40, 0.08), transparent 100%),
+    radial-gradient(ellipse 9% 13% at 14% 82%, rgba(110, 65, 20, 0.16), rgba(110, 65, 20, 0.05) 70%, transparent 100%),
+    radial-gradient(circle at 40% 12%, rgba(100, 60, 20, 0.12) 0 1.2%, transparent 1.6%),
+    radial-gradient(ellipse at 50% 55%, transparent 52%, rgba(95, 55, 18, 0.32) 100%),
+    url('images/grimoire/page.webp?v=1') 60% 70% / 260% auto, #e2cd9f;
+}
+.papier-usure {
+  background:
+    radial-gradient(circle at 30% 18%, transparent 0 12%, rgba(120, 70, 25, 0.2) 12.6%, rgba(120, 70, 25, 0.08) 14.5%, transparent 16%),
+    radial-gradient(ellipse 22% 9% at 62% 88%, rgba(110, 65, 20, 0.15), transparent 100%),
+    radial-gradient(circle at 75% 60%, rgba(100, 60, 20, 0.1) 0 1.5%, transparent 2%),
+    radial-gradient(ellipse at 50% 50%, transparent 48%, rgba(95, 55, 18, 0.35) 100%),
+    url('images/grimoire/page.webp?v=1') 40% 60% / 340% auto, #d6bb88;
+}
+.tache-cafe { position: absolute; z-index: 0; pointer-events: none; height: auto; overflow: visible; mix-blend-mode: multiply; }
+.tache-cafe .voile { fill: rgba(150, 95, 45, 0.28); stroke: none; }
+.tache-cafe .bord { fill: none; stroke: rgba(105, 60, 22, 0.85); stroke-width: 2.2; stroke-linejoin: round; }
+.tache-cafe .bord.fin { stroke-width: 0.8; opacity: 0.6; }
+.tache-cafe .eclat { fill: rgba(115, 68, 26, 0.7); }
+
+/* v314 — LES CROQUIS DU RÉCIT (MIA_ILLUSTRATEUR) : l'encre détourée, posée sur la
+   page à la suite du texte ; elle monte dans le papier la première fois. Le
+   portrait d'un PNJ nouveau tient une page entière, son nom dessous. */
+.croquis-recit { display: block; margin: calc(var(--u) * 1.6) auto calc(var(--u) * 1.2); padding: 0; transform: rotate(var(--penche, 0deg)); }
+.croquis-recit.place-gauche { margin-left: 0; }
+.croquis-recit.place-droite { margin-right: 0; }
+.croquis-recit img, .portrait-pleine-page img { display: block; width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; filter: sepia(0.25) contrast(1.05); }
+.portrait-pleine-page { position: absolute; inset: calc(var(--u) * 7) calc(var(--u) * 7) calc(var(--u) * 6); margin: 0; display: flex; flex-direction: column; align-items: center; }
+.portrait-pleine-page img { flex: 1; min-height: 0; }
+.portrait-pleine-page figcaption { margin-top: calc(var(--u) * 1.2); font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important;
+  font-weight: var(--poids-titres, 400); font-size: calc(var(--u) * 6 * var(--echelle-titres, 1)); color: #24150a; text-align: center; line-height: 1.1; }
+.croquis-recit.neuf img, .portrait-pleine-page.neuf img { animation: croquis-monte 2.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes croquis-monte {
+  0% { opacity: 0; filter: blur(6px) sepia(1) contrast(0.4); clip-path: inset(0 100% 0 0); }
+  40% { opacity: 0.8; }
+  100% { opacity: 1; filter: sepia(0.25) contrast(1.05); clip-path: inset(0 0 0 0); } }
+
+/* (v314) Le marque-page du Narrateur, moins large : l'icône au-dessus du mot, le
+   tout dans la part qui dépasse du livre (~95 unités). */
+.recit-postit { left: calc(1712px * var(--s, 1)); }
+.papier-postit { flex-direction: column; justify-content: center; align-items: flex-end; gap: calc(var(--u) * 0.3);
+  padding-right: calc(var(--u) * 1.1); font-size: calc(var(--u) * 2.3); text-align: right; }
+.papier-postit svg { width: calc(var(--u) * 3.4); height: calc(var(--u) * 3.4); }

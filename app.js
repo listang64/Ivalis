@@ -2745,6 +2745,8 @@ window.redimensionnerImageCloudinary = redimensionnerImageCloudinary;
 // changement d'armure : une seule implémentation, pour que le pont Cloudinary,
 // le détourage et la mise au carré restent identiques partout.
 window.detourerFondMagenta = (...a) => detourerFondMagenta(...a);
+// (v314) Le dépôt détouré, pour les illustrations du récit (illustrations_recit.js).
+window.televerserImageDetoureeIvalis = (...a) => televerserImageDetouree(...a);
 window.urlCloudinaryEnPng = (...a) => urlCloudinaryEnPng(...a);
 window.imageVersBlobPng = (...a) => portraitVersBlobPng(...a);
 window.signatureCloudinaryIvalis = (...a) => sha1Hex(...a);

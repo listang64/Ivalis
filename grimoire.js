@@ -28,7 +28,8 @@
 // =========================================================================
 (function () {
     const IMAGES = {
-        couverture: "images/grimoire/couverture.webp?v=1",
+        // v314 : la nouvelle couverture de Nico (l'ancienne : images/grimoire/couverture.webp).
+        couverture: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793823356/IMG_2214_etfv11.png",
         livre: "images/grimoire/livre_ouvert.webp?v=1",
         page: "images/grimoire/page.webp?v=1",
         // v305 : la table de bois, l'encrier et la plume (l'image de Nico).
@@ -39,7 +40,9 @@
     const LIVRE = { w: 2000, h: 1117 };
     const ZONE = { x: 251, y: 62, w: 1514, h: 984 };       // les deux pages
     const PAGE = { w: ZONE.w / 2, h: ZONE.h };
-    const COUVERTURE = { w: 1344, h: 2000 };               // l'image de la couverture
+    // L'image de la couverture : ses proportions sont relues au chargement (v314 : la
+    // nouvelle n'a peut-être pas celles de l'ancienne, 1344 × 2000).
+    const COUVERTURE = { w: 1344, h: 2000 };
     // LA TABLE (v305) : Nico, « voilà l'image que j'aimerais en background…
     // le livre fermé posé dessus [comme sur l'exemple] ; quand on ouvre et que
     // ça zoome un peu, la table suit le mouvement ; que l'image s'adapte à tous
@@ -543,6 +546,9 @@
         const imgTable = document.getElementById("grimoire-table");
         const tableChargee = () => { if (imgTable.naturalWidth > 0) { tableTaille = { w: imgTable.naturalWidth, h: imgTable.naturalHeight }; poser(); } };
         if (imgTable.complete) tableChargee(); else imgTable.addEventListener("load", tableChargee, { once: true });
+        const imgCouv = livre.querySelector(".page-couverture img");
+        const couvChargee = () => { if (imgCouv.naturalWidth > 0) { COUVERTURE.w = imgCouv.naturalWidth; COUVERTURE.h = imgCouv.naturalHeight; poser(); } };
+        if (imgCouv) { if (imgCouv.complete) couvChargee(); else imgCouv.addEventListener("load", couvChargee, { once: true }); }
         imgTable.addEventListener("error", () => imgTable.classList.add("absente"), { once: true });
         for (let i = 0; i <= 5; i++) pages[i] = document.getElementById("grimoire-page-" + i);
         dos = pages[5];

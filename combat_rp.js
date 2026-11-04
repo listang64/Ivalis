@@ -331,7 +331,7 @@ window.abandonnerCombatRP = async function() {
     if (typeof window.confirm === "function" && !window.confirm("Abandonner le combat du récit ? Le récit reprendra sans lui.")) return false;
     // Le plateau se vide de ce combat, puis l'arène retrouve sa carte.
     if (typeof window.reinitialiserCombat === "function") { try { await window.reinitialiserCombat({ rp: true }); } catch (e) { console.error(e); } }
-    await rendreLArene();
+    await rendreLArene(c);
     const ok = await transaction((data) => (data.Combat_RP && data.Combat_RP.Id === c.Id) ? { maj: { Combat_RP: deleteField() } } : null);
     actualiserTout();
     return !!ok;
@@ -1209,7 +1209,28 @@ async function rendreLArene(c) {
         await setDoc(refVTT(), { ...vtt.Arene_Sauvegarde, Arene_Sauvegarde: deleteField(), Carte_RP: deleteField() }, { merge: true });
         console.log("🏛️ [Combat du récit] L'arène retrouve sa carte.");
     } catch (e) { console.error("Retour de l'arène :", e); }
+    finally { if (c) effacerImagesDuCombat(c); }
 }
+// LES IMAGES DU COMBAT S'EN VONT AVEC LUI (v314). Nico : « quand le combat est
+// terminé avec le bouton DEV, ça ne supprime pas les images des tokens et des
+// maps dans Cloudinary ». La carte dessinée pour ce combat et les pions de ses
+// ennemis partent (jamais l'arène, ni le portrait d'un PNJ), à toute fin de
+// combat du récit — gagné, perdu, passé ou abandonné. Un instant après : le
+// plateau a rendu ses pions.
+const imagesEffacees = new Set();
+function effacerImagesDuCombat(c) {
+    if (!c || !c.Id || imagesEffacees.has(c.Id)) return;
+    imagesEffacees.add(c.Id);
+    const urls = [];
+    if (c.Carte && /Combats\/Cartes/.test(c.Carte)) urls.push(c.Carte);
+    Object.values(c.Tokens || {}).forEach(u => { if (u && /Tokens\/Ennemis/.test(u)) urls.push(u); });
+    if (!urls.length || typeof window.oublierImages !== "function") return;
+    setTimeout(() => {
+        Promise.resolve(window.oublierImages(urls, "combat du récit terminé", { seulementHeros: true }))
+            .catch(e => console.error("Images du combat :", e));
+    }, R.effacerImagesApresMs || 4000);
+}
+window.effacerImagesDuCombatRP = effacerImagesDuCombat;
 
 const debutsAbandon = {};
 function suivreLaFin(c, p) {
@@ -1224,7 +1245,7 @@ function suivreLaFin(c, p) {
             if (Date.now() - debutsAbandon[c.Id] > R.abandonMs) {
                 delete debutsAbandon[c.Id];
                 transaction((data) => (data.Combat_RP && data.Combat_RP.Id === c.Id && !(data.Fin_Combat && data.Fin_Combat.idRencontre === idR)) ? { maj: { Combat_RP: deleteField() } } : null)
-                    .then(ok => { if (ok) { console.log("⚔️ Le combat du récit a disparu du plateau : le récit reprend."); rendreLArene(); } });
+                    .then(ok => { if (ok) { console.log("⚔️ Le combat du récit a disparu du plateau : le récit reprend."); rendreLArene(c); } });
             } else setTimeout(() => suivreLaFin(etat() || c, lirePartieVue()), R.abandonMs + 200);
         } else delete debutsAbandon[c.Id];
         return;
@@ -1470,30 +1491,27 @@ function actualiserFenetreCombat() {
 // combat : chacun le voit (au départ, en renfort), peut retoucher un nom ou une
 // apparence, et un joueur valide ; alors seulement les pions se dessinent.
 // « Tirer d'autres ennemis » renvoie la composition à l'IA.
+// v314 : Nico, « pas besoin de leur apparence, juste une liste à décocher si on
+// ne les veut pas ». Chacun coché d'avance ; un décoché quitte le combat.
 function htmlValidationEnnemis(c) {
-    const e = c.Ennemis || {}, t = e.Tirage || {}, visuels = e.Visuels || {};
-    const ligne = (m, i, moment) => `<li class="ennemi-a-valider">
-        <input type="text" class="nom-ennemi-valider" data-groupe="${moment}" data-i="${i}" value="${echapper(m.nom || "")}" maxlength="40" aria-label="Nom">
-        <span class="role-ennemi-valider">${echapper(ROLES[m.archetype] || m.archetype || "")} · ${echapper(m.palier || "")}${m.leader ? " · <b>chef</b>" : ""}${m.pnj ? " · PNJ" : ""}</span></li>`;
+    const t = (c.Ennemis || {}).Tirage || {};
+    const ligne = (m, i, groupe) => `<li><label class="ennemi-a-valider">
+        <input type="checkbox" class="garder-ennemi" data-groupe="${groupe}" data-i="${i}" checked>
+        <span class="nom-ennemi-valider">${echapper(m.nom || "")}</span>
+        <span class="role-ennemi-valider">${echapper(ROLES[m.archetype] || m.archetype || "")}${m.leader ? " · chef" : ""}</span></label></li>`;
     const depart = (t.depart || []).map((m, i) => ligne(m, i, "depart")).join("");
     const renforts = (t.renforts || []).map((m, i) => ligne(m, i, "renforts")).join("");
-    const apparences = Object.entries(visuels).map(([cle, v]) => {
-        const qui = [...(t.depart || []), ...(t.renforts || [])].filter(m => m.visuel === cle).map(m => m.nom).join(", ");
-        return `<li class="visuel-a-valider"><span class="qui-visuel">${echapper(qui || cle)}</span>
-            <textarea class="description-visuel-valider" data-cle="${echapper(cle)}" rows="2" maxlength="600" aria-label="Apparence">${echapper(v.Description || "")}</textarea></li>`;
-    }).join("");
     return `<div class="feuille-ennemis">
         <div class="titre-feuille-ennemis">Qui vous fait face ?</div>
-        <p class="aide-feuille-ennemis">Voici ceux que le récit met sur votre route. Retouchez un nom ou une apparence si besoin, puis validez : leurs pions seront alors dessinés.</p>
+        <p class="aide-feuille-ennemis">Décochez ceux que vous ne voulez pas dans ce combat, puis validez : les pions des autres seront dessinés.</p>
         <div class="colonnes-ennemis">
-          <div><div class="sous-titre-ennemis">Au départ</div><ol class="liste-ennemis-valider">${depart || "<li><i>personne</i></li>"}</ol></div>
-          <div><div class="sous-titre-ennemis">En renfort</div><ol class="liste-ennemis-valider">${renforts || "<li><i>aucun renfort</i></li>"}</ol></div>
+          <div><div class="sous-titre-ennemis">Au départ</div><ul class="liste-ennemis-valider">${depart || "<li><i>personne</i></li>"}</ul></div>
+          <div><div class="sous-titre-ennemis">En renfort</div><ul class="liste-ennemis-valider">${renforts || "<li><i>aucun renfort</i></li>"}</ul></div>
         </div>
-        <div class="sous-titre-ennemis">Leur apparence</div>
-        <ul class="liste-visuels-valider">${apparences}</ul>
+        <p class="note-feuille-ennemis" id="note-ennemis-rp"></p>
         <div class="boutons-feuille-ennemis">
           <button type="button" class="relancer-ennemis" id="btn-relancer-ennemis">Tirer d'autres ennemis</button>
-          <button type="button" class="valider-ennemis" id="btn-valider-ennemis">Valider et dessiner les pions</button>
+          <button type="button" class="valider-ennemis" id="btn-valider-ennemis">Valider</button>
         </div></div>`;
 }
 function actualiserValidationEnnemis(c) {
@@ -1521,22 +1539,24 @@ window.validerEnnemisCombatRP = async function() {
     if (!c || c.Etat !== "preparation" || !c.Ennemis || c.Ennemis_Valides) return false;
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     const f = $("validation-ennemis-rp");
-    const noms = { depart: {}, renforts: {} }, descriptions = {};
-    if (f) {
-        f.querySelectorAll(".nom-ennemi-valider").forEach(el => { const v = el.value.trim(); if (v) noms[el.dataset.groupe][Number(el.dataset.i)] = v; });
-        f.querySelectorAll(".description-visuel-valider").forEach(el => { descriptions[el.dataset.cle] = el.value.trim(); });
+    const retires = { depart: new Set(), renforts: new Set() };
+    if (f) f.querySelectorAll(".garder-ennemi").forEach(el => { if (!el.checked) retires[el.dataset.groupe].add(Number(el.dataset.i)); });
+    const t0 = c.Ennemis.Tirage || {};
+    const restants = (t0.depart || []).length - retires.depart.size + (t0.renforts || []).length - retires.renforts.size;
+    if (restants <= 0 || (t0.depart || []).length - retires.depart.size <= 0) {
+        const n = $("note-ennemis-rp");
+        if (n) n.textContent = "Gardez au moins un adversaire au départ.";
+        return false;
     }
     const ok = await transaction((data) => {
         const x = data.Combat_RP;
         if (!x || x.Id !== c.Id || !x.Ennemis || x.Ennemis_Valides) return null;
         const e = JSON.parse(JSON.stringify(x.Ennemis));
-        ["depart", "renforts"].forEach(g => (e.Tirage[g] || []).forEach((m, i) => { if (noms[g][i]) m.nom = noms[g][i]; }));
-        Object.entries(descriptions).forEach(([k, d]) => {
-            if (!e.Visuels[k] || !d) return;
-            e.Visuels[k].Description = d;
-            ["depart", "renforts"].forEach(g => (e.Tirage[g] || []).forEach(m => { if (m.visuel === k) m.description = d; }));
-        });
-        return { maj: { "Combat_RP.Ennemis": e, "Combat_RP.Ennemis_Valides": { Par: idJoueur(), Nom: nomJoueur(), Le: Date.now() } } };
+        ["depart", "renforts"].forEach(g => { e.Tirage[g] = (e.Tirage[g] || []).filter((m, i) => !retires[g].has(i)); });
+        // Les apparences que plus personne ne porte : leurs pions ne seront pas dessinés.
+        const portes = new Set([...(e.Tirage.depart || []), ...(e.Tirage.renforts || [])].map(m => m.visuel));
+        Object.keys(e.Visuels || {}).forEach(k => { if (!portes.has(k)) delete e.Visuels[k]; });
+        return { maj: { "Combat_RP.Ennemis": e, "Combat_RP.Ennemis_Valides": { Par: idJoueur(), Nom: nomJoueur(), Le: Date.now(), Retires: retires.depart.size + retires.renforts.size } } };
     });
     actualiserTout();
     if (ok) setTimeout(poursuivre, 0);

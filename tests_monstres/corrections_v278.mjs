@@ -455,13 +455,12 @@ await section(async () => {
   await p.evaluate(() => window.rejoindreCombatRP());
   await p.waitForTimeout(500);
   const page = await p.evaluate(() => { const f = document.getElementById("validation-ennemis-rp");
-    return { vue: !!f && f.style.display === "flex", noms: f ? [...f.querySelectorAll(".nom-ennemi-valider")].map(x => x.value) : [], visuels: f ? f.querySelectorAll(".description-visuel-valider").length : 0 }; });
-  verifier("v313 : la page « Qui vous fait face ? » les montre, noms et apparences à retoucher", page.vue && page.noms.length >= 1 && page.visuels >= 1, JSON.stringify(page));
-  await p.evaluate(() => { const el = document.querySelectorAll("#validation-ennemis-rp .nom-ennemi-valider")[1]; if (el) el.value = "Le Balafré"; });
+    return { vue: !!f && f.style.display === "flex", noms: f ? [...f.querySelectorAll(".nom-ennemi-valider")].map(x => x.textContent) : [], cases: f ? f.querySelectorAll("input.garder-ennemi:checked").length : 0 }; });
+  verifier("v313-v314 : la page « Qui vous fait face ? » : la liste des ennemis, tous cochés", page.vue && page.noms.length >= 1 && page.cases === page.noms.length, JSON.stringify(page));
   await p.evaluate(() => document.getElementById("btn-valider-ennemis").click());
   const pret = await attendreQue(async () => { const c = await crp(); return !!c && !!c.Carte && !!c.Ennemis && c.Tokens && Object.keys(c.Ennemis.Visuels || {}).every(k => c.Tokens[k] !== undefined); }, 15000);
   const c = await crp();
-  verifier("v313 : validés (le nom retouché est gardé), la page se ferme, les pions se dessinent", !!c.Ennemis_Valides && (page.noms.length < 2 || [...c.Ennemis.Tirage.depart, ...c.Ennemis.Tirage.renforts].some(m => m.nom === "Le Balafré"))
+  verifier("v313 : validés, la page se ferme, les pions se dessinent", !!c.Ennemis_Valides
            && await p.evaluate(() => document.getElementById("validation-ennemis-rp").style.display === "none"), JSON.stringify(c.Ennemis_Valides));
   const v = await vtt();
   verifier("tout est prêt jusqu'aux pions", pret, JSON.stringify(c && Object.keys(c)));

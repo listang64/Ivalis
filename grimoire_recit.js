@@ -222,6 +222,12 @@ function construireEntrees(messages) {
         if (m.Est_Narration_IA) {
             const textes = parasDeNarration(m.Texte);
             if (textes.length) entrees.push({ id, type: "narration", auteurId: "MJ", textes, jets: [], enCours: m.Recit_En_Cours === true });
+            // (v314) Le croquis de MIA_ILLUSTRATEUR, après les paragraphes ; les PNJ nouveaux, en pleine page.
+            const ill = m.Illustration;
+            if (ill && ill.Url) entrees.push({ id: id + "-croquis", type: "illustration", image: ill, textes: [], jets: [] });
+            (Array.isArray(m.Portraits_PNJ) ? m.Portraits_PNJ : []).forEach((p, k) => {
+                if (p && p.Url) entrees.push({ id: `${id}-pnj${k}`, type: "portrait", image: p, textes: [], jets: [] });
+            });
             continue;
         }
         if (m.Texte_Livre && (idsHeros.has(m.Auteur_ID) || m.Livre)) {
@@ -319,6 +325,7 @@ function romain(n) {
 function paragraphesDuChapitre(entrees) {
     const paras = [];
     for (const e of entrees) {
+        if (e.image) { etat.totaux[e.id] = 0; paras.push({ e: e.id, type: e.type, image: e.image, mots: [] }); continue; }
         const blocs = jetonsDe(e);
         let i0 = 0;
         etat.totaux[e.id] = blocs.reduce((n, p) => n + p.length, 0);
@@ -334,6 +341,27 @@ function paragraphesDuChapitre(entrees) {
     }
     return paras;
 }
+// LES CROQUIS (v314, illustrations_recit.js) : une taille tirée par l'IA, une place
+// tirée ici (à gauche, au milieu, à droite), le tout stable d'un affichage à l'autre.
+// Un croquis déjà vu ne se redessine pas.
+etat.croquisVus = etat.croquisVus || new Set();
+function htmlCroquis(para) {
+    const im = para.image, r = hasard("croquis-" + para.e);
+    const place = ["gauche", "milieu", "droite"][Math.floor(r() * 3)];
+    const neuf = !etat.croquisVus.has(para.e);
+    if (neuf) setTimeout(() => etat.croquisVus.add(para.e), 4000);
+    const largeur = Math.round(Math.max(20, Math.min(90, (Number(im.Taille) || 0.6) * 100)));
+    const penche = ((r() * 2 - 1) * 2.2).toFixed(1);
+    return `<figure class="croquis-recit place-${place}${neuf ? " neuf" : ""}" data-e="${echapper(para.e)}" style="width:${largeur}%;aspect-ratio:${Number(im.Ratio) || 1};--penche:${penche}deg">`
+        + `<img src="${echapper(im.Url)}" alt="" draggable="false"></figure>`;
+}
+function htmlPortraitPleinePage(para) {
+    const im = para.image;
+    const neuf = !etat.croquisVus.has(para.e);
+    if (neuf) setTimeout(() => etat.croquisVus.add(para.e), 4000);
+    return `<figure class="portrait-pleine-page${neuf ? " neuf" : ""}" data-e="${echapper(para.e)}">`
+        + `<img src="${echapper(im.Url)}" alt="${echapper(im.Nom || "")}" draggable="false"><figcaption>${echapper(im.Nom || "")}</figcaption></figure>`;
+}
 // Rend les pages du chapitre (HTML) : une page par élément.
 function paginer(entrees) {
     const pages = [];
@@ -345,6 +373,28 @@ function paginer(entrees) {
     const vide = () => !boite.querySelector(".para-recit");
     const fermer = () => { pages.push(boite.innerHTML); j++; boite = boiteDeMesure(j % 2 === 0); boite.innerHTML = ""; };
     for (const para of paragraphesDuChapitre(entrees)) {
+        // (v314) LES IMAGES : le croquis suit le texte (sur la page suivante s'il n'y tient
+        // pas, plus petit s'il ne tient sur aucune) ; le portrait d'un PNJ prend une page entière.
+        if (para.image) {
+            if (para.type === "portrait") {
+                if (boite.innerHTML.trim()) fermer();          // toujours une page à lui
+                boite.innerHTML += htmlPortraitPleinePage(para);
+                fermer();
+                continue;
+            }
+            const tmp = document.createElement("div");
+            tmp.innerHTML = htmlCroquis(para);
+            const fig = tmp.firstElementChild;
+            boite.appendChild(fig);
+            if (deborde()) {
+                boite.removeChild(fig);
+                if (!vide() || boite.querySelector("figure")) fermer();
+                boite.appendChild(fig);
+                let t = parseFloat(fig.style.width) || 60;
+                while (deborde() && t > 20) { t -= 6; fig.style.width = t + "%"; }
+            }
+            continue;
+        }
         const mots = para.mots;
         let debut = 0, premier = true;
         // (le petit dé de la marge se pose sur la ligne du premier mot de son action)
@@ -409,6 +459,41 @@ function sommaireHtml() {
 // ---------------------------------------------------------------------
 //  LE RENDU : les pages de la suite, posées dans le livre
 // ---------------------------------------------------------------------
+// LES TACHES DE CAFÉ (v314). Nico : « dans les pages RP, de façon totalement
+// aléatoire et très légère, mets parfois une tache de café, de taille et de
+// position aléatoires, et pas à toutes les pages ». Une page sur quatre environ ;
+// le hasard est tiré de la partie et du numéro de la page : la tache ne bouge
+// pas d'un affichage à l'autre. Un anneau irrégulier, plus foncé sur un bord,
+// un voile clair dedans, parfois une éclaboussure.
+// (Le petit hasard du récit donne des suites voisines pour des graines voisines :
+// ici, la graine est d'abord bien mélangée — FNV-1a, puis mulberry32.)
+function hasardMelange(graine) {
+    let h = 2166136261 >>> 0;
+    for (const c of String(graine)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+    return () => {
+        h = (h + 0x6D2B79F5) >>> 0;
+        let t = h;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+function tacheDeCafe(k) {
+    const r = hasardMelange("cafe-" + (etat.idPartie || "") + "-" + k);
+    if (r() > 0.27) return "";
+    const t = 22 + r() * 22, x = 4 + r() * (88 - t), y = 6 + r() * (82 - t * 0.9), rot = Math.round(r() * 360), o = (0.13 + r() * 0.12).toFixed(2);
+    const anneau = (rayon, ecart) => {
+        let d = "";
+        for (let i = 0; i <= 36; i++) {
+            const a = i / 36 * Math.PI * 2, k2 = rayon + Math.sin(a * 3 + ecart) * 1.3 + (r() - 0.5) * 1.1;
+            d += `${i ? "L" : "M"} ${(50 + Math.cos(a) * k2).toFixed(1)} ${(50 + Math.sin(a) * k2).toFixed(1)} `;
+        }
+        return d + "Z";
+    };
+    const goutte = r() < 0.5 ? `<circle cx="${(82 + r() * 10).toFixed(1)}" cy="${(14 + r() * 12).toFixed(1)}" r="${(1.5 + r() * 2.5).toFixed(1)}" class="eclat"/>` : "";
+    return `<svg class="tache-cafe" viewBox="0 0 100 100" aria-hidden="true" style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;width:${t.toFixed(1)}%;opacity:${o};transform:rotate(${rot}deg)">
+        <path class="voile" d="${anneau(40, 0)}"/><path class="bord" d="${anneau(41, 1.7)}"/><path class="bord fin" d="${anneau(38.5, 3.1)}"/>${goutte}</svg>`;
+}
 function creerPage(i) {
     const el = document.createElement("div");
     el.className = `page-grimoire page-papier ${(premiereSuite() + i) % 2 === 1 ? "gauche" : "droite"} page-suite`;
@@ -430,7 +515,7 @@ function rendre() {
     }
     const recit = paginer(entrees);
     // (Une page de droite garde sa marge basse pour le parchemin d'écriture.)
-    const html = [...sommaireHtml(), ...recit.map(h => `<div class="contenu-page page-recit">${h}</div>`)];
+    const html = [...sommaireHtml(), ...recit.map((h, k) => `<div class="contenu-page page-recit">${tacheDeCafe(k)}${h}</div>`)];
     let change = html.length !== etat.elements.length;
     while (etat.elements.length < html.length) etat.elements.push(creerPage(etat.elements.length));
     if (etat.elements.length > html.length) etat.elements.length = html.length;
