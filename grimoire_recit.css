@@ -170,30 +170,44 @@
 @keyframes de-appelle { 0%, 100% { transform: rotate(0) scale(1); } 50% { transform: rotate(-12deg) scale(1.12); } }
 @keyframes de-roule { to { transform: rotate(360deg); } }
 
-/* LA BANDE DU PORTRAIT (v301) : elle sort du haut de la page de gauche,
-   derrière les marque-pages. Nico : « qu'elle sorte en haut de la page gauche
-   et derrière les marque-pages ». Glissée sous les pages, sous les
-   marque-pages aussi ; le nom en haut, le portrait dessous. */
-.recit-portrait {
-  position: absolute; left: calc(285px * var(--s, 1)); top: calc(-172px * var(--s, 1));
-  width: calc(255px * var(--s, 1)); height: calc(300px * var(--s, 1)); pointer-events: none;
+/* LES PAPIERS DES AVATARS (v306, grimoire_recit.js) : Nico, « ils sortent du
+   côté gauche du livre, un peu en biais, sur un morceau de parchemin usé ; dans
+   la partie RP, il reste sorti avec l'avatar de son personnage ; un nom cliqué :
+   un autre papier sort par-dessus, légèrement décalé ». Un étui du bord gauche
+   de l'écran jusqu'à la tranche des pages (x 251 du livre) : rangés, les papiers
+   y sont glissés sous les pages, à droite ; sortis, ils dépassent à gauche. */
+.recit-avatars {
+  position: absolute; top: 0; height: 100%; overflow: hidden; pointer-events: none;
+  left: calc(-1 * var(--marge-gauche, 0px)); width: calc(var(--marge-gauche, 0px) + 251px * var(--s, 1));
+  opacity: 0; transition: opacity 0.3s ease;
 }
-.bande-portrait {
-  position: absolute; inset: 0; box-sizing: border-box; padding: calc(var(--u) * 2); display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 1.4);
-  background: url('images/grimoire/page.webp?v=1') 50% 40% / 300% auto, #e8d5a8;
-  clip-path: polygon(3% 1%, 100% 0, 99% 100%, 0 99%);
-  filter: drop-shadow(calc(var(--u) * -0.3) calc(var(--u) * -0.3) calc(var(--u) * 0.7) rgba(40, 20, 6, 0.5));
-  transform: translateY(102%) rotate(0deg); transform-origin: 50% 100%; transition: transform 0.5s cubic-bezier(0.45, 0.05, 0.25, 1);
+.recit-avatars.visible { opacity: 1; }
+.papier-avatar {
+  position: absolute; right: 0; top: calc(285px * var(--s, 1));
+  width: min(calc(var(--marge-gauche, 0px) + 251px * var(--s, 1) - 14px), calc(250px * var(--s, 1)));
+  transform: translateX(105%) rotate(0deg); transform-origin: 100% 50%;
+  transition: transform 0.55s cubic-bezier(0.45, 0.05, 0.25, 1);
+  filter: drop-shadow(calc(var(--u) * 0.5) calc(var(--u) * 0.8) calc(var(--u) * 0.9) rgba(0, 0, 0, 0.55));
 }
-.recit-portrait.sortie { pointer-events: auto; }
-.recit-portrait.sortie .bande-portrait { transform: translateY(0) rotate(-3deg); }
-.nom-portrait { order: -1; }
-.cadre-portrait { width: 100%; flex: none; height: calc(170px * var(--s, 1)); display: flex; align-items: center; justify-content: center; overflow: hidden;
-  box-shadow: inset 0 0 calc(var(--u) * 1) rgba(60, 35, 15, 0.5); }
-.cadre-portrait img { width: 100%; height: 100%; object-fit: cover; object-position: top; filter: sepia(0.25) contrast(1.05); }
+.papier-avatar.sortie { transform: translateX(0) rotate(-6deg); pointer-events: auto; }
+/* Le papier d'un nom touché : par-dessus, un peu plus bas, penché autrement. */
+#recit-portrait { top: calc(310px * var(--s, 1)); z-index: 2; }
+#recit-portrait.sortie { transform: translate(calc(-12px * var(--s, 1)), calc(14px * var(--s, 1))) rotate(3deg); }
+.papier-usure {
+  box-sizing: border-box; padding: calc(var(--u) * 2.2) calc(var(--u) * 2) calc(var(--u) * 2.6); display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 1.2);
+  background: url('images/grimoire/page.webp?v=1') 40% 60% / 340% auto, #dcc394;
+  /* des bords déchirés, brunis par le temps */
+  clip-path: polygon(2% 3%, 14% 0, 31% 2%, 47% 0, 66% 3%, 83% 0, 98% 2%, 100% 16%, 97% 34%, 100% 55%, 98% 76%, 100% 97%, 81% 100%, 62% 97%, 44% 100%, 27% 97%, 9% 100%, 0 96%, 3% 74%, 0 52%, 2% 29%, 0 12%);
+  box-shadow: inset 0 0 calc(var(--u) * 2.4) rgba(92, 52, 16, 0.75), inset 0 0 calc(var(--u) * 0.6) rgba(60, 30, 8, 0.6);
+}
+.cadre-portrait { width: 100%; aspect-ratio: 1 / 1.08; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  box-shadow: inset 0 0 calc(var(--u) * 1) rgba(60, 35, 15, 0.55); border-radius: 2px; }
+.cadre-portrait img { width: 100%; height: 100%; object-fit: cover; object-position: top; filter: sepia(0.3) contrast(1.05); }
 .cadre-portrait .silhouette { width: 70%; height: auto; }
 .cadre-portrait .silhouette path { fill: none; stroke: #1b1009; stroke-width: 2.4; stroke-linecap: round; opacity: 0.75; }
-.nom-portrait { font-family: 'Almendra', serif; font-weight: 700; font-size: calc(var(--u) * 3.4); color: #24150a; text-align: center; }
+.nom-portrait { font-family: 'Almendra', serif; font-weight: 700; font-size: calc(var(--u) * 3.2); color: #24150a; text-align: center; line-height: 1.1; }
+/* Les héros : en gras, sans souligné, mais on peut les toucher (v306). */
+.nom-livre.nom-heros { border-bottom: none; color: #2b1a0e; }
 
 /* LA POUSSIÈRE : les lettres s'envolent vers le livre. */
 .recit-poussiere { position: absolute; inset: 0; pointer-events: none; z-index: 60; overflow: hidden; }
@@ -211,7 +225,6 @@
 }
 
 /* v304 : les noms des héros, juste en gras (ils ne s'ouvrent pas). */
-.nom-heros { font-weight: bold; color: #2b1a0e; }
 /* LA PETITE FLÈCHE : la suite est sur la page d'après (en bas à droite). */
 .fleche-suite { position: absolute; right: calc(var(--u) * 6); bottom: calc(var(--u) * 4.5); width: calc(var(--u) * 4.2); height: calc(var(--u) * 2.4); pointer-events: none; }
 .fleche-suite svg { width: 100%; height: 100%; overflow: visible; }

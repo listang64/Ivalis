@@ -66,8 +66,8 @@
     };
     window.MODES_LEADER = {
         force: "un Normal du départ mène",
-        deux: "deux Normaux du départ mènent",
-        tousDepart: "tout le départ mène",
+        deux: "un Normal du départ mène (v306 : un seul leader par combat)",
+        tousDepart: "un du départ mène (v306 : un seul leader par combat)",
         possibleDepart: "leader possible au départ",
         possibleRenforts: "leader possible parmi les renforts",
         possibleTous: "leader possible parmi tous",
@@ -327,6 +327,13 @@
             case "possibleTous": { const l = [...depart, ...renfortsMenables]; if (avecLeader && l.length) hasard(l).leader = true; break; }
             default: break;
         }
+        // v306 : Nico, « il m'a généré deux leaders dans le même combat ; c'est un
+        // seul par combat, max ». Les cas « deux Normaux mènent » et « tout le
+        // départ mène » n'en gardent qu'un (le premier Normal du départ).
+        const meneurs = [...normauxDabord(depart), ...renforts].filter(m => m.leader);
+        meneurs.slice(1).forEach(m => { delete m.leader; });
+        // Un leader déjà là : la première créature ne se relèvera pas en chef.
+        if (meneurs.length) [...depart, ...renforts].forEach(m => { delete m.releveEnLeader; });
 
         return { apparition: numero, aleatoire: !choisie, cas: indexCas + 1, nomCas: cas.nom || "", depart, renforts,
                  ...(cas.pieges ? { pieges: copie(cas.pieges) } : {}),

@@ -261,7 +261,21 @@ await section(async () => {
   await p.waitForTimeout(1500);
   await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipNext("top"));
   await p.waitForTimeout(2600);
-  verifier("on ne peut pas tourner au-delà du chapitre (le livre y revient)", (await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex())) === 3);
+  // v306 : Nico, « qu'on ne puisse pas fermer la dernière page du livre ; qu'on tourne
+  // plutôt une page vierge ». Après le chapitre, des pages vierges ; la dernière ne se tourne pas.
+  const v = await p.evaluate(() => ({ ici: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), vierge: !!document.querySelector("#grimoire-vierge-0"), ouvert: window.grimoireEtat().ouvert }));
+  verifier("au-delà du chapitre, une page vierge (v306) : le livre reste ouvert", v.ici === 5 && v.vierge && v.ouvert, JSON.stringify(v));
+  await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.turnToPage(window.grimoireEtat().nbPages - 3));
+  await p.waitForTimeout(300);
+  const d = await p.evaluate(() => { const r = document.getElementById("grimoire-livre").getBoundingClientRect(); return { x: r.right - 25, y: r.top + r.height * 0.8, w: r.width / 2 }; });
+  await p.mouse.move(d.x, d.y); await p.mouse.down();
+  for (let i = 1; i <= 20; i++) { await p.mouse.move(d.x - d.w * 1.6 * i / 20, d.y - 8 * i / 20); await p.waitForTimeout(20); }
+  await p.mouse.up();
+  await p.waitForTimeout(1500);
+  const fin = await p.evaluate(() => ({ ici: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), n: window.grimoireEtat().nbPages, ouvert: window.grimoireEtat().ouvert }));
+  verifier("la dernière page vierge ne se tourne pas : le livre ne se referme jamais par la fin", fin.ici === fin.n - 3 && fin.ouvert, JSON.stringify(fin));
+  await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.turnToPage(3));
+  await p.waitForTimeout(300);
   await cliquer("#grimoire-page-3 .revenir");
   await p.waitForTimeout(1500);
   verifier("« ← Revenir au journal » ramène aussi au journal", (await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex())) === 1);

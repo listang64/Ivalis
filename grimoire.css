@@ -56,6 +56,10 @@
   mask-composite: intersect;
 }
 .grimoire-table.absente { display: none; }
+/* v306 : la table a deux cadrages (le livre fermé, le livre ouvert) ; elle
+   glisse de l'un à l'autre au rythme du zoom de la scène. */
+.grimoire-table { transform-origin: 0 0; transition: transform 0.75s cubic-bezier(0.45, 0.05, 0.25, 1); }
+.grimoire-scene.ferme .grimoire-table { transform: var(--table-ferme, none); }
 /* L'OMBRE PORTÉE du livre fermé sur la table (v305) : Nico, « sur le côté droit
    et bas du livre l'ombre portée, refais la même entre la table et le livre ».
    La couverture elle-même, noircie et floutée, glissée en bas à droite. */
@@ -257,9 +261,13 @@
 .marque-page.marque-plume .marque-papier { background-position: 70% 40%; }
 .marque-page.marque-plume:not(.inactif):hover, .marque-page.marque-plume:not(.inactif):focus-visible { transform: rotate(3deg) translateY(-6%); }
 .marque-page.marque-plume:not(.inactif):active { transform: rotate(4deg) translateY(-3%) scale(0.98); }
-/* Éteint hors partie : pâli, il ne réagit pas. */
-.marque-page.inactif { cursor: default; filter: grayscale(0.75) brightness(0.92) drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.4) rgba(40, 20, 6, 0.35)); }
-.marque-page.inactif .marque-papier { opacity: 0.7; }
+/* Éteint (hors partie) : v306, Nico, « les marque-pages grisés, range-les
+   cachés dans le livre, et fais-les ressortir une fois la partie chargée ». Il
+   descend sous les pages ; actif, il remonte. */
+.marque-page { transition: transform 0.55s cubic-bezier(0.45, 0.05, 0.25, 1), filter 0.4s ease, opacity 0.5s ease 0.15s; }
+.marque-page.inactif { cursor: default; pointer-events: none; transform: translateY(calc(110px * var(--s, 1))) rotate(-6deg); }
+.marque-page.marque-plume.inactif { transform: translateY(calc(110px * var(--s, 1))) rotate(5deg); }
+.marque-page.marque-terre.inactif { transform: translateY(calc(110px * var(--s, 1))) rotate(9deg); }
 /* Livre fermé : on ne voit que la couverture. */
 .grimoire-scene.ferme .marque-page { opacity: 0; pointer-events: none; transition-delay: 0s; }
 
@@ -308,17 +316,14 @@
 .dessin-terre .feuille { fill: rgba(255, 246, 222, 0.25); }
 .dessin-terre .coin { fill: rgba(18, 11, 6, 0.18); }
 
-/* LES PAGES QUI DÉFILENT (v304) : un lien ou un marque-page touché, des feuilles
-   se lèvent et tournent très vite au-dessus du livre (grimoire.js, defiler). */
-.defile-pages { position: absolute; z-index: 9; perspective: 2400px; pointer-events: auto; }
-.feuille-defile {
-  position: absolute; top: 0; width: 50%; height: 100%; opacity: 0;
-  background: url('images/grimoire/page.webp?v=1') center / 100% 100% no-repeat, #e8d4a8;
-  box-shadow: 0 0 calc(var(--u) * 1.2) rgba(60, 35, 15, 0.35);
-  backface-visibility: visible; will-change: transform;
+/* LES FEUILLETS DU DÉFILEMENT (v306, grimoire.js pageManuscrite) : de vraies
+   pages du livre, couvertes d'une écriture au hasard ; elles passent trop vite
+   pour être lues. */
+.page-manuscrite .ecriture-feuillet {
+  position: absolute; inset: 9% 11% 9% 11%; overflow: hidden;
+  font-family: 'IM Fell English', 'Almendra', serif; font-style: italic; font-size: calc(var(--u) * 3.3); line-height: 1.5;
+  color: rgba(38, 22, 10, 0.86); text-align: justify; hyphens: auto;
 }
-.feuille-defile::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
-.feuille-defile.vers-gauche { left: 50%; transform-origin: left center; }
-.feuille-defile.vers-gauche::after { background: linear-gradient(to right, rgba(36, 18, 3, 0.45), rgba(36, 18, 3, 0) 35%); }
-.feuille-defile.vers-droite { left: 0; transform-origin: right center; }
-.feuille-defile.vers-droite::after { background: linear-gradient(to left, rgba(36, 18, 3, 0.45), rgba(36, 18, 3, 0) 35%); }
+.page-manuscrite p { margin: 0 0 calc(var(--u) * 2.2); text-indent: calc(var(--u) * 4); transform: rotate(var(--penche, 0deg)); }
+.page-manuscrite .croquis { display: block; width: 62%; margin: calc(var(--u) * 1) auto calc(var(--u) * 2.4); }
+.page-manuscrite .croquis path, .page-manuscrite .croquis circle { fill: none; stroke: rgba(38, 22, 10, 0.8); stroke-width: 1.4; stroke-linecap: round; }

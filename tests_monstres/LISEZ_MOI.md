@@ -10052,3 +10052,67 @@ l'ouverture). Il échoue sur la v304. Tests mis à jour : corrections_v297 (la
 table au lieu du beige, plus de zoom 0,82), v294 (les IA du combat repérées par
 leur nom, l'Arbitre aux tarifs de 3.8 Flash), v295 (l'Arbitre de la v304),
 v300 et v302 (attendre la carte après le chargement).
+
+## v306 — L'ouverture sur la table, les pages qui défilent pour de vrai, les papiers des avatars, un seul leader
+
+Nico : « le zoom quand le livre s'ouvre ne va pas car les tailles diffèrent :
+le livre dépasse de la table et est sur la plume et l'encrier » ; « quand les
+pages défilent vite, tu n'utilises pas la bibliothèque des pages… fais défiler
+des pages de texte au hasard » ; « les noms cliquables ne marchent toujours
+pas » ; « qu'on ne puisse pas fermer la dernière page du livre » ; « les
+marque-pages grisés, range-les cachés dans le livre » ; « les avatars sortent du
+côté gauche du livre, en biais, sur un parchemin usé ; le sien reste sorti dans
+la partie RP ; un nom cliqué, un autre papier par-dessus, légèrement décalé » ;
+« deux leaders dans le même combat : un seul par combat max » ; « il doit y
+avoir une intention de combattre ; on lance le combat dès qu'il y a un acte
+agressif évident ».
+
+- L'ouverture : les deux images ne s'accordent pas (une moitié du livre ouvert
+  est presque carrée, la couverture étroite) ; le livre ouvert a sa propre
+  place sur la table (TABLE.ouvert : la reliure x 200, y 232, 905 de large, à
+  gauche de l'encrier, sous la plume). La table a deux cadrages ; fermée, une
+  transformation (--table-ferme) la ramène sous la couverture ; elle glisse de
+  l'un à l'autre au rythme du zoom (0,75 s).
+- Le défilement : de vraies pages de StPageFlip. 12 feuillets manuscrits
+  (pageManuscrite : des phrases au hasard, parfois un croquis) ; entre la double
+  page ouverte et celle qu'on cherche, le livre reçoit 2 à 6 doubles pages de
+  feuillets (updateFromHtml), les tourne à 0,15 s la page (flipNext/flipPrev,
+  coin du bas), puis retrouve ses vraies pages (les mêmes à l'écran) ; la
+  durée revient à 0,5 s. Silencieux pendant (surTourne et la plume du récit
+  attendent), un seul bruit « pages-defilent ». La double page voisine se tourne
+  comme avant.
+- Les noms : depuis la v304 les héros étaient en gras mais muets — ils sont de
+  nouveau des liens (<b class="nom-livre nom-heros">), sans souligné. Le doigt
+  posé sur un nom n'attrape plus la page (brancherPrise).
+- Six pages vierges avant la quatrième de couverture (hors partie et en
+  partie) ; la dernière double page vierge ne se tourne pas : le livre ne se
+  referme jamais par la fin.
+- Les marque-pages éteints descendent sous les pages (translateY 110 unités) ;
+  allumés, ils remontent.
+- Les papiers des avatars (#recit-avatars) : un étui du bord gauche de l'écran
+  jusqu'à la tranche des pages ; les papiers y sont glissés à droite (cachés),
+  sortis ils dépassent à gauche, penchés, parchemin déchiré (clip-path),
+  bruni. #recit-avatar : son héros, sorti tant qu'on est dans le récit.
+  #recit-portrait : le nom touché (héros ou PNJ), par-dessus, décalé, penché
+  de l'autre côté ; un toucher ailleurs le range. Sur iPad, la place à gauche
+  du livre est étroite : les papiers y font ~160 px.
+- Un seul leader : apparitions.js n'en garde qu'un après le tirage (« Les deux
+  chefs », « Les éclaireurs qui fuient » ; libellés des réglages mis à jour) ;
+  un leader tiré, personne ne se relèvera en chef ; combat_etat.js : une
+  créature « à relever en leader » tombe si un autre leader est debout.
+- MIA_COMBAT (combat_rp.js) : un combat seulement sur un ACTE AGRESSIF ÉVIDENT ;
+  des ennemis qui menacent, encerclent, barrent la route ou sortent leurs armes
+  sans avoir frappé, c'est encore marchander, soudoyer, convaincre, fuir…
+
+corrections_v306.mjs (dans la suite) vérifie la place du livre ouvert (loin de
+l'encrier, la table couvre l'écran), les marque-pages rangés puis sortis, les
+feuillets (dans le livre, écrits, différents, tournés vite, réglage rendu,
+vraies pages revenues, un bruit, pas de clic, en avant et en arrière), les
+papiers (le sien, à gauche, penché, déchiré ; le nom touché par-dessus,
+décalé ; un héros aussi ; rangé au toucher ailleurs ; hors du récit), les pages
+vierges et la dernière qui ne tourne pas, 1 500 rencontres sans deux leaders,
+la relève bloquée par un leader debout, la consigne de MIA_COMBAT. Il échoue
+sur la v305 (14 échecs). Tests mis à jour : v268 (un leader), v297 (les pages
+vierges), v299 (marque-page rangé), v300 et v301 (les héros touchables, les
+papiers à gauche, 12 pages), v302 (12/18 pages), v304 (les feuillets), v305
+(le livre ouvert à sa place).

@@ -250,8 +250,8 @@ await section(async () => {
   verifier("la narration en paragraphes de livre (sans balises, sans bulles)", r.paras.length === 4 && /^J'ai connu des tavernes/.test(r.paras[0]) && r.bulles === 0, r.paras.length + " paragraphes");
   verifier("la ligne d'un joueur : celle du livre (récrite), pas ses mots bruts", r.paras.some(t => /trois chopes sauter de frayeur/.test(t)) && !r.paras.some(t => /je tape sur le comptoir/.test(t)));
   verifier("une ligne d'avant le livre (sans récriture) : rapportée telle quelle", r.paras.some(t => /Lyra : « je regarde les sorties »/.test(t)), r.paras[4]);
-  // v304 : « les noms des joueurs ne sont pas cliquables… juste en gras ».
-  verifier("les PNJ nommés se touchent ; les héros sont en gras, sans lien", ["Le Chaudron Fêlé", "Varos"].every(n => r.noms.includes(n)) && !r.noms.includes("Thorin") && ["Thorin", "Lyra"].every(n => r.heros.includes(n)), r.noms.join(",") + " / " + r.heros.join(","));
+  // v306 : les héros en gras (v304), et de nouveau touchables (« les noms cliquables ne marchent toujours pas »).
+  verifier("les PNJ et les héros se touchent ; les héros en gras", ["Le Chaudron Fêlé", "Varos", "Thorin", "Lyra"].every(n => r.noms.includes(n)) && ["Thorin", "Lyra"].every(n => r.heros.includes(n)), r.noms.join(",") + " / " + r.heros.join(","));
   verifier("ce qui était écrit avant l'arrivée est là d'un coup (pas d'encre qui coule)", r.caches === 0, String(r.caches));
   // Une nouvelle page du Narrateur : l'ancien parchemin, l'écran d'attente et le bandeau ne s'ouvrent plus.
   await p.evaluate(() => { window.__vieux = []; window.lancerRecitDynamique("x"); window.afficherEcranAttente(); window.annoncerJetsDemandes({}); window.afficherEcranAttente("archivage"); });
@@ -442,22 +442,23 @@ await section(async () => {
   const nom = await centre('#grimoire-suite-2 .nom-heros');
   await p.mouse.click(nom.x, nom.y);
   await p.waitForTimeout(700);
-  verifier("v304 : le nom d'un héros (en gras) ne sort pas de bande", !(await p.evaluate(() => document.getElementById("recit-portrait").classList.contains("sortie"))));
+  const th = await p.evaluate(() => ({ sortie: document.getElementById("recit-portrait").classList.contains("sortie"), nom: document.getElementById("recit-portrait-nom").textContent }));
+  verifier("v306 : le nom d'un héros (en gras) touché : son papier sort", th.sortie && th.nom === "Thorin Ironfoot", JSON.stringify(th));
   const pnj = await centre('#grimoire-suite-2 .nom-livre[data-nom="Varos"]');
   await p.mouse.click(pnj.x, pnj.y);
   await p.waitForTimeout(700);
   const r = await p.evaluate(() => {
-    const el = document.getElementById("recit-portrait"), b = el.querySelector(".bande-portrait").getBoundingClientRect(), g = document.getElementById("grimoire-suite-2").getBoundingClientRect();
-    return { sortie: el.classList.contains("sortie"), img: (el.querySelector("img") || {}).getAttribute ? el.querySelector("img").getAttribute("src") : "", nom: document.getElementById("recit-portrait-nom").textContent,
-             gauche: b.left < g.left + g.width * 0.5, haute: b.top < g.top };
+    const el = document.getElementById("recit-portrait"), b = el.getBoundingClientRect(), g = document.getElementById("grimoire-suite-2").getBoundingClientRect();
+    return { sortie: el.classList.contains("sortie"), nom: document.getElementById("recit-portrait-nom").textContent,
+             gauche: b.left < g.left };
   });
-  verifier("Varos touché : une bande de papier sort (v301 : du haut de la page gauche)", r.sortie && r.nom === "Varos" && r.gauche && r.haute, JSON.stringify(r));
+  verifier("Varos touché : son papier sort (v306 : du côté gauche du livre)", r.sortie && r.nom === "Varos" && r.gauche, JSON.stringify(r));
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v300_portrait.png" });
   const v = await p.evaluate(() => ({ sil: !!document.querySelector("#recit-portrait .silhouette"), nom: document.getElementById("recit-portrait-nom").textContent }));
   verifier("un PNJ sans portrait (les portraits sont en pause) : une silhouette à la plume", v.sil && v.nom === "Varos", JSON.stringify(v));
   await p.mouse.click(600, 20);
   await p.waitForTimeout(600);
-  verifier("un toucher ailleurs : la bande rentre dans le livre", !(await p.evaluate(() => document.getElementById("recit-portrait").classList.contains("sortie"))));
+  verifier("un toucher ailleurs : son papier rentre dans le livre", !(await p.evaluate(() => document.getElementById("recit-portrait").classList.contains("sortie"))));
 });
 
 // =========================================================================
@@ -561,7 +562,7 @@ await section(async () => {
   await p.evaluate(() => window.confirmerRetourMenu());
   await p.waitForTimeout(1300);
   const s = await p.evaluate(() => ({ etatPf: window.GRIMOIRE_PAGEFLIP.getState(), n: window.grimoireEtat().nbPages, actif: window.GRIMOIRE_RECIT.etat().actif, ecriture: !!document.getElementById("recit-ecriture"), plume: document.getElementById("grimoire-marque-recit").classList.contains("inactif") }));
-  verifier("retour au menu : le livre perd le récit, le marque-page à la plume s'éteint", s.n === 6 && !s.actif && !s.ecriture && s.plume, JSON.stringify(s));
+  verifier("retour au menu : le livre perd le récit, le marque-page à la plume s'éteint", s.n === 12 && !s.actif && !s.ecriture && s.plume, JSON.stringify(s));
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

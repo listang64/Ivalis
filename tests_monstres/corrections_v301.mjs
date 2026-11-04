@@ -131,7 +131,7 @@ await p.waitForTimeout(300);
 const mesures = () => p.evaluate(() => {
   const k = document.querySelector(".grimoire-fond-livre").getBoundingClientRect().width / 2000;
   const d = document.getElementById("grimoire-suite-3").getBoundingClientRect(), g = document.getElementById("grimoire-suite-2").getBoundingClientRect();
-  const pap = document.querySelector("#recit-ecriture .papier-ecriture").getBoundingClientRect(), bande = document.querySelector("#recit-portrait .bande-portrait").getBoundingClientRect();
+  const pap = document.querySelector("#recit-ecriture .papier-ecriture").getBoundingClientRect(), bande = document.querySelector("#recit-portrait .papier-usure").getBoundingClientRect();
   const r = (x) => ({ l: x.left, r: x.right, t: x.top, b: x.bottom, w: x.width, h: x.height });
   return { k, droite: r(d), gauche: r(g), pap: r(pap), bande: r(bande),
            sortie: document.getElementById("recit-ecriture").classList.contains("sortie"), portrait: document.getElementById("recit-portrait").classList.contains("sortie") };
@@ -167,28 +167,22 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("2. LE PORTRAIT : IL SORT DU HAUT DE LA PAGE GAUCHE, DERRIÈRE LES MARQUE-PAGES");
+titre("2. LE PORTRAIT : (v306) IL SORT DU CÔTÉ GAUCHE DU LIVRE, SUR UN PAPIER USÉ");
 // =========================================================================
+// v306 : Nico, « les avatars, quand on clique sur leur nom, sortent du côté gauche
+// du livre, un peu en biais » (corrections_v306 vérifie le reste).
 await section(async () => {
   const avant = await mesures();
-  verifier("rentré, il est caché derrière la page", !avant.portrait && avant.bande.t >= avant.gauche.t - 1, `${avant.bande.t.toFixed(0)} / ${avant.gauche.t.toFixed(0)}`);
-  const nom = await centre('#grimoire-suite-2 .nom-livre[data-nom="Varos"]');   // v304 : les héros ne sont plus cliquables
+  verifier("rentré, on ne le voit pas", !avant.portrait);
+  const nom = await centre('#grimoire-suite-2 .nom-livre[data-nom="Varos"]');
   await p.mouse.click(nom.x, nom.y);
-  await attendreQue(async () => { const x = await mesures(); return x.bande.t < x.gauche.t - 150 * x.k; }, 4000);
-  await p.waitForTimeout(250);
+  await p.waitForTimeout(800);
   const m = await mesures();
-  const r = await p.evaluate(() => ({ img: (document.querySelector("#recit-portrait img") || { getAttribute: () => "" }).getAttribute("src"), nom: document.getElementById("recit-portrait-nom").textContent,
-    ordre: (() => { const b = document.getElementById("recit-portrait"), mp = document.getElementById("grimoire-marque-page"), mr = document.getElementById("grimoire-marque-recit");
-                    return !!(b.compareDocumentPosition(mp) & Node.DOCUMENT_POSITION_FOLLOWING) && !!(b.compareDocumentPosition(mr) & Node.DOCUMENT_POSITION_FOLLOWING); })() }));
-  verifier("un nom touché : la bande sort du haut de la page de gauche, avec le portrait", m.portrait && r.nom === "Varos" && m.bande.t < m.gauche.t - 150 * m.k && m.bande.l > m.gauche.l - 20 * m.k && m.bande.r < m.gauche.l + m.gauche.w * 0.5, JSON.stringify({ haut: Math.round(m.bande.t), page: Math.round(m.gauche.t), g: Math.round(m.bande.l) }));
-  const mp = await p.evaluate(() => { const r = document.getElementById("grimoire-marque-page").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height * 0.25 }; });
-  verifier("derrière les marque-pages : ils restent devant, et se touchent", r.ordre && await dans(mp.x, mp.y, "#grimoire-marque-page"), await dessus(mp.x, mp.y));
-  verifier("… et derrière la page (sous son bord, c'est la page)", await dans((m.bande.l + m.bande.r) / 2 + 30, m.gauche.t + 15, "#grimoire-suite-2"), await dessus((m.bande.l + m.bande.r) / 2 + 30, m.gauche.t + 15));
+  verifier("un nom touché : le papier sort à gauche du livre, avec le nom", m.portrait && m.bande.r <= m.gauche.l + 2 && (await p.evaluate(() => document.getElementById("recit-portrait-nom").textContent)) === "Varos", JSON.stringify({ r: m.bande.r, page: m.gauche.l }));
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v301_portrait.png" });
   await p.mouse.click(600, 20);
   await p.waitForTimeout(700);
-  const apres = await mesures();
-  verifier("un toucher ailleurs : elle rentre dans le livre", !apres.portrait && apres.bande.t >= apres.gauche.t - 1);
+  verifier("un toucher ailleurs : il rentre dans le livre", !(await mesures()).portrait);
 });
 
 // =========================================================================

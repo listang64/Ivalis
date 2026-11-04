@@ -136,7 +136,7 @@ await section(async () => {
              traits: m ? m.querySelectorAll("svg path").length : 0, encre: m ? getComputedStyle(m.querySelector("svg circle")).stroke : "",
              apresPlume: m && p ? m.getBoundingClientRect().left - p.getBoundingClientRect().left : 0, transform: m ? getComputedStyle(m).transform : "" };
   });
-  verifier("hors partie, le livre n'a pas la carte (6 pages)", r.n === 6, String(r.n));
+  verifier("hors partie, le livre n'a pas la carte (6 pages, + 6 vierges en v306)", r.n === 12, String(r.n));
   verifier("un marque-page à la terre dessinée au trait noir (globe, méridiens, terres)", r.existe && r.globe && r.traits >= 5 && /rgb\(18, 11, 6\)/.test(r.encre), `${r.traits} traits, ${r.encre}`);
   verifier("… côté gauche, en biais vers la droite", r.apresPlume > 20 && angleDe(r.transform) > 5, `${angleDe(r.transform).toFixed(1)}°`);
   verifier("… éteint hors partie", r.inactif);
@@ -156,7 +156,7 @@ await section(async () => {
   await relayer([], true);
   await attendreQue(async () => (await page()) === 5, 4000);   // v304 : le livre tourne jusqu'à la carte
   const e = await p.evaluate(() => ({ n: window.grimoireEtat().nbPages, actif: !document.getElementById("grimoire-marque-carte").classList.contains("inactif"), page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() }));
-  verifier("en partie : la double page de la carte entre dans le livre, le marque-page s'allume", e.n === 12 && e.actif && e.page === 5, JSON.stringify(e));   // v304 : la partie s'ouvre sur la carte
+  verifier("en partie : la double page de la carte entre dans le livre, le marque-page s'allume", e.n === 18 && e.actif && e.page === 5, JSON.stringify(e));   // v304 : la partie s'ouvre sur la carte
   await p.evaluate(() => window.grimoireAllerIndex());
   await attendreQue(async () => (await page()) === 3, 3000);
   await p.waitForTimeout(400);
@@ -292,7 +292,7 @@ await section(async () => {
   await p.evaluate(() => window.confirmerRetourMenu());
   await p.waitForTimeout(1300);
   const s = await p.evaluate(() => ({ n: window.grimoireEtat().nbPages, terre: document.getElementById("grimoire-marque-carte").classList.contains("inactif") }));
-  verifier("le livre revient à 6 pages, le marque-page de la terre s'éteint", s.n === 6 && s.terre, JSON.stringify(s));
+  verifier("le livre revient à 6 pages (+ 6 vierges), le marque-page de la terre s'éteint", s.n === 12 && s.terre, JSON.stringify(s));
   const index = lire("index.html");
   const v = (re) => Number((index.match(re) || [])[1] || 0);
   verifier("la carte dans son propre fichier (grimoire_carte.js, .css), après le récit", index.indexOf('src="grimoire_carte.js?v=') > index.indexOf('src="grimoire_recit.js?v=') && /grimoire_carte\.css\?v=\d+/.test(index));

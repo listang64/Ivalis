@@ -152,32 +152,33 @@ titre("2. LES MARQUE-PAGES ET LES LIENS : LES PAGES DÉFILENT TRÈS VITE, SANS C
 // =========================================================================
 const surLeClic = (sel) => p.evaluate((sel) => {
   window.__sons = []; window.__clics = 0;
+  const depart = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex();
   document.querySelector(sel).click();
-  const c = document.querySelector(".defile-pages");
-  return { feuilles: c ? c.querySelectorAll(".feuille-defile").length : 0, sens: c && c.firstElementChild ? c.firstElementChild.className : "",
-           anims: c ? [...c.querySelectorAll(".feuille-defile")].map(f => f.getAnimations().length).reduce((a, b) => a + b, 0) : 0,
-           depart: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() };
+  // v306 : de vraies pages du livre, manuscrites, glissées le temps du défilement.
+  const l = document.getElementById("grimoire-livre");
+  return { feuilles: l.querySelectorAll(".page-manuscrite").length, ecrites: [...l.querySelectorAll(".page-manuscrite")].every(f => f.querySelectorAll(".ecriture-feuillet p").length >= 3),
+           enCours: window.GRIMOIRE.defileEnCours(), depart };
 }, sel);
-const apres = () => p.evaluate(() => ({ page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), sons: window.__sons.map(x => x[0]), clics: window.__clics, reste: !!document.querySelector(".defile-pages") }));
+const apres = () => p.evaluate(() => ({ page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), sons: window.__sons.map(x => x[0]), clics: window.__clics, reste: !!document.querySelector(".page-manuscrite") }));
 await section(async () => {
   // La carte (5) → le récit (9) : le marque-page à la plume.
   const a = await surLeClic("#grimoire-marque-recit");
   if (CAPTURES) { await p.waitForTimeout(160); await p.screenshot({ path: CAPTURES + "/v304_pages_defilent.png" }); }
-  verifier("le marque-page du récit : une liasse de feuilles se met à défiler (vers la gauche)", a.feuilles >= 6 && a.anims === a.feuilles && /vers-gauche/.test(a.sens) && a.depart === 5, JSON.stringify(a));
+  verifier("le marque-page du récit : de vraies pages, écrites à la main, défilent (v306)", a.feuilles >= 4 && a.ecrites && a.enCours && a.depart === 5, JSON.stringify(a));
   await p.waitForTimeout(1100);
   let z = await apres();
-  verifier("… le livre arrive au récit (page 9), la liasse s'efface", z.page === 9 && !z.reste, JSON.stringify(z));
+  verifier("… le livre arrive au récit (page 9), les pages de passage s'en vont", z.page === 9 && !z.reste, JSON.stringify(z));
   verifier("le bruit : des pages qui défilent, et plus de son de clic", z.sons.join(",") === "pages-defilent" && z.clics === 0, JSON.stringify(z));
   // Le récit (9) → l'index (3) : le marque-page de l'index, à l'envers.
   const b2 = await surLeClic("#grimoire-marque-page");
   await p.waitForTimeout(1100);
   z = await apres();
-  verifier("le marque-page de l'index : les pages défilent vers la droite, jusqu'à l'index", b2.feuilles >= 6 && /vers-droite/.test(b2.sens) && z.page === 3 && z.sons.join(",") === "pages-defilent" && z.clics === 0, JSON.stringify([b2, z]));
+  verifier("le marque-page de l'index : les pages défilent en arrière, jusqu'à l'index", b2.feuilles >= 4 && b2.enCours && z.page === 3 && z.sons.join(",") === "pages-defilent" && z.clics === 0, JSON.stringify([b2, z]));
   // Un lien du livre : « Le récit » dans l'index.
   const c = await surLeClic("#grimoire-index-recit");
   await p.waitForTimeout(1100);
   z = await apres();
-  verifier("un lien de l'index (« Le récit ») : même défilement, sans clic", c.feuilles >= 6 && z.page === 9 && z.clics === 0 && !z.sons.includes("clic"), JSON.stringify([c, z]));
+  verifier("un lien de l'index (« Le récit ») : même défilement, sans clic", c.feuilles >= 4 && z.page === 9 && z.clics === 0 && !z.sons.includes("clic"), JSON.stringify([c, z]));
   // La double page voisine se tourne normalement (pas de liasse) : l'index → la carte.
   await p.evaluate(() => window.grimoireAllerIndex());
   await p.waitForTimeout(1100);
@@ -202,11 +203,12 @@ await section(async () => {
              liens: [...document.querySelectorAll(".page-suite .nom-livre")].map(a => a.dataset.nom) };
   });
   verifier("Thorin et Lyra en gras (comme l'ancien chat), sans souligné", ["Thorin", "Lyra"].every(n => r.heros.includes(n)) && r.gras.every(g => g >= 700) && r.souligne.every(s => s === "none") && r.balise.every(t => t === "B"), JSON.stringify(r));
-  verifier("ils ne sont plus des liens ; Varos (un PNJ) l'est toujours", !r.liens.includes("Thorin") && !r.liens.includes("Lyra") && r.liens.includes("Varos"), r.liens.join(","));
+  // v306 : « les noms cliquables ne marchent toujours pas » — en gras, ET touchables.
+  verifier("v306 : ils se touchent comme Varos (un PNJ)", r.liens.includes("Thorin") && r.liens.includes("Lyra") && r.liens.includes("Varos"), r.liens.join(","));
   const c = await centre(".page-suite .nom-heros");
   await p.mouse.click(c.x, c.y);
   await p.waitForTimeout(600);
-  verifier("un nom de héros touché : pas de bande de portrait", !(await p.evaluate(() => document.getElementById("recit-portrait").classList.contains("sortie"))));
+  verifier("v306 : un nom de héros touché : son papier sort", await p.evaluate(() => document.getElementById("recit-portrait").classList.contains("sortie")));
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v304_heros_gras.png" });
 });
 

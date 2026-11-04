@@ -158,8 +158,9 @@ const AP = (() => {
   verifier("2.1 LA PATROUILLE : 2N ou 1N+1P sans leader au départ ; au tour 3, 1N+1P ou 3P (leader possible)",
            tous("2.1", t => ["2N0P", "1N1P"].includes(compo(t.depart)) && !t.depart.some(m => m.leader) && t.renforts.every(m => m.entreeManche === 3)
                 && ["1N1P", "0N3P"].includes(compo(t.renforts))));
-  verifier("2.2 LES FUYARDS : 2 Petits à distance, leaders, fuyards (70 %, jusqu'au tour 8)",
-           tous("2.2", t => compo(t.depart) === "0N2P" && t.depart.every(m => DIST.includes(m.archetype) && m.leader && m.fuyard
+  // v306 : Nico, « un seul leader par combat, max » — l'un des deux fuyards mène.
+  verifier("2.2 LES FUYARDS : 2 Petits à distance, un leader (v306), fuyards (70 %, jusqu'au tour 8)",
+           tous("2.2", t => compo(t.depart) === "0N2P" && t.depart.filter(m => m.leader).length === 1 && t.depart.every(m => DIST.includes(m.archetype) && m.fuyard
                 && m.fuyard.esquiveOpportunite === 70 && m.fuyard.jusqua === 8)));
   verifier("…au tour 8 l'Apparition 4 entre, sans leader — pas si tous sont vaincus avant",
            tous("2.2", t => t.renforts.every(m => m.entreeManche === 8 && m.annuleSiVide && m.sansLeader && !m.leader && m.finFuite)
@@ -174,8 +175,8 @@ const AP = (() => {
            tous("2.5", t => ["2N0P", "1N1P", "0N2P"].includes(compo(t.depart)) && t.renforts.every(m => [2, 4].includes(m.entreeManche))));
   verifier("3.1 LA BANDE : 3N, 1N+2P ou 2N+1P ; au tour 5, 1N+1P ou 3P",
            tous("3.1", t => ["3N0P", "1N2P", "2N1P"].includes(compo(t.depart)) && t.renforts.every(m => m.entreeManche === 5)));
-  verifier("3.2 LES DEUX CHEFS : deux Normaux leaders et un Normal ou un Petit ; pas de renfort, pas de soutien",
-           tous("3.2", t => t.depart.filter(m => m.leader && m.palier === "Normal").length === 2 && t.depart.length === 3 && t.renforts.length === 0 && soutiens(t.depart) === 0));
+  verifier("3.2 LES DEUX CHEFS : un Normal leader (v306 : un seul par combat) et un Normal ou un Petit ; pas de renfort, pas de soutien",
+           tous("3.2", t => t.depart.filter(m => m.leader).length === 1 && t.depart.filter(m => m.leader && m.palier === "Normal").length === 1 && t.depart.length === 3 && t.renforts.length === 0 && soutiens(t.depart) === 0));
   verifier("3.3 LA HORDE : 3 au hasard ; un Petit tous les 3 tours, 5 fois, ni tank ni soutien",
            tous("3.3", t => t.depart.length === 3 && JSON.stringify(heures(t)) === "[4,7,10,13,16]" && t.renforts.every(m => m.annuleSiVide && m.archetype !== ARCH.TANK && m.archetype !== ARCH.SOUTIEN)));
   verifier("4.1 L'ESCOUADE : 4N, 3N+1P, 2N+2P ou 5P ; pas de renfort",

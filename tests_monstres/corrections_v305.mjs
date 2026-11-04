@@ -86,7 +86,9 @@ const surLaTable = (p) => p.evaluate(() => {
   const tb = t.getBoundingClientRect(), W = t.naturalWidth, H = t.naturalHeight;
   const c = document.querySelector("#grimoire-page-0 img").getBoundingClientRect(), l = document.getElementById("grimoire-livre").getBoundingClientRect();
   const enTable = (r) => [(r.left - tb.left) / tb.width * 1672, (r.top - tb.top) / tb.height * 941, r.height / tb.height * 941];
-  return { couv: enTable(c), livre: enTable(l), table: [tb.left, tb.top, tb.right, tb.bottom], vw: innerWidth, vh: innerHeight, W, H };
+  const f = document.querySelector(".grimoire-fond-livre").getBoundingClientRect();
+  const reliure = [(f.left + 68 / 2000 * f.width - tb.left) / tb.width * 1672, (f.top + 43 / 1117 * f.height - tb.top) / tb.height * 941, 1931 / 2000 * f.width / tb.width * 1672];
+  return { couv: enTable(c), livre: enTable(l), reliure, table: [tb.left, tb.top, tb.right, tb.bottom], vw: innerWidth, vh: innerHeight, W, H };
 });
 const proche = (a, b, e = 2) => a.every((v, i) => Math.abs(v - b[i]) <= e);
 const PLACE = [623, 150, 630];
@@ -114,8 +116,10 @@ await section(async () => {
   await p.waitForTimeout(1300);
   const apres = await surLaTable(p);
   const zoom = (apres.table[2] - apres.table[0]) / (avant.table[2] - avant.table[0]);
-  verifier("à l'ouverture, la table suit le zoom du livre (iPad : presque rien depuis le livre grossi)", zoom > 0.98 && zoom < 1.6, `× ${zoom.toFixed(3)}`);
-  verifier("… et le livre reste à sa place sur elle, pendant et après", proche(milieu.livre, avant.livre, 2.5) && proche(apres.livre, avant.livre, 2.5), [avant.livre, milieu.livre, apres.livre].map(x => x.map(v => v.toFixed(1)).join(" ")).join(" | "));
+  verifier("à l'ouverture, la table zoome un peu (v306 : le livre ouvert à sa place)", zoom > 1.05 && zoom < 1.8, `× ${zoom.toFixed(3)}`);
+  // v306 : « le livre s'ouvre, dépasse de la table et est sur la plume et l'encrier » —
+  // ouvert, il a sa propre place sur la table (corrections_v306) ; fermé, il retrouve la sienne.
+  verifier("… (v306) ouvert, le livre a sa place sur la table, à gauche de l'encrier", apres.reliure && proche(apres.reliure, [200, 232, 905], 3), JSON.stringify(apres.reliure));
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v305_table_ouvert.png" });
   await p.close();
 });

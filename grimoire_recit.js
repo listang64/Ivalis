@@ -111,12 +111,13 @@ function nomsConnus() {
     Object.keys(etat.pnjImages).forEach(n => { if (n) noms.add(n.trim()); });
     return [...noms].filter(n => n.length > 1).sort((a, b) => b.length - a.length);
 }
-// v304 : Nico, « les noms des joueurs : ne les rends pas cliquables, ne les
-// souligne pas, juste en gras, comme dans l'ancienne interface ». Les PNJ
-// gardent leur lien (leur portrait sort du livre).
+// v304 : Nico, « les noms des joueurs : ne les souligne pas, juste en gras,
+// comme dans l'ancienne interface ». v306 : « les noms cliquables dans le
+// texte RP ne marchent toujours pas » — ils restaient muets depuis la v304 :
+// en gras, et cliquables (l'avatar sort du livre), comme ceux des PNJ.
 const estHeros = (nom) => herosDeLaPartie().some(h => sansAccent(h.prenom) === sansAccent(nom));
 const lien = (nom, texte) => estHeros(nom)
-    ? `<b class="nom-heros">${echapper(texte)}</b>`
+    ? `<b class="nom-livre nom-heros" data-nom="${echapper(nom)}">${echapper(texte)}</b>`
     : `<a class="nom-livre" data-nom="${echapper(nom)}">${echapper(texte)}</a>`;
 // Un texte en mots (jetons HTML) ; les noms connus deviennent des liens, un seul jeton.
 function jetonsDuTexte(texte, noms) {
@@ -494,7 +495,7 @@ function placeDuMot(mot) {
     if (!pf || etat.lecture) return "ouvert";
     const index = PREMIERE_SUITE + etat.elements.indexOf(mot.closest(".page-suite"));
     const ici = pf.getCurrentPageIndex(), gauche = ici % 2 === 1 ? ici : ici - 1;
-    if (!g.ouvert() || pf.getState() !== "read" || ici < PREMIERE_RECIT) return "apres";
+    if (!g.ouvert() || pf.getState() !== "read" || ici < PREMIERE_RECIT || (g.defileEnCours && g.defileEnCours())) return "apres";
     if (index < gauche) return "avant";
     if (index > gauche + 1) return "apres";
     return "ouvert";
@@ -523,12 +524,20 @@ function creerElements() {
     const g = G();
     const scene = g.scene(), livre = g.livre(), ecran = g.ecran();
     const avantLivre = (el) => scene.insertBefore(el, livre);
-    const portrait = document.createElement("div");
-    portrait.className = "recit-portrait";
-    portrait.id = "recit-portrait";
-    portrait.innerHTML = `<div class="bande-portrait"><div class="cadre-portrait" id="recit-portrait-image"></div><div class="nom-portrait" id="recit-portrait-nom"></div></div>`;
-    // (v301) Sous les pages et sous les marque-pages : elle sort du haut de la page de gauche.
-    scene.insertBefore(portrait, document.getElementById("grimoire-marque-page") || livre);
+    // LES PAPIERS DES AVATARS (v306). Nico : « les avatars des personnages, quand
+    // on clique sur leur nom, sortent du côté gauche du livre, un peu en biais,
+    // sur un morceau de parchemin usé. Quand on ne clique rien, dans la partie RP,
+    // il reste sorti tout le temps avec l'avatar de son personnage. Quand on
+    // clique sur un nom, un autre papier vient sortir par-dessus, légèrement
+    // décalé, pour donner l'illusion de superposition. » Glissés sous la tranche
+    // gauche du livre : ils en sortent vers la gauche.
+    const avatars = document.createElement("div");
+    avatars.className = "recit-avatars";
+    avatars.id = "recit-avatars";
+    const papier = (id, idImage, idNom) => `<div class="papier-avatar" id="${id}"><div class="papier-usure"><div class="cadre-portrait" id="${idImage}"></div><div class="nom-portrait" id="${idNom}"></div></div></div>`;
+    avatars.innerHTML = papier("recit-avatar", "recit-avatar-image", "recit-avatar-nom") + papier("recit-portrait", "recit-portrait-image", "recit-portrait-nom");
+    scene.insertBefore(avatars, document.getElementById("grimoire-marque-page") || livre);
+    const portrait = avatars.querySelector("#recit-portrait"), avatar = avatars.querySelector("#recit-avatar");
     const notes = document.createElement("div");
     notes.className = "recit-notes";
     notes.id = "recit-notes";
@@ -553,7 +562,7 @@ function creerElements() {
     poussiere.className = "recit-poussiere";
     poussiere.id = "recit-poussiere";
     ecran.appendChild(poussiere);
-    elts = { portrait, notes, postit, ecriture, poussiere, saisie: ecriture.querySelector("textarea"), form: ecriture.querySelector("form") };
+    elts = { portrait, avatar, avatars, notes, postit, ecriture, poussiere, saisie: ecriture.querySelector("textarea"), form: ecriture.querySelector("form") };
     elts.form.addEventListener("submit", (ev) => { ev.preventDefault(); envoyer(); });
     elts.saisie.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); envoyer(); } });
     toucherVite(postit, () => lancerNarrateur());
@@ -572,7 +581,7 @@ function creerElements() {
         return false;
     }, true);
 }
-// Un toucher ailleurs : la bande du portrait rentre dans le livre.
+// Un toucher ailleurs : le papier du nom touché rentre dans le livre (le sien reste).
 document.addEventListener("pointerdown", (ev) => {
     if (!elts || !elts.portrait.classList.contains("sortie")) return;
     if (ev.target.closest && (ev.target.closest(".nom-livre") || ev.target.closest("#recit-portrait"))) return;
@@ -595,13 +604,18 @@ function toucherVite(el, faire, deleguer) {
     });
 }
 
-// LA BANDE DU PORTRAIT : elle sort du livre côté gauche.
+// LE PAPIER D'UN NOM TOUCHÉ : il sort par-dessus le sien, un peu décalé.
+function remplirPapier(idImage, idNom, nom, h) {
+    const url = h ? (h.urlCloudinary || h.urlPortraitReference || "") : (etat.pnjImages[nom] || etat.pnjImages[Object.keys(etat.pnjImages).find(n => sansAccent(n) === sansAccent(nom))] || "");
+    const cadre = document.getElementById(idImage);
+    const voulu = url ? `<img src="${echapper(url)}" alt="${echapper(nom)}" draggable="false">` : SILHOUETTE;
+    if (cadre.__voulu !== voulu) { cadre.innerHTML = voulu; cadre.__voulu = voulu; }
+    document.getElementById(idNom).textContent = h ? `${h.prenom} ${h.nom || ""}`.trim() : nom;
+}
 function montrerPortrait(nom) {
     if (!elts || !nom) return;
     const h = herosDeLaPartie().find(p => sansAccent(p.prenom) === sansAccent(nom) || sansAccent(`${p.prenom} ${p.nom}`) === sansAccent(nom));
-    const url = h ? (h.urlCloudinary || h.urlPortraitReference || "") : (etat.pnjImages[nom] || etat.pnjImages[Object.keys(etat.pnjImages).find(n => sansAccent(n) === sansAccent(nom))] || "");
-    document.getElementById("recit-portrait-image").innerHTML = url ? `<img src="${echapper(url)}" alt="${echapper(nom)}" draggable="false">` : SILHOUETTE;
-    document.getElementById("recit-portrait-nom").textContent = h ? `${h.prenom} ${h.nom || ""}`.trim() : nom;
+    remplirPapier("recit-portrait-image", "recit-portrait-nom", nom, h);
     elts.portrait.classList.remove("sortie");
     void elts.portrait.offsetWidth;
     elts.portrait.classList.add("sortie");
@@ -661,6 +675,10 @@ function majInterface() {
             `<a class="heros-choix${h.idPersonnage === heros.idPersonnage ? " choisi" : ""}" data-heros="${echapper(h.idPersonnage)}">${echapper(h.prenom)}</a>`).join("");
     }
     elts.postit.classList.toggle("sortie", recit && posee);
+    // (v306) Son papier : sorti tant qu'on est dans le récit, avec l'avatar de son héros.
+    if (heros) remplirPapier("recit-avatar-image", "recit-avatar-nom", heros.prenom, heros);
+    elts.avatar.classList.toggle("sortie", !!(recit && posee && heros));
+    elts.avatars.classList.toggle("visible", !!(etat.actif && g && g.ouvert()));
     elts.postit.classList.toggle("eteint", bloque || etat.envoi || ecrit);
     elts.postit.disabled = bloque || etat.envoi;
     elts.notes.classList.toggle("visible", !!(etat.actif && g && g.ouvert() && pf && pf.getCurrentPageIndex() > 0));
@@ -1080,7 +1098,7 @@ function sortir() {
     clearInterval(etat.minuteur); etat.minuteur = null;
     const g = G();
     if (g && g.ecran()) g.ecran().removeEventListener("grimoire-page", majInterface);
-    if (elts) ["portrait", "notes", "postit", "ecriture", "poussiere"].forEach(k => { if (elts[k]) elts[k].remove(); });
+    if (elts) ["avatars", "notes", "postit", "ecriture", "poussiere"].forEach(k => { if (elts[k]) elts[k].remove(); });
     elts = null;
     if (mesureur) { mesureur.remove(); mesureur = null; }
     etat.elements = []; etat.htmlPages = []; etat.pagesRecit = 0;

@@ -879,7 +879,10 @@ export function tomber(etat, id, acteur, options) {
     if (!(nombre(c.pvMax) > 0 && nombre(c.pv) <= 0)) return [];
     c.pv = 0;
     if (c.sursis) return [];                      // déjà en sursis : il tient
-    if (c.estMonstre && c.releveEnLeader && !c.leader) return releverEnLeader(etat, c, acteur, options);
+    // v306 : Nico, « un seul leader par combat, max » — un autre leader encore
+    // debout : celui-ci ne se relève pas en chef, il tombe.
+    const autreLeader = Object.values(etat.combattants || {}).some(x => x && x !== c && x.estMonstre && x.leader && !x.aTerre && nombre(x.pv) > 0);
+    if (c.estMonstre && c.releveEnLeader && !c.leader && !autreLeader) return releverEnLeader(etat, c, acteur, options);
     const tours = nombre(c.atouts && c.atouts.sursis);
     if (tours > 0 && !c.sursisUtilise) {
         const entame = ((etat.file || [])[0] || {}).id === id;

@@ -243,6 +243,14 @@ titre("5. LE MARQUE-PAGE : SOUS LES PAGES, AU-DESSUS DU LIVRE, À GAUCHE ; ÉTEI
 // =========================================================================
 let geo = null;
 await section(async () => {
+  // v306 : Nico, « les marque-pages grisés, range-les cachés dans le livre ; fais-les
+  // ressortir une fois la partie chargée ». Hors partie, il est rangé sous les pages ;
+  // pour mesurer sa forme, on le fait sortir un instant.
+  const range = await p.evaluate(() => { const m = document.getElementById("grimoire-marque-page"), fond = document.querySelector(".grimoire-fond-livre").getBoundingClientRect();
+    return { top: m.getBoundingClientRect().top, pages: fond.top + 62 * fond.width / 2000, inactif: m.classList.contains("inactif") }; });
+  verifier("v306 : hors partie, il est rangé dans le livre (caché sous les pages)", range.inactif && range.top > range.pages, `haut ${range.top.toFixed(0)} px, pages ${range.pages.toFixed(0)} px`);
+  await p.evaluate(() => document.getElementById("grimoire-marque-page").classList.remove("inactif"));
+  await p.waitForTimeout(800);
   geo = await p.evaluate(() => {
     const m = document.getElementById("grimoire-marque-page"), fond = document.querySelector(".grimoire-fond-livre").getBoundingClientRect();
     const r = m.getBoundingClientRect(), k = fond.width / 2000, st = getComputedStyle(m), papier = getComputedStyle(m.querySelector(".marque-papier"));
@@ -263,6 +271,9 @@ await section(async () => {
   const x = (geo.gauche + geo.droite) / 2;
   verifier("glissé sous les pages : sous leur bord, la page le recouvre", geo.avantLivre && !(await dans(x, geo.pagesTop + 40 * geo.k, "#grimoire-marque-page")) && geo.bas > geo.pagesTop + 20, await dessus(x, geo.pagesTop + 40 * geo.k));
   verifier("… et au-dessus, on le touche", await dans(x, geo.top + 25 * geo.k, "#grimoire-marque-page"));
+  await p.evaluate(() => document.getElementById("grimoire-marque-page").classList.add("inactif"));
+  await p.waitForTimeout(800);
+  geo.inactif = true;
   verifier("hors partie, il est éteint (désactivé)", geo.inactif && geo.aria === "true");
   await p.evaluate(() => { window.__clics = 0; });
   const avant = await page();

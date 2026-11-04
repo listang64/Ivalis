@@ -48,7 +48,17 @@
     // couvre l'écran (recadrée autour du livre) ; le livre y est posé ; la table
     // est dans la scène, elle zoome avec lui à l'ouverture. Nico ensuite :
     // « grossis un peu la taille du livre posé sur la table » (560 → 630).
-    const TABLE = { w: 1672, h: 941, livre: { x: 623, y: 150, h: 630 } };
+    const TABLE = { w: 1672, h: 941, livre: { x: 623, y: 150, h: 630 },
+    // v306 : Nico, « le zoom quand le livre s'ouvre ne va pas car les tailles
+    // diffèrent : le livre s'ouvre, dépasse de la table et est complètement sur
+    // la plume et l'encrier ». Les deux images ne s'accordent pas (une moitié du
+    // livre ouvert est presque carrée, la couverture étroite) : le livre ouvert a
+    // sa propre place sur la table — à gauche de l'encrier, sous la plume, à peu
+    // près de la hauteur du livre fermé. Sa reliure (x 68 → 1999, y 43 → 1080 de
+    // l'image du livre ouvert) va dans cette boîte ; la table glisse d'un cadrage
+    // à l'autre pendant l'ouverture, en même temps que le zoom.
+                    ouvert: { x: 200, y: 232, w: 905 } };
+    const RELIURE = { x: 68, y: 43, w: 1931, h: 1037 };   // la reliure du livre ouvert, dans son image
     // v298 : Nico, « le livre, descends-le au max sur l'écran — ne l'agrandis
     // pas, juste descends-le ». Même taille qu'avant (tout le livre tient à
     // l'écran), mais posé en bas, un filet de marge sous lui.
@@ -86,7 +96,19 @@
     // récit et les pages du chapitre. Le livre compte alors 0 couverture,
     // 1-2 titre et journal, 3-4 index ou chapitre, les pages de la suite, et
     // la quatrième de couverture (`dos`), toujours la dernière.
-    let dos = null, suite = [], nbPages = 6;
+    // LES PAGES VIERGES (v306) : Nico, « fais en sorte qu'on ne puisse pas
+    // fermer la dernière page du livre ; que si ça devait se passer, on tourne
+    // plutôt une page vierge, quitte à créer 6 pages vierges utilisées que pour
+    // ça ». Avant la quatrième de couverture, toujours ; la dernière double page
+    // vierge ne se tourne plus (brancherPrise).
+    const NB_VIERGES = 6;
+    // LES PAGES DU DÉFILEMENT (v306) : Nico, « quand les pages défilent vite,
+    // tu n'utilises pas la bibliothèque des pages, ça fait défiler comme des
+    // couvertures rigides… les pages ne sont pas naturelles ; fais défiler des
+    // pages de texte au hasard, avec de l'écriture, pour simuler que le livre
+    // est écrit ». Des pages manuscrites glissées le temps du défilement.
+    const NB_FEUILLETS = 12;
+    let dos = null, suite = [], nbPages = 6 + NB_VIERGES, vierges = [], feuillets = [], listeActuelle = [];
     // LA CARTE DU MONDE (v302) : sa double page vient juste après l'index (5-6),
     // en partie seulement ; la suite (le récit) commence alors à la page 7.
     // Nico : « page de gauche cette partie de la map, page de droite celle-là ;
@@ -381,7 +403,10 @@
         const tx = ox + bx * k - gauche - z * lx, ty = oy + by * k - haut - z * ly;
         // La table, dans la scène (elle suit le zoom de l'ouverture).
         const table = { x: (ox - gauche - tx) / z, y: (oy - haut - ty) / z, w: tw * k / z, h: th * k / z };
-        return { s, gauche, haut, tx, ty, z, table, vw, vh };
+        // Ouvert (v306) : la table sous la reliure du livre ouvert, à sa place.
+        const u = RELIURE.w * s / (TABLE.ouvert.w * r);            // pixels de scène par pixel de table
+        const tableOuverte = { x: RELIURE.x * s - TABLE.ouvert.x * r * u, y: RELIURE.y * s - TABLE.ouvert.y * th / TABLE.h * u, w: tw * u, h: th * u };
+        return { s, gauche, haut, tx, ty, z, table, tableOuverte, vw, vh };
     }
     function poser() {
         if (!scene) return;
@@ -393,10 +418,16 @@
         scene.style.setProperty("--u", (PAGE.w * m.s / 100) + "px");   // 1 % de la largeur d'une page
         scene.style.setProperty("--transform-ferme", `translate(${m.tx}px, ${m.ty}px) scale(${m.z})`);
         const table = document.getElementById("grimoire-table");
-        if (table) Object.assign(table.style, { left: m.table.x + "px", top: m.table.y + "px", width: m.table.w + "px", height: m.table.h + "px" });
+        if (table) {
+            // Posée à sa place « ouvert » ; fermée, une transformation la ramène sous la couverture.
+            const o = m.tableOuverte, f = m.table, sigma = f.w / o.w;
+            Object.assign(table.style, { left: o.x + "px", top: o.y + "px", width: o.w + "px", height: o.h + "px" });
+            scene.style.setProperty("--table-ferme", `translate(${f.x - o.x}px, ${f.y - o.y}px) scale(${sigma})`);
+        }
         const ombre = document.getElementById("grimoire-ombre-couverture");
         if (ombre) Object.assign(ombre.style, { left: (ZONE.x + PAGE.w) * m.s + "px", top: ZONE.y * m.s + "px", height: PAGE.h * m.s + "px" });
         scene.style.setProperty("--s", String(m.s));
+        scene.style.setProperty("--marge-gauche", m.gauche + "px");   // (v306) la place à gauche du livre ouvert
         livre.style.left = ZONE.x * m.s + "px";
         livre.style.top = ZONE.y * m.s + "px";
         livre.style.width = ZONE.w * m.s + "px";
@@ -448,6 +479,15 @@
         imgTable.addEventListener("error", () => imgTable.classList.add("absente"), { once: true });
         for (let i = 0; i <= 5; i++) pages[i] = document.getElementById("grimoire-page-" + i);
         dos = pages[5];
+        vierges = Array.from({ length: NB_VIERGES }, (_, i) => {
+            const el = document.createElement("div");
+            el.className = `page-grimoire page-papier ${i % 2 === 0 ? "gauche" : "droite"} page-vierge`;
+            el.id = "grimoire-vierge-" + i;
+            livre.insertBefore(el, dos);
+            return el;
+        });
+        feuillets = Array.from({ length: NB_FEUILLETS }, (_, i) => pageManuscrite(i));
+        listeActuelle = [pages[0], pages[1], pages[2], pages[3], pages[4], ...vierges, dos];
         pagesCarte = [pageCarte("gauche"), pageCarte("droite")];
         pages[1].innerHTML = pageTitre();
         pages[2].innerHTML = pageJournal();
@@ -540,11 +580,13 @@
         livre.addEventListener("pointerdown", (ev) => {
             if (!pageFlip || !ouvert) return;
             if (ev.pointerType === "mouse" && ev.button !== 0) return;
-            if (ev.target && ev.target.closest && ev.target.closest("input, label, button, select, textarea, a, [data-action], .liste-parties-grimoire")) return;
-            if (pageFlip.getState() !== "read") return;
+            if (ev.target && ev.target.closest && ev.target.closest("input, label, button, select, textarea, a, [data-action], .liste-parties-grimoire, .nom-livre, .nom-heros")) return;
+            if (pageFlip.getState() !== "read" || defileEnCours) return;
             const p = pos(ev), pw = p.r.width / 2, h = p.r.height;
             const aGauche = p.x < pw, xp = aGauche ? p.x : p.x - pw;
             if (aGauche ? xp > pw * ZONE_PRISE : xp < pw * (1 - ZONE_PRISE)) return;
+            // (v306) la dernière double page vierge : on ne referme pas le livre par la fin.
+            if (!aGauche && pageFlip.getCurrentPageIndex() >= nbPages - 3) return;
             const coinY = p.y >= h / 2 ? h - 1 : 1;
             prise = { id: ev.pointerId, x0: p.x, y0: p.y, dy: coinY - p.y, partie: false };
             try { livre.setPointerCapture(ev.pointerId); } catch (e) {}
@@ -589,6 +631,7 @@
         try { pageFlip.flipNext("top"); } catch (e) { try { pageFlip.turnToPage(1); } catch (e2) {} }
     }
     function surTourne(index) {
+        if (defileEnCours) return;               // (v306) les feuillets qui passent ne comptent pas
         if (index >= nbPages - 1) {             // la quatrième de couverture : on revient à la dernière double page
             setTimeout(() => { try { pageFlip.flip(nbPages - 3, "top"); } catch (e) {} }, 60);
             return;
@@ -775,7 +818,7 @@
         const etait = enPartie;
         enPartie = false;
         if (etait) { try { if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.sortir(); } catch (e) { console.error("Grimoire : le récit", e); } }
-        if (suite.length || nbPages !== 6) definirSuite([]);
+        if (suite.length || nbPages !== 6 + NB_VIERGES) definirSuite([]);
         if (origine && origine.parent && ecran.parentNode !== origine.parent) {
             const suivant = origine.suivant && origine.suivant.parentNode === origine.parent ? origine.suivant : null;
             origine.parent.insertBefore(ecran, suivant);
@@ -812,7 +855,7 @@
     function definirSuite(elements) {
         suite = (elements || []).slice();
         if (!pageFlip) return;
-        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? pagesCarte : []), ...suite, dos];
+        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? pagesCarte : []), ...suite, ...vierges, dos];
         const generation = ++definirSuite.generation;      // seule la dernière demande s'applique
         const appliquer = () => {
             if (generation !== definirSuite.generation) return;
@@ -820,6 +863,7 @@
             const ici = pageFlip.getCurrentPageIndex();
             liste.forEach(el => { if (el.parentNode !== livre) livre.appendChild(el); });
             nbPages = liste.length;
+            listeActuelle = liste;
             muet = true;
             try { pageFlip.updateFromHtml(liste); } catch (e) { console.error("Grimoire : les pages", e); }
             muet = false;
@@ -833,9 +877,11 @@
     // ALLER À UNE PAGE PAR UN LIEN (v304) : les pages défilent. Nico : « quand
     // on clique sur un des marque-pages, une animation de plein de pages qui
     // défilent très vite, comme si la page était loin dans le livre ; pareil
-    // dès qu'on clique sur un lien dans le livre ». Des feuilles se lèvent et
-    // tournent l'une après l'autre au-dessus du livre ; à mi-course, le livre
-    // passe d'un coup à la bonne page, que les dernières feuilles découvrent.
+    // dès qu'on clique sur un lien dans le livre ».
+    // v306 : de vraies pages de StPageFlip (souples, qui se courbent), couvertes
+    // d'écriture : entre la double page ouverte et celle qu'on cherche, le livre
+    // reçoit quelques feuillets manuscrits et les tourne très vite ; arrivé, il
+    // retrouve ses vraies pages (les mêmes sont à l'écran : rien ne saute).
     let defileEnCours = false;
     function allerALaPage(n) {
         if (!pageFlip || defileEnCours) return;
@@ -845,37 +891,84 @@
         if (ici === cible || (cible % 2 === 0 ? ici === cible - 1 : ici === cible + 1)) return;
         // La double page voisine (ou la couverture) se tourne normalement ; le
         // défilement rapide, c'est pour une page « loin dans le livre ».
-        const planche = (p) => Math.floor((p + 1) / 2);
-        if (Math.abs(planche(cible) - planche(ici)) <= 1 || pageFlip.getState() !== "read" || typeof Element.prototype.animate !== "function") {
+        if (Math.abs(planche(cible) - planche(ici)) <= 1 || ici === 0 || pageFlip.getState() !== "read") {
             try { pageFlip.flip(cible, "top"); } catch (e) { try { pageFlip.turnToPage(cible); } catch (e2) {} }
             return;
         }
         defiler(ici, cible);
     }
-    const DEFILE = { pas: 42, duree: 300 };
+    const planche = (p) => Math.floor((p + 1) / 2);         // 0 la couverture, 1 les pages 1-2, 2 les pages 3-4…
+    const DEFILE = { tourne: 150, min: 2, max: NB_FEUILLETS / 2 };
     function defiler(ici, cible) {
-        defileEnCours = true;
-        const enAvant = cible > ici;
-        const n = Math.min(14, 6 + Math.round(Math.abs(cible - ici) / 2) * 2);
-        const couche = document.createElement("div");
-        couche.className = "defile-pages";
-        Object.assign(couche.style, { left: livre.style.left, top: livre.style.top, width: livre.style.width, height: livre.style.height });
-        scene.appendChild(couche);
-        for (let k = 0; k < n; k++) {
-            const f = document.createElement("div");
-            f.className = "feuille-defile " + (enAvant ? "vers-gauche" : "vers-droite");
-            couche.appendChild(f);
-            f.animate([
-                { transform: "rotateY(0deg)", opacity: 1, filter: "brightness(1)" },
-                { offset: 0.85, opacity: 1 },
-                { transform: `rotateY(${enAvant ? -180 : 180}deg)`, opacity: 0, filter: "brightness(0.82)" }
-            ], { duration: DEFILE.duree, delay: k * DEFILE.pas, easing: "cubic-bezier(0.45, 0.05, 0.4, 1)", fill: "forwards" });
+        const vrai = listeActuelle.slice();
+        const sI = planche(ici), sC = planche(cible), enAvant = sC > sI;
+        const k = Math.max(DEFILE.min, Math.min(DEFILE.max, Math.abs(sC - sI) - 1));
+        // Des feuillets pris au hasard (un nombre pair : k doubles pages).
+        const pile = feuillets.slice().sort(() => Math.random() - 0.5).slice(0, 2 * k)
+            .map((el, j) => { el.classList.toggle("gauche", j % 2 === 0); el.classList.toggle("droite", j % 2 === 1); return el; });
+        let temp, depart;
+        if (enAvant) {
+            temp = [...vrai.slice(0, 2 * sI + 1), ...pile, vrai[2 * sC - 1], vrai[2 * sC], ...vrai.slice(2 * sC + 1)];
+            depart = 2 * sI - 1;
+        } else {
+            temp = [...vrai.slice(0, 2 * sC + 1), ...pile, vrai[2 * sI - 1], vrai[2 * sI], ...vrai.slice(2 * sI + 1)];
+            depart = 2 * sC + 1 + 2 * k;
         }
+        defileEnCours = true;
         bruitPage("pages-defilent");
-        const total = (n - 1) * DEFILE.pas + DEFILE.duree;
-        // Le livre saute à sa page sous les feuilles qui volent, sans son propre bruit de page.
-        setTimeout(() => { muet = true; try { pageFlip.turnToPage(cible); } catch (e) {} muet = false; }, Math.round(total * 0.5));
-        setTimeout(() => { couche.remove(); defileEnCours = false; }, total + 60);
+        muet = true;
+        const reglages = pageFlip.getSettings(), duree = reglages.flippingTime;
+        pile.forEach(el => { if (el.parentNode !== livre) livre.appendChild(el); });
+        try {
+            pageFlip.updateFromHtml(temp);
+            if (pageFlip.getCurrentPageIndex() !== depart) pageFlip.turnToPage(depart);
+        } catch (e) { finir(false); return; }
+        reglages.flippingTime = DEFILE.tourne;
+        let restant = k + 1;
+        const pas = () => {
+            if (!pageFlip) return;
+            if (pageFlip.getState() !== "read") { setTimeout(pas, 16); return; }
+            if (restant === 0) { finir(true); return; }
+            restant--;
+            try { enAvant ? pageFlip.flipNext("bottom") : pageFlip.flipPrev("bottom"); } catch (e) { finir(true); return; }
+            setTimeout(pas, 30);
+        };
+        setTimeout(pas, 20);
+        function finir(arrive) {
+            reglages.flippingTime = duree;
+            try {
+                pageFlip.updateFromHtml(vrai);
+                const bonne = 2 * sC - 1;
+                if (!arrive || pageFlip.getCurrentPageIndex() !== bonne) pageFlip.turnToPage(Math.max(1, bonne));
+            } catch (e) {}
+            pile.forEach(el => el.remove());
+            muet = false;
+            defileEnCours = false;
+            surTourne(pageFlip.getCurrentPageIndex());   // la page d'arrivée compte, elle
+        }
+    }
+    // UN FEUILLET MANUSCRIT : des lignes d'écriture au hasard, un peu de
+    // ratures, parfois un croquis ; on ne les lit pas, elles passent trop vite.
+    const MOTS = ("nous marchons longtemps sous le ciel bas et la route se perd entre les collines le vent porte une odeur de pluie " +
+        "Thorin grogne que la bière d'ici ne vaut rien Lyra rit doucement les feux du camp éclairent nos visages fatigués " +
+        "au matin la brume couvre la vallée un corbeau nous suit depuis trois jours personne n'en parle mais tous le regardent " +
+        "la cité de marbre se dresse enfin devant nous ses portes de bronze sont fermées un garde nous dévisage longuement " +
+        "le marchand jure par tous les dieux que son vin vient d'Arcaï je n'en crois pas un mot la nuit tombe vite").split(" ");
+    function pageManuscrite(i) {
+        const el = document.createElement("div");
+        el.className = "page-grimoire page-papier page-manuscrite";
+        el.id = "grimoire-feuillet-" + i;
+        const alea = (n) => Math.floor(Math.random() * n);
+        const phrase = (n) => { const m = []; for (let j = 0; j < n; j++) m.push(MOTS[alea(MOTS.length)]); const s = m.join(" "); return s.charAt(0).toUpperCase() + s.slice(1) + "."; };
+        const paras = [];
+        const nb = 3 + alea(3);
+        for (let p = 0; p < nb; p++) {
+            const txt = Array.from({ length: 2 + alea(3) }, () => phrase(6 + alea(10))).join(" ");
+            paras.push(`<p style="--penche:${(Math.random() * 1.2 - 0.6).toFixed(2)}deg">${txt}</p>`);
+        }
+        if (i % 4 === 2) paras.splice(1 + alea(2), 0, `<svg class="croquis" viewBox="0 0 120 70" aria-hidden="true"><path d="M6 60 Q30 ${10 + alea(20)} 54 48 T112 ${20 + alea(30)}"/><path d="M20 62 l10 -14 l10 14 M70 58 l8 -12 l8 12"/><circle cx="${80 + alea(25)}" cy="${12 + alea(10)}" r="6"/></svg>`);
+        el.innerHTML = `<div class="ecriture-feuillet">${paras.join("")}</div>`;
+        return el;
     }
     function allerIndex() {
         if (!enPartie || !pageFlip) return;
@@ -997,7 +1090,7 @@
     // Pour le récit (grimoire_recit.js) : la scène, les pages, la suite.
     window.GRIMOIRE = {
         ecran: () => ecran, scene: () => scene, livre: () => livre, pageFlip: () => pageFlip,
-        enPartie: () => enPartie, ouvert: () => ouvert, nbPages: () => nbPages,
+        enPartie: () => enPartie, ouvert: () => ouvert, nbPages: () => nbPages, defileEnCours: () => defileEnCours,
         premiereDeLaSuite: 7, PAGE_CARTE, IMAGES_CARTE, pagesCarte: () => pagesCarte.slice(), allerALaCarte, definirSuite, allerALaPage, unite: () => (scene ? parseFloat(scene.style.getPropertyValue("--u")) || 0 : 0)
     };
 })();
