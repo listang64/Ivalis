@@ -49,8 +49,9 @@ const PREMIERE_SUITE = 7;              // le sommaire (7-8)
 const PREMIERE_RECIT = 9;              // la première page du chapitre
 const MOTS_PAR_SECONDE = 17;           // « les phrases doivent s'écrire quand même vite »
 const AUTEURS_RECRITS = ["DESTIN", "SYSTEME_TEMPS"];
-const DELAI_LITE_MS = 20000;
+const DELAI_LITE_MS = 25000;
 const MODELE_LITE = "gemini-flash-lite-latest";
+const MODELE_PLUME = "gemini-3.8-flash";
 
 const etat = {
     actif: false, idPartie: null, messages: [], initialRecu: false,
@@ -272,10 +273,10 @@ function boiteDeMesure(gauche) {
     return mesureur.firstElementChild;
 }
 const SVG_DE = (classe, texte) => `<svg class="${classe}" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 2 L36 11 L36 29 L20 38 L4 29 L4 11 Z"/><path d="M20 9 L31 27 L9 27 Z" class="facette"/>${texte != null ? `<text x="20" y="25">${texte}</text>` : ""}</svg>`;
-function deDeMarge(jets) {
+function deDeMarge(jets, id) {
     return jets.map(j => {
         const classe = j.de === 20 ? " critique" : (j.de === 1 ? " fumble" : "");
-        return `<span class="de-marge${classe}" title="Jet de ${echapper(nomCaracJoli(j.carac))} : ${j.de} ${echapper(j.mod)} = ${j.total}">${SVG_DE("de-marge-svg", j.total)}</span>`;
+        return `<span class="de-marge${classe}" data-e="${echapper(id || "")}" title="Jet de ${echapper(nomCaracJoli(j.carac))} : ${j.de} ${echapper(j.mod)} = ${j.total}">${SVG_DE("de-marge-svg", j.total)}</span>`;
     }).join("");
 }
 function enteteChapitre() {
@@ -295,6 +296,29 @@ function romain(n) {
     return r;
 }
 
+// LE RÉCIT D'UN SEUL SOUFFLE (v303). Nico : « j'aimerais que le récit soit
+// fluide et continu, en intégrant ce que disent ou font les joueurs ». La
+// ligne d'un joueur (récrite dans la voix du Narrateur) ne commence pas un
+// nouveau paragraphe : elle continue celui qui précède, comme une phrase de
+// plus. Chaque mot garde son entrée (data-e) et son rang (data-i) : l'encre
+// écrit chaque entrée à son tour, même au milieu d'un paragraphe.
+function paragraphesDuChapitre(entrees) {
+    const paras = [];
+    for (const e of entrees) {
+        const blocs = jetonsDe(e);
+        let i0 = 0;
+        etat.totaux[e.id] = blocs.reduce((n, p) => n + p.length, 0);
+        blocs.forEach((jetons, k) => {
+            const mots = jetons.map((h, x) => ({ h, e: e.id, i: i0 + x }));
+            if (k === 0 && e.jets.length && mots.length) mots[0].de = e.jets;
+            const precedent = paras[paras.length - 1];
+            if (k === 0 && e.type === "joueur" && precedent && (precedent.type === "narration" || precedent.type === "joueur")) precedent.mots.push(...mots);
+            else paras.push({ e: e.id, type: e.type, mots });
+            i0 += jetons.length;
+        });
+    }
+    return paras;
+}
 // Rend les pages du chapitre (HTML) : une page par élément.
 function paginer(entrees) {
     const pages = [];
@@ -305,42 +329,38 @@ function paginer(entrees) {
     const deborde = () => boite.scrollHeight > boite.clientHeight + 1;
     const vide = () => !boite.querySelector(".para-recit");
     const fermer = () => { pages.push(boite.innerHTML); j++; boite = boiteDeMesure(j % 2 === 0); boite.innerHTML = ""; };
-    for (const e of entrees) {
-        const paras = jetonsDe(e);
-        let i0 = 0;
-        etat.totaux[e.id] = paras.reduce((n, p) => n + p.length, 0);
-        paras.forEach((jetons, k) => {
-            let debut = 0, premier = true;
-            const remplir = (p, a, b) => {
-                p.innerHTML = (k === 0 && premier && e.jets.length ? deDeMarge(e.jets) : "")
-                    + jetons.slice(a, b).map((t, x) => `<span class="mot" data-i="${i0 + a + x}">${t}</span>`).join(" ");
-            };
-            while (debut < jetons.length) {
-                const p = document.createElement("p");
-                p.className = `para-recit type-${e.type}${premier ? "" : " suite"}${k === 0 && premier ? " premier" : ""}`;
-                p.dataset.e = e.id;
-                remplir(p, debut, jetons.length);
-                boite.appendChild(p);
-                if (!deborde()) { debut = jetons.length; break; }
-                let lo = 0, hi = jetons.length - debut;
-                while (lo < hi) {
-                    const mid = Math.ceil((lo + hi) / 2);
-                    remplir(p, debut, debut + mid);
-                    if (deborde()) hi = mid - 1; else lo = mid;
-                }
-                if (lo === 0) {
-                    boite.removeChild(p);
-                    if (vide()) { remplir(p, debut, debut + 1); boite.appendChild(p); debut += 1; premier = false; }
-                    fermer();
-                    continue;
-                }
-                remplir(p, debut, debut + lo);
-                debut += lo;
-                premier = false;
-                fermer();
+    for (const para of paragraphesDuChapitre(entrees)) {
+        const mots = para.mots;
+        let debut = 0, premier = true;
+        // (le petit dé de la marge se pose sur la ligne du premier mot de son action)
+        const remplir = (p, a, b) => {
+            p.innerHTML = mots.slice(a, b).map(m => (m.de ? deDeMarge(m.de, m.e) : "")
+                + `<span class="mot" data-e="${echapper(m.e)}" data-i="${m.i}">${m.h}</span>`).join(" ");
+        };
+        while (debut < mots.length) {
+            const p = document.createElement("p");
+            p.className = `para-recit type-${para.type}${premier ? " premier" : " suite"}`;
+            p.dataset.e = para.e;
+            remplir(p, debut, mots.length);
+            boite.appendChild(p);
+            if (!deborde()) { debut = mots.length; break; }
+            let lo = 0, hi = mots.length - debut;
+            while (lo < hi) {
+                const mid = Math.ceil((lo + hi) / 2);
+                remplir(p, debut, debut + mid);
+                if (deborde()) hi = mid - 1; else lo = mid;
             }
-            i0 += jetons.length;
-        });
+            if (lo === 0) {
+                boite.removeChild(p);
+                if (vide()) { remplir(p, debut, debut + 1); boite.appendChild(p); debut += 1; premier = false; }
+                fermer();
+                continue;
+            }
+            remplir(p, debut, debut + lo);
+            debut += lo;
+            premier = false;
+            fermer();
+        }
     }
     if (boite.innerHTML.trim() || !pages.length) pages.push(boite.innerHTML || `<p class="page-blanche"></p>`);
     boite.innerHTML = "";                  // le mesureur ne garde rien (ses mots ne sont pas ceux du livre)
@@ -417,7 +437,7 @@ function rendre() {
 function appliquerEcriture() {
     Object.keys(etat.ecrits).forEach(id => {
         const n = etat.ecrits[id], total = etat.totaux[id] || 0;
-        etat.elements.forEach(el => el.querySelectorAll(`.para-recit[data-e="${CSS.escape(id)}"] .mot`).forEach(m => {
+        etat.elements.forEach(el => el.querySelectorAll(`.mot[data-e="${CSS.escape(id)}"]`).forEach(m => {
             m.classList.toggle("a-ecrire", Number(m.dataset.i) >= n);
         }));
         if (n >= total && total > 0 && !etat.lecture) { /* fini : on le garde, il ne se cache plus */ }
@@ -438,7 +458,7 @@ function ecrireUnMot() {
     const i = etat.ecrits[id];
     etat.ecrits[id] = i + 1;
     let mot = null;
-    for (const el of etat.elements) { mot = el.querySelector(`.para-recit[data-e="${CSS.escape(id)}"] .mot[data-i="${i}"]`); if (mot) break; }
+    for (const el of etat.elements) { mot = el.querySelector(`.mot[data-e="${CSS.escape(id)}"][data-i="${i}"]`); if (mot) break; }
     if (mot) {
         mot.classList.remove("a-ecrire");
         mot.classList.add("ecrit");
@@ -449,7 +469,7 @@ function ecrireUnMot() {
 // L'ordre des entrées dans le livre (celles d'abord, celles d'après ensuite).
 function construireOrdreEcriture() {
     const vus = [];
-    etat.elements.forEach(el => el.querySelectorAll(".para-recit[data-e]").forEach(p => { if (!vus.includes(p.dataset.e)) vus.push(p.dataset.e); }));
+    etat.elements.forEach(el => el.querySelectorAll(".mot[data-e]").forEach(m => { if (!vus.includes(m.dataset.e)) vus.push(m.dataset.e); }));
     Object.keys(etat.ecrits).forEach(id => { if (!vus.includes(id)) vus.push(id); });
     return vus;
 }
@@ -785,7 +805,8 @@ function poussiere(zone, cible) {
         const cx = b.left + b.width / 2, cy = b.top + b.height / 2;
         const dx = cible.x - cx, dy = cible.y - cy;
         const jx = (Math.random() - 0.5) * 60, jy = -20 - Math.random() * 50;
-        const duree = 850 + Math.random() * 600, delai = i * 7 + Math.random() * 80;
+        // (v303 : plus lent, le temps que la plume du Narrateur récrive la ligne)
+        const duree = 1500 + Math.random() * 900, delai = i * 12 + Math.random() * 140;
         fin = Math.max(fin, duree + delai);
         anims.push(sp.animate([
             { transform: "translate(0,0) scale(1)", opacity: 1, filter: "blur(0)" },
@@ -799,7 +820,7 @@ function poussiere(zone, cible) {
                 grain.style.left = cx + "px"; grain.style.top = cy + "px";
                 couche.appendChild(grain);
                 const gx = (Math.random() - 0.5) * 90, gy = (Math.random() - 0.5) * 70;
-                const d2 = 700 + Math.random() * 900;
+                const d2 = 1300 + Math.random() * 1200;
                 fin = Math.max(fin, d2 + delai);
                 anims.push(grain.animate([
                     { transform: "translate(0,0)", opacity: 0.9 },
@@ -812,37 +833,54 @@ function poussiere(zone, cible) {
     return new Promise(res => setTimeout(() => {
         couche.querySelectorAll(".poussiere-texte, .grain-poussiere").forEach(n => n.remove());
         res();
-    }, Math.min(fin, 2400) + 40));
+    }, Math.min(fin, 3800) + 40));
 }
 
 // ---------------------------------------------------------------------
 //  LE NARRATEUR LITE (Flash-Lite) : la ligne d'un joueur, dans la voix du
 //  Narrateur. Il ne reçoit que les 4 dernières lignes du livre.
 // ---------------------------------------------------------------------
-const PROMPT_NARRATEUR_LITE = `Tu es le Narrateur d'Ivalis : tu accompagnes un groupe d'aventuriers dans un monde d'Antiquité fantastique et tu écris le livre de leurs aventures, à la première personne. Tu es un témoin : tu ne décides rien à leur place.
-Un joueur vient d'écrire ce que fait ou dit son héros. Récris-le pour le livre, dans ta voix :
-- à la première personne (c'est toi qui racontes : « Je vois Thorin… », « Thorin, fidèle à lui-même, … »), au présent ;
-- garde au mieux l'essence de ce que le joueur a voulu faire ou dire, ni plus ni moins ; n'invente ni la suite, ni le résultat (tu ne sais pas encore si ça réussit), ni de nouveaux personnages ;
-- s'il parle, garde ses paroles entre guillemets « », à peine corrigées ;
-- ajoute si tu veux une touche de ton regard (amusé, inquiet, admiratif…), légère et courte ;
-- une à trois phrases, sans mise en forme, sans titre, sans guillemets autour de l'ensemble.
-Les dernières lignes du livre te donnent la scène et le ton : enchaîne avec elles, sans les répéter.`;
-const PROMPT_ANNONCE_LITE = `Tu es le Narrateur d'Ivalis : tu accompagnes un groupe d'aventuriers et tu écris le livre de leurs aventures, à la première personne, au présent.
-Une annonce du jeu (le temps qui passe, le destin, la route) doit entrer dans le livre. Récris-la en une ou deux phrases, dans ta voix, sans rien ajouter d'important, sans mise en forme.`;
+// LA PLUME DU NARRATEUR (v303). Nico : « l'IA qui retravaille le texte des
+// joueurs commence toujours par "Je vois Untel faire…", et tous les
+// paragraphes : ça casse le récit, ça ne fait pas la continuité. J'aimerais
+// que le récit soit fluide et continu, en intégrant ce que disent ou font les
+// joueurs — quitte à mettre la version payante. » Elle écrit maintenant la
+// suite de la dernière phrase du livre, dans le même paragraphe (voir
+// paragraphesDuChapitre), et c'est le modèle du Narrateur (Gemini 3.8 Flash,
+// réflexion basse) qui tient la plume ; Flash-Lite reprend s'il est refusé.
+const PROMPT_NARRATEUR_LITE = `Tu es la plume du Narrateur d'Ivalis. Le Narrateur accompagne un groupe d'aventuriers dans un monde d'Antiquité fantastique et écrit le livre de leurs aventures : de la prose, au présent, à la première personne ; c'est un témoin, il ne décide rien à leur place.
+Un joueur vient d'écrire ce que fait ou dit son héros. Écris la ou les phrases qui l'intègrent au livre, comme si le Narrateur poursuivait sa propre page :
+- Tes phrases viennent JUSTE APRÈS la dernière ligne du livre, dans le même paragraphe : enchaîne avec elle naturellement (le rythme, le lieu, le moment, une liaison si elle sert), sans répéter ce qu'elle dit et sans recommencer la scène.
+- Raconte directement l'action ou la réplique du héros (« Thorin abat son poing sur le comptoir… », « Sans attendre, Lyra… », « C'est le moment que choisit Thorin pour… », ou la réplique d'abord). Ne commence JAMAIS par « Je vois », « Je regarde », « J'observe », « Je remarque » ni aucune formule de ce genre, et varie tes débuts d'une fois sur l'autre.
+- Le « je » du Narrateur n'apparaît que s'il apporte quelque chose (une remarque, une émotion, un trait d'humour), jamais pour dire qu'il voit ou qu'il entend.
+- Garde au mieux l'essence de ce que le joueur a voulu faire ou dire, ni plus ni moins. N'invente ni la suite, ni le résultat (on ne sait pas encore si ça réussit), ni de nouveaux personnages.
+- S'il parle, ses paroles restent entre guillemets « », à peine corrigées, avec le nom de celui qui parle dans la phrase.
+- Une à trois phrases, sans mise en forme, sans titre, sans guillemets autour de l'ensemble.`;
+const PROMPT_ANNONCE_LITE = `Tu es la plume du Narrateur d'Ivalis : il accompagne un groupe d'aventuriers et écrit le livre de leurs aventures, en prose, au présent, à la première personne.
+Une annonce du jeu (le temps qui passe, le destin, la route) doit entrer dans le livre. Écris-la en une ou deux phrases qui enchaînent avec la dernière ligne du livre, sans rien ajouter d'important, sans mise en forme, sans commencer par « Je vois ».`;
 function dernieresLignes(n) {
     return construireEntrees(etat.messages).slice(-n).map(e => (e.textes || []).join(" ")).filter(Boolean).join("\n");
 }
-async function appelLite(systeme, texte) {
+// `plume` : le modèle du Narrateur (réflexion basse) ; sinon Flash-Lite. Un
+// modèle refusé (inconnu, réservé, quota) passe la main à Flash-Lite.
+async function appelLite(systeme, texte, plume) {
     const cle = (() => { try { return localStorage.getItem("ivalis_GEMINI_API_KEY"); } catch (e) { return null; } })();
     if (!cle) return null;
-    const rep = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELE_LITE}:generateContent?key=${cle}`, {
+    const modele = plume ? MODELE_PLUME : MODELE_LITE;
+    const generationConfig = { temperature: 0.85, maxOutputTokens: plume ? 1200 : 400 };
+    if (plume) generationConfig.thinkingConfig = { thinkingLevel: "low" };
+    const rep = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modele}:generateContent?key=${cle}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             systemInstruction: { parts: [{ text: systeme }] },
             contents: [{ role: "user", parts: [{ text: texte }] }],
-            generationConfig: { temperature: 0.8, maxOutputTokens: 400 }
+            generationConfig
         })
     });
+    if (!rep.ok && plume && [400, 403, 404, 429].includes(rep.status)) {
+        console.warn(`[La plume du Narrateur] ${modele} refusé (${rep.status}) : ${MODELE_LITE} prend la plume.`);
+        return appelLite(systeme, texte, false);
+    }
     if (!rep.ok) throw new Error("statut " + rep.status);
     const data = await rep.json();
     if (data.usageMetadata && typeof window.ajouterTokens === "function") window.ajouterTokens(data.usageMetadata.totalTokenCount || 0);
@@ -852,7 +890,7 @@ async function appelLite(systeme, texte) {
 }
 function reformuler(texte, heros) {
     const qui = [heros.prenom, heros.nom].filter(Boolean).join(" ") + (heros.race ? ` (${heros.race}${heros.classe ? ", " + heros.classe : ""})` : "");
-    return appelLite(PROMPT_NARRATEUR_LITE, `LES DERNIÈRES LIGNES DU LIVRE :\n${dernieresLignes(4) || "(le livre commence)"}\n\nLE HÉROS : ${qui}\nCE QU'ÉCRIT SON JOUEUR : ${texte}`);
+    return appelLite(PROMPT_NARRATEUR_LITE, `LES DERNIÈRES LIGNES DU LIVRE (tu continues la dernière) :\n${dernieresLignes(4) || "(le livre commence)"}\n\nLE HÉROS : ${qui}\nCE QU'ÉCRIT SON JOUEUR : ${texte}`, true);
 }
 // Le Destin et le Maître du Temps : un seul poste récrit chaque annonce
 // (il la réserve d'abord), les autres attendent sa ligne.
@@ -874,7 +912,7 @@ async function recrireAnnonce(m) {
     } catch (e) { console.warn("Le livre : annonce", e); }
     if (!aMoi) return;
     let t = null;
-    try { t = await appelLite(PROMPT_ANNONCE_LITE, `LES DERNIÈRES LIGNES DU LIVRE :\n${dernieresLignes(3) || "(le livre commence)"}\n\nL'ANNONCE : ${sansBalises(m.Texte)}`); }
+    try { t = await appelLite(PROMPT_ANNONCE_LITE, `LES DERNIÈRES LIGNES DU LIVRE :\n${dernieresLignes(3) || "(le livre commence)"}\n\nL'ANNONCE : ${sansBalises(m.Texte)}`, true); }
     catch (e) { console.warn("Le Narrateur lite (annonce) :", e); }
     try { await updateDoc(ref, { Texte_Livre: t || sansBalises(m.Texte).replace(/^[⏳\s*]+|\*+$/g, "") }); }
     catch (e) { console.error("Le livre : annonce", e); }

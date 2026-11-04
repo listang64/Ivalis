@@ -185,7 +185,8 @@ await section(async () => {
   await p.waitForTimeout(200);
   verifier("« Les fiches personnages » ouvre encore l'ancienne fenêtre", (await p.evaluate(() => window.__appels.join(","))) === "ouvrirMenuPersonnages");
   await cliquer("#grimoire-index-carte");
-  await p.waitForTimeout(900);
+  await attendreQue(async () => (await page()) === 5, 3000);
+  await p.waitForTimeout(300);
   // v302 : la carte du monde est dans le livre (pages 5-6, corrections_v302).
   verifier("v302 : « Carte du monde » mène à sa double page", (await page()) === 5, String(await page()));
   await p.evaluate(() => window.grimoireAllerIndex());
@@ -243,7 +244,8 @@ await section(async () => {
     return { paras: paras.map(p => p.innerText.replace(/\s+/g, " ").trim()), noms: [...document.querySelectorAll("#grimoire-suite-2 .nom-livre")].map(a => a.dataset.nom),
              caches: document.querySelectorAll(".mot.a-ecrire").length, bulles: document.querySelectorAll("#grimoire-suite-2 .bulle, #grimoire-suite-2 img").length };
   });
-  verifier("la narration en paragraphes de livre (sans balises, sans bulles)", r.paras.length === 5 && /^J'ai connu des tavernes/.test(r.paras[0]) && r.bulles === 0, r.paras.length + " paragraphes");
+  // v303 : la ligne d'un joueur continue le paragraphe qui la précède (corrections_v303).
+  verifier("la narration en paragraphes de livre (sans balises, sans bulles)", r.paras.length === 4 && /^J'ai connu des tavernes/.test(r.paras[0]) && r.bulles === 0, r.paras.length + " paragraphes");
   verifier("la ligne d'un joueur : celle du livre (récrite), pas ses mots bruts", r.paras.some(t => /trois chopes sauter de frayeur/.test(t)) && !r.paras.some(t => /je tape sur le comptoir/.test(t)));
   verifier("une ligne d'avant le livre (sans récriture) : rapportée telle quelle", r.paras.some(t => /Lyra : « je regarde les sorties »/.test(t)), r.paras[4]);
   verifier("les PNJ et les héros nommés se touchent", ["Le Chaudron Fêlé", "Varos", "Thorin", "Lyra"].every(n => r.noms.includes(n)), r.noms.join(","));
@@ -262,15 +264,15 @@ await section(async () => {
   await p.evaluate(() => { window.__sons = []; });
   await relayer(M2);
   await p.waitForTimeout(250);
-  const a = await p.evaluate(() => ({ caches: document.querySelectorAll('.para-recit[data-e="m3"] .mot.a-ecrire').length, total: document.querySelectorAll('.para-recit[data-e="m3"] .mot').length }));
+  const a = await p.evaluate(() => ({ caches: document.querySelectorAll('.mot[data-e="m3"].a-ecrire').length, total: document.querySelectorAll('.mot[data-e="m3"]').length }));
   verifier("la page nouvelle du Narrateur s'écrit : au début, presque tout reste à écrire", a.total > 20 && a.caches > a.total * 0.7, `${a.caches}/${a.total}`);
   await p.waitForTimeout(1000);
-  const b1 = await p.evaluate(() => document.querySelectorAll('.para-recit[data-e="m3"] .mot.ecrit').length);
+  const b1 = await p.evaluate(() => document.querySelectorAll('.mot[data-e="m3"].ecrit').length);
   verifier("… vite : une quinzaine de mots par seconde", b1 >= 12 && b1 <= 26, `${b1} mots en ~1,25 s`);
   // Le texte grandit pendant qu'il s'écrit (le Narrateur n'a pas fini) : la plume continue.
   const M3 = M2.map(m => m.idDoc === "m3" ? { ...m, Recit_En_Cours: false, Texte: m.Texte + "<br>« Un nain qui frappe mon comptoir, c'est un nain qui paie sa tournée », dit-il en posant trois chopes devant nous." } : m);
   await relayer(M3);
-  await attendreQue(() => p.evaluate(() => document.querySelectorAll('.para-recit[data-e="m3"] .mot.a-ecrire').length === 0), 6000);
+  await attendreQue(() => p.evaluate(() => document.querySelectorAll('.mot[data-e="m3"].a-ecrire').length === 0), 6000);
   const c = await p.evaluate(() => ({ restants: document.querySelectorAll('.mot.a-ecrire').length, paras: document.querySelectorAll('.para-recit[data-e="m3"]:not(.suite)').length,
     sons: window.__sons.filter(s => s[0] === "plume-ecrit").length }));
   verifier("le texte qui arrive pendant l'écriture s'écrit à la suite, jusqu'au bout", c.restants === 0 && c.paras === 2, JSON.stringify(c));
@@ -316,13 +318,13 @@ await section(async () => {
   await attendreQue(() => p.evaluate(() => (window.__ajouts || []).some(a => a.col === "Messages_Chat")), 5000);
   const ajout = await p.evaluate(() => (window.__ajouts || []).find(a => a.col === "Messages_Chat"));
   const lite = appelsIA.find(a => /Narrateur d'Ivalis/.test(a.sys) && /CE QU'ÉCRIT SON JOUEUR/.test(a.txt));
-  verifier("le Narrateur lite (Flash-Lite) reçoit les mots du joueur et la fin du livre", lite && /gemini-flash-lite-latest/.test(lite.url) && lite.txt.includes(texte) && /trois chopes/.test(lite.txt) && /Thorin Ironfoot/.test(lite.txt), lite ? lite.txt.slice(0, 80) : "aucun appel");
-  verifier("… et sa consigne : première personne, garder l'essence, ne pas inventer la suite", lite && /première personne/.test(lite.sys) && /essence/.test(lite.sys) && /n'invente/.test(lite.sys));
+  verifier("le Narrateur lite (v303 : la plume, Gemini 3.8 Flash) reçoit les mots du joueur et la fin du livre", lite && /gemini-3\.8-flash:generateContent/.test(lite.url) && lite.txt.includes(texte) && /trois chopes/.test(lite.txt) && /Thorin Ironfoot/.test(lite.txt), lite ? lite.txt.slice(0, 80) : "aucun appel");
+  verifier("… et sa consigne : première personne, garder l'essence, ne pas inventer la suite", lite && /première personne/.test(lite.sys) && /essence/.test(lite.sys) && /n'invente/i.test(lite.sys));
   verifier("la ligne part dans la partie : les mots du joueur et ceux du livre", ajout && ajout.data.Texte === texte && /trinque/.test(ajout.data.Texte_Livre) && ajout.data.Livre === true && ajout.data.Auteur_ID === "H1", ajout ? ajout.data.Texte_Livre.slice(0, 60) : "rien");
   M4 = M2.map(m => m.idDoc === "m3" ? { ...m, Recit_En_Cours: false } : m).concat([{ idDoc: "m4", ...ajout.data, Timestamp: 4000 }]);
   await relayer(M4);
   await p.waitForTimeout(150);
-  const s = await p.evaluate(() => ({ caches: document.querySelectorAll('.para-recit[data-e="m4"] .mot.a-ecrire').length, sorti: document.getElementById("recit-ecriture").classList.contains("sortie") }));
+  const s = await p.evaluate(() => ({ caches: document.querySelectorAll('.mot[data-e="m4"].a-ecrire').length, sorti: document.getElementById("recit-ecriture").classList.contains("sortie") }));
   verifier("elle s'écrit à son tour dans le livre, à l'encre ; le parchemin ressort", s.caches > 5 && s.sorti, JSON.stringify(s));
   await attendreQue(() => p.evaluate(() => document.querySelectorAll('.mot.a-ecrire').length === 0), 5000);
   // Le Narrateur lite en panne : la ligne part quand même, telle quelle.
@@ -387,7 +389,7 @@ await section(async () => {
   await relayer(M6);
   await p.waitForTimeout(900);
   const apres = await p.evaluate(() => ({ notes: document.querySelectorAll(".note-de").length, tours: window.__tours,
-    de: (() => { const d = document.querySelector('.para-recit[data-e="m4"] .de-marge'); return d ? { total: d.innerText.trim(), titre: d.title, x: d.getBoundingClientRect().left, para: d.parentNode.getBoundingClientRect().left } : null; })() }));
+    de: (() => { const d = document.querySelector('.de-marge[data-e="m4"]'); return d ? { total: d.innerText.trim(), titre: d.title, x: d.getBoundingClientRect().left, para: d.parentNode.getBoundingClientRect().left } : null; })() }));
   verifier("le jet lancé : sa note rentre dans le livre (l'autre attend)", apres.notes === 1, String(apres.notes));
   verifier("dans la marge, un petit dé et son résultat, à côté de l'action", apres.de && apres.de.total === "15" && /Charisme : 14 \+1 = 15/.test(apres.de.titre) && apres.de.x < apres.de.para, JSON.stringify(apres.de));
   verifier("un jet manque encore : le Narrateur attend", apres.tours === 0);

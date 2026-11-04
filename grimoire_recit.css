@@ -44,8 +44,9 @@
 .nom-livre:hover { color: #000; border-bottom-style: solid; }
 
 /* Le petit dé dans la marge, à côté de l'action. */
-.de-marge { position: absolute; left: calc(var(--u) * -8.2); top: calc(var(--u) * -0.2); width: calc(var(--u) * 6.2); height: calc(var(--u) * 6.2); text-indent: 0; }
-.de-marge + .de-marge { top: calc(var(--u) * 6.4); }
+/* (v303 : sans « top », il se pose sur la ligne de son mot, même au milieu d'un paragraphe.) */
+.de-marge { position: absolute; left: calc(var(--u) * -8.2); margin-top: calc(var(--u) * -0.4); width: calc(var(--u) * 6.2); height: calc(var(--u) * 6.2); text-indent: 0; }
+.de-marge + .de-marge { margin-top: calc(var(--u) * 6); }
 .de-marge-svg { width: 100%; height: 100%; overflow: visible; }
 .de-marge-svg path { fill: rgba(255, 246, 222, 0.6); stroke: #2a170b; stroke-width: 2.2; stroke-linejoin: round; }
 .de-marge-svg path.facette { fill: none; stroke-width: 1; opacity: 0.55; }

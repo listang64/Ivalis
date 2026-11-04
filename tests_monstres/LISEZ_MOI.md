@@ -9924,3 +9924,34 @@ calque caché ailleurs) ; le retour au menu (6 pages). Il échoue sur la v301
 (10 échecs). Tests mis à jour : corrections_v299 et v300 (la carte en 5-6, le
 récit en 9) ; corrections_v257, v274, v275 et v283 choisissent l'onglet
 « Ancien » (ils cliquent les anciens outils de la popup).
+
+## v303 — Le récit d'un seul souffle : la plume du Narrateur, la poussière plus lente
+
+Nico : « le texte qui part dans le parchemin, réduis un peu la vitesse de
+l'animation pour que ça coordonne bien » ; « l'IA qui retravaille le texte des
+joueurs commence toujours par "Je vois Untel faire…", et tous les paragraphes :
+ça casse le récit. J'aimerais que le récit soit fluide et continu, en
+intégrant ce que disent ou font les joueurs — quitte à mettre la version
+payante. »
+
+- La poussière : chaque lettre vole 1,5 à 2,4 s (0,85 à 1,45 s avant), le vol
+  entier 2 à 3,5 s ; la ligne part quand la poussière est posée ET la plume a
+  fini (25 s au plus, puis la ligne telle quelle).
+- La plume du Narrateur (l'ancien Narrateur lite) : Gemini 3.8 Flash (le
+  modèle du Narrateur), réflexion basse ; refusé (400, 403, 404, 429),
+  Flash-Lite reprend. Nouvelle consigne : écrire la suite de la dernière
+  ligne du livre, dans le même paragraphe, sans la répéter ; raconter
+  directement l'action ou la réplique ; jamais « Je vois / Je regarde /
+  J'observe… », des débuts variés ; le « je » seulement s'il apporte quelque
+  chose. Les annonces du Destin et du Temps passent par la même plume.
+- La mise en pages : la ligne d'un joueur continue le paragraphe qui précède
+  (narration ou autre joueur) au lieu d'en ouvrir un. Chaque mot porte son
+  entrée (data-e) et son rang (data-i) : l'encre écrit chaque entrée à son
+  tour, même au milieu d'un paragraphe ; le petit dé de la marge se pose sur
+  la ligne du premier mot de son action (position statique, sans « top »).
+
+corrections_v303.mjs (dans la suite) vérifie la durée du vol, la ligne qui
+part après lui, le modèle et la réflexion de la plume, la consigne, le relais
+de Flash-Lite, la ligne qui continue le paragraphe (et s'y écrit), le dé sur
+la ligne de son action. Il échoue sur la v302 (12 échecs). corrections_v300
+mis à jour (paragraphes, sélecteurs des mots, modèle de la plume).
