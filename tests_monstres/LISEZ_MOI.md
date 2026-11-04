@@ -10361,3 +10361,10 @@ DEV sur un petit écran (dans l'écran, défilement, barre) ; les ciseaux (le ca
 le bouton à côté du pinceau, le calque, la peinture, l'enregistrement, la carte et
 les pages découpées, le papier vu au pixel, le pinceau qui brûle toujours) ; une
 image introuvable sans bandeau. Il échoue sur la v310 (13 échecs).
+
+Après la suite complète (v311) : corrections_v299 et corrections_v308 vérifient
+maintenant le marque-page de la marche (v310) sur les cartes du livre, à la place
+de l'ancien bouton du voyage (caché sur le livre). Les autres échecs de la suite
+sont ceux d'avant (v274 passe seul ; v289, v243, v251, v254, v256, v267,
+animations_en_jeu_2, jauges_selection, saut_deplacement, fabrique_sons, studio_* :
+connus, au timing ou sans Internet).

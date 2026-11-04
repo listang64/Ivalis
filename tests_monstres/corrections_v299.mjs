@@ -310,7 +310,7 @@ await section(async () => {
     const ecran = document.getElementById("ecran-grimoire");
     return { entrees: window.__entrees.slice(), e: window.grimoireEtat(), parent: ecran.parentNode.id, jeu: getComputedStyle(document.getElementById("ecran-jeu")).display,
              fond: getComputedStyle(ecran, "::before").opacity, z: getComputedStyle(ecran).zIndex, nav: document.getElementById("menu-navigation-bas").parentNode.id,
-             marque: document.getElementById("grimoire-marque-page").classList.contains("inactif"), voyage: getComputedStyle(document.getElementById("btn-voyage-essai")).display,
+             marque: document.getElementById("grimoire-marque-page").classList.contains("inactif"), voyage: getComputedStyle(document.getElementById("btn-voyage-essai")).display, marche: !document.getElementById("grimoire-marque-marche").classList.contains("inactif"),
              menu: getComputedStyle(document.getElementById("menu-lateral")).display };
   });
   verifier("on entre dans la partie (la carte du jeu s'installe)", r.entrees.join(",") === "P1" && r.jeu === "block", JSON.stringify(r.entrees));
@@ -324,7 +324,8 @@ await section(async () => {
   verifier("v300 : les petits boutons restent dans le livre (en haut à droite)", r.nav === "ecran-grimoire");
   verifier("en partie, le marque-page s'allume", r.marque === false);
   // v308 : le voyage revient dans le livre — son bouton se montre sur ses cartes (le livre s'ouvre sur la carte du monde).
-  verifier("v308 : sur la carte du monde du livre, le bouton du voyage se montre", r.voyage === "block", r.voyage);
+  // v310 : le bouton devient un marque-page en haut à droite du livre (Nico) ; le bouton, lui, se cache sur le livre.
+  verifier("v310 : sur la carte du monde du livre, le marque-page de la marche sort (le bouton se cache)", r.marche && r.voyage === "none", `${r.marche} / ${r.voyage}`);
 });
 
 // =========================================================================

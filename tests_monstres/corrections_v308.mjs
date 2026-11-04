@@ -269,10 +269,14 @@ await section(async () => {
 titre("5. LE VOYAGE : SON BOUTON SUR LES CARTES DU LIVRE ; LES OUTILS DEV DANS « NOUVEAU »");
 // =========================================================================
 await section(async () => {
-  const bouton = () => p.evaluate(() => { const b = document.getElementById("btn-voyage"), n = document.getElementById("menu-navigation-bas"); if (!b) return null;
-    const r = b.getBoundingClientRect(), rn = n.getBoundingClientRect(); return { vu: getComputedStyle(b).display !== "none" && r.width > 0, aGauche: r.right <= rn.left + 1, haut: Math.abs(r.top - rn.top) < 3 }; });
+  // v310 : Nico, « remplace le bouton de marche par un marque-page en haut à droite du livre » :
+  // c'est lui qui sort sur les cartes du livre (le bouton se cache sur le livre).
+  const bouton = () => p.evaluate(() => { const m = document.getElementById("grimoire-marque-marche"), b = document.getElementById("btn-voyage"), l = document.getElementById("grimoire-livre").getBoundingClientRect();
+    if (!m) return null; const r = m.getBoundingClientRect();
+    return { vu: !m.classList.contains("inactif"), aDroite: r.left > l.left + l.width * 0.8, haut: r.top < l.top, boutonCache: !b || getComputedStyle(b).display === "none" }; });
+  await p.waitForTimeout(800);   // (il sort en 0,55 s)
   const surMonde = await bouton();
-  verifier("sur la carte du monde : le bouton du voyage, à gauche des petits boutons du haut", surMonde && surMonde.vu && surMonde.aGauche && surMonde.haut, JSON.stringify(surMonde));
+  verifier("sur la carte du monde : le marque-page de la marche sort, en haut à droite du livre (v310)", surMonde && surMonde.vu && surMonde.aDroite && surMonde.haut && surMonde.boutonCache, JSON.stringify(surMonde));
   await p.evaluate(() => window.ouvrirCarteRegionale(5));
   await pose();
   await p.waitForTimeout(400);
