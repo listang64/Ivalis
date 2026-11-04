@@ -304,7 +304,10 @@ function poserOnglets() {
         <div id="zones-livre-selection" class="popup-regions-info">Aucune boîte sélectionnée</div>
         <button type="button" id="btn-zones-livre-supprimer" class="popup-regions-bouton secondaire" disabled>Supprimer cette boîte</button>
         <div id="zones-livre-total" class="popup-regions-total"></div>
-        <p class="popup-regions-aide">Sur la double page de la carte : une boîte glissée se déplace, ses coins s'étirent, un clic sur un bord ajoute un point, un double-clic sur un point l'enlève.</p>`;
+        <p class="popup-regions-aide">Sur la double page de la carte : une boîte glissée se déplace, ses coins s'étirent, un clic sur un bord ajoute un point, un double-clic sur un point l'enlève.</p>
+        <div class="popup-regions-sous-titre">⚔️ Le combat du récit</div>
+        <button type="button" id="btn-passer-combat-rp" class="popup-regions-bouton">Passer le combat (compté gagné)</button>
+        <p class="popup-regions-aide">(v307) Un combat lancé se termine aussitôt, comme une victoire : le Narrateur reprend le récit.</p>`;
     tete.after(onglets);
     onglets.after(ancien);
     ancien.after(nouveau);
@@ -317,6 +320,11 @@ function poserOnglets() {
     document.getElementById("case-zones-livre-visibles").addEventListener("change", (e) => afficher(e.target.checked));
     document.getElementById("btn-zones-livre-nouvelle").addEventListener("click", () => { if (typeof window.jouerSonClic === "function") window.jouerSonClic(); creerZone(); });
     document.getElementById("btn-zones-livre-supprimer").addEventListener("click", () => { if (typeof window.jouerSonClic === "function") window.jouerSonClic(); supprimerZone(); });
+    document.getElementById("btn-passer-combat-rp").addEventListener("click", (e) => {
+        const actif = typeof window.combatRPActif === "function" && window.combatRPActif();
+        if (!actif) { e.currentTarget.nextElementSibling.textContent = "Aucun combat du récit en cours."; return; }
+        if (typeof window.passerCombatRP === "function") window.passerCombatRP();
+    });
     choisirOnglet(lire(CLE_ONGLET) === "ancien" ? "ancien" : "nouveau");
 }
 function choisirOnglet(nom) {

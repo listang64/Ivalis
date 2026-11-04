@@ -1023,7 +1023,7 @@
             // les pages qui défilent font leur propre bruit)
             if (action === "marque-page") allerIndex();
             else if (action === "marque-carte") allerALaCarte();
-            else if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.allerAuRecit();
+            else if (window.GRIMOIRE_RECIT) (window.GRIMOIRE_RECIT.marqueDuRecit || window.GRIMOIRE_RECIT.allerAuRecit)();   // (v307) deux fois : le sommaire
             return;
         }
         if (action === "index") { choisirIndex(cible.dataset.entree); return; }

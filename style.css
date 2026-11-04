@@ -5515,8 +5515,9 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
    fumée vont jusqu'à une fois et demie son rayon), SOUS son image (z 2). */
 /* (v287 : l'effet est réduit DANS son dessin, combat.js, ETENDUE_AURA — la
    boîte garde son repère, l'anneau reste collé au bord du pion.) */
+/* (v307 : Nico, « l'animation rouge sous les tokens leaders, réduis l'opacité à 60 % ».) */
 .aura-leader { position: absolute; left: -50%; top: -50%; width: 200%; height: 200%;
-  pointer-events: none; z-index: 1; }
+  pointer-events: none; z-index: 1; opacity: 0.6; }
 .aura-leader svg { display: block; width: 100%; height: 100%; overflow: visible; }
 
 /* LA LECTURE AUTOMATIQUE DES TOURS (DEV, v254) : une case à gauche de l'œil d'or. */

@@ -320,9 +320,10 @@ function paragraphesDuChapitre(entrees) {
         blocs.forEach((jetons, k) => {
             const mots = jetons.map((h, x) => ({ h, e: e.id, i: i0 + x }));
             if (k === 0 && e.jets.length && mots.length) mots[0].de = e.jets;
-            const precedent = paras[paras.length - 1];
-            if (k === 0 && e.type === "joueur" && precedent && (precedent.type === "narration" || precedent.type === "joueur")) precedent.mots.push(...mots);
-            else paras.push({ e: e.id, type: e.type, mots });
+            // v307 : Nico, « quand les joueurs écrivent leur texte, fais que l'IA saute
+            // quand même une ligne pour aérer le texte » — la ligne d'un joueur ouvre
+            // son paragraphe (la plume l'écrit toujours dans la continuité du récit).
+            paras.push({ e: e.id, type: e.type, mots });
             i0 += jetons.length;
         });
     }
@@ -471,10 +472,15 @@ function ecrireUnMot() {
     // la page lui-même pour lire la suite ». Un mot qui tombe sur une page
     // pas encore ouverte attend que le lecteur y arrive ; un mot sur une page
     // qu'il a déjà dépassée s'écrit d'un coup.
+    // v307 : Nico, « quand le texte s'écrit sur les pages d'après, fais-les écrire
+    // directement, pas quand le joueur tourne la page : quand il la tournera, les
+    // mots seront déjà écrits ». Hors de la double page ouverte (avant, après, ou
+    // le lecteur ailleurs dans le livre), l'encre se pose d'un coup ; seule une
+    // page en mouvement fait attendre la plume. (La petite flèche reste.)
     const ou = mot ? placeDuMot(mot) : "ouvert";
-    if (ou === "apres") return;
-    if (ou === "avant") {
-        while (mot && placeDuMot(mot) === "avant") {
+    if (ou === "attente") return;
+    if (ou !== "ouvert") {
+        while (mot && !["ouvert", "attente"].includes(placeDuMot(mot))) {
             mot.classList.remove("a-ecrire");
             etat.ecrits[id] += 1;
             mot = null;
@@ -495,7 +501,8 @@ function placeDuMot(mot) {
     if (!pf || etat.lecture) return "ouvert";
     const index = PREMIERE_SUITE + etat.elements.indexOf(mot.closest(".page-suite"));
     const ici = pf.getCurrentPageIndex(), gauche = ici % 2 === 1 ? ici : ici - 1;
-    if (!g.ouvert() || pf.getState() !== "read" || ici < PREMIERE_RECIT || (g.defileEnCours && g.defileEnCours())) return "apres";
+    if (pf.getState() !== "read" || (g.defileEnCours && g.defileEnCours())) return "attente";
+    if (!g.ouvert() || ici < PREMIERE_RECIT) return "ailleurs";
     if (index < gauche) return "avant";
     if (index > gauche + 1) return "apres";
     return "ouvert";
@@ -645,6 +652,18 @@ function allerAuRecit() {
     if (etat.lecture) { etat.lecture = null; rendre(); }
     allerALaDernierePage();
 }
+// LE MARQUE-PAGE DU RÉCIT (v307). Nico : « ça amène à la dernière page du récit ;
+// fais que si on rappuie une deuxième fois, ça amène à l'index des chapitres ».
+function marqueDuRecit() {
+    if (!etat.actif) return;
+    const g = G(), pf = g && g.pageFlip();
+    if (pf && !etat.lecture) {
+        const derniere = PREMIERE_RECIT + Math.max(etat.pagesRecit, 2) - 1, gauche = derniere % 2 === 1 ? derniere : derniere - 1;
+        const ici = pf.getCurrentPageIndex();
+        if (ici === gauche || ici === gauche + 1) { g.allerALaPage(PREMIERE_SUITE); return; }
+    }
+    allerAuRecit();
+}
 
 // ---------------------------------------------------------------------
 //  LE PARCHEMIN D'ÉCRITURE, LE POST-IT, LES NOTES DES DÉS
@@ -664,7 +683,12 @@ function majInterface() {
     const posee = pf && pf.getState() === "read";
     const heros = monHeros();
     const recit = surLeRecit();
-    const ouvrir = recit && posee && !bloque && !etat.envoi && !!heros;
+    // v307 : Nico, « quand un joueur écrit et que l'animation se joue, ne replie pas
+    // de suite le morceau de papier dans le livre ; on le replie quand le narrateur
+    // écrit ». Pendant l'envoi il reste là (sans rien prendre de plus) ; il rentre
+    // quand le Narrateur prend la plume (son tour, ou sa page qui s'écrit).
+    const ouvrir = recit && posee && !bloque && !ecrit && !!heros;
+    elts.saisie.readOnly = !!etat.envoi;
     const etaitSorti = elts.ecriture.classList.contains("sortie");
     elts.ecriture.classList.toggle("sortie", ouvrir);
     if (ouvrir && !etaitSorti && window.matchMedia && !window.matchMedia("(hover: none)").matches) setTimeout(() => { try { elts.saisie.focus({ preventScroll: true }); } catch (e) {} }, 450);
@@ -674,13 +698,20 @@ function majInterface() {
         document.getElementById("recit-choix-heros").innerHTML = liste.map(h =>
             `<a class="heros-choix${h.idPersonnage === heros.idPersonnage ? " choisi" : ""}" data-heros="${echapper(h.idPersonnage)}">${echapper(h.prenom)}</a>`).join("");
     }
-    elts.postit.classList.toggle("sortie", recit && posee);
+    // v307 : Nico, « quand on clique sur le marque-page du narrateur, fais-le rentrer
+    // complètement dans le livre, et qu'il ressorte quand le narrateur a fini de
+    // parler ». Touché, il rentre ; il reste rentré tant que le Narrateur a la main
+    // (son tour, les dés qu'il attend, sa page qui s'écrit).
+    if (etat.narrateurDemande && (etat.verrou || attente.manquants.length || Date.now() - etat.narrateurDemande > 15000)) etat.narrateurDemande = 0;
+    const narrateurOccupe = !!etat.narrateurDemande || bloque || ecrit;
+    elts.postit.classList.toggle("sortie", recit && posee && !narrateurOccupe);
+    if (etat.narrateurDemande) { clearTimeout(etat.revoirNarrateur); etat.revoirNarrateur = setTimeout(majInterface, 15200); }
     // (v306) Son papier : sorti tant qu'on est dans le récit, avec l'avatar de son héros.
     if (heros) remplirPapier("recit-avatar-image", "recit-avatar-nom", heros.prenom, heros);
     elts.avatar.classList.toggle("sortie", !!(recit && posee && heros));
     elts.avatars.classList.toggle("visible", !!(etat.actif && g && g.ouvert()));
-    elts.postit.classList.toggle("eteint", bloque || etat.envoi || ecrit);
-    elts.postit.disabled = bloque || etat.envoi;
+    elts.postit.classList.toggle("eteint", narrateurOccupe || etat.envoi);
+    elts.postit.disabled = narrateurOccupe || etat.envoi;
     elts.notes.classList.toggle("visible", !!(etat.actif && g && g.ouvert() && pf && pf.getCurrentPageIndex() > 0));
     majNotes(attente);
     majNoteCombat();
@@ -770,8 +801,8 @@ async function lancerLeDe(d, el) {
 function lancerNarrateur() {
     if (!elts || elts.postit.disabled || etat.verrou) return;
     son("page-prise", 0.6);
-    elts.postit.classList.add("appuye");
-    setTimeout(() => elts.postit.classList.remove("appuye"), 400);
+    etat.narrateurDemande = Date.now();         // (v307) il rentre dans le livre
+    majInterface();
     if (typeof window.declencherTourIA === "function") {
         Promise.resolve(window.declencherTourIA()).catch(e => console.error("Le Narrateur :", e));
     }
@@ -896,7 +927,7 @@ function poussiere(zone, cible) {
 // émotion ou la réaction des autres), d'après le guide de style du propriétaire.
 const PROMPT_NARRATEUR_LITE = `Tu es la plume du Narrateur d'Ivalis. Le Narrateur est un membre à part entière d'un groupe d'aventuriers, dans un monde d'Antiquité fantastique, et il écrit le livre de leurs aventures de l'intérieur : de la prose, au présent, à la première personne (« je » pour ce qu'il ressent et fait, « nous » pour ce que le groupe vit ensemble). Il vit la scène avec eux, mais il ne décide rien à leur place.
 Un joueur vient d'écrire ce que fait ou dit son héros. Écris la ou les phrases qui l'intègrent au livre, comme si le Narrateur poursuivait sa propre page, à côté du héros :
-- Tes phrases viennent JUSTE APRÈS la dernière ligne du livre, dans le même paragraphe : enchaîne avec elle naturellement (le rythme, le lieu, le moment, une liaison si elle sert), sans répéter ce qu'elle dit et sans recommencer la scène.
+- Tes phrases viennent JUSTE APRÈS la dernière ligne du livre, en ouvrant un nouveau paragraphe (pour aérer le texte) qui en est la suite directe : enchaîne avec elle naturellement (le rythme, le lieu, le moment, une liaison si elle sert), sans répéter ce qu'elle dit et sans recommencer la scène.
 - Raconte directement l'action ou la réplique du héros (« Thorin abat son poing sur le comptoir… », « Sans attendre, Lyra… », « C'est le moment que choisit Thorin pour… », ou la réplique d'abord). Ne commence JAMAIS par « Je vois », « Je regarde », « J'observe », « Je remarque » ni aucune formule de ce genre, et varie tes débuts d'une fois sur l'autre.
 - Le Narrateur peut ensuite réagir en une demi-phrase, s'il le sent : une émotion, une sensation, la réaction visible des autres, une remarque complice (« À côté de moi, Lyra retient son souffle. », « Je ne peux pas m'empêcher de sourire. »). Son « je » n'est jamais pour dire qu'il voit ou qu'il entend : il ressent, il réagit.
 - Garde au mieux l'essence de ce que le joueur a voulu faire ou dire, ni plus ni moins. N'invente ni la suite, ni le résultat (on ne sait pas encore si ça réussit), ni de nouveaux personnages, ni les pensées du héros.
@@ -1109,7 +1140,7 @@ let redim = null;
 window.addEventListener("resize", () => { clearTimeout(redim); redim = setTimeout(() => { if (etat.actif) { etat.htmlPages = []; rendre(); } }, 250); });
 
 window.GRIMOIRE_RECIT = {
-    entrer, sortir, allerAuRecit, archiverChapitre, rendre, envoyer,
+    entrer, sortir, allerAuRecit, marqueDuRecit, archiverChapitre, rendre, envoyer,
     construireEntrees, jetsEnAttente, reformuler,
     etat: () => ({ actif: etat.actif, idPartie: etat.idPartie, pagesRecit: etat.pagesRecit, verrou: etat.verrou, envoi: etat.envoi,
                    lecture: etat.lecture ? etat.lecture.id : null, chapitres: etat.chapitres.length,

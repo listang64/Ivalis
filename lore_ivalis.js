@@ -106,7 +106,11 @@
     // CE QU'UNE IA DOIT SAVOIR POUR INVENTER DES ENNEMIS (v287) : l'Antiquité,
     // les peuples, et la région où l'on se trouve (s'il y en a une).
     window.contexteEnnemisIvalis = function (numeroRegion) {
-        const morceaux = [ANTIQUITE, "Les peuples d'Elyria :\n" + Object.entries(PEUPLES).map(([n, d]) => `- ${n} : ${d}`).join("\n")];
+        // v307 : Nico, « les monstres générés par l'IA combat ne semblent pas suivre
+        // les races de mon monde : elle m'a créé genre un orc ». Ces peuples, et
+        // eux seuls ; les races d'une autre fantasy n'existent pas ici.
+        const morceaux = [ANTIQUITE, "Les peuples d'Elyria — les SEULS peuples qui existent :\n" + Object.entries(PEUPLES).map(([n, d]) => `- ${n} : ${d}`).join("\n"),
+            "INTERDIT : les races d'autres univers de fantasy n'existent PAS dans ce monde — jamais d'orc, d'orque, de demi-orc, d'elfe, de nain, de gobelin, de troll, d'ogre, de kobold, de hobbit, d'homme-lézard générique, ni de mort-vivant de bestiaire. Un ennemi est d'un des peuples ci-dessus (nomme son peuple tel quel : « Vargen », « Ankylar »…), ou une bête de la faune de la région, ou une créature de la mythologie antique (harpie, centaure, cyclope, hydre, satyre, minotaure…). Un Vargen se décrit avec ses traits de bête, sans jamais le mot « orc »."];
         if (Number(numeroRegion) > 0) morceaux.push(window.loreDeLaRegion(numeroRegion));
         else morceaux.push("L'Ordre d'Ivalis :\n- " + ORDRE.join("\n- "));
         return morceaux.join("\n\n");

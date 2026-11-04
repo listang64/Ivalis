@@ -247,7 +247,7 @@ await section(async () => {
              caches: document.querySelectorAll(".mot.a-ecrire").length, bulles: document.querySelectorAll("#grimoire-suite-2 .bulle, #grimoire-suite-2 img").length };
   });
   // v303 : la ligne d'un joueur continue le paragraphe qui la précède (corrections_v303).
-  verifier("la narration en paragraphes de livre (sans balises, sans bulles)", r.paras.length === 4 && /^J'ai connu des tavernes/.test(r.paras[0]) && r.bulles === 0, r.paras.length + " paragraphes");
+  verifier("la narration en paragraphes de livre (sans balises, sans bulles)", r.paras.length === 5 /* v307 : la ligne d'un joueur a son paragraphe */ && /^J'ai connu des tavernes/.test(r.paras[0]) && r.bulles === 0, r.paras.length + " paragraphes");
   verifier("la ligne d'un joueur : celle du livre (récrite), pas ses mots bruts", r.paras.some(t => /trois chopes sauter de frayeur/.test(t)) && !r.paras.some(t => /je tape sur le comptoir/.test(t)));
   verifier("une ligne d'avant le livre (sans récriture) : rapportée telle quelle", r.paras.some(t => /Lyra : « je regarde les sorties »/.test(t)), r.paras[4]);
   // v306 : les héros en gras (v304), et de nouveau touchables (« les noms cliquables ne marchent toujours pas »).
@@ -287,6 +287,9 @@ titre("6. LE PARCHEMIN D'ÉCRITURE ET LE POST-IT DU NARRATEUR");
 // =========================================================================
 let M4 = null;
 await section(async () => {
+  // v307 : le parchemin et le post-it attendent que la page du Narrateur ait fini de s'écrire.
+  await attendreQue(() => p.evaluate(() => document.getElementById("recit-ecriture").classList.contains("sortie")), 4000);
+  await p.waitForTimeout(700);
   const r = await p.evaluate(() => {
     const e = document.getElementById("recit-ecriture"), pap = e.querySelector(".papier-ecriture").getBoundingClientRect(), droite = document.getElementById("grimoire-suite-3").getBoundingClientRect();
     const pi = document.getElementById("recit-postit"), rp = pi.getBoundingClientRect();
@@ -316,7 +319,8 @@ await section(async () => {
   const vol = await p.evaluate(() => ({ lettres: document.querySelectorAll(".recit-poussiere .poussiere-texte span").length, grains: document.querySelectorAll(".recit-poussiere .grain-poussiere").length,
     vide: document.getElementById("recit-saisie").value === "", rentre: !document.getElementById("recit-ecriture").classList.contains("sortie"), son: window.__sons.some(s => s[0] === "poussiere-envol") }));
   verifier("validé : le texte se détache en lettres qui partent en poussière", vol.lettres === texte.length && vol.grains > 20 && vol.vide, `${vol.lettres} lettres, ${vol.grains} grains`);
-  verifier("… le parchemin rentre pendant le vol, un souffle l'accompagne", vol.rentre && vol.son);
+  // v307 : Nico, « ne replie pas de suite le morceau de papier ; on le replie quand le narrateur écrit ».
+  verifier("… le parchemin reste sorti pendant le vol (v307), un souffle l'accompagne", !vol.rentre && vol.son);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v300_poussiere.png" });
   await attendreQue(() => p.evaluate(() => (window.__ajouts || []).some(a => a.col === "Messages_Chat")), 5000);
   const ajout = await p.evaluate(() => (window.__ajouts || []).find(a => a.col === "Messages_Chat"));
@@ -473,21 +477,19 @@ await section(async () => {
   const avant = await page();
   await relayer(M9);
   // v304 : « il va finir la page en cours et laisser le joueur tourner la page lui-même » — la plume s'arrête au bas de la double page ouverte, une petite flèche noire dit qu'il y a une suite.
-  const ouvertes = () => p.evaluate(() => [...document.querySelectorAll(".mot.a-ecrire")].length);
-  let reste = -1;
-  for (let i = 0; i < 120; i++) { const n = await ouvertes(); if (n > 0 && n === reste) break; reste = n; await p.waitForTimeout(250); }
+  // v307 : Nico, « quand le texte s'écrit sur les pages d'après, fais-les écrire directement :
+  // quand il tournera la page, les mots seront déjà écrits ». Le livre ne tourne pas seul (v304),
+  // la petite flèche dit qu'il y a une suite, et la suite est déjà écrite.
+  await attendreQue(() => p.evaluate(() => document.querySelectorAll('.mot.a-ecrire').length === 0), 20000);
   const pause = await p.evaluate(() => {
     const ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), droite = document.querySelectorAll(".page-suite")[ici - 7 + 1];
     return { ici, reste: document.querySelectorAll(".mot.a-ecrire").length, fleche: !!(droite && droite.querySelector(".fleche-suite")) };
   });
-  verifier("v304 : la plume finit la double page ouverte et s'arrête ; le livre ne tourne pas tout seul", avant === 9 && pause.ici === 9 && pause.reste > 0, JSON.stringify(pause));
+  verifier("v307 : le livre ne tourne pas seul, et les pages suivantes sont déjà écrites", avant === 9 && pause.ici === 9 && pause.reste === 0, JSON.stringify(pause));
   verifier("v304 : une petite flèche noire en bas à droite annonce la suite", pause.fleche);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v304_fleche_suite.png" });
-  for (let k = 0; k < 6; k++) {
-    if (!(await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length))) break;
-    await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipNext("top"));
-    await attendreQue(() => p.evaluate(() => { const ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return ![...document.querySelectorAll(".page-suite")].slice(ici - 7, ici - 5).some(pg => pg.querySelector(".mot.a-ecrire")); }), 15000);
-  }
+  await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipNext("top"));
+  await p.waitForTimeout(900);
   await attendreQue(() => p.evaluate(() => document.querySelectorAll('.mot.a-ecrire').length === 0), 8000);
   await p.waitForTimeout(1200);
   const r = await p.evaluate(() => {
@@ -499,7 +501,7 @@ await section(async () => {
   verifier("le récit s'étend sur plusieurs pages, toujours en nombre pair", r.n >= 4 && r.n % 2 === 0, `${r.n} pages`);
   verifier("aucune page ne déborde ; un paragraphe coupé continue sur la page suivante", r.deborde === 0 && r.suites >= 1, JSON.stringify(r));
   verifier("jamais de ponctuation seule en haut d'une page", r.orphelins === 0);
-  verifier("v304 : le lecteur tourne lui-même, la plume reprend et finit le récit", r.page >= 11 && (await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length)) === 0, `${avant} → ${r.page} (sur ${r.total})`);
+  verifier("v307 : le lecteur tourne lui-même : la suite l'attend, écrite", r.page >= 11 && (await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length)) === 0, `${avant} → ${r.page} (sur ${r.total})`);
 });
 
 // =========================================================================

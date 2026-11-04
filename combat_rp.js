@@ -296,6 +296,41 @@ window.abandonnerCombatRP = async function() {
     return !!ok;
 };
 
+// DEV : PASSER LE COMBAT (v307). Nico : « dans le bouton DEV, un bouton pour
+// skip un combat qui s'est lancé ; ça fera comme si le combat était gagné, pour
+// continuer le RP sans faire le combat ». Le plateau se vide, l'arène revient,
+// et le Narrateur raconte une victoire, comme à la fin d'un vrai combat.
+window.passerCombatRP = async function() {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const c = etat();
+    if (!c || !window.combatRPActif()) return false;
+    if (typeof window.confirm === "function" && !window.confirm("Passer ce combat ? Il comptera comme gagné, et le récit reprendra.")) return false;
+    const pris = await transaction((data) => {
+        const x = data.Combat_RP;
+        if (!x || x.Id !== c.Id || !["preparation", "en_cours"].includes(x.Etat)) return null;
+        return { maj: { "Combat_RP.Etat": "narration", "Combat_RP.Narrateur": moi(), "Combat_RP.Issue": "victoire", "Combat_RP.Passe": true, "Combat_RP.Narration_Le": Date.now() } };
+    });
+    if (!pris) return false;
+    narrationsVues.add(c.Id);
+    if (typeof window.reinitialiserCombat === "function") { try { await window.reinitialiserCombat({ rp: true }); } catch (e) { console.error(e); } }
+    const resume = window.resumeCombatPourMJ(c, { issue: "victoire" })
+        + "\n- (Le combat s'est réglé vite et sans grand mal : raconte la victoire des héros en quelques lignes, sans blessure grave, et reprends le récit.)";
+    try {
+        const date = window.DATE_EN_JEU_ACTUELLE || {};
+        await addDoc(collection(db, "Messages_Chat"), {
+            ID_Partie: window.ID_PARTIE_COURANTE, ...AUTEUR_DESTIN,
+            Texte: "*Le fracas des armes retombe : les héros ont eu le dessus.* (Narrateur, raconte la fin du combat.)",
+            Date_Jour: date.jour || "", Date_An: date.annee || "", Timestamp: Date.now()
+        });
+    } catch (e) { console.error("Message de fin de combat :", e); }
+    try { if (typeof window.declencherTourIA === "function") await window.declencherTourIA({ issueCombat: resume }); }
+    catch (e) { console.error("Le MJ après le combat :", e); }
+    await rendreLArene(c);
+    await transaction((data) => (data.Combat_RP && data.Combat_RP.Id === c.Id) ? { maj: { Combat_RP: deleteField() } } : null);
+    actualiserTout();
+    return true;
+};
+
 // =========================================================================
 //  4. LA PRÉPARATION (le poste qui prépare)
 // =========================================================================

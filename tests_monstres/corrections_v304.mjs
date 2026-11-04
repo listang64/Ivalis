@@ -222,7 +222,7 @@ await section(async () => {
   const avant = await page();
   await relayer(M9);
   let reste = -1;
-  for (let i = 0; i < 120; i++) { const n = await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length); if (n > 0 && n === reste) break; reste = n; await p.waitForTimeout(250); }
+  for (let i = 0; i < 120; i++) { const n = await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length); if (n === 0 || n === reste) break; reste = n; await p.waitForTimeout(250); }
   const r = await p.evaluate(() => {
     const ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), pages = [...document.querySelectorAll(".page-suite")];
     const visibles = pages.slice(ici - 7, ici - 5), suivantes = pages.slice(ici - 5);
@@ -232,7 +232,8 @@ await section(async () => {
              fleche: f ? { coinBas: d.bottom - a.bottom < d.height * 0.12, coinDroit: d.right - a.right < d.width * 0.15, petite: a.width < d.width * 0.08, noir: st.stroke } : null,
              flechesGauche: pages.filter((pg, j) => j % 2 === 0 && pg.querySelector(".fleche-suite")).length };
   });
-  verifier("la plume finit la double page ouverte, puis s'arrête (le livre ne tourne pas tout seul)", avant === 9 && r.ici === 9 && r.ouvertesFinies && r.suiteEnAttente, JSON.stringify(r));
+  // v307 : les pages d'après s'écrivent directement (« quand il tournera la page, les mots seront déjà écrits »).
+  verifier("le livre ne tourne pas tout seul ; les pages d'après s'écrivent quand même (v307)", avant === 9 && r.ici === 9 && r.ouvertesFinies && !r.suiteEnAttente, JSON.stringify(r));
   verifier("une toute petite flèche noire au coin bas-droit de la page de droite", r.fleche && r.fleche.coinBas && r.fleche.coinDroit && r.fleche.petite && /rgb\(18, 11, 6\)/.test(r.fleche.noir) && r.flechesGauche === 0, JSON.stringify(r.fleche));
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v304_fleche_suite.png" });
   await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipNext("top"));
@@ -240,7 +241,7 @@ await section(async () => {
   const enCours = await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length);
   await p.waitForTimeout(1200);
   const plusTard = await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length);
-  verifier("le joueur tourne la page : la plume reprend là où elle s'était arrêtée", (await page()) === 11 && plusTard < enCours, `${enCours} → ${plusTard} mots à écrire`);
+  verifier("le joueur tourne la page : la suite est déjà écrite", (await page()) === 11 && enCours === 0 && plusTard === 0, `${enCours} → ${plusTard} mots à écrire`);
   for (let k = 0; k < 5 && (await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length)); k++) {
     await attendreQue(() => p.evaluate(() => { const ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return ![...document.querySelectorAll(".page-suite")].slice(ici - 7, ici - 5).some(pg => pg.querySelector(".mot.a-ecrire")); }), 15000);
     if (await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length)) await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipNext("top"));

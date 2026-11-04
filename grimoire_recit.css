@@ -128,7 +128,8 @@
 .recit-postit.sortie:not(.eteint):hover { transform: translateX(4%) rotate(2deg); }
 .recit-postit.appuye { transform: translateX(-4%) rotate(5deg) scale(0.97); }
 .recit-postit.eteint { filter: grayscale(0.7) brightness(0.92) drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.4) rgba(40, 20, 6, 0.3)); cursor: default; }
-.recit-postit.eteint.sortie { transform: translateX(-35%) rotate(4deg); }
+/* (v307) rentré, il disparaît tout entier sous la page de droite. */
+.recit-postit:not(.sortie) { transform: translateX(-80%) rotate(0deg); pointer-events: none; }
 
 /* LES NOTES DES DÉS : une par jet demandé, elles sortent du haut du livre. */
 .recit-notes {

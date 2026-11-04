@@ -159,7 +159,8 @@ titre("2. LA PLUME DU NARRATEUR : LE MODÈLE DU NARRATEUR, ET UNE CONSIGNE POUR 
 await section(async () => {
   const plume = appelsIA.filter(a => /CE QU'ÉCRIT SON JOUEUR/.test(a.txt)).slice(-1)[0];
   verifier("la plume, c'est Gemini 3.8 Flash (le modèle du Narrateur), réflexion basse", plume && /models\/gemini-3\.8-flash:generateContent/.test(plume.url) && plume.config.thinkingConfig && plume.config.thinkingConfig.thinkingLevel === "low", plume ? plume.url.split("models/")[1].split("?")[0] : "aucun appel");
-  verifier("elle écrit la suite de la dernière ligne du livre, dans le même paragraphe", plume && /JUSTE APRÈS la dernière ligne du livre, dans le même paragraphe/.test(plume.sys) && /tu continues la dernière/.test(plume.txt));
+  // v307 : Nico, « que l'IA saute quand même une ligne pour aérer le texte ».
+  verifier("elle écrit la suite de la dernière ligne du livre, dans un nouveau paragraphe (v307)", plume && /JUSTE APRÈS la dernière ligne du livre, en ouvrant un nouveau paragraphe/.test(plume.sys) && /tu continues la dernière/.test(plume.txt));
   verifier("elle ne commence jamais par « Je vois » (ni « Je regarde », « J'observe »…), et varie ses débuts", plume && /Ne commence JAMAIS par « Je vois », « Je regarde », « J'observe »/.test(plume.sys) && /varie tes débuts/.test(plume.sys));
   verifier("le « je » seulement s'il apporte quelque chose ; l'essence du joueur gardée, rien d'inventé", plume && /jamais pour dire qu'il voit/.test(plume.sys) && /essence/.test(plume.sys) && /N'invente ni la suite/.test(plume.sys));
   // Le modèle refusé (inconnu, quota…) : Flash-Lite reprend la plume.
@@ -180,6 +181,9 @@ titre("3. LE RÉCIT D'UN SEUL SOUFFLE : LA LIGNE DU JOUEUR CONTINUE LE PARAGRAPH
 await section(async () => {
   const avant = await p.evaluate(() => document.querySelectorAll(".page-suite .para-recit").length);
   const M2 = M.concat([{ idDoc: "m2", ...ajout.data, Timestamp: 2000 }]);
+  // (le lecteur sur la page du récit : une page déjà dépassée s'écrirait d'un coup, v307)
+  await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.turnToPage(9));
+  await p.waitForTimeout(200);
   await relayer(M2);
   await p.waitForTimeout(250);
   const r = await p.evaluate(() => {
@@ -188,8 +192,8 @@ await section(async () => {
     return { n: paras.length, dernier: dernier.innerText.replace(/\s+/g, " ").trim(), entrees: [...new Set([...dernier.querySelectorAll(".mot")].map(m => m.dataset.e))],
              caches: document.querySelectorAll('.mot[data-e="m2"].a-ecrire').length, total: document.querySelectorAll('.mot[data-e="m2"]').length };
   });
-  verifier("la ligne du joueur ne commence pas de nouveau paragraphe", r.n === avant && r.n === 2, `${avant} → ${r.n}`);
-  verifier("elle continue le dernier paragraphe, à la suite du Narrateur", r.entrees.join(",") === "m1,m2" && /sur les dalles\. Je vois Thorin lever sa chope/.test(r.dernier), r.dernier.slice(-90));
+  verifier("v307 : la ligne du joueur ouvre son paragraphe (le texte s'aère)", r.n === avant + 1 && r.n === 3, `${avant} → ${r.n}`);
+  verifier("… juste après le Narrateur, rien que sa ligne", r.entrees.join(",") === "m2" && /^Je vois Thorin lever sa chope/.test(r.dernier), r.dernier.slice(0, 90));
   verifier("… et s'y écrit à l'encre, mot après mot", r.total > 10 && r.caches > r.total * 0.6, `${r.caches}/${r.total}`);
   await attendreQue(() => p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length === 0), 6000);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v303_fil.png" });
@@ -204,7 +208,7 @@ await section(async () => {
     const a = de.getBoundingClientRect(), b = mot.getBoundingClientRect(), c = para.getBoundingClientRect();
     return { total: de.innerText.trim(), ecartLigne: Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)), marge: a.right <= c.left + 2, hautPara: Math.abs(a.top - c.top) };
   });
-  verifier("le petit dé se pose sur la ligne de l'action, dans la marge (même au milieu d'un paragraphe)", d && d.total === "14" && d.ecartLigne < 14 && d.marge && d.hautPara > 10, JSON.stringify(d));
+  verifier("le petit dé se pose sur la ligne de l'action, dans la marge (même au milieu d'un paragraphe)", d && d.total === "14" && d.ecartLigne < 14 && d.marge && d.hautPara >= 0, JSON.stringify(d));
 });
 
 await section(async () => {

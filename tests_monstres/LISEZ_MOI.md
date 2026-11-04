@@ -10116,3 +10116,46 @@ sur la v305 (14 échecs). Tests mis à jour : v268 (un leader), v297 (les pages
 vierges), v299 (marque-page rangé), v300 et v301 (les héros touchables, les
 papiers à gauche, 12 pages), v302 (12/18 pages), v304 (les feuillets), v305
 (le livre ouvert à sa place).
+
+## v307 — Le récit aéré, les pages d'après déjà écrites, le post-it qui rentre, passer un combat, les peuples du monde
+
+Nico : « quand les joueurs écrivent, fais que l'IA saute quand même une ligne
+pour aérer » ; « les pages d'après : fais-les écrire directement » ; « ne replie
+pas de suite le papier quand un joueur écrit ; on le replie quand le narrateur
+écrit » ; « le marque-page du narrateur : qu'il rentre complètement, qu'il
+ressorte quand le narrateur a fini » ; « un bouton DEV pour skip un combat,
+comme gagné » ; « l'animation rouge sous les leaders à 60 % » ; « les monstres
+ne suivent pas les races de mon monde : un orc » ; « le marque-page du récit :
+une deuxième fois, l'index des chapitres ».
+
+- La ligne d'un joueur ouvre son paragraphe (paragraphesDuChapitre) ; la plume
+  écrit « en ouvrant un nouveau paragraphe (pour aérer le texte) » qui est la
+  suite directe de la dernière ligne.
+- L'encre (ecrireUnMot, placeDuMot) : hors de la double page ouverte (avant,
+  après, ou le lecteur ailleurs), les mots se posent d'un coup ; seule une page
+  en mouvement (ou le défilement) fait attendre la plume. Le livre ne tourne
+  toujours pas seul ; la petite flèche reste.
+- Le papier d'écriture reste sorti pendant l'envoi (la zone de texte en lecture
+  seule) ; il rentre quand le Narrateur a la main (son tour, les dés, sa page
+  qui s'écrit).
+- Le post-it du Narrateur, touché, rentre tout entier sous la page (et pendant
+  que le Narrateur réfléchit, attend les dés ou écrit) ; il ressort ensuite.
+- Le marque-page du récit : sur la dernière double page du récit, il mène au
+  sommaire (page 7) ; sinon à la dernière page (marqueDuRecit).
+- DEV, onglet Nouveau : « Passer le combat (compté gagné) » (passerCombatRP,
+  combat_rp.js) : le plateau se vide, l'arène revient, un message du Destin et
+  le Narrateur raconte la victoire (resumeCombatPourMJ + « réglé vite »).
+- .aura-leader : opacité 0,6.
+- Les peuples : contexteEnnemisIvalis (lore_ivalis.js) dit « les SEULS peuples
+  qui existent » et interdit orcs, elfes, nains, gobelins, trolls, ogres… (une
+  bête de la région ou une créature de la mythologie antique, sinon) ; le
+  dessin des pions ennemis (fabriquerTokenIA, app.js) l'interdit aussi.
+
+corrections_v307.mjs (dans la suite) vérifie la poussière avec le papier qui
+reste, la consigne de la plume, le paragraphe du joueur, le post-it rentré
+(touché, verrou, page qui s'écrit) puis ressorti, les pages d'après écrites
+(le livre resté page 9), le marque-page du récit une, deux, trois fois, le
+bouton DEV et la victoire racontée, le halo, les peuples. Il échoue sur la
+v306 (15 échecs). Tests mis à jour : v300 (5 paragraphes, le papier qui reste,
+les pages d'après écrites), v303 (le paragraphe du joueur), v304 (la suite
+déjà écrite).
