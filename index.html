@@ -13,12 +13,12 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=123">
+  <link rel="stylesheet" href="style.css?v=124">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
   <link rel="stylesheet" href="grimoire.css?v=10">
   <link rel="stylesheet" href="grimoire_recit.css?v=7">
-  <link rel="stylesheet" href="grimoire_carte.css?v=1">
+  <link rel="stylesheet" href="grimoire_carte.css?v=2">
   <link rel="stylesheet" href="grimoire_regions.css?v=2">
 
  
@@ -107,6 +107,9 @@
           afficher("module non chargé : " + (e.target.getAttribute("src") || "?"), "");
           return;
         }
+        // (v311) Une image (ou un son) qui ne se charge pas n'est pas une erreur de
+        // code : elle s'affichait « erreur inconnue », sans rien dire d'utile.
+        if (e.target && e.target !== window && e.target.tagName) return;
         var ou = e.filename ? String(e.filename).split("/").pop() : "";
         afficher(e.message || "erreur inconnue", ou + (e.lineno ? ":" + e.lineno : ""));
       }, true);
@@ -1351,12 +1354,21 @@
             <div class="popup-regions-calques" role="group" aria-label="Ce que peint le pinceau">
               <button type="button" id="btn-region-calque-usure" class="popup-regions-calque actif" aria-pressed="true"
                       onclick="jouerSonClic(); window.choisirCalqueRegion('usure')">🔥 Usure du parchemin</button>
+              <!-- v311 : les morceaux retirés (le papier y manque, arraché). -->
+              <button type="button" id="btn-region-calque-coupe" class="popup-regions-calque" aria-pressed="false"
+                      onclick="jouerSonClic(); window.choisirCalqueRegion('coupe')">✂️ Morceaux retirés</button>
             </div>
             <p id="aide-calque-usure" class="popup-regions-aide">Peins les endroits où le parchemin peut s'abîmer : sur un bord, il s'y déchire et noircit ; plus loin dedans, il brûle en taches et se perce. Ailleurs, le bord reste fin. L'aperçu suit chaque trait.</p>
+            <p id="aide-calque-coupe" class="popup-regions-aide" style="display: none;">Les ciseaux : peins en bleu les morceaux de carte à retirer ; le papier y manque, arraché, avec un bord déchiré et fibreux. La gomme les rend. L'aperçu suit chaque trait.</p>
             <div class="popup-regions-outils">
               <button type="button" id="btn-region-pinceau" class="popup-regions-outil" title="Pinceau : peindre où le parchemin peut brûler, se déchirer, se percer"
                       aria-label="Pinceau" onclick="jouerSonClic(); window.choisirOutilRegion('pinceau')">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5 L19.5 9.5 L11 18 L6 13 Z"/><path d="M6 13 C3.5 13.5 3.5 17 2.5 20.5 C6 19.5 9.5 19.5 11 18"/></svg>
+              </button>
+              <!-- v311 : les ciseaux, à côté du pinceau qui brûle : retirer des morceaux de carte. -->
+              <button type="button" id="btn-region-ciseaux" class="popup-regions-outil" title="Ciseaux : peindre les morceaux de carte à retirer"
+                      aria-label="Ciseaux" onclick="jouerSonClic(); window.choisirOutilRegion('ciseaux')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6.5" r="3"/><circle cx="6" cy="17.5" r="3"/><path d="M8.6 8 L20 17.5"/><path d="M8.6 16 L20 6.5"/></svg>
               </button>
               <button type="button" id="btn-region-gomme" class="popup-regions-outil" title="Gomme : effacer une zone"
                       aria-label="Gomme" onclick="jouerSonClic(); window.choisirOutilRegion('gomme')">
@@ -2439,7 +2451,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=215"></script>
+<script src="trace_combat.js?v=216"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2507,18 +2519,18 @@
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=4"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
-<script type="module" src="grimoire_recit.js?v=9"></script>
+<script type="module" src="grimoire_recit.js?v=10"></script>
 <!-- LA CARTE DU MONDE DANS LE GRIMOIRE (v302) : sa double page, ses zones (DEV). -->
 <script type="module" src="grimoire_carte.js?v=4"></script>
-<script src="grimoire_regions.js?v=3"></script>
+<script src="grimoire_regions.js?v=4"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=4"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région et son titre (plus de nuages dessus, v286). -->
 <!-- Les nuages réalistes (v279) : la carte graphique les calcule (la traversée entre les cartes). -->
 <script src="nuages_realistes.js?v=3"></script>
 <!-- Les bords de parchemin des cartes (v282) : calculés à part (un Worker). -->
-<script src="bords_parchemin.js?v=5"></script>
-<script type="module" src="cartes_regionales.js?v=14"></script>
+<script src="bords_parchemin.js?v=6"></script>
+<script type="module" src="cartes_regionales.js?v=15"></script>
 <!-- L'usure du parchemin de la carte du monde (v283) : le pinceau DEV et sa base. -->
 <script type="module" src="usure_monde.js?v=1"></script>
 <!-- Le lore du monde, par région (v273), puis les villages des cartes régionales et MIA_VILLAGE. -->

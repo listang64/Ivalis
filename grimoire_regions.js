@@ -98,13 +98,13 @@
     // s'efface : les trous montrent le papier du livre.
     function bruler(r) {
         const fiche = window.CARTES_REGIONALES && window.CARTES_REGIONALES[r.numero];
-        const usure = (fiche && fiche.usure) || null;
-        const sig = JSON.stringify([usure, r.aspect || 0]);
+        const usure = (fiche && fiche.usure) || null, coupe = (fiche && fiche.coupe) || null;   // (v311) et les morceaux retirés
+        const sig = JSON.stringify([usure, coupe, r.aspect || 0]);
         if (r.usureSig === sig || !window.BordsParchemin || !r.aspect) return;
         r.usureSig = sig;
         const graine = typeof window.graineParcheminRegion === "function" ? window.graineParcheminRegion(r.numero) : r.numero;
         r.pages.forEach(pg => pg.querySelectorAll(".region-carte-cadre").forEach(cadre => {
-            window.BordsParchemin.appliquer(cadre, { graine, aspect: r.aspect, cote: 2048, apres: cadre.querySelector("img"), zones: usure })
+            window.BordsParchemin.appliquer(cadre, { graine, aspect: r.aspect, cote: 2048, apres: cadre.querySelector("img"), zones: usure, coupe })
                 .catch(e => console.error("Le livre : le bord de la carte", e));
         }));
     }

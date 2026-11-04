@@ -68,7 +68,8 @@ const etat = {
     pagesRecit: 0,
     heros: null,                       // le héros pour qui j'écris
     lances: new Set(), autoLances: new Set(), reecritures: new Set(),
-    pnjImages: {}, notes: {}, ecouteFlip: false, minuteur: null, sonPlume: 0
+    pnjImages: {}, notes: {}, ecouteFlip: false, minuteur: null, sonPlume: 0,
+    lu: null                           // (v311) le dernier mot lu, sur ce poste : { e, i }
 };
 
 // ---------------------------------------------------------------------
@@ -519,8 +520,38 @@ function construireOrdreEcriture() {
 function allerALaDernierePage() {
     const g = G();
     if (!g) return;
+    g.allerALaPage(pageALire());
+}
+// LÀ OÙ ON N'A PAS ENCORE LU (v311). Nico : « le narrateur a écrit sur trois
+// pages, ça m'a ouvert direct à la troisième ; il faudrait que, si je n'ai pas lu
+// la suite, ça s'ouvre là où je n'ai pas encore lu ». Le livre retient (sur ce
+// poste, pour chaque partie) le dernier mot écrit qu'on a eu sous les yeux — la
+// fin de la double page ouverte, posée, sur le récit ; le récit s'ouvre sur la
+// double page du mot suivant. Tout lu (ou rien de retenu) : la dernière page.
+const cleLu = () => "ivalis_livre_lu_" + (etat.idPartie || "");
+const tousLesMots = () => etat.elements.flatMap(el => [...el.querySelectorAll(".mot[data-e]")]);
+const rangDe = (mots, lu) => lu ? mots.findIndex(m => m.dataset.e === lu.e && m.dataset.i === String(lu.i)) : -1;
+function noterLecture() {
+    const g = G(), pf = g && g.pageFlip();
+    if (!pf || !surLeRecit() || pf.getState() !== "read" || (g.defileEnCours && g.defileEnCours())) return;
+    const ici = pf.getCurrentPageIndex(), gauche = ici % 2 === 1 ? ici : ici - 1;
+    const vus = [gauche, gauche + 1].map(i => etat.elements[i - premiereSuite()]).filter(Boolean)
+        .flatMap(el => [...el.querySelectorAll(".mot[data-e]:not(.a-ecrire)")]);
+    const dernier = vus[vus.length - 1];
+    if (!dernier) return;
+    const mots = tousLesMots();
+    if (rangDe(mots, etat.lu) >= mots.indexOf(dernier)) return;
+    etat.lu = { e: dernier.dataset.e, i: Number(dernier.dataset.i) };
+    try { localStorage.setItem(cleLu(), JSON.stringify(etat.lu)); } catch (e) {}
+}
+function pageALire() {
     const derniere = premiereRecit() + Math.max(etat.pagesRecit, 2) - 1;
-    g.allerALaPage(derniere % 2 === 1 ? derniere : derniere - 1);
+    const finale = derniere % 2 === 1 ? derniere : derniere - 1;
+    const mots = tousLesMots(), rang = rangDe(mots, etat.lu);
+    if (rang < 0 || rang + 1 >= mots.length) return finale;
+    const page = premiereSuite() + etat.elements.indexOf(mots[rang + 1].closest(".page-suite"));
+    if (page < premiereRecit()) return finale;
+    return Math.min(finale, page % 2 === 1 ? page : page - 1);
 }
 
 // ---------------------------------------------------------------------
@@ -662,7 +693,8 @@ function marqueDuRecit() {
     if (!etat.actif) return;
     const g = G(), pf = g && g.pageFlip();
     if (pf && !etat.lecture) {
-        const derniere = premiereRecit() + Math.max(etat.pagesRecit, 2) - 1, gauche = derniere % 2 === 1 ? derniere : derniere - 1;
+        // (v311) la double page à lire : la première pas encore lue, sinon la dernière.
+        const gauche = pageALire();
         const ici = pf.getCurrentPageIndex();
         if (ici === gauche || ici === gauche + 1) { g.allerALaPage(premiereSuite()); return; }
     }
@@ -678,6 +710,7 @@ function surLeRecit() {
 }
 function majInterface() {
     if (!elts) return;
+    noterLecture();
     const g = G(), pf = g && g.pageFlip();
     const attente = jetsEnAttente(etat.messages);
     const ecrit = Object.keys(etat.ecrits).some(id => etat.ecrits[id] < (etat.totaux[id] || 0) && etat.messages.some(m => idDe(m) === id && m.Est_Narration_IA));
@@ -1102,6 +1135,11 @@ function faireTaireLAncienChat() {
     envelopper("majRecitDynamique", () => true);
     envelopper("annoncerJetsDemandes", () => true);
     envelopper("afficherEcranAttente", (texte) => !texte);
+    // v311 : Nico, « mon groupe s'est déplacé vers un POI, l'ancien code entre en
+    // conflit : l'avatar de mon perso est apparu en gros à droite de l'écran ».
+    // L'arrivée au POI (et le feu de camp, le retour d'un combat) ouvrait l'ancien
+    // chat ; dans le livre, c'est le récit qui s'ouvre, là où on n'a pas encore lu.
+    envelopper("ouvrirChatbox", () => { allerAuRecit(); return true; });
 }
 function entrer(idPartie) {
     const g = G();
@@ -1115,6 +1153,7 @@ function entrer(idPartie) {
     etat.affiches = new Set(); etat.ecrits = {}; etat.totaux = {};
     etat.lances = new Set(); etat.autoLances = new Set(); etat.reecritures = new Set();
     etat.elements = []; etat.htmlPages = []; etat.pagesRecit = 0; etat.notes = {};
+    try { etat.lu = JSON.parse(localStorage.getItem(cleLu()) || "null"); } catch (e) { etat.lu = null; }
     etat.initialRecu = etat.messages.length > 0 && etat.messages.every(m => m.ID_Partie === idPartie);
     if (!etat.initialRecu) etat.messages = [];
     else construireEntrees(etat.messages).forEach(e => etat.affiches.add(e.id));

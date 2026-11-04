@@ -22,4 +22,6 @@
 .dev-onglet.choisi { color: #fff; background: #a01212; border-color: #6d0808; }
 #dev-onglet-ancien[hidden], #dev-onglet-nouveau[hidden] { display: none; }
 /* Les petits boutons sont en haut (v300) : la popup s'ouvre vers le bas. */
-#menu-navigation-bas.nav-livre .popup-regions-dev { bottom: auto; top: calc(100% + 12px); }
+#menu-navigation-bas.nav-livre .popup-regions-dev { bottom: auto; top: calc(100% + 12px);
+  /* (v311) ouverte vers le bas, depuis le haut de l'écran : elle s'arrête avant le bas, et défile */
+  max-height: calc(var(--app-h, 100vh) - 120px - env(safe-area-inset-top, 0px)); }

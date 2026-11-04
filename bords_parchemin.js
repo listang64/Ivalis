@@ -129,13 +129,16 @@
         // Calcule les deux images d'une carte (largeur × hauteur en pixels de
         // calcul) ; `zones` : la grille peinte en DEV ({ colonnes, lignes, cases }),
         // ou rien. Rend { masque, usure } : deux tableaux RGBA.
-        function calculer(W, H, graine, zones) {
+        // v311 — `coupe` : la grille des MORCEAUX RETIRÉS (Nico : « à côté du pinceau
+        // pour brûler les maps, crée-m'en un pour supprimer des morceaux de map »).
+        // Là, le papier manque : arraché, un bord déchiré, fibreux, un peu bruni.
+        function calculer(W, H, graine, zones, coupe) {
             const s = Math.min(W, H), px = 1 / s, bande = BANDE * s;
             const m = new Uint8ClampedArray(W * H * 4), o = new Uint8ClampedArray(W * H * 4);
             for (let i = 0; i < W * H; i++) { m[i * 4] = m[i * 4 + 1] = m[i * 4 + 2] = 255; m[i * 4 + 3] = 255; }
             const coins = [[0, 0], [W / s, 0], [0, H / s], [W / s, H / s]];
             const g = graine | 0;
-            const champ = champDesZones(zones);
+            const champ = champDesZones(zones), champC = champDesZones(coupe);
             // Ce que la couche d'usure reçoit en un point : du brun, du noir, de la frange.
             const brunR = 98, brunV = 62, brunB = 26, noirR = 24, noirV = 12, noirB = 4, clairR = 236, clairV = 222, clairB = 188;
             const poser = (k, brun, noir, frange) => {
@@ -155,11 +158,13 @@
             for (let y = 0; y < H; y++) {
                 const dy = Math.min(y, H - 1 - y), v = y * px;
                 const ligneZone = champ ? Math.max(0, Math.min(champ.L - 1, Math.floor(y / H * champ.L))) : 0;
+                const ligneCoupe = champC ? Math.max(0, Math.min(champC.L - 1, Math.floor(y / H * champC.L))) : 0;
                 for (let x = 0; x < W; x++) {
                     const dbord = Math.min(x, W - 1 - x, dy);
                     const prochesDuBord = dbord <= bande;
                     const dansZone = !!champ && champ.actif[ligneZone * champ.C + Math.min(champ.C - 1, Math.floor(x / W * champ.C))] === 1;
-                    if (!prochesDuBord && !dansZone) continue;
+                    const dansCoupe = !!champC && champC.actif[ligneCoupe * champC.C + Math.min(champC.C - 1, Math.floor(x / W * champC.C))] === 1;
+                    if (!prochesDuBord && !dansZone && !dansCoupe) continue;
                     const u = x * px;
                     // La zone est lue un peu de travers (un champ de bruit la tord) :
                     // ni rond de pinceau, ni escalier de cases ne se voient.
@@ -193,6 +198,21 @@
                         brun += 0.55 * (0.55 + 0.9 * fbm(u * 24, v * 24, g + 500, 2)) * lisse(SEUIL_TROU - 1.0, SEUIL_TROU - 0.35, q) * (1 - 0.6 * charbon);
                         if (q > SEUIL_TROU) alpha = Math.min(alpha, 1 - lisse(SEUIL_TROU, SEUIL_TROU + 0.03, q));
                     }
+                    // 3. LES MORCEAUX RETIRÉS (v311) : au-delà du seuil, plus de papier ; le
+                    //    bord de l'arrachement ondule, s'effiloche, une frange claire de
+                    //    fibres et un liseré bruni le suivent.
+                    if (dansCoupe) {
+                        const zc = champC.lire(x / W + 1.4 * TORSION * (fbm(u * 5, v * 5, g + 900, 3) - 0.5), y / H + 1.4 * TORSION * (fbm(u * 5, v * 5, g + 950, 3) - 0.5) * W / H);
+                        if (zc > 0.02) {
+                            const t = zc + 0.22 * (fbm(u * 14, v * 14, g + 970, 3) - 0.5) + 0.07 * (bruit(u * 90, v * 90, g + 990) - 0.5);
+                            const ecart = (0.5 - t) / 0.5;          // > 0 : encore du papier ; le bord à 0
+                            if (t > 0.5) alpha = Math.min(alpha, 1 - lisse(0.5, 0.515, t));
+                            else {
+                                frange += 0.55 * Math.exp(-ecart / 0.025);
+                                brun += 0.45 * Math.exp(-ecart / 0.07) * (0.7 + 0.6 * fbm(u * 24, v * 24, g + 980, 2));
+                            }
+                        }
+                    }
                     m[k + 3] = Math.round(255 * alpha);
                     if (alpha > 0) poser(k, brun, noir, frange);
                 }
@@ -212,22 +232,22 @@
         if (travailleur !== null) return travailleur;
         try {
             const source = `const calculer = (${noyau.toString()})();
-self.onmessage = (e) => { const d = e.data, r = calculer(d.W, d.H, d.g, d.zones);
+self.onmessage = (e) => { const d = e.data, r = calculer(d.W, d.H, d.g, d.zones, d.coupe);
   self.postMessage({ id: d.id, masque: r.masque, usure: r.usure }, [r.masque.buffer, r.usure.buffer]); };`;
             travailleur = new Worker(URL.createObjectURL(new Blob([source], { type: "text/javascript" })));
             travailleur.onmessage = (e) => { const t = attente.get(e.data.id); attente.delete(e.data.id); if (t) t.resoudre(e.data); };
             travailleur.onerror = () => {
                 travailleur = false;
-                attente.forEach((t) => t.resoudre(calculer(t.W, t.H, t.g, t.zones)));
+                attente.forEach((t) => t.resoudre(calculer(t.W, t.H, t.g, t.zones, t.coupe)));
                 attente.clear();
             };
         } catch (e) { travailleur = false; }
         return travailleur;
     }
-    function tableaux(W, H, g, zones) {
+    function tableaux(W, H, g, zones, coupe) {
         const w = ouvrier();
-        if (!w) return Promise.resolve(calculer(W, H, g, zones));
-        return new Promise((resoudre) => { const id = ++numero; attente.set(id, { resoudre, W, H, g, zones }); w.postMessage({ id, W, H, g, zones }); });
+        if (!w) return Promise.resolve(calculer(W, H, g, zones, coupe));
+        return new Promise((resoudre) => { const id = ++numero; attente.set(id, { resoudre, W, H, g, zones, coupe }); w.postMessage({ id, W, H, g, zones, coupe }); });
     }
 
     const enUrl = (toile) => new Promise((resoudre) => {
@@ -267,17 +287,18 @@ self.onmessage = (e) => { const d = e.data, r = calculer(d.W, d.H, d.g, d.zones)
 
     // Les deux images d'une carte, en adresses. Gardées (une par carte et par
     // peinture) ; `provisoire` (l'aperçu pendant que le DEV peint) : pas gardées.
-    function fabriquer(largeur, hauteur, graine, zones, provisoire) {
-        const z = normaliserZones(zones);
-        const cle = `${graine}:${largeur}x${hauteur}:${z ? z.signature : "-"}`;
+    function fabriquer(largeur, hauteur, graine, zones, provisoire, coupe) {
+        const z = normaliserZones(zones), c = normaliserZones(coupe);
+        const cle = `${graine}:${largeur}x${hauteur}:${z ? z.signature : "-"}:${c ? c.signature : "-"}`;
         const calcul = async () => {
             const t0 = performance.now();
-            const r = await tableaux(largeur, hauteur, graine | 0, z ? { colonnes: z.colonnes, lignes: z.lignes, cases: z.cases } : null);
+            const r = await tableaux(largeur, hauteur, graine | 0, z ? { colonnes: z.colonnes, lignes: z.lignes, cases: z.cases } : null,
+                                     c ? { colonnes: c.colonnes, lignes: c.lignes, cases: c.cases } : null);
             const toile = (donnees) => { const c = document.createElement("canvas"); c.width = largeur; c.height = hauteur;
                 c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(donnees.buffer || donnees), largeur, hauteur), 0, 0); return c; };
             const [m, u] = await Promise.all([enUrl(toile(r.masque)), enUrl(toile(r.usure))]);
             const ms = Math.round(performance.now() - t0);
-            return { masque: m, usure: u, largeur, hauteur, graine, zones: !!z, provisoire: !!provisoire, ms };
+            return { masque: m, usure: u, largeur, hauteur, graine, zones: !!z, coupe: !!c, provisoire: !!provisoire, ms };
         };
         if (provisoire && !cache.has(cle)) return calcul();
         if (!cache.has(cle)) cache.set(cle, calcul());
@@ -292,7 +313,7 @@ self.onmessage = (e) => { const d = e.data, r = calculer(d.W, d.H, d.g, d.zones)
     // Lancer le calcul d'avance (la carte s'ouvre : il tourne pendant la plongée).
     function preparer(options) {
         const o = options || {}, d = dimensions(o.aspect || 1, o.cote || 2048);
-        return fabriquer(d.largeur, d.hauteur, o.graine || 1, o.zones || null);
+        return fabriquer(d.largeur, d.hauteur, o.graine || 1, o.zones || null, false, o.coupe || null);
     }
     const oublierProvisoire = (element) => {
         (element.__urlsProvisoires || []).forEach(u => { try { if (String(u).startsWith("blob:")) URL.revokeObjectURL(u); } catch (e) { /* déjà libérée */ } });
@@ -307,7 +328,7 @@ self.onmessage = (e) => { const d = e.data, r = calculer(d.W, d.H, d.g, d.zones)
         if (element.__graineParchemin !== (o.graine || 1)) retirer(element);
         element.__bordParchemin = jeton;
         element.__graineParchemin = o.graine || 1;
-        const r = await fabriquer(largeur, hauteur, o.graine || 1, o.zones || null, !!o.provisoire);
+        const r = await fabriquer(largeur, hauteur, o.graine || 1, o.zones || null, !!o.provisoire, o.coupe || null);
         if (element.__bordParchemin !== jeton) {               // une autre carte (ou peinture) entre-temps
             if (r.provisoire) [r.masque, r.usure].forEach(u => { try { URL.revokeObjectURL(u); } catch (e) { /* rien */ } });
             return null;
@@ -330,6 +351,7 @@ self.onmessage = (e) => { const d = e.data, r = calculer(d.W, d.H, d.g, d.zones)
         if (r.provisoire) element.__urlsProvisoires = [r.masque, r.usure];
         element.classList.add("bord-parchemin");
         element.__zonesParchemin = !!r.zones;
+        element.__coupeParchemin = !!r.coupe;
         return r;
     }
     // L'OMBRE DU PARCHEMIN SUR LE SOL (v290). Nico : « l'ombre portée se fait

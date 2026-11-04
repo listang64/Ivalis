@@ -10315,3 +10315,49 @@ borné (mesuré pendant l'ouverture, à la molette), le marque-page de la marche
 (hauteur, sans cadre, nom en bas, la tranche par-dessus, celui d'un nom touché)
 et le défilement. Il échoue sur la v309 (18 échecs). Tests mis à jour : v306
 (le défilement à 0,12 s).
+
+## v311 — L'arrivée au POI dans le livre, le récit ouvert là où on n'a pas lu, les fenêtres qui défilent, les ciseaux des cartes
+
+Nico : « mon groupe s'est déplacé vers un POI : l'avatar de mon perso est apparu
+en gros à droite de l'écran » ; « le narrateur a écrit sur 3 pages, ça m'a ouvert
+direct à la troisième ; si je n'ai pas lu la suite, que ça s'ouvre là où je n'ai
+pas encore lu » ; « sur iPad, l'onglet Paramètres s'ouvre beaucoup trop grand ;
+dans Outils, mets une barre de défilement ; pareil pour la popup DEV rouge » ;
+« à côté du pinceau pour brûler les maps, crée-m'en un pour supprimer des
+morceaux de map ». (La brûlure : « en dessous de la map brûlée il y a la map
+intacte » — c'était bien ça, corrigé en v310.)
+
+- L'arrivée au POI (voyage_groupe.js), le feu de camp, le retour d'un combat
+  appelaient window.ouvrirChatbox : l'ancien chat s'ouvrait par-dessus le livre
+  (avec le grand avatar du héros). grimoire_recit.js l'enveloppe comme les autres
+  morceaux de l'ancien chat : dans le livre, c'est le récit qui s'ouvre.
+- Là où on n'a pas lu (grimoire_recit.js) : le livre retient, sur ce poste et
+  pour chaque partie (localStorage ivalis_livre_lu_<partie>), le dernier mot écrit
+  qu'on a eu sous les yeux (la double page ouverte, posée, sur le récit). Le
+  récit (marque-page, index, POI) s'ouvre sur la double page du mot suivant ;
+  tout lu, ou rien de retenu, la dernière. Retouché sur cette double page, le
+  marque-page mène au sommaire (v307).
+- Les Paramètres (style.css) : chaque étape de #conteneur-parametres tient dans
+  l'écran (hauteur visible − 110 px) et défile, au doigt (pan-y), avec une barre
+  de défilement fine et brune ; la popup DEV rouge aussi (sa barre ; ouverte vers
+  le bas sur le livre, elle s'arrête avant le bas de l'écran, grimoire_carte.css).
+- Les ciseaux (cartes_regionales.js, bords_parchemin.js, index.html) : un second
+  calque « coupe » (✂️ Morceaux retirés, peint en bleu), enregistré dans la fiche
+  (Cartes_Regionales/{n}.Coupe, même codage que l'Usure). Le bouton Ciseaux est
+  juste à côté du pinceau : le pinceau brûle (l'usure), les ciseaux retirent ; la
+  gomme efface sur le calque en cours ; « Valider les morceaux retirés ». Dans le
+  calcul du bord (même graine), au-delà du seuil le papier manque : un bord
+  d'arrachement tordu, effiloché, avec sa frange de fibres et un liseré bruni. La
+  carte vivante et les pages du livre (grimoire_regions.js) sont découpées.
+- Le bandeau des erreurs (index.html) n'affiche plus une image ou un son qui ne
+  se charge pas (« erreur inconnue », sans rien d'utile) ; les modules qui ne se
+  chargent pas, oui.
+
+corrections_v311.mjs (dans la suite) vérifie ouvrirChatbox et le feu de camp
+dans le livre, le dernier mot lu retenu, le récit ouvert sur la première double
+page non lue (trois pages écrites pendant qu'on était sur la carte), puis la
+dernière une fois tout lu, puis le sommaire ; les Paramètres (Outils) et la popup
+DEV sur un petit écran (dans l'écran, défilement, barre) ; les ciseaux (le calcul,
+le bouton à côté du pinceau, le calque, la peinture, l'enregistrement, la carte et
+les pages découpées, le papier vu au pixel, le pinceau qui brûle toujours) ; une
+image introuvable sans bandeau. Il échoue sur la v310 (13 échecs).
