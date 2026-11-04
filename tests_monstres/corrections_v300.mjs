@@ -21,6 +21,9 @@
 // progressivement, au bruit de la plume ; un nom touché : une bande de papier
 // sort à gauche avec le portrait ; les portraits des PNJ en pause.
 //
+// (v302 : la carte du monde prend les pages 5-6 ; le sommaire est en 7, le
+// récit commence en 9.)
+//
 // Lancer : node tests_monstres/corrections_v300.mjs
 // (IVALIS_RACINE=… pour un autre dossier ; V300_CAPTURES=dossier pour les captures.)
 import fs from 'fs';
@@ -182,8 +185,11 @@ await section(async () => {
   await p.waitForTimeout(200);
   verifier("« Les fiches personnages » ouvre encore l'ancienne fenêtre", (await p.evaluate(() => window.__appels.join(","))) === "ouvrirMenuPersonnages");
   await cliquer("#grimoire-index-carte");
-  await p.waitForTimeout(200);
-  verifier("« Carte du monde » : bientôt dans le livre", /bientôt/.test(await p.evaluate(() => document.getElementById("grimoire-note-index").textContent)));
+  await p.waitForTimeout(900);
+  // v302 : la carte du monde est dans le livre (pages 5-6, corrections_v302).
+  verifier("v302 : « Carte du monde » mène à sa double page", (await page()) === 5, String(await page()));
+  await p.evaluate(() => window.grimoireAllerIndex());
+  await p.waitForTimeout(900);
   const sou = await p.evaluate(() => [...document.querySelectorAll(".entree-index-texte")].map(t => decodeURIComponent(getComputedStyle(t).backgroundImage)));
   verifier("l'index souligné à la plume : un trait d'encre sous chaque ligne, plus de jaune", sou.length === 6 && sou.every(s => /rgba\(20,12,6/.test(s) && !/236,190,60/.test(s)), sou.length);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v300_index.png" });
@@ -212,20 +218,20 @@ await section(async () => {
   await p.waitForTimeout(1000);
   const r = await p.evaluate(() => ({ page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), n: window.grimoireEtat().nbPages,
     entete: (document.querySelector("#grimoire-suite-2 .numero-chapitre") || {}).textContent, sous: (document.querySelector("#grimoire-suite-2 .titre-chapitre") || {}).textContent }));
-  verifier("« Le récit » de l'index : les pages tournent jusqu'au chapitre en cours", r.page === 7 && r.entete === "Chapitre I" && /en cours/.test(r.sous), JSON.stringify(r));
+  verifier("« Le récit » de l'index : les pages tournent jusqu'au chapitre en cours", r.page === 9 && r.entete === "Chapitre I" && /en cours/.test(r.sous), JSON.stringify(r));
   await p.evaluate(() => window.grimoireAllerIndex());
   await p.waitForTimeout(900);
   const mp = await centre("#grimoire-marque-recit");
   await p.mouse.click(mp.x, mp.y - mp.h * 0.3);
   await p.waitForTimeout(1000);
-  verifier("le marque-page à la plume y va aussi", (await page()) === 7, String(await page()));
-  await p.evaluate(() => window.GRIMOIRE.allerALaPage(5));
+  verifier("le marque-page à la plume y va aussi", (await page()) === 9, String(await page()));
+  await p.evaluate(() => window.GRIMOIRE.allerALaPage(7));
   await p.waitForTimeout(900);
   const s = await p.evaluate(() => ({ titre: (document.querySelector("#grimoire-suite-0 .titre-sommaire") || {}).textContent, lignes: [...document.querySelectorAll(".ligne-sommaire")].map(l => l.innerText.replace(/\s+/g, " ").trim()) }));
   verifier("avant le chapitre, le sommaire du récit : le chapitre en cours", s.titre === "Le récit" && s.lignes.join("|") === "I Le chapitre en cours", JSON.stringify(s));
   await cliquer('.ligne-sommaire[data-recit="courant"]');
   await p.waitForTimeout(1000);
-  verifier("… qui ramène au chapitre", (await page()) === 7);
+  verifier("… qui ramène au chapitre", (await page()) === 9);
 });
 
 // =========================================================================
@@ -469,7 +475,7 @@ await section(async () => {
   verifier("le récit s'étend sur plusieurs pages, toujours en nombre pair", r.n >= 4 && r.n % 2 === 0, `${r.n} pages`);
   verifier("aucune page ne déborde ; un paragraphe coupé continue sur la page suivante", r.deborde === 0 && r.suites >= 1, JSON.stringify(r));
   verifier("jamais de ponctuation seule en haut d'une page", r.orphelins === 0);
-  verifier("le lecteur sur la dernière double page : le livre tourne avec le récit", avant === 7 && r.page >= 9 && r.page >= r.total - 3, `${avant} → ${r.page} (sur ${r.total})`);
+  verifier("le lecteur sur la dernière double page : le livre tourne avec le récit", avant === 9 && r.page >= 11 && r.page >= r.total - 3, `${avant} → ${r.page} (sur ${r.total})`);
 });
 
 // =========================================================================
@@ -482,7 +488,7 @@ await section(async () => {
   const titreIA = appelsIA.find(a => /donnes leur titre aux chapitres/.test(a.sys));
   verifier("un chapitre fini se range : son numéro, son titre écrit d'après ce qui a été vécu", res && res.titre === "La tournée du nain" && st.ajouts[0] && st.ajouts[0].Numero === 1 && st.ajouts[0].ID_Partie === "P1" && titreIA && /trois chopes/.test(titreIA.txt), JSON.stringify(st.ajouts[0]));
   verifier("… et ses pages à part (Recits_Textes) : seul le chapitre ouvert se charge", st.sets.length === 1 && st.sets[0].chemin === "Recits_Textes/" + res.id && st.sets[0].n >= 4 && /narration/.test(st.sets[0].types), JSON.stringify(st.sets));
-  await p.evaluate(() => window.GRIMOIRE.allerALaPage(5));
+  await p.evaluate(() => window.GRIMOIRE.allerALaPage(7));
   await p.waitForTimeout(900);
   const s = await p.evaluate(() => [...document.querySelectorAll(".ligne-sommaire")].map(l => l.innerText.replace(/\s+/g, " ").trim()));
   verifier("le sommaire : « I La tournée du nain », puis le chapitre II en cours", s.join("|") === "I La tournée du nain|II Le chapitre en cours", s.join("|"));
@@ -492,7 +498,7 @@ await section(async () => {
   const l = await p.evaluate(() => ({ page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), lecture: window.GRIMOIRE_RECIT.etat().lecture,
     titre: (document.querySelector("#grimoire-suite-2 .titre-chapitre") || {}).textContent, num: (document.querySelector("#grimoire-suite-2 .numero-chapitre") || {}).textContent,
     texte: document.getElementById("grimoire-suite-2").innerText, ecriture: document.getElementById("recit-ecriture").classList.contains("sortie") }));
-  verifier("un chapitre relu : chargé à la demande, ses pages, son titre", l.page === 7 && l.lecture === res.id && l.num === "Chapitre I" && l.titre === "La tournée du nain" && /J'ai connu des tavernes/.test(l.texte), JSON.stringify({ ...l, texte: "" }));
+  verifier("un chapitre relu : chargé à la demande, ses pages, son titre", l.page === 9 && l.lecture === res.id && l.num === "Chapitre I" && l.titre === "La tournée du nain" && /J'ai connu des tavernes/.test(l.texte), JSON.stringify({ ...l, texte: "" }));
   verifier("… on ne l'écrit plus (pas de parchemin)", !l.ecriture);
   await cliquer('.lien-recit[data-recit="courant"]');
   await p.waitForTimeout(900);

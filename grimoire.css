@@ -267,3 +267,16 @@
 }
 .note-index.visible { opacity: 1; }
 #ecran-grimoire > #menu-navigation-bas { position: absolute; }
+
+/* LA CARTE DU MONDE (v302) : ses deux images remplissent les pages, centrées. */
+.page-carte .contenu-carte { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 1; }
+.page-carte .image-carte { width: 100%; height: 100%; object-fit: contain; object-position: center; pointer-events: none;
+  -webkit-user-drag: none; user-select: none; }
+/* Le marque-page de la carte : une terre au trait noir, côté gauche, penché vers la droite. */
+.marque-page.marque-terre { left: calc(532px * var(--s, 1)); top: calc(-24px * var(--s, 1)); width: calc(62px * var(--s, 1)); height: calc(190px * var(--s, 1)); transform: rotate(9deg); }
+.marque-page.marque-terre .marque-papier { background-position: 45% 60%; }
+.marque-page.marque-terre:not(.inactif):hover, .marque-page.marque-terre:not(.inactif):focus-visible { transform: rotate(7deg) translateY(-6%); }
+.marque-page.marque-terre:not(.inactif):active { transform: rotate(8deg) translateY(-3%) scale(0.98); }
+.dessin-terre circle { stroke: #120b06; stroke-width: 2.1; stroke-linecap: round; }
+.dessin-terre .feuille { fill: rgba(255, 246, 222, 0.25); }
+.dessin-terre .coin { fill: rgba(18, 11, 6, 0.18); }

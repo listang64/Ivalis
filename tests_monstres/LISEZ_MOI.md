@@ -9884,3 +9884,43 @@ bande au-dessus de la page gauche, derrière les marque-pages (qui se touchent)
 et la page, qu'elle rentre ; cinq tailles d'écran (tout reste dans l'écran,
 livre posé en bas) ; les versions. Il échoue sur la v300 (9 échecs).
 corrections_v300 mis à jour (positions v301).
+
+## v302 — La carte du monde dans le grimoire ; le bouton DEV : Ancien / Nouveau ; les boîtes des zones de clic
+
+Nico : « raccordons la carte du monde : Carte du monde dans l'index mène à la
+bonne page ; côté gauche, en biais droit, un marque-page avec le dessin au
+trait noir d'une terre ; à gauche cette partie de la map (IMG_2203), à droite
+celle-là (IMG_2207), qui remplissent l'espace, centrées. Dans le bouton DEV
+rouge : Ancien et Nouveau ; dans Nouveau, mes nouveaux outils, à commencer par
+les boîtes des zones de clic, pareil qu'avant. »
+
+- grimoire.js : en partie, la double page de la carte vient juste après
+  l'index (pages 5-6) ; le sommaire du récit passe en 7-8, le chapitre en 9…
+  (grimoire_recit.js). Les deux images (Cloudinary, adresses de Nico) en
+  object-fit: contain, centrées, sur toute la page ; préchargées à l'entrée.
+  Un troisième marque-page : une terre (globe, méridiens, parallèles, terres
+  esquissées), à droite de la plume, penché de 9° vers la droite ; éteint hors
+  partie. L'index et ce marque-page tournent jusqu'à la carte.
+- grimoire_carte.js (module à part) + grimoire_carte.css :
+  · la popup du bouton rouge reçoit deux onglets ; « Ancien » garde tout ce
+    qu'elle avait (déplacé tel quel), « Nouveau » les outils du livre ;
+    l'onglet est retenu (ivalis_DEV_ONGLET) ; la popup s'ouvre vers le bas
+    (les petits boutons sont en haut) ;
+  · les boîtes : un calque SVG posé sur la double page (unités de l'image du
+    livre, 1514 × 984), visible sur la carte seulement ; mêmes gestes que
+    regions_carte.js (glisser, étirer un coin, un point par clic sur un bord,
+    double-clic pour l'ôter), numéros uniques tirés en transaction, jamais
+    réutilisés ; base Carte_Livre/Zones ; ACTIONS_ZONES_LIVRE[numéro] pour
+    les actions à venir (les cartes régionales).
+
+corrections_v302.mjs (dans la suite) vérifie : hors partie pas de carte et le
+marque-page éteint (dessin, position, penche) ; en partie, l'index et le
+marque-page mènent à la carte, les deux images (adresses, chargées, contain,
+centrées, page pleine), le récit en page 9 ; les onglets (popup vers le bas,
+Ancien intact, Nouveau par défaut, retenu) ; les boîtes (naissance sur la
+carte, transaction, calque calé, popup, glisser, étirer, point ajouté et
+ôté, numéros 1-2-3, suppression en base, boîte reçue de la base, masquées,
+calque caché ailleurs) ; le retour au menu (6 pages). Il échoue sur la v301
+(10 échecs). Tests mis à jour : corrections_v299 et v300 (la carte en 5-6, le
+récit en 9) ; corrections_v257, v274, v275 et v283 choisissent l'onglet
+« Ancien » (ils cliquent les anciens outils de la popup).

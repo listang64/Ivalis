@@ -36,16 +36,17 @@
 //  chat, ia_master.js) se range dans Recits_Chapitres (le titre, le numéro)
 //  et Recits_Textes (ses pages) ; il n'est jamais renvoyé au Narrateur.
 //
-//  Les pages du livre (grimoire.js) : 3-4 l'index, 5-6 le sommaire du récit,
-//  7… les pages du chapitre, toujours en nombre pair, puis la quatrième de
-//  couverture.
+//  Les pages du livre (grimoire.js) : 3-4 l'index, 5-6 la carte du monde
+//  (v302), 7-8 le sommaire du récit, 9… les pages du chapitre, toujours en
+//  nombre pair, puis la quatrième de couverture.
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { collection, doc, getDoc, getDocs, addDoc, updateDoc, setDoc, query, where, runTransaction } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 const G = () => window.GRIMOIRE || null;
-const PREMIERE_SUITE = 5;              // le sommaire (5-6)
-const PREMIERE_RECIT = 7;              // la première page du chapitre
+// (v302 : la carte du monde occupe 5-6, juste après l'index, grimoire.js.)
+const PREMIERE_SUITE = 7;              // le sommaire (7-8)
+const PREMIERE_RECIT = 9;              // la première page du chapitre
 const MOTS_PAR_SECONDE = 17;           // « les phrases doivent s'écrire quand même vite »
 const AUTEURS_RECRITS = ["DESTIN", "SYSTEME_TEMPS"];
 const DELAI_LITE_MS = 20000;

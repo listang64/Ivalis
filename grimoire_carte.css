@@ -1,0 +1,25 @@
+/* =========================================================================
+   IVALIS — LA CARTE DU MONDE DANS LE GRIMOIRE (v302, grimoire_carte.js)
+   =========================================================================
+   Le calque des zones cliquables, posé sur la double page de la carte (en
+   unités de l'image du livre), et les onglets « Ancien » / « Nouveau » du
+   bouton DEV rouge. Les boîtes reprennent l'allure de celles de la carte
+   d'avant (style.css, #calque-regions).
+   ========================================================================= */
+#calque-zones-livre { position: absolute; display: none; pointer-events: none; overflow: visible; z-index: 7; }
+#calque-zones-livre.visible { display: block; }
+#calque-zones-livre.edition .region-forme { fill: rgba(196, 28, 28, 0.2); stroke: #c41c1c; stroke-width: 2px; vector-effect: non-scaling-stroke;
+  pointer-events: fill; cursor: move; }
+#calque-zones-livre.edition .region.selectionnee .region-forme { fill: rgba(232, 180, 40, 0.24); stroke: #f3d27a; stroke-width: 3px; }
+#calque-zones-livre .region-bord { pointer-events: none; }
+#calque-zones-livre.edition .region-bord { pointer-events: stroke; }
+#calque-zones-livre .region-numero { font-size: 22px; }
+
+/* Les onglets du bouton rouge. */
+.dev-onglets { display: flex; gap: 6px; margin: -2px 0 10px; }
+.dev-onglet { flex: 1; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-family: 'Cinzel', serif; font-weight: bold; font-size: 13px;
+  color: #7a0d0d; background: transparent; border: 1px solid #a01212; }
+.dev-onglet.choisi { color: #fff; background: #a01212; border-color: #6d0808; }
+#dev-onglet-ancien[hidden], #dev-onglet-nouveau[hidden] { display: none; }
+/* Les petits boutons sont en haut (v300) : la popup s'ouvre vers le bas. */
+#menu-navigation-bas.nav-livre .popup-regions-dev { bottom: auto; top: calc(100% + 12px); }

@@ -347,10 +347,12 @@ await section(async () => {
   // v300 : le livre ne se range plus ; la carte attend son tour, le récit est dans le livre,
   // les autres chapitres ouvrent l'ancienne fenêtre par-dessus le livre.
   await cliquer("#grimoire-index-carte");
-  await p.waitForTimeout(400);
+  await attendreQue(async () => (await page()) === 5, 3000);
+  await p.waitForTimeout(300);
   let r = await lisRange();
-  const noteCarte = await p.evaluate(() => document.getElementById("grimoire-note-index").textContent);
-  verifier("v300 : « Carte du monde » : bientôt dans le livre (le livre reste ouvert à l'index)", /bientôt/.test(noteCarte) && r.page === 3, noteCarte);
+  verifier("v302 : « Carte du monde » mène à sa double page dans le livre", r.page === 5, JSON.stringify(r));
+  await p.evaluate(() => window.grimoireAllerIndex());
+  await p.waitForTimeout(900);
   const mp = await p.evaluate(() => { const r = document.getElementById("grimoire-marque-page").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 20 }; });
   verifier("le marque-page se touche", await dans(mp.x, mp.y, "#grimoire-marque-page"), await dessus(mp.x, mp.y));
   await cliquer("#grimoire-index-recit");

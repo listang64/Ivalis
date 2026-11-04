@@ -15,6 +15,8 @@ import fs from 'fs';
 import { ouvrirStudio } from './_studio_commun.mjs';
 
 const { p, verifier, fin } = await ouvrirStudio();
+// v302 : la popup du bouton rouge a deux onglets ; ce banc travaille dans « Ancien ».
+await p.evaluate(() => { if (window.GRIMOIRE_CARTE) window.GRIMOIRE_CARTE.choisirOnglet("ancien"); });
 console.log("\n=========================================================");
 console.log("  LES CORRECTIONS DE LA v257 : LES RÉGIONS DE LA CARTE");
 console.log("=========================================================");

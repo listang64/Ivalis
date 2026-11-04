@@ -75,6 +75,16 @@
     // 1-2 titre et journal, 3-4 index ou chapitre, les pages de la suite, et
     // la quatrième de couverture (`dos`), toujours la dernière.
     let dos = null, suite = [], nbPages = 6;
+    // LA CARTE DU MONDE (v302) : sa double page vient juste après l'index (5-6),
+    // en partie seulement ; la suite (le récit) commence alors à la page 7.
+    // Nico : « page de gauche cette partie de la map, page de droite celle-là ;
+    // elles doivent remplir tout l'espace si possible, et centrées ».
+    const PAGE_CARTE = 5;
+    const IMAGES_CARTE = {
+        gauche: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793744008/IMG_2203_gvfqfv.png",
+        droite: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793744008/IMG_2207_sz48ll.png"
+    };
+    let pagesCarte = [];
     const pages = {};
 
     // ---------------------------------------------------------------------
@@ -232,6 +242,26 @@
                   <path class="coin" d="M 13 74 l -2.5 3.5"/></svg>`;
     }
 
+    // Le dessin du marque-page de la carte (v302) : une terre, au trait noir —
+    // le globe, ses méridiens et parallèles, et des terres esquissées.
+    function dessinTerre() {
+        return `<svg class="dessin-marque dessin-terre" viewBox="0 0 60 80" aria-hidden="true">
+                  <circle class="feuille" cx="30" cy="38" r="21"/>
+                  <path class="ligne" d="M 9.5 38 C 20 41 40 41 50.5 38"/>
+                  <path class="ligne" d="M 13 27 C 22 29.5 38 29.5 47 27 M 13 49 C 22 46.5 38 46.5 47 49"/>
+                  <path class="ligne" d="M 30 17 C 21 26 21 50 30 59 M 30 17 C 39 26 39 50 30 59"/>
+                  <path class="coin" d="M 17 24 C 21 21 26 23 25 27 C 24 31 28 32 27 36 C 26 40 20 39 18 35 C 16 31 14 27 17 24 Z"/>
+                  <path class="coin" d="M 35 30 C 39 27 45 29 46 34 C 47 40 43 45 38 47 C 35 48 33 44 35 41 C 37 38 32 34 35 30 Z"/>
+                  <path class="ligne" d="M 22 66 C 26 64 34 64 38 66 M 30 59 L 30 66"/></svg>`;
+    }
+    function pageCarte(cote) {
+        const el = document.createElement("div");
+        el.className = `page-grimoire page-papier ${cote} page-carte`;
+        el.id = "grimoire-carte-" + cote;
+        el.innerHTML = `<div class="contenu-carte"><img class="image-carte" src="${IMAGES_CARTE[cote]}" alt="La carte du monde" draggable="false"></div>`;
+        return el;
+    }
+
     // La double page d'un chapitre : [gauche, droite].
     function chapitreHtml(nom) {
         if (nom === "index") return indexHtml();
@@ -358,6 +388,9 @@
             <button type="button" class="marque-page marque-plume inactif" id="grimoire-marque-recit" data-action="marque-recit"
                     aria-label="Aller au récit" aria-disabled="true" title="Le récit (en partie)">
               <span class="marque-papier">${dessinPlume()}</span></button>
+            <button type="button" class="marque-page marque-terre inactif" id="grimoire-marque-carte" data-action="marque-carte"
+                    aria-label="Aller à la carte du monde" aria-disabled="true" title="La carte du monde (en partie)">
+              <span class="marque-papier">${dessinTerre()}</span></button>
             <div class="grimoire-livre" id="grimoire-livre">
               <div class="page-grimoire page-couverture" data-density="hard" id="grimoire-page-0">
                 <img src="${IMAGES.couverture}" alt="Les Chroniques d'Ivalis" draggable="false"></div>
@@ -375,6 +408,7 @@
         attrape = document.getElementById("grimoire-attrape");
         for (let i = 0; i <= 5; i++) pages[i] = document.getElementById("grimoire-page-" + i);
         dos = pages[5];
+        pagesCarte = [pageCarte("gauche"), pageCarte("droite")];
         pages[1].innerHTML = pageTitre();
         pages[2].innerHTML = pageJournal();
         remplirChapitre("");
@@ -674,6 +708,8 @@
         majMarquePage();
         placerNavigation();
         poser();
+        definirSuite(suite);                     // la double page de la carte entre dans le livre (v302)
+        try { if (window.GRIMOIRE_CARTE) window.GRIMOIRE_CARTE.entrer(); } catch (e) { console.error("Grimoire : la carte", e); }
         try { if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.entrer(id || window.ID_PARTIE_COURANTE); }
         catch (e) { console.error("Grimoire : le récit", e); }
         if (!pageFlip) return;
@@ -687,7 +723,7 @@
         const etait = enPartie;
         enPartie = false;
         if (etait) { try { if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.sortir(); } catch (e) { console.error("Grimoire : le récit", e); } }
-        if (suite.length) definirSuite([]);
+        if (suite.length || nbPages !== 6) definirSuite([]);
         if (origine && origine.parent && ecran.parentNode !== origine.parent) {
             const suivant = origine.suivant && origine.suivant.parentNode === origine.parent ? origine.suivant : null;
             origine.parent.insertBefore(ecran, suivant);
@@ -699,7 +735,7 @@
     // Les marque-pages ne servent qu'en partie (Nico : « désactivé tant que pas
     // rentré dans une partie »). Le livre levé cache l'ancienne interface.
     function majMarquePage() {
-        ["grimoire-marque-page", "grimoire-marque-recit"].forEach(idm => {
+        ["grimoire-marque-page", "grimoire-marque-recit", "grimoire-marque-carte"].forEach(idm => {
             const m = document.getElementById(idm);
             if (!m) return;
             m.classList.toggle("inactif", !enPartie);
@@ -724,7 +760,7 @@
     function definirSuite(elements) {
         suite = (elements || []).slice();
         if (!pageFlip) return;
-        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...suite, dos];
+        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? pagesCarte : []), ...suite, dos];
         const generation = ++definirSuite.generation;      // seule la dernière demande s'applique
         const appliquer = () => {
             if (generation !== definirSuite.generation) return;
@@ -756,13 +792,15 @@
     // Les chapitres de l'index. Le récit est dans le livre (v300) ; les
     // autres ouvrent encore l'ancienne fenêtre, par-dessus le livre ; la
     // carte et le village viendront.
+    function allerALaCarte() { if (enPartie) allerALaPage(PAGE_CARTE); }
     const OUVRIR_INDEX = {
+        carte: () => allerALaCarte(),
         recit: () => window.GRIMOIRE_RECIT && window.GRIMOIRE_RECIT.allerAuRecit(),
         fiches: () => window.ouvrirMenuPersonnages && window.ouvrirMenuPersonnages(),
         combats: () => window.ouvrirPopupRencontre && window.ouvrirPopupRencontre(),
         parametres: () => window.ouvrirParametres && window.ouvrirParametres()
     };
-    const BIENTOT = { carte: "La carte du monde : bientôt dans le livre.", village: "Le village : ce chapitre s'écrira bientôt." };
+    const BIENTOT = { village: "Le village : ce chapitre s'écrira bientôt." };
     function choisirIndex(id) {
         if (!enPartie) return;
         if (BIENTOT[id]) {
@@ -793,10 +831,11 @@
     function agir(cible) {
         if (!cible || cible.disabled) return;
         const action = cible.dataset.action;
-        if (action === "marque-page" || action === "marque-recit") {
+        if (action === "marque-page" || action === "marque-recit" || action === "marque-carte") {
             if (!enPartie) return;               // éteints hors partie : rien, pas même le clic
             son();
             if (action === "marque-page") allerIndex();
+            else if (action === "marque-carte") allerALaCarte();
             else if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.allerAuRecit();
             return;
         }
@@ -865,6 +904,6 @@
     window.GRIMOIRE = {
         ecran: () => ecran, scene: () => scene, livre: () => livre, pageFlip: () => pageFlip,
         enPartie: () => enPartie, ouvert: () => ouvert, nbPages: () => nbPages,
-        premiereDeLaSuite: 5, definirSuite, allerALaPage, unite: () => (scene ? parseFloat(scene.style.getPropertyValue("--u")) || 0 : 0)
+        premiereDeLaSuite: 7, PAGE_CARTE, IMAGES_CARTE, pagesCarte: () => pagesCarte.slice(), allerALaCarte, definirSuite, allerALaPage, unite: () => (scene ? parseFloat(scene.style.getPropertyValue("--u")) || 0 : 0)
     };
 })();

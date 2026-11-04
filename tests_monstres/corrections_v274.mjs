@@ -63,6 +63,8 @@ await p.route('**res.cloudinary.com**', r => {
 });
 const erreurs = []; p.on('pageerror', e => erreurs.push(e.message));
 await p.goto(base + '/index.html'); await p.waitForTimeout(1500);
+// v302 : la popup du bouton rouge a deux onglets ; ce banc travaille dans « Ancien ».
+await p.evaluate(() => { if (window.GRIMOIRE_CARTE) window.GRIMOIRE_CARTE.choisirOnglet("ancien"); });
 await p.evaluate(() => {
   window.jouerSonClic = () => {}; window.confirm = () => true;
   localStorage.setItem("ivalis_DEV_MODE", "on");

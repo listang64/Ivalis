@@ -168,6 +168,8 @@ await p.route('**api.cloudinary.com/**', async r => {
 const erreurs = []; p.on('pageerror', e => erreurs.push(e.message));
 const consoles = []; p.on('console', m => consoles.push(m.text()));
 await p.goto(base + '/index.html'); await p.waitForTimeout(1500);
+// v302 : la popup du bouton rouge a deux onglets ; ce banc travaille dans « Ancien ».
+await p.evaluate(() => { if (window.GRIMOIRE_CARTE) window.GRIMOIRE_CARTE.choisirOnglet("ancien"); });
 
 // La table : une partie, deux joueurs (Thorin, Lyra), le groupe dans la
 // région 1. Trois boîtes sur la carte du monde (1 à l'ouest, 2 à l'est, 4 au
