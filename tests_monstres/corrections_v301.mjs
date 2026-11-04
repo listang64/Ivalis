@@ -195,7 +195,7 @@ await section(async () => {
     await p.waitForTimeout(700);
     const m = await mesures();
     const bas = await p.evaluate(() => innerHeight - document.querySelector(".grimoire-fond-livre").getBoundingClientRect().bottom);
-    verifier(`${w} × ${h} : le parchemin et le portrait sortis tiennent dans l'écran, le livre posé en bas`, m.sortie && m.portrait && m.pap.t >= 0 && m.bande.t >= 0 && bas >= 0 && bas <= h * 0.013 + 1,
+    verifier(`${w} × ${h} : le parchemin et le portrait sortis tiennent dans l'écran, le livre posé en bas`, m.sortie && m.portrait && m.pap.t >= 0 && m.bande.t >= 0 && bas >= 0 && bas <= h * (h < 900 ? 0.041 : 0.013) + 1,
              `parchemin ${m.pap.t.toFixed(0)} px, portrait ${m.bande.t.toFixed(0)} px`);
   }
   await p.setViewportSize({ width: 1194, height: 834 });

@@ -295,7 +295,7 @@ await section(async () => {
   verifier("le terrain lu sur la carte (l'analyse gardée, pas refaite)", /cendre crisse/.test(blocNature) && /Alentours : au nord/.test(blocNature) && terrains().length === n0);
   verifier("les lieux connus à proximité, direction et temps de marche", /Lieux connus à proximité : Brumefosse \(village\), à environ 2(,5)? jours de marche à l'est/.test(blocNature),
            (blocNature.match(/Lieux connus[^\n]*/) || [""])[0]);
-  verifier("la consigne : des rencontres, oui ; aucun bâtiment inventé", /des rencontres/.test(blocNature) && /AUCUN bâtiment, village, ruine ni lieu construit/.test(blocNature));
+  verifier("la consigne : une rencontre, oui (rarement, v312) ; aucun bâtiment inventé", /Une rencontre/.test(blocNature) && /RAREMENT/.test(blocNature) && /AUCUN bâtiment, village, ruine ni lieu construit/.test(blocNature));
   verifier("le descriptif RP de la région", /Descriptif de La vallée de souffre : Une vallée de soufre et de forges/.test(blocNature));
   verifier("et son lore (la cité de Volcanisse, l'Ordre d'Ivalis)", /La cité de Volcanisse/.test(blocNature) && /L'Ordre d'Ivalis/.test(blocNature));
   verifier("le texte envoyé s'écrit dans la console (Nico : « pour que je puisse contrôler »)", consoles.some(t => /Environnement envoyé au maître du jeu/.test(t) && /DANS LA NATURE/.test(t)));

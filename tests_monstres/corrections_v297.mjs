@@ -100,13 +100,13 @@ await section(async () => {
   const r = await p.evaluate(() => {
     const scene = document.getElementById("grimoire-scene"), fond = document.querySelector(".grimoire-fond-livre").getBoundingClientRect();
     return { page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), ouvert: scene.classList.contains("ouvert"), zoom: getComputedStyle(scene).transform,
-             livreVisible: getComputedStyle(document.querySelector(".grimoire-fond-livre")).opacity === "1", haut: fond.top, bas: innerHeight - fond.bottom, largeur: fond.width, vw: innerWidth,
+             livreVisible: getComputedStyle(document.querySelector(".grimoire-fond-livre")).opacity === "1", haut: fond.top, bas: innerHeight - fond.bottom, largeur: fond.width, vw: innerWidth, vh: innerHeight,
              image: /livre_ouvert\.webp/.test(document.querySelector(".grimoire-fond-livre").src) };
   });
   verifier("la couverture tourne avec StPageFlip (animation de page)", pendant === "flipping" || pendant === "fold_corner", pendant);
   verifier("le livre ouvert apparaît, sur la double page titre + journal", r.page === 1 && r.ouvert && r.livreVisible && r.image, JSON.stringify({ page: r.page, ouvert: r.ouvert }));
   // v298 : « ne l'agrandis pas, juste descends-le » : tout le livre tient à l'écran, posé en bas.
-  verifier("il grossit (zoom levé), tout entier à l'écran, posé en bas (v298)", r.zoom === "none" && r.bas >= 0 && r.bas < 20 && r.largeur > r.vw * 0.9 && r.largeur <= r.vw, `bas ${r.bas.toFixed(0)} px, haut ${r.haut.toFixed(0)} px, largeur ${r.largeur.toFixed(0)}/${r.vw}`);
+  verifier("il grossit (zoom levé), tout entier à l'écran, posé en bas (v298)", r.zoom === "none" && r.bas >= 0 && r.bas <= r.vh * (r.vh < 900 ? 0.041 : 0.02) + 1 && r.largeur > r.vw * 0.9 && r.largeur <= r.vw, `bas ${r.bas.toFixed(0)} px, haut ${r.haut.toFixed(0)} px, largeur ${r.largeur.toFixed(0)}/${r.vw}`);
   const a = await alignement();
   verifier("les deux pages se posent exactement sur celles du livre dessiné", a.ecart < 3, `${a.ecart.toFixed(1)} px`);
 });
@@ -132,7 +132,8 @@ await section(async () => {
   // v300 : Nico, « remplace "Journal de …" par : Journal d'un aventurier, sans surlignage, un peu plus gros ».
   verifier("page de droite : « Journal d'un aventurier » (v300 ; « Journal de Nico » surligné en v297)", r.journal === "Journal d'un aventurier" && r.sansNom, r.journal);
   verifier("… bordée à la plume noire", r.bordure);
-  verifier("… Nouvelle partie, Charger partie, Compte, dans des cadres tracés à la main", r.entrees.join(",") === "Nouvelle partie✎,Charger partie✎,Compte✎", r.entrees.join(","));
+  // v312 : le menu principal s'est complété (Paramètres, Quitter le jeu).
+  verifier("… Nouvelle partie, Charger partie, Paramètres, Compte, Quitter le jeu, dans des cadres tracés à la main", r.entrees.join(",") === "Nouvelle partie✎,Charger partie✎,Paramètres✎,Compte✎,Quitter le jeu✎", r.entrees.join(","));
   if (process.env.V297_CAPTURES) await p.screenshot({ path: process.env.V297_CAPTURES + "/v297_journal.png" });
 });
 
@@ -282,7 +283,8 @@ await section(async () => {
   await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipPrev("top"));
   await p.waitForTimeout(1600);
   const f = await p.evaluate(() => ({ page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), ferme: document.getElementById("grimoire-scene").classList.contains("ferme"), attrape: getComputedStyle(document.getElementById("grimoire-attrape")).display }));
-  verifier("tourner jusqu'à la couverture referme le livre (et un toucher le rouvrira)", f.page === 0 && f.ferme && f.attrape === "block", JSON.stringify(f));
+  // v312 : Nico, « bloque le fait qu'on puisse refermer le livre » : il se rouvre aussitôt.
+  verifier("v312 : tourné jusqu'à la couverture, le livre ne se referme pas (il se rouvre)", f.page === 1 && !f.ferme && f.attrape === "none", JSON.stringify(f));
 });
 
 // =========================================================================

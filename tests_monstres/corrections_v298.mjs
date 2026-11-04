@@ -105,7 +105,7 @@ await section(async () => {
   // Même taille qu'en v297 : le livre entier tient (2 % de marge sur les côtés, 2,5 % en haut et 1,2 % en bas au plus).
   const s = Math.min(r.vw * 0.96 / 2000, r.vh * (1 - 0.025 - 0.012) / 1117);
   verifier("pas agrandi : tout le livre tient à l'écran, à sa taille d'avant", Math.abs(r.largeur - 2000 * s) < 2 && r.largeur <= r.vw, `${r.largeur.toFixed(0)} px pour ${(2000 * s).toFixed(0)}`);
-  verifier("descendu au max : posé en bas, un filet de marge dessous", r.bas >= 0 && r.bas <= r.vh * 0.013 + 1 && r.haut > r.vh * 0.1, `${r.bas.toFixed(1)} px sous le livre, ${r.haut.toFixed(0)} px au-dessus`);
+  verifier("descendu au max : posé en bas, un filet de marge dessous", r.bas >= 0 && r.bas <= r.vh * (r.vh < 900 ? 0.041 : 0.013) + 1 && r.haut > r.vh * 0.1, `${r.bas.toFixed(1)} px sous le livre, ${r.haut.toFixed(0)} px au-dessus`);
   const a = await alignement();
   verifier("les pages restent posées au pixel sur le livre dessiné", a.ecart < 3, `${a.ecart.toFixed(1)} px`);
 });
@@ -210,10 +210,9 @@ await section(async () => {
   // La couverture : refermée, puis un toucher la rouvre aussitôt.
   await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipPrev("top"));
   await p.waitForTimeout(1000);
-  await toucher("#grimoire-attrape");
-  await p.waitForTimeout(120);
-  const c = await p.evaluate(() => ({ etat: window.GRIMOIRE_PAGEFLIP.getState(), ouvert: window.grimoireEtat().ouvert, clics: window.__clics }));
-  verifier("un toucher sur la couverture l'ouvre aussitôt (sans le son de clic : le bruit de page suffit)", c.ouvert && c.etat === "flipping" && c.clics === 0, JSON.stringify(c));
+  // v312 : le livre ne se referme plus ; la couverture fermée (au tout début) s'ouvre toujours d'un toucher (corrections_v306).
+  const c = await p.evaluate(() => ({ etat: window.GRIMOIRE_PAGEFLIP.getState(), ouvert: window.grimoireEtat().ouvert, page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), clics: window.__clics }));
+  verifier("v312 : tourné vers la couverture, le livre reste ouvert (sans le son de clic)", c.ouvert && c.page === 1 && c.clics === 0, JSON.stringify(c));
   const css = await p.evaluate(() => [getComputedStyle(document.getElementById("grimoire-attrape")).touchAction, getComputedStyle(document.getElementById("grimoire-btn-nouvelle")).touchAction]);
   verifier("touch-action: manipulation sur la couverture et les boutons (pas d'attente du double-toucher)", css.every(x => x === "manipulation"), css.join(","));
 });

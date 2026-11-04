@@ -287,8 +287,9 @@ console.log("\n3. TOUT LE MONDE PORTE LE MÊME MÉDAILLON ROND, MÊME TAILLE, M�
   verifier("et les deux font la même taille", Math.abs(m1.largeur - h1.largeur) < 1,
            `(${Math.round(m1.largeur)} vs ${Math.round(h1.largeur)})`);
   verifier("la créature a son chiffre d'initiative comme les autres", m1.initiative === "75", m1.initiative);
-  verifier("et ses deux jauges penchées", m1.jauges === 2, String(m1.jauges));
-  verifier("le héros aussi", h1.jauges === 2, String(h1.jauges));
+  // v312 : Nico, « sur la piste d'initiative, retire les jauges de PV et de fatigue ».
+  verifier("et plus de jauges sur la piste (v312)", m1.jauges === 0, String(m1.jauges));
+  verifier("le héros non plus", h1.jauges === 0, String(h1.jauges));
 
   const img = await p.evaluate(() => {
     const t = document.querySelector('.piste-tuile[data-id="M1"] img');
