@@ -10159,3 +10159,62 @@ bouton DEV et la victoire racontée, le halo, les peuples. Il échoue sur la
 v306 (15 échecs). Tests mis à jour : v300 (5 paragraphes, le papier qui reste,
 les pages d'après écrites), v303 (le paragraphe du joueur), v304 (la suite
 déjà écrite).
+
+## v308 — Les cartes régionales dans le livre
+
+Nico : « nous allons remettre les maps régionales avec le système de
+déplacement et tout ce qu'on avait fait. La map régionale va s'afficher sur une
+double page qui est à elle, côté page de droite ; côté gauche le nom de la
+région. Pas d'effet de nuages, juste le défilement des pages. Les cartes
+régionales se trouvent sur les pages d'après la map globale. Quand la carte est
+en mode paysage, tu peux l'afficher en double page. » Ses réponses : A (une
+double page par région, dans l'ordre des boîtes) ; titre à la plume en haut de
+la page gauche sur une carte en paysage ; pincement et molette pour zoomer, un
+doigt pour glisser une carte zoomée, sinon il tourne la page ; les fenêtres du
+voyage par-dessus le livre ; le livre suit le groupe et s'ouvre sur sa région ;
+les outils DEV régionaux dans « Nouveau » ; l'usure gardée.
+
+- grimoire_regions.js (nouveau) : les boîtes de la carte du livre (Carte_Livre/
+  Zones) et leurs régions (1 forêt → 1, 2 vallée → 2, 3 désert → 5, 4 enclave →
+  6, 5 pointe → 10, 6 Aurelya → 11, 7 Pletia → 3, 8 île → 7, 9 Atrium → 8,
+  10 îlots → 13, 11 crique → 12 ; Arcaï et Volcanisse n'en ont pas). Les fiches
+  gardent leurs anciens numéros (villages, terrains, POI, position du groupe).
+  Une double page par boîte qui a une carte, dans l'ordre des boîtes, après la
+  carte du monde (pages 7, 9, …) ; le récit vient après elles (premiereDeLaSuite
+  = 7 + 2 × régions ; grimoire_recit.js lit ce décalage). Sans boîte (les tests
+  d'avant), le livre ne change pas.
+- Les pages : en portrait, le nom à la plume sur la page de gauche, la carte
+  « contenue » sur la page de droite ; en paysage (largeur / hauteur > 1,15, lu
+  sur l'image), la carte sur la double page, le nom posé en haut à gauche.
+- La carte vivante : sur la double page ouverte, la vue de cartes_regionales.js
+  (mode « dans le livre » : options.livre, posée dans #grimoire-livre à la place
+  de la carte, cadrage « contenu », ni plongée ni nuages, ni sol ni titre) ; elle
+  se cache le temps qu'une page tourne (l'image de la page tourne). Les pions,
+  le tracé, les villages, les POI, le voile de nuit, l'usure suivent.
+- Les gestes : la carte à sa taille, un doigt est rendu au livre (la page se
+  prend) ; zoomée, ou à deux doigts (GRIMOIRE.annulerPrise), la carte garde le
+  geste ; la molette zoome.
+- ouvrirCarteRegionale / fermerCarteRegionale (le voyage les appelle) : le livre
+  va à la région (les pages défilent) ou revient à la carte du monde. Les boîtes
+  de la carte du monde (ACTIONS_ZONES_LIVRE) mènent aux régions ; en mode voyage
+  « monde », elles choisissent la destination.
+- La partie chargée : le livre s'ouvre sur la région du groupe (sinon la carte
+  du monde) ; les pages arrivées, il y va.
+- Le voyage : son bouton sur les cartes du livre (#ecran-jeu.livre-carte), rangé
+  à gauche des petits boutons du haut ; ses fenêtres (vote, nuit, halte, jour)
+  par-dessus le livre.
+- DEV : les outils de la carte régionale (#regions-dev-carte) passent dans
+  « Nouveau » quand le livre tient la partie, et retrouvent leur place dans
+  « Ancien » hors du livre.
+- Pas encore : le tracé d'un voyage d'une région à l'autre ne se dessine pas
+  sur la carte du monde du livre (il vit sur l'ancienne carte du monde) ; le
+  groupe y arrive, le livre va à la région.
+
+corrections_v308.mjs (dans la suite) vérifie les pages (ordre, noms, paysage,
+le récit décalé), l'ouverture sur la région du groupe, la carte vivante (place,
+cadrage, titre, pion), sans nuages, le zoom à la molette, le glisser zoomé, la
+page prise à un doigt (la carte cachée pendant la tourne), la région suivante
+en portrait, les boîtes du monde, ouvrir/fermer, le bouton du voyage (monde,
+région, pas dans le récit), les outils DEV dans « Nouveau », une destination
+proposée d'un toucher, la sortie de partie. Il échoue sur la v307 (13 échecs).
+Tests mis à jour : v302 (les boîtes masquées restent des liens).

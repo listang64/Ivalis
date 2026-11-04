@@ -279,7 +279,8 @@ await section(async () => {
   await p.evaluate(() => { const c = document.getElementById("case-zones-livre-visibles"); c.checked = false; c.dispatchEvent(new Event("change")); });
   await p.waitForTimeout(150);
   const m = await p.evaluate(() => { const c = document.getElementById("calque-zones-livre"), f = c.querySelector(".region-forme"); return { edition: c.classList.contains("edition"), clic: f ? getComputedStyle(f).pointerEvents : "", poignees: c.querySelectorAll(".region-poignee").length }; });
-  verifier("« Afficher les boîtes » décoché : invisibles et sans prise (pas d'action pour l'instant)", !m.edition && m.clic === "none" && m.poignees === 0, JSON.stringify(m));
+  // v308 : les boîtes mènent aux cartes régionales : invisibles, elles restent des liens.
+  verifier("« Afficher les boîtes » décoché : invisibles, sans édition (v308 : elles restent des liens vers les régions)", !m.edition && m.poignees === 0, JSON.stringify(m));
   await p.evaluate(() => window.grimoireAllerIndex());
   await p.waitForTimeout(1000);
   verifier("ailleurs dans le livre, le calque de la carte se cache", !(await p.evaluate(() => document.getElementById("calque-zones-livre").classList.contains("visible"))));

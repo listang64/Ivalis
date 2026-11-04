@@ -243,6 +243,7 @@ const etat = {
     editionTitre: false
 };
 window.carteRegionaleOuverte = () => etat.ouverte;
+window.carteRegionaleDansLeLivre = () => !!(etat.ouverte && etat.dansLeLivre);
 window.cadrageCarteRegion = () => ({ numero: etat.ouverte, zoom: etat.zoom, base: etat.base, panX: etat.panX, panY: etat.panY,
                                      largeur: etat.largeur, hauteur: etat.hauteur, zoomMax: etat.base * ZOOM_MAX });
 
@@ -288,7 +289,8 @@ function construireVue() {
 // jeu, qu'elle couvre : le petit zoom d'arrivée (un transform sur la vue) ne
 // les fausse pas.
 function tailleVue() {
-    const ecran = $("ecran-jeu");
+    // (v308) Dans le livre, la vue est la place de la carte sur la page.
+    const ecran = etat.dansLeLivre ? $("vue-carte-region") : $("ecran-jeu");
     const r = ecran && ecran.getBoundingClientRect();
     return { l: (r && r.width) || window.innerWidth, h: (r && r.height) || window.innerHeight,
              gauche: (r && r.left) || 0, haut: (r && r.top) || 0 };
@@ -318,15 +320,17 @@ function cadrer(garder) {
     const { l, h } = tailleVue();
     const relatif = garder && etat.base ? etat.zoom / etat.base : 1;
     const centre = garder ? { x: (l / 2 - etat.panX) / etat.zoom, y: (h / 2 - etat.panY) / etat.zoom } : null;
-    etat.base = h / etat.hauteur;
+    etat.base = etat.dansLeLivre ? Math.min(l / etat.largeur, h / etat.hauteur) : h / etat.hauteur;   // (v308) toute la carte sur la page
     etat.zoom = borne(etat.base * relatif, etat.base, etat.base * ZOOM_MAX);
     if (centre) { etat.panX = l / 2 - centre.x * etat.zoom; etat.panY = h / 2 - centre.y * etat.zoom; }
-    else { etat.panX = (l - etat.largeur * etat.zoom) / 2; etat.panY = 0; }
+    else { etat.panX = (l - etat.largeur * etat.zoom) / 2; etat.panY = etat.dansLeLivre ? (h - etat.hauteur * etat.zoom) / 2 : 0; }
     bornerPan();
     poserCarte();
 }
 // Zoomer d'un facteur autour d'un point de l'écran (molette, doigts). Jamais
 // moins que la hauteur de l'écran, jamais plus que ZOOM_MAX fois.
+// (v308) Le livre a bougé (ouverture, écran) : la carte se recale sur sa page.
+window.recadrerCarteRegionale = () => { if (etat.ouverte) cadrer(true); };
 window.zoomerCarteRegion = function(facteur, x, y) {
     if (!etat.ouverte || !etat.largeur) return etat.zoom;
     const vue = tailleVue();
@@ -377,6 +381,16 @@ function brancherGestes(vue) {
 
     vue.addEventListener("pointerdown", (e) => {
         if (!etat.ouverte || etat.enTransition) return;
+        // (v308) DANS LE LIVRE : la carte à sa taille de page, un seul doigt, sans
+        // outil, c'est la page qu'on prend (le livre écoute plus haut). Zoomée, ou
+        // à deux doigts, la carte garde le geste.
+        if (etat.dansLeLivre) {
+            const libre = !etat.outil && !etat.editionTitre && etat.zoom <= etat.base * 1.02;
+            if (libre && pointeurs.size === 0) { pointeurs.set(e.pointerId, { x: e.clientX, y: e.clientY, livre: true }); return; }
+            if (pointeurs.size === 1 && [...pointeurs.values()][0].livre && window.GRIMOIRE && window.GRIMOIRE.annulerPrise) window.GRIMOIRE.annulerPrise();
+            e.stopPropagation();
+            pointeurs.forEach((p, id) => { p.livre = false; try { vue.setPointerCapture(id); } catch (err) {} });
+        }
         pointeurs.set(e.pointerId, { x: e.clientX, y: e.clientY });
         try { vue.setPointerCapture(e.pointerId); } catch (err) { /* pointeur déjà parti */ }
         if (pointeurs.size === 2) { commencerPincement(); return; }
@@ -399,7 +413,9 @@ function brancherGestes(vue) {
     });
     vue.addEventListener("pointermove", (e) => {
         if (!pointeurs.has(e.pointerId)) return;
+        if (pointeurs.get(e.pointerId).livre) { pointeurs.get(e.pointerId).x = e.clientX; pointeurs.get(e.pointerId).y = e.clientY; return; }
         pointeurs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (etat.dansLeLivre) e.stopPropagation();
         if (!geste) return;
         e.preventDefault();
         if (geste.type === "pincement") { suivrePincement(); return; }
@@ -417,7 +433,9 @@ function brancherGestes(vue) {
     });
     const lever = (e) => {
         if (!pointeurs.has(e.pointerId)) return;
+        const pourLeLivre = pointeurs.get(e.pointerId).livre;
         pointeurs.delete(e.pointerId);
+        if (pourLeLivre) return;
         if (geste && geste.type === "pincement") {
             // Il reste un doigt : il reprend la main pour glisser.
             const reste = [...pointeurs.values()][0];
@@ -431,6 +449,9 @@ function brancherGestes(vue) {
     };
     vue.addEventListener("pointerup", lever);
     vue.addEventListener("pointercancel", lever);
+    // (v308) un doigt laissé au livre se lève hors de la vue : la vue l'oublie.
+    window.addEventListener("pointerup", (e) => { const p = pointeurs.get(e.pointerId); if (p && p.livre) pointeurs.delete(e.pointerId); }, true);
+    window.addEventListener("pointercancel", (e) => { const p = pointeurs.get(e.pointerId); if (p && p.livre) pointeurs.delete(e.pointerId); }, true);
 }
 function mesurePincement() {
     const [a, b] = [...pointeurs.values()];
@@ -620,11 +641,23 @@ window.chargerImageCarteRegionale = chargerImage;
 
 window.ouvrirCarteRegionale = async function(numero, options) {
     const n = Number(numero);
+    // LE LIVRE (v308, grimoire_regions.js) : en partie, la carte régionale est
+    // une double page du livre ; l'ouvrir, c'est y aller (les pages défilent).
+    const livre = options && options.livre;
+    if (!livre && window.GRIMOIRE_REGIONS && window.GRIMOIRE_REGIONS.actif()) return window.GRIMOIRE_REGIONS.ouvrir(n);
     const carte = window.CARTES_REGIONALES[n];
     if (!carte || etat.enTransition || etat.ouverte) return false;
     if (!carte.image) { annoncer(`${carte.nom} — carte à venir`); return false; }
     construireVue();
-    const sansTransition = !!(options && options.sansTransition);
+    if (livre) {
+        // Posée sur la page, à la place de la carte : ni plongée, ni nuages.
+        const vue = $("vue-carte-region");
+        etat.dansLeLivre = true;
+        if (vue.parentNode !== livre.conteneur) livre.conteneur.appendChild(vue);
+        vue.classList.add("dans-le-livre");
+        Object.assign(vue.style, livre.place || {});
+    }
+    const sansTransition = !!(options && options.sansTransition) || !!livre;
     etat.enTransition = true;
     // Le pinceau d'usure de la carte du monde (v283) se pose en partant.
     if (typeof window.lacherOutilUsureMonde === "function") window.lacherOutilUsureMonde();
@@ -635,7 +668,7 @@ window.ouvrirCarteRegionale = async function(numero, options) {
     chargement.then(img => { if (img && window.BordsParchemin) window.BordsParchemin.preparer({ graine: graineBord, aspect: img.naturalWidth / img.naturalHeight, cote: 2048, zones: carte.usure }); });
     const region = (window.REGIONS_CARTE || {})[n];
     etat.centreMonde = region && typeof window.centreRegion === "function" ? window.centreRegion(region.points) : { x: 1920, y: 1080 };
-    if (typeof window.replierMenuLateral === "function") window.replierMenuLateral({ silencieux: true });
+    if (!livre && typeof window.replierMenuLateral === "function") window.replierMenuLateral({ silencieux: true });
     const mondeEl = $("carte-fond-jeu");
     const plongee = plongeeMonde(etat.centreMonde);
     etat.cadrageMonde = plongee.cadre;
@@ -664,7 +697,7 @@ window.ouvrirCarteRegionale = async function(numero, options) {
         dessinerPeinture();
         // Le bouton de retour (au-dessus de tout) attend que les nuages se
         // soient dissipés : il ne flotte pas sur l'écran blanc (v279).
-        if (sansTransition) $("btn-retour-monde").style.display = "flex";
+        if (sansTransition && !livre) $("btn-retour-monde").style.display = "flex";
         actualiserDev();
         signaler(true);
     };
@@ -699,8 +732,10 @@ window.ouvrirCarteRegionale = async function(numero, options) {
 };
 
 window.fermerCarteRegionale = async function(options) {
+    // (v308) Dans le livre, quitter la carte régionale, c'est revenir à la carte du monde.
+    if (etat.dansLeLivre && !(options && options.livre) && window.GRIMOIRE_REGIONS && window.GRIMOIRE_REGIONS.actif()) return window.GRIMOIRE_REGIONS.versLeMonde();
     if (!etat.ouverte || etat.enTransition) return false;
-    const sansTransition = !!(options && options.sansTransition);
+    const sansTransition = !!(options && options.sansTransition) || !!(options && options.livre);
     etat.enTransition = true;
     // Un titre en cours d'édition s'enregistre en partant.
     if (etat.editionTitre) window.basculerEditionTitreRegion(false);
@@ -715,6 +750,8 @@ window.fermerCarteRegionale = async function(options) {
         $("btn-retour-monde").style.display = "none";
         const numero = etat.ouverte;
         etat.ouverte = null;
+        etat.dansLeLivre = false;
+        vue.classList.remove("dans-le-livre");
         actualiserDev();
         signaler(false, numero);
     };

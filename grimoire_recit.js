@@ -45,8 +45,10 @@ import { collection, doc, getDoc, getDocs, addDoc, updateDoc, setDoc, query, whe
 
 const G = () => window.GRIMOIRE || null;
 // (v302 : la carte du monde occupe 5-6, juste après l'index, grimoire.js.)
-const PREMIERE_SUITE = 7;              // le sommaire (7-8)
-const PREMIERE_RECIT = 9;              // la première page du chapitre
+// (v308) Les cartes régionales s'intercalent après la carte du monde : le
+// sommaire et le chapitre se décalent d'autant (7 et 9 sans elles).
+const premiereSuite = () => { const g = window.GRIMOIRE; const p = g && typeof g.premiereDeLaSuite === "function" ? g.premiereDeLaSuite() : 7; return Number(p) || 7; };
+const premiereRecit = () => premiereSuite() + 2;
 const MOTS_PAR_SECONDE = 17;           // « les phrases doivent s'écrire quand même vite »
 const AUTEURS_RECRITS = ["DESTIN", "SYSTEME_TEMPS"];
 const DELAI_LITE_MS = 25000;
@@ -406,7 +408,7 @@ function sommaireHtml() {
 // ---------------------------------------------------------------------
 function creerPage(i) {
     const el = document.createElement("div");
-    el.className = `page-grimoire page-papier ${(PREMIERE_SUITE + i) % 2 === 1 ? "gauche" : "droite"} page-suite`;
+    el.className = `page-grimoire page-papier ${(premiereSuite() + i) % 2 === 1 ? "gauche" : "droite"} page-suite`;
     el.id = "grimoire-suite-" + i;
     return el;
 }
@@ -499,10 +501,10 @@ function ecrireUnMot() {
 function placeDuMot(mot) {
     const g = G(), pf = g && g.pageFlip();
     if (!pf || etat.lecture) return "ouvert";
-    const index = PREMIERE_SUITE + etat.elements.indexOf(mot.closest(".page-suite"));
+    const index = premiereSuite() + etat.elements.indexOf(mot.closest(".page-suite"));
     const ici = pf.getCurrentPageIndex(), gauche = ici % 2 === 1 ? ici : ici - 1;
     if (pf.getState() !== "read" || (g.defileEnCours && g.defileEnCours())) return "attente";
-    if (!g.ouvert() || ici < PREMIERE_RECIT) return "ailleurs";
+    if (!g.ouvert() || ici < premiereRecit()) return "ailleurs";
     if (index < gauche) return "avant";
     if (index > gauche + 1) return "apres";
     return "ouvert";
@@ -517,7 +519,7 @@ function construireOrdreEcriture() {
 function allerALaDernierePage() {
     const g = G();
     if (!g) return;
-    const derniere = PREMIERE_RECIT + Math.max(etat.pagesRecit, 2) - 1;
+    const derniere = premiereRecit() + Math.max(etat.pagesRecit, 2) - 1;
     g.allerALaPage(derniere % 2 === 1 ? derniere : derniere - 1);
 }
 
@@ -644,7 +646,7 @@ async function choisirDansLeSommaire(cle) {
             textes: (e.textes || []).slice(), jets: (e.jets || []).slice() }));
         etat.lecture = { id, numero: fiche.Numero, titre: fiche.Titre, entrees };
         rendre();
-        G().allerALaPage(PREMIERE_RECIT);
+        G().allerALaPage(premiereRecit());
     } catch (e) { console.error("Le livre : chapitre", e); }
 }
 function allerAuRecit() {
@@ -658,9 +660,9 @@ function marqueDuRecit() {
     if (!etat.actif) return;
     const g = G(), pf = g && g.pageFlip();
     if (pf && !etat.lecture) {
-        const derniere = PREMIERE_RECIT + Math.max(etat.pagesRecit, 2) - 1, gauche = derniere % 2 === 1 ? derniere : derniere - 1;
+        const derniere = premiereRecit() + Math.max(etat.pagesRecit, 2) - 1, gauche = derniere % 2 === 1 ? derniere : derniere - 1;
         const ici = pf.getCurrentPageIndex();
-        if (ici === gauche || ici === gauche + 1) { g.allerALaPage(PREMIERE_SUITE); return; }
+        if (ici === gauche || ici === gauche + 1) { g.allerALaPage(premiereSuite()); return; }
     }
     allerAuRecit();
 }
@@ -670,7 +672,7 @@ function marqueDuRecit() {
 // ---------------------------------------------------------------------
 function surLeRecit() {
     const g = G(), pf = g && g.pageFlip();
-    return !!(etat.actif && pf && g.ouvert() && pf.getCurrentPageIndex() >= PREMIERE_RECIT && !etat.lecture);
+    return !!(etat.actif && pf && g.ouvert() && pf.getCurrentPageIndex() >= premiereRecit() && !etat.lecture);
 }
 function majInterface() {
     if (!elts) return;
@@ -849,11 +851,11 @@ function pointDArrivee() {
     if (pf) {
         const ici = pf.getCurrentPageIndex(), gauche = ici % 2 === 1 ? ici : ici - 1;
         for (const index of [gauche + 1, gauche]) {
-            const el = etat.elements[index - PREMIERE_SUITE];
+            const el = etat.elements[index - premiereSuite()];
             const mots = el ? el.querySelectorAll(".mot") : [];
             if (mots.length) { const r = mots[mots.length - 1].getBoundingClientRect(); if (r.width) return { x: r.right + 6, y: r.top + r.height / 2 }; }
         }
-        const el = etat.elements[gauche - PREMIERE_SUITE];
+        const el = etat.elements[gauche - premiereSuite()];
         if (el) { const r = el.getBoundingClientRect(); if (r.width) return { x: r.left + r.width * 0.5, y: r.top + r.height * 0.25 }; }
     }
     return { x: innerWidth * 0.45, y: innerHeight * 0.4 };
@@ -1145,5 +1147,5 @@ window.GRIMOIRE_RECIT = {
     etat: () => ({ actif: etat.actif, idPartie: etat.idPartie, pagesRecit: etat.pagesRecit, verrou: etat.verrou, envoi: etat.envoi,
                    lecture: etat.lecture ? etat.lecture.id : null, chapitres: etat.chapitres.length,
                    ecrits: { ...etat.ecrits }, totaux: { ...etat.totaux } }),
-    PREMIERE_RECIT, PROMPT_NARRATEUR_LITE
+    get PREMIERE_RECIT() { return premiereRecit(); }, PROMPT_NARRATEUR_LITE
 };

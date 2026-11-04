@@ -16,9 +16,10 @@
   <link rel="stylesheet" href="style.css?v=123">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
-  <link rel="stylesheet" href="grimoire.css?v=8">
+  <link rel="stylesheet" href="grimoire.css?v=9">
   <link rel="stylesheet" href="grimoire_recit.css?v=6">
   <link rel="stylesheet" href="grimoire_carte.css?v=1">
+  <link rel="stylesheet" href="grimoire_regions.css?v=1">
 
  
   <!-- ===================================================================== -->
@@ -2438,7 +2439,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=212"></script>
+<script src="trace_combat.js?v=213"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2447,7 +2448,7 @@
 <script src="cles_gemini.js?v=3"></script>
 <!-- LE GRIMOIRE (v297) : StPageFlip 2.0.7 (MIT, dans vendor/), puis le livre -->
 <script src="vendor/page-flip/page-flip.browser.js?v=2.0.7"></script>
-<script src="grimoire.js?v=10"></script>
+<script src="grimoire.js?v=11"></script>
 <!-- LES DÉPENSES DU MJ (v293) : tokens et coût en euros de chaque réponse -->
 <script src="depenses_ia.js?v=3"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
@@ -2506,9 +2507,10 @@
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=4"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
-<script type="module" src="grimoire_recit.js?v=7"></script>
+<script type="module" src="grimoire_recit.js?v=8"></script>
 <!-- LA CARTE DU MONDE DANS LE GRIMOIRE (v302) : sa double page, ses zones (DEV). -->
-<script type="module" src="grimoire_carte.js?v=2"></script>
+<script type="module" src="grimoire_carte.js?v=3"></script>
+<script src="grimoire_regions.js?v=1"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=4"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région et son titre (plus de nuages dessus, v286). -->
@@ -2516,7 +2518,7 @@
 <script src="nuages_realistes.js?v=3"></script>
 <!-- Les bords de parchemin des cartes (v282) : calculés à part (un Worker). -->
 <script src="bords_parchemin.js?v=5"></script>
-<script type="module" src="cartes_regionales.js?v=12"></script>
+<script type="module" src="cartes_regionales.js?v=13"></script>
 <!-- L'usure du parchemin de la carte du monde (v283) : le pinceau DEV et sa base. -->
 <script type="module" src="usure_monde.js?v=1"></script>
 <!-- Le lore du monde, par région (v273), puis les villages des cartes régionales et MIA_VILLAGE. -->
@@ -2527,7 +2529,7 @@
 <!-- Le déplacement des PJ (v275) : les terrains praticables des cartes régionales,
      puis le groupe, son bouton voyage, les tracés, les votes, la marche et les nuits. -->
 <script type="module" src="terrains_regionaux.js?v=2"></script>
-<script type="module" src="voyage_groupe.js?v=9"></script>
+<script type="module" src="voyage_groupe.js?v=10"></script>
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
 <script type="module" src="environnement_mj.js?v=4"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->

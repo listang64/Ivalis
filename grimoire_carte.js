@@ -311,6 +311,27 @@ function poserOnglets() {
     tete.after(onglets);
     onglets.after(ancien);
     ancien.after(nouveau);
+    // (v308) Les outils de la carte régionale ouverte (l'usure, les villages, les
+    // terrains, le groupe, le téléport) passent dans « Nouveau » : ils servent sur
+    // la carte régionale du livre.
+    const outilsRegion = document.getElementById("regions-dev-carte");
+    if (outilsRegion) {
+        // Sa place d'avant (l'ancienne interface) est gardée : il y retourne hors du livre.
+        repereOutils = document.createComment("outils-region");
+        outilsRegion.parentNode.insertBefore(repereOutils, outilsRegion);
+        const tete = document.createElement("div");
+        tete.className = "popup-regions-sous-titre";
+        tete.id = "dev-nouveau-region-titre";
+        tete.textContent = "🗺️ La carte régionale (dans le livre)";
+        const aide = document.createElement("p");
+        aide.className = "popup-regions-aide";
+        aide.id = "dev-nouveau-region-aide";
+        aide.textContent = "Ouvre la double page d'une région pour ses outils.";
+        nouveau.appendChild(tete);
+        nouveau.appendChild(aide);
+        nouveau.appendChild(outilsRegion);
+    }
+    placerOutilsRegion(true);
     onglets.addEventListener("click", (e) => {
         const b = e.target.closest("[data-onglet]");
         if (!b) return;
@@ -327,6 +348,16 @@ function poserOnglets() {
     });
     choisirOnglet(lire(CLE_ONGLET) === "ancien" ? "ancien" : "nouveau");
 }
+// (v308) Les outils régionaux : dans « Nouveau » quand le livre tient la partie,
+// à leur ancienne place sinon (l'ancienne interface, ses tests).
+let repereOutils = null;
+function placerOutilsRegion(dansLeLivre) {
+    const outils = document.getElementById("regions-dev-carte"), nouveau = document.getElementById("dev-onglet-nouveau");
+    if (!outils || !nouveau) return;
+    if (dansLeLivre) { if (outils.parentNode !== nouveau) nouveau.appendChild(outils); return; }
+    if (repereOutils && repereOutils.parentNode && outils.previousSibling !== repereOutils) repereOutils.parentNode.insertBefore(outils, repereOutils.nextSibling);
+}
+window.placerOutilsRegionDev = placerOutilsRegion;
 function choisirOnglet(nom) {
     const voulu = nom === "ancien" ? "ancien" : "nouveau";
     ecrire(CLE_ONGLET, voulu);

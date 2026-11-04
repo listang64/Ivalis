@@ -1358,13 +1358,17 @@ const IMAGE_CROIX_CHAT = "data:image/svg+xml;utf8," + encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="29" fill="#e8d5a5" stroke="#5c3a21" stroke-width="4"/>`
     + `<path d="M21 21 L43 43 M43 21 L21 43" stroke="#5c3a21" stroke-width="6" stroke-linecap="round"/></svg>`);
 window.chatOuvertVoyage = chatOuvert;
+window.actualiserBoutonVoyage = () => actualiserBouton();
 function actualiserBouton() {
     const b = bouton();
     if (!b) return;
     const rouvrir = $("btn-rouvrir-menu");
     const fermerChat = chatOuvert();
     // Le chat ouvert cache le menu (et son bouton) : la croix, elle, se montre.
-    const visible = !!window.ID_PARTIE_COURANTE && (fermerChat || (!!rouvrir && rouvrir.style.display !== "none"));
+    // (v308) Le livre levé : le bouton se montre sur ses cartes (le monde, une région).
+    const surLeLivre = document.getElementById("ecran-jeu") && document.getElementById("ecran-jeu").classList.contains("livre-leve");
+    const carteDuLivre = surLeLivre && document.getElementById("ecran-jeu").classList.contains("livre-carte");
+    const visible = !!window.ID_PARTIE_COURANTE && (surLeLivre ? (carteDuLivre && !fermerChat) : (fermerChat || (!!rouvrir && rouvrir.style.display !== "none")));
     b.style.display = visible ? "block" : "none";
     b.classList.toggle("fermer-chat", fermerChat);
     // Les boutons voisins (le retour au monde) se poussent d'une place.

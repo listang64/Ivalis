@@ -109,6 +109,10 @@
     // est écrit ». Des pages manuscrites glissées le temps du défilement.
     const NB_FEUILLETS = 12;
     let dos = null, suite = [], nbPages = 6 + NB_VIERGES, vierges = [], feuillets = [], listeActuelle = [];
+    // LES CARTES RÉGIONALES (v308, grimoire_regions.js) : une double page par
+    // région, juste après la carte du monde ; le récit vient après elles.
+    let pagesRegions = [];
+    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length : 0);
     // LA CARTE DU MONDE (v302) : sa double page vient juste après l'index (5-6),
     // en partie seulement ; la suite (le récit) commence alors à la page 7.
     // Nico : « page de gauche cette partie de la map, page de droite celle-là ;
@@ -612,6 +616,7 @@
         };
         livre.addEventListener("pointerup", lacher);
         livre.addEventListener("pointercancel", lacher);
+        brancherPrise.annuler = () => { if (prise && !prise.partie) { try { livre.releasePointerCapture(prise.id); } catch (e) {} prise = null; } };
     }
 
     // ---------------------------------------------------------------------
@@ -797,20 +802,21 @@
         catch (e) { console.error("Grimoire : le récit", e); }
         if (!pageFlip) return;
         if (!ouvert) etatOuvert(true);
-        const ici = pageFlip.getCurrentPageIndex();
         // v304 : Nico, « après avoir chargé la partie, ouvre sur la page de la map globale ».
+        // v308 : « le livre suit le groupe » — sur la carte de sa région, si elle est dans le livre.
         // Un livre encore en mouvement ignorerait le geste : on attend qu'il se pose (3 s au plus).
-        if (ici !== PAGE_CARTE && ici !== PAGE_CARTE + 1) {
-            let essais = 0;
-            const versLaCarte = () => {
-                if (!pageFlip || !enPartie) return;
-                const p = pageFlip.getCurrentPageIndex();
-                if (p === PAGE_CARTE || p === PAGE_CARTE + 1) return;
-                if (pageFlip.getState() !== "read" && ++essais < 25) { setTimeout(versLaCarte, 120); return; }
-                try { pageFlip.flip(PAGE_CARTE, "top"); } catch (e) { try { pageFlip.turnToPage(PAGE_CARTE); } catch (e2) {} }
-            };
-            setTimeout(versLaCarte, 60);
-        }
+        let essais = 0;
+        const versLaCarte = () => {
+            if (!pageFlip || !enPartie) return;
+            const voulue = (window.GRIMOIRE_REGIONS && window.GRIMOIRE_REGIONS.pageDuGroupe()) || PAGE_CARTE;
+            const p = pageFlip.getCurrentPageIndex();
+            if (p === voulue || p === voulue + 1) return;
+            if ((pageFlip.getState() !== "read" || defileEnCours) && ++essais < 25) { setTimeout(versLaCarte, 120); return; }
+            if (Math.abs(planche(voulue) - planche(p)) > 1 && pageFlip.getState() === "read") { allerALaPage(voulue); return; }
+            try { pageFlip.flip(voulue, "top"); } catch (e) { try { pageFlip.turnToPage(voulue); } catch (e2) {} }
+        };
+        setTimeout(versLaCarte, 60);
+        passerEnPartie.versLaCarte = () => { essais = 0; setTimeout(versLaCarte, 60); };
     }
     // De retour au journal (« Retour au menu ») : le livre ressort de l'écran
     // de jeu, perd les pages du récit, et les marque-pages s'éteignent.
@@ -855,17 +861,21 @@
     function definirSuite(elements) {
         suite = (elements || []).slice();
         if (!pageFlip) return;
-        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? pagesCarte : []), ...suite, ...vierges, dos];
+        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions] : []), ...suite, ...vierges, dos];
         const generation = ++definirSuite.generation;      // seule la dernière demande s'applique
         const appliquer = () => {
             if (generation !== definirSuite.generation) return;
             if (pageFlip.getState() !== "read") { setTimeout(appliquer, 80); return; }
-            const ici = pageFlip.getCurrentPageIndex();
+            let ici = pageFlip.getCurrentPageIndex();
+            // (v308) les pages ouvertes gardent leur place si des cartes régionales entrent ou sortent avant elles
+            const ouverteAvant = listeActuelle[ici];
             liste.forEach(el => { if (el.parentNode !== livre) livre.appendChild(el); });
             nbPages = liste.length;
             listeActuelle = liste;
             muet = true;
             try { pageFlip.updateFromHtml(liste); } catch (e) { console.error("Grimoire : les pages", e); }
+            const retrouvee = ouverteAvant ? liste.indexOf(ouverteAvant) : -1;
+            if (retrouvee > 0 && retrouvee !== ici) { ici = retrouvee; try { pageFlip.turnToPage(retrouvee); } catch (e) {} }
             muet = false;
             if (ici >= nbPages - 1) { try { pageFlip.turnToPage(Math.max(0, nbPages - 3)); } catch (e) {} }
             poser();
@@ -1091,6 +1101,10 @@
     window.GRIMOIRE = {
         ecran: () => ecran, scene: () => scene, livre: () => livre, pageFlip: () => pageFlip,
         enPartie: () => enPartie, ouvert: () => ouvert, nbPages: () => nbPages, defileEnCours: () => defileEnCours,
-        premiereDeLaSuite: 7, PAGE_CARTE, IMAGES_CARTE, pagesCarte: () => pagesCarte.slice(), allerALaCarte, definirSuite, allerALaPage, unite: () => (scene ? parseFloat(scene.style.getPropertyValue("--u")) || 0 : 0)
+        premiereDeLaSuite, PAGE_CARTE,
+        // (v308) les cartes régionales : leurs pages, la prise du doigt à rendre (un pincement sur la carte)
+        definirRegions: (els) => { pagesRegions = (els || []).slice(); if (enPartie) definirSuite(suite); },
+        pagesRegions: () => pagesRegions.slice(), annulerPrise: () => { if (brancherPrise.annuler) brancherPrise.annuler(); },
+        ouvrirSurLeGroupe: () => { if (enPartie && passerEnPartie.versLaCarte) passerEnPartie.versLaCarte(); }, IMAGES_CARTE, pagesCarte: () => pagesCarte.slice(), allerALaCarte, definirSuite, allerALaPage, unite: () => (scene ? parseFloat(scene.style.getPropertyValue("--u")) || 0 : 0)
     };
 })();

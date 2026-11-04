@@ -29,8 +29,10 @@
 #ecran-grimoire.en-partie .grimoire-invite { display: none; }
 #ecran-jeu.livre-leve #menu-lateral, #ecran-jeu.livre-leve #btn-rouvrir-menu, #ecran-jeu.livre-leve #affichage-tokens,
 #ecran-jeu.livre-leve #btn-fermer-chat-nouveau, #ecran-jeu.livre-leve #fenetre-chatbox,
-#ecran-jeu.livre-leve .btn-voyage, #ecran-jeu.livre-leve .btn-retour-monde,
-#ecran-jeu.livre-leve .bandeau-voyage, #ecran-jeu.livre-leve .boite-voyage { display: none !important; }
+#ecran-jeu.livre-leve:not(.livre-carte) .btn-voyage, #ecran-jeu.livre-leve .btn-retour-monde { display: none !important; }
+/* (v308) Le voyage revient dans le livre : son bouton sur les cartes du livre
+   (grimoire_regions.js, .livre-carte), ses fenêtres (le vote, la nuit, la halte,
+   le jour qui passe) par-dessus le livre, comme les autres anciennes fenêtres. */
 
 /* LES PETITS BOUTONS EN HAUT À DROITE (v300). */
 #menu-navigation-bas.nav-livre { top: 15px; bottom: auto; }
