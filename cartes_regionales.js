@@ -292,6 +292,12 @@ function tailleVue() {
     // (v308) Dans le livre, la vue est la place de la carte sur la page.
     const ecran = etat.dansLeLivre ? $("vue-carte-region") : $("ecran-jeu");
     const r = ecran && ecran.getBoundingClientRect();
+    // (v310) Dans le livre, la taille de la page sans le zoom du livre qui
+    // s'ouvre : Nico, « on ne doit pas pouvoir dézoomer plus que la taille de
+    // l'image à l'ouverture de la page ». Mesurée pendant l'ouverture (le livre
+    // encore petit), la base était trop petite, et le dézoom allait en dessous.
+    if (etat.dansLeLivre && ecran && ecran.offsetWidth && ecran.offsetHeight)
+        return { l: ecran.offsetWidth, h: ecran.offsetHeight, gauche: (r && r.left) || 0, haut: (r && r.top) || 0 };
     return { l: (r && r.width) || window.innerWidth, h: (r && r.height) || window.innerHeight,
              gauche: (r && r.left) || 0, haut: (r && r.top) || 0 };
 }

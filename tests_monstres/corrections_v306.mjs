@@ -199,7 +199,7 @@ await section(async () => {
     reste: document.querySelectorAll(".page-manuscrite").length, n: window.grimoireEtat().nbPages, sons: window.__sons.map(x => x[0]), clics: window.__clics }));
   const tournes = r.etats.filter(e => e === "flipping").length;
   verifier("le livre les tourne une à une (de vraies tournes de pages, souples)", tournes >= 3, `${tournes} tournes`);
-  verifier("… très vite (0,15 s la page), puis le réglage revient (0,5 s)", r.durees.some(x => x === 150) && r.apres === 500, JSON.stringify([...new Set(r.durees)]));
+  verifier("… très vite (0,12 s la page depuis la v310), puis le réglage revient (0,5 s)", r.durees.some(x => x === 120) && r.apres === 500, JSON.stringify([...new Set(r.durees)]));
   verifier("arrivé au récit : les vraies pages sont revenues, les feuillets repartis", r.page === 9 && r.reste === 0 && r.n === n0, JSON.stringify({ page: r.page, reste: r.reste, n: r.n, n0 }));
   verifier("un seul bruit (les pages qui défilent), pas de clic", r.sons.join(",") === "pages-defilent" && r.clics === 0, r.sons.join(","));
   // En arrière : le marque-page de l'index.

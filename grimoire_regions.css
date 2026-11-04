@@ -3,11 +3,12 @@
    ========================================================================= */
 /* Les pages : la carte sur la page de droite (portrait) ou sur la double page
    (paysage) ; le nom de la région à la plume sur la page de gauche. */
-.page-region .region-place { position: absolute; display: flex; align-items: center; justify-content: center; }
-.page-region .region-carte-img.contenue { width: 100%; height: 100%; object-fit: contain; object-position: 50% 50%;
-  filter: sepia(0.12) drop-shadow(0 calc(var(--u) * 0.4) calc(var(--u) * 0.8) rgba(60, 35, 15, 0.35)); }
 .page-region .region-moitie { position: absolute; inset: 0; overflow: hidden; }
-.page-region .region-moitie .region-carte-img { position: absolute; max-width: none; filter: sepia(0.12); }
+/* (v310) La boîte exacte de l'image : son bord brûlé (bords_parchemin.js) s'y pose. */
+.page-region .region-carte-cadre { position: absolute; }
+.page-region .region-carte-cadre .region-carte-img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; max-width: none; display: block; }
+/* Sous la carte vivante, l'image de la page s'efface : un trou brûlé montre le papier du livre. */
+.page-region.sous-la-vue .region-carte-cadre { visibility: hidden; }
 .region-titre-page { position: absolute; left: 10%; right: 10%; top: 30%; display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 1.6); text-align: center; }
 .region-sur { font-family: 'IM Fell English', 'Almendra', serif; font-style: italic; font-size: calc(var(--u) * 3.6); color: rgba(58, 34, 16, 0.75); letter-spacing: 0.08em; }
 .region-nom { font-family: 'Almendra', serif; font-weight: 700; font-style: italic; font-size: calc(var(--u) * 8.4); line-height: 1.1; color: #1d1209;
@@ -25,8 +26,16 @@
 .vue-carte-region.dans-le-livre #carte-region-table, .vue-carte-region.dans-le-livre .table-ombre,
 .vue-carte-region.dans-le-livre #carte-region-dessus { display: none !important; }
 .vue-carte-region.dans-le-livre.en-tourne { visibility: hidden; }
+/* L'OMBRE DE LA PLIURE PAR-DESSUS LA CARTE VIVANTE (v310) : la même que celle
+   des pages (grimoire.css, .page-papier::after) — 40 % de chaque page, du dos
+   vers l'extérieur ; la carte paraît épouser le creux du livre. */
+.region-pliure { position: absolute; left: 30%; top: 0; width: 40%; height: 100%; z-index: 42; pointer-events: none; display: flex; }
+.region-pliure i { flex: 1; mix-blend-mode: multiply; }
+.region-pliure .gauche { background: linear-gradient(to left, rgba(36, 18, 3, 0.72) 0%, rgba(44, 22, 5, 0.52) 4%, rgba(54, 28, 7, 0.34) 12%,
+                                     rgba(64, 36, 10, 0.2) 25%, rgba(70, 40, 12, 0.08) 50%, rgba(70, 40, 12, 0) 100%); }
+.region-pliure .droite { background: linear-gradient(to right, rgba(36, 18, 3, 0.72) 0%, rgba(44, 22, 5, 0.52) 4%, rgba(54, 28, 7, 0.34) 12%,
+                                      rgba(64, 36, 10, 0.2) 25%, rgba(70, 40, 12, 0.08) 50%, rgba(70, 40, 12, 0) 100%); }
+.region-pliure:not(.paysage) .gauche { visibility: hidden; }
 .region-titre-livre { position: absolute; left: 0; top: 0; width: 50%; height: 100%; z-index: 45; pointer-events: none; }
 .region-titre-livre.en-tourne { visibility: hidden; }
-/* Le bouton du voyage, sur les cartes du livre : à gauche des petits boutons
-   du haut (le volume, la maison, quitter). */
-#ecran-jeu.livre-leve.livre-carte .btn-voyage { width: 46px; min-width: 46px; max-width: 46px; }
+/* (v310) Le bouton du voyage n'est plus sur le livre : le marque-page de la marche le remplace (grimoire.css). */

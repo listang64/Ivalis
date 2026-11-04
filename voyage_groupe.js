@@ -1359,6 +1359,13 @@ const IMAGE_CROIX_CHAT = "data:image/svg+xml;utf8," + encodeURIComponent(
     + `<path d="M21 21 L43 43 M43 21 L21 43" stroke="#5c3a21" stroke-width="6" stroke-linecap="round"/></svg>`);
 window.chatOuvertVoyage = chatOuvert;
 window.actualiserBoutonVoyage = () => actualiserBouton();
+// (v310) Le marque-page de la marche, sur le livre (grimoire_regions.js) : il
+// ne sort que quand on peut voyager — une partie, ni voyage en route, ni combat.
+window.etatVoyageLivre = () => {
+    const combat = combatEnCours(), actif = !!(choix && choix.type === "voyage");
+    return { possible: !!window.ID_PARTIE_COURANTE && !voyage && !combat, actif, occupe: !!voyage, bloque: combat,
+             titre: actif ? "Annuler le voyage" : "Voyager" };
+};
 function actualiserBouton() {
     const b = bouton();
     if (!b) return;

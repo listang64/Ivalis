@@ -29,7 +29,8 @@
 #ecran-grimoire.en-partie .grimoire-invite { display: none; }
 #ecran-jeu.livre-leve #menu-lateral, #ecran-jeu.livre-leve #btn-rouvrir-menu, #ecran-jeu.livre-leve #affichage-tokens,
 #ecran-jeu.livre-leve #btn-fermer-chat-nouveau, #ecran-jeu.livre-leve #fenetre-chatbox,
-#ecran-jeu.livre-leve:not(.livre-carte) .btn-voyage, #ecran-jeu.livre-leve .btn-retour-monde { display: none !important; }
+/* v310 : sur le livre, le marque-page de la marche remplace le bouton du voyage. */
+#ecran-jeu.livre-leve .btn-voyage, #ecran-jeu.livre-leve .btn-retour-monde { display: none !important; }
 /* (v308) Le voyage revient dans le livre : son bouton sur les cartes du livre
    (grimoire_regions.js, .livre-carte), ses fenêtres (le vote, la nuit, la halte,
    le jour qui passe) par-dessus le livre, comme les autres anciennes fenêtres. */
@@ -314,6 +315,19 @@
 .marque-page.marque-terre .marque-papier { background-position: 45% 60%; }
 .marque-page.marque-terre:not(.inactif):hover, .marque-page.marque-terre:not(.inactif):focus-visible { transform: rotate(7deg) translateY(-6%); }
 .marque-page.marque-terre:not(.inactif):active { transform: rotate(8deg) translateY(-3%) scale(0.98); }
+/* LE MARQUE-PAGE DE LA MARCHE (v310), en haut à droite du livre : rangé sous
+   les pages tant qu'on ne peut pas voyager ; il sort sur les cartes du livre. */
+.marque-page.marque-marche { left: calc(1636px * var(--s, 1)); top: calc(-22px * var(--s, 1)); width: calc(62px * var(--s, 1)); height: calc(190px * var(--s, 1)); transform: rotate(-8deg); }
+.marque-page.marque-marche .marque-papier { background-position: 20% 75%; }
+.marque-page.marque-marche:not(.inactif):hover, .marque-page.marque-marche:not(.inactif):focus-visible { transform: rotate(-6deg) translateY(-6%); }
+.marque-page.marque-marche:not(.inactif):active { transform: rotate(-7deg) translateY(-3%) scale(0.98); }
+.marque-page.marque-marche.inactif { transform: translateY(calc(110px * var(--s, 1))) rotate(-8deg); }
+/* On choisit sa destination : il sort un peu plus, doré (on le retouche pour annuler). */
+.marque-page.marque-marche.choix:not(.inactif) { transform: rotate(-6deg) translateY(-9%);
+  filter: drop-shadow(0 0 calc(var(--u) * 1) rgba(255, 196, 92, 0.95)) drop-shadow(calc(var(--u) * 0.25) calc(var(--u) * 0.5) calc(var(--u) * 0.6) rgba(40, 20, 6, 0.55)); }
+.dessin-pas .feuille { stroke-width: 1.1; fill: rgba(18, 11, 6, 0.16); }
+.dessin-pas .orteil { fill: rgba(18, 11, 6, 0.55); stroke: #120b06; stroke-width: 0.5; }
+.dessin-pas .chemin { stroke-dasharray: 2.2 3.4; opacity: 0.7; }
 .dessin-terre circle { stroke: #120b06; stroke-width: 2.1; stroke-linecap: round; }
 .dessin-terre .feuille { fill: rgba(255, 246, 222, 0.25); }
 .dessin-terre .coin { fill: rgba(18, 11, 6, 0.18); }

@@ -295,6 +295,18 @@
                   <path class="coin" d="M 35 30 C 39 27 45 29 46 34 C 47 40 43 45 38 47 C 35 48 33 44 35 41 C 37 38 32 34 35 30 Z"/>
                   <path class="ligne" d="M 22 66 C 26 64 34 64 38 66 M 30 59 L 30 66"/></svg>`;
     }
+    // Le dessin du marque-page de la marche (v310) : des pas de sandales qui
+    // montent, à l'encre, le long d'un chemin en pointillé.
+    function dessinPas() {
+        // Un pied (sa semelle et ses orteils), dessiné à l'origine puis posé, agrandi.
+        const pied = (cx, cy, sens, angle) => `<g transform="translate(${cx} ${cy}) rotate(${angle}) scale(${sens * 1.75} 1.75)">`
+            + `<path class="feuille" d="M -3.6 8 C -5.6 2 -4.8 -5 0.2 -6.6 C 4.6 -5.4 4.8 1.5 3 8 C 2 11 -2.6 11 -3.6 8 Z"/>`
+            + [[-3.4, -9.4, 1.5], [-0.6, -10.6, 1.3], [1.8, -10.2, 1.15], [3.6, -8.8, 1]].map(([x, y, r]) => `<circle class="orteil" cx="${x}" cy="${y}" r="${r}"/>`).join("")
+            + `</g>`;
+        return `<svg class="dessin-marque dessin-pas" viewBox="0 0 60 80" aria-hidden="true">
+                  <path class="ligne chemin" d="M 14 78 C 18 66 26 60 24 52 C 22 42 34 36 38 28"/>
+                  ${pied(19, 54, -1, -10)}${pied(40, 28, 1, 12)}</svg>`;
+    }
     function pageCarte(cote) {
         const el = document.createElement("div");
         el.className = `page-grimoire page-papier ${cote} page-carte`;
@@ -461,6 +473,9 @@
             <button type="button" class="marque-page marque-terre inactif" id="grimoire-marque-carte" data-action="marque-carte"
                     aria-label="Aller à la carte du monde" aria-disabled="true" title="La carte du monde (en partie)">
               <span class="marque-papier">${dessinTerre()}</span></button>
+            <button type="button" class="marque-page marque-marche inactif" id="grimoire-marque-marche" data-action="marque-marche"
+                    aria-label="Voyager" aria-disabled="true" title="Voyager">
+              <span class="marque-papier">${dessinPas()}</span></button>
             <div class="grimoire-livre" id="grimoire-livre">
               <div class="page-grimoire page-couverture" data-density="hard" id="grimoire-page-0">
                 <img src="${IMAGES.couverture}" alt="Les Chroniques d'Ivalis" draggable="false"></div>
@@ -928,7 +943,8 @@
         defiler(ici, cible);
     }
     const planche = (p) => Math.floor((p + 1) / 2);         // 0 la couverture, 1 les pages 1-2, 2 les pages 3-4…
-    const DEFILE = { tourne: 150, min: 2, max: NB_FEUILLETS / 2 };
+    // v310 : Nico, « fais défiler un tout petit peu plus vite » — 0,12 s la page (0,15 s avant).
+    const DEFILE = { tourne: 120, min: 2, max: NB_FEUILLETS / 2 };
     function defiler(ici, cible) {
         const vrai = listeActuelle.slice();
         const sI = planche(ici), sC = planche(cible), enAvant = sC > sI;
@@ -1054,6 +1070,14 @@
             if (action === "marque-page") allerIndex();
             else if (action === "marque-carte") allerALaCarte();
             else if (window.GRIMOIRE_RECIT) (window.GRIMOIRE_RECIT.marqueDuRecit || window.GRIMOIRE_RECIT.allerAuRecit)();   // (v307) deux fois : le sommaire
+            return;
+        }
+        // (v310) LE MARQUE-PAGE DE LA MARCHE : Nico, « remplace le bouton de marche
+        // par un marque-page en haut à droite du livre, qui ne se montre que
+        // quand il peut être utilisé » (grimoire_regions.js l'allume).
+        if (action === "marque-marche") {
+            if (!enPartie || cible.classList.contains("inactif")) return;   // (pas de son : v304)
+            if (typeof window.basculerModeVoyage === "function") window.basculerModeVoyage();
             return;
         }
         if (action === "index") { choisirIndex(cible.dataset.entree); return; }

@@ -59,31 +59,54 @@
     }
     // L'image posée « contenue » dans sa place, en pourcentages de chaque page.
     // En largeurs de page : une page fait 1 de large et H de haut ; la place de la
-    // carte va de MARGE.x à 2 − MARGE.x, et de MARGE.y·H à H − MARGE.y·H.
-    function imagesPaysage(r) {
-        const H = 984 / 757;
-        const L = 2 - 2 * MARGE.x, P = H * (1 - 2 * MARGE.y);
-        let w = L, h = L / r.aspect;
-        if (h > P) { h = P; w = P * r.aspect; }
-        const x0 = MARGE.x + (L - w) / 2, y0 = MARGE.y * H + (P - h) / 2;
+    // carte va de MARGE.x à 2 − MARGE.x (paysage) ou de 1 + MARGE.x à 2 − MARGE.x
+    // (portrait, la page de droite), et de MARGE.y·H à H − MARGE.y·H.
+    // (v310) Une boîte exacte (plus d'object-fit) : le bord brûlé s'y pose.
+    function boitesImage(r) {
+        const H = 984 / 757, aspect = r.aspect || 1;
+        const debut = paysage(r) ? MARGE.x : 1 + MARGE.x;
+        const L = 2 - MARGE.x - debut, P = H * (1 - 2 * MARGE.y);
+        let w = L, h = L / aspect;
+        if (h > P) { h = P; w = P * aspect; }
+        const x0 = debut + (L - w) / 2, y0 = MARGE.y * H + (P - h) / 2;
         const commun = { top: (y0 / H * 100) + "%", width: (w * 100) + "%", height: (h / H * 100) + "%" };
         return { gauche: { left: (x0 * 100) + "%", ...commun }, droite: { left: ((x0 - 1) * 100) + "%", ...commun } };
     }
     const style = (o) => Object.entries(o).map(([k, v]) => `${k}:${v}`).join(";");
     const TRAIT = `<svg class="region-trait" viewBox="0 0 200 20" aria-hidden="true"><path d="M4 12 C40 4 70 16 100 10 C130 4 160 15 196 8"/><path d="M92 13 C98 9 102 9 108 13"/></svg>`;
+    const carteImg = (url, boite, alt) => `<div class="region-moitie"><div class="region-carte-cadre" style="${style(boite)}"><img class="region-carte-img" src="${url}" alt="${alt}" draggable="false"></div></div>`;
     function remplir(r) {
         const [g, d] = r.pages;
         const nom = echapper(r.nom), url = echapper(r.url);
+        const boites = boitesImage(r);
         g.classList.toggle("paysage", paysage(r)); d.classList.toggle("paysage", paysage(r));
         if (paysage(r)) {
-            const im = imagesPaysage(r);
-            g.innerHTML = `<div class="region-moitie"><img class="region-carte-img" src="${url}" alt="" draggable="false" style="${style(im.gauche)}"></div>
-                           <div class="region-titre-sur-carte"><span class="region-nom">${nom}</span>${TRAIT}</div>`;
-            d.innerHTML = `<div class="region-moitie"><img class="region-carte-img" src="${url}" alt="" draggable="false" style="${style(im.droite)}"></div>`;
+            g.innerHTML = carteImg(url, boites.gauche, "") + `<div class="region-titre-sur-carte"><span class="region-nom">${nom}</span>${TRAIT}</div>`;
+            d.innerHTML = carteImg(url, boites.droite, "");
         } else {
             g.innerHTML = `<div class="region-titre-page"><span class="region-sur">Carte de la région</span><span class="region-nom">${nom}</span>${TRAIT}</div>`;
-            d.innerHTML = `<div class="region-place" style="inset:${MARGE.y * 100}% ${MARGE.x * 100}%"><img class="region-carte-img contenue" src="${url}" alt="${nom}" draggable="false"></div>`;
+            d.innerHTML = carteImg(url, boites.droite, nom);
         }
+        r.usureSig = null;
+        bruler(r);
+    }
+    // LE PARCHEMIN BRÛLÉ SUR LES PAGES (v310). Nico : « l'effet de brûlure de la
+    // map au pinceau se fait très très mal sur la page ». La carte vivante est
+    // brûlée (bords_parchemin.js) mais l'image de la page, dessous, ne l'était
+    // pas : chaque trou montrait la carte intacte. Les pages portent maintenant
+    // le même bord (même graine, même usure), et sous la carte vivante leur image
+    // s'efface : les trous montrent le papier du livre.
+    function bruler(r) {
+        const fiche = window.CARTES_REGIONALES && window.CARTES_REGIONALES[r.numero];
+        const usure = (fiche && fiche.usure) || null;
+        const sig = JSON.stringify([usure, r.aspect || 0]);
+        if (r.usureSig === sig || !window.BordsParchemin || !r.aspect) return;
+        r.usureSig = sig;
+        const graine = typeof window.graineParcheminRegion === "function" ? window.graineParcheminRegion(r.numero) : r.numero;
+        r.pages.forEach(pg => pg.querySelectorAll(".region-carte-cadre").forEach(cadre => {
+            window.BordsParchemin.appliquer(cadre, { graine, aspect: r.aspect, cote: 2048, apres: cadre.querySelector("img"), zones: usure })
+                .catch(e => console.error("Le livre : le bord de la carte", e));
+        }));
     }
     function pagePour(r, cote) {
         const el = document.createElement("div");
@@ -112,6 +135,8 @@
         if (!g || !g.enPartie()) return;
         const liste = voulues();
         const sig = liste.map(x => `${x.zone}:${x.numero}:${x.carte.image}:${x.carte.nom}`).join("|");
+        // (v310) L'usure validée en DEV : les pages se brûlent à nouveau.
+        regions.forEach(bruler);
         if (sig === signature) return;
         signature = sig;
         const anciennes = regions;
@@ -121,7 +146,8 @@
             r.nom = x.carte.nom; r.url = urlDe(x.carte);
             if (!r.pages) r.pages = [pagePour(r, "gauche"), pagePour(r, "droite")];
             lireAspect(r);
-            remplir(r);
+            const rendu = r.url + "|" + r.nom;
+            if (r.rendu !== rendu) { r.rendu = rendu; remplir(r); }
             return r;
         });
         g.definirRegions(regions.flatMap(r => r.pages));
@@ -183,6 +209,25 @@
         ["left", "top", "width", "height"].forEach(k => { vue.style[k] = ""; });
     }
 
+    function allumerMarche(oui, actif, titre) {
+        const m = $("grimoire-marque-marche");
+        if (!m) return;
+        m.classList.toggle("inactif", !oui);
+        m.classList.toggle("choix", oui && actif);
+        m.setAttribute("aria-disabled", String(!oui));
+        if (m.title !== titre) m.title = m.ariaLabel = titre;
+    }
+    // L'ombre de la pliure (v310). Nico : « sur les maps régionales sur les deux
+    // pages, mets l'ombre de la pliure du livre par-dessus l'image, comme si
+    // l'image épousait la page ». La même que celle des pages (grimoire.css).
+    function poserPliure(r) {
+        let el = $("region-pliure");
+        if (!r) { if (el) el.remove(); return; }
+        if (!el) { el = document.createElement("div"); el.id = "region-pliure"; el.className = "region-pliure"; el.innerHTML = `<i class="gauche"></i><i class="droite"></i>`; }
+        if (el.parentNode !== G().livre()) G().livre().appendChild(el);
+        el.classList.toggle("paysage", paysage(r));
+    }
+    let tailleVue = "";
     let etaitEnPartie = false, posee = true;
     function veiller() {
         const g = G();
@@ -193,6 +238,8 @@
             if (etaitEnPartie) {
                 etaitEnPartie = false; signature = ""; regions = []; ouvertureFaite = false;
                 if (typeof window.placerOutilsRegionDev === "function") window.placerOutilsRegionDev(false);
+                allumerMarche(false, false, "Voyager");
+                poserPliure(null);
                 const jeu = $("ecran-jeu");
                 if (jeu) jeu.classList.remove("livre-carte");
                 demonter().then(rendreLaVue);
@@ -203,6 +250,8 @@
         etaitEnPartie = true;
         construire();
         const pf = g.pageFlip();
+        // (v310) Une page qui part : la carte vivante et sa pliure se cachent tout de suite.
+        if (pf && !pf.__veilleRegions) { pf.__veilleRegions = true; try { pf.on("changeState", () => setTimeout(veiller, 0)); } catch (e) {} }
         const lu = !!pf && pf.getState() === "read" && !(g.defileEnCours && g.defileEnCours());
         const vue = $("vue-carte-region");
         if (vue) vue.classList.toggle("en-tourne", !lu && !!montee);
@@ -221,14 +270,21 @@
         const jeu = $("ecran-jeu");
         const carteDuLivre = !!(surLaCarteDuMonde() || (r && montee === r.numero));
         if (jeu) jeu.classList.toggle("livre-carte", carteDuLivre);
-        // Le bouton se range à gauche des petits boutons du haut.
-        const bv = $("btn-voyage"), nav = $("menu-navigation-bas");
-        if (bv) {
-            const nr = carteDuLivre && nav ? nav.getBoundingClientRect() : null;
-            bv.style.top = nr && nr.width ? nr.top + "px" : "";
-            bv.style.right = nr && nr.width ? (window.innerWidth - nr.left + 10) + "px" : "";
-        }
         if (typeof window.actualiserBoutonVoyage === "function") window.actualiserBoutonVoyage();
+        // (v310) Le bouton du voyage devient un marque-page, en haut à droite du
+        // livre : il ne sort que sur ses cartes, et quand on peut voyager.
+        const ev = typeof window.etatVoyageLivre === "function" ? window.etatVoyageLivre() : null;
+        allumerMarche(carteDuLivre && !!ev && ev.possible, !!ev && ev.actif, ev ? ev.titre : "Voyager");
+        // (v310) La pliure du livre par-dessus la carte vivante ; sous elle, l'image
+        // de la page s'efface (ses trous brûlés montrent le papier, pas la carte).
+        regions.forEach(x => x.pages.forEach(pg => pg.classList.toggle("sous-la-vue", lu && montee === x.numero)));
+        poserPliure(lu && montee && r && montee === r.numero ? r : null);
+        // (v310) La place de la carte a changé de taille (écran tourné, livre posé) : on recadre.
+        if (vue && montee) {
+            const taille = vue.offsetWidth + "x" + vue.offsetHeight;
+            if (taille !== tailleVue && typeof window.recadrerCarteRegionale === "function") window.recadrerCarteRegionale();
+            tailleVue = taille;
+        }
     }
 
     // --- ALLER À UNE RÉGION, REVENIR AU MONDE ---------------------------------

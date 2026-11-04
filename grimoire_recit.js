@@ -544,7 +544,9 @@ function creerElements() {
     avatars.className = "recit-avatars";
     avatars.id = "recit-avatars";
     const papier = (id, idImage, idNom) => `<div class="papier-avatar" id="${id}"><div class="papier-usure"><div class="cadre-portrait" id="${idImage}"></div><div class="nom-portrait" id="${idNom}"></div></div></div>`;
-    avatars.innerHTML = papier("recit-avatar", "recit-avatar-image", "recit-avatar-nom") + papier("recit-portrait", "recit-portrait-image", "recit-portrait-nom");
+    avatars.innerHTML = papier("recit-avatar", "recit-avatar-image", "recit-avatar-nom") + papier("recit-portrait", "recit-portrait-image", "recit-portrait-nom")
+        // v310 : les couches hautes de la tranche, par-dessus les papiers.
+        + `<div class="recit-tranche" aria-hidden="true"></div>`;
     scene.insertBefore(avatars, document.getElementById("grimoire-marque-page") || livre);
     const portrait = avatars.querySelector("#recit-portrait"), avatar = avatars.querySelector("#recit-avatar");
     const notes = document.createElement("div");

@@ -10263,3 +10263,55 @@ seul Vargen, la race inventée, les peuples restants, l'interdit), la recherche
 d'un peuple dans un texte, un combat forcé jusqu'aux pions (le Grimoire relu,
 la règle de MIA_ENNEMIS, l'apparence ajoutée aux pions vargens et pas au loup),
 monstres.js et les versions. Il échoue sur la v308 (14 échecs).
+
+## v310 — Papier d'avatar entre les feuillets, défilement plus vif, pliure et brûlures sur les cartes du livre, marque-page de la marche
+
+Nico : « l'image des avatars sur le bord gauche : le double en hauteur et
+toujours coincée dans les pages du dessous ; enlève la bordure cadre, juste un
+vieux morceau de parchemin qui dépasse ; le nom en titre, gros, en bas » ;
+« le défilement rapide : un tout petit peu plus vite » ; « sur les maps
+régionales sur les deux pages, l'ombre de la pliure par-dessus l'image » ;
+« remplace le bouton de marche par un marque-page en haut à droite du livre,
+qui ne se montre que quand il peut être utilisé » ; « au dézoom d'une carte
+régionale, pas plus petit que l'image à l'ouverture de la page » ; « l'effet de
+brûlure au pinceau se fait très très mal sur la page ».
+
+- Les papiers d'avatar (grimoire_recit.css/js) : le portrait fait 2,5 fois sa
+  largeur en hauteur (deux fois l'ancien), sans cadre ni ombre, ses bords fondus
+  dans le parchemin (masque radial, image en « multiply ») ; le nom en titre
+  (Almendra, 5,2 % de page) en bas. Les couches hautes de la tranche (x 200 →
+  251 de l'image du livre, .recit-tranche) repassent par-dessus les papiers :
+  ils sortent d'entre les feuillets ; leur contenu se centre sur la part visible,
+  une ombre marque l'entrée sous les feuillets.
+- Le défilement des pages (grimoire.js) : 0,12 s la page (0,15 s avant).
+- La pliure (grimoire_regions.js/css) : #region-pliure, posée dans le livre
+  par-dessus la carte vivante (z 42), la même ombre que les pages ; les deux
+  moitiés en paysage, la droite seule en portrait ; elle part pendant les
+  tournes (la veille suit maintenant les changements d'état du livre).
+- Les brûlures : sous la carte vivante, l'image de la page (intacte) se voyait
+  dans chaque trou brûlé — d'où « très très mal ». Les images des pages sont
+  maintenant dans une boîte exacte (.region-carte-cadre, plus d'object-fit) qui
+  porte le même bord de parchemin (bords_parchemin.js, même graine, même usure,
+  rebrûlée quand l'usure validée change) ; sous la carte vivante, elles
+  s'effacent (.sous-la-vue) : les trous montrent le papier du livre. Pendant une
+  tourne, c'est la page brûlée qu'on voit.
+- Le dézoom (cartes_regionales.js) : dans le livre, la taille de la place de la
+  carte se lit sans le zoom de la scène (offsetWidth/Height) — mesurée pendant
+  l'ouverture du livre, la base était trop petite et le dézoom allait sous la
+  taille de la page. La veille recadre aussi quand cette place change de taille.
+- Le marque-page de la marche (grimoire.js/css, voyage_groupe.js) :
+  #grimoire-marque-marche, des pas de sandales à l'encre, en haut à droite du
+  livre (x 1636). window.etatVoyageLivre() dit s'il sert : une partie, ni voyage
+  en route, ni combat. Il sort sur les cartes du livre (le monde, une région),
+  rentré ailleurs ; le toucher bascule le choix de la destination (doré pendant
+  le choix, retouché il annule). Le bouton du voyage est caché sur le livre.
+
+corrections_v310.mjs (dans la suite) vérifie la pliure (paysage, portrait,
+pendant une tourne, la carte toujours touchable), les pages brûlées (bord sur
+chaque image, effacées sous la carte vivante, rebrûlées après validation, un
+trou qui montre le papier — au pixel —, revenues pendant une tourne), le dézoom
+borné (mesuré pendant l'ouverture, à la molette), le marque-page de la marche
+(place, toucher, annulation, combat, monde, récit), les papiers d'avatar
+(hauteur, sans cadre, nom en bas, la tranche par-dessus, celui d'un nom touché)
+et le défilement. Il échoue sur la v309 (18 échecs). Tests mis à jour : v306
+(le défilement à 0,12 s).
