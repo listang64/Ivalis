@@ -358,9 +358,11 @@ await section(async () => {
              tranche: tr ? { l: r(tr).left, r: r(tr).right, fond: getComputedStyle(tr).backgroundImage.slice(0, 80) } : null,
              x175: scene.left + 200 * s, x251: scene.left + 251 * s, livre: { t: r(document.getElementById("grimoire-livre")).top, b: r(document.getElementById("grimoire-livre")).bottom } };
   });
-  verifier("le portrait est deux fois plus haut qu'avant (hauteur 2,5 × sa largeur, au lieu de 1,08 ; sa hauteur au moins 1,7 × l'ancienne)", Math.abs(a.ratio - 2.5) < 0.05 && a.hCadre >= 1.7 * a.ancienne, `${a.ratio.toFixed(2)}, ${a.hCadre.toFixed(0)} px / avant ${a.ancienne.toFixed(0)} px`);
-  verifier("sans cadre : ni bordure ni ombre autour de l'image, ses bords fondus dans le parchemin", a.ombreCadre === "none" && a.bordCadre === "0px" && /radial-gradient/.test(a.masque) && a.img, `${a.ombreCadre} / ${a.bordCadre} / ${a.masque.slice(0, 30)}`);
-  verifier("le nom en titre, gros, en bas du papier (sous l'image)", a.nom.t >= a.imgBas && a.nom.b <= a.hPapier && a.nom.taille >= a.uPx * 5 - 0.5 && a.nom.texte === "Thorin Ironfoot", JSON.stringify(a.nom) + " u=" + a.uPx);
+  // (v312 : l'image descend jusqu'au bord déchiré, 2,6 × sa largeur)
+  verifier("le portrait est deux fois plus haut qu'avant (2,6 × sa largeur depuis la v312 ; au moins 1,7 × l'ancienne hauteur)", Math.abs(a.ratio - 2.6) < 0.05 && a.hCadre >= 1.7 * a.ancienne, `${a.ratio.toFixed(2)}, ${a.hCadre.toFixed(0)} px / avant ${a.ancienne.toFixed(0)} px`);
+  verifier("sans cadre : ni bordure ni ombre autour de l'image, ses bords fondus dans le parchemin", a.ombreCadre === "none" && a.bordCadre === "0px" && /gradient/.test(a.masque) && a.img, `${a.ombreCadre} / ${a.bordCadre} / ${a.masque.slice(0, 30)}`);
+  // (v312 : le nom, doré, se pose en bas SUR l'image, sur une ligne ajustée à la largeur)
+  verifier("le nom en titre, en bas du papier (v312 : posé sur l'image, une seule ligne)", a.nom.b <= a.hPapier && a.nom.b > a.hPapier * 0.8 && a.nom.texte === "Thorin Ironfoot", JSON.stringify(a.nom) + " u=" + a.uPx);
   verifier("le papier tient dans la hauteur du livre", a.papier.t > a.livre.t && a.papier.b < a.livre.b, `${a.papier.t.toFixed(0)} → ${a.papier.b.toFixed(0)} (livre ${a.livre.t.toFixed(0)} → ${a.livre.b.toFixed(0)})`);
   verifier("les feuillets du dessus (la tranche, x 200 → 251 du livre) repassent par-dessus le papier", !!a.tranche && Math.abs(a.tranche.l - a.x175) < 2 && Math.abs(a.tranche.r - a.x251) < 2 && /livre_ouvert/.test(a.tranche.fond), JSON.stringify(a.tranche));
   const pile = await p.evaluate(() => { const e = document.getElementById("recit-avatars"), tr = e.querySelector(".recit-tranche");
@@ -375,7 +377,7 @@ await section(async () => {
   const c = await centre('#grimoire-livre .nom-livre[data-nom="Varos"]');
   if (c) { await p.mouse.click(c.x, c.y); await p.waitForTimeout(800); }
   const vu = await p.evaluate(() => { const v = document.getElementById("recit-portrait"); return { sortie: v.classList.contains("sortie"), ratio: v.querySelector(".cadre-portrait").offsetHeight / v.querySelector(".cadre-portrait").offsetWidth, nom: v.querySelector(".nom-portrait").textContent }; });
-  verifier("un nom touché (Varos) : son papier, aussi haut, sort par-dessus", vu.sortie && Math.abs(vu.ratio - 2.5) < 0.05 && vu.nom === "Varos", JSON.stringify(vu));
+  verifier("un nom touché (Varos) : son papier, aussi haut, sort par-dessus", vu.sortie && Math.abs(vu.ratio - 2.6) < 0.05 && vu.nom === "Varos", JSON.stringify(vu));
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v310_papiers_avatar.png" });
 });
 

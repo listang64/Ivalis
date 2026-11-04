@@ -151,7 +151,7 @@ await section(async () => {
     await p.setViewportSize({ width: w, height: h });
     await p.waitForTimeout(400);
     const g = await p.evaluate(() => { const f = document.querySelector(".grimoire-fond-livre").getBoundingClientRect(); return { haut: f.top, bas: innerHeight - f.bottom, vh: innerHeight, w: f.width, vw: innerWidth }; });
-    verifier(`${w} × ${h} : une marge raisonnable au-dessus du livre, posé en bas`, g.haut >= g.vh * 0.1 && g.bas <= g.vh * 0.013 + 1 && g.w <= g.vw, `${g.haut.toFixed(0)} px au-dessus, ${g.bas.toFixed(0)} dessous`);
+    verifier(`${w} × ${h} : une marge raisonnable au-dessus du livre, posé en bas`, g.haut >= g.vh * 0.1 && g.bas <= g.vh * (g.vh < 900 ? 0.041 : 0.013) + 1 && g.w <= g.vw, `${g.haut.toFixed(0)} px au-dessus, ${g.bas.toFixed(0)} dessous`);   // (v312 : 4 % de marge en bas sous 900 px)
   }
 });
 
@@ -194,7 +194,7 @@ await section(async () => {
   await p.evaluate(() => window.grimoireAllerIndex());
   await p.waitForTimeout(900);
   const sou = await p.evaluate(() => [...document.querySelectorAll(".entree-index-texte")].map(t => decodeURIComponent(getComputedStyle(t).backgroundImage)));
-  verifier("l'index souligné à la plume : un trait d'encre sous chaque ligne, plus de jaune", sou.length === 6 && sou.every(s => /rgba\(20,12,6/.test(s) && !/236,190,60/.test(s)), sou.length);
+  verifier("l'index souligné à la plume : un trait d'encre sous chaque ligne, plus de jaune", sou.length === 5 && sou.every(s => /rgba\(20,12,6/.test(s) && !/236,190,60/.test(s)), sou.length);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v300_index.png" });
 });
 

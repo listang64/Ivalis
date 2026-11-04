@@ -559,6 +559,10 @@ function pageALire() {
 // ---------------------------------------------------------------------
 let elts = null;
 const SVG_PLUME = `<svg viewBox="0 0 40 40" aria-hidden="true"><path class="plein" d="M34 3 C24 8 15 18 11 31 C18 24 28 16 34 3 Z"/><path d="M34 3 C26 14 18 24 7 37"/></svg>`;
+// LA TÊTE QUI PARLE (v312) : Nico, « récupère le bouton du micro pour le mettre
+// au-dessus de la plume, dans l'encart où les joueurs écrivent ; un dessin en noir
+// dans le même style que la plume, d'un symbole de tête qui parle, discret ».
+const SVG_TETE_PARLE = `<svg viewBox="0 0 40 40" aria-hidden="true"><path class="plein" d="M9 33 C8 27 6 24 6.5 18 C7 10 13 5.5 19.5 6 C25 6.4 28.5 10.5 28.6 15.5 C28.7 17.5 30.5 19.5 30.6 20.6 C30.7 21.6 29 21.8 28.7 22.4 C28.5 23 29 24.6 28.4 25.4 C27.8 26.2 26.6 25.8 26.6 26.8 C26.6 28 27.4 29.6 25.8 30.4 C24.2 31.2 21 30.3 20.2 31.3 C19.6 32 19.8 33 19.8 34"/><path d="M32.5 13.5 C34.4 15.2 34.6 18.6 32.6 20.6"/><path d="M35.2 10.6 C38.6 13.8 38.8 20.6 35.4 23.8"/></svg>`;
 const SILHOUETTE = `<svg class="silhouette" viewBox="0 0 100 140" aria-hidden="true"><path d="M50 18 C64 18 70 30 69 42 C68 56 60 66 50 66 C40 66 32 56 31 42 C30 30 36 18 50 18 Z"/><path d="M14 136 C16 104 30 84 50 82 C70 84 84 104 86 136"/></svg>`;
 function creerElements() {
     const g = G();
@@ -597,6 +601,7 @@ function creerElements() {
     ecriture.innerHTML = `<form class="papier-ecriture" id="recit-form" novalidate>
         <div class="choix-heros" id="recit-choix-heros"></div>
         <textarea id="recit-saisie" rows="3" maxlength="900" placeholder="Ce que ton héros dit ou fait…"></textarea>
+        <button type="button" class="ecriture-micro" id="recit-micro" aria-label="Dicter à voix haute" title="Dicter à voix haute">${SVG_TETE_PARLE}</button>
         <button type="submit" class="ecriture-plume" id="recit-envoyer" aria-label="Écrire dans le livre">${SVG_PLUME}</button>
       </form>`;
     avantLivre(ecriture);                  // (v301) un marque-page : sous les pages, il sort par le haut
@@ -607,7 +612,12 @@ function creerElements() {
     elts = { portrait, avatar, avatars, notes, postit, ecriture, poussiere, saisie: ecriture.querySelector("textarea"), form: ecriture.querySelector("form") };
     elts.form.addEventListener("submit", (ev) => { ev.preventDefault(); envoyer(); });
     elts.saisie.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); envoyer(); } });
+    elts.micro = ecriture.querySelector("#recit-micro");
+    toucherVite(elts.micro, () => basculerDictee());
     toucherVite(postit, () => lancerNarrateur());
+    // (v312) Les papiers des avatars : un toucher ouvre la fiche du héros.
+    toucherVite(avatar, () => ouvrirFicheDuPapier(avatar));
+    toucherVite(portrait, () => ouvrirFicheDuPapier(portrait));
     // Les liens du récit (noms, chapitres) et le choix du héros : une seule
     // fois par scène (elle sert à toutes les parties).
     if (scene.__recit) return;
@@ -623,6 +633,68 @@ function creerElements() {
         return false;
     }, true);
 }
+// LA DICTÉE (v312). L'ancien bouton du chat (app.js, toggleMicro) récrivait, à
+// chaque phrase, seulement celle en cours : après une pause, ce qu'on venait de
+// dire s'effaçait (Nico : « si je faisais une pause, il effaçait tout ce que je
+// venais de dire au lieu d'ajouter à la suite »). Ici, on garde tout : le texte
+// d'avant, chaque phrase finie, et celle qu'on dit encore. Si le navigateur coupe
+// l'écoute sur un silence, elle reprend toute seule, à la suite, jusqu'au
+// prochain toucher.
+const dictee = { reco: null, voulue: false, base: "", finies: "" };
+const joindre = (a, b) => { a = a || ""; b = (b || "").trim(); if (!b) return a; return a + (a && !/\s$/.test(a) ? " " : "") + b; };
+window.texteDictee = (base, resultats) => {           // (pour les bancs) ce que la dictée écrit
+    let finies = "", enCours = "";
+    for (const r of resultats) { if (r.isFinal) finies = joindre(finies, r.texte); else enCours = joindre(enCours, r.texte); }
+    return joindre(joindre(base, finies), enCours);
+};
+function basculerDictee() {
+    if (!elts) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { elts.saisie.placeholder = "La dictée à voix haute demande Safari, Chrome ou Edge."; return; }
+    if (dictee.voulue) { arreterDictee(); return; }
+    dictee.voulue = true;
+    dictee.base = elts.saisie.value;
+    dictee.finies = "";
+    demarrerDictee(SR);
+    elts.micro.classList.add("ecoute");
+    son("page-prise", 0.4);
+}
+function demarrerDictee(SR) {
+    const reco = new SR();
+    reco.lang = "fr-FR"; reco.interimResults = true; reco.continuous = true;
+    reco.onresult = (ev) => {
+        // TOUS les résultats de la séance (pas seulement depuis resultIndex) : les phrases finies restent.
+        let finies = "", enCours = "";
+        for (let i = 0; i < ev.results.length; i++) {
+            const t = ev.results[i][0].transcript;
+            if (ev.results[i].isFinal) finies = joindre(finies, t); else enCours = joindre(enCours, t);
+        }
+        dictee.finies = finies;
+        elts.saisie.value = joindre(joindre(dictee.base, finies), enCours);
+    };
+    reco.onend = () => {
+        // Une pause a coupé l'écoute : on garde ce qui est dit, et on reprend à la suite.
+        dictee.base = joindre(dictee.base, dictee.finies);
+        dictee.finies = "";
+        if (dictee.voulue && elts) { try { demarrerDictee(SR); return; } catch (e) {} }
+        finirDictee();
+    };
+    reco.onerror = (ev) => { if (ev && (ev.error === "not-allowed" || ev.error === "service-not-allowed")) { dictee.voulue = false; finirDictee(); } };
+    dictee.reco = reco;
+    try { reco.start(); } catch (e) { dictee.voulue = false; finirDictee(); }
+}
+function arreterDictee() {
+    dictee.voulue = false;
+    if (dictee.reco) { try { dictee.reco.stop(); } catch (e) { try { dictee.reco.abort(); } catch (e2) {} } }
+    finirDictee();
+}
+function finirDictee() {
+    if (elts && elts.micro) elts.micro.classList.remove("ecoute");
+    if (!dictee.voulue) dictee.reco = null;
+    // (comme l'ancien bouton) l'iPad rend le volume du jeu une fois le micro fermé
+    setTimeout(() => { if (typeof window.appliquerVolumesAudio === "function") window.appliquerVolumesAudio(); }, 500);
+}
+
 // Un toucher ailleurs : le papier du nom touché rentre dans le livre (le sien reste).
 document.addEventListener("pointerdown", (ev) => {
     if (!elts || !elts.portrait.classList.contains("sortie")) return;
@@ -652,7 +724,29 @@ function remplirPapier(idImage, idNom, nom, h) {
     const cadre = document.getElementById(idImage);
     const voulu = url ? `<img src="${echapper(url)}" alt="${echapper(nom)}" draggable="false">` : SILHOUETTE;
     if (cadre.__voulu !== voulu) { cadre.innerHTML = voulu; cadre.__voulu = voulu; }
-    document.getElementById(idNom).textContent = h ? `${h.prenom} ${h.nom || ""}`.trim() : nom;
+    const el = document.getElementById(idNom), texte = h ? `${h.prenom} ${h.nom || ""}`.trim() : nom;
+    if (el.textContent !== texte) { el.textContent = texte; ajusterNom(el); }
+    else if (!el.__ajuste) ajusterNom(el);
+    // (v312) un héros : un toucher sur son papier ouvre sa fiche
+    const papier = cadre.closest(".papier-avatar");
+    if (papier) papier.dataset.heros = h ? h.idPersonnage : "";
+}
+// LE NOM SUR UNE LIGNE (v312) : sa taille se règle sur la largeur du papier.
+function ajusterNom(el) {
+    if (!el) return;
+    el.style.fontSize = "";
+    const largeur = el.clientWidth, voulue = el.scrollWidth;
+    if (!largeur) { el.__ajuste = false; return; }
+    el.__ajuste = true;
+    if (voulue > largeur) el.style.fontSize = (parseFloat(getComputedStyle(el).fontSize) * largeur / voulue * 0.97).toFixed(2) + "px";
+}
+window.addEventListener("resize", () => setTimeout(() => document.querySelectorAll(".papier-avatar .nom-portrait").forEach(ajusterNom), 300));
+function ouvrirFicheDuPapier(papier) {
+    const id = papier && papier.dataset.heros;
+    const h = id && herosDeLaPartie().find(p => p.idPersonnage === id);
+    if (!h || typeof window.ouvrirFichePerso !== "function") return;
+    son("page-prise", 0.5);
+    try { window.ouvrirFichePerso(h.idPersonnage, h.prenom, h.nom, h.couleur); } catch (e) { console.error("Le livre : la fiche", e); }
 }
 function montrerPortrait(nom) {
     if (!elts || !nom) return;
@@ -718,6 +812,12 @@ function majInterface() {
     const combat = etat.combat && ["preparation", "en_cours", "narration"].includes(etat.combat.Etat);
     const bloque = etat.verrou || attente.manquants.length > 0 || combat;
     const posee = pf && pf.getState() === "read";
+    // v312 — Nico : « quand on tourne la page du RP, l'encart de l'avatar, les
+    // post-its et l'encart pour écrire sursautent, comme s'ils s'enlevaient
+    // brièvement avant de reprendre leur place ; laisse-les juste en place ».
+    // Tant qu'une page tourne (ou que les pages défilent), ils ne bougent pas :
+    // on regarde de nouveau quand le livre s'est posé.
+    const fige = !posee || !!(g && g.defileEnCours && g.defileEnCours());
     const heros = monHeros();
     const recit = surLeRecit();
     // v307 : Nico, « quand un joueur écrit et que l'animation se joue, ne replie pas
@@ -727,7 +827,7 @@ function majInterface() {
     const ouvrir = recit && posee && !bloque && !ecrit && !!heros;
     elts.saisie.readOnly = !!etat.envoi;
     const etaitSorti = elts.ecriture.classList.contains("sortie");
-    elts.ecriture.classList.toggle("sortie", ouvrir);
+    if (!fige) elts.ecriture.classList.toggle("sortie", ouvrir);
     if (ouvrir && !etaitSorti && window.matchMedia && !window.matchMedia("(hover: none)").matches) setTimeout(() => { try { elts.saisie.focus({ preventScroll: true }); } catch (e) {} }, 450);
     if (heros) {
         elts.saisie.placeholder = `Ce que ${heros.prenom} dit ou fait…`;
@@ -741,11 +841,11 @@ function majInterface() {
     // (son tour, les dés qu'il attend, sa page qui s'écrit).
     if (etat.narrateurDemande && (etat.verrou || attente.manquants.length || Date.now() - etat.narrateurDemande > 15000)) etat.narrateurDemande = 0;
     const narrateurOccupe = !!etat.narrateurDemande || bloque || ecrit;
-    elts.postit.classList.toggle("sortie", recit && posee && !narrateurOccupe);
+    if (!fige) elts.postit.classList.toggle("sortie", recit && posee && !narrateurOccupe);
     if (etat.narrateurDemande) { clearTimeout(etat.revoirNarrateur); etat.revoirNarrateur = setTimeout(majInterface, 15200); }
     // (v306) Son papier : sorti tant qu'on est dans le récit, avec l'avatar de son héros.
     if (heros) remplirPapier("recit-avatar-image", "recit-avatar-nom", heros.prenom, heros);
-    elts.avatar.classList.toggle("sortie", !!(recit && posee && heros));
+    if (!fige) elts.avatar.classList.toggle("sortie", !!(recit && posee && heros));
     elts.avatars.classList.toggle("visible", !!(etat.actif && g && g.ouvert()));
     elts.postit.classList.toggle("eteint", narrateurOccupe || etat.envoi);
     elts.postit.disabled = narrateurOccupe || etat.envoi;
@@ -755,7 +855,7 @@ function majInterface() {
     // Une page encore en mouvement : on regarde de nouveau quand elle s'est posée
     // (l'événement de StPageFlip peut arriver avant son état « read »).
     clearTimeout(etat.revoir);
-    if (etat.actif && pf && !posee) etat.revoir = setTimeout(majInterface, 120);
+    if (etat.actif && pf && fige) etat.revoir = setTimeout(majInterface, 120);
 }
 // LE COMBAT DU RÉCIT (v278, combat_rp.js) : son bouton vivait dans l'ancien
 // parchemin du MJ ; dans le livre, une note rouge sort du haut du livre —
@@ -851,6 +951,7 @@ function lancerNarrateur() {
 // ---------------------------------------------------------------------
 async function envoyer() {
     if (!elts || etat.envoi) return;
+    if (dictee.voulue) arreterDictee();          // (v312) on écrit : la dictée s'arrête
     const texte = elts.saisie.value.trim();
     const heros = monHeros();
     if (!texte || !heros || !window.ID_PARTIE_COURANTE) return;
@@ -1003,7 +1104,11 @@ async function appelLite(systeme, texte, plume) {
     return t || null;
 }
 function reformuler(texte, heros) {
-    const qui = [heros.prenom, heros.nom].filter(Boolean).join(" ") + (heros.race ? ` (${heros.race}${heros.classe ? ", " + heros.classe : ""})` : "");
+    // (v312) son genre aussi : la plume accorde (« elle », « il »).
+    const fem = typeof window.estGenreFeminin === "function" ? window.estGenreFeminin(heros.genre) : /^f/i.test(String(heros.genre || ""));
+    const genre = heros.genre ? (fem ? "une femme — accorde au féminin" : "un homme") : "";
+    const details = [genre, heros.race, heros.classe && (typeof window.nomClasseGenre === "function" ? window.nomClasseGenre(heros.classe, heros.genre) : heros.classe)].filter(Boolean).join(", ");
+    const qui = [heros.prenom, heros.nom].filter(Boolean).join(" ") + (details ? ` (${details})` : "");
     return appelLite(PROMPT_NARRATEUR_LITE, `LES DERNIÈRES LIGNES DU LIVRE (tu continues la dernière) :\n${dernieresLignes(4) || "(le livre commence)"}\n\nLE HÉROS : ${qui}\nCE QU'ÉCRIT SON JOUEUR : ${texte}`, true);
 }
 // Le Destin et le Maître du Temps : un seul poste récrit chaque annonce

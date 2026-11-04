@@ -6250,3 +6250,9 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 .bloc-stat-final.jet-demande .icone-d20-stat { animation: jet-demande-lueur 1.4s ease-in-out infinite; border-radius: 50%; }
 .bloc-stat-final.jet-demande .titre-stat-final { color: #8a5a00; }
 @keyframes jet-demande-lueur { 0%, 100% { filter: drop-shadow(0 0 2px #d4af37); } 50% { filter: drop-shadow(0 0 12px #ffcc33); } }
+
+/* v312 — Les réglages du son, dans les Paramètres (pour tous, avant le mot de passe). */
+.reglages-son { margin: 0 auto 18px; padding: 10px 16px 14px; max-width: 300px; border: 1px solid rgba(92, 58, 33, 0.35); border-radius: 8px; background: rgba(255, 246, 222, 0.35); }
+.reglages-son .ligne-volume { margin-bottom: 8px; }
+.titre-reglages-son, .titre-acces-reserve { margin: 4px 0 10px; font-family: 'Berkshire Swash', 'Almendra', serif; font-weight: 400; font-size: 21px; color: #3a2210; }
+.titre-acces-reserve { margin-top: 6px; border-top: 1px solid rgba(92, 58, 33, 0.35); padding-top: 12px; }

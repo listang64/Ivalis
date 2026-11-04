@@ -151,7 +151,7 @@ titre("2. LES MARQUE-PAGES ÉTEINTS : RANGÉS DANS LE LIVRE, ILS RESSORTENT EN P
 // =========================================================================
 const marques = () => p.evaluate(() => {
   const f = document.querySelector(".grimoire-fond-livre").getBoundingClientRect(), pages = f.top + 62 * f.width / 2000;
-  return ["grimoire-marque-page", "grimoire-marque-recit", "grimoire-marque-carte"].map(id => { const m = document.getElementById(id); return { id, inactif: m.classList.contains("inactif"), cache: m.getBoundingClientRect().top > pages }; });
+  return ["grimoire-marque-page", "grimoire-marque-recit"].map(id => { const m = document.getElementById(id); return { id, inactif: m.classList.contains("inactif"), cache: m.getBoundingClientRect().top > pages }; });
 });
 await section(async () => {
   const hors = await marques();

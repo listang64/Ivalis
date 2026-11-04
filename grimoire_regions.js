@@ -227,6 +227,78 @@
         if (el.parentNode !== G().livre()) G().livre().appendChild(el);
         el.classList.toggle("paysage", paysage(r));
     }
+    // LE GROUPE SUR LA CARTE DU MONDE DU LIVRE (v312). Nico : « rebranche sur la map
+    // globale le token de là où se trouve le groupe, et les traces de déplacement
+    // d'une région à l'autre ». La carte du livre a ses propres boîtes (Carte_Livre,
+    // grimoire_carte.js) : le groupe se pose au centre de la boîte de sa région ; un
+    // voyage d'une région à l'autre trace sa route en pointillé, d'une boîte à
+    // l'autre, et le groupe y avance (la même marche que l'ancienne carte).
+    const REGION_VERS_ZONE = Object.fromEntries(Object.entries(ZONE_VERS_REGION).map(([z, r]) => [r, Number(z)]));
+    const LIVRE_L = 1514, LIVRE_H = 984, SVG_NS = "http://www.w3.org/2000/svg";
+    function centreZone(region) {
+        const z = (window.ZONES_LIVRE || {})[REGION_VERS_ZONE[Number(region)]];
+        if (!z || !Array.isArray(z.points) || !z.points.length) return null;
+        const xs = z.points.map(p => p.x), ys = z.points.map(p => p.y);
+        return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
+    }
+    // La route : un arc léger d'une boîte à l'autre ; `f` de 0 à 1.
+    const controle = (A, B) => { const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2, dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1; return { x: mx - dy / l * l * 0.12, y: my + dx / l * l * 0.12 }; };
+    const surArc = (A, B, f) => { const C = controle(A, B), u = 1 - f; return { x: u * u * A.x + 2 * u * f * C.x + f * f * B.x, y: u * u * A.y + 2 * u * f * C.y + f * f * B.y }; };
+    function calqueGroupe() {
+        const g = G();
+        if (!g || !g.scene() || !g.livre()) return null;
+        let svg = $("calque-groupe-livre");
+        if (!svg) {
+            svg = document.createElementNS(SVG_NS, "svg");
+            svg.id = "calque-groupe-livre";
+            svg.setAttribute("class", "calque-groupe-livre");
+            svg.setAttribute("viewBox", `0 0 ${LIVRE_L} ${LIVRE_H}`);
+            svg.setAttribute("preserveAspectRatio", "none");
+            g.scene().appendChild(svg);
+        }
+        const livre = g.livre();
+        Object.assign(svg.style, { left: livre.style.left, top: livre.style.top, width: livre.style.width, height: livre.style.height });
+        return svg;
+    }
+    function poserGroupeSurLeMonde(visible) {
+        const svg = calqueGroupe();
+        if (!svg) return;
+        svg.classList.toggle("visible", !!visible);
+        if (!visible) return;
+        const ev = typeof window.etatVoyageGroupe === "function" ? window.etatVoyageGroupe() : {};
+        const v = ev.voyage, pos = ev.position, choix = ev.choix;
+        let route = null, ici = null;
+        if (v && v.Type === "monde" && v.Depart && v.Arrivee) {
+            const A = centreZone(v.Depart.Region), B = centreZone(v.Arrivee.Region);
+            if (A && B) {
+                const f = v.Etat === "marche" && ev.anim && ev.anim.cle === (window.cleAnimationVoyage ? window.cleAnimationVoyage(v) : null) ? Number(ev.anim.f) || 0 : (v.Etat === "vote" ? 0 : 0);
+                route = { A, B, provisoire: v.Etat === "vote" };
+                ici = surArc(A, B, Math.max(0, Math.min(1, f)));
+            }
+        } else if (choix && choix.proposition && choix.proposition.type === "monde") {
+            const A = centreZone(choix.proposition.depart.Region), B = centreZone(choix.proposition.arrivee.Region);
+            if (A && B) route = { A, B, provisoire: true };
+        }
+        if (!ici) {
+            const region = v && v.Type === "region" ? v.Arrivee && v.Arrivee.Region : pos && pos.Region;
+            ici = centreZone(region);
+        }
+        const signature = JSON.stringify([route && [route.A, route.B, route.provisoire], ici && [Math.round(ici.x), Math.round(ici.y)]]);
+        if (svg.__signature === signature) return;
+        svg.__signature = signature;
+        let html = "";
+        if (route) {
+            const C = controle(route.A, route.B);
+            html += `<path class="route-groupe-livre${route.provisoire ? " provisoire" : ""}" d="M ${route.A.x.toFixed(1)} ${route.A.y.toFixed(1)} Q ${C.x.toFixed(1)} ${C.y.toFixed(1)} ${route.B.x.toFixed(1)} ${route.B.y.toFixed(1)}"/>`;
+            html += `<path class="croix-groupe-livre" d="M ${route.B.x - 9} ${route.B.y - 9} l 18 18 M ${route.B.x + 9} ${route.B.y - 9} l -18 18"/>`;
+        }
+        if (ici && window.IMAGE_GROUPE_MONDE) {
+            const t = 78;
+            html += `<image class="pion-groupe-livre" href="${window.IMAGE_GROUPE_MONDE}" x="${(ici.x - t / 2).toFixed(1)}" y="${(ici.y - t * 0.82).toFixed(1)}" width="${t}" height="${t}"/>`;
+        }
+        svg.innerHTML = html;
+    }
+    window.poserGroupeSurLaCarteDuLivre = () => poserGroupeSurLeMonde(true);
     let tailleVue = "";
     let etaitEnPartie = false, posee = true;
     function veiller() {
@@ -239,6 +311,7 @@
                 etaitEnPartie = false; signature = ""; regions = []; ouvertureFaite = false;
                 if (typeof window.placerOutilsRegionDev === "function") window.placerOutilsRegionDev(false);
                 allumerMarche(false, false, "Voyager");
+                poserGroupeSurLeMonde(false);
                 poserPliure(null);
                 const jeu = $("ecran-jeu");
                 if (jeu) jeu.classList.remove("livre-carte");
@@ -275,6 +348,7 @@
         // livre : il ne sort que sur ses cartes, et quand on peut voyager.
         const ev = typeof window.etatVoyageLivre === "function" ? window.etatVoyageLivre() : null;
         allumerMarche(carteDuLivre && !!ev && ev.possible, !!ev && ev.actif, ev ? ev.titre : "Voyager");
+        poserGroupeSurLeMonde(lu && surLaCarteDuMonde());
         // (v310) La pliure du livre par-dessus la carte vivante ; sous elle, l'image
         // de la page s'efface (ses trous brûlés montrent le papier, pas la carte).
         regions.forEach(x => x.pages.forEach(pg => pg.classList.toggle("sous-la-vue", lu && montee === x.numero)));

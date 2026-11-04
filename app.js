@@ -2826,7 +2826,7 @@ window.fabriquerTokenIA = async function(options) {
     const blobPortrait = o.portrait ? await portraitVersBlobPng(o.portrait).catch(() => null) : null;
     const sujet = o.sujet || (blobPortrait ? "character" : "creature");
     const prompt = blobPortrait ? promptPionMedaillon(sujet)
-        : "Universe: Mythic Ancient Fantasy (Greco-Roman antiquity with magic — bronze, leather and linen; crested helmets; never medieval plate armour). "
+        : "Universe: Mythic Ancient Fantasy (Greco-Roman antiquity with magic — bronze, leather and linen; crested helmets; never medieval plate armour, never a crossbow or any firearm). "
           // v307 : les peuples de ce monde seulement (Nico : « elle m'a créé un orc »).
           + "Only this world's peoples or creatures of Greek mythology and real fauna: never draw an orc, elf, dwarf, goblin, troll or ogre from other fantasy settings. "
           + promptPionMedaillon(sujet, o.description || "a fearsome creature");

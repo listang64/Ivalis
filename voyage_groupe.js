@@ -787,7 +787,7 @@ async function arriverAuPoi(poi) {
     try {
         await addDoc(collection(db, "Messages_Chat"), {
             ID_Partie: window.ID_PARTIE_COURANTE, ...AUTEUR_DESTIN,
-            Texte: `*Le groupe quitte un instant sa route et s'approche de ${poi.Nom || "ce qu'il a aperçu"}.* (Narrateur, décris de manière immersive leur arrivée en ce lieu, l'atmosphère et ce qu'ils voient en premier.)`,
+            Texte: `*Le groupe quitte un instant sa route et s'approche de ${poi.Nom || "ce qu'il a aperçu"}.* (Narrateur, décris de manière immersive leur arrivée en ce lieu, l'atmosphère et ce qu'ils voient en premier ; le récit tourne autour de ce lieu, sans ajouter d'autre lieu ni d'autre rencontre.)`,
             Date_Jour: date.jour || "", Date_An: date.annee || "", Timestamp: Date.now()
         });
     } catch (e) { console.error("Message d'arrivée au POI :", e); }
@@ -1901,6 +1901,7 @@ window.appliquerVoyageDeLaPartie = function(data) {
     }
     dessinerTout();
 };
+window.IMAGE_GROUPE_MONDE = IMAGE_GROUPE_MONDE;      // (v312) le pion du groupe, aussi sur la carte du monde du livre
 window.etatVoyageGroupe = () => ({
     position: positionEffective(), voyage: voyage ? JSON.parse(JSON.stringify(voyage)) : null,
     choix: window.choixVoyageGroupe(), anim: anim ? { cle: anim.cle, f: anim.f, de: anim.de, a: anim.a, duree: anim.duree, delai: anim.delai } : null,

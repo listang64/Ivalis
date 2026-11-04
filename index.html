@@ -13,13 +13,13 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=124">
+  <link rel="stylesheet" href="style.css?v=125">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
-  <link rel="stylesheet" href="grimoire.css?v=10">
-  <link rel="stylesheet" href="grimoire_recit.css?v=7">
+  <link rel="stylesheet" href="grimoire.css?v=11">
+  <link rel="stylesheet" href="grimoire_recit.css?v=8">
   <link rel="stylesheet" href="grimoire_carte.css?v=2">
-  <link rel="stylesheet" href="grimoire_regions.css?v=2">
+  <link rel="stylesheet" href="grimoire_regions.css?v=3">
 
  
   <!-- ===================================================================== -->
@@ -1444,18 +1444,7 @@
       <div class="conteneur-volume-nav">
         <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/volume_c53qqq.png" class="icone-nav" alt="Volume" onclick="jouerSonClic(); toggleBulleVolume(event)">
         <div id="bulle-volume">
-          <div class="ligne-volume">
-             <label>Général</label>
-             <input type="range" id="vol-general" min="0" max="1" step="0.01" oninput="changerVolume('general', this.value)" style="accent-color: #5c3a21;">
-          </div>
-          <div class="ligne-volume">
-             <label>Musique</label>
-             <input type="range" id="vol-musique" min="0" max="1" step="0.01" oninput="changerVolume('musique', this.value)" style="accent-color: #8c6a45;">
-          </div>
-          <div class="ligne-volume">
-             <label>Interface</label>
-             <input type="range" id="vol-interface" min="0" max="1" step="0.01" oninput="changerVolume('interface', this.value)" style="accent-color: #8c6a45;">
-          </div>
+          <!-- v312 : les réglages du son sont passés dans les Paramètres (Nico). -->
         </div>
       </div>
       <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781472665/home_gsoldf.png" class="icone-nav" alt="Retour Menu" onclick="jouerSonClic(); demanderRetourMenu()">
@@ -1498,7 +1487,25 @@
   <div id="conteneur-parametres">
 
     <div id="etape-mdp-parametres" class="fenetre-volante-parchemin fondu-interne">
-      <h2>Accès Réservé</h2>
+      <!-- v312 : Nico, « les réglages de sons, bascule-les dans Paramètres ». Pour
+           tous (avant le mot de passe) ; les mêmes curseurs qu'avant (app.js). -->
+      <h2>Paramètres</h2>
+      <div class="reglages-son" id="reglages-son">
+        <h3 class="titre-reglages-son">Le son</h3>
+        <div class="ligne-volume">
+             <label>Général</label>
+             <input type="range" id="vol-general" min="0" max="1" step="0.01" oninput="changerVolume('general', this.value)" style="accent-color: #5c3a21;">
+          </div>
+          <div class="ligne-volume">
+             <label>Musique</label>
+             <input type="range" id="vol-musique" min="0" max="1" step="0.01" oninput="changerVolume('musique', this.value)" style="accent-color: #8c6a45;">
+          </div>
+          <div class="ligne-volume">
+             <label>Interface</label>
+             <input type="range" id="vol-interface" min="0" max="1" step="0.01" oninput="changerVolume('interface', this.value)" style="accent-color: #8c6a45;">
+        </div>
+      </div>
+      <h3 class="titre-acces-reserve">Accès Réservé</h3>
       <p>Le Savoir d'Ivalis est protégé.</p>
       <input type="password" id="input-secret-parametres" class="input-texte-parchemin" placeholder="Mot de passe" style="text-align: center;">
       <p id="erreur-mdp-parametres" style="color: #ff4c4c; font-weight: bold; font-size: 16px; margin-top: -10px; margin-bottom: 10px; opacity: 0; transition: opacity 0.3s;">Mot de passe incorrect.</p>
@@ -2451,16 +2458,16 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=216"></script>
+<script src="trace_combat.js?v=217"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
 <script src="porte_joueur.js?v=1"></script>
 <!-- Les deux clés Gemini (v278) : la seconde pour les IA du combat. -->
-<script src="cles_gemini.js?v=3"></script>
+<script src="cles_gemini.js?v=4"></script>
 <!-- LE GRIMOIRE (v297) : StPageFlip 2.0.7 (MIT, dans vendor/), puis le livre -->
 <script src="vendor/page-flip/page-flip.browser.js?v=2.0.7"></script>
-<script src="grimoire.js?v=13"></script>
+<script src="grimoire.js?v=14"></script>
 <!-- LES DÉPENSES DU MJ (v293) : tokens et coût en euros de chaque réponse -->
 <script src="depenses_ia.js?v=3"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
@@ -2514,15 +2521,15 @@
 <script type="module" src="pont_combat.js?v=46"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=53"></script>
-<script type="module" src="ia_master.js?v=19"></script>
-<script type="module" src="app.js?v=137"></script>
+<script type="module" src="ia_master.js?v=20"></script>
+<script type="module" src="app.js?v=138"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=4"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
-<script type="module" src="grimoire_recit.js?v=10"></script>
+<script type="module" src="grimoire_recit.js?v=11"></script>
 <!-- LA CARTE DU MONDE DANS LE GRIMOIRE (v302) : sa double page, ses zones (DEV). -->
 <script type="module" src="grimoire_carte.js?v=4"></script>
-<script src="grimoire_regions.js?v=4"></script>
+<script src="grimoire_regions.js?v=5"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=4"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région et son titre (plus de nuages dessus, v286). -->
@@ -2541,12 +2548,12 @@
 <!-- Le déplacement des PJ (v275) : les terrains praticables des cartes régionales,
      puis le groupe, son bouton voyage, les tracés, les votes, la marche et les nuits. -->
 <script type="module" src="terrains_regionaux.js?v=2"></script>
-<script type="module" src="voyage_groupe.js?v=11"></script>
+<script type="module" src="voyage_groupe.js?v=12"></script>
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
-<script type="module" src="environnement_mj.js?v=4"></script>
+<script type="module" src="environnement_mj.js?v=5"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->
 <script src="poi_catalogue.js?v=1"></script>
-<script type="module" src="poi_creation.js?v=2"></script>
+<script type="module" src="poi_creation.js?v=3"></script>
 <script src="jet_d20.js?v=2"></script>
 <script src="fabrique_sons.js?v=21"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->
@@ -2580,7 +2587,7 @@
 <script type="module" src="sequence_tour.js?v=25"></script>
 <script src="zombie_token.js?v=1"></script>
 <script src="murs_terre.js?v=10"></script>
-<script type="module" src="combat.js?v=157"></script>
+<script type="module" src="combat.js?v=158"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=40"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
@@ -2588,7 +2595,7 @@
 <!-- LES APPARITIONS (v268) : le tableau de Nico, son tirage, sa fenêtre de
      réglage. Avant monstres.js, qui le lit dès son chargement. -->
 <script src="apparitions.js?v=3"></script>
-<script type="module" src="monstres.js?v=45"></script>
+<script type="module" src="monstres.js?v=46"></script>
 <script type="module" src="monstres_competences.js?v=30"></script>
 <script type="module" src="monstres_ia.js?v=42"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
@@ -2597,7 +2604,7 @@
 <script type="module" src="objets_ia.js?v=18"></script>
 <script type="module" src="loot.js?v=31"></script>
 <!-- LES COMBATS DU RÉCIT (v278) : la détection, la préparation, le retour au récit. -->
-<script type="module" src="combat_rp.js?v=6"></script>
+<script type="module" src="combat_rp.js?v=7"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

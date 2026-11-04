@@ -39,3 +39,11 @@
 .region-titre-livre { position: absolute; left: 0; top: 0; width: 50%; height: 100%; z-index: 45; pointer-events: none; }
 .region-titre-livre.en-tourne { visibility: hidden; }
 /* (v310) Le bouton du voyage n'est plus sur le livre : le marque-page de la marche le remplace (grimoire.css). */
+
+/* v312 — Le groupe sur la carte du monde du livre : son pion, et sa route d'une région à l'autre. */
+.calque-groupe-livre { position: absolute; z-index: 38; pointer-events: none; overflow: visible; opacity: 0; transition: opacity 0.25s ease; }
+.calque-groupe-livre.visible { opacity: 1; }
+.route-groupe-livre { fill: none; stroke: #7a0d0d; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 2 12; opacity: 0.9; }
+.route-groupe-livre.provisoire { opacity: 0.55; }
+.croix-groupe-livre { fill: none; stroke: #7a0d0d; stroke-width: 4; stroke-linecap: round; }
+.pion-groupe-livre { filter: drop-shadow(2px 4px 3px rgba(30, 15, 5, 0.6)); }

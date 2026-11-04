@@ -343,3 +343,42 @@
 .page-manuscrite p { margin: 0 0 calc(var(--u) * 2.2); text-indent: calc(var(--u) * 4); transform: rotate(var(--penche, 0deg)); }
 .page-manuscrite .croquis { display: block; width: 62%; margin: calc(var(--u) * 1) auto calc(var(--u) * 2.4); }
 .page-manuscrite .croquis path, .page-manuscrite .croquis circle { fill: none; stroke: rgba(38, 22, 10, 0.8); stroke-width: 1.4; stroke-linecap: round; }
+
+/* =========================================================================
+   v312 — LA POLICE DES TITRES, LE SOMMAIRE, LES MARQUE-PAGES, LE MENU
+   ========================================================================= */
+/* « Pour le sommaire et les titres en général, une police grasse qui fait écrit
+   manuscrit ancien » : Berkshire Swash (OFL), gardée dans le dépôt. */
+@font-face { font-family: 'Berkshire Swash'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('images/polices/berkshire_swash.woff2?v=1') format('woff2'); }
+.entete-index, .nom-partie-index, .entree-index, .journal-entete, .page-chapitre h2, .page-chapitre h3,
+.numero-chapitre, .titre-chapitre, .titre-sommaire, .region-nom, .papier-avatar .nom-portrait, .titre-reglages-son, .titre-acces-reserve,
+.entete-index *, .entree-index *, .journal-entete * {
+  /* (!important : style.css impose Almendra à tout, « * { … !important } ») */
+  font-family: 'Berkshire Swash', 'Almendra', serif !important; font-style: normal; letter-spacing: 0.01em; }
+.entete-index { font-weight: 400; font-size: calc(var(--u) * 9); letter-spacing: 0.04em; margin-left: 0; }
+.nom-partie-index { font-size: calc(var(--u) * 4.6); color: #6b3e1c; margin-top: calc(var(--u) * -0.6); min-height: 1em; text-align: center; }
+.entree-index { font-weight: 400; font-style: normal; }
+.numero-index { color: #6b3e1c; margin-right: 0.15em; }
+/* Le fond du sommaire : l'image de Nico à 20 %, étirée sur la double page
+   (chaque page en montre sa moitié, jusqu'à ses bords). */
+.fond-sommaire { position: absolute; inset: 0; background-repeat: no-repeat; background-size: 200% 100%; opacity: 0.2; pointer-events: none; }
+.fond-sommaire.gauche { background-position: 0 0; }
+.fond-sommaire.droite { background-position: 100% 0; }
+
+/* Le marque-page du menu (≡) : le plus à gauche, au-dessus de la page de gauche. */
+.marque-page.marque-menu { left: calc(268px * var(--s, 1)); top: calc(-20px * var(--s, 1)); width: calc(60px * var(--s, 1)); height: calc(185px * var(--s, 1)); transform: rotate(-3deg); }
+.marque-page.marque-menu .marque-papier { background-position: 15% 70%; }
+.marque-page.marque-menu:not(.inactif):hover, .marque-page.marque-menu:not(.inactif):focus-visible { transform: rotate(-2deg) translateY(-6%); }
+.marque-page.marque-menu:not(.inactif):active { transform: rotate(-3deg) translateY(-3%) scale(0.98); }
+.dessin-menu .trait-menu { fill: none; stroke: #120b06; stroke-width: 3.4; stroke-linecap: round; }
+.dessin-etoile .feuille { stroke-width: 1.9; fill: rgba(18, 11, 6, 0.12); stroke-linejoin: round; }
+.dessin-plume .feuille { stroke-width: 1.5; fill: rgba(255, 246, 222, 0.4); }
+.dessin-plume .ligne { stroke-width: 0.9; opacity: 0.8; }
+
+/* « Vire tous les boutons en haut à droite de l'écran (sauf le bouton DEV) » :
+   le volume passe dans les Paramètres ; la maison et la porte, au menu du livre. */
+#menu-navigation-bas.nav-livre .conteneur-volume-nav, #menu-navigation-bas.nav-livre > .icone-nav { display: none !important; }
+
+/* (v312) Les Paramètres ouverts depuis le menu du livre : sur la page entière, par-dessus le livre. */
+body > #conteneur-parametres { z-index: 95; }

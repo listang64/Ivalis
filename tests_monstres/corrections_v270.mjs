@@ -334,9 +334,9 @@ titre("7. LA PISTE D'INITIATIVE, DEUX FOIS PLUS GRANDE");
     return sortie;
   });
   // (v287 : un peu réduite, 1,7.)
-  verifier("l'échelle de la piste est 1,7 (v287 : un peu réduite)", r.echelle === 1.7);
-  verifier("un portrait mesure 116 × 133 à l'écran (68 × 78 au dessin)", Math.abs(r.tuileL - 68 * 1.7) < 1 && Math.abs(r.tuileH - 78 * 1.7) < 1, `${r.tuileL} × ${r.tuileH}`);
-  verifier("la piste entière grandit d'un bloc (×1,7) à l'écran", Math.abs(r.largeurEcran - 1.7 * r.largeurDessin) < 1, `${r.largeurEcran} pour ${r.largeurDessin}`);
+  verifier("l'échelle de la piste est 1,14 (v287 : 1,7 ; v312 : un tiers de moins)", r.echelle === 1.14);
+  verifier("un portrait mesure 78 × 89 à l'écran (68 × 78 au dessin, ×1,14)", Math.abs(r.tuileL - 68 * 1.14) < 1 && Math.abs(r.tuileH - 78 * 1.14) < 1, `${r.tuileL} × ${r.tuileH}`);
+  verifier("la piste entière grandit d'un bloc (×1,14) à l'écran", Math.abs(r.largeurEcran - 1.14 * r.largeurDessin) < 1, `${r.largeurEcran} pour ${r.largeurDessin}`);
   verifier("à 14 combattants, elle se resserre et reste dans l'écran", r.pleineGauche >= 0 && r.pleineDroite <= r.largeurFenetre,
            `${r.pleineGauche.toFixed(0)} → ${r.pleineDroite.toFixed(0)} / ${r.largeurFenetre}`);
 }

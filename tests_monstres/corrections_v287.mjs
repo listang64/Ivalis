@@ -379,7 +379,7 @@ await section(async () => {
     const anneau = [...a.querySelectorAll("circle")].filter(c => c.getAttribute("fill") === "none").map(c => Number(c.getAttribute("r")));
     return { echelle: window.ECHELLE_PISTE_INITIATIVE, feu: Number(feu && feu.getAttribute("r")), halo: Number(halo && halo.getAttribute("r")), anneau };
   });
-  verifier("la piste d'initiative : ×1,7 (au lieu de ×2)", r.echelle === 1.7, String(r.echelle));
+  verifier("la piste d'initiative : ×1,7 (au lieu de ×2) ; v312 : un tiers de moins, ×1,14", r.echelle === 1.14, String(r.echelle));
   // Le pion a un rayon de 50 : la fumée allait jusqu'à 96, le halo jusqu'à 80.
   verifier("l'aura du leader : la fumée et le halo vont un peu plus qu'à moitié moins loin du pion", r.feu > 72 && r.feu < 78 && r.halo > 64 && r.halo < 68, JSON.stringify([r.feu, r.halo]));
   verifier("…l'anneau reste collé au bord du médaillon", r.anneau.length >= 3 && r.anneau.every(x => Math.abs(x - 51) < 0.5), JSON.stringify(r.anneau));

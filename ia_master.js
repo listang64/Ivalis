@@ -667,6 +667,8 @@ Le Maître du Jeu va répondre aux dernières actions des joueurs. Avant qu'il �
 
 Prépare une fiche SEULEMENT pour un personnage que les joueurs vont aborder en personne : quelqu'un à qui ils parlent, qu'ils interpellent, qu'ils viennent voir, chez qui ils entrent (l'aubergiste de la taverne où ils entrent, le garde qu'ils questionnent, le marchand dont ils poussent la porte).
 JAMAIS de figurants anonymes, de foules, de passants, de groupes. JAMAIS un personnage déjà connu ni un Héros. Deux fiches AU PLUS ; le plus souvent, AUCUNE (liste vide).
+UN BLUFF N'EST PAS UN FAIT (v312) : un nom qu'un héros invente pour mentir ou bluffer (« je suis envoyé par le seigneur Untel ») n'existe pas : PAS de fiche pour lui.
+IMPORTANCE (v312) : seulement un personnage qui a un minimum d'importance — un rôle à jouer avec les héros (une information, une demande, un marché, un conflit), qu'on reverra sans doute. Un simple paysan, un passant, un serviteur, quelqu'un qu'on croise sans enjeu : PAS de fiche, même s'ils échangent deux mots.
 Chaque personnage a un VRAI nom propre, court, antique (un prénom, éventuellement un surnom).
 RACES OBLIGATOIRES : ${racesConnues.join(", ")}.
 
@@ -759,6 +761,7 @@ Voici les Héros : ${JSON.stringify(nomsHeros)}.
 
 Lis le texte du Maître du Jeu. Y a-t-il de NOUVEAUX personnages expressément NOMMÉS (VRAI prénom ou nom propre de personne) qui viennent d'apparaître ?
 Règles : Ignore les descriptions génériques ("un garde", "le tavernier", "la prêtresse"), les titres seuls, les foules, les dieux et les lieux. Ne liste JAMAIS les Héros. Trois noms au plus.
+IMPORTANCE (v312) : ne liste un nom que si ce personnage COMPTE dans la scène — il parle avec les héros ou agit envers eux, il a un rôle à jouer (une information, une demande, un marché, un conflit, une menace), on risque de le revoir. Un figurant nommé au passage (un paysan, un passant, un serviteur, un client de taverne, un enfant qui court) : NE LE LISTE PAS.
 Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste vide.`;
 
     const outilsDetection = [{
@@ -823,6 +826,7 @@ Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste 
 Tu dois inventer les fiches détaillées de ces nouveaux personnages : ${JSON.stringify(nouveauxNomsDetectes)}.
 RACES OBLIGATOIRES À UTILISER DANS CET UNIVERS : ${racesConnues.join(", ")}. Tu dois choisir l'une de ces races pour chaque personnage.
 Assure-toi que tous les éléments de la fiche sont cohérents entre eux et adaptés à l'univers Antique Fantastique (Antiquité magique, mythologie).
+ÉQUIPEMENT DE L'ANTIQUITÉ SEULEMENT (v312) : lances, glaives, épées courtes, haches, arcs, frondes, javelots, boucliers, cuirasses de bronze ou de lin, tuniques, capes. JAMAIS d'arbalète, d'arme à feu, d'armure de plaques, de heaume médiéval.
 Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
 
     const outilsCreation = [{
@@ -1670,12 +1674,16 @@ async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTe
     const reglages = window.reglagesNarrateur();
     let modele = reglages.modele;
     let dejaEnvoye = false, texteRecu = "";
+    // (v312) Les deux clés : la seconde prend le relais d'une première à court
+    // de crédit ou de quota (402, 429, 503), comme pour les autres IA.
+    const cles = typeof window.clesGeminiPour === "function" ? window.clesGeminiPour() : [cleGemini];
+    let iCle = 0;
     const relais = surTexte ? (t) => { dejaEnvoye = true; texteRecu = t; surTexte(t); } : null;
 
     for (let tentative = 1; tentative <= maxTentatives; tentative++) {
         try {
             console.log(`✍️ [Narrateur] ${modele} (réflexion ${reglages.reflexion}) — tentative ${tentative}/${maxTentatives}`);
-            const { texte, tokens, usage } = await appelNarrateurEnFlux(modele, corpsNarrateur(bodyRequete, modele, reglages.reflexion), cleGemini, relais);
+            const { texte, tokens, usage } = await appelNarrateurEnFlux(modele, corpsNarrateur(bodyRequete, modele, reglages.reflexion), cles[iCle] || cleGemini, relais);
             // Les dépenses du tour (v293, depenses_ia.js) : ce que le narrateur a lu et écrit.
             if (usage && window.DEPENSES_IA) window.DEPENSES_IA.noterNarrateur(null, modele, usage);
             if (!texte.trim()) throw new Error("réponse vide");
@@ -1683,6 +1691,12 @@ async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTe
             return texte;
         } catch (erreur) {
             console.warn(`⚠️ [Narrateur] Échec tentative ${tentative} (${modele}) :`, erreur.message);
+            if (!dejaEnvoye && [402, 429, 503].includes(erreur.statut) && iCle < cles.length - 1) {
+                iCle++;
+                console.warn(`[Narrateur] Clé ${iCle} refusée (${erreur.statut}) : la clé ${iCle + 1} prend le relais.`);
+                tentative--;
+                continue;
+            }
             // Le modèle choisi est refusé (inconnu, réservé au forfait payant,
             // quota épuisé) : Flash-Lite prend le relais, sans attendre.
             if (!dejaEnvoye && modele !== MODELE_NARRATEUR_SECOURS && [400, 403, 404, 429].includes(erreur.statut)) {
@@ -1692,7 +1706,10 @@ async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTe
                 continue;
             }
             if (dejaEnvoye) return texteRecu;
-            if (tentative < maxTentatives) await new Promise(resolve => setTimeout(resolve, 4000));
+            // (v312) Une coupure réseau (sans statut : « Failed to fetch »,
+            // ERR_QUIC_PROTOCOL_ERROR…) : le navigateur repasse par une autre
+            // connexion ; on relance presque aussitôt plutôt qu'après 4 s.
+            if (tentative < maxTentatives) await new Promise(resolve => setTimeout(resolve, erreur.statut ? 4000 : 400));
             else return `*Le grimoire refuse de s'ouvrir... (${erreur.message}).*`;
         }
     }
@@ -1846,32 +1863,53 @@ Réponds avec l'outil 'deciderJets'. Liste vide seulement si aucune action ne m�
             }
         }]
     }];
-    const controle = typeof AbortController === "function" ? new AbortController() : null;
-    const minuteur = controle ? setTimeout(() => controle.abort(), DELAI_ARBITRE_MS) : null;
+    // v312 — Nico : « l'IA qui scanne s'il faut des lancers de dés est cassée : pas
+    // une seule fois elle ne m'a demandé un lancer avant que le narrateur continue ».
+    // Elle n'avait qu'une clé (la première, sans relais vers la seconde), un seul
+    // essai de 20 s, et ne se rabattait sur Flash-Lite que pour quelques refus :
+    // un délai, une coupure (ERR_QUIC_PROTOCOL_ERROR), un crédit épuisé (402), une
+    // réponse sans appel d'outil… et elle se taisait (« aucun jet »). Maintenant :
+    // les deux clés (window.fetchGemini), un premier essai court, puis Flash-Lite
+    // sans réflexion sur n'importe quel échec ; une réponse en texte JSON est lue
+    // aussi ; chaque échec est écrit dans la console.
+    const corps = (modele) => JSON.stringify({
+        systemInstruction: { parts: [{ text: promptSysteme }] },
+        contents: [{ role: "user", parts: [{ text: texte }] }],
+        tools: outils, toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: ["deciderJets"] } },
+        generationConfig: modele === MODELE_ARBITRE ? { temperature: 0, thinkingConfig: { thinkingLevel: "low" } } : { temperature: 0 }
+    });
+    const essayer = async (modele, delai) => {
+        const controle = typeof AbortController === "function" ? new AbortController() : null;
+        const minuteur = controle ? setTimeout(() => controle.abort(), delai) : null;
+        try {
+            const rep = typeof window.fetchGemini === "function"
+                ? await window.fetchGemini("arbitre", corps(modele), { modele, signal: controle ? controle.signal : undefined })
+                : await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modele}:generateContent?key=${cleGemini}`, {
+                    method: "POST", headers: { "Content-Type": "application/json" }, signal: controle ? controle.signal : undefined, body: corps(modele) });
+            if (!rep.ok) throw new Error(`${modele} : statut ${rep.status}`);
+            const data = await rep.json();
+            const parts = (data.candidates?.[0]?.content?.parts) || [];
+            const appel = parts.find(p => p.functionCall && p.functionCall.name === "deciderJets");
+            if (appel) return (appel.functionCall.args && appel.functionCall.args.jets) || [];
+            // Pas d'appel d'outil : une réponse en JSON, peut-être.
+            const brut = parts.filter(p => typeof p.text === "string" && !p.thought).map(p => p.text).join("");
+            const m = brut.match(/\{[\s\S]*\}/);
+            if (m) { const j = JSON.parse(m[0]); if (Array.isArray(j.jets)) return j.jets; }
+            throw new Error(`${modele} : réponse sans décision`);
+        } finally { if (minuteur) clearTimeout(minuteur); }
+    };
     try {
-        const appeler = (modele) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modele}:generateContent?key=${cleGemini}`, {
-            method: "POST", headers: { "Content-Type": "application/json" }, signal: controle ? controle.signal : undefined,
-            body: JSON.stringify({
-                systemInstruction: { parts: [{ text: promptSysteme }] },
-                contents: [{ role: "user", parts: [{ text: texte }] }],
-                tools: outils, toolConfig: { functionCallingConfig: { mode: "ANY" } },
-                generationConfig: modele === MODELE_ARBITRE ? { temperature: 0, thinkingConfig: { thinkingLevel: "low" } } : { temperature: 0 }
-            })
-        });
-        let rep = await appeler(MODELE_ARBITRE);
-        if (!rep.ok && [400, 403, 404, 429].includes(rep.status)) {
-            console.warn(`[MIA_DES] ${MODELE_ARBITRE} refusé (${rep.status}) : ${MODELE_ARBITRE_SECOURS} arbitre.`);
-            rep = await appeler(MODELE_ARBITRE_SECOURS);
+        let bruts;
+        try { bruts = await essayer(MODELE_ARBITRE, DELAI_ARBITRE_MS * 0.6); }
+        catch (e1) {
+            console.warn(`[MIA_DES] ${e1 && e1.name === "AbortError" ? MODELE_ARBITRE + " : trop long" : (e1 && e1.message || e1)} — ${MODELE_ARBITRE_SECOURS} arbitre.`);
+            bruts = await essayer(MODELE_ARBITRE_SECOURS, DELAI_ARBITRE_MS * 0.5);
         }
-        if (!rep.ok) throw new Error("statut " + rep.status);
-        const data = await rep.json();
-        const appel = (data.candidates?.[0]?.content?.parts || []).find(p => p.functionCall && p.functionCall.name === "deciderJets");
-        const bruts = (appel && appel.functionCall.args && appel.functionCall.args.jets) || [];
         // Seulement des héros qui ont agi, des caractéristiques qui existent,
         // une difficulté connue, un jet par héros.
         const auteurs = new Set(etat.actions.map(m => m.Auteur_ID));
         const jets = [];
-        bruts.forEach(j => {
+        (Array.isArray(bruts) ? bruts : []).forEach(j => {
             const h = heros.find(x => x.prenom && j && sansAccentPNJ(x.prenom) === sansAccentPNJ(String(j.heros || "").split(/\s+/)[0]));
             const carac = CARACS_ARBITRE.find(c => normCarac(c.nom) === normCarac(j && j.caracteristique));
             if (!h || !carac || !auteurs.has(h.idPersonnage) || jets.some(x => x.idPerso === h.idPersonnage)) return;
@@ -1883,9 +1921,10 @@ Réponds avec l'outil 'deciderJets'. Liste vide seulement si aucune action ne m�
     } catch (e) {
         console.warn("[MIA_DES] Arbitrage impossible, le MJ raconte directement :", e && e.message || e);
         return [];
-    } finally { if (minuteur) clearTimeout(minuteur); }
+    }
 }
 
+window.__arbitreDesBanc = demanderArbitreDes;   // (v312) pour les bancs
 const nomCaracJoli = (nom) => nom.charAt(0) + nom.slice(1).toLowerCase();
 
 // L'arbitrage du tour. Rend true si le narrateur doit parler maintenant.
@@ -2138,6 +2177,22 @@ window.declencherTourIA = async function(options) {
         if (typeof window.contexteEnvironnementMJ === "function") {
             try { contexte += `\n${await window.contexteEnvironnementMJ(dataPartieMJ)}\n`; }
             catch (e) { console.error("Environnement du MJ (le tour continue) :", e); }
+        }
+
+        // LES HÉROS (v312). Nico : « le narrateur n'a pas pris en compte le genre féminin
+        // de mon personnage ; envoie-lui les fiches personnages avec ce genre d'infos ».
+        // Chaque héros du groupe : son nom, son genre (pour accorder), son peuple, sa
+        // classe (au féminin s'il le faut), son âge et son allure.
+        const herosDuGroupe = (window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || []).filter(p => p && !p.estMonstre && !p.estIllusion && p.actif !== false && p.prenom);
+        if (herosDuGroupe.length) {
+            const feminin = (g) => typeof window.estGenreFeminin === "function" ? window.estGenreFeminin(g) : /^f/i.test(String(g || ""));
+            contexte += `\n--- LES HÉROS DU GROUPE (accorde-les selon leur genre : il, elle) ---\n`;
+            herosDuGroupe.forEach(h => {
+                const genre = h.genre ? (feminin(h.genre) ? "femme (elle)" : "homme (il)") : "genre non précisé";
+                const classe = h.classe ? (typeof window.nomClasseGenre === "function" ? window.nomClasseGenre(h.classe, h.genre) : h.classe) : "";
+                const allure = [h.age && `âge apparent ${h.age}`, h.corpulence, h.cheveux && `cheveux ${h.cheveux}`, h.signes].filter(Boolean).join(", ");
+                contexte += `- ${`${h.prenom} ${h.nom || ""}`.trim()} : ${genre}${h.race ? `, ${h.race}` : ""}${classe ? `, ${classe}` : ""}${allure ? ` — ${allure}` : ""}.\n`;
+            });
         }
 
         // NOUVEAU : Injection des tags et de la jauge (ISOLATION STRICTE)

@@ -32,7 +32,9 @@
         livre: "images/grimoire/livre_ouvert.webp?v=1",
         page: "images/grimoire/page.webp?v=1",
         // v305 : la table de bois, l'encrier et la plume (l'image de Nico).
-        table: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793777473/BG_tjiigl.png"
+        table: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793777473/BG_tjiigl.png",
+        // v312 : le fond du sommaire (l'image de Nico), à 20 %, étiré sur la double page.
+        sommaire: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1787900056/IMG_2057_ez0wu9.png"
     };
     const LIVRE = { w: 2000, h: 1117 };
     const ZONE = { x: 251, y: 62, w: 1514, h: 984 };       // les deux pages
@@ -83,11 +85,15 @@
     // bande du portrait et les notes des dés (grimoire_recit.css) : jusqu'à
     // 175 unités au-dessus de l'image du livre. La place leur est gardée.
     const HAUT_DES_MARQUES = 175;
-    // L'INDEX (v299) : les chapitres du jeu, trois par page.
+    // LE SOMMAIRE (v299, l'index ; v312 : Nico, « Index renommé Sommaire ; devant
+    // chaque titre le numéro en chiffres romains ; dans cet ordre : Aventuriers
+    // (qui remplace Fiches persos), Carte du monde, Le village, Les combats, Le
+    // récit » ; les Paramètres passent au menu principal). Trois puis deux.
     const ENTREES_INDEX = [
-        ["carte", "Carte du monde"], ["recit", "Le récit"], ["fiches", "Les fiches personnages"],
-        ["combats", "Les combats"], ["village", "Le village"], ["parametres", "Les paramètres"]
+        ["fiches", "Aventuriers"], ["carte", "Carte du monde"], ["village", "Le village"],
+        ["combats", "Les combats"], ["recit", "Le récit"]
     ];
+    const ROMAINS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
 
     let ecran = null, scene = null, livre = null, pageFlip = null, attrape = null;
     let ouvert = false, chapitre = "", initialise = false, departEnCours = false;
@@ -207,7 +213,9 @@
             <div class="journal-entrees">
               ${bouton("grimoire-btn-nouvelle", "Nouvelle partie", "nouvelle")}
               ${bouton("grimoire-btn-charger", "Charger partie", "charger")}
+              ${bouton("grimoire-btn-parametres", "Paramètres", "parametres")}
               ${bouton("grimoire-btn-compte", "Compte", "compte")}
+              ${bouton("grimoire-btn-quitter", enPartie ? "Quitter la partie" : "Quitter le jeu", "quitter")}
             </div>
           </div>`;
     }
@@ -227,24 +235,34 @@
         // (les apostrophes encodées aussi : l'attribut style est entre apostrophes)
         return `url("data:image/svg+xml,${encodeURIComponent(svg).replace(/'/g, "%27")}")`;
     }
-    function entreeIndex(id, texte) {
+    function entreeIndex(id, texte, rang) {
         const r = hasard("index-" + id);
         const penche = ((r() * 2 - 1) * 3.4).toFixed(2), decale = ((r() * 2 - 1) * 7).toFixed(1);
         return `<button type="button" class="entree-index" id="grimoire-index-${id}" data-action="index" data-entree="${id}"
-                   style="--penche:${penche}deg; --decale:${decale}"><span class="entree-index-texte" style='background-image:${souligneFond("trait-" + id)}'>${texte}</span></button>`;
+                   style="--penche:${penche}deg; --decale:${decale}"><span class="entree-index-texte" style='background-image:${souligneFond("trait-" + id)}'><span class="numero-index">${ROMAINS[rang]}-</span> ${texte}</span></button>`;
     }
+    // Le nom de la partie en cours (sous le titre du sommaire).
+    const nomDeLaPartie = () => {
+        const id = window.ID_PARTIE_COURANTE;
+        const p = (window.LISTE_PARTIES_CACHE || []).find(x => x.id === id) || (partieChoisie && partieChoisie.id === id ? partieChoisie : null);
+        return (p && p.nom) || "";
+    };
+    // Le fond du sommaire (v312) : une image sur la double page, à 20 % ; chaque
+    // page en montre sa moitié, étirée jusqu'à ses bords.
+    const fondSommaire = (cote) => `<div class="fond-sommaire ${cote}" style="background-image:url('${IMAGES.sommaire}')" aria-hidden="true"></div>`;
     function indexHtml() {
-        const entrees = (a, b) => ENTREES_INDEX.slice(a, b).map(([id, t]) => entreeIndex(id, t)).join("");
+        const entrees = (a, b) => ENTREES_INDEX.slice(a, b).map(([id, t], i) => entreeIndex(id, t, a + i)).join("");
         return [
-            `<div class="contenu-page page-index">
-               <div class="entete-index">Index</div>
+            `${fondSommaire("gauche")}<div class="contenu-page page-index">
+               <div class="entete-index">Sommaire</div>
+               <div class="nom-partie-index" id="grimoire-nom-partie">${echapper(nomDeLaPartie())}</div>
                <svg class="fleuron fleuron-index" viewBox="0 0 200 24" aria-hidden="true">
                  <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/>
                  <circle cx="100" cy="12" r="2.2"/></svg>
                <div class="entrees-index">${entrees(0, 3)}</div>
              </div>`,
-            `<div class="contenu-page page-index droite">
-               <div class="entrees-index">${entrees(3, 6)}</div>
+            `${fondSommaire("droite")}<div class="contenu-page page-index droite">
+               <div class="entrees-index">${entrees(3, 5)}</div>
                <p class="note-index" id="grimoire-note-index" aria-live="polite"></p>
              </div>`
         ];
@@ -252,35 +270,53 @@
     // Le dessin du marque-page, à la plume : une feuille au coin corné,
     // couverte de lignes manuscrites — l'index du livre.
     function dessinMarque() {
-        const r = hasard("marque-page");
-        const j = (a) => ((r() - 0.5) * 2 * a).toFixed(2);
-        let lignes = "";
-        for (let i = 0; i < 6; i++) {
-            const y = 25 + i * 8.2, fin = 41 - (i === 5 ? 12 : r() * 7);
-            let d = `M ${16 + +j(0.6)} ${y + +j(0.5)}`;
-            for (let x = 16; x < fin; x += 4) d += ` q 1 ${j(1.4)} 2 ${j(0.5)} t 2 ${j(0.6)}`;
-            lignes += `<path class="ligne" d="${d}"/>`;
+        // v312 : Nico, « le marque-page du sommaire : fais une étoile ». Une étoile
+        // à cinq branches tracée à la plume, un peu irrégulière, avec un éclat.
+        const r = hasard("marque-etoile");
+        const j = (a) => (r() - 0.5) * 2 * a;
+        const pts = [];
+        for (let i = 0; i < 10; i++) {
+            const ang = -Math.PI / 2 + i * Math.PI / 5, rayon = (i % 2 ? 9.5 : 22) + j(1.2);
+            pts.push(`${(30 + Math.cos(ang) * rayon + j(0.6)).toFixed(1)} ${(36 + Math.sin(ang) * rayon + j(0.6)).toFixed(1)}`);
         }
-        return `<svg class="dessin-marque" viewBox="0 0 60 80" aria-hidden="true">
-                  <path class="feuille" d="M 11 8.5 C 20 7.6 31 8.4 40.5 7.8 L 49.5 17 C 49 34 50.2 53 49.3 72.4 C 37 73.2 23 71.8 10.6 72.8 C 11.6 51 10.2 29 11 8.5 Z"/>
-                  <path class="coin" d="M 40.5 7.8 C 41.2 11 40.6 14 41 17.3 C 44 16.8 46.6 17.4 49.5 17"/>
-                  ${lignes}</svg>`;
+        return `<svg class="dessin-marque dessin-etoile" viewBox="0 0 60 80" aria-hidden="true">
+                  <path class="feuille" d="M ${pts.join(" L ")} Z"/>
+                  <path class="ligne" d="M 30 20 L 30 30 M 23 34 L 28 35 M 37 34 L 32 35"/>
+                  <path class="ligne" d="M 47 13 l 0 5 M 44.5 15.5 l 5 0 M 13 58 l 0 4 M 11 60 l 4 0"/></svg>`;
     }
-
-    // Le dessin du marque-page du récit (v300) : une plume d'oie, à l'encre.
+    // LE MARQUE-PAGE DU MENU (v312) : Nico, « en haut à gauche, le plus à gauche du
+    // livre, avec le dessin de trois traits horizontaux, qui fera revenir à la page
+    // principale ». Trois traits d'encre, un peu tremblés.
+    function dessinMenu() {
+        const r = hasard("marque-menu");
+        const j = (a) => ((r() - 0.5) * 2 * a).toFixed(2);
+        const trait = (y) => `<path class="trait-menu" d="M ${12 + +j(0.8)} ${y + +j(0.6)} C ${22} ${y + +j(1.2)} ${36} ${y + +j(1.2)} ${48 + +j(0.8)} ${y + +j(0.6)}"/>`;
+        return `<svg class="dessin-marque dessin-menu" viewBox="0 0 60 80" aria-hidden="true">${trait(24)}${trait(36)}${trait(48)}</svg>`;
+    }
+    // Le dessin du marque-page du récit (v300 ; refait en v312 : Nico, « refais le
+    // dessin de la plume ») : une plume d'oie penchée, son rachis courbe, ses
+    // barbes fines de part et d'autre, une encoche, et le bec taillé.
     function dessinPlume() {
-        const r = hasard("marque-plume");
+        const r = hasard("plume-v312");
+        // Le rachis : du bec (en bas à gauche) vers la pointe (en haut à droite).
+        const P = (t) => { const x = 16 + 30 * t + 4 * Math.sin(Math.PI * t), y = 72 - 62 * t; return [x, y]; };
         let barbes = "";
-        for (let i = 0; i < 9; i++) {
-            const t = 0.12 + i * 0.085, x = 44 - t * 30, y = 10 + t * 56;
-            barbes += `<path class="ligne" d="M ${x.toFixed(1)} ${y.toFixed(1)} q ${(-7 - r() * 3).toFixed(1)} ${(2 + r() * 2).toFixed(1)} ${(-10 - r() * 3).toFixed(1)} ${(7 + r() * 2).toFixed(1)}"/>`;
-            barbes += `<path class="ligne" d="M ${x.toFixed(1)} ${y.toFixed(1)} q ${(5 + r() * 2).toFixed(1)} ${(1 + r()).toFixed(1)} ${(7 + r() * 2).toFixed(1)} ${(5 + r() * 2).toFixed(1)}"/>`;
+        for (let i = 0; i < 15; i++) {
+            const t = 0.3 + i * 0.045;
+            if (Math.abs(t - 0.62) < 0.03) continue;                 // l'encoche
+            const [x, y] = P(t), l = 9 * Math.sin(Math.PI * (t - 0.22) / 0.82) + 2 * r();
+            barbes += `<path class="ligne" d="M ${x.toFixed(1)} ${y.toFixed(1)} q ${(-l * 0.6).toFixed(1)} ${(-1 - r()).toFixed(1)} ${(-l).toFixed(1)} ${(-l * 0.55).toFixed(1)}"/>`;
+            barbes += `<path class="ligne" d="M ${x.toFixed(1)} ${y.toFixed(1)} q ${(l * 0.5).toFixed(1)} ${(0.5 + r()).toFixed(1)} ${(l * 0.8).toFixed(1)} ${(-l * 0.15).toFixed(1)}"/>`;
         }
-        return `<svg class="dessin-marque" viewBox="0 0 60 80" aria-hidden="true">
-                  <path class="feuille" d="M 46 6 C 33 14 22 34 17 62 C 27 50 40 30 46 6 Z"/>
-                  <path class="coin" d="M 46 6 C 36 26 26 46 13 74"/>
+        const pts = Array.from({ length: 11 }, (_, i) => P(0.28 + i * 0.072)), haut = P(1);
+        const gauche = pts.map(([x, y], i) => `${(x - 7 * Math.sin(Math.PI * i / 10) - 1).toFixed(1)} ${(y - 3 * Math.sin(Math.PI * i / 10)).toFixed(1)}`);
+        const droite = pts.slice().reverse().map(([x, y], i) => `${(x + 5 * Math.sin(Math.PI * i / 10) + 0.5).toFixed(1)} ${(y + 1.5 * Math.sin(Math.PI * i / 10)).toFixed(1)}`);
+        const [x0, y0] = P(0), [x1, y1] = P(0.28);
+        return `<svg class="dessin-marque dessin-plume" viewBox="0 0 60 80" aria-hidden="true">
+                  <path class="feuille" d="M ${gauche.join(" L ")} L ${haut[0].toFixed(1)} ${haut[1].toFixed(1)} L ${droite.join(" L ")} Z"/>
                   ${barbes}
-                  <path class="coin" d="M 13 74 l -2.5 3.5"/></svg>`;
+                  <path class="coin" d="M ${x0} ${y0} Q ${((x0 + x1) / 2 + 1.5).toFixed(1)} ${((y0 + y1) / 2).toFixed(1)} ${x1.toFixed(1)} ${y1.toFixed(1)} L ${haut[0].toFixed(1)} ${haut[1].toFixed(1)}"/>
+                  <path class="coin" d="M ${x0} ${y0} l -2.2 3.4 M ${x0} ${y0} l 1.6 -0.6"/></svg>`;
     }
 
     // Le dessin du marque-page de la carte (v302) : une terre, au trait noir —
@@ -394,14 +430,21 @@
     //  haut) ; fermé, la couverture est plus petite et centrée.
     // ---------------------------------------------------------------------
     let tableTaille = { w: TABLE.w, h: TABLE.h };
+    // v312 — Nico : « sur iPad, il y a peu de marge en bas du livre ; rehausse-la un
+    // peu sur les plus petits écrans » et « remonte légèrement le livre, il y a trop
+    // de place en haut ». Le livre est posé sur le bas de l'écran : la marge du bas
+    // grandit sur les écrans de moins de 900 px de haut (le haut garde la place
+    // des marque-pages et des papiers).
+    const margeBas = (vh) => (vh < 900 ? 0.04 : MARGE_BAS);
     function mesurer() {
         const vw = window.innerWidth, vh = window.innerHeight;
-        let s = Math.min(vw * (1 - 2 * MARGE_COTE) / LIVRE.w, vh * (1 - MARGE_HAUT - MARGE_BAS) / LIVRE.h);
+        const mb = margeBas(vh);
+        let s = Math.min(vw * (1 - 2 * MARGE_COTE) / LIVRE.w, vh * (1 - MARGE_HAUT - mb) / LIVRE.h);
         // Le marque-page dépasse au-dessus du livre : sur un écran très large,
         // le livre perd juste ce qu'il faut pour qu'il reste visible.
-        const place = vh * (1 - MARGE_BAS) - 4;
+        const place = vh * (1 - mb) - 4;
         if (place - LIVRE.h * s < HAUT_DES_MARQUES * s) s = place / (LIVRE.h + HAUT_DES_MARQUES);
-        const gauche = (vw - LIVRE.w * s) / 2, haut = vh * (1 - MARGE_BAS) - LIVRE.h * s;
+        const gauche = (vw - LIVRE.w * s) / 2, haut = vh * (1 - mb) - LIVRE.h * s;
         // La table, fermée : elle couvre l'écran ; recadrée autour du livre, sans
         // jamais découvrir son bord (un écran extrême : le livre tient d'abord,
         // le plancher sombre prolonge l'image).
@@ -465,14 +508,15 @@
             <img class="grimoire-ombre-couverture" id="grimoire-ombre-couverture" src="${IMAGES.couverture}" alt="" draggable="false">
             <img class="grimoire-fond-livre" src="${IMAGES.livre}" alt="" draggable="false">
             <button type="button" class="marque-page inactif" id="grimoire-marque-page" data-action="marque-page"
-                    aria-label="Aller à l'index" aria-disabled="true" title="L'index (en partie)">
+                    aria-label="Aller au sommaire" aria-disabled="true" title="Le sommaire (en partie)">
               <span class="marque-papier">${dessinMarque()}</span></button>
             <button type="button" class="marque-page marque-plume inactif" id="grimoire-marque-recit" data-action="marque-recit"
                     aria-label="Aller au récit" aria-disabled="true" title="Le récit (en partie)">
               <span class="marque-papier">${dessinPlume()}</span></button>
-            <button type="button" class="marque-page marque-terre inactif" id="grimoire-marque-carte" data-action="marque-carte"
-                    aria-label="Aller à la carte du monde" aria-disabled="true" title="La carte du monde (en partie)">
-              <span class="marque-papier">${dessinTerre()}</span></button>
+            <!-- v312 : plus de marque-page de la carte (Nico) ; le menu (≡), le plus à gauche. -->
+            <button type="button" class="marque-page marque-menu" id="grimoire-marque-menu" data-action="marque-menu"
+                    aria-label="Revenir à la page principale" title="La page principale">
+              <span class="marque-papier">${dessinMenu()}</span></button>
             <button type="button" class="marque-page marque-marche inactif" id="grimoire-marque-marche" data-action="marque-marche"
                     aria-label="Voyager" aria-disabled="true" title="Voyager">
               <span class="marque-papier">${dessinPas()}</span></button>
@@ -606,6 +650,9 @@
             if (aGauche ? xp > pw * ZONE_PRISE : xp < pw * (1 - ZONE_PRISE)) return;
             // (v306) la dernière double page vierge : on ne referme pas le livre par la fin.
             if (!aGauche && pageFlip.getCurrentPageIndex() >= nbPages - 3) return;
+            // (v312) Nico : « quand on ouvre le livre, bloque le fait qu'on puisse le
+            // refermer » : la première double page ne se tourne pas vers la couverture.
+            if (aGauche && pageFlip.getCurrentPageIndex() <= 2) return;
             const coinY = p.y >= h / 2 ? h - 1 : 1;
             prise = { id: ev.pointerId, x0: p.x, y0: p.y, dy: coinY - p.y, partie: false };
             try { livre.setPointerCapture(ev.pointerId); } catch (e) {}
@@ -657,7 +704,8 @@
             return;
         }
         try { ecran.dispatchEvent(new CustomEvent("grimoire-page", { detail: { index } })); } catch (e) {}
-        if (index === 0 && ouvert) etatOuvert(false);   // tourné jusqu'à la couverture : le livre se referme
+        // (v312) le livre ne se referme plus : arrivé malgré tout sur la couverture, il se rouvre.
+        if (index === 0 && ouvert) { setTimeout(() => { try { pageFlip.flip(1, "top"); } catch (e) { try { pageFlip.turnToPage(1); } catch (e2) {} } }, 60); return; }
         else if (index > 0 && !ouvert) etatOuvert(true);
     }
     function remplirChapitre(nom) {
@@ -852,7 +900,7 @@
     // Les marque-pages ne servent qu'en partie (Nico : « désactivé tant que pas
     // rentré dans une partie »). Le livre levé cache l'ancienne interface.
     function majMarquePage() {
-        ["grimoire-marque-page", "grimoire-marque-recit", "grimoire-marque-carte"].forEach(idm => {
+        ["grimoire-marque-page", "grimoire-marque-recit"].forEach(idm => {
             const m = document.getElementById(idm);
             if (!m) return;
             m.classList.toggle("inactif", !enPartie);
@@ -860,6 +908,9 @@
         });
         const jeu = document.getElementById("ecran-jeu");
         if (jeu) jeu.classList.toggle("livre-leve", enPartie);
+        // (v312) Le dernier bouton du menu principal : quitter la partie, ou le jeu.
+        const q = document.querySelector("#grimoire-btn-quitter span");
+        if (q) q.textContent = enPartie ? "Quitter la partie" : "Quitter le jeu";
     }
     // LES PETITS BOUTONS (v299, v300) : le DEV rouge, le volume, la maison, la
     // porte. Nico : « dès que l'on voit le livre » ; v300 : « finalement, mets-
@@ -1063,12 +1114,34 @@
     function agir(cible) {
         if (!cible || cible.disabled) return;
         const action = cible.dataset.action;
-        if (action === "marque-page" || action === "marque-recit" || action === "marque-carte") {
+        // (v312) Le marque-page du menu : la page principale (le journal), en partie ou non.
+        if (action === "marque-menu") {
+            if (!pageFlip || !ouvert) return;
+            const ici = pageFlip.getCurrentPageIndex();
+            if (ici !== 1 && ici !== 2) allerALaPage(1);
+            return;
+        }
+        // (v312) Le menu principal : les Paramètres ; quitter la partie (en partie) ou le jeu.
+        if (action === "parametres") {
+            son();
+            // Ses fenêtres vivaient dans l'écran de jeu, caché hors partie : elles
+            // passent sur la page entière, par-dessus le livre (grimoire.css).
+            const conteneur = document.getElementById("conteneur-parametres");
+            if (conteneur && conteneur.parentNode !== document.body) document.body.appendChild(conteneur);
+            if (typeof window.ouvrirParametres === "function") window.ouvrirParametres();
+            return;
+        }
+        if (action === "quitter") {
+            son();
+            if (enPartie) { if (typeof window.demanderRetourMenu === "function") window.demanderRetourMenu(); }
+            else if (typeof window.demanderQuitterJeu === "function") window.demanderQuitterJeu();
+            return;
+        }
+        if (action === "marque-page" || action === "marque-recit") {
             if (!enPartie) return;               // éteints hors partie : rien, pas même le clic
             // (v304 : « enlève le son quand on clique sur un marque-page ou un bouton de l'index » —
             // les pages qui défilent font leur propre bruit)
             if (action === "marque-page") allerIndex();
-            else if (action === "marque-carte") allerALaCarte();
             else if (window.GRIMOIRE_RECIT) (window.GRIMOIRE_RECIT.marqueDuRecit || window.GRIMOIRE_RECIT.allerAuRecit)();   // (v307) deux fois : le sommaire
             return;
         }

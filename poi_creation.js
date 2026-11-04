@@ -55,7 +55,8 @@ const REGLES = `RÈGLES DE CRÉATION (absolues) :
 5. COHÉRENCE : avec le terrain (pas de port dans le désert, pas de mine dans un marais), avec la région et son lore (qui y vit, qui y domine, ce qui y est interdit), avec le niveau de danger. L'ambiance et l'accroche tirées sont des pistes : adapte-les avec bon sens à ce type de lieu.
 6. NOMS : sonorités antiques (grecques, latines ou inventées dans cet esprit), courts, prononçables, sans article superflu.
 7. ORIGINALITÉ : un lieu différent de ceux qui existent déjà (autre nom, autre identité).
-8. SOBRIÉTÉ : du concret, des détails sensoriels, des gens crédibles ; du mystère, oui, mais du mystère qui tient debout.`;
+8. SOBRIÉTÉ : du concret, des détails sensoriels, des gens crédibles ; du mystère, oui, mais du mystère qui tient debout.
+9. UN LIEU, PAS UNE FOIRE (v312) : l'accroche du MJ tourne autour de CE lieu — une seule piste, simple. Pas de rencontres annexes, pas d'autres sites alentour (autel, camp, ruine voisine), pas de méchants ajoutés pour faire du combat. Les menaces citées dans le descriptif de la région sont possibles mais pas obligatoires : beaucoup de lieux sont paisibles.`;
 
 function promptLieu(region, graine, terrain, nomsExistants, lieuxProches) {
     const carte = (window.CARTES_REGIONALES || {})[region] || {};

@@ -10368,3 +10368,69 @@ de l'ancien bouton du voyage (caché sur le livre). Les autres échecs de la sui
 sont ceux d'avant (v274 passe seul ; v289, v243, v251, v254, v256, v267,
 animations_en_jeu_2, jauges_selection, saut_deplacement, fabrique_sons, studio_* :
 connus, au timing ou sans Internet).
+
+## v312 — Le grand lot : menu et sommaire du livre, arbitre des dés, Narrateur plus sobre, dictée, piste d'initiative
+
+Les demandes de Nico (un long message, puis trois ajouts) et ce qui a été fait :
+
+- Le livre ouvert ne se referme plus (grimoire.js) : la prise à la main sur le bord
+  gauche de la première double page est refusée ; arrivé malgré tout à la
+  couverture, il se rouvre sur la page 1.
+- Le menu principal (la page du journal) : Nouvelle partie, Charger partie,
+  Paramètres, Compte, Quitter le jeu (« Quitter la partie » en partie). Les
+  Paramètres passent sur la page entière (body, au-dessus du livre) : hors
+  partie, ils vivaient dans l'écran de jeu caché. Les réglages du son sont dans
+  leur première fenêtre, pour tous, avant le mot de passe. Les boutons du haut à
+  droite (volume, maison, porte) disparaissent sur le livre ; le DEV reste.
+- Le sommaire (l'ancien Index) : le titre de la partie dessous ; I- Aventuriers,
+  II- Carte du monde, III- Le village, IV- Les combats, V- Le récit (les Paramètres
+  en sont sortis) ; l'image de Nico (IMG_2057) en fond, à 20 %, étirée sur la
+  double page (200 % × 100 %, une moitié par page). La police des titres :
+  Berkshire Swash (OFL, images/polices/berkshire_swash.woff2), avec !important —
+  style.css impose « * { font-family: Almendra !important } », qui écrasait déjà
+  les polices du livre.
+- Les marque-pages : plus de marque-page de la carte ; le sommaire, une étoile ; le
+  récit, une plume redessinée ; un nouveau, ≡ (trois traits), le plus à gauche, qui
+  ramène à la page principale (en partie ou non).
+- iPad : sous 900 px de haut, 4 % de marge sous le livre (au lieu de 1,2 %) : il
+  remonte.
+- Le papier d'avatar (grimoire_recit) : l'image descend jusqu'au bord déchiré (et
+  un peu au-delà) ; le nom, doré, en Berkshire Swash, sur une seule ligne dont la
+  taille s'ajuste à la largeur ; un toucher ouvre la fiche du héros
+  (window.ouvrirFichePerso).
+- Les éléments autour du livre (avatar, post-it, encart d'écriture) ne bougent
+  plus pendant une tourne ni un défilement : leur état se fige jusqu'à ce que le
+  livre se pose.
+- La dictée : une tête qui parle, à l'encre, au-dessus de la plume. L'ancien bouton
+  du chat ne recopiait que la phrase en cours (depuis resultIndex) : une pause
+  effaçait le reste. Ici, toutes les phrases de la séance restent, et une écoute
+  coupée par un silence reprend toute seule, à la suite ; un toucher l'arrête.
+- L'arbitre des dés (ia_master.js) : il passe par window.fetchGemini (les deux
+  clés, relais sur 402/429/503), essaie le modèle du Narrateur 12 s puis
+  Flash-Lite sur n'importe quel échec (délai, coupure, 500, réponse sans outil),
+  lit aussi une réponse en texte JSON. Le Narrateur relaie aussi la seconde clé,
+  et relance en 0,4 s (au lieu de 4 s) après une coupure réseau
+  (ERR_QUIC_PROTOCOL_ERROR). window.__arbitreDesBanc pour les bancs.
+- Le Narrateur (environnement_mj.js, toujours ajouté au contexte, même avec le
+  prompt des Paramètres) : la région est un décor de fond, pas une usine à
+  rencontres ; au plus un événement à la fois ; dans un lieu, le récit tourne
+  autour de lui ; un bluff de héros n'est pas un fait ; l'Antiquité, sans
+  arbalète. Les héros du groupe (genre, peuple, classe au féminin, allure) lui
+  sont envoyés ; la plume du Narrateur lite accorde aussi le genre.
+- Les PNJ (MIA_CASTING, le détecteur de MIA_PNJ) : seulement ceux qui comptent ;
+  pas de fiche pour un nom inventé dans un bluff ; MIA_PNJ : équipement antique.
+  MIA_BESTIAIRE n'a plus « arbalétrier » ; le dessin des pions refuse l'arbalète.
+  MIA_POI : « un lieu, pas une foire ».
+- Le combat : la piste d'initiative ×1,14 (au lieu de ×1,7), sans jauges ;
+  MIA_TERRAIN_COMBAT avec le modèle du Narrateur (et sa réflexion), une consigne
+  de sobriété (dans le doute, pas de mur), 30 éléments au plus, plafond des cases
+  bloquées 30 %.
+- La carte du monde du livre (grimoire_regions.js) : le pion du groupe au centre
+  de la boîte de sa région, la route en pointillé d'une boîte à l'autre pendant un
+  voyage (ou sa proposition), le groupe qui y avance.
+- Abandonné à la demande de Nico : les morceaux de vieux scotch.
+
+corrections_v312.mjs (dans la suite) vérifie tout cela ; il échoue sur la v311
+(36 échecs). Tests mis à jour : v299 (boutons du haut, ≡, son, sommaire, étoile,
+marge), v300 (marge, cinq entrées), v302 et v306 (plus de marque-page de la
+carte), v310 (le papier d'avatar), v287 et v270 (la piste ×1,14).

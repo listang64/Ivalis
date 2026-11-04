@@ -137,9 +137,8 @@ await section(async () => {
              apresPlume: m && p ? m.getBoundingClientRect().left - p.getBoundingClientRect().left : 0, transform: m ? getComputedStyle(m).transform : "" };
   });
   verifier("hors partie, le livre n'a pas la carte (6 pages, + 6 vierges en v306)", r.n === 12, String(r.n));
-  verifier("un marque-page à la terre dessinée au trait noir (globe, méridiens, terres)", r.existe && r.globe && r.traits >= 5 && /rgb\(18, 11, 6\)/.test(r.encre), `${r.traits} traits, ${r.encre}`);
-  verifier("… côté gauche, en biais vers la droite", r.apresPlume > 20 && angleDe(r.transform) > 5, `${angleDe(r.transform).toFixed(1)}°`);
-  verifier("… éteint hors partie", r.inactif);
+  // v312 — Nico : « vire le marque-page qui amène à la carte du monde » (le sommaire y mène).
+  verifier("v312 : plus de marque-page de la terre", !r.existe);
 });
 
 // =========================================================================
@@ -155,7 +154,7 @@ await section(async () => {
   await p.waitForTimeout(1300);
   await relayer([], true);
   await attendreQue(async () => (await page()) === 5, 4000);   // v304 : le livre tourne jusqu'à la carte
-  const e = await p.evaluate(() => ({ n: window.grimoireEtat().nbPages, actif: !document.getElementById("grimoire-marque-carte").classList.contains("inactif"), page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() }));
+  const e = await p.evaluate(() => ({ n: window.grimoireEtat().nbPages, actif: !document.getElementById("grimoire-marque-page").classList.contains("inactif"), page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() }));
   verifier("en partie : la double page de la carte entre dans le livre, le marque-page s'allume", e.n === 18 && e.actif && e.page === 5, JSON.stringify(e));   // v304 : la partie s'ouvre sur la carte
   await p.evaluate(() => window.grimoireAllerIndex());
   await attendreQue(async () => (await page()) === 3, 3000);
@@ -175,10 +174,7 @@ await section(async () => {
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v302_carte.png" });
   await p.evaluate(() => window.grimoireAllerIndex());
   await p.waitForTimeout(900);
-  const mc = await centre("#grimoire-marque-carte");
-  await p.mouse.click(mc.x, mc.y - mc.h * 0.3);
-  await p.waitForTimeout(1000);
-  verifier("le marque-page de la terre y mène aussi", (await page()) === 5, String(await page()));
+  // (v312 : plus de marque-page de la terre ; le sommaire suffit)
   await p.evaluate(() => window.GRIMOIRE_RECIT.allerAuRecit());
   await p.waitForTimeout(1000);
   verifier("le récit suit (son chapitre commence maintenant page 9)", (await page()) === 9, String(await page()));
@@ -292,7 +288,7 @@ titre("5. RETOUR AU MENU : LE LIVRE PERD LA CARTE");
 await section(async () => {
   await p.evaluate(() => window.confirmerRetourMenu());
   await p.waitForTimeout(1300);
-  const s = await p.evaluate(() => ({ n: window.grimoireEtat().nbPages, terre: document.getElementById("grimoire-marque-carte").classList.contains("inactif") }));
+  const s = await p.evaluate(() => ({ n: window.grimoireEtat().nbPages, terre: document.getElementById("grimoire-marque-page").classList.contains("inactif") }));
   verifier("le livre revient à 6 pages (+ 6 vierges), le marque-page de la terre s'éteint", s.n === 12 && s.terre, JSON.stringify(s));
   const index = lire("index.html");
   const v = (re) => Number((index.match(re) || [])[1] || 0);

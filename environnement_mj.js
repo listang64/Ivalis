@@ -265,15 +265,29 @@ window.contexteEnvironnementMJ = async function(partie, options) {
             lignes.push(analyse && analyse.Descriptif ? `Le terrain (lu sur la carte) :\n${analyse.Descriptif}` : "Le terrain : inconnu (la carte n'a pas pu être lue).");
             const lieux = lieuxProches(pos);
             lignes.push(lieux.length ? `Lieux connus à proximité : ${lieux.map(l => l.texte).join(" ; ")}.` : "Aucun lieu connu à proximité.");
-            lignes.push("CONSIGNE ABSOLUE : le groupe est en pleine nature. Tu peux faire surgir des rencontres (voyageurs, patrouilles, bêtes, créatures, phénomènes, traces), mais tu n'inventes AUCUN bâtiment, village, ruine ni lieu construit qui ne soit pas cité ici : le décor est celui décrit ci-dessus.");
+            lignes.push("CONSIGNE ABSOLUE : le groupe est en pleine nature. Tu n'inventes AUCUN bâtiment, village, ruine ni lieu construit qui ne soit pas cité ici : le décor est celui décrit ci-dessus. Une rencontre (voyageurs, patrouille, bête, phénomène, traces) peut arriver, mais RAREMENT : la plupart du temps, la route est calme.");
         } else {
             const v = (window.VILLAGES_REGIONAUX || {})[p.Lieu_Actuel];
             lignes.push(`Région : ${nomRegion}. Le groupe se trouve dans un lieu connu${v ? ` : ${v.nom}` : ""} (sa description est donnée ci-dessus).`);
+            // v312 : Nico, « au POI, au lieu de tourner un RP autour de ce lieu, il m'a
+            // créé deux autres rencontres (des esclavagistes, un autel rituel) ».
+            lignes.push("CONSIGNE : le récit tourne autour de CE lieu — son ambiance, ses détails, ses gens, ses mystères. N'ajoute ni autre lieu, ni autre site, ni autre rencontre à côté : les joueurs explorent celui-ci.");
         }
         lignes.push("", "--- LA RÉGION ---");
         const descriptif = typeof window.descriptifRegion === "function" ? window.descriptifRegion(pos.Region).texte : fiche.description;
         lignes.push(descriptif ? `Descriptif de ${nomRegion} : ${descriptif}` : `Descriptif de ${nomRegion} : (pas encore écrit).`);
         if (typeof window.loreDeLaRegion === "function") lignes.push(window.loreDeLaRegion(pos.Region));
+        // v312 — Nico : « mon narrateur prend trop ma description de région à cœur :
+        // j'ai mis qu'on pouvait croiser des Gros gobs et des esclavagistes de gobs, il
+        // ne fait spawn que ça… Dis au MJ qu'il ne soit pas une usine à rencontres et
+        // qu'il laisse les joueurs respirer. »
+        lignes.push("", "COMMENT TE SERVIR DE LA RÉGION : c'est un DÉCOR DE FOND, pas une liste de rencontres à placer. Ce qui y est cité (peuples, menaces, factions) PEUT arriver, de loin en loin — pas à chaque scène, et jamais tout à la fois. Varie : la plupart du temps, il ne se passe rien d'extraordinaire ; de la vie ordinaire, du paysage, du temps qui passe, des gens sans histoire. Tu n'es pas une usine à rencontres : laisse les joueurs respirer, explorer et décider ; au plus UN événement nouveau à la fois, et seulement si la scène l'appelle.");
+        // v312 : « le jeu a créé une arbalète au mec ; l'histoire se passe dans l'Antiquité ».
+        // v312 : « mon personnage a bluffé en invoquant un nom random, et le narrateur
+        // l'a fait apparaître dans le récit et le combat. Le narrateur ne suit pas à
+        // la lettre ce que disent les joueurs : ça reste un maître du jeu. »
+        lignes.push("TU RESTES LE MAÎTRE DU JEU : ce qu'écrivent les joueurs, ce sont les paroles et les tentatives de leurs héros, PAS des faits du monde. Un héros qui ment, bluffe, invente un nom, une menace, un allié ou un titre ne le fait pas exister pour autant : la personne citée n'apparaît pas, l'objet n'est pas là. C'est toi qui décides de ce qui est vrai, et de la réaction des PNJ (ils peuvent croire le bluff, douter, ou le démasquer — d'après le jet de dés s'il y en a un).");
+        lignes.push("L'ÉPOQUE : l'Antiquité (mythologie, Antiquité magique). Armes, outils et tenues de l'Antiquité seulement : jamais d'arbalète, d'arme à feu, d'armure de plaques, de château ni d'objet médiéval ou moderne.");
     }
     const texte = lignes.join("\n");
     // Nico : « un message dans la console avec le descriptif envoyé ».

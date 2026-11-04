@@ -200,40 +200,45 @@ await section(async () => {
     return { parent: nav.parentNode.id, vue: getComputedStyle(nav).display !== "none" && rc.width > 0 && rc.bottom <= innerHeight && rc.right <= innerWidth,
              dev: !!nav.querySelector("#conteneur-regions-dev"), icones: [...nav.querySelectorAll(".icone-nav")].map(i => i.alt) };
   });
-  verifier("hors partie, les boutons du bas sont dans le grimoire, visibles", r.parent === "ecran-grimoire" && r.vue, JSON.stringify(r));
-  verifier("… le volume, la maison, la porte — et le DEV rouge avec eux", r.dev && r.icones.join(",").includes("Retour Menu") && r.icones.join(",").includes("Quitter") && r.icones.length >= 3, r.icones.join(","));
+  // v312 — Nico : « vire tous les boutons en haut à droite de l'écran (sauf le bouton
+  // DEV) » ; le son passe dans les Paramètres, la maison devient le marque-page ≡,
+  // la porte le bouton « Quitter » du menu principal.
+  const icones = await p.evaluate(() => [...document.querySelectorAll("#menu-navigation-bas .icone-nav")].map(i => i.getBoundingClientRect().width));
+  verifier("hors partie, les petits boutons vivent dans le grimoire ; v312 : le volume, la maison et la porte n'y sont plus", r.parent === "ecran-grimoire" && icones.every(w => w === 0), JSON.stringify({ ...r, icones }));
+  verifier("… le DEV rouge reste avec eux", r.dev);
   await p.evaluate(() => { document.getElementById("conteneur-regions-dev").style.display = "flex"; });
   const dev = await centre("#btn-regions-dev");
   verifier("le DEV rouge s'y montre aussi (en mode DEV), au-dessus du livre", await dans(dev.x, dev.y, "#btn-regions-dev"));
-  const maison = await centre('#menu-navigation-bas img[alt="Retour Menu"]');
-  verifier("la maison est au-dessus de tout (le doigt l'atteint)", await dans(maison.x, maison.y, "#menu-navigation-bas"), await dessus(maison.x, maison.y));
-  // Sur un chapitre : la maison ramène au journal, sans fenêtre de confirmation.
+  // Sur un chapitre : le marque-page ≡ ramène au journal, sans fenêtre de confirmation.
   await cliquer("#grimoire-btn-compte");
   await p.waitForTimeout(800);
   const avant = await page();
-  await p.mouse.click(maison.x, maison.y);
+  const menu = await centre("#grimoire-marque-menu");
+  await p.mouse.click(menu.x, menu.y - 18);
   await p.waitForTimeout(900);
   const apres = await p.evaluate(() => ({ page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), modale: getComputedStyle(document.getElementById("modale-retour-menu")).display, voile: getComputedStyle(document.getElementById("overlay-jeu-modale")).display }));
-  verifier("hors partie, la maison fait revenir le livre à sa page principale (le journal)", avant === 3 && apres.page === 1 && apres.modale === "none" && apres.voile === "none", JSON.stringify({ avant, ...apres }));
-  // Livre fermé : la maison l'ouvre sur le journal.
+  verifier("hors partie, le marque-page ≡ fait revenir le livre à sa page principale (le journal)", avant === 3 && apres.page === 1 && apres.modale === "none" && apres.voile === "none", JSON.stringify({ avant, ...apres }));
+  // Le livre ouvert ne se referme plus (v312).
   await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipPrev("top"));
-  await p.waitForTimeout(900);
-  const ferme = (await etat()).ouvert;
-  await p.mouse.click(maison.x, maison.y);
   await p.waitForTimeout(1300);
   const e = await etat();
-  verifier("livre fermé, la maison l'ouvre sur le journal", ferme === false && e.ouvert && e.page === 1, JSON.stringify(e));
-  // Le volume et la porte marchent aussi par-dessus le livre.
-  await clicVrai('#menu-navigation-bas .conteneur-volume-nav img');
-  await p.waitForTimeout(150);
-  const bulle = await p.evaluate(() => getComputedStyle(document.getElementById("bulle-volume")).display);
-  verifier("le volume ouvre sa bulle", bulle === "block", bulle);
-  await p.evaluate(() => { document.getElementById("bulle-volume").style.display = "none"; });
-  await clicVrai('#menu-navigation-bas img[alt="Quitter"]');
-  await p.waitForTimeout(200);
+  verifier("v312 : le livre ouvert ne se referme plus (tourné vers la couverture, il se rouvre)", e.ouvert && e.page === 1, JSON.stringify(e));
+  // Le son : dans les Paramètres, pour tous (avant le mot de passe).
+  // (le banc remplace window.ouvrirParametres : on vérifie l'appel et la place des curseurs)
+  await p.evaluate(() => { window.__appels = []; });
+  await cliquer("#grimoire-btn-parametres");
+  await p.waitForTimeout(500);
+  const son = await p.evaluate(() => { const el = document.getElementById("vol-general"); return { dans: !!el.closest("#etape-mdp-parametres"), avantMdp: !!(el.compareDocumentPosition(document.getElementById("input-secret-parametres")) & Node.DOCUMENT_POSITION_FOLLOWING),
+    appel: window.__appels.includes("ouvrirParametres"), corps: document.getElementById("conteneur-parametres").parentNode === document.body }; });
+  verifier("v312 : « Paramètres » (menu principal) les ouvre, par-dessus le livre ; le son y est, avant le mot de passe", son.dans && son.avantMdp && son.appel && son.corps, JSON.stringify(son));
+  await p.evaluate(() => window.fermerParametres && window.fermerParametres());
+  await p.waitForTimeout(400);
+  // La porte : le bouton « Quitter le jeu » du menu principal.
+  await cliquer("#grimoire-btn-quitter");
+  await p.waitForTimeout(250);
   const q = await p.evaluate(() => { const m = document.getElementById("modale-quitter-jeu"), r = m.getBoundingClientRect(), el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
     return { vue: getComputedStyle(m).display !== "none", dessus: !!(el && el.closest("#modale-quitter-jeu")) }; });
-  verifier("la porte demande s'il faut quitter, au-dessus du livre", q.vue && q.dessus, JSON.stringify(q));
+  verifier("« Quitter le jeu » (menu principal) demande s'il faut quitter, au-dessus du livre", q.vue && q.dessus, JSON.stringify(q));
   await p.evaluate(() => window.fermerModalesJeu());
   await p.evaluate(() => { document.getElementById("conteneur-regions-dev").style.display = "none"; });
 });
@@ -257,7 +262,7 @@ await section(async () => {
     const svg = m.querySelector("svg.dessin-marque");
     return { k, top: r.top, bas: r.bottom, gauche: r.left, droite: r.right, fondTop: fond.top, fondGauche: fond.left, dos: fond.left + 1008 * k, pagesTop: fond.top + 62 * k,
              transform: st.transform, inactif: m.classList.contains("inactif"), aria: m.getAttribute("aria-disabled"),
-             texture: papier.backgroundImage, clip: papier.clipPath, feuille: !!(svg && svg.querySelector("path.feuille")), lignes: svg ? svg.querySelectorAll("path.ligne").length : 0,
+             texture: papier.backgroundImage, clip: papier.clipPath, feuille: !!(svg && svg.querySelector("path.feuille")), lignes: svg ? svg.querySelectorAll("path.ligne").length : 0, etoile: !!(svg && svg.classList.contains("dessin-etoile")),
              encre: svg ? getComputedStyle(svg.querySelector("path.feuille")).stroke : "", avantLivre: m.compareDocumentPosition(document.getElementById("grimoire-livre")) & Node.DOCUMENT_POSITION_FOLLOWING };
   });
   verifier("il dépasse au-dessus du livre", geo.top < geo.fondTop + 44 * geo.k - 30 && geo.top >= 0, `haut ${geo.top.toFixed(0)} px, bord du livre ${(geo.fondTop + 44 * geo.k).toFixed(0)} px`);
@@ -266,7 +271,8 @@ await section(async () => {
   const angle = m ? Math.atan2(Number(m[2]), Number(m[1])) * 180 / Math.PI : 0;
   verifier("penché légèrement", angle < -2 && angle > -12, `${angle.toFixed(1)}°`);
   verifier("texture parchemin, le bout taillé", /page\.webp/.test(geo.texture) && /polygon/.test(geo.clip), geo.clip.slice(0, 40));
-  verifier("un dessin à la plume noire : une feuille couverte de lignes manuscrites", geo.feuille && geo.lignes >= 5 && /rgb\((1[0-9]|[0-9]), /.test(geo.encre), `${geo.lignes} lignes, ${geo.encre}`);
+  // v312 : Nico, « le marque-page du sommaire, fais une étoile ».
+  verifier("un dessin à la plume noire : une étoile (v312)", geo.feuille && geo.etoile && /rgb\((1[0-9]|[0-9]), /.test(geo.encre), `${geo.etoile} ${geo.encre}`);
   // Sous les pages : plus bas que leur bord, ce sont les pages que l'on touche.
   const x = (geo.gauche + geo.droite) / 2;
   verifier("glissé sous les pages : sous leur bord, la page le recouvre", geo.avantLivre && !(await dans(x, geo.pagesTop + 40 * geo.k, "#grimoire-marque-page")) && geo.bas > geo.pagesTop + 20, await dessus(x, geo.pagesTop + 40 * geo.k));
@@ -281,10 +287,10 @@ await section(async () => {
   await p.waitForTimeout(700);
   verifier("… le toucher ne fait rien (pas même le clic)", (await page()) === avant && (await p.evaluate(() => window.__clics)) === 0);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v299_journal.png" });
-  // Livre fermé, on ne voit que la couverture : pas de marque-page.
-  await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipPrev("top"));
-  await p.waitForTimeout(1300);
-  const op = await p.evaluate(() => getComputedStyle(document.getElementById("grimoire-marque-page")).opacity);
+  // Livre fermé, on ne voit que la couverture : pas de marque-page (v312 : le
+  // livre ouvert ne se referme plus ; on regarde la règle sur la scène fermée).
+  const op = await p.evaluate(() => { const sc = document.getElementById("grimoire-scene"), mq = document.getElementById("grimoire-marque-page"); mq.style.transition = "none"; sc.classList.add("ferme"); sc.classList.remove("ouvert");
+    const o = getComputedStyle(mq).opacity; mq.style.transition = ""; sc.classList.remove("ferme"); sc.classList.add("ouvert"); return o; });
   verifier("livre fermé : le marque-page disparaît avec lui", op === "0", op);
   await p.evaluate(() => window.ouvrirGrimoire());
   await p.waitForTimeout(1300);
@@ -345,14 +351,16 @@ await section(async () => {
     return { g: lis(3), d: lis(4), u, entete: (document.querySelector("#grimoire-page-3 .entete-index") || {}).textContent };
   });
   const tout = [...r.g, ...r.d];
-  verifier("page de gauche : Carte du monde, Le récit, Les fiches personnages", r.g.map(x => x.texte).join(" | ") === "Carte du monde | Le récit | Les fiches personnages", r.g.map(x => x.texte).join(" | "));
-  verifier("page de droite : Les combats, Le village, Les paramètres", r.d.map(x => x.texte).join(" | ") === "Les combats | Le village | Les paramètres", r.d.map(x => x.texte).join(" | "));
+  // v312 : « dans le sommaire, devant chaque titre le numéro en chiffres romains ; dans cet
+  // ordre : Aventuriers, Carte du monde, Le village, Les combats, Le récit ».
+  verifier("page de gauche (v312) : I- Aventuriers, II- Carte du monde, III- Le village", r.g.map(x => x.texte).join(" | ") === "I- Aventuriers | II- Carte du monde | III- Le village", r.g.map(x => x.texte).join(" | "));
+  verifier("page de droite (v312) : IV- Les combats, V- Le récit", r.d.map(x => x.texte).join(" | ") === "IV- Les combats | V- Le récit", r.d.map(x => x.texte).join(" | "));
   verifier("en gros (plus de deux fois le texte des pages)", tout.every(x => x.taille > r.u * 7), `${tout[0] && tout[0].taille.toFixed(1)} px, u = ${r.u.toFixed(2)} px`);
-  verifier("à la main, en gras (Almendra, gras, penché d'écriture)", tout.every(x => /Almendra/.test(x.police) && Number(x.poids) >= 700 && x.style === "italic"));
+  verifier("à la main, en gras (v312 : Berkshire Swash, manuscrite ancienne et grasse)", tout.every(x => /Berkshire Swash/.test(x.police)), tout[0] && tout[0].police);
   const angles = tout.map(x => { const m = /matrix\(([-\d.e]+), ([-\d.e]+)/.exec(x.transform); return m ? Math.atan2(Number(m[2]), Number(m[1])) * 180 / Math.PI : 0; });
   verifier("pas bien droit : chaque ligne penche un peu, chacune à sa façon", angles.every(a => Math.abs(a) > 0.2 && Math.abs(a) < 4) && new Set(angles.map(a => a.toFixed(1))).size >= 5, angles.map(a => a.toFixed(1)).join(" "));
   verifier("v300 : souligné d'un trait de plume (plus de jaune), ligne par ligne", tout.every(x => x.surligne && x.clone === "clone"));
-  verifier("un petit titre « Index »", r.entete === "Index", r.entete);
+  verifier("un titre « Sommaire » (v312, l'ancien « Index »)", r.entete === "Sommaire", r.entete);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v299_index.png" });
 });
 
@@ -382,7 +390,8 @@ await section(async () => {
   await p.waitForTimeout(1000);
   r = await lisRange();
   verifier("un toucher sur le marque-page : retour à l'index", r.page === 3 && r.chapitre === "index", JSON.stringify(r));
-  for (const [id, appel] of [["fiches", "ouvrirMenuPersonnages"], ["combats", "ouvrirPopupRencontre"], ["parametres", "ouvrirParametres"]]) {
+  // (v312 : les Paramètres ont quitté le sommaire pour le menu principal)
+  for (const [id, appel] of [["fiches", "ouvrirMenuPersonnages"], ["combats", "ouvrirPopupRencontre"]]) {
     await p.evaluate(() => { window.__appels = []; });
     await cliquer("#grimoire-index-" + id);
     await p.waitForTimeout(300);
@@ -424,11 +433,15 @@ await section(async () => {
 titre("9. LA MAISON EN PARTIE : QUITTER LA PARTIE, RETOUR AU JOURNAL DU LIVRE");
 // =========================================================================
 await section(async () => {
-  const maison = await centre('#menu-navigation-bas img[alt="Retour Menu"]');
-  await p.mouse.click(maison.x, maison.y);
+  // v312 : la maison est partie ; le menu principal (marque-page ≡) a « Quitter la partie ».
+  await p.evaluate(() => document.getElementById("grimoire-marque-menu").click());
+  await attendreQue(async () => (await page()) === 1, 4000);
+  await p.waitForTimeout(400);
+  const texteQuitter = await p.evaluate(() => document.querySelector("#grimoire-btn-quitter span").textContent);
+  await cliquer("#grimoire-btn-quitter");
   await p.waitForTimeout(300);
   const m = await p.evaluate(() => getComputedStyle(document.getElementById("modale-retour-menu")).display);
-  verifier("en partie, la maison demande d'abord s'il faut quitter la partie", m === "block", m);
+  verifier("en partie, « Quitter la partie » demande d'abord s'il faut quitter la partie", m === "block" && texteQuitter === "Quitter la partie", `${m} / ${texteQuitter}`);
   await p.evaluate(() => window.confirmerRetourMenu());
   await p.waitForTimeout(1300);
   const r = await p.evaluate(() => {
@@ -455,7 +468,7 @@ await section(async () => {
       return { marque: m.top, bas: innerHeight - fond.bottom, ecart: Math.max(Math.abs(g.left - (fond.left + 251 * k)), Math.abs(g.top - (fond.top + 62 * k)), Math.abs(g.right - (fond.left + 1008 * k))),
                largeur: fond.width, vw: innerWidth, vh: innerHeight };
     });
-    verifier(`${w} × ${h} : marque-page dans l'écran, livre en bas, pages posées`, r.marque >= 0 && r.bas >= 0 && r.bas <= r.vh * 0.013 + 1 && r.ecart < 3 && r.largeur <= r.vw, `haut du marque-page ${r.marque.toFixed(0)} px, ${r.ecart.toFixed(1)} px`);
+    verifier(`${w} × ${h} : marque-page dans l'écran, livre en bas, pages posées`, r.marque >= 0 && r.bas >= 0 && r.bas <= r.vh * (r.vh < 900 ? 0.041 : 0.013) + 1 && r.ecart < 3 && r.largeur <= r.vw, `haut du marque-page ${r.marque.toFixed(0)} px, ${r.ecart.toFixed(1)} px`);
   }
   await p.setViewportSize({ width: 1194, height: 834 });
 });

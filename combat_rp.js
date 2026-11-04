@@ -196,15 +196,24 @@ const aLesCles = () => {
 // =========================================================================
 //  2. LES IA DE TEXTE (seconde clé, JSON)
 // =========================================================================
-async function demanderJSON({ systeme, texte, image, temperature }) {
+// `narrateur` (v312) : le modèle du Narrateur (le payant, avec sa réflexion), et
+// Flash-Lite s'il est refusé.
+async function demanderJSON({ systeme, texte, image, temperature, narrateur }) {
     if (typeof window.fetchGemini !== "function" || !window.cleGemini("combat")) throw new Error("Aucune clé Gemini");
     const parts = [{ text: texte }];
     if (image) parts.push({ inline_data: { mime_type: "image/jpeg", data: image } });
-    const res = await window.fetchGemini("combat", JSON.stringify({
-        systemInstruction: { parts: [{ text: systeme }] },
-        contents: [{ role: "user", parts }],
-        generationConfig: { temperature: temperature === undefined ? 0.4 : temperature, responseMimeType: "application/json" }
-    }));
+    const corps = (avecReflexion) => {
+        const generationConfig = { temperature: temperature === undefined ? 0.4 : temperature, responseMimeType: "application/json" };
+        if (avecReflexion) generationConfig.thinkingConfig = { thinkingLevel: avecReflexion };
+        return JSON.stringify({ systemInstruction: { parts: [{ text: systeme }] }, contents: [{ role: "user", parts }], generationConfig });
+    };
+    let res = null;
+    if (narrateur && typeof window.reglagesNarrateur === "function") {
+        const r = window.reglagesNarrateur(), fiche = (window.MODELES_NARRATEUR || []).find(m => m.id === r.modele);
+        res = await window.fetchGemini("combat", corps(fiche && fiche.reflexion ? r.reflexion : null), { modele: r.modele });
+        if (!res.ok) { console.warn(`[Combat du récit] ${r.modele} refusé (${res.status}) : Flash-Lite prend le relais.`); res = null; }
+    }
+    if (!res) res = await window.fetchGemini("combat", corps(null));
     const data = await res.json();
     if (!res.ok || data.error) throw new Error((data.error && data.error.message) || `Gemini ${res.status}`);
     if (typeof window.ajouterTokens === "function" && data.usageMetadata) window.ajouterTokens(data.usageMetadata.totalTokenCount || 0);
@@ -819,7 +828,8 @@ RÈGLES :
 - Le sol libre (dallage, herbe, sable, plancher, tapis), les ombres, les petits objets : rien.
 - Les passages restent libres : portes, brèches, ponts, gués, escaliers praticables.
 - "box_2d" : [ymin, xmin, ymax, xmax], des entiers de 0 à 1000 (0,0 = coin haut gauche de l'image, 1000,1000 = coin bas droit).
-- Au plus 40 éléments. La plus grande partie de la carte doit rester praticable.
+- Au plus 30 éléments. La plus grande partie de la carte doit rester praticable : un combat tactique a besoin d'espace.
+- SOBRIÉTÉ (v312) : un "mur" seulement pour ce qui est CLAIREMENT un obstacle haut et solide qu'on voit nettement sur l'image. Une tache sombre, une texture, une ombre, une bordure décorative, un motif du sol, un buisson bas : PAS un mur. Dans le doute, n'encadre rien ; mieux vaut trop peu de murs que trop.
 
 Réponds UNIQUEMENT en JSON : {"elements": [{"sorte": "mur", "nom": "colonne du portique", "box_2d": [120, 80, 180, 130]}]}`;
 
@@ -832,7 +842,7 @@ Inspire-toi du récit (une embuscade rapproche les ennemis, une charge les met f
 Réponds UNIQUEMENT en JSON : {"heros": [500, 200], "ennemis": [480, 780], "renforts": [[60, 900], [950, 820]], "raison": "une phrase"}`;
 
 const SORTES = { mur: "murs", infranchissable: "inaccessibles", difficile: "difficiles" };
-const PLAFONDS = { bloquees: 0.45, difficiles: 0.4 };   // en part des cases de la carte
+const PLAFONDS = { bloquees: 0.3, difficiles: 0.35 };   // en part des cases de la carte (v312 : moins de murs)
 // Les cadres de l'IA → leurs cases (pure : les bancs l'appellent).
 // `elements` : [{ sorte, box_2d: [ymin, xmin, ymax, xmax] (0…1000) }].
 window.zonesDepuisCadres = function(elements, cases, L, H, taille) {
@@ -932,7 +942,10 @@ async function peindreLeTerrain() {
     // 1. LES ZONES : la carte nue, encadrée par l'IA, passée sur la grille.
     let elements = [];
     if (img) try {
-        const r = await demanderJSON({ systeme: PROMPT_TERRAIN, temperature: 0.2, image: imageNue(img),
+        // v312 — Nico : « l'IA qui analyse le terrain pour le peindre fait beaucoup trop
+        // de murs partout : mets-lui la même IA payante que le narrateur, pour qu'elle
+        // réfléchisse et peigne mieux la map ».
+        const r = await demanderJSON({ systeme: PROMPT_TERRAIN, temperature: 0.2, image: imageNue(img), narrateur: true,
             texte: `--- LE LIEU DU COMBAT ---\n${(c.Lieu && c.Lieu.Titre) || ""}${c.Lieu && c.Lieu.Interieur ? " (intérieur)" : ""}\n${(c.Lieu && c.Lieu.Description) || ""}` });
         elements = Array.isArray(r && r.elements) ? r.elements : [];
     } catch (e) { console.error("🖌️ [MIA_TERRAIN_COMBAT] Zones impossibles :", e); }

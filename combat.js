@@ -5437,7 +5437,8 @@ const PISTE_MARGE_ETATS = 26;
 // mesures ci-dessus restent celles du dessin ; la largeur disponible, elle,
 // se lit à cette échelle (voir largeurMax).
 // v287 — Nico : « réduis un peu la taille des tokens sur la piste d'initiative » : 1,7.
-window.ECHELLE_PISTE_INITIATIVE = 1.7;
+// v312 — Nico : « réduis un peu la taille de la piste d'initiative de 33 % » : 1,14.
+window.ECHELLE_PISTE_INITIATIVE = 1.14;
 
 // L'ordre COMPLET de la manche en cours : { manche, ordre: [{id, initiative, idCarte}] }.
 window.PISTE_MANCHE = { manche: 0, ordre: [] };
@@ -5737,13 +5738,8 @@ function contenuTuilePiste(entree, cestSonTour, choix, choixNeuf) {
     const perso = entree.perso;
     const L = PISTE_LARGEUR_TUILE, H = PISTE_HAUTEUR_TUILE;
 
-    const pvMax = ((window.pvMaxCombattant ? window.pvMaxCombattant(perso) : (parseInt(perso.PV_Max) || 0) + (parseInt(perso.Dev_Mod_PV) || 0)) || 1);
-    const pvActuels = perso.PV_Actuels !== undefined ? parseInt(perso.PV_Actuels) : pvMax;
-    const pctPv = Math.min(100, Math.max(0, (pvActuels / pvMax) * 100));
-
-    const fatigueMax = window.fatigueMaxCombattant(perso);
-    const fatigue = perso.fatigueActuelle !== undefined ? parseInt(perso.fatigueActuelle) : fatigueMax;
-    const pctFatigue = Math.min(100, Math.max(0, (fatigue / fatigueMax) * 100));
+    // (v312 — Nico : « sur la piste d'initiative, retire les jauges de PV et de
+    // fatigue » : elles restent sous les pions du plateau.)
 
     // UNE CRÉATURE PORTE SON MÉDAILLON ROND, celui-là même qu'elle a sur le
     // plateau, et à la taille des portraits voisins : on reconnaît d'un coup
@@ -5814,13 +5810,6 @@ function contenuTuilePiste(entree, cestSonTour, choix, choixNeuf) {
             <span style="color: ${texteInitiative}; font-family: 'Cinzel', serif; font-size: 12px; font-weight: bold; text-shadow: ${texteInitiative === "#ffffff" ? "1px 1px 2px rgba(0,0,0,0.8)" : "0 1px 0 rgba(255,255,255,0.35)"};">${affichageInit}</span>
         </div>
 
-        <div style="position: absolute; bottom: 5px; left: -6px; width: 31px; height: 5px; background: #000; border: 1px solid #1a0f08; border-radius: 2px; transform: rotate(30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 3;">
-            <div style="position: absolute; top: 0; right: 0; width: ${pctPv}%; height: 100%; background: linear-gradient(to right, #e63946, #ff8b8b); transition: width 0.3s ease;"></div>
-        </div>
-
-        <div style="position: absolute; bottom: 5px; right: -6px; width: 31px; height: 5px; background: #000; border: 1px solid #1a0f08; border-radius: 2px; transform: rotate(-30deg); transform-origin: center; box-shadow: 0 2px 4px rgba(0,0,0,0.8); overflow: hidden; z-index: 3;">
-            <div style="position: absolute; top: 0; left: 0; width: ${pctFatigue}%; height: 100%; background: linear-gradient(to right, #c2a878, #fbf5bd); transition: width 0.3s ease;"></div>
-        </div>
         ${etatsHtml}
         ${badgeChoixPiste(choix, choixNeuf)}`;
 }

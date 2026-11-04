@@ -978,7 +978,7 @@ const AMBIANCE_ARCHETYPES = {
     "TANK CAC":          "créature massive et résistante qui encaisse (ours, golem, colosse...)",
     "SOUTIEN":           "soigneur ou soutien du groupe (chaman, oracle, prêtre corrompu...)",
     "DPS MAGE CAC":      "combattant magique de mêlée (moine élémentaire, lame enchantée...)",
-    "DPS DISTANCE":      "tireur à distance (archer, arbalétrier, frondeur...)",
+    "DPS DISTANCE":      "tireur à distance (archer, frondeur, lanceur de javelots — v312 : jamais d'arbalète, l'Antiquité n'en a pas)",
     "DPS MAGE DISTANCE": "lanceur de sorts à distance (mage noir, nécromancien, invocateur...)"
 };
 

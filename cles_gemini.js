@@ -53,6 +53,8 @@
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: corps,
+                // (v312) un délai d'attente (AbortController) peut l'interrompre.
+                signal: options && options.signal ? options.signal : undefined,
                 // v305 : l'usage voyage avec la requête (fetch l'ignore) : le relevé
                 // des dépenses (depenses_ia.js) écarte ainsi les IA du combat, qui
                 // partagent maintenant la clé du Narrateur.
