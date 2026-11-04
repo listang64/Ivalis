@@ -125,8 +125,8 @@ function caracsDe(id) {
 //  LES PAGES
 // ---------------------------------------------------------------------
 let pagesClans = [];
-const pagesFiche = {};          // fiche-g, fiche-d, comp-g, comp-d, forge-g, forge-d, inv-g, inv-d, dev-g, dev-d
-const ORDRE_FICHE = ["fiche-g", "fiche-d", "comp-g", "comp-d", "forge-g", "forge-d", "inv-g", "inv-d"];
+const pagesFiche = {};          // fiche-g, fiche-d, tal-g, tal-d, comp-g, comp-d, forge-g, forge-d, inv-g, inv-d, dev-g, dev-d
+const ORDRE_FICHE = ["fiche-g", "fiche-d", "tal-g", "tal-d", "comp-g", "comp-d", "forge-g", "forge-d", "inv-g", "inv-d"];
 const ORDRE_DEV = ["dev-g", "dev-d"];
 let heros = null;               // l'identifiant du héros affiché
 let carteOuverte = null;        // la compétence montrée sur la page de droite
@@ -299,6 +299,84 @@ function piece(metal) {
         <path class="reflet" d="M 14 22 Q 20 11 32 9"/></svg>`;
 }
 
+// LE LAVIS D'AQUARELLE (v315, Nico : « un peu d'aquarelle léger et irrégulier,
+// artistique ») : deux ou trois flaques de couleur aux bords tremblés (bruit
+// de Perlin qui déplace le contour), le pigment plus dense sur les bords comme
+// une eau qui sèche, un grain de papier qui le marbre. Les taches de sang des
+// blessures : un lavis à peine posé et des gouttes. La graine fixe le dessin :
+// il ne change pas d'un affichage à l'autre.
+const TEINTES_LAVIS = {
+    rouge: { couleurs: ["#b3261e", "#c8402f", "#8f1d15"], opacite: 0.34 },
+    jaune: { couleurs: ["#f0c21a", "#f5d23e"], opacite: 0.27 },
+    vert: { couleurs: ["#6fa64f", "#8dbb6a"], opacite: 0.19 },
+    beige: { couleurs: ["#c49a62", "#dcbc8c", "#a87d4c"], opacite: 0.3 },
+    gris: { couleurs: ["#6f6c66", "#8d8981", "#5b5852"], opacite: 0.2 },
+    sang: { couleurs: ["#a3201a", "#7d1610", "#c0352a"], opacite: 0.42, tachete: true }
+};
+let numeroLavis = 0;
+function lavis(teinte, graine, options) {
+    const t = TEINTES_LAVIS[teinte] || TEINTES_LAVIS.gris;
+    const o = options || {};
+    const r = hasard("lavis-" + teinte + "-" + graine);
+    const id = "filtre-lavis-" + (++numeroLavis);
+    const seed = Math.floor(r() * 900) + 1;
+    // Une flaque : un contour polaire bosselé autour de (cx, cy).
+    const flaque = (cx, cy, rx, ry, couleur, opacite) => {
+        const n = 14, pts = [];
+        const phase = r() * 6.28;
+        for (let i = 0; i < n; i++) {
+            const a = phase + (i / n) * Math.PI * 2;
+            const k = 0.82 + r() * 0.3;
+            pts.push([cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k]);
+        }
+        // Courbes lissées (Catmull-Rom → Bézier).
+        let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+        for (let i = 0; i < n; i++) {
+            const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+            const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+            const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+            d += ` C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+        }
+        return `<path d="${d} Z" fill="${couleur}" fill-opacity="${opacite.toFixed(2)}"/>`;
+    };
+    let formes = "";
+    if (t.tachete) {
+        formes += flaque(100, 50, 92, 40, t.couleurs[0], 0.28);
+        const n = 16 + Math.floor(r() * 10);
+        for (let i = 0; i < n; i++) {
+            const gros = r() < 0.25;
+            const rx = gros ? 5 + r() * 6 : 1.4 + r() * 3.4;
+            formes += flaque(8 + r() * 184, 8 + r() * 84, rx, rx * (0.7 + r() * 0.5), t.couleurs[i % t.couleurs.length], 0.55 + r() * 0.35);
+        }
+    } else {
+        const n = t.couleurs.length;
+        for (let i = 0; i < n; i++) {
+            const cx = 100 + (r() * 2 - 1) * 26, cy = 50 + (r() * 2 - 1) * 10;
+            formes += flaque(cx, cy, 70 + r() * 26 - i * 8, 32 + r() * 12 - i * 3, t.couleurs[i], i === 0 ? 0.85 : 0.5 + r() * 0.3);
+        }
+    }
+    // Où il déborde (la carte de compétence : sur un bord, au hasard).
+    let style = "";
+    if (o.deborde) {
+        const cote = Math.floor(r() * 4);
+        const e = 6 + r() * 6, l = (96 + e).toFixed(1) + "%";
+        style = ["left:-" + e.toFixed(1) + "%;width:" + l, "width:" + l, "top:-" + e.toFixed(1) + "%;height:" + l, "height:" + l][cote];
+        style = ` style="${style}"`;
+    }
+    return `<svg class="lavis lavis-${teinte}${o.deborde ? " lavis-deborde" : ""}" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true"${style}><defs><filter id="${id}" x="-20%" y="-30%" width="140%" height="160%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.025 0.05" numOctaves="3" seed="${seed}" result="bruit"/>
+        <feDisplacementMap in="SourceGraphic" in2="bruit" scale="${t.tachete ? 7 : 16}" xChannelSelector="R" yChannelSelector="G" result="forme"/>
+        <feTurbulence type="fractalNoise" baseFrequency="0.11" numOctaves="2" seed="${seed + 11}" result="grain"/>
+        <feColorMatrix in="grain" type="matrix" values="1.3 0 0 0 -0.15  1.3 0 0 0 -0.15  1.3 0 0 0 -0.15  1.3 0 0 0 -0.15" result="grainGris"/>
+        <feComposite in="forme" in2="grainGris" operator="arithmetic" k1="0.6" k2="0.55" k3="0" k4="0" result="marbre"/>
+        <feMorphology in="forme" operator="erode" radius="1.6" result="dedans"/>
+        <feComposite in="forme" in2="dedans" operator="out" result="bord"/>
+        <feGaussianBlur in="bord" stdDeviation="0.7" result="bordDoux"/>
+        <feGaussianBlur in="marbre" stdDeviation="0.5" result="eau"/>
+        <feMerge><feMergeNode in="eau"/><feMergeNode in="bordDoux"/></feMerge>
+      </filter></defs><g filter="url(#${id})" opacity="${t.opacite}">${formes}</g></svg>`;
+}
+
 // Le petit d20 d'un jet que l'Arbitre attend.
 const D20 = `<svg class="d20-fiche" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 2 L37 11 L37 29 L20 38 L3 29 L3 11 Z M20 2 L11 25 L29 25 Z M3 11 L11 25 M37 11 L29 25 M11 25 L20 38 L29 25 M3 29 L11 25 M37 29 L29 25"/></svg>`;
 
@@ -389,10 +467,69 @@ function htmlTalents(h) {
     }).join("");
     const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev();
     return `<div class="encart-fiche encart-talents">${cadre("talents-" + h.idPersonnage)}
-        <div class="titre-encart">Talents</div>
+        <div class="entete-encart-talents"><div class="titre-encart">Talents</div>
+          <button type="button" class="lien-fiche vers-talents" data-action="fiches" data-fa="talents">${dispo > 0 && moi ? `✦ ${dispo} à choisir` : "Tous les talents"} ›</button></div>
         ${lignes ? `<ul class="liste-talents">${lignes}</ul>` : `<p class="fiche-attente">Aucun talent encore.</p>`}
-        ${dispo > 0 && moi ? `<button type="button" class="lien-fiche talent-a-prendre" data-action="fiches" data-fa="talents">✦ ${dispo} talent${dispo > 1 ? "s" : ""} à choisir</button>` : ""}
       </div>`;
+}
+
+// LA DOUBLE PAGE DES TALENTS (v315, Nico : « intègre du mieux que tu
+// puisses la fenêtre des talents dans les pages de sa fiche ») : les sept
+// lignes de talents.js, Général et les six caractéristiques, chacune sous son
+// médaillon, avec la valeur de la carac et le compte des talents pris. Chaque
+// talent est une étiquette à l'encre : coché s'il est pris, cerclé d'or s'il
+// peut l'être (un toucher : la même demande que l'ancienne fenêtre), pâli et
+// cadenassé s'il manque la carac, « à venir » s'il n'est pas encore écrit. Un
+// appui long : son effet (pour ce héros s'il l'a).
+const LIGNES_PAR_PAGE = { gauche: [null, "force", "dex", "con"], droite: ["int", "sag", "cha"] };
+function htmlTalentsPage(h, cote) {
+    if (!window.LIGNES_TALENTS || !window.TALENTS || typeof window.etatTalent !== "function") {
+        return `<div class="contenu-page page-talents"><p class="fiche-attente">Les talents ne sont pas encore chargés.</p></div>`;
+    }
+    const pris = window.talentsDuPerso(h);
+    const dispo = typeof window.pointsTalentsDisponibles === "function" ? window.pointsTalentsDisponibles(h) : 0;
+    const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev();
+    const connues = typeof window.caracsConnuesPourTalents !== "function" || window.caracsConnuesPourTalents(h);
+    const lignes = window.LIGNES_TALENTS.filter(l => LIGNES_PAR_PAGE[cote].includes(l.cle)).map(ligne => {
+        const talents = window.TALENTS.filter(t => t.carac === ligne.cle);
+        const prisLigne = talents.reduce((s, t) => s + (pris[t.id] || 0), 0);
+        const total = talents.reduce((s, t) => s + (t.aVenir ? 0 : t.max), 0);
+        const valeur = ligne.cle && connues && typeof window.caracPourTalents === "function" ? window.caracPourTalents(h, ligne.cle) : null;
+        const etiquettes = talents.map(t => {
+            const e = window.etatTalent(h, t.id);
+            const rangs = e.rangs || 0;
+            const classes = ["talent-livre"];
+            if (rangs > 0) classes.push("pris");
+            if (e.complet) classes.push("complet");
+            if (e.ok && moi) classes.push("prenable");
+            if (e.verrou) classes.push("verrou");
+            if (e.aVenir) classes.push("a-venir");
+            const effet = rangs > 0 && typeof window.resumeTalent === "function" ? window.resumeTalent(h, t.id) : t.texte;
+            const texte = [effet, rangs > 0 && t.texte !== effet ? t.texte : "",
+                e.verrou || e.aVenir ? e.raison : (e.ok && moi ? "Touche pour le prendre." : "")].filter(Boolean).join("\n\n");
+            const r = hasard("talent-" + t.id + h.idPersonnage);
+            return `<button type="button" class="${classes.join(" ")}" data-action="fiches" data-fa="talent" data-id="${t.id}" style="--penche:${((r() * 2 - 1) * 1.2).toFixed(2)}deg"
+                      ${aide(t.nom + (t.max > 1 ? ` (${rangs}/${t.max})` : ""), texte)}>
+                <span class="coche-talent">${rangs > 0 ? "✔" : e.verrou ? "🔒" : "○"}</span>
+                <span class="nom-talent-livre">${echapper(t.nom)}</span>
+                ${t.max > 1 ? `<small class="rangs-talent">${rangs}/${t.max}</small>` : ""}
+                <small class="exigence-talent">${e.aVenir ? "à venir" : echapper(window.libelleExigenceTalent(t))}</small>
+              </button>`;
+        }).join("");
+        return `<section class="ligne-talents-livre" data-ligne="${ligne.icone}">
+            <div class="tete-ligne-talents">${typeof window.medaillonTalent === "function" ? window.medaillonTalent(ligne.icone, 40) : ""}
+              <span class="nom-ligne-talents">${echapper(ligne.nom)}</span>
+              ${valeur !== null ? `<span class="valeur-ligne-talents">${ligne.court} ${valeur}</span>` : ""}
+              <span class="compte-ligne-talents">${prisLigne}/${total}</span></div>
+            <div class="etiquettes-talents">${etiquettes}</div>
+          </section>`;
+    }).join("");
+    const entete = cote === "gauche"
+        ? `<div class="entete-fiche"><span class="titre-page-fiche">Talents</span>
+             <span class="points-talents${dispo > 0 ? " a-placer" : ""}" ${aide("Points de talent", "Un point par niveau. Un talent pris ne se retire pas.")}>${dispo > 0 ? `✦ <b>${dispo}</b> à choisir` : "Aucun point à placer"}</span></div>`
+        : "";
+    const pied = cote === "droite" ? `<button type="button" class="lien-fiche retour-fiche" data-action="fiches" data-fa="retour-fiche">‹ La fiche</button>` : "";
+    return `<div class="contenu-page page-talents">${entete}${lignes}${pied}</div>`;
 }
 
 function htmlBlessures(h) {
@@ -404,7 +541,7 @@ function htmlBlessures(h) {
         const reste = typeof window.resteBlessure === "function" ? window.resteBlessure(inst) : "";
         return `<li class="blessure-fiche" ${aide(b.nom, (b.texte || "") + (reste ? `\n\nReste : ${reste}` : ""))}>✗ ${echapper(b.nom)}${reste ? ` <small>${echapper(reste)}</small>` : ""}</li>`;
     }).join("");
-    return `<div class="encart-fiche encart-blessures-fiche">${cadre("blessures-" + h.idPersonnage)}
+    return `<div class="encart-fiche encart-blessures-fiche">${lavis("sang", "blessures-" + h.idPersonnage)}${cadre("blessures-" + h.idPersonnage)}
         <div class="titre-encart">Blessures</div>
         ${mort ? `<p class="mort-fiche">✝ ${echapper(nomHeros(h))} a succombé à ses blessures.</p>` : ""}
         ${lignes ? `<ul class="liste-blessures">${lignes}</ul>` : (mort ? "" : `<p class="fiche-attente">Aucune blessure.</p>`)}
@@ -423,15 +560,15 @@ function htmlFicheDroite(h) {
           <div class="niveau-fiche">Niveau <b>${niveau}</b></div>
           <div class="jauge-niveau" data-pct="${Math.round(Math.max(0, Math.min(1, pct)) * 100)}">${jaugeCrayon(pct, h.idPersonnage + "-" + niveau)}</div>
         </div>
-        <div class="encart-fiche encart-identite">${cadre("identite-" + h.idPersonnage)}
+        <div class="encart-fiche encart-identite">${lavis("beige", "identite-" + h.idPersonnage)}${cadre("identite-" + h.idPersonnage)}
           <span class="morceau-identite" ${aide(h.race || "Race", descriptionRace(h))}><small>Race</small> ${echapper(h.race || "—")}</span>
           <span class="morceau-identite" ${aide(classeDe(h) || "Classe", descriptionClasse(h))}><small>Classe</small> ${echapper(classeDe(h) || "—")}</span>
         </div>
         ${htmlCaracs(h)}
         <div class="rangee-vitale">
-          <div class="vital-fiche" ${aide("Points de vie", "Ce que le héros encaisse avant de tomber. La Constitution les fait monter.")}>${cadre("pv-" + h.idPersonnage)}<b>${val("pvMaxCombattant", h.PV_Max || 0)}</b><span>Points de vie</span></div>
-          <div class="vital-fiche" ${aide("Fatigue max", "L'énergie du héros : chaque technique en coûte.")}>${cadre("fat-" + h.idPersonnage)}<b>${val("fatigueMaxCombattant", 100)}</b><span>Fatigue max</span></div>
-          <div class="vital-fiche" ${aide("Régénération", "La part d'énergie rendue à chaque tour.")}>${cadre("reg-" + h.idPersonnage)}<b>${val("regenerationCombattant", 0)} %</b><span>Régén.</span></div>
+          <div class="vital-fiche" ${aide("Points de vie", "Ce que le héros encaisse avant de tomber. La Constitution les fait monter.")}>${lavis("rouge", "pv-" + h.idPersonnage)}${cadre("pv-" + h.idPersonnage)}<b>${val("pvMaxCombattant", h.PV_Max || 0)}</b><span>Points de vie</span></div>
+          <div class="vital-fiche" ${aide("Fatigue max", "L'énergie du héros : chaque technique en coûte.")}>${lavis("jaune", "fat-" + h.idPersonnage)}${cadre("fat-" + h.idPersonnage)}<b>${val("fatigueMaxCombattant", 100)}</b><span>Fatigue max</span></div>
+          <div class="vital-fiche" ${aide("Régénération", "La part d'énergie rendue à chaque tour.")}>${lavis("vert", "reg-" + h.idPersonnage)}${cadre("reg-" + h.idPersonnage)}<b>${val("regenerationCombattant", 0)} %</b><span>Régén.</span></div>
         </div>
         ${htmlTalents(h)}
         <div class="rangee-defenses">
@@ -547,16 +684,40 @@ function htmlCarte(h, id) {
     const puissance = typeof window.fatigueDeSurpuissance === "function" ? window.fatigueDeSurpuissance(data, h) : (Number(data.Fatigue) || fatigue);
     const surpuissance = typeof window.texteSurpuissance === "function" ? window.texteSurpuissance(puissance) : "";
     const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev();
+    // LES SYMBOLES DU COMBAT (v315, Nico : « les mêmes symboles qu'en mode
+    // combat, dans le visuel qui lance l'attaque ») : les montants de l'encart
+    // (ligneEffetsCarte, combat.js : l'explosion, la baguette, la tête qui
+    // ondule, la croix des soins, le chiffre vrai), la petite cible de la
+    // distance et la zone en hexagones — repeints à l'encre pour le papier.
+    const sym = window.SYMBOLES_ENCART || {};
+    const distance = typeof window.distanceEncartCarte === "function" ? window.distanceEncartCarte(data, h) : null;
+    const zone = typeof window.dessinZoneCarte === "function" ? window.dessinZoneCarte(data, "#7a5634", 12) : "";
+    let effets = null;
+    if (typeof window.ligneEffetsCarte === "function") {
+        try { effets = window.ligneEffetsCarte(data, h); } catch (e) { console.warn("Le livre : les effets de la carte", e); }
+    }
+    const corps = effets !== null
+        ? `<div class="carte-effets carte-effets-encart">${effets}</div>`
+        : `<ul class="carte-effets">${lignesEffets(data, h)}</ul>`;
+    const noteSurpuissance = surpuissance && !(effets && effets.includes("encart-surpuissance"));
     return `<div class="carte-encre" data-carte="${echapper(id)}">
+        ${lavis("gris", "carte-" + id, { deborde: true })}
         ${cadre("carte-" + id, 1.2)}${cadre("carte2-" + id, 2.2)}
         <div class="carte-entete">
           <span class="carte-init" ${aide("Initiative", "Plus elle est haute, plus la technique part tôt dans le tour.")}>${echapper(data.Initiative || 0)}</span>
           <span class="carte-titre">${echapper(data.Nom || "Technique")}</span>
           <span class="carte-fatigue" ${aide("Fatigue", "L'énergie que coûte la technique.")}>⚡ ${echapper(fatigue)}</span>
         </div>
-        ${arme ? `<div class="carte-arme">${arme}</div>` : ""}
+        ${arme || (distance && distance.portee) ? `<div class="carte-sous-titre">
+          ${arme ? `<span class="carte-arme">${arme}</span>` : "<span></span>"}
+          ${distance && distance.portee ? `<span class="carte-distance" ${aide("Distance", `La technique porte à ${distance.portee} cases.`)}>${sym.cible || "◎"}<b>${echapper(distance.portee)}</b></span>` : ""}
+        </div>` : ""}
         <svg class="fleuron fleuron-carte" viewBox="0 0 200 24" aria-hidden="true"><path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>
-        <ul class="carte-effets">${lignesEffets(data, h)}${surpuissance ? `<li class="effet"><b>Surpuissance ${echapper(surpuissance)}</b></li>` : ""}</ul>
+        <div class="carte-corps${zone ? " avec-zone" : ""}">
+          ${zone ? `<div class="carte-zone" ${aide("Zone", "Les cases touchées autour du point visé (la case grise : le lanceur).")}>${zone}</div>` : ""}
+          ${corps}
+        </div>
+        ${noteSurpuissance ? `<p class="carte-note surpuissance">Surpuissance ${echapper(surpuissance)}</p>` : ""}
         ${technique ? `<p class="carte-note">Technique de classe : une fois par combat, hors mémoire.</p>`
           : (moi ? `<button type="button" class="lien-fiche bouton-memoriser" data-action="fiches" data-fa="memoriser" data-id="${echapper(id)}">${memorisee ? "Oublier pour le combat" : "Mémoriser pour le combat"}</button>` : "")}
         ${bloquee ? `<p class="carte-note bloquee">${echapper(bloquee)}</p>` : ""}
@@ -877,7 +1038,7 @@ function rentrerLesModales() {
         if (el && el.classList.contains("hors-fiche")) { el.classList.remove("hors-fiche"); remettre(el); }
     });
 }
-const PAGE_ONGLET = { "onglet-inventaire": "inv-g", "onglet-competences": "comp-g", "onglet-dev": "dev-g", "onglet-stats": "fiche-g" };
+const PAGE_ONGLET = { "onglet-talents": "tal-g", "onglet-inventaire": "inv-g", "onglet-competences": "comp-g", "onglet-dev": "dev-g", "onglet-stats": "fiche-g" };
 function ouvrirHeros(id, onglet, sansAller) {
     const h = herosParId(id);
     if (!h) return false;
@@ -920,7 +1081,7 @@ function brancherFicheAncienne() {
 function signatureFiche(h) {
     if (!h) return "";
     return JSON.stringify([h, caracsDe(h.idPersonnage), (window.CACHE_COMPETENCES_GLOBAL || {})[h.idPersonnage] || null,
-        deckDe(h), carteOuverte, modeDev(), (window.JETS_DEMANDES || []).length, !!joueurs, !!(window.RACES_MONDE || []).length]);
+        deckDe(h), carteOuverte, modeDev(), typeof window.talentsDuPerso === "function" ? window.talentsDuPerso(h) : null, (window.JETS_DEMANDES || []).length, !!joueurs, !!(window.RACES_MONDE || []).length]);
 }
 function majPlus(force) {
     const g = G();
@@ -941,7 +1102,7 @@ function majPlus(force) {
     const h = herosParId(heros);
     const sig = signatureFiche(h);
     if (!h) {
-        ["fiche-g", "fiche-d", "comp-g", "comp-d", "inv-g", "inv-d"].forEach(c => { if (pagesFiche[c]) pagesFiche[c].innerHTML = `<div class="contenu-page"><p class="fiche-attente">Aucun aventurier.</p></div>`; });
+        ["fiche-g", "fiche-d", "tal-g", "tal-d", "comp-g", "comp-d", "inv-g", "inv-d"].forEach(c => { if (pagesFiche[c]) pagesFiche[c].innerHTML = `<div class="contenu-page"><p class="fiche-attente">Aucun aventurier.</p></div>`; });
         preparerPagesForge();
         return;
     }
@@ -955,6 +1116,8 @@ function rendre(h) {
     const saisie = actif && actif.classList && actif.classList.contains("saisie-pieces") ? actif.dataset.metal : null;
     pagesFiche["fiche-g"].innerHTML = htmlAvatar(h);
     pagesFiche["fiche-d"].innerHTML = htmlFicheDroite(h);
+    pagesFiche["tal-g"].innerHTML = htmlTalentsPage(h, "gauche");
+    pagesFiche["tal-d"].innerHTML = htmlTalentsPage(h, "droite");
     pagesFiche["comp-g"].innerHTML = htmlCompetencesGauche(h);
     const avant = pagesFiche["comp-d"].querySelector(".carte-encre");
     const memeCarte = avant && avant.dataset.carte === carteOuverte;
@@ -1004,7 +1167,17 @@ function agir(cible) {
     if (fa === "forger") { son(); ouvrirForge(); return; }
     if (fa === "fermer-forge") { son(); if (typeof window.fermerForgeCompetence === "function") window.fermerForgeCompetence(); else fermerForge(true); return; }
     if (fa === "arme") { son(); if (typeof window.selectionnerArme === "function") window.selectionnerArme(cible.dataset.arme); setTimeout(majCodex, 30); return; }
-    if (fa === "talents") { son(); window.TALENTS_FICHE = h; if (typeof window.ouvrirTalents === "function") window.ouvrirTalents(); return; }
+    // Les talents ont leur double page (v315) ; un talent qu'on peut prendre
+    // ouvre la même demande que l'ancienne fenêtre (talents_ui.js).
+    if (fa === "talents") { son(); aller(pagesFiche["tal-g"]); return; }
+    if (fa === "talent") {
+        const id = cible.dataset.id;
+        if (!cible.classList.contains("prenable") || typeof window.demanderTalent !== "function") return;
+        window.TALENTS_FICHE = h;
+        window.demanderTalent(id);
+        return;
+    }
+    if (fa === "retour-fiche") { son(); aller(pagesFiche["fiche-g"]); return; }
     if (fa === "repartir") {
         son();
         const champ = document.getElementById("champ-id-personnage");

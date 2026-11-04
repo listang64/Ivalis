@@ -10505,3 +10505,35 @@ sur le sommaire, écriture, Aventuriers, récit), v309 (validation des ennemis).
 
 corrections_v314.mjs vérifie tout cela (9 échecs sur la v313). Tests mis à jour :
 v278 (la liste à cocher), v297 et v305 (la nouvelle couverture ; v297 la sert en local).
+
+## v315 — La fiche à l'aquarelle, les talents dans le livre, la carte aux symboles du combat, l'illustrateur qui voit les héros
+
+- Le sommaire : les chiffres romains (I-, II-…) prennent l'encre des titres (`color: inherit`),
+  au sommaire du livre comme à celui du récit.
+- Les taches de café des pages du récit sont retirées (tacheDeCafe, .tache-cafe) ; les
+  papiers vieillis (écriture, avatar) restent.
+- La fiche : sous le nom de l'avatar, une ombre noire (plus le papier clair qui remontait),
+  ombres portées du nom en noir.
+- Les lavis d'aquarelle (grimoire_fiches.js, lavis) : un SVG sous le texte (z-index -1,
+  encart isolé), deux ou trois flaques aux bords déplacés par un bruit (feTurbulence +
+  feDisplacementMap), le pigment plus dense au bord, un grain qui marbre ; graine fixe.
+  Points de vie rouge, fatigue jaune très léger, régénération vert très léger, blessures
+  rouge tacheté (un voile et des gouttes), race et classe beige nuancé (trois tons).
+- La carte de compétence : les symboles du combat (ligneEffetsCarte : l'explosion, la
+  baguette, la tête qui ondule, la croix des soins, le chiffre vrai), repeints pour le papier ;
+  la petite cible et la portée (distanceEncartCarte) ; la zone en hexagones à l'encre
+  (dessinZoneCarte) ; un lavis gris léger qui déborde sur un bord tiré au hasard.
+- Les talents : une double page après la fiche (tal-g, tal-d) — les sept lignes de
+  talents.js sous leur médaillon, valeur de la carac, compte ; chaque talent coché s'il est
+  pris, cerclé d'or s'il peut l'être (un toucher : demanderTalent pour ce héros), pâli et
+  cadenassé s'il manque la carac ; un appui long : son effet. « Talents » sur la fiche y mène.
+- MIA_ILLUSTRATEUR : les héros se lisent dans PERSOS_JOUEURS_PARTIE ET PERSOS_PARTIE (la
+  première pouvait être vide : aucun héros, aucune référence, trois inconnus) ; ceux du croquis
+  = nommés par l'agent + nommés dans sa description (+ ceux que cite le Narrateur s'il parle
+  du groupe sans nommer) ; même procédé que l'avatar rhabillé (portrait de référence en PNG
+  sur le magenta, image[] vers /images/edits, nom + genre/race/classe annoncés) ; un portrait
+  existant mais illisible : pas de croquis ; un héros sans portrait : décrit en mots. Qualité
+  « medium », dépôt q_auto:best. Prompt : seulement l'essentiel, pas de décor sauf s'il sert.
+
+corrections_v315.mjs vérifie tout cela (19 échecs sur la v314). Tests mis à jour : v313 (les
+effets de la carte), v314 (plus de taches ; qualité medium).

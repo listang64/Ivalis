@@ -201,12 +201,8 @@ await section(async () => {
   verifier("… son coin du haut arraché (une déchirure en dents de scie dans l'angle)", (r.clip.match(/%/g) || []).length > 20, r.clip.slice(0, 80));
   verifier("le papier où l'on écrit : vieilli, taché de café", r.ecriture >= 4, String(r.ecriture));
   verifier("le papier de l'avatar aussi", r.usure >= 3, String(r.usure));
-  verifier("des taches de café, légères, sur certaines pages du récit seulement", r.pages >= 6 && r.taches >= 1 && r.taches < r.pages && r.opacites.every(o => o > 0 && o <= 0.26), `${r.taches} / ${r.pages} pages, opacités ${r.opacites.join(",")}`);
-  const memes = await p.evaluate(() => { const a = [...document.querySelectorAll(".tache-cafe")].map(t => t.getAttribute("style")); window.GRIMOIRE_RECIT.rendre(); const b = [...document.querySelectorAll(".tache-cafe")].map(t => t.getAttribute("style")); return JSON.stringify(a) === JSON.stringify(b); });
-  verifier("une tache reste à sa place d'un affichage à l'autre", memes);
-  await p.evaluate(() => { const pg = document.querySelector(".tache-cafe").closest(".page-grimoire"); window.GRIMOIRE.allerALaPage(window.GRIMOIRE.indexDe(pg)); });
-  await p.waitForTimeout(2600); await pose();
-  await cap("v314_taches");
+  // (v315 : les taches de café du récit sont retirées, à la demande de Nico.)
+  verifier("(v315) plus de taches de café sur les pages du récit", r.pages >= 6 && r.taches === 0, `${r.taches} / ${r.pages} pages`);
 });
 
 // =========================================================================
@@ -230,7 +226,7 @@ await section(async () => {
   const a = await p.evaluate(() => window.__agent[0]);
   verifier("après le Narrateur, l'agent lit les messages des joueurs et la réponse du Narrateur", !!a && /je cours vers le comptoir/.test(a.corps.contents[0].parts[0].text) && /Varos éclate de rire/.test(a.corps.contents[0].parts[0].text) && /drôle|dramatique/.test(a.corps.systemInstruction.parts[0].text));
   const croquis = imagesIA.find(x => /edits/.test(x.url) && /pen-and-ink/.test(x.corps));
-  verifier("le croquis : à la plume, sur fond magenta (détouré), qualité « low » comme les pions", !!croquis && /#FF00FF/.test(croquis.corps) && /name="quality"\r\n\r\nlow/.test(croquis.corps), croquis ? croquis.url : imagesIA.map(x => x.url).join(","));
+  verifier("le croquis : à la plume, sur fond magenta (détouré), qualité « medium » (v315)", !!croquis && /#FF00FF/.test(croquis.corps) && /name="quality"\r\n\r\nmedium/.test(croquis.corps), croquis ? croquis.url : imagesIA.map(x => x.url).join(","));
   verifier("les héros du croquis en référence, avec leur nom (comme pour les avatars)", !!croquis && (croquis.corps.match(/name="image\[\]"/g) || []).length === 1 && /image 1 is Kaya/.test(croquis.corps), "");
   verifier("une scène : en paysage (1536 × 1024)", !!croquis && /name="size"\r\n\r\n1536x1024/.test(croquis.corps));
   const m = await p.evaluate(() => window.__docs["Messages_Chat/m1"]);

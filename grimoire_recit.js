@@ -459,41 +459,8 @@ function sommaireHtml() {
 // ---------------------------------------------------------------------
 //  LE RENDU : les pages de la suite, posées dans le livre
 // ---------------------------------------------------------------------
-// LES TACHES DE CAFÉ (v314). Nico : « dans les pages RP, de façon totalement
-// aléatoire et très légère, mets parfois une tache de café, de taille et de
-// position aléatoires, et pas à toutes les pages ». Une page sur quatre environ ;
-// le hasard est tiré de la partie et du numéro de la page : la tache ne bouge
-// pas d'un affichage à l'autre. Un anneau irrégulier, plus foncé sur un bord,
-// un voile clair dedans, parfois une éclaboussure.
-// (Le petit hasard du récit donne des suites voisines pour des graines voisines :
-// ici, la graine est d'abord bien mélangée — FNV-1a, puis mulberry32.)
-function hasardMelange(graine) {
-    let h = 2166136261 >>> 0;
-    for (const c of String(graine)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
-    return () => {
-        h = (h + 0x6D2B79F5) >>> 0;
-        let t = h;
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-}
-function tacheDeCafe(k) {
-    const r = hasardMelange("cafe-" + (etat.idPartie || "") + "-" + k);
-    if (r() > 0.27) return "";
-    const t = 22 + r() * 22, x = 4 + r() * (88 - t), y = 6 + r() * (82 - t * 0.9), rot = Math.round(r() * 360), o = (0.13 + r() * 0.12).toFixed(2);
-    const anneau = (rayon, ecart) => {
-        let d = "";
-        for (let i = 0; i <= 36; i++) {
-            const a = i / 36 * Math.PI * 2, k2 = rayon + Math.sin(a * 3 + ecart) * 1.3 + (r() - 0.5) * 1.1;
-            d += `${i ? "L" : "M"} ${(50 + Math.cos(a) * k2).toFixed(1)} ${(50 + Math.sin(a) * k2).toFixed(1)} `;
-        }
-        return d + "Z";
-    };
-    const goutte = r() < 0.5 ? `<circle cx="${(82 + r() * 10).toFixed(1)}" cy="${(14 + r() * 12).toFixed(1)}" r="${(1.5 + r() * 2.5).toFixed(1)}" class="eclat"/>` : "";
-    return `<svg class="tache-cafe" viewBox="0 0 100 100" aria-hidden="true" style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;width:${t.toFixed(1)}%;opacity:${o};transform:rotate(${rot}deg)">
-        <path class="voile" d="${anneau(40, 0)}"/><path class="bord" d="${anneau(41, 1.7)}"/><path class="bord fin" d="${anneau(38.5, 3.1)}"/>${goutte}</svg>`;
-}
+// (v315 : les taches de café des pages du récit sont retirées — Nico : « ce
+// n'est pas beau ». Les papiers vieillis restent.)
 function creerPage(i) {
     const el = document.createElement("div");
     el.className = `page-grimoire page-papier ${(premiereSuite() + i) % 2 === 1 ? "gauche" : "droite"} page-suite`;
@@ -515,7 +482,7 @@ function rendre() {
     }
     const recit = paginer(entrees);
     // (Une page de droite garde sa marge basse pour le parchemin d'écriture.)
-    const html = [...sommaireHtml(), ...recit.map((h, k) => `<div class="contenu-page page-recit">${tacheDeCafe(k)}${h}</div>`)];
+    const html = [...sommaireHtml(), ...recit.map(h => `<div class="contenu-page page-recit">${h}</div>`)];
     let change = html.length !== etat.elements.length;
     while (etat.elements.length < html.length) etat.elements.push(creerPage(etat.elements.length));
     if (etat.elements.length > html.length) etat.elements.length = html.length;

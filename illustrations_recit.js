@@ -27,6 +27,26 @@
 //       (Portraits_PNJ du message).
 //  Pas à chaque réponse : seulement quand l'IA trouve un vrai moment, et au
 //  plus une illustration toutes les deux réponses du Narrateur.
+//
+//  v315 (Nico : « l'IA n'a pas reçu le design de mes personnages, elle a créé
+//  trois personnages inconnus ; utilise le même procédé que pour l'image de
+//  référence de l'avatar quand il change d'habit ; l'image est pixelisée ; pas
+//  forcément de fond, on ne dessine que ce qui est strictement important ») :
+//    · les héros se lisent dans les DEUX listes de la partie (la liste des
+//      joueurs pouvait être vide : aucun héros, aucune référence) ; ceux du
+//      croquis sont ceux que l'agent nomme, plus ceux dont le prénom est écrit
+//      dans sa description ; s'il parle du groupe sans les nommer, ceux que le
+//      Narrateur cite ;
+//    · comme pour l'avatar rhabillé (objets_ia.js, dessinerAvatarHabille) :
+//      chaque portrait de référence (urlPortraitReference, sinon l'avatar),
+//      mis en PNG carré sur le magenta (imageVersBlobPng), joint en image[] à
+//      /v1/images/edits, dans l'ordre annoncé par le texte, qualité
+//      « medium » ; un héros dont le portrait ne se lit pas : pas de croquis
+//      (plutôt rien que trois inconnus) ; un héros qui n'a encore aucun
+//      portrait : décrit en mots (genre, race, classe) ;
+//    · qualité « medium » (au lieu de « low ») et dépôt en q_auto:best ;
+//    · le croquis ne montre que l'essentiel : les personnages, et un décor
+//      seulement s'il sert ce qu'on raconte.
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, updateDoc, setDoc, getDocs, collection, query, where } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
@@ -34,7 +54,7 @@ import { doc, updateDoc, setDoc, getDocs, collection, query, where } from "https
 const R = window.REGLAGES_ILLUSTRATIONS = window.REGLAGES_ILLUSTRATIONS || {
     actif: true,
     ecart: 2,                 // au plus une illustration toutes les N réponses du Narrateur
-    qualite: "low",           // comme les pions (window.QUALITE_PION_ENNEMI)
+    qualite: "medium",        // v315 : « low » donnait un trait pixelisé (l'avatar rhabillé : medium)
     tailleMin: 0.42, tailleMax: 0.82,   // largeur de l'illustration, en part de la page
     portraitsMax: 2           // portraits pleine page par réponse, au plus
 };
@@ -43,7 +63,36 @@ const lireCles = () => (typeof window.clesApiIvalis === "function" ? window.cles
 const aLesCles = () => { const c = lireCles(); return !!(c.openai && c.cloudName && c.cloudKey && c.cloudSecret) && typeof window.fetchGemini === "function"; };
 const sansAccent = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 const memeNom = (a, b) => { const x = sansAccent(a), y = sansAccent(b); return !!x && !!y && (x === y || x.split(/\s+/)[0] === y.split(/\s+/)[0]); };
-const herosDeLaPartie = () => (window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || []).filter(p => p && !p.estIllusion && (!p.camp || p.camp === "Allié"));
+// (v315 : les deux listes, réunies — PERSOS_JOUEURS_PARTIE peut être un tableau vide.)
+function herosDeLaPartie() {
+    const vus = new Set();
+    return [...(window.PERSOS_JOUEURS_PARTIE || []), ...(window.PERSOS_PARTIE || [])].filter(p => {
+        if (!p || p.estIllusion || p.estMonstre || (p.camp && p.camp !== "Allié") || !p.prenom) return false;
+        const cle = p.idPersonnage || p.prenom;
+        if (vus.has(cle)) return false;
+        vus.add(cle);
+        return true;
+    });
+}
+// Le prénom écrit dans un texte, en mot entier (sans accents ni casse).
+const nommeDans = (texte, prenom) => {
+    const t = " " + sansAccent(texte).replace(/[^a-z0-9]+/g, " ") + " ";
+    const n = sansAccent(prenom).replace(/[^a-z0-9]+/g, " ").trim();
+    return !!n && t.includes(" " + n + " ");
+};
+// LES HÉROS DU CROQUIS : ceux que l'agent nomme, ceux que sa description
+// nomme ; s'il parle d'eux sans les nommer (« the heroes », « the group »…),
+// ceux que le Narrateur cite.
+function herosDuCroquis(avis, texteMJ) {
+    const tous = herosDeLaPartie();
+    const choisis = tous.filter(h => (avis.heros || []).some(n => memeNom(h.prenom, n)) || nommeDans(avis.description || "", h.prenom));
+    if (!choisis.length && /\b(heroes|hero|heroine|adventurers?|companions?|party|group|travell?ers?|friends)\b/i.test(avis.description || "")) {
+        return tous.filter(h => nommeDans(texteMJ || "", h.prenom)).slice(0, 4);
+    }
+    return choisis.slice(0, 4);
+}
+const decrireHeros = (h) => [h.genre ? (/f/i.test(h.genre) ? "a woman" : "a man") : "", h.race, h.classe].filter(Boolean).join(", ");
+window.herosDuCroquisIllustrateur = herosDuCroquis;   // (pour les bancs)
 
 // LA CADENCE : les réponses du Narrateur depuis la dernière illustration (par partie).
 const cleCadence = () => "ivalis_illus_ecart_" + (window.ID_PARTIE_COURANTE || "");
@@ -57,9 +106,9 @@ const PROMPT_AGENT = `Tu es MIA_ILLUSTRATEUR, l'illustrateur du carnet de voyage
 
 QUAND DESSINER : seulement un moment qui marque — drôle (une maladresse, une réplique, une situation absurde), dramatique (un danger, une perte, un affrontement, une révélation), ou attachant (un geste tendre, une rencontre, un instant de camaraderie), ou un lieu saisissant. Une réponse banale (on marche, on parle de la route, on achète du pain) : NE DESSINE PAS. Dans le doute, ne dessine pas.
 
-QUOI DESSINER : soit une SCÈNE (deux ou trois personnages en action, un lieu), soit UN PERSONNAGE en particulier (un héros, un PNJ). Décris concrètement ce que montre le croquis, en anglais, en une ou deux phrases (qui, quoi, où, l'attitude) — pas d'abstraction, pas de texte dans l'image.
+QUOI DESSINER : soit une SCÈNE (les personnages en action), soit UN PERSONNAGE en particulier (un héros, un PNJ), soit un LIEU saisissant. Ne dessine QUE ce qui est strictement important pour raconter le moment : les personnages concernés et, seulement s'il est indispensable, l'objet ou l'élément avec lequel ils agissent. PAS de décor ni d'arrière-plan, sauf si le lieu est lui-même le sujet ou qu'il est nécessaire pour comprendre le moment. Décris concrètement ce que montre le croquis, en anglais, en une ou deux phrases (qui, quoi, l'attitude) — pas d'abstraction, pas de texte dans l'image.
 
-LES HÉROS : n'en cite que ceux qui apparaissent DANS le croquis (leur prénom exact, dans la liste fournie).
+LES HÉROS : cite TOUS ceux qui apparaissent DANS le croquis (leur prénom exact, dans la liste fournie), et dans la description, désigne chacun par son prénom exact (jamais « a warrior », « the adventurers » : « Kaya », « Thorin »). N'ajoute AUCUN personnage anonyme qui ne serait pas dans la réponse du Narrateur.
 LES PNJ NOMMÉS : liste TOUS les personnages non-joueurs désignés par un VRAI nom propre dans la réponse du Narrateur (pas les héros, pas « l'aubergiste », pas un nom inventé par un héros pour bluffer), avec leur race (parmi celles du monde, Humain par défaut) et une description physique précise tirée du texte (ou plausible). Indique aussi ceux qui apparaissent dans le croquis.
 
 Réponds UNIQUEMENT en JSON :
@@ -86,7 +135,9 @@ async function demanderAgent(texteJoueurs, texteMJ) {
 // ---------------------------------------------------------------------
 const STYLE_CROQUIS = "A quick pen-and-ink sketch drawn with a quill in the margin of an old adventurer's travel journal: "
     + "confident dark brown-black iron-gall ink lines, loose hatching and cross-hatching for the shadows, a few small ink blots, "
-    + "lively and expressive like a master's study sketch. Ink only: no colour, no grey wash, no paper texture, no frame, no border, "
+    + "lively and expressive like a master's study sketch, crisp clean high-resolution lines. "
+    + "Draw ONLY what matters for the moment: the characters and, if essential, the one object or element they act with. "
+    + "No background, no scenery, no ground line, unless the place itself is the subject. Ink only: no colour, no grey wash, no paper texture, no frame, no border, "
     + "no text, no letters, no signature. The drawing floats alone on a flat, clean, pure fluorescent magenta (#FF00FF) background used "
     + "as a chroma key: every empty area is that exact magenta, with no gradient, no ground shadow, no paper. The magenta is only a "
     + "chroma key: the ink lines never take any purple, pink or magenta tint. "
@@ -96,19 +147,30 @@ const STYLE_CROQUIS = "A quick pen-and-ink sketch drawn with a quill in the marg
 const CADRAGES = { scene: "1536x1024", personnage: "1024x1024", portrait: "1024x1536" };
 const ratioDe = (taille) => { const [w, h] = taille.split("x").map(Number); return +(w / h).toFixed(4); };
 
-async function dessiner(prompt, references, cadrage) {
+async function dessiner(prompt, references, cadrage, options) {
+    const o = options || {};
     const cles = lireCles();
     const taille = CADRAGES[cadrage] || "1024x1024";
+    // LES RÉFÉRENCES, comme l'avatar rhabillé : le portrait mis en PNG carré sur
+    // le magenta (imageVersBlobPng), joint dans l'ordre que le texte annonce.
     const blobs = [];
     for (const r of references || []) {
         if (!r.url || typeof window.imageVersBlobPng !== "function") continue;
         const b = await window.imageVersBlobPng(r.url).catch(() => null);
         if (b) blobs.push({ ...r, blob: b });
+        else console.warn(`[MIA_ILLUSTRATEUR] Le portrait de ${r.nom} est illisible (${r.url}).`);
         if (blobs.length >= 4) break;
     }
-    const refsTexte = blobs.length ? " The reference images show the characters to draw, in this order: "
+    // Des héros sans leur image : on ne dessine pas des inconnus à leur place.
+    if (o.herosAttendus && blobs.filter(b => b.heros).length < o.herosAttendus) {
+        throw new Error(`MIA_ILLUSTRATEUR : ${o.herosAttendus} héros attendus, ${blobs.filter(b => b.heros).length} référence(s) lisible(s) — pas de croquis`);
+    }
+    console.log(`🖋️ [MIA_ILLUSTRATEUR] ${blobs.length} référence(s) jointe(s)${blobs.length ? " : " + blobs.map(b => b.nom).join(", ") : ""}.`);
+    const refsTexte = blobs.length ? ` The ${blobs.length} attached reference image${blobs.length > 1 ? "s show" : " shows"} the EXACT character${blobs.length > 1 ? "s" : ""} to draw, in this order: `
         + blobs.map((b, i) => `image ${i + 1} is ${b.nom}${b.qui ? " (" + b.qui + ")" : ""}`).join("; ")
-        + ". Keep each one recognisable (face, hair, build, clothing), translated into the ink sketch style. Do not copy their backgrounds or colours." : "";
+        + ". Each of them must be clearly recognisable as the person in their reference image: same face, hairstyle, hair colour, beard or not, build, "
+        + "age, clothing and equipment — only translated into the ink sketch style. Do not copy the references' backgrounds or colours. "
+        + "Do not add any other person than those named here and in the description." : "";
     const texte = `${STYLE_CROQUIS}${refsTexte} The sketch shows: ${prompt}`;
     const modeles = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1"];
     const delais = [5000, 15000, 30000];
@@ -143,9 +205,11 @@ async function dessiner(prompt, references, cadrage) {
     }
     if (!json) throw new Error("MIA_ILLUSTRATEUR : aucune image");
     const source = json.data[0].url || ("data:image/png;base64," + json.data[0].b64_json);
-    const url = typeof window.televerserImageDetoureeIvalis === "function"
+    const depot = typeof window.televerserImageDetoureeIvalis === "function"
         ? await window.televerserImageDetoureeIvalis(source, cadrage === "portrait" ? "PNJ" : "Recit/Illustrations", cles) : "";
-    if (!url) throw new Error("MIA_ILLUSTRATEUR : dépôt impossible");
+    if (!depot) throw new Error("MIA_ILLUSTRATEUR : dépôt impossible");
+    // (Un trait d'encre : la compression automatique la plus fine, pas d'escalier.)
+    const url = String(depot).replace("/upload/q_auto,f_auto/", "/upload/q_auto:best,f_auto/");
     return { url, ratio: ratioDe(taille) };
 }
 
@@ -211,13 +275,19 @@ window.illustrerLeRecit = async function (options) {
     // LE CROQUIS DU MOMENT.
     if (avis.illustrer && avis.description && ecart >= R.ecart) {
         const refs = [];
-        (avis.heros || []).forEach(n => {
-            const h = herosDeLaPartie().find(x => memeNom(x.prenom, n));
-            if (h) refs.push({ nom: h.prenom, qui: [h.genre && /f/i.test(h.genre) ? "a woman" : h.genre ? "a man" : "", h.race].filter(Boolean).join(", "), url: h.urlPortraitReference || h.urlCloudinary || "" });
-        });
+        const heros = herosDuCroquis(avis, o.texteMJ);
+        heros.forEach(h => refs.push({ nom: h.prenom, qui: decrireHeros(h), url: h.urlPortraitReference || h.urlCloudinary || "", heros: true }));
+        // Les héros du croquis se nomment dans la description (le dessinateur
+        // relie ainsi chaque prénom à son image).
+        const manquants = heros.filter(h => !nommeDans(avis.description, h.prenom)).map(h => h.prenom);
+        if (manquants.length) avis.description += ` (With ${manquants.join(" and ")}.)`;
         (avis.pnj_dans_le_croquis || []).forEach(n => { const f = Object.values(fiches).find(x => memeNom(x.Nom_PNJ, n)); if (f && f.URL_Cloudinary) refs.push({ nom: f.Nom_PNJ, qui: f.Race || "", url: f.URL_Cloudinary }); });
         try {
-            const img = await dessiner(avis.description, refs, avis.sujet === "personnage" ? "personnage" : "scene");
+            // (Un héros qui n'a encore aucun portrait se dit en mots ; celui dont le
+            // portrait existe mais ne se lit pas arrête le croquis.)
+            const sansImage = heros.filter(h => !(h.urlPortraitReference || h.urlCloudinary));
+            if (sansImage.length) avis.description += " " + sansImage.map(h => `${h.prenom} is ${decrireHeros(h) || "an adventurer"}.`).join(" ");
+            const img = await dessiner(avis.description, refs, avis.sujet === "personnage" ? "personnage" : "scene", { herosAttendus: heros.length - sansImage.length });
             const taille = +(R.tailleMin + Math.random() * (R.tailleMax - R.tailleMin)).toFixed(3);
             resultat.illustration = { Url: img.url, Ratio: img.ratio, Taille: taille, Moment: String(avis.moment || ""), Sujet: avis.sujet === "personnage" ? "personnage" : "scene", Le: Date.now() };
             await updateDoc(ref, { Illustration: resultat.illustration });

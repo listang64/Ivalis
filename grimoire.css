@@ -360,7 +360,8 @@
 .entete-index { font-weight: 400; font-size: calc(var(--u) * 9); letter-spacing: 0.04em; margin-left: 0; }
 .nom-partie-index { font-size: calc(var(--u) * 4.6); color: #6b3e1c; margin-top: calc(var(--u) * -0.6); min-height: 1em; text-align: center; }
 .entree-index { font-weight: 400; font-style: normal; }
-.numero-index { color: #6b3e1c; margin-right: 0.15em; }
+/* v315 : les chiffres romains de la même encre que les titres. */
+.numero-index { color: inherit; margin-right: 0.15em; }
 /* Le fond du sommaire : l'image de Nico à 20 %, étirée sur la double page
    (chaque page en montre sa moitié, jusqu'à ses bords). */
 .fond-sommaire { position: absolute; inset: 0; background-repeat: no-repeat; background-size: 200% 100%; opacity: 0.2; pointer-events: none; }

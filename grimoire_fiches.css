@@ -50,13 +50,15 @@
 .avatar-heros.absente { display: none; }
 .avatar-absent { margin: auto; font-style: italic; color: #6b4a2b; font-size: calc(var(--u) * 4); }
 /* Les pieds de l'image : le papier remonte, sous le nom. */
-.pied-avatar { position: absolute; left: 0; right: 0; bottom: 0; height: 26%; pointer-events: none;
-  background: linear-gradient(180deg, rgba(222, 200, 160, 0) 0%, rgba(214, 190, 148, 0.55) 45%, rgba(206, 180, 136, 0.8) 100%); }
+/* v315 (Nico : « sous le nom, l'ombre portée est en blanc, mets-la plutôt
+   noire ») : plus de papier clair qui remonte sous le nom, une ombre noire. */
+.pied-avatar { position: absolute; left: 0; right: 0; bottom: 0; height: 30%; pointer-events: none;
+  background: radial-gradient(ellipse 46% 30% at 50% 66%, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.36) 45%, rgba(0, 0, 0, 0) 100%); }
 .nom-heros-fiche { position: absolute; left: calc(var(--u) * 6); right: calc(var(--u) * 6); bottom: calc(var(--u) * 7); z-index: 2;
   white-space: nowrap; text-align: center; line-height: 1.25; font-size: calc(var(--u) * 12 * var(--echelle-titres, 1));
   background: linear-gradient(180deg, #fff3b8 0%, #f0cf63 38%, #c8952c 62%, #8a5d12 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.15) rgba(30, 14, 2, 0.95)) drop-shadow(0 calc(var(--u) * 1) calc(var(--u) * 1.4) rgba(30, 14, 2, 0.7)); }
+  filter: drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.15) rgba(0, 0, 0, 0.95)) drop-shadow(0 calc(var(--u) * 1) calc(var(--u) * 1.4) rgba(0, 0, 0, 0.8)); }
 
 /* ---------------------------- LES ENCARTS ---------------------------- */
 .encart-fiche { position: relative; padding: calc(var(--u) * 1.6) calc(var(--u) * 2.6); }
@@ -268,3 +270,84 @@
 /* (v313) Les liens d'un objet, un peu loin du bord du cadre. */
 .objet-actions { padding-right: calc(var(--u) * 2); }
 .page-fiches .page-carte-competence { justify-content: flex-start; padding-top: calc(var(--u) * 14); }
+
+/* =========================================================================
+   v315 — LE LAVIS D'AQUARELLE (grimoire_fiches.js, lavis) : sous le texte,
+   un peu plus large que l'encart, irrégulier. La carte de compétence : gris
+   léger, qui déborde sur un bord.
+   ========================================================================= */
+.encart-fiche, .vital-fiche, .carte-encre { isolation: isolate; }
+.lavis { position: absolute; left: -3%; top: -9%; width: 106%; height: 118%; z-index: -1; pointer-events: none; overflow: visible;
+  mix-blend-mode: multiply; }
+/* (Un SVG en position absolue garde sa taille propre : largeur et hauteur explicites.) */
+.vital-fiche .lavis { left: -5%; top: -12%; width: 110%; height: 124%; }
+.lavis-deborde { left: 4%; top: 4%; width: 92%; height: 92%; }
+
+/* La carte de compétence avec les symboles du combat (ligneEffetsCarte),
+   repeints pour le papier : l'encre pour le texte, des couleurs sourdes pour
+   les montants. */
+.carte-sous-titre { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * 2); }
+.carte-distance { display: inline-flex; align-items: center; gap: 0.25em; font-size: calc(var(--u) * 4); font-weight: 700; color: #2b1a0e; }
+.carte-distance .encart-symbole { width: 1em; height: 1em; }
+.carte-corps { display: flex; align-items: flex-start; gap: calc(var(--u) * 3); }
+.carte-corps .carte-effets { flex: 1; min-width: 0; }
+.carte-zone { flex: none; width: 26%; display: flex; justify-content: center; padding-top: calc(var(--u) * 1); }
+.carte-zone svg { width: 100%; height: auto; max-height: calc(var(--u) * 26); filter: none !important; }
+.carte-zone polygon { stroke: #2b1a0e !important; stroke-width: 1.2 !important; fill-opacity: 0.55 !important; }
+.carte-effets-encart { display: block !important; font-size: calc(var(--u) * 3.1); line-height: 1.3; color: #2b1a0e; text-shadow: none; }
+.carte-effets-encart > div { color: #2b1a0e !important; margin-top: calc(var(--u) * 0.8) !important; }
+.carte-effets-encart > div:first-child { margin-top: 0 !important; }
+.carte-effets-encart > div > div { color: #2b1a0e !important; }
+.carte-effets-encart > div > div + div { color: #4a2e1b !important; font-size: 0.88em !important; margin-left: calc(var(--u) * 3) !important; }
+.carte-effets-encart span { color: #6b4a2b !important; }
+.carte-effets-encart .encart-montant { display: flex; align-items: center; gap: 0.3em; font-weight: 700; font-size: 1.15em; }
+.carte-effets-encart .encart-montant[data-nature="physique"], .carte-effets-encart .encart-montant[data-nature="brut"] { color: #9e1f14 !important; }
+.carte-effets-encart .encart-montant[data-nature="magique"] { color: #1d5b94 !important; }
+.carte-effets-encart .encart-montant[data-nature="mental"] { color: #63399a !important; }
+.carte-effets-encart .encart-montant[data-nature="soin"] { color: #2a7430 !important; }
+.carte-effets-encart .encart-symbole { flex-shrink: 0; }
+.carte-effets-encart .encart-chiffre { font-size: 1.15em; color: inherit !important; font-style: normal; }
+.carte-effets-encart .encart-surpuissance { font-style: normal; }
+.carte-effets-encart .encart-surpuissance { color: #9a6a06 !important; font-size: 0.8em; }
+.carte-effets-encart .encart-etalement { color: #5c3a21 !important; font-weight: 400; font-style: italic; font-size: 0.8em; }
+.carte-note.surpuissance { color: #9a6a06; }
+
+/* La fiche : l'encart des talents mène à leur double page. */
+.entete-encart-talents { display: flex; align-items: baseline; justify-content: space-between; gap: calc(var(--u) * 2); }
+.vers-talents { font-size: calc(var(--u) * 2.9) !important; align-self: auto; }
+
+/* =========================================================================
+   v315 — LA DOUBLE PAGE DES TALENTS
+   ========================================================================= */
+.page-talents { gap: calc(var(--u) * 2.2) !important; }
+.points-talents { font-size: calc(var(--u) * 3.2); color: #5c3a21; white-space: nowrap; }
+.points-talents.a-placer { color: #6b1a10; }
+.points-talents b { font-size: 1.3em; }
+.ligne-talents-livre { display: flex; flex-direction: column; gap: calc(var(--u) * 1); }
+.tete-ligne-talents { display: flex; align-items: center; gap: calc(var(--u) * 1.6); border-bottom: 1px solid rgba(43, 26, 14, 0.35); padding-bottom: calc(var(--u) * 0.5); }
+.tete-ligne-talents .talents-medaillon { width: calc(var(--u) * 6); height: calc(var(--u) * 6); flex: none; filter: sepia(0.35) saturate(0.8); }
+.nom-ligne-talents { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important;
+  font-size: calc(var(--u) * 4.4 * var(--echelle-titres, 1)); color: #24150a; line-height: 1.1; flex: 1; }
+.valeur-ligne-talents { font-size: calc(var(--u) * 2.8); color: #5c3a21; letter-spacing: 0.06em; }
+.compte-ligne-talents { font-size: calc(var(--u) * 2.8); color: #6b4a2b; min-width: 2.6em; text-align: right; }
+.etiquettes-talents { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 1) calc(var(--u) * 1.6); }
+.talent-livre { position: relative; isolation: isolate; display: flex !important; align-items: baseline; gap: calc(var(--u) * 0.8); text-align: left;
+  padding: calc(var(--u) * 0.7) calc(var(--u) * 1.2) !important; font-size: calc(var(--u) * 3) !important; line-height: 1.15;
+  transform: rotate(var(--penche, 0deg)); border-radius: 3px; }
+.talent-livre .coche-talent { flex: none; width: 1.1em; text-align: center; color: #6b4a2b; }
+.talent-livre .nom-talent-livre { flex: 1; min-width: 0; }
+.talent-livre .rangs-talent { color: #6b4a2b; font-size: 0.8em; }
+.talent-livre .exigence-talent { flex: none; color: #8a6a4a; font-size: 0.72em; font-style: italic; }
+.talent-livre.pris { font-weight: 700; }
+.talent-livre.pris .coche-talent { color: #24150a; }
+.talent-livre.pris::after { content: ""; position: absolute; left: 4%; right: 6%; bottom: 8%; height: 0.32em; z-index: -1;
+  background: rgba(196, 154, 98, 0.35); border-radius: 40% 60% 50% 45%; }
+.talent-livre.prenable { cursor: pointer; outline: 1.5px dashed rgba(160, 110, 20, 0.85); outline-offset: -1px;
+  background: radial-gradient(ellipse at 50% 50%, rgba(230, 180, 60, 0.22), rgba(230, 180, 60, 0.04) 75%); animation: talent-livre-appel 2.4s ease-in-out infinite; }
+.talent-livre.prenable .coche-talent { color: #9a6a06; }
+.talent-livre.prenable:hover { background: radial-gradient(ellipse at 50% 50%, rgba(230, 180, 60, 0.4), rgba(230, 180, 60, 0.08) 75%); }
+.talent-livre.verrou, .talent-livre.a-venir { opacity: 0.5; }
+.talent-livre.verrou .coche-talent { font-size: 0.75em; filter: grayscale(1); }
+.talent-livre.a-venir .nom-talent-livre { font-style: italic; }
+@keyframes talent-livre-appel { 50% { outline-color: rgba(160, 110, 20, 0.35); } }
+.retour-fiche { margin-top: auto; }

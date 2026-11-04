@@ -59,7 +59,7 @@
 .titre-sommaire { margin: 0; font-family: 'Cinzel', serif; font-size: calc(var(--u) * 7); color: #3a2210; }
 .liste-sommaire { display: flex; flex-direction: column; gap: calc(var(--u) * 2.6); width: 100%; margin-top: calc(var(--u) * 3); }
 .ligne-sommaire { display: flex; align-items: baseline; gap: calc(var(--u) * 2); color: #24150a; text-decoration: none; font-size: calc(var(--u) * 4.4); }
-.ligne-sommaire .num { font-family: 'Cinzel', serif; font-weight: 700; min-width: calc(var(--u) * 9); text-align: right; color: #5c3a21; }
+.ligne-sommaire .num { font-family: 'Cinzel', serif; font-weight: 700; min-width: calc(var(--u) * 9); text-align: right; color: inherit; }
 .ligne-sommaire .tit { font-family: 'Almendra', serif; font-style: italic; border-bottom: 1px dotted rgba(43, 26, 14, 0.4); flex: 1; }
 .ligne-sommaire.courant .tit { font-weight: 700; }
 .ligne-sommaire:hover .tit { color: #000; border-bottom-style: solid; }
@@ -333,11 +333,6 @@
     radial-gradient(ellipse at 50% 50%, transparent 48%, rgba(95, 55, 18, 0.35) 100%),
     url('images/grimoire/page.webp?v=1') 40% 60% / 340% auto, #d6bb88;
 }
-.tache-cafe { position: absolute; z-index: 0; pointer-events: none; height: auto; overflow: visible; mix-blend-mode: multiply; }
-.tache-cafe .voile { fill: rgba(150, 95, 45, 0.28); stroke: none; }
-.tache-cafe .bord { fill: none; stroke: rgba(105, 60, 22, 0.85); stroke-width: 2.2; stroke-linejoin: round; }
-.tache-cafe .bord.fin { stroke-width: 0.8; opacity: 0.6; }
-.tache-cafe .eclat { fill: rgba(115, 68, 26, 0.7); }
 
 /* v314 — LES CROQUIS DU RÉCIT (MIA_ILLUSTRATEUR) : l'encre détourée, posée sur la
    page à la suite du texte ; elle monte dans le papier la première fois. Le
