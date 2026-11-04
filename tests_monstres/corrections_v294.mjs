@@ -247,14 +247,17 @@ await section(async () => {
   const coutNarr = (12000 * 0.75 + 1000 * 3.75) / 1e6;
   verifier("son coût aux tarifs de 3.8 Flash : 0,01275 $", proche(ligne.narrateur.coutUSD, coutNarr, 1e-12), String(ligne.narrateur.coutUSD));
   const reqs = requetes.slice(avant);
-  const aides1 = reqs.filter(x => x.qui !== "NARRATEUR" && x.cle === "cle-GEMINI_API_KEY").length;
-  const combat = reqs.filter(x => x.cle === "cle-GEMINI_API_KEY_2").length;
+  // v304 : les IA du combat prennent la clé du Narrateur ; v305 : elles restent hors du relevé.
+  const aides1 = reqs.filter(x => x.qui !== "NARRATEUR" && x.qui !== "MIA_COMBAT" && x.cle === "cle-GEMINI_API_KEY").length;
+  const combat = reqs.filter(x => x.qui === "MIA_COMBAT").length;
   verifier("les IA d'appoint du tour (casting, Mia, bâtiment, PNJ, réputation…) : toutes relevées", ligne.aides.appels === aides1 && aides1 >= 5 && ligne.aides.envoyes === 1000 * aides1,
            `${ligne.aides.appels} relevées / ${aides1} appels, ${ligne.aides.envoyes} envoyés`);
-  verifier("les IA du combat (seconde clé) ne sont pas comptées", combat >= 1 && ligne.aides.envoyes < 99999, `${combat} appel(s) de la seconde clé`);
+  verifier("les IA du combat (v305 : même clé que le Narrateur) ne sont pas comptées", combat >= 1 && ligne.aides.envoyes < 99999, `${combat} appel(s) de MIA_COMBAT`);
   verifier("l'image : le portrait de Myrto (moyen, 1024×1792)", ligne.images.nombre === 1 && /medium 1024x1792/.test(ligne.images.detail.join(",")) && proche(ligne.images.coutUSD, 0.053 * 1.75, 1e-12),
            JSON.stringify(ligne.images));
-  const totalUSD = coutNarr + aides1 * (1000 * 0.30 + 100 * 2.50) / 1e6 + 0.053 * 1.75;
+  // v304 : l'Arbitre des dés (MIA_DES) juge avec Gemini 3.8 Flash, à ses tarifs.
+  const arbitre = reqs.filter(x => x.qui === "MIA_DES" && x.cle === "cle-GEMINI_API_KEY").length;
+  const totalUSD = coutNarr + (aides1 - arbitre) * (1000 * 0.30 + 100 * 2.50) / 1e6 + arbitre * (1000 * 0.75 + 100 * 3.75) / 1e6 + 0.053 * 1.75;
   verifier("total en dollars = narrateur + appoint + images", proche(ligne.totalUSD, totalUSD, 1e-9), `${ligne.totalUSD} contre ${totalUSD}`);
   verifier("converti au taux de la BCE du jour (1 $ = 0,90 €, 31/10/2026)", ligne.taux === 0.9 && ligne.tauxDate === "2026-10-31" && !ligne.tauxSecours && proche(ligne.totalEUR, totalUSD * 0.9, 1e-9),
            `${ligne.totalEUR} €`);

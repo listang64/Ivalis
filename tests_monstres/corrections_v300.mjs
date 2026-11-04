@@ -169,6 +169,7 @@ await section(async () => {
   await cliquer("#grimoire-valider-partie");
   await p.waitForTimeout(1300);
   await relayer([], true);
+  await attendreQue(async () => (await page()) === 5, 4000);   // v304 : le livre tourne jusqu'à la carte
   const r = await p.evaluate(() => {
     const ecran = document.getElementById("ecran-grimoire"), sc = document.getElementById("grimoire-scene").getBoundingClientRect();
     return { e: window.grimoireEtat(), parent: ecran.parentNode.id, fond: getComputedStyle(ecran, "::before").opacity, place: [sc.left, sc.top, sc.width],

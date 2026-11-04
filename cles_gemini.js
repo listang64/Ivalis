@@ -52,7 +52,11 @@
             const reponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modele}:generateContent?key=${cles[i]}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: corps
+                body: corps,
+                // v305 : l'usage voyage avec la requête (fetch l'ignore) : le relevé
+                // des dépenses (depenses_ia.js) écarte ainsi les IA du combat, qui
+                // partagent maintenant la clé du Narrateur.
+                ivalisUsage: usage
             });
             derniere = reponse;
             if ((reponse.status === 402 || reponse.status === 429 || reponse.status === 503) && i < cles.length - 1) {

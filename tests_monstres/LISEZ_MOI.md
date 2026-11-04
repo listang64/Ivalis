@@ -10008,3 +10008,47 @@ le relais sur 402, l'Arbitre, les consignes du Narrateur et de la plume. Il
 échoue sur la v303 (27 échecs). Tests mis à jour : corrections_v278 (clé du
 combat), blessures (le son), v299, v300, v301, v302 (ouverture sur la carte,
 héros non cliquables, pause et flèche, détection muette).
+
+## v305 — La table : le livre posé dessus, la table suit le zoom, l'ombre portée
+
+Nico : « voilà l'image que j'aimerais en background (la table vide) … et
+l'exemple pour te montrer où placer le livre fermé dessus. Quand on ouvre et
+que ça zoome un peu, la table suit le mouvement. Que l'image s'adapte à tous
+les écrans ; le plus important, que le livre reste à la même place sur la
+table, peu importe où l'image est tronquée » ; « l'ombre portée à droite et en
+bas du livre, refais la même entre la table et le livre » ; puis « grossis un
+peu la taille du livre posé sur la table ».
+
+- La table (Cloudinary BG_tjiigl, q_auto/f_auto) est le premier enfant de la
+  scène du livre : elle prend sa transformation (fermé → ouvert), donc le zoom.
+- grimoire.js, TABLE : la boîte de l'image de la couverture fermée, en pixels
+  de l'image (1672 × 941) : x 623, y 150, 630 de haut (560 d'abord, grossie à
+  la demande), à gauche de l'encrier. Sa vraie taille est relue au chargement
+  (les proportions restent).
+- mesurer() : fermé, la table couvre l'écran (« cover »), recadrée autour du
+  livre sans découvrir son bord ; un écran extrême garde le livre entier (le
+  plancher sombre prolonge). L'échelle et le décalage de la scène fermée en
+  découlent (plus de ZOOM_FERME fixe) ; ouvert, la mise en page du livre ne
+  change pas. Les bords de l'image se fondent (masque) dans le plancher
+  (#130c06, la couleur de son bord), visible si le livre ouvert montre plus
+  que l'image.
+- L'ombre : la couverture elle-même, noircie et floutée, glissée en bas à
+  droite sous le livre fermé ; elle s'efface à l'ouverture. Le livre ouvert a
+  la même ombre (drop-shadow en bas à droite). « Touchez le grimoire » passe en
+  clair sur le bois.
+- Avec le livre grossi, l'ouverture zoome peu sur iPad (× 1,01), plus sur un
+  écran 16/9 (× 1,1) ; sur un 4/3 elle recule à peine.
+- Corrigé au passage : depenses_ia.js écartait les IA du combat par leur clé
+  (la seconde) ; depuis v304 elles ont celle du Narrateur. fetchGemini porte
+  maintenant l'usage dans la requête (ivalisUsage, ignoré par fetch) et le
+  relevé écarte l'usage « combat ».
+
+corrections_v305.mjs (dans la suite) vérifie l'image et sa place dans la
+scène, le plancher, la couverture à sa place sur la table (8 écrans, du
+portrait au 21/9), la table qui couvre l'écran, le livre entier visible, la
+table qui suit le zoom (le livre ne glisse pas dessus, pendant ni après), une
+image d'une autre taille, l'ombre (forme, sens, force, effacée à
+l'ouverture). Il échoue sur la v304. Tests mis à jour : corrections_v297 (la
+table au lieu du beige, plus de zoom 0,82), v294 (les IA du combat repérées par
+leur nom, l'Arbitre aux tarifs de 3.8 Flash), v295 (l'Arbitre de la v304),
+v300 et v302 (attendre la carte après le chargement).

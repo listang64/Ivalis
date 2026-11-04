@@ -194,7 +194,8 @@ await section(async () => {
   t1 = await tour();
   const des = t1.reqs.find(x => x.qui === "MIA_DES");
   verifier("au clic, MIA_DES est consultée en premier", !!des && t1.reqs[0].qui === "MIA_DES", t1.reqs.map(x => x.qui).join(" → "));
-  verifier("rapide : Flash-Lite, sans réflexion, température 0", !!des && /gemini-flash-lite-latest:generateContent/.test(des.url) && des.generationConfig.temperature === 0 && !des.generationConfig.thinkingConfig);
+  // v304 : Nico, « l'IA qui détermine les lancés de dés semble ne pas fonctionner » — le modèle du Narrateur, réflexion basse.
+  verifier("rapide : Gemini 3.8 Flash (v304), réflexion basse, température 0", !!des && /gemini-3\.8-flash:generateContent/.test(des.url) && des.generationConfig.temperature === 0 && des.generationConfig.thinkingConfig && des.generationConfig.thinkingConfig.thinkingLevel === "low");
   verifier("elle lit la dernière narration et les actions des joueurs depuis", !!des && /lourde porte de bronze/.test(des.texte) && /Thorin : J'enfonce la porte/.test(des.texte) && /Lyra : Je salue le prêtre/.test(des.texte));
   verifier("le narrateur ne parle PAS (on attend les dés)", !t1.reqs.some(x => x.qui === "NARRATEUR") && !t1.ajouts.some(a => a.Est_Narration_IA));
   const msg = t1.ajouts.find(a => a.Auteur_ID === "ARBITRE_DES");
@@ -212,7 +213,7 @@ await section(async () => {
   const s = des.systeme;
   verifier("son prompt : les six caractéristiques et ce qu'elles couvrent", ["FORCE : soulever", "DEXTÉRITÉ : sauter", "CONSTITUTION : endurance", "INTELLIGENCE : se souvenir", "SAGESSE : percevoir", "CHARISME : persuader"].every(x => s.includes(x)));
   verifier("… la manière compte (forcer = Force, crocheter = Dextérité, convaincre = Charisme)", /forcer une porte = FORCE ; la crocheter = DEXTÉRITÉ ; convaincre le garde de l'ouvrir = CHARISME/.test(s));
-  verifier("… un jet seulement si l'action est tentée, incertaine, et que l'échec compte", /TENTE quelque chose maintenant/.test(s) && /INCERTAINE/.test(s) && /CONSÉQUENCE intéressante/.test(s));
+  verifier("… un jet dès que l'action est tentée et incertaine ; dans le doute, un jet (v304)", /DEMANDE UN JET dès qu'un héros TENTE maintenant/.test(s) && /n'est pas acquise/.test(s) && /DANS LE DOUTE, DEMANDE UN JET/.test(s));
   verifier("… jamais pour un combat, jamais deux fois, un seul jet par héros", /JAMAIS DE JET POUR UN COMBAT/.test(s) && /JAMAIS DEUX FOIS/.test(s) && /Un seul jet par héros/.test(s));
   verifier("… les cinq difficultés, expliquées", ["facile :", "moyenne :", "difficile :", "très difficile :", "héroïque :"].every(x => s.includes(x)));
 });

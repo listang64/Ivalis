@@ -77,14 +77,15 @@ await section(async () => {
     const fond = getComputedStyle(ecran).backgroundImage + getComputedStyle(ecran, "::before").backgroundImage /* v299 : le fond sur ::before */, couv = document.querySelector(".page-couverture img");
     const rc = couv.getBoundingClientRect();
     return { menu: getComputedStyle(document.getElementById("ecran-menu")).display, ferme: scene.classList.contains("ferme"),
-             fondBeige: /radial-gradient/.test(fond) && /241, 230, 207|rgb\(241/.test(fond), couverture: couv.complete && couv.naturalWidth === 1344 && /couverture\.webp/.test(couv.src),
+             fondBeige: !!document.getElementById("grimoire-table") /* v305 : la table de bois remplace le beige */, couverture: couv.complete && couv.naturalWidth === 1344 && /couverture\.webp/.test(couv.src),
              couvCentre: Math.abs((rc.left + rc.right) / 2 - innerWidth / 2), livreOuvertCache: getComputedStyle(document.querySelector(".grimoire-fond-livre")).opacity === "0",
              pf: !!window.GRIMOIRE_PAGEFLIP, page: window.GRIMOIRE_PAGEFLIP ? window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() : -1, zoom: getComputedStyle(scene).transform };
   });
   verifier("après l'écran noir de connexion, le grimoire apparaît (à la place de l'ancien menu)", vu && r.menu === "none", r.menu);
-  verifier("sur fond beige", r.fondBeige);
+  verifier("sur son fond (v305 : la table de bois)", r.fondBeige);
   verifier("livre fermé : on ne voit que la couverture (les Chroniques d'Ivalis)", r.ferme && r.couverture && r.livreOuvertCache && r.page === 0, JSON.stringify({ ferme: r.ferme, page: r.page }));
-  verifier("la couverture est au centre de l'écran, un peu plus petite (zoom)", r.couvCentre < 3 && /matrix\(0\.82/.test(r.zoom), `${r.couvCentre.toFixed(1)} px du centre, ${r.zoom.slice(0, 30)}`);
+  // v305 : la couverture est posée à sa place sur la table (corrections_v305), à peu près au milieu.
+  verifier("la couverture au milieu de l'écran, posée sur la table (zoom de la scène)", r.couvCentre < 1194 * 0.05 && /matrix\(/.test(r.zoom), `${r.couvCentre.toFixed(1)} px du centre, ${r.zoom.slice(0, 30)}`);
   verifier("StPageFlip (vendor/page-flip, 2.0.7) tient le livre", r.pf);
 });
 

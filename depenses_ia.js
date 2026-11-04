@@ -11,8 +11,10 @@
 //    sont relevées au passage, sur la réponse de Gemini (`usageMetadata`) ;
 //  - les images (portraits, bâtiments) sont comptées sur leur demande à
 //    OpenAI (qualité, taille).
-//  Les appels de la seconde clé (les IA du combat) ne comptent pas : ce ne
-//  sont pas des dépenses du MJ.
+//  Les appels des IA du combat ne comptent pas : ce ne sont pas des dépenses
+//  du MJ. (v305 : elles partagent la clé du Narrateur depuis la v304 ; c'est
+//  l'usage « combat », porté par la requête de fetchGemini, qui les écarte —
+//  la seconde clé reste écartée aussi.)
 //
 //  Le coût est calculé aux tarifs publiés (dollars par million de tokens,
 //  la réflexion facturée comme la sortie), puis converti en euros au taux du
@@ -226,7 +228,8 @@
                 if (/generativelanguage\.googleapis\.com\/.*:generateContent/.test(url)) {
                     const cle = (url.match(/[?&]key=([^&]+)/) || [])[1] || "";
                     const combat = cleCombat();
-                    if (!(combat && decodeURIComponent(cle) === combat)) {
+                    const duCombat = (options && options.ivalisUsage === "combat") || (combat && decodeURIComponent(cle) === combat);
+                    if (!duCombat) {
                         const modele = (url.match(/models\/([^:]+):/) || [])[1] || "";
                         releve.enAttente.push(reponse.clone().json().then(d => {
                             if (d && d.usageMetadata) releve.aides.push({ modele, ...lireUsage(d.usageMetadata) });

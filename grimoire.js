@@ -30,13 +30,25 @@
     const IMAGES = {
         couverture: "images/grimoire/couverture.webp?v=1",
         livre: "images/grimoire/livre_ouvert.webp?v=1",
-        page: "images/grimoire/page.webp?v=1"
+        page: "images/grimoire/page.webp?v=1",
+        // v305 : la table de bois, l'encrier et la plume (l'image de Nico).
+        table: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793777473/BG_tjiigl.png"
     };
     const LIVRE = { w: 2000, h: 1117 };
     const ZONE = { x: 251, y: 62, w: 1514, h: 984 };       // les deux pages
     const PAGE = { w: ZONE.w / 2, h: ZONE.h };
     const COUVERTURE = { w: 1344, h: 2000 };               // l'image de la couverture
-    const ZOOM_FERME = 0.82;                                // le livre fermé, un peu plus petit
+    // LA TABLE (v305) : Nico, « voilà l'image que j'aimerais en background…
+    // le livre fermé posé dessus [comme sur l'exemple] ; quand on ouvre et que
+    // ça zoome un peu, la table suit le mouvement ; que l'image s'adapte à tous
+    // les écrans, le plus important c'est que le livre reste à la même place sur
+    // la table, peu importe où l'image est tronquée ». En pixels de l'image de
+    // la table (1672 × 941 ; sa vraie taille est relue au chargement) : la boîte
+    // de l'image de la couverture fermée, à gauche de l'encrier. Fermé, la table
+    // couvre l'écran (recadrée autour du livre) ; le livre y est posé ; la table
+    // est dans la scène, elle zoome avec lui à l'ouverture. Nico ensuite :
+    // « grossis un peu la taille du livre posé sur la table » (560 → 630).
+    const TABLE = { w: 1672, h: 941, livre: { x: 623, y: 150, h: 630 } };
     // v298 : Nico, « le livre, descends-le au max sur l'écran — ne l'agrandis
     // pas, juste descends-le ». Même taille qu'avant (tout le livre tient à
     // l'écran), mais posé en bas, un filet de marge sous lui.
@@ -343,6 +355,7 @@
     //  LA MISE EN PAGE : le livre ouvert remplit l'écran (petite marge en
     //  haut) ; fermé, la couverture est plus petite et centrée.
     // ---------------------------------------------------------------------
+    let tableTaille = { w: TABLE.w, h: TABLE.h };
     function mesurer() {
         const vw = window.innerWidth, vh = window.innerHeight;
         let s = Math.min(vw * (1 - 2 * MARGE_COTE) / LIVRE.w, vh * (1 - MARGE_HAUT - MARGE_BAS) / LIVRE.h);
@@ -351,11 +364,24 @@
         const place = vh * (1 - MARGE_BAS) - 4;
         if (place - LIVRE.h * s < HAUT_DES_MARQUES * s) s = place / (LIVRE.h + HAUT_DES_MARQUES);
         const gauche = (vw - LIVRE.w * s) / 2, haut = vh * (1 - MARGE_BAS) - LIVRE.h * s;
-        // La couverture fermée : à droite du dos, sa hauteur celle d'une page.
-        const largeurCouv = PAGE.h * COUVERTURE.w / COUVERTURE.h;
-        const cx = (ZONE.x + PAGE.w + largeurCouv / 2) * s, cy = (ZONE.y + PAGE.h / 2) * s;
-        const tx = vw / 2 - gauche - ZOOM_FERME * cx, ty = vh / 2 - haut - ZOOM_FERME * cy;
-        return { s, gauche, haut, tx, ty, vw, vh };
+        // La table, fermée : elle couvre l'écran ; recadrée autour du livre, sans
+        // jamais découvrir son bord (un écran extrême : le livre tient d'abord,
+        // le plancher sombre prolonge l'image).
+        const tw = tableTaille.w, th = tableTaille.h, r = tw / TABLE.w;
+        const bh = TABLE.livre.h * th / TABLE.h, bw = bh * COUVERTURE.w / COUVERTURE.h;
+        const bx = TABLE.livre.x * r, by = TABLE.livre.y * th / TABLE.h;
+        const k = Math.min(Math.max(vw / tw, vh / th), vh * 0.92 / bh, vw * 0.92 / bw);
+        let ox = vw / 2 - (bx + bw / 2) * k, oy = vh / 2 - (by + bh / 2) * k;
+        ox = tw * k >= vw ? Math.min(0, Math.max(vw - tw * k, ox)) : (vw - tw * k) / 2;
+        oy = th * k >= vh ? Math.min(0, Math.max(vh - th * k, oy)) : (vh - th * k) / 2;
+        // La couverture fermée (dans la scène : à droite du dos, la hauteur d'une
+        // page) va sur sa place de la table : l'échelle et le décalage de la scène fermée.
+        const lx = (ZONE.x + PAGE.w) * s, ly = ZONE.y * s, lh = PAGE.h * s;
+        const z = bh * k / lh;
+        const tx = ox + bx * k - gauche - z * lx, ty = oy + by * k - haut - z * ly;
+        // La table, dans la scène (elle suit le zoom de l'ouverture).
+        const table = { x: (ox - gauche - tx) / z, y: (oy - haut - ty) / z, w: tw * k / z, h: th * k / z };
+        return { s, gauche, haut, tx, ty, z, table, vw, vh };
     }
     function poser() {
         if (!scene) return;
@@ -365,7 +391,11 @@
         scene.style.width = LIVRE.w * m.s + "px";
         scene.style.height = LIVRE.h * m.s + "px";
         scene.style.setProperty("--u", (PAGE.w * m.s / 100) + "px");   // 1 % de la largeur d'une page
-        scene.style.setProperty("--transform-ferme", `translate(${m.tx}px, ${m.ty}px) scale(${ZOOM_FERME})`);
+        scene.style.setProperty("--transform-ferme", `translate(${m.tx}px, ${m.ty}px) scale(${m.z})`);
+        const table = document.getElementById("grimoire-table");
+        if (table) Object.assign(table.style, { left: m.table.x + "px", top: m.table.y + "px", width: m.table.w + "px", height: m.table.h + "px" });
+        const ombre = document.getElementById("grimoire-ombre-couverture");
+        if (ombre) Object.assign(ombre.style, { left: (ZONE.x + PAGE.w) * m.s + "px", top: ZONE.y * m.s + "px", height: PAGE.h * m.s + "px" });
         scene.style.setProperty("--s", String(m.s));
         livre.style.left = ZONE.x * m.s + "px";
         livre.style.top = ZONE.y * m.s + "px";
@@ -384,6 +414,8 @@
         origine = { parent: ecran.parentNode, suivant: ecran.nextSibling };
         ecran.innerHTML = `
           <div class="grimoire-scene ferme" id="grimoire-scene">
+            <img class="grimoire-table" id="grimoire-table" src="${IMAGES.table}" alt="" draggable="false">
+            <img class="grimoire-ombre-couverture" id="grimoire-ombre-couverture" src="${IMAGES.couverture}" alt="" draggable="false">
             <img class="grimoire-fond-livre" src="${IMAGES.livre}" alt="" draggable="false">
             <button type="button" class="marque-page inactif" id="grimoire-marque-page" data-action="marque-page"
                     aria-label="Aller à l'index" aria-disabled="true" title="L'index (en partie)">
@@ -409,6 +441,11 @@
         scene = document.getElementById("grimoire-scene");
         livre = document.getElementById("grimoire-livre");
         attrape = document.getElementById("grimoire-attrape");
+        // La table : sa vraie taille relue au chargement (le livre garde sa place).
+        const imgTable = document.getElementById("grimoire-table");
+        const tableChargee = () => { if (imgTable.naturalWidth > 0) { tableTaille = { w: imgTable.naturalWidth, h: imgTable.naturalHeight }; poser(); } };
+        if (imgTable.complete) tableChargee(); else imgTable.addEventListener("load", tableChargee, { once: true });
+        imgTable.addEventListener("error", () => imgTable.classList.add("absente"), { once: true });
         for (let i = 0; i <= 5; i++) pages[i] = document.getElementById("grimoire-page-" + i);
         dos = pages[5];
         pagesCarte = [pageCarte("gauche"), pageCarte("droite")];
