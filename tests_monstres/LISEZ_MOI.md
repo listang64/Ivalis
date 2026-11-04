@@ -10504,4 +10504,4 @@ sur le sommaire, écriture, Aventuriers, récit), v309 (validation des ennemis).
   dessous. window.REGLAGES_ILLUSTRATIONS (actif, ecart, qualite, tailles).
 
 corrections_v314.mjs vérifie tout cela (9 échecs sur la v313). Tests mis à jour :
-v278 (la liste à cocher), v297 (la nouvelle couverture, servie en local par le banc).
+v278 (la liste à cocher), v297 et v305 (la nouvelle couverture ; v297 la sert en local).

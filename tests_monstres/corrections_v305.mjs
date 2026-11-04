@@ -164,7 +164,7 @@ await section(async () => {
              memeBoite: Math.abs(ro.width - rc.width) < 2 && Math.abs(ro.height - rc.height) < 2,
              decale: [ro.left - rc.left, ro.top - rc.top], hauteur: rc.height, livreOuvert: getComputedStyle(document.querySelector(".grimoire-fond-livre")).filter };
   });
-  verifier("la forme de la couverture, noircie et floutée, sous le livre", /couverture\.webp/.test(r.src) && /brightness\(0\)/.test(r.filtre) && /blur\(/.test(r.filtre) && r.avant && r.memeBoite, r.filtre);
+  verifier("la forme de la couverture, noircie et floutée, sous le livre", /IMG_2214_etfv11\.png/.test(r.src) && /brightness\(0\)/.test(r.filtre) && /blur\(/.test(r.filtre) && r.avant && r.memeBoite, r.filtre);
   verifier("glissée en bas à droite (comme l'exemple : plus bas qu'à droite)", r.decale[0] > r.hauteur * 0.02 && r.decale[1] > r.decale[0] && r.decale[1] < r.hauteur * 0.08, r.decale.map(v => v.toFixed(1)).join(", ") + ` (livre ${r.hauteur.toFixed(0)} px)`);
   verifier("bien sombre, livre fermé", r.opacite > 0.85, String(r.opacite));
   verifier("le livre ouvert : son ombre aussi en bas à droite", /drop-shadow\(rgba\(0, 0, 0, 0\.72\) [\d.]+px [\d.]+px/.test(r.livreOuvert), r.livreOuvert);
