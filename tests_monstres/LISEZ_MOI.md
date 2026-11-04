@@ -10230,3 +10230,36 @@ Après la suite complète (v308) :
   région du groupe) cède la place à une navigation du joueur.
 - corrections_v299 : le bouton du voyage se montre sur la carte du monde du
   livre (le livre posé).
+
+## v309 — Le Grimoire des Races dans les combats du récit
+
+Nico : « le descriptif des races est inscrit dans la BDD, et je les rentre dans
+les Paramètres, onglet Race. Récupère l'accès ici. »
+
+- combat_rp.js : window.chargerRacesDuMonde() lit Monde_Races (Nom,
+  Descriptif_Physique, Place_Monde) avec le compte du joueur, à chaque combat
+  (une race modifiée dans les Paramètres compte au combat suivant), et range les
+  fiches nommées dans window.RACES_MONDE. Les fiches sans nom sont ignorées.
+- lore_ivalis.js : window.peuplesDuMonde() — les fiches du Grimoire d'abord
+  (« - Vargen : APPARENCE : … — PLACE DANS LE MONDE : … »), puis les peuples
+  écrits dans le code que le Grimoire n'a pas encore (Vargen et Vargens sont le
+  même peuple : singulier, pluriel et accents confondus). contexteEnnemisIvalis
+  s'en sert ; l'interdit (orc, elfe, nain, gobelin…) demeure. Sans fiche lue
+  (base injoignable), la liste écrite dans le code reste.
+- MIA_ENNEMIS (le récit, puis l'habillage) : une règle « L'APPARENCE D'UN
+  PEUPLE » — la description physique suit fidèlement l'apparence du Grimoire,
+  puis ce qui est propre à l'individu.
+- Les pions : window.racesNommeesDans(texte) retrouve les peuples du Grimoire
+  qu'une description nomme (« un guerrier vargen », pas « gobelin ») ; leur
+  apparence s'ajoute au prompt du médaillon (« What a Vargen looks like in this
+  world: … », deux peuples au plus). Une bête sans peuple garde sa description.
+- monstres.js : window.nommerMonstresIA (MIA_BESTIAIRE) relit aussi le
+  Grimoire avant de composer le monde.
+
+corrections_v309.mjs (dans la suite), monté sur le banc du combat RP (v278) avec
+trois fiches Monde_Races (Vargen, une race inventée « Sylvaride », une fiche
+vide), vérifie la liste sans Grimoire, la lecture, le monde donné aux IA (un
+seul Vargen, la race inventée, les peuples restants, l'interdit), la recherche
+d'un peuple dans un texte, un combat forcé jusqu'aux pions (le Grimoire relu,
+la règle de MIA_ENNEMIS, l'apparence ajoutée aux pions vargens et pas au loup),
+monstres.js et les versions. Il échoue sur la v308 (14 échecs).

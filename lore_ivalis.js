@@ -103,13 +103,51 @@
     window.LORE_IVALIS = { ordre: ORDRE, regions: REGIONS, cites: CITES, peuples: PEUPLES, antiquite: ANTIQUITE,
         univers: "Antique Fantastique : mythologie, Antiquité magique." };
 
+    // LE GRIMOIRE DES RACES (v309). Nico : « le descriptif des races est inscrit
+    // dans la BDD, je les rentre dans les Paramètres, onglet Race ». Les fiches
+    // de Monde_Races (Nom, Descriptif_Physique, Place_Monde), lues par
+    // window.chargerRacesDuMonde (combat_rp.js), passent avant le texte écrit
+    // ici ; un peuple que le Grimoire n'a pas encore garde ce texte.
+    const sansAccent = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    // « Vargens » et « Vargen », « Éthérés » et « Ethere » : le même peuple.
+    const racine = (t) => sansAccent(t).replace(/(es|s|x)$/, "");
+    window.cleDeRace = racine;
+    window.peuplesDuMonde = function () {
+        const fiches = (Array.isArray(window.RACES_MONDE) ? window.RACES_MONDE : []).filter(r => r && String(r.Nom || "").trim());
+        const liste = [];
+        const vus = new Set();
+        fiches.forEach(r => {
+            const cle = racine(r.Nom);
+            if (vus.has(cle)) return;
+            vus.add(cle);
+            const ecrit = Object.entries(PEUPLES).find(([n]) => racine(n) === cle);
+            const physique = String(r.Descriptif_Physique || "").trim().replace(/\s+/g, " ");
+            const place = String(r.Place_Monde || "").trim().replace(/\s+/g, " ") || (ecrit ? ecrit[1] : "");
+            const morceaux = [];
+            if (physique) morceaux.push("APPARENCE : " + physique);
+            if (place) morceaux.push("PLACE DANS LE MONDE : " + place);
+            liste.push({ nom: String(r.Nom).trim(), physique, texte: morceaux.join(" — ") || (ecrit ? ecrit[1] : "") });
+        });
+        Object.entries(PEUPLES).forEach(([n, d]) => { if (!vus.has(racine(n))) liste.push({ nom: n, physique: "", texte: d }); });
+        return liste;
+    };
+    // Les peuples du Grimoire qu'un texte nomme (« un guerrier vargen… ») : leur
+    // apparence complète la description d'un pion à dessiner.
+    window.racesNommeesDans = function (texte) {
+        const t = " " + sansAccent(texte).replace(/[^a-z0-9]+/g, " ") + " ";
+        return window.peuplesDuMonde().filter(r => r.physique).filter(r => {
+            const c = racine(r.nom).replace(/[^a-z0-9]+/g, " ").trim();
+            return c.length >= 3 && new RegExp(" " + c.replace(/ /g, " ") + "(e|es|s|x|ne|nes)? ").test(t);
+        });
+    };
+
     // CE QU'UNE IA DOIT SAVOIR POUR INVENTER DES ENNEMIS (v287) : l'Antiquité,
     // les peuples, et la région où l'on se trouve (s'il y en a une).
     window.contexteEnnemisIvalis = function (numeroRegion) {
         // v307 : Nico, « les monstres générés par l'IA combat ne semblent pas suivre
         // les races de mon monde : elle m'a créé genre un orc ». Ces peuples, et
         // eux seuls ; les races d'une autre fantasy n'existent pas ici.
-        const morceaux = [ANTIQUITE, "Les peuples d'Elyria — les SEULS peuples qui existent :\n" + Object.entries(PEUPLES).map(([n, d]) => `- ${n} : ${d}`).join("\n"),
+        const morceaux = [ANTIQUITE, "Les peuples d'Elyria — les SEULS peuples qui existent :\n" + window.peuplesDuMonde().map(r => `- ${r.nom} : ${r.texte}`).join("\n"),
             "INTERDIT : les races d'autres univers de fantasy n'existent PAS dans ce monde — jamais d'orc, d'orque, de demi-orc, d'elfe, de nain, de gobelin, de troll, d'ogre, de kobold, de hobbit, d'homme-lézard générique, ni de mort-vivant de bestiaire. Un ennemi est d'un des peuples ci-dessus (nomme son peuple tel quel : « Vargen », « Ankylar »…), ou une bête de la faune de la région, ou une créature de la mythologie antique (harpie, centaure, cyclope, hydre, satyre, minotaure…). Un Vargen se décrit avec ses traits de bête, sans jamais le mot « orc »."];
         if (Number(numeroRegion) > 0) morceaux.push(window.loreDeLaRegion(numeroRegion));
         else morceaux.push("L'Ordre d'Ivalis :\n- " + ORDRE.join("\n- "));

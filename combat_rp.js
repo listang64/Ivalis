@@ -91,6 +91,38 @@ const R = window.REGLAGES_COMBAT_RP = {
     narrationBloqueeMs: 180000
 };
 
+// LE GRIMOIRE DES RACES (v309). Nico : « le descriptif des races est inscrit
+// dans la BDD, je les rentre dans les Paramètres, onglet Race ». Les fiches de
+// Monde_Races (Nom, Descriptif_Physique, Place_Monde) sont relues à chaque
+// combat (une modification dans les Paramètres compte au combat suivant), et
+// window.contexteEnnemisIvalis (lore_ivalis.js) les donne aux IA des ennemis.
+let racesEnLecture = null;
+window.chargerRacesDuMonde = function () {
+    if (racesEnLecture) return racesEnLecture;
+    racesEnLecture = (async () => {
+        try {
+            const snap = await getDocs(query(collection(db, "Monde_Races")));
+            const races = [];
+            snap.forEach(d => { const x = d.data() || {}; if (String(x.Nom || "").trim()) races.push({ Nom: x.Nom, Descriptif_Physique: x.Descriptif_Physique || "", Place_Monde: x.Place_Monde || "" }); });
+            if (races.length) window.RACES_MONDE = races;
+            console.log(`📖 [Races] ${races.length} race(s) du Grimoire : ${races.map(r => r.Nom).join(", ")}.`);
+        } catch (e) { console.warn("📖 [Races] Grimoire des Races illisible :", e); }
+        return window.RACES_MONDE || [];
+    })().finally(() => { racesEnLecture = null; });
+    return racesEnLecture;
+};
+
+// La description d'un pion à dessiner, complétée par l'apparence que le
+// Grimoire donne au peuple qu'elle nomme (« un Vargen… » → son descriptif).
+function descriptionAvecRace(description) {
+    const texte = String(description || "").trim();
+    if (!texte || typeof window.racesNommeesDans !== "function") return texte;
+    const races = window.racesNommeesDans(texte).slice(0, 2);
+    if (!races.length) return texte;
+    return texte + " " + races.map(r => `(What a ${r.nom} looks like in this world: ${r.physique})`).join(" ");
+}
+window.descriptionPionAvecRace = descriptionAvecRace;
+
 // =========================================================================
 //  1. L'ÉTAT (Systeme_Parties/{id}.Combat_RP)
 // =========================================================================
@@ -566,6 +598,7 @@ const PROMPT_ENNEMIS = `Tu es MIA_ENNEMIS, l'IA qui dresse la liste des ennemis 
 LE MONDE (v287) — tu reçois l'univers, les peuples et la région :
 - Ce sont des gens ou des créatures de CE monde. Leur peuple vient du récit ; sinon, choisis-le parmi les peuples d'Elyria selon la région (ses peuples abondants d'abord, ceux qui y sont traqués ou absents rarement) et selon leur rôle dans l'histoire (des esclavagistes d'Arcaï sont humains, des gardes de Volcanisse ankylars ou humains de la Cendre…). Une bête ou un monstre : de la faune de la région ou de la mythologie.
 - Tout est ANTIQUE : tenues, armes, armures de l'Antiquité, jamais médiévales.
+- L'APPARENCE D'UN PEUPLE (v309) : quand un peuple a une APPARENCE dans la liste (le Grimoire des Races), la description physique la suit fidèlement (peau, traits, taille, signes du peuple), puis y ajoute ce qui est propre à cet individu. Jamais l'apparence d'une race d'un autre univers.
 - LE NOM DIT QUI ILS SONT DANS LE RÉCIT : le nom que le récit leur donne ; sinon leur bande, leur peuple, leur métier ou leur fonction dans l'histoire (« Contrebandier gob », « Mercenaire de la Cendre », « Garde du Concordia »), ou un vrai nom propre de leur peuple avec un surnom (« Draxos le Balafré »). Jamais un nom de bestiaire générique sans lien avec le récit (« Ombre sanglante », « Brute », « Guerrier noir »).
 - Si l'un d'eux est un des PNJ NOMMÉS listés, recopie son nom EXACT dans "pnj" (sinon laisse vide) et reprends son apparence.
 - "renforts" : 2 à 4 idées de renforts plausibles pour CET affrontement (des compagnons de la même bande, des gardes appelés, des bêtes du lieu…), chacune avec un nom et une description physique.
@@ -583,6 +616,7 @@ RÈGLES :
 - LE NOM DIT QUI IL EST DANS LE RÉCIT : celui que le récit lui donne ; sinon sa bande, son peuple, son métier ou sa fonction dans l'histoire (« Contrebandier gob », « Archer de la Cendre », « Esclavagiste d'Arcaï »), ou un nom propre de son peuple avec un surnom (« Draxos le Balafré »). Le leader porte un titre de chef de CETTE bande (« Capitaine des contrebandiers »). Jamais un nom de bestiaire générique sans lien avec le récit (« Ombre sanglante », « Brute », « Lame noire »).
 - Tous les noms sont différents : 1 à 4 mots, en français, sans chiffre.
 - Chaque description physique commence par le peuple ou l'espèce, et décrit une tenue et des armes antiques.
+- L'APPARENCE D'UN PEUPLE (v309) : quand un peuple a une APPARENCE dans la liste (le Grimoire des Races), la description physique la suit fidèlement (peau, traits, taille, signes du peuple), puis y ajoute ce qui est propre à cet individu.
 - "visuel" : une clé courte, commune aux créatures qui se RESSEMBLENT (trois loups gris identiques partagent la même clé) ; au plus 5 visuels différents. Chaque visuel a une description physique précise de la tête et du haut du corps (elle servira à sculpter un médaillon).
 
 Réponds UNIQUEMENT en JSON : {"creatures": [{"numero": 1, "nom": "...", "visuel": "loup", "pnj": ""}], "visuels": [{"cle": "loup", "description_physique": "..."}]}`;
@@ -601,6 +635,7 @@ async function composerLesEnnemis() {
     const pnjs = Object.values((lieu.env && lieu.env.pnjsPresents) || {}).filter(x => x && x.Nom_PNJ);
     // L'univers, les peuples, la région du groupe (v287).
     const region = Number(partie.Position_Groupe && partie.Position_Groupe.Region) || 0;
+    await window.chargerRacesDuMonde();
     const monde = typeof window.contexteEnnemisIvalis === "function" ? window.contexteEnnemisIvalis(region) : "";
     const listePnj = pnjs.length ? pnjs.map(x => `- ${x.Nom_PNJ} (${x.Race || "?"}, ${x.Occupation || "?"}) : ${x.Description_Physique || ""}`).join("\n") : "(aucun)";
     const c = etat();
@@ -688,7 +723,7 @@ async function dessinerLesPions() {
             let url = "";
             try {
                 url = typeof window.fabriquerTokenIA === "function"
-                    ? await window.fabriquerTokenIA({ portrait: v.Portrait || "", description: v.Description || "", sujet: v.PNJ ? "character" : "creature" })
+                    ? await window.fabriquerTokenIA({ portrait: v.Portrait || "", description: descriptionAvecRace(v.Description), sujet: v.PNJ ? "character" : "creature" })
                     : "";
             } catch (e) { console.error(`⚔️ [Pion ennemi] ${cle} :`, e); }
             // "" : le pion commun des ennemis le remplacera.

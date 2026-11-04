@@ -1030,6 +1030,8 @@ window.nommerMonstresIA = async function(composition) {
     // v287 — Nico : « assure-toi qu'il génère en suivant les races et le RP, dans
     // un monde antique ; les noms des ennemis doivent être représentatifs du RP ».
     const region = Number(((window.PARTIE_DATA || {}).Position_Groupe || {}).Region) || 0;
+    // v309 : les races du Grimoire (Monde_Races), lues par combat_rp.js.
+    if (typeof window.chargerRacesDuMonde === "function") { try { await window.chargerRacesDuMonde(); } catch (e) {} }
     const monde = typeof window.contexteEnnemisIvalis === "function" ? window.contexteEnnemisIvalis(region) : "Univers : Antique Fantastique.";
     const crp = (window.PARTIE_DATA || {}).Combat_RP;
     const recit = crp && (crp.Raison || crp.Adversaires) ? `${crp.Raison || ""} ${crp.Adversaires ? "(adversaires : " + crp.Adversaires + ")" : ""}`.trim() : "";
