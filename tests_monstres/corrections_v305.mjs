@@ -64,6 +64,8 @@ async function ouvrirPage(w, h, image, echelle = 1) {
   const demandes = [];
   await p.route('**', r => { const u = r.request().url();
     if (u.startsWith(base)) return r.continue();
+    // v314 : la couverture de Nico (Cloudinary) : l'ancienne image locale la remplace dans le banc.
+    if (/IMG_2214_etfv11\.png/.test(u)) return r.fulfill({ status: 200, contentType: 'image/webp', body: fs.readFileSync(path.join(RACINE, "images/grimoire/couverture.webp")) });
     if (/res\.cloudinary\.com\/.*BG_tjiigl/.test(u)) { demandes.push(u); return r.fulfill({ status: 200, contentType: VRAIE && image === TABLE_1672 ? 'image/webp' : 'image/png', body: image }); }
     return r.abort(); });
   await p.route('**/firebase-app.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_APP }));
