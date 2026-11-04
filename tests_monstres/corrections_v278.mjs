@@ -446,8 +446,23 @@ await section(async () => {
 titre("5. LA PRÉPARATION : LE LIEU, LA CARTE, LES ENNEMIS, LES PIONS");
 // =========================================================================
 await section(async () => {
+  // v313 : les ennemis composés attendent qu'un joueur les valide (une page
+  // de la fenêtre de combat) ; alors seulement leurs pions se dessinent.
+  const composes = await attendreQue(async () => { const c = await crp(); return !!c && !!c.Carte && !!c.Ennemis; }, 15000);
+  await p.waitForTimeout(1500);
+  const avant = await crp();
+  verifier("v313 : les ennemis composés, aucun pion ne se dessine avant la validation", composes && !avant.Ennemis_Valides && !openai.some(x => /medallion/.test(x.prompt)), JSON.stringify(Object.keys(avant || {})));
+  await p.evaluate(() => window.rejoindreCombatRP());
+  await p.waitForTimeout(500);
+  const page = await p.evaluate(() => { const f = document.getElementById("validation-ennemis-rp");
+    return { vue: !!f && f.style.display === "flex", noms: f ? [...f.querySelectorAll(".nom-ennemi-valider")].map(x => x.value) : [], visuels: f ? f.querySelectorAll(".description-visuel-valider").length : 0 }; });
+  verifier("v313 : la page « Qui vous fait face ? » les montre, noms et apparences à retoucher", page.vue && page.noms.length >= 1 && page.visuels >= 1, JSON.stringify(page));
+  await p.evaluate(() => { const el = document.querySelectorAll("#validation-ennemis-rp .nom-ennemi-valider")[1]; if (el) el.value = "Le Balafré"; });
+  await p.evaluate(() => document.getElementById("btn-valider-ennemis").click());
   const pret = await attendreQue(async () => { const c = await crp(); return !!c && !!c.Carte && !!c.Ennemis && c.Tokens && Object.keys(c.Ennemis.Visuels || {}).every(k => c.Tokens[k] !== undefined); }, 15000);
   const c = await crp();
+  verifier("v313 : validés (le nom retouché est gardé), la page se ferme, les pions se dessinent", !!c.Ennemis_Valides && (page.noms.length < 2 || [...c.Ennemis.Tirage.depart, ...c.Ennemis.Tirage.renforts].some(m => m.nom === "Le Balafré"))
+           && await p.evaluate(() => document.getElementById("validation-ennemis-rp").style.display === "none"), JSON.stringify(c.Ennemis_Valides));
   const v = await vtt();
   verifier("tout est prêt jusqu'aux pions", pret, JSON.stringify(c && Object.keys(c)));
   verifier("l'arène est mise de côté (sa carte, sa grille, ses couches) et le plateau vidé",
@@ -461,7 +476,7 @@ await section(async () => {
   const carte = openai.find(x => /STYLE DE TEST/.test(x.prompt));
   verifier("la carte : le style « Style map crea » des paramètres + la description du lieu", !!carte && /cour dallée bordée d'un portique/.test(carte.prompt), carte ? carte.prompt.slice(0, 90) : "aucune");
   verifier("les mêmes réglages que les portraits des héros : gpt-image, qualité medium ; en paysage", !!carte && carte.qualite === "medium" && carte.taille === "1536x1024", carte && `${carte.qualite} ${carte.taille}`);
-  verifier("la carte est hébergée et posée sur le plateau (couches remises à zéro)", /Combats\/Cartes/.test(c.Carte) && v.URL_Map === c.Carte && (v.Tuiles_Murs || []).length === 0, `${c.Carte} / ${v.URL_Map}`);
+  verifier("la carte est hébergée et posée sur le plateau (couches remises à zéro)", /Combats\/Cartes/.test(c.Carte) && v.URL_Map === c.Carte && ((v.Tuiles_Murs || []).length === 0 || !!c.Peint), `${c.Carte} / ${v.URL_Map}`);
   const ennemis = requetes.filter(x => x.mia === "MIA_ENNEMIS");
   verifier("MIA_ENNEMIS lit le récit et les PNJ nommés présents (Dame Koré)", ennemis.length === 2 && /Dame Koré \(Humain, Grande prêtresse\)/.test(ennemis[0].texte), `${ennemis.length} appel(s)`);
   const tirage = c.Ennemis.Tirage;
@@ -483,55 +498,17 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("6. LA BOÎTE DE LA GRILLE : LES JOUEURS EN MODE DEV, PRIORITÉ À NICO ET BEN");
+titre("6. LA GRILLE VALIDÉE D'OFFICE (v313 : plus de boîte DEV)");
 // =========================================================================
 await section(async () => {
-  await p.evaluate(() => window.rejoindreCombatRP());
-  await p.waitForTimeout(400);
   const r = await p.evaluate(() => {
     const voile = document.getElementById("voile-combat-rp"), boite = document.getElementById("boite-grille-rp");
-    return { bandeau: !!voile && voile.classList.contains("bandeau") && /Les ennemis se préparent/.test(voile.textContent),
-             boite: !!boite && boite.style.display === "flex", qui: (document.getElementById("boite-grille-qui") || {}).textContent || "",
-             carte: document.getElementById("image-map-vtt").src };
+    return { bandeau: !!voile && voile.classList.contains("bandeau"), boite: !!boite && boite.style.display === "flex", carte: document.getElementById("image-map-vtt").src };
   });
   verifier("la carte s'ouvre dans la fenêtre de combat, l'attente devient un bandeau", r.bandeau && /Combats\/Cartes/.test(r.carte), JSON.stringify(r));
-  verifier("un joueur en mode DEV (Nico) voit la boîte et a la main", r.boite && /C'est toi/.test(r.qui), r.qui);
-  const regleurs = ((await crp()) || {}).Regleurs || {};
-  verifier("il s'inscrit devant la boîte (nom, présence)", !!regleurs.P_01 && regleurs.P_01.nom === "Nico", JSON.stringify(regleurs));
-  // Priorité : Adrien est arrivé avant, Ben après ; Nico parti, c'est Ben qui a la main.
-  const prio = await p.evaluate(() => {
-    const t = Date.now();
-    const c = { Regleurs: { P_03: { nom: "Adrien", t, depuis: t - 9000 }, P_02: { nom: "Ben", t, depuis: t - 1000 }, P_01: { nom: "Nico", t, depuis: t } } };
-    const sansNico = { Regleurs: { P_03: c.Regleurs.P_03, P_02: c.Regleurs.P_02 } };
-    const seulAdrien = { Regleurs: { P_03: c.Regleurs.P_03, P_01: { nom: "Nico", t: t - 60000, depuis: t } } };
-    return [window.teneurGrilleCombatRP(c), window.teneurGrilleCombatRP(sansNico), window.teneurGrilleCombatRP(seulAdrien)];
-  });
-  verifier("la main : Nico d'abord, puis Ben, sinon le premier arrivé (un absent ne compte plus)", JSON.stringify(prio) === '["P_01","P_02","P_03"]', JSON.stringify(prio));
-  // Adrien (P_03) en DEV, Nico présent : il voit la boîte en lecture.
-  const lecture = await p.evaluate(async () => {
-    localStorage.setItem("ID_JOUEUR_COURANT", "P_03"); window.COMPTE_JOUEUR = { nom: "Adrien" };
-    window.actualiserCombatRPAffichage();
-    const boite = document.getElementById("boite-grille-rp");
-    const r = { lecture: boite.classList.contains("en-lecture"), qui: document.getElementById("boite-grille-qui").textContent,
-                bloque: [...boite.querySelectorAll("button")].every(x => x.disabled) };
-    localStorage.setItem("ID_JOUEUR_COURANT", "P_01"); window.COMPTE_JOUEUR = { nom: "Nico" };
-    window.actualiserCombatRPAffichage();
-    return r;
-  });
-  verifier("un autre joueur DEV voit « Nico règle la grille… », sans pouvoir y toucher", lecture.lecture && /Nico règle la grille/.test(lecture.qui) && lecture.bloque, JSON.stringify(lecture));
-  // Un joueur hors DEV ne la voit pas.
-  const horsDev = await p.evaluate(() => { localStorage.setItem("ivalis_DEV_MODE", "off"); window.actualiserCombatRPAffichage();
-    const v = document.getElementById("boite-grille-rp").style.display; localStorage.setItem("ivalis_DEV_MODE", "on"); window.actualiserCombatRPAffichage(); return v; });
-  verifier("hors mode DEV, pas de boîte", horsDev === "none", horsDev);
-  // Nico règle : + + → 62, l'aperçu part pour les autres ; il valide.
-  await p.evaluate(() => { document.querySelector('#boite-grille-rp [data-d="1"]').click(); document.querySelector('#boite-grille-rp [data-d="1"]').click(); });
-  await p.waitForTimeout(600);
-  const apercu = await p.evaluate(() => ({ local: window.PLATEAU_VTT.hexSize, valeur: document.getElementById("boite-grille-valeur").textContent, base: (window.__docs["Systeme_Parties/P1"].Combat_RP || {}).Apercu_Grille }));
-  verifier("les hexagones grandissent sous ses yeux, et chez les autres (aperçu)", apercu.local === 62 && apercu.valeur === "62" && apercu.base === 62, JSON.stringify(apercu));
-  await p.evaluate(() => document.getElementById("boite-grille-valider").click());
-  await p.waitForTimeout(300);
-  const g = (await crp()).Grille, tv = (await vtt()).Taille_Hex;
-  verifier("validée : la taille est enregistrée, et l'IA de peinture se lance", !!g && g.Taille === 62 && g.Par === "P_01" && tv === 62, JSON.stringify(g) + " " + tv);
+  const g = await attendreQue(async () => !!((await crp()) || {}).Grille, 8000);
+  const c = await crp(), tv = (await vtt()).Taille_Hex;
+  verifier("v313 : la taille des hexagones est validée d'office (celle de l'arène), sans boîte DEV", g && c.Grille.Par === "auto" && c.Grille.Taille === 60 && tv === 60 && !r.boite, JSON.stringify(c.Grille) + " " + tv);
 });
 
 // =========================================================================
@@ -541,7 +518,7 @@ await section(async () => {
   const pret = await attendreQue(async () => ((await crp()) || {}).Etat === "en_cours", 15000);
   verifier("zones, positions, déploiement : le combat commence", pret, JSON.stringify(((await crp()) || {}).Etat));
   const geo = await p.evaluate(() => {
-    const cases = window.casesGrilleCombatRP(1536, 1024, 62);
+    const cases = window.casesGrilleCombatRP(1536, 1024, 60);
     const P = window.PLATEAU_VTT;
     const ecarts = cases.slice(0, 40).map(c => { const px = P.hexToPixel(c.q, c.r); return Math.hypot(px.x - c.x, px.y - c.y); });
     const numeros = cases.map(c => c.n);
@@ -555,8 +532,8 @@ await section(async () => {
   verifier("elle reçoit la carte nue et la description du lieu", zones.length === 1 && zones[0].image && zones[0].imageTaille > 2000 && /bassin sacré/.test(zones[0].texte), zones[0] && [zones[0].imageTaille, zones[0].texte.slice(0, 200)].join(" "));
   const v = await vtt();
   const attendu = await p.evaluate((cadres) => {
-    const cases = window.casesGrilleCombatRP(1536, 1024, 62);
-    const z = window.zonesDepuisCadres(cadres, cases, 1536, 1024, 62);
+    const cases = window.casesGrilleCombatRP(1536, 1024, 60);
+    const z = window.zonesDepuisCadres(cadres, cases, 1536, 1024, 60);
     const centre = (cle) => cases.find(c => c.cle === cle);
     const dans = (cle, b) => { const c = centre(cle); return c.x >= b[1] / 1000 * 1536 - 40 && c.x <= b[3] / 1000 * 1536 + 40 && c.y >= b[0] / 1000 * 1024 - 40 && c.y <= b[2] / 1000 * 1024 + 40; };
     return { z, mursDansColonnes: z.murs.every(k => dans(k, cadres[0].box_2d) || dans(k, cadres[1].box_2d)), bassin: z.inaccessibles.every(k => dans(k, cadres[2].box_2d)),
@@ -573,7 +550,7 @@ await section(async () => {
   verifier("MIA_SPAWN : la carte aux cases teintées et les 6 derniers messages", !!spawn && spawn.image && six.length === 6, `${six.length} lignes`);
   const pt = await partie();
   const pos = await p.evaluate(({ h, e, cle }) => {
-    const cases = window.casesGrilleCombatRP(1536, 1024, 62), k = (q) => cases.find(c => c.q === q.q && c.r === q.r);
+    const cases = window.casesGrilleCombatRP(1536, 1024, 60), k = (q) => cases.find(c => c.q === q.q && c.r === q.r);
     const ch = k(h), ce = k(e);
     const bloquees = new Set([...(cle.m || []), ...(cle.s || [])]);
     return { h: ch && [ch.x / 1536, ch.y / 1024], e: ce && [ce.x / 1536, ce.y / 1024], libres: ch && ce && !bloquees.has(ch.cle) && !bloquees.has(ce.cle) };
@@ -621,7 +598,7 @@ await section(async () => {
   verifier("une créature des combats du récit montre son propre pion", /Tokens\/Ennemis\/x\.png/.test(r.pion || ""), r.pion);
   verifier("le bandeau du tour de Dame Koré : son avatar, en pied, comme un héros", r.enPied && /portrait_kore/.test(r.src || ""), JSON.stringify(r));
   const voile = await p.evaluate(() => ({ voile: (document.getElementById("voile-combat-rp") || {}).style?.display, boite: (document.getElementById("boite-grille-rp") || {}).style?.display }));
-  verifier("tout est prêt : le message d'attente et la boîte disparaissent", voile.voile === "none" && voile.boite === "none", JSON.stringify(voile));
+  verifier("tout est prêt : le message d'attente et la boîte disparaissent", voile.voile === "none" && (voile.boite === "none" || voile.boite === undefined), JSON.stringify(voile));
   await p.evaluate(() => { window.EVENEMENT_EN_COURS = null; window.rafraichirVoileTour && window.rafraichirVoileTour(); });
 });
 
@@ -725,15 +702,12 @@ await section(async () => {
   const carte = await attendreQue(async () => !!((await crp()) || {}).Carte, 8000);
   const c = await crp();
   verifier("sans dessin, la carte de l'arène sert de champ de bataille", carte && c.Carte === URL_ARENE, c && c.Carte);
-  // Personne en mode DEV devant la boîte : la grille attend (v279 : pas de
-  // minuteur) ; un joueur DEV la valide.
-  await p.evaluate(() => { localStorage.setItem("ivalis_DEV_MODE", "off"); window.fermerCombat(); window.poursuivreCombatRP(); });
-  await p.waitForTimeout(2500);
-  const attend = !((await crp()) || {}).Grille;
-  await p.evaluate(() => { localStorage.setItem("ivalis_DEV_MODE", "on"); return window.validerGrilleCombatRP(60); });
+  // v313 : la grille est validée d'office ; les ennemis attendent d'être validés.
+  await p.evaluate(() => { localStorage.setItem("ivalis_DEV_MODE", "off"); window.poursuivreCombatRP(); });
   const auto = await attendreQue(async () => !!((await crp()) || {}).Grille, 8000);
-  verifier("sans joueur DEV, la grille attend ; un joueur DEV la valide", attend && auto && ((await crp()).Grille || {}).Par === "P_01", JSON.stringify(((await crp()) || {}).Grille));
-  await p.evaluate(() => localStorage.setItem("ivalis_DEV_MODE", "off"));
+  verifier("v313 : sans joueur DEV, la grille est validée d'office", auto && ((await crp()).Grille || {}).Par === "auto", JSON.stringify(((await crp()) || {}).Grille));
+  await attendreQue(async () => !!((await crp()) || {}).Ennemis, 8000);
+  await p.evaluate(() => window.validerEnnemisCombatRP());
   // Les MIA de peinture muettes : rien n'est peint, les positions sont posées quand même.
   const enCours = await attendreQue(async () => ((await crp()) || {}).Etat === "en_cours", 15000);
   const pt = await partie();

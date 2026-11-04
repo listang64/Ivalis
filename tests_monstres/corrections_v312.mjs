@@ -214,7 +214,7 @@ await section(async () => {
            r.gauche.join(" | ") === "I- Aventuriers | II- Carte du monde | III- Le village" && r.droite.join(" | ") === "IV- Les combats | V- Le récit", r.gauche.concat(r.droite).join(" | "));
   verifier("le fond du sommaire : l'image de Nico, à 20 %, étirée sur la double page (une moitié par page)",
            r.fonds.length === 2 && r.fonds.every(f => /IMG_2057_ez0wu9\.png/.test(f.img) && f.op === "0.2" && f.taille === "200% 100%") && r.fonds[0].pos !== r.fonds[1].pos, JSON.stringify(r.fonds.map(f => [f.op, f.taille, f.pos])));
-  verifier("une police grasse, manuscrite ancienne (Berkshire Swash, chargée)", /Berkshire Swash/.test(r.police) && /Berkshire Swash/.test(r.policeEntree) && r.charge, `${r.police} / ${r.charge}`);
+  verifier("une écriture manuscrite (v313 : celle choisie dans Paramètres, Homemade Apple par défaut)", /Homemade Apple/.test(r.police) && /Homemade Apple/.test(r.policeEntree), `${r.police}`);
   verifier("le marque-page du sommaire : une étoile ; celui du récit : une plume redessinée", r.etoile && r.plume);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v312_sommaire.png" });
   await p.evaluate(() => document.getElementById("grimoire-marque-menu").click());
@@ -256,7 +256,7 @@ await section(async () => {
   const a = await p.evaluate(() => { const pa = document.getElementById("recit-avatar"), u = pa.querySelector(".papier-usure"), c = pa.querySelector(".cadre-portrait"), n = pa.querySelector(".nom-portrait"), st = getComputedStyle(n);
     return { basImage: c.offsetTop + c.offsetHeight, hPapier: u.offsetHeight, uneLigne: n.scrollWidth <= n.clientWidth + 1 && n.offsetHeight < parseFloat(st.fontSize) * 1.6, police: st.fontFamily, dore: /gradient/.test(st.backgroundImage) && /text/.test(st.webkitBackgroundClip || st.backgroundClip), texte: n.textContent }; });
   verifier("l'image descend jusqu'au bas du papier (et un peu au-delà, sous la déchirure)", a.basImage >= a.hPapier, `${a.basImage} / ${a.hPapier}`);
-  verifier("le nom en titre doré, sur une seule ligne qui s'ajuste à la largeur", a.uneLigne && a.dore && /Berkshire/.test(a.police) && a.texte === "Thorin Ironfoot le Grand des Montagnes", JSON.stringify(a));
+  verifier("le nom en titre doré, sur une seule ligne qui s'ajuste à la largeur", a.uneLigne && a.dore && /Homemade Apple/.test(a.police) && a.texte === "Thorin Ironfoot le Grand des Montagnes", JSON.stringify(a));
   const pa = await centre("#recit-avatar .papier-usure");
   await p.mouse.click(pa.x - pa.w * 0.25, pa.y);
   await p.waitForTimeout(400);
@@ -268,10 +268,12 @@ await section(async () => {
   await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipNext("top"));
   await p.waitForTimeout(150);
   const pendant = await p.evaluate(() => ["recit-avatar", "recit-postit", "recit-ecriture"].map(id => document.getElementById(id).classList.contains("sortie")));
+  // (v313 : après la dernière page du récit viennent les Aventuriers : arrivé là, le
+  // papier rentre, à raison. On ne regarde que la tourne elle-même.)
+  const sauts = await p.evaluate(() => { window.__obsSauts.disconnect(); return window.__sauts.slice(); });
   await pose(); await p.waitForTimeout(500);
   await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipPrev("top"));
   await pose(); await p.waitForTimeout(500);
-  const sauts = await p.evaluate(() => { window.__obsSauts.disconnect(); return window.__sauts.slice(); });
   verifier("une page du récit qui tourne : l'avatar, le post-it et l'encart d'écriture restent en place", JSON.stringify(pendant) === JSON.stringify(avant) && sauts.length === 0, JSON.stringify({ avant, pendant, sauts }));
   // La dictée : la tête qui parle au-dessus de la plume ; une pause n'efface plus rien.
   const micro = await p.evaluate(() => { const m = document.getElementById("recit-micro"), pl = document.getElementById("recit-envoyer"); if (!m) return null;

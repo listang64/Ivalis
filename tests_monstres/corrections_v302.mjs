@@ -155,7 +155,7 @@ await section(async () => {
   await relayer([], true);
   await attendreQue(async () => (await page()) === 5, 4000);   // v304 : le livre tourne jusqu'à la carte
   const e = await p.evaluate(() => ({ n: window.grimoireEtat().nbPages, actif: !document.getElementById("grimoire-marque-page").classList.contains("inactif"), page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() }));
-  verifier("en partie : la double page de la carte entre dans le livre, le marque-page s'allume", e.n === 18 && e.actif && e.page === 5, JSON.stringify(e));   // v304 : la partie s'ouvre sur la carte
+  verifier("en partie : la double page de la carte entre dans le livre, le marque-page s'allume", e.n >= 18 && e.actif && e.page === 3, JSON.stringify(e));   // v313 : la partie s'ouvre sur le sommaire (Aventuriers : +10 pages)
   await p.evaluate(() => window.grimoireAllerIndex());
   await attendreQue(async () => (await page()) === 3, 3000);
   await p.waitForTimeout(400);

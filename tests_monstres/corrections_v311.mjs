@@ -188,7 +188,7 @@ await section(async () => {
   const r = await p.evaluate(() => ({ chat: document.getElementById("fenetre-chatbox").style.display, page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), recit: window.GRIMOIRE.premiereDeLaSuite() + 2,
     menu: (document.getElementById("menu-navigation-bas") || {}).style ? document.getElementById("menu-navigation-bas").style.display : "" }));
   verifier("ouvrirChatbox (l'arrivée au POI) : l'ancien chat (et son grand avatar) ne s'ouvre pas", r.chat !== "flex", r.chat);
-  verifier("… le livre va au récit à la place", avant === 9 && r.page >= r.recit, `${avant} → ${r.page} (récit ${r.recit})`);
+  verifier("… le livre va au récit à la place (v313 : il était sur le sommaire)", avant !== r.page && r.page >= r.recit, `${avant} → ${r.page} (récit ${r.recit})`);
   verifier("… et les petits boutons du livre restent là", r.menu !== "none", r.menu);
   await p.evaluate(() => window.GRIMOIRE_REGIONS.ouvrir(5)); await monteeSur(5); await pose(); await p.waitForTimeout(300);
   const feu = await p.evaluate(() => { const ok = window.discuterAutourDuFeu ? window.discuterAutourDuFeu() : null; return { ok, chat: document.getElementById("fenetre-chatbox").style.display }; });

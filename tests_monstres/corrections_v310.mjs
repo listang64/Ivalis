@@ -182,6 +182,9 @@ const geo = () => p.evaluate(() => {
 titre("1. LA PLIURE DU LIVRE PAR-DESSUS LA CARTE VIVANTE");
 // =========================================================================
 await section(async () => {
+  // (v313 : le livre s'ouvre sur le sommaire ; on va à la carte du groupe)
+  await pose(); await attendreQue(() => p.evaluate(() => !!window.GRIMOIRE_REGIONS.pageDuGroupe()), 8000); await pose();
+  await p.evaluate(() => window.GRIMOIRE.allerALaPage(window.GRIMOIRE_REGIONS.pageDuGroupe())); await p.waitForTimeout(2500);
   await monteeSur(5); await pose(); await p.waitForTimeout(500);
   const r = await p.evaluate(() => {
     const pl = document.getElementById("region-pliure"), v = document.getElementById("vue-carte-region");

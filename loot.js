@@ -134,7 +134,8 @@ window.emplacementVersChampFront = {
 window.champDocVersFront = {
     "Equip_Armure": "equipArmure",
     "Equip_Main_Droite": "equipMainDroite",
-    "Equip_Main_Gauche": "equipMainGauche"
+    "Equip_Main_Gauche": "equipMainGauche",
+    "Equip_Stock": "equipStock"            // v313 : le stockage du livre
 };
 
 window.iconeParEmplacement = function(objet) {

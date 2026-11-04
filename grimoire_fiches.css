@@ -1,0 +1,270 @@
+/* =========================================================================
+   v313 — LES AVENTURIERS DANS LE LIVRE (grimoire_fiches.js)
+   Les clans, la fiche, les compétences, la Forge, l'inventaire, le DEV :
+   à l'encre et au crayon, comme le reste du livre. --u : 1 % d'une page.
+   ========================================================================= */
+.page-fiches .contenu-page { position: absolute; inset: 0; padding: calc(var(--u) * 7) calc(var(--u) * 8) calc(var(--u) * 6);
+  display: flex; flex-direction: column; align-items: stretch; gap: calc(var(--u) * 1.6); color: #2b1a0e; overflow: hidden; box-sizing: border-box; }
+.page-fiches.droite .contenu-page { padding-left: calc(var(--u) * 7); padding-right: calc(var(--u) * 8.5); }
+.page-fiches.gauche .contenu-page { padding-left: calc(var(--u) * 8.5); padding-right: calc(var(--u) * 7); }
+.page-fiches, .page-fiches * { -webkit-touch-callout: none; }
+.page-fiches button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; touch-action: manipulation; }
+
+/* LES TITRES : Berkshire Swash (le global « * { Almendra !important } » l'écraserait). */
+.titre-clan, .titre-page-fiche, .nom-heros-fiche, .niveau-fiche, .titre-encart, .carte-titre, .separation-classe span {
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important; }
+
+.fiche-attente { margin: 0; font-style: italic; color: #6b4a2b; font-size: calc(var(--u) * 3.2); }
+.lien-fiche { font-size: calc(var(--u) * 3.3) !important; color: #3a2210 !important; text-decoration: underline; text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em; align-self: flex-start; }
+.lien-fiche:hover { color: #000 !important; }
+.lien-fiche small { font-size: 0.8em; color: #6b4a2b; }
+.note-fiche { position: absolute; left: 10%; right: 10%; bottom: calc(var(--u) * 3); margin: 0; text-align: center; font-style: italic;
+  font-size: calc(var(--u) * 3.1); color: #6b1a10; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
+.note-fiche.visible { opacity: 1; }
+
+/* ---------------------------- LES CLANS ---------------------------- */
+.page-fiches .page-liste-clan { align-items: center; padding-top: calc(var(--u) * 11) !important; }
+.titre-clan { font-size: calc(var(--u) * 8.4 * var(--echelle-titres, 1)); color: #24150a; text-align: center; line-height: 1.1; }
+.fleuron-clan, .fleuron-fin { width: 46%; height: auto; margin: calc(var(--u) * 1) 0 calc(var(--u) * 3); }
+.fleuron-fin { margin-top: 40%; opacity: 0.5; }
+.page-fiches .fleuron path { fill: none; stroke: #2b1a0e; stroke-width: 1.4; }
+.page-fiches .fleuron circle { fill: #2b1a0e; }
+.liste-aventuriers { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: calc(var(--u) * 2.4); counter-reset: av; }
+.liste-aventuriers li { transform: rotate(var(--penche, 0deg)); }
+.ligne-aventurier { display: block; width: 100%; text-align: left; font-size: calc(var(--u) * 5) !important; line-height: 1.2; padding: calc(var(--u) * 0.6) 0 !important; }
+.ligne-aventurier::before { counter-increment: av; content: counter(av) ". "; color: #6b4a2b; }
+.nom-aventurier { font-weight: 700; }
+.tiret-aventurier { color: #6b4a2b; }
+.classe-aventurier { font-style: italic; }
+.aventurier-absent { font-size: 0.65em; color: #8a6a4a; font-style: italic; }
+.ligne-aventurier:hover .nom-aventurier { text-decoration: underline; text-underline-offset: 0.15em; }
+.clan-vide { font-style: italic; color: #6b4a2b; font-size: calc(var(--u) * 3.6); }
+.nouvel-aventurier { margin-top: calc(var(--u) * 5); font-size: calc(var(--u) * 3.6) !important; color: #5c3a21 !important; text-decoration: underline; }
+
+/* ---------------------------- L'AVATAR ---------------------------- */
+.page-avatar-heros { padding: 0 !important; }
+.avatar-heros { position: absolute; left: 0; right: 0; top: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 4%, #000 76%, rgba(0,0,0,0.35) 90%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 4%, #000 76%, rgba(0,0,0,0.35) 90%, transparent 100%); }
+.avatar-heros.absente { display: none; }
+.avatar-absent { margin: auto; font-style: italic; color: #6b4a2b; font-size: calc(var(--u) * 4); }
+/* Les pieds de l'image : le papier remonte, sous le nom. */
+.pied-avatar { position: absolute; left: 0; right: 0; bottom: 0; height: 26%; pointer-events: none;
+  background: linear-gradient(180deg, rgba(222, 200, 160, 0) 0%, rgba(214, 190, 148, 0.55) 45%, rgba(206, 180, 136, 0.8) 100%); }
+.nom-heros-fiche { position: absolute; left: calc(var(--u) * 6); right: calc(var(--u) * 6); bottom: calc(var(--u) * 7); z-index: 2;
+  white-space: nowrap; text-align: center; line-height: 1.25; font-size: calc(var(--u) * 12 * var(--echelle-titres, 1));
+  background: linear-gradient(180deg, #fff3b8 0%, #f0cf63 38%, #c8952c 62%, #8a5d12 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.15) rgba(30, 14, 2, 0.95)) drop-shadow(0 calc(var(--u) * 1) calc(var(--u) * 1.4) rgba(30, 14, 2, 0.7)); }
+
+/* ---------------------------- LES ENCARTS ---------------------------- */
+.encart-fiche { position: relative; padding: calc(var(--u) * 1.6) calc(var(--u) * 2.6); }
+.encart-fiche > .cadre-main { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.page-fiches .cadre-main path { fill: none; stroke: #1b1009; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.page-fiches .cadre-main .trait-1 { stroke-width: calc(var(--u) * 0.32); opacity: 0.8; }
+.page-fiches .cadre-main .trait-2 { stroke-width: calc(var(--u) * 0.16); opacity: 0.45; }
+.titre-encart { font-size: calc(var(--u) * 4 * var(--echelle-titres, 1)); color: #3a2210; line-height: 1.1; margin-bottom: calc(var(--u) * 0.6); }
+[data-aide] { cursor: help; -webkit-user-select: none; user-select: none; }
+
+/* Le niveau et sa jauge au crayon de papier. */
+.encart-niveau { display: flex; align-items: center; gap: calc(var(--u) * 3); }
+.niveau-fiche { font-size: calc(var(--u) * 4.6 * var(--echelle-titres, 1)); white-space: nowrap; color: #2b1a0e; }
+.niveau-fiche b { font-size: 1.3em; font-weight: 400; }
+.jauge-niveau { flex: 1; height: calc(var(--u) * 4.2); }
+.jauge-crayon { width: 100%; height: 100%; overflow: visible; display: block; }
+.jauge-crayon .graphite path { fill: none; stroke: #4a4a48; stroke-width: 1.5; stroke-linecap: round; }
+.jauge-crayon .graphite .repasse { stroke-width: 0.8; opacity: 0.35; }
+.jauge-crayon .contour { fill: none; stroke: #1b1009; stroke-width: 1.2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.jauge-crayon .contour.leger { stroke-width: 0.6; opacity: 0.45; }
+
+/* La race et la classe. */
+.encart-identite { display: flex; justify-content: space-around; gap: calc(var(--u) * 2); font-size: calc(var(--u) * 3.8); }
+.morceau-identite small { display: block; font-size: 0.62em; color: #6b4a2b; text-transform: uppercase; letter-spacing: 0.12em; }
+.morceau-identite { text-align: center; font-weight: 700; }
+
+/* Les caractéristiques. */
+.grille-caracs { display: grid; grid-template-columns: repeat(6, 1fr); gap: calc(var(--u) * 1); }
+.case-carac { position: relative; display: flex; flex-direction: column; align-items: center; line-height: 1.05; padding: calc(var(--u) * 0.6) 0; border-radius: 40%; }
+.nom-carac { font-size: calc(var(--u) * 2.5); letter-spacing: 0.1em; color: #6b4a2b; }
+.valeur-carac { font-size: calc(var(--u) * 5.6); font-weight: 700; }
+.mod-carac { font-size: calc(var(--u) * 2.6); color: #5c3a21; }
+.case-carac.jet-demande { cursor: pointer; background: radial-gradient(circle, rgba(200, 140, 30, 0.25), transparent 70%); }
+.case-carac .d20-fiche { position: absolute; right: -4%; top: -6%; width: 34%; height: auto; animation: d20-fiche 1.6s ease-in-out infinite; }
+.d20-fiche path { fill: rgba(220, 160, 40, 0.25); stroke: #6b1a10; stroke-width: 2; stroke-linejoin: round; }
+@keyframes d20-fiche { 50% { filter: drop-shadow(0 0 4px rgba(220, 150, 30, 0.9)); } }
+
+/* Points de vie, fatigue, régénération. */
+.rangee-vitale { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--u) * 1.6); }
+.vital-fiche { position: relative; text-align: center; padding: calc(var(--u) * 1) 0; line-height: 1.05; }
+.vital-fiche b { display: block; font-size: calc(var(--u) * 5.2); }
+.vital-fiche span { font-size: calc(var(--u) * 2.6); color: #5c3a21; }
+
+.liste-talents, .liste-blessures { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: calc(var(--u) * 0.6) calc(var(--u) * 3);
+  font-size: calc(var(--u) * 3.2); }
+.liste-talents small, .liste-blessures small { color: #6b4a2b; font-size: 0.78em; }
+.blessure-fiche { color: #6b1a10; }
+.mort-fiche { margin: 0; color: #6b1a10; font-style: italic; font-size: calc(var(--u) * 3.2); }
+.talent-a-prendre { margin-top: calc(var(--u) * 0.6); color: #6b1a10 !important; }
+.encart-talents .fiche-attente, .encart-blessures-fiche .fiche-attente { font-size: calc(var(--u) * 2.9); }
+
+.rangee-defenses { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 2); }
+.ligne-defense { display: flex; justify-content: space-between; font-size: calc(var(--u) * 3.2); border-bottom: 1px dotted rgba(43, 26, 14, 0.35); }
+.ligne-defense b { font-weight: 700; }
+
+/* ---------------------------- LES COMPÉTENCES ---------------------------- */
+.entete-fiche { display: flex; align-items: baseline; justify-content: space-between; gap: calc(var(--u) * 2); }
+.titre-page-fiche { font-size: calc(var(--u) * 7 * var(--echelle-titres, 1)); color: #24150a; line-height: 1.1; }
+.compte-memoire { font-size: calc(var(--u) * 3.2); color: #5c3a21; white-space: nowrap; }
+.compte-memoire b { font-size: 1.3em; }
+.liste-bannieres { display: flex; flex-direction: column; gap: calc(var(--u) * 0.4); }
+.rang-banniere { position: relative; display: flex; align-items: center; }
+.banniere-livre { position: relative; width: 86%; height: calc(var(--u) * 9.6); transition: transform 0.2s ease; }
+.banniere-livre:hover { transform: translateX(calc(var(--u) * 1)); }
+.banniere-livre.memorisee { transform: translateX(calc(var(--u) * 5)); }
+.banniere-livre.memorisee:hover { transform: translateX(calc(var(--u) * 6)); }
+.dessin-banniere { position: absolute; overflow: visible; }
+.plaque-banniere { left: calc(var(--u) * 6); right: 0; top: 0; height: 100%; width: calc(100% - var(--u) * 6); }
+.medaillon-banniere { left: 0; top: 0; height: 100%; width: calc(var(--u) * 9.6); }
+.dessin-banniere path { fill: none; stroke: #1b1009; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.dessin-banniere .plaque, .dessin-banniere .medaillon { stroke-width: 1.6; }
+.dessin-banniere .leger { stroke-width: 0.7; opacity: 0.5; }
+.dessin-banniere .filet { stroke-width: 0.6; opacity: 0.4; }
+.dessin-banniere .plaque-fond { fill: rgba(120, 80, 40, 0.10); stroke: none; }
+.dessin-banniere .medaillon-fond { fill: #e9d6ac; stroke: none; }
+.dessin-banniere .perle { stroke-width: 1.2; }
+.banniere-livre.memorisee .plaque-fond { fill: rgba(110, 60, 20, 0.26); }
+.banniere-livre.ouverte .plaque { stroke: #6b1a10; stroke-width: 2.2; }
+.banniere-livre.bloquee, .banniere-livre.verrouillee { opacity: 0.45; filter: grayscale(1); }
+.init-banniere { position: absolute; left: 0; width: calc(var(--u) * 9.6); top: 50%; transform: translateY(-50%); text-align: center;
+  font-size: calc(var(--u) * 4.4); font-weight: 700; }
+.titre-banniere { position: absolute; left: calc(var(--u) * 11); right: 6%; top: 50%; transform: translateY(-50%); text-align: center; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; font-size: calc(var(--u) * 3.3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+.sceau-memoire { position: absolute; right: -2.4%; top: 50%; width: calc(var(--u) * 4); height: calc(var(--u) * 4); transform: translateY(-50%) rotate(-8deg);
+  border-radius: 46% 54% 50% 48%; background: radial-gradient(circle at 40% 35%, #b2362a, #7a1610 70%); box-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+.effacer-banniere { margin-left: auto; width: calc(var(--u) * 4.4); height: calc(var(--u) * 4.4); border-radius: 50% !important;
+  color: #8a1a10 !important; font-size: calc(var(--u) * 3) !important; line-height: 1; border: 1px solid #8a1a10 !important; }
+.separation-classe { display: flex; align-items: center; gap: calc(var(--u) * 2); margin: calc(var(--u) * 1.6) 0 calc(var(--u) * 0.6); }
+.separation-classe::before, .separation-classe::after { content: ""; flex: 1; border-top: 1px solid rgba(43, 26, 14, 0.6); }
+.separation-classe span { font-size: calc(var(--u) * 3.6 * var(--echelle-titres, 1)); }
+.bouton-forger { margin-top: auto; }
+.bouton-forger.eteint { opacity: 0.5; }
+
+/* LA CARTE, qui monte dans le papier comme de l'encre. */
+.page-carte-competence { justify-content: center; }
+.invite-carte { text-align: center; }
+.carte-encre { position: relative; padding: calc(var(--u) * 4) calc(var(--u) * 4.4) calc(var(--u) * 3.4); display: flex; flex-direction: column; gap: calc(var(--u) * 1.2);
+  animation: encre-monte 1.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.carte-encre.deja-ecrite { animation: none; }
+@keyframes encre-monte {
+  0% { opacity: 0; filter: blur(7px) sepia(1) contrast(0.4); clip-path: circle(4% at 50% 38%); }
+  35% { opacity: 0.75; filter: blur(3px) sepia(0.6) contrast(0.7); }
+  100% { opacity: 1; filter: none; clip-path: circle(120% at 50% 38%); } }
+.carte-entete { display: flex; align-items: center; gap: calc(var(--u) * 2); }
+.carte-init { flex: none; width: calc(var(--u) * 9); height: calc(var(--u) * 9); border-radius: 50%; border: 2px solid #1b1009;
+  box-shadow: 0 0 0 calc(var(--u) * 0.6) #e9d6ac, 0 0 0 calc(var(--u) * 0.8) rgba(27, 16, 9, 0.6);
+  display: flex; align-items: center; justify-content: center; font-size: calc(var(--u) * 4.4); font-weight: 700; }
+.carte-titre { flex: 1; font-size: calc(var(--u) * 5.6 * var(--echelle-titres, 1)); line-height: 1.05; text-align: center; color: #24150a; }
+.carte-fatigue { flex: none; font-size: calc(var(--u) * 3.6); font-weight: 700; white-space: nowrap; }
+.carte-arme { text-align: center; font-style: italic; color: #5c3a21; font-size: calc(var(--u) * 3.1); }
+.fleuron-carte { width: 40%; height: auto; align-self: center; }
+.carte-effets { list-style: none; margin: 0; padding: 0; font-size: calc(var(--u) * 3.1); line-height: 1.35; display: flex; flex-direction: column; gap: calc(var(--u) * 0.8); }
+.carte-effets .effet::before { content: "• "; }
+.carte-effets .sous-effet { margin-left: calc(var(--u) * 4); color: #4a2e1b; }
+.carte-effets .sous-effet::before { content: "↳ "; }
+.carte-effets span { font-style: italic; color: #4a2e1b; }
+.carte-note { margin: 0; font-size: calc(var(--u) * 2.8); font-style: italic; color: #6b4a2b; }
+.carte-note.bloquee { color: #6b1a10; }
+.bouton-memoriser { align-self: center; margin-top: calc(var(--u) * 1); }
+
+/* ---------------------------- LA FORGE ---------------------------- */
+.page-forge { gap: calc(var(--u) * 1.2); }
+.defile-fiche { overflow-y: auto !important; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(60, 35, 15, 0.5) transparent; }
+.page-fiches .contenu-page.defile-fiche { overflow-y: auto; }
+.codex-liste { flex: 1; min-height: 0; }
+.codex-armes { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 1.4) calc(var(--u) * 4); }
+.codex-armes .fiche-attente { width: 100%; }
+.codex-armes.appelle { animation: codex-appelle 0.6s ease 2; }
+@keyframes codex-appelle { 50% { color: #6b1a10; transform: translateX(calc(var(--u) * 0.6)); } }
+.compte-tags { font-size: calc(var(--u) * 3); color: #5c3a21; }
+/* La Forge d'avant, posée sur le papier : sans ses fonds sombres. */
+.forge-dans-livre, .page-codex { font-size: calc(var(--u) * 3.1); }
+.forge-dans-livre .forge-bandeau, .forge-dans-livre .forge-corps, .forge-dans-livre .forge-parchemin, .forge-dans-livre .forge-pied,
+.page-codex .forge-grimoire-liste { background: none !important; box-shadow: none !important; border: 0 !important; color: #2b1a0e !important;
+  padding: 0 !important; margin: 0 0 calc(var(--u) * 1.2) !important; max-height: none !important; overflow: visible !important; width: auto !important; }
+.forge-dans-livre .forge-bandeau { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 1.4); align-items: center; }
+.forge-dans-livre .forge-bandeau-droite { display: none; }
+.forge-dans-livre .forge-medaillon, .forge-dans-livre .forge-cap, .forge-dans-livre .forge-btn-aide {
+  background: none !important; border: 1px solid rgba(27, 16, 9, 0.7) !important; border-radius: 40% 46% 42% 48% / 50% 44% 52% 46% !important;
+  color: #2b1a0e !important; box-shadow: none !important; padding: calc(var(--u) * 0.8) calc(var(--u) * 2) !important; }
+.forge-dans-livre input, .forge-dans-livre select { background: transparent !important; border: 0 !important; border-bottom: 1px solid #2b1a0e !important;
+  color: #1b1009 !important; border-radius: 0 !important; box-shadow: none !important; font-size: calc(var(--u) * 4) !important; width: 100%; }
+.forge-dans-livre .forge-libelle { color: #5c3a21 !important; }
+.forge-dans-livre .forge-actions > *, .forge-dans-livre .forge-actions div { background-color: transparent !important; color: #2b1a0e !important; border-color: rgba(27, 16, 9, 0.5) !important; box-shadow: none !important; }
+.forge-dans-livre .forge-btn-ajouter, .forge-dans-livre .forge-valider { background: none !important; color: #2b1a0e !important; border: 1px solid #2b1a0e !important; box-shadow: none !important; }
+.forge-dans-livre .forge-valider { font-size: calc(var(--u) * 3.8) !important; padding: calc(var(--u) * 1) calc(var(--u) * 3) !important; }
+.page-codex .forge-grimoire-liste * { color: #2b1a0e !important; background-color: transparent !important; box-shadow: none !important; text-shadow: none !important; }
+.page-codex .forge-grimoire-liste [onclick], .page-codex .forge-grimoire-liste button { border-color: rgba(27, 16, 9, 0.45) !important; }
+.page-codex .forge-grimoire-liste h4, .page-codex .forge-grimoire-liste h3 { border-bottom: 1px solid rgba(27, 16, 9, 0.6) !important; }
+
+/* ---------------------------- L'INVENTAIRE ---------------------------- */
+.rangee-pieces { display: flex; justify-content: space-around; align-items: center; gap: calc(var(--u) * 2); }
+.tas-pieces { display: flex; align-items: center; gap: calc(var(--u) * 1.2); font-size: calc(var(--u) * 3.4); }
+.tas-pieces span { color: #5c3a21; font-style: italic; }
+.piece { width: calc(var(--u) * 10); height: calc(var(--u) * 10); flex: none; filter: drop-shadow(0 1px 1.5px rgba(40, 20, 5, 0.5)); }
+.piece .tranche { fill: rgba(60, 35, 10, 0.55); }
+.piece .flan { stroke: rgba(60, 35, 10, 0.6); stroke-width: 0.7; }
+.piece .grenetis circle { fill: rgba(70, 45, 10, 0.55); }
+.piece .motif ellipse, .piece .motif circle, .piece .motif path { fill: rgba(70, 45, 10, 0.5); stroke: rgba(50, 30, 5, 0.55); stroke-width: 0.6; }
+.piece .motif .creux { fill: rgba(255, 240, 200, 0.35); }
+.piece .motif .trait { fill: none; stroke-width: 1.1; }
+.piece .motif .trait.epais { stroke-width: 1.8; }
+.piece .reflet { fill: none; stroke: rgba(255, 250, 220, 0.6); stroke-width: 1.4; stroke-linecap: round; }
+.saisie-pieces { width: calc(var(--u) * 12); background: transparent; border: 0; border-bottom: 1px solid #2b1a0e; text-align: center;
+  font-size: calc(var(--u) * 5) !important; font-weight: 700; color: #1b1009; outline: none; -moz-appearance: textfield; }
+.saisie-pieces::-webkit-outer-spin-button, .saisie-pieces::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.tas-pieces b { font-size: calc(var(--u) * 5); }
+.encart-objet { display: flex; flex-direction: column; gap: calc(var(--u) * 0.8); }
+.objet-corps { display: flex; gap: calc(var(--u) * 2.4); align-items: flex-start; }
+.objet-image { flex: none; width: calc(var(--u) * 17); height: calc(var(--u) * 17); display: flex; align-items: center; justify-content: center;
+  border: 1px dashed rgba(27, 16, 9, 0.4); border-radius: 8%; }
+.objet-armure .objet-image { width: calc(var(--u) * 26); height: calc(var(--u) * 26); }
+.objet-image img { width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+.objet-icone { font-size: calc(var(--u) * 7); opacity: 0.35; filter: grayscale(1) sepia(0.6); }
+.objet-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: calc(var(--u) * 0.4); }
+.objet-nom { font-size: calc(var(--u) * 3.8); font-weight: 700; }
+.encart-objet.vide .objet-nom { font-weight: 400; font-style: italic; color: #6b4a2b; }
+.objet-rarete { font-size: calc(var(--u) * 2.7); }
+.objet-rarete .carac-objet { color: #5c3a21; }
+.objet-effet { font-size: calc(var(--u) * 2.9); font-style: italic; color: #4a2e1b; }
+.objet-alerte { font-size: calc(var(--u) * 2.7); color: #6b1a10; }
+.objet-actions { display: flex; gap: calc(var(--u) * 4); justify-content: flex-end; }
+.objet-actions .lien-fiche { align-self: auto; font-size: calc(var(--u) * 3) !important; }
+.lien-dev { margin-top: auto; align-self: flex-end; font-size: calc(var(--u) * 2.8) !important; color: #8a1a10 !important; text-decoration: underline;
+  text-underline-offset: 0.18em; opacity: 0.8; }
+
+/* ---------------------------- LE DEV ---------------------------- */
+.page-dev { font-size: calc(var(--u) * 3); }
+.page-dev .contenu-dev > div { margin-bottom: calc(var(--u) * 2) !important; padding: calc(var(--u) * 2) !important; border-radius: 6px !important; }
+.page-dev h3, .page-dev h4 { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important; }
+.page-dev input, .page-dev select { max-width: 100%; box-sizing: border-box; }
+.page-dev .titre-page-fiche { color: #8a1a10; }
+
+/* L'APPUI LONG : la note à l'encre. */
+.bulle-aide-fiche { position: absolute; z-index: 90; max-width: min(340px, 80vw); padding: 10px 14px 12px; pointer-events: none;
+  background: #efe0bd; color: #2b1a0e; border: 1px solid rgba(43, 26, 14, 0.55); border-radius: 3px 8px 4px 9px;
+  box-shadow: 0 6px 16px rgba(30, 15, 5, 0.35), inset 0 0 18px rgba(140, 100, 50, 0.18);
+  font-size: 15px; line-height: 1.35; opacity: 0; transform: translateY(4px) rotate(-0.6deg); transition: opacity 0.2s ease, transform 0.2s ease; }
+.bulle-aide-fiche.visible { opacity: 1; transform: translateY(0) rotate(-0.6deg); }
+.bulle-aide-fiche b { display: block; font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: 400; font-size: 18px; margin-bottom: 4px; }
+.bulle-aide-fiche p { margin: 0 0 5px; }
+
+/* L'ANCIENNE FICHE, quand le livre la montre : cachée, mais remplie. Ses
+   fenêtres utiles sortent sur la page entière. */
+#fenetre-fiche-perso.dans-le-livre { display: none !important; }
+#voile-suppression-perso.hors-fiche { position: fixed; inset: 0; z-index: 400; }
+#modale-creation-caracs.hors-fiche { position: fixed !important; z-index: 400 !important; }
+
+/* (v313) Les liens d'un objet, un peu loin du bord du cadre. */
+.objet-actions { padding-right: calc(var(--u) * 2); }
+.page-fiches .page-carte-competence { justify-content: flex-start; padding-top: calc(var(--u) * 14); }

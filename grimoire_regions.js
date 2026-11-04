@@ -28,6 +28,7 @@
 // =========================================================================
 (function () {
     const ZONE_VERS_REGION = { 1: 1, 2: 2, 3: 5, 4: 6, 5: 10, 6: 11, 7: 3, 8: 7, 9: 8, 10: 13, 11: 12 };
+    window.ZONE_VERS_REGION = ZONE_VERS_REGION;      // (v313) les régions voisines (voyage_groupe.js)
     // Les marges de la carte sur sa page (fractions de la page).
     const MARGE = { x: 0.075, y: 0.075 };
     const PAYSAGE = 1.15;                         // au-delà, la carte s'étale sur la double page

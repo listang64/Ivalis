@@ -49,6 +49,8 @@ const G = () => window.GRIMOIRE || null;
 // sommaire et le chapitre se décalent d'autant (7 et 9 sans elles).
 const premiereSuite = () => { const g = window.GRIMOIRE; const p = g && typeof g.premiereDeLaSuite === "function" ? g.premiereDeLaSuite() : 7; return Number(p) || 7; };
 const premiereRecit = () => premiereSuite() + 2;
+// (v313) Après le récit viennent les pages des Aventuriers (grimoire_fiches.js) : le récit s'arrête à sa dernière page.
+const finDuRecit = () => premiereSuite() + Math.max(2, etat.elements.length);
 const MOTS_PAR_SECONDE = 17;           // « les phrases doivent s'écrire quand même vite »
 const AUTEURS_RECRITS = ["DESTIN", "SYSTEME_TEMPS"];
 const DELAI_LITE_MS = 25000;
@@ -505,7 +507,7 @@ function placeDuMot(mot) {
     const index = premiereSuite() + etat.elements.indexOf(mot.closest(".page-suite"));
     const ici = pf.getCurrentPageIndex(), gauche = ici % 2 === 1 ? ici : ici - 1;
     if (pf.getState() !== "read" || (g.defileEnCours && g.defileEnCours())) return "attente";
-    if (!g.ouvert() || ici < premiereRecit()) return "ailleurs";
+    if (!g.ouvert() || ici < premiereRecit() || ici >= finDuRecit()) return "ailleurs";
     if (index < gauche) return "avant";
     if (index > gauche + 1) return "apres";
     return "ouvert";
@@ -781,6 +783,13 @@ function allerAuRecit() {
     if (etat.lecture) { etat.lecture = null; rendre(); }
     allerALaDernierePage();
 }
+// v313 : Nico, « quand on clique sur Le récit dans le sommaire, ça envoie à la
+// page du sommaire des chapitres du récit ».
+function allerAuSommaireDuRecit() {
+    if (!etat.actif) return;
+    if (etat.lecture) { etat.lecture = null; rendre(); }
+    G().allerALaPage(premiereSuite());
+}
 // LE MARQUE-PAGE DU RÉCIT (v307). Nico : « ça amène à la dernière page du récit ;
 // fais que si on rappuie une deuxième fois, ça amène à l'index des chapitres ».
 function marqueDuRecit() {
@@ -800,7 +809,8 @@ function marqueDuRecit() {
 // ---------------------------------------------------------------------
 function surLeRecit() {
     const g = G(), pf = g && g.pageFlip();
-    return !!(etat.actif && pf && g.ouvert() && pf.getCurrentPageIndex() >= premiereRecit() && !etat.lecture);
+    const ici = pf ? pf.getCurrentPageIndex() : -1;
+    return !!(etat.actif && pf && g.ouvert() && ici >= premiereRecit() && ici < finDuRecit() && !etat.lecture);
 }
 function majInterface() {
     if (!elts) return;
@@ -881,10 +891,22 @@ function majNoteCombat() {
     if (el.dataset.etat === voulu) return;
     el.dataset.etat = voulu;
     const adv = c.Adversaires ? `Face à ${echapper(c.Adversaires)}` : "Le combat éclate";
+    // v313 : Nico, « revois le post-it qui apparaît quand un combat commence : pas
+    // d'animation qui bouge sur Combattre, plus joli, dans le style du livre ».
+    // Deux glaives croisés à l'encre, le titre à la main, l'adversaire, et le
+    // bouton tracé à la plume, scellé d'une goutte de cire. Rien ne palpite.
+    const GLAIVES = `<svg class="glaives-combat" viewBox="0 0 64 44" aria-hidden="true">
+        <path d="M 10 40 L 46 6 M 54 40 L 18 6"/><path class="garde" d="M 13 31 L 19 37 M 51 31 L 45 37"/>
+        <path class="lame" d="M 46 6 L 50 3 L 48 8 Z M 18 6 L 14 3 L 16 8 Z"/>
+        <circle cx="9" cy="41" r="1.8"/><circle cx="55" cy="41" r="1.8"/></svg>`;
     el.innerHTML = voulu === "detection"
         ? `<div class="papier-note"><div class="note-heros">⚔️</div><div class="note-jet"><i>Le destin hésite…</i></div></div>`
-        : `<div class="papier-note"><div class="note-heros">${adv}</div>
-             <button type="button" class="note-combattre">${voulu === "en_cours" ? "Rejoindre le combat" : "Combattre"}</button></div>`;
+        : `<div class="papier-note">${GLAIVES}
+             <div class="titre-note-combat">${voulu === "en_cours" ? "La mêlée gronde" : "Aux armes !"}</div>
+             <div class="adversaires-note-combat">${adv}</div>
+             <button type="button" class="note-combattre"><svg class="trait-combattre" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">
+               <path d="M 3 6 Q 50 2 97 5 L 96 25 Q 50 28 4 26 Z"/><path class="leger" d="M 5 4 Q 52 4 95 7 L 98 24 Q 48 30 2 24 Z"/></svg>
+               <span>${voulu === "en_cours" ? "Rejoindre le combat" : "Combattre"}</span><i class="cire-combattre" aria-hidden="true"></i></button></div>`;
     const b = el.querySelector(".note-combattre");
     if (b) toucherVite(b, () => { son("gong-blessure", 0.6); if (typeof window.rejoindreCombatRP === "function") window.rejoindreCombatRP(); });
 }
@@ -1288,7 +1310,7 @@ let redim = null;
 window.addEventListener("resize", () => { clearTimeout(redim); redim = setTimeout(() => { if (etat.actif) { etat.htmlPages = []; rendre(); } }, 250); });
 
 window.GRIMOIRE_RECIT = {
-    entrer, sortir, allerAuRecit, marqueDuRecit, archiverChapitre, rendre, envoyer,
+    entrer, sortir, allerAuRecit, allerAuSommaireDuRecit, marqueDuRecit, archiverChapitre, rendre, envoyer,
     construireEntrees, jetsEnAttente, reformuler,
     etat: () => ({ actif: etat.actif, idPartie: etat.idPartie, pagesRecit: etat.pagesRecit, verrou: etat.verrou, envoi: etat.envoi,
                    lecture: etat.lecture ? etat.lecture.id : null, chapitres: etat.chapitres.length,

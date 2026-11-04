@@ -355,7 +355,8 @@
 .numero-chapitre, .titre-chapitre, .titre-sommaire, .region-nom, .papier-avatar .nom-portrait, .titre-reglages-son, .titre-acces-reserve,
 .entete-index *, .entree-index *, .journal-entete * {
   /* (!important : style.css impose Almendra à tout, « * { … !important } ») */
-  font-family: 'Berkshire Swash', 'Almendra', serif !important; font-style: normal; letter-spacing: 0.01em; }
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-style: normal; letter-spacing: 0.01em;
+  font-weight: var(--poids-titres, 400) !important; }
 .entete-index { font-weight: 400; font-size: calc(var(--u) * 9); letter-spacing: 0.04em; margin-left: 0; }
 .nom-partie-index { font-size: calc(var(--u) * 4.6); color: #6b3e1c; margin-top: calc(var(--u) * -0.6); min-height: 1em; text-align: center; }
 .entree-index { font-weight: 400; font-style: normal; }
@@ -382,3 +383,15 @@
 
 /* (v312) Les Paramètres ouverts depuis le menu du livre : sur la page entière, par-dessus le livre. */
 body > #conteneur-parametres { z-index: 95; }
+
+/* =========================================================================
+   v313 — L'ÉCRITURE DES TITRES, AU CHOIX (police_titres.js) : Nico, « change
+   la police du sommaire et des titres ; fais-moi une page pour choisir ».
+   La taille suit l'écriture choisie (certaines sont petites de nature).
+   ========================================================================= */
+.entete-index { font-size: calc(var(--u) * 9 * var(--echelle-titres, 1)); }
+.nom-partie-index { font-size: calc(var(--u) * 4.6 * var(--echelle-titres, 1)); }
+.entree-index { font-size: calc(var(--u) * 7.6 * var(--echelle-titres, 1)); }
+.journal-entete { font-size: calc(var(--u) * 6.6 * var(--echelle-titres, 1)); }
+.page-chapitre h2 { font-size: calc(var(--u) * 7 * var(--echelle-titres, 1)); }
+.titre-reglages-son, .titre-acces-reserve { font-size: calc(21px * var(--echelle-titres, 1)) !important; }

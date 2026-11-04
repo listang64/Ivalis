@@ -141,7 +141,7 @@ titre("1. LA PARTIE CHARGÉE : LE LIVRE S'OUVRE SUR LA CARTE DU MONDE");
 // =========================================================================
 await section(async () => {
   const e = await p.evaluate(() => ({ page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), enPartie: window.grimoireEtat().enPartie, carte: !!document.querySelector("#grimoire-carte-gauche img") }));
-  verifier("après le chargement, la double page de la carte du monde (5-6)", e.enPartie && e.page === 5 && e.carte, JSON.stringify(e));
+  verifier("après le chargement, le sommaire (v313 : Nico, « ouvre le livre sur le sommaire »)", e.enPartie && e.page === 3 && e.carte, JSON.stringify(e));
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v304_ouverture_carte.png" });
 });
 await relayer(M, true);
@@ -164,7 +164,7 @@ await section(async () => {
   // La carte (5) → le récit (9) : le marque-page à la plume.
   const a = await surLeClic("#grimoire-marque-recit");
   if (CAPTURES) { await p.waitForTimeout(160); await p.screenshot({ path: CAPTURES + "/v304_pages_defilent.png" }); }
-  verifier("le marque-page du récit : de vraies pages, écrites à la main, défilent (v306)", a.feuilles >= 4 && a.ecrites && a.enCours && a.depart === 5, JSON.stringify(a));
+  verifier("le marque-page du récit : de vraies pages, écrites à la main, défilent (v306)", a.feuilles >= 4 && a.ecrites && a.enCours && a.depart === 3, JSON.stringify(a));
   await p.waitForTimeout(1100);
   let z = await apres();
   verifier("… le livre arrive au récit (page 9), les pages de passage s'en vont", z.page === 9 && !z.reste, JSON.stringify(z));
@@ -178,7 +178,7 @@ await section(async () => {
   const c = await surLeClic("#grimoire-index-recit");
   await p.waitForTimeout(1100);
   z = await apres();
-  verifier("un lien de l'index (« Le récit ») : même défilement, sans clic", c.feuilles >= 4 && z.page === 9 && z.clics === 0 && !z.sons.includes("clic"), JSON.stringify([c, z]));
+  verifier("un lien de l'index (« Le récit », v313 : son sommaire des chapitres, page 7) : même défilement, sans clic", c.feuilles >= 4 && z.page === 7 && z.clics === 0 && !z.sons.includes("clic"), JSON.stringify([c, z]));
   // La double page voisine se tourne normalement (pas de liasse) : l'index → la carte.
   await p.evaluate(() => window.grimoireAllerIndex());
   await p.waitForTimeout(1100);

@@ -303,6 +303,9 @@ await section(async () => {
   await p.evaluate(() => { window.__docs["Monde_Races/R_VARGEN"].Descriptif_Physique += " Crinière tressée d'os."; });
   const avant = requetes.length, avantImg = openai.length;
   const ok = await p.evaluate(() => window.forcerCombatRP());
+  // (v313 : les ennemis composés attendent qu'un joueur les valide)
+  await attendreQue(async () => { const c = await crp(); return !!c && !!c.Ennemis; }, 20000);
+  await p.evaluate(() => window.validerEnnemisCombatRP());
   const pret = await attendreQue(async () => { const c = await crp(); return !!c && !!c.Ennemis && c.Tokens && Object.keys(c.Ennemis.Visuels || {}).every(k => c.Tokens[k] !== undefined); }, 20000);
   const reqs = requetes.slice(avant).filter(x => x.mia === "MIA_ENNEMIS");
   verifier("le combat se prépare jusqu'aux pions", ok && pret, `${ok} ${pret}`);
@@ -315,7 +318,7 @@ await section(async () => {
   verifier("le pion du chef vargen : sa description + l'apparence d'un Vargen selon le Grimoire",
            !!chef && /What a Vargen looks like in this world: Humanoïdes lupins de deux mètres[^)]*Crinière tressée d'os/.test(chef.prompt), chef ? chef.prompt.slice(0, 120) : `${pions.length} pion(s)`);
   verifier("… le guerrier vargen aussi", !!guerrier && /What a Vargen looks like in this world/.test(guerrier.prompt));
-  verifier("le loup (aucun peuple nommé) : sa description seule", !!loup && !/looks like in this world/.test(loup.prompt));
+  verifier("le loup (aucun peuple nommé) : sa description seule", !!loup && !/looks like in this world/.test(loup.prompt), pions.map(x => x.prompt.slice(0, 200)).join(" || "));
   verifier("le dessin garde l'interdit : jamais d'orc", !!chef && /never draw an orc/.test(chef.prompt));
 });
 

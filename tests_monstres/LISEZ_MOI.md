@@ -10434,3 +10434,40 @@ corrections_v312.mjs (dans la suite) vérifie tout cela ; il échoue sur la v311
 (36 échecs). Tests mis à jour : v299 (boutons du haut, ≡, son, sommaire, étoile,
 marge), v300 (marge, cinq entrées), v302 et v306 (plus de marque-page de la
 carte), v310 (le papier d'avatar), v287 et v270 (la piste ×1,14).
+
+## v313 — Les Aventuriers dans le livre, l'écriture des titres au choix, le début des combats
+
+- Les fiches dans le livre (grimoire_fiches.js, grimoire_fiches.css) : « I- Aventuriers »
+  mène aux clans (un par joueur, « Clan de Benjamin », le sien d'abord), leurs héros
+  dans l'ordre de création (« Nom - Classe » ; Cree_Le sur les nouveaux héros). Un
+  toucher ouvre le héros : l'avatar en pleine page et son nom doré qui s'ajuste ; le
+  niveau et sa jauge au crayon (sans XP), la race et la classe, les caractéristiques,
+  PV / fatigue max / régénération, les talents, réflexes et résistances, les
+  blessures — un appui long dit ce que c'est. Puis les compétences (bannières dessinées
+  en code, sans couleur de joueur ; la carte monte à l'encre sur la page de droite,
+  « Mémoriser pour le combat »), la Forge sur sa double page (la Forge de
+  competences.js rangée dans le livre ; à droite le codex des effets), l'inventaire
+  (richesse en laiton et bronze, 30 bronzes = 1 laiton, pièces dessinées ; armure,
+  mains, stockage d'une arme : Ranger / Prendre en main) et, en mode DEV, un « Dev »
+  souligné qui mène aux pages du panneau DEV (l'onglet DEV de l'ancienne fiche, rangé
+  dans le livre). window.ouvrirFichePerso ouvre le livre quand il est là (pas en
+  combat) ; l'ancienne fenêtre reste derrière, cachée, et garde ses rôles. Les pages
+  des Aventuriers viennent après le récit (il s'arrête à sa dernière page).
+- Plus d'image générée pour une compétence (window.ILLUSTRER_COMPETENCES la rallume).
+- L'écriture des titres (police_titres.js) : Paramètres → « Choisir l'écriture », 25
+  écritures manuscrites (Google Fonts) ; Homemade Apple par défaut ; --police-titres,
+  --echelle-titres, --poids-titres. Berkshire Swash ne sert plus que de repli.
+- Le livre s'ouvre sur le sommaire en partie ; « V- Le récit » mène au sommaire des
+  chapitres (le marque-page plume, à la page à lire).
+- Les voyages : seulement vers une région limitrophe ou une île proche (contours de la
+  carte du monde à 3 % près ; Carte_Monde/Regions.Voisins corrige, en DEV).
+- Le lieu (POI) qui ne naissait pas : transactions réessayées (failed-precondition…),
+  création relancée par le poste rechargé, reprise par un autre au bout de 4 min,
+  bouton « Réessayer de révéler le lieu ».
+- Le combat : la note du récit refaite à l'encre (sans animation) ; la grille validée
+  d'office ; une page « Qui vous fait face ? » où un joueur valide les ennemis avant que
+  leurs pions ne soient dessinés.
+
+corrections_v313.mjs vérifie tout cela (16 échecs sur la v312). Tests mis à jour :
+v278, v279 (grille, ennemis), v299, v300, v302, v304, v308, v310, v311, v312 (ouverture
+sur le sommaire, écriture, Aventuriers, récit), v309 (validation des ennemis).

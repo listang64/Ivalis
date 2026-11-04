@@ -48,7 +48,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import {
-    doc, collection, onSnapshot, setDoc, updateDoc, addDoc, deleteField, runTransaction
+    doc, collection, onSnapshot, setDoc, updateDoc, addDoc, deleteField, runTransaction, getDoc
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 const IMAGE_GROUPE_MONDE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1792842687/B713FC3C-F7B3-4C38-B3DA-4040AC5D34F3_bfvzfg.png";
@@ -433,7 +433,21 @@ window.replanifierApresPoiVoyage = replanifierApresPoi;
 // --- LES ÉCRITURES ---------------------------------------------------------
 // Une transaction sur la partie (et la date en jeu, au besoin). `fn(data,
 // date)` rend { maj, date, resultat } ou null (rien à faire).
+// v313 : Nico, « lors de la création d'un POI de mon frère, le lieu ne s'est pas
+// créé » (Commit … failed-precondition). Deux postes écrivent la partie au même
+// moment (chacun finit son tronçon) : Firestore refuse l'un des deux et le SDK
+// réessaie cinq fois ; sous forte concurrence il peut abandonner, et l'écriture
+// (le lieu né, l'arrivée) était perdue. On réessaie encore, un peu plus tard.
+const ERREURS_REESSAYABLES = ["failed-precondition", "aborted", "unavailable", "deadline-exceeded", "resource-exhausted"];
 async function transaction(fn, options) {
+    for (let essai = 0; ; essai++) {
+        const r = await transactionUneFois(fn, options, essai < 3);
+        if (r !== REESSAYER) return r;
+        await new Promise(ok => setTimeout(ok, 250 * Math.pow(2, essai) + Math.random() * 200));
+    }
+}
+const REESSAYER = Symbol("réessayer");
+async function transactionUneFois(fn, options, peutReessayer) {
     if (!window.ID_PARTIE_COURANTE) return null;
     try {
         return await runTransaction(db, async (tx) => {
@@ -451,6 +465,7 @@ async function transaction(fn, options) {
             return r.resultat === undefined ? true : r.resultat;
         });
     } catch (e) {
+        if (peutReessayer && e && ERREURS_REESSAYABLES.includes(e.code)) { console.warn("Voyage du groupe : écriture refusée (" + e.code + "), on réessaie."); return REESSAYER; }
         console.error("Voyage du groupe :", e);
         return null;
     }
@@ -693,7 +708,7 @@ window.voterPoiGroupe = async function(reponse, options) {
         if (!votants.every(x => votes[x.id] === "oui")) return { maj: { "Voyage_Groupe.Poi.Votes": votes }, resultat: { vote: true } };
         const detour = cheminDetour(v, v.Poi);
         const poi = { ...v.Poi, Votes: votes, Detour: detour.trace, Longueur: detour.longueur };
-        if (createur) poi.Createur = moi;
+        if (createur) { poi.Createur = moi; poi.Pris_Le = Date.now(); }
         return { maj: champsVoyage({ Etat: "detour", Poi: poi, Debut_Marche: Date.now(), Duree_Marche_Ms: dureeDetour(poi), Delai_Depart_Ms: 300 }),
                  resultat: { detour: true, poi, createur } };
     });
@@ -757,19 +772,43 @@ async function lancerCreationPoi(id, poi) {
     }
 }
 window.lancerCreationPoiVoyage = lancerCreationPoi;
-// Un POI à créer et personne pour le faire (le poste du dernier oui n'a pas
-// les clés) : ce poste, s'il les a, le réclame.
-async function reclamerCreationPoi(v) {
-    if (!v || !v.Poi || v.Poi.Createur || v.Poi.Lieu || v.Poi.Echec || reclamations.has(v.Poi.Id)) return;
-    if (!(typeof window.peutCreerPoi === "function" && window.peutCreerPoi())) return;
-    reclamations.add(v.Poi.Id);
-    const moi = idJoueur(), id = v.Id, poiId = v.Poi.Id;
+// (v313) Le lieu n'a pas pu naître : un poste qui a les clés peut réessayer.
+window.reessayerLieuPoi = async function () {
+    const v = voyage, id = v && v.Id, poiId = v && v.Poi && v.Poi.Id;
+    if (!poiId || !(window.peutCreerPoi && window.peutCreerPoi())) return null;
+    clic();
+    creationsIci.delete(poiId); reclamations.delete(poiId);
     const r = await transaction((data) => {
         const w = data.Voyage_Groupe;
-        if (!memeVoyage(w, id) || !w.Poi || w.Poi.Id !== poiId || w.Poi.Createur) return null;
-        return { maj: { "Voyage_Groupe.Poi.Createur": moi }, resultat: { pris: true } };
+        if (!memeVoyage(w, id) || !w.Poi || w.Poi.Id !== poiId || w.Poi.Lieu) return null;
+        return { maj: { "Voyage_Groupe.Poi.Echec": deleteField(), "Voyage_Groupe.Poi.Createur": idJoueur(), "Voyage_Groupe.Poi.Pris_Le": Date.now() }, resultat: { pris: true } };
     });
     if (r && r.pris) lancerCreationPoi(id, v.Poi);
+    return r;
+};
+// (v313) Sans nouvelle de la partie pendant la halte, la reprise se vérifie quand même.
+setInterval(() => { try { if (voyage && voyage.Poi && ["detour", "halte"].includes(voyage.Etat)) reclamerCreationPoi(voyage); } catch (e) {} }, 30000);
+// Un POI à créer et personne pour le faire (le poste du dernier oui n'a pas
+// les clés) : ce poste, s'il les a, le réclame.
+// v313 : le poste qui avait pris la création a pu se recharger ou partir (le
+// groupe attendait alors en halte pour toujours) : rechargé, il la relance ;
+// parti depuis plus de 4 minutes sans lieu, un autre poste qui a les clés la reprend.
+const DELAI_REPRISE_POI = 4 * 60 * 1000;
+const createurParti = (poi) => !!(poi && poi.Createur && !poi.Lieu && !poi.Echec && Date.now() - (Number(poi.Pris_Le) || 0) > DELAI_REPRISE_POI);
+async function reclamerCreationPoi(v) {
+    if (!v || !v.Poi || v.Poi.Lieu || v.Poi.Echec || reclamations.has(v.Poi.Id)) return;
+    if (!(typeof window.peutCreerPoi === "function" && window.peutCreerPoi())) return;
+    const moi = idJoueur(), id = v.Id, poiId = v.Poi.Id;
+    if (v.Poi.Createur === moi && !creationsIci.has(poiId)) { reclamations.add(poiId); lancerCreationPoi(id, v.Poi); return; }
+    if (v.Poi.Createur && !createurParti(v.Poi)) return;
+    reclamations.add(poiId);
+    const r = await transaction((data) => {
+        const w = data.Voyage_Groupe;
+        if (!memeVoyage(w, id) || !w.Poi || w.Poi.Id !== poiId || w.Poi.Lieu || (w.Poi.Createur && !createurParti(w.Poi))) return null;
+        return { maj: { "Voyage_Groupe.Poi.Createur": moi, "Voyage_Groupe.Poi.Pris_Le": Date.now() }, resultat: { pris: true } };
+    });
+    if (r && r.pris) lancerCreationPoi(id, v.Poi);
+    else setTimeout(() => reclamations.delete(poiId), 5000);
 }
 // L'arrivée au POI (chez tous) : le chat s'ouvre ; le poste qui a créé le lieu
 // pose l'arrivée et réveille le MJ (Nico : « ça ouvre la chatbox et le MJ
@@ -1447,6 +1486,77 @@ function surChangementChoix() {
     dessinerTout();
 }
 
+// LES RÉGIONS VOISINES (v313). Nico : « pour les déplacements inter-régions, on
+// ne peut pas aller dans une région qui n'est pas limitrophe : seulement sur une
+// région ou une île adjacente ». Deux régions sont voisines quand leurs contours
+// (la carte du monde, regions_carte.js ; à défaut les boîtes de la carte du
+// livre) se touchent ou presque — 3 % de la largeur de la carte : une île posée
+// près de la côte compte. Le DEV corrige à la main (Carte_Monde/Regions,
+// champ Voisins : { "3": { "7": true|false } }), dans les deux sens.
+const SEUIL_VOISINES = 0.03;
+function distanceSegment(p, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+    return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+function dedans(p, pts) {
+    let c = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const a = pts[i], b = pts[j];
+        if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / ((b.y - a.y) || 1e-9) + a.x) c = !c;
+    }
+    return c;
+}
+function distancePolygones(A, B) {
+    if (A.some(p => dedans(p, B)) || B.some(p => dedans(p, A))) return 0;
+    let d = Infinity;
+    const cote = (P, Q) => P.forEach(p => { for (let i = 0; i < Q.length; i++) d = Math.min(d, distanceSegment(p, Q[i], Q[(i + 1) % Q.length])); });
+    cote(A, B); cote(B, A);
+    return d;
+}
+// Les contours de chaque région, en fraction de la largeur de leur carte.
+function contoursRegions() {
+    const res = {};
+    Object.values(window.REGIONS_CARTE || {}).forEach(r => { if (r && r.points && r.points.length >= 3) res[r.numero] = r.points.map(p => ({ x: p.x / 3840, y: p.y / 3840 })); });
+    if (Object.keys(res).length >= 2) return res;
+    const vers = window.ZONE_VERS_REGION || {};
+    Object.values(window.ZONES_LIVRE || {}).forEach(z => {
+        const n = Number(vers[z.numero] || z.numero);
+        if (z && z.points && z.points.length >= 3 && n > 0) res[n] = z.points.map(p => ({ x: p.x / 1514, y: p.y / 1514 }));
+    });
+    return res;
+}
+window.VOISINES_DEV = window.VOISINES_DEV || {};
+window.regionsVoisines = function (a, b) {
+    a = Number(a); b = Number(b);
+    if (!(a > 0) || !(b > 0) || a === b) return false;
+    const dev = window.VOISINES_DEV || {};
+    const force = (dev[a] && typeof dev[a][b] === "boolean") ? dev[a][b] : (dev[b] && typeof dev[b][a] === "boolean" ? dev[b][a] : null);
+    if (force !== null) return force;
+    const c = contoursRegions();
+    if (!c[a] || !c[b]) return true;                 // contours inconnus : on ne bloque pas
+    return distancePolygones(c[a], c[b]) <= SEUIL_VOISINES;
+};
+window.voisinesDe = (a) => Object.keys(contoursRegions()).map(Number).filter(b => window.regionsVoisines(a, b));
+// (DEV) Déclarer deux régions voisines, ou non.
+window.declarerVoisinesDev = async function (a, b, oui) {
+    a = Number(a); b = Number(b);
+    window.VOISINES_DEV[a] = { ...(window.VOISINES_DEV[a] || {}), [b]: !!oui };
+    window.VOISINES_DEV[b] = { ...(window.VOISINES_DEV[b] || {}), [a]: !!oui };
+    try { await setDoc(doc(db, "Carte_Monde", "Regions"), { Voisins: { [a]: { [b]: !!oui }, [b]: { [a]: !!oui } } }, { merge: true }); }
+    catch (e) { console.error("Régions voisines :", e); }
+};
+let voisinesLues = false;
+async function lireVoisines() {
+    if (voisinesLues) return;
+    voisinesLues = true;
+    try {
+        const snap = await getDoc(doc(db, "Carte_Monde", "Regions"));
+        const v = snap && snap.exists() ? (snap.data().Voisins || {}) : {};
+        Object.entries(v).forEach(([x, liste]) => { window.VOISINES_DEV[x] = { ...(window.VOISINES_DEV[x] || {}), ...liste }; });
+    } catch (e) { voisinesLues = false; console.warn("Régions voisines :", e); }
+}
+
 // Un clic sur une région de la carte du monde, en mode choix (regions_carte.js).
 window.surChoixRegionCarte = function(numero) {
     if (!choix || choix.vue !== "monde") return false;
@@ -1460,6 +1570,16 @@ window.surChoixRegionCarte = function(numero) {
     const pos = positionEffective();
     if (!pos) return true;
     if (pos.Region === n) { annoncer("Le groupe est déjà dans cette région."); return true; }
+    lireVoisines();
+    if (!window.regionsVoisines(pos.Region, n)) {
+        // (DEV) La carte se trompe : on peut déclarer les deux régions voisines.
+        if (estDev() && window.confirm(`${nomRegion(n)} n'est pas limitrophe de ${nomRegion(pos.Region)} d'après la carte.\n\n(DEV) Les déclarer voisines ?`)) {
+            window.declarerVoisinesDev(pos.Region, n, true);
+        } else {
+            annoncer(`${nomRegion(n)} n'est pas limitrophe : on ne voyage que vers une région ou une île voisine.`);
+            return true;
+        }
+    }
     const A = centreMonde(pos.Region), B = centreMonde(n);
     if (!A || !B) return true;
     choix.proposition = {
@@ -1593,6 +1713,7 @@ function boite() {
             if (a === "forcer-rester") window.choisirNuitVoyageGroupe("rester", { forcer: true });
             if (a === "poi-oui" || a === "poi-non") window.voterPoiGroupe(a === "poi-oui" ? "oui" : "non");
             if (a === "halte-reprendre" || a === "halte-rester") window.choisirHalteGroupe(a === "halte-rester" ? "rester" : "reprendre");
+            if (a === "halte-reessayer") window.reessayerLieuPoi();
             if (a === "forcer-halte-rester") window.choisirHalteGroupe("rester", { forcer: true });
             if (a === "feu-de-camp") window.discuterAutourDuFeu();
         });
@@ -1691,6 +1812,7 @@ function actualiserBoite() {
                 ${jeVote ? `<div class="boite-voyage-boutons">
                     <button type="button" data-action="halte-reprendre"${mien === "reprendre" ? " class=\"choisi\"" : ""}>Reprendre la route</button>
                     <button type="button" data-action="halte-rester" class="secondaire${mien === "rester" ? " choisi" : ""}">Rester ici</button></div>` : ""}
+                ${window.peutCreerPoi && window.peutCreerPoi() ? `<div class="boite-voyage-boutons"><button type="button" data-action="halte-reessayer" class="secondaire">Réessayer de révéler le lieu</button></div>` : ""}
                 <div class="boite-voyage-etat">Rien ne bouge tant que tous ne sont pas d'accord.</div>
                 ${dev ? `<div class="boite-voyage-boutons"><button type="button" data-action="forcer" class="boite-voyage-dev">Forcer : reprendre</button>
                     <button type="button" data-action="forcer-halte-rester" class="boite-voyage-dev">Forcer : rester</button></div>` : ""}`

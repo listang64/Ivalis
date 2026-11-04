@@ -322,22 +322,23 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("3. LA GRILLE : PAS DE MINUTEUR, ELLE ATTEND UN JOUEUR EN MODE DEV");
+titre("3. LA GRILLE VALIDÉE D'OFFICE (v313), LES ENNEMIS VALIDÉS PAR UN JOUEUR");
 // =========================================================================
 await section(async () => {
   await p.evaluate(() => { localStorage.setItem("ivalis_DEV_MODE", "off"); window.fermerCombat && window.fermerCombat(); });
   await p.evaluate(() => window.forcerCombatRP());
-  const carte = await attendreQue(async () => !!((await crp()) || {}).Carte, 15000);
-  await p.waitForTimeout(4000);
-  const r = await p.evaluate(() => ({ grille: !!(window.__docs["Systeme_Parties/P1"].Combat_RP || {}).Grille, etat: (window.__docs["Systeme_Parties/P1"].Combat_RP || {}).Etat }));
-  verifier("la carte est prête, personne en mode DEV : la grille attend (pas de validation seule)", carte && !r.grille && r.etat === "preparation", JSON.stringify(r));
-  await p.evaluate(() => { localStorage.setItem("ivalis_DEV_MODE", "on"); window.rejoindreCombatRP(); });
+  const carte = await attendreQue(async () => !!((await crp()) || {}).Grille, 15000);
+  const r = await p.evaluate(() => ({ grille: (window.__docs["Systeme_Parties/P1"].Combat_RP || {}).Grille, etat: (window.__docs["Systeme_Parties/P1"].Combat_RP || {}).Etat }));
+  verifier("v313 : la carte prête, la grille est validée d'office, sans joueur DEV", carte && !!r.grille && r.grille.Par === "auto" && r.etat === "preparation", JSON.stringify(r));
+  await attendreQue(async () => !!((await crp()) || {}).Ennemis, 15000);
+  await p.waitForTimeout(2500);
+  const attend = ((await crp()) || {}).Etat === "preparation" && !((await crp()) || {}).Ennemis_Valides;
+  verifier("v313 : les ennemis composés attendent un joueur (pas de pions, pas de combat)", attend, JSON.stringify(((await crp()) || {}).Etat));
+  await p.evaluate(() => window.rejoindreCombatRP());
   await p.waitForTimeout(400);
-  const boite = await p.evaluate(() => (document.getElementById("boite-grille-rp") || {}).style?.display);
-  verifier("un joueur passe en mode DEV : la boîte s'ouvre pour lui", boite === "flex", boite);
-  await p.evaluate(() => document.getElementById("boite-grille-valider").click());
+  await p.evaluate(() => document.getElementById("btn-valider-ennemis").click());
   const suite = await attendreQue(async () => ((await crp()) || {}).Etat === "en_cours", 20000);
-  verifier("il valide : la préparation reprend jusqu'au combat", suite);
+  verifier("un joueur valide : la préparation reprend jusqu'au combat", suite);
   await p.evaluate(() => window.abandonnerCombatRP());
   await attendreQue(async () => !(await crp()), 8000);
   await p.evaluate(() => { window.fermerCombat && window.fermerCombat(); window.fermerToutesLesFenetres && window.fermerToutesLesFenetres(); });

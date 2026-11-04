@@ -188,11 +188,17 @@ await section(async () => {
 titre("2. LA PARTIE CHARGÉE : LE LIVRE S'OUVRE SUR LA RÉGION DU GROUPE ; LA CARTE VIVANTE Y EST POSÉE");
 // =========================================================================
 await section(async () => {
+  // v313 : le livre s'ouvre sur le sommaire (Nico) ; la carte du groupe est à sa page.
+  await pose();
+  verifier("v313 : la partie chargée, le livre s'ouvre sur le sommaire", (await page()) === 3, `page ${await page()}`);
+  await attendreQue(() => p.evaluate(() => !!window.GRIMOIRE_REGIONS.pageDuGroupe()), 8000); await pose();
+  await p.evaluate(() => window.GRIMOIRE.allerALaPage(window.GRIMOIRE_REGIONS.pageDuGroupe()));
+  await p.waitForTimeout(2500);
   await monteeSur(5);
   await pose();
   await p.waitForTimeout(500);
   const v = await vueDuLivre();
-  verifier("le groupe est dans le désert d'Etheria : le livre s'ouvre sur sa double page", (await page()) === 9 && v && v.numero === 5, `page ${await page()}`);
+  verifier("le groupe est dans le désert d'Etheria : sa double page (9) porte sa carte", (await page()) === 9 && v && v.numero === 5, `page ${await page()}`);
   verifier("la carte vivante (cartes_regionales.js) est posée dans le livre, sur la double page (paysage)", v.parent === "grimoire-livre" && v.dansLeLivre && v.affichee && !v.cachee && v.place[0] < 0.06 && v.place[2] > 0.9, JSON.stringify(v.place.map(x => +x.toFixed(3))));
   verifier("… toute la carte tient dans sa place (à sa taille de page)", Math.abs(v.zoom - v.base) < 1e-6 && v.carte[2] <= v.carte[4] + 1 && v.carte[3] <= v.carte[5] + 1, JSON.stringify(v.carte.map(Math.round)));
   const t = await p.evaluate(() => { const el = document.querySelector("#region-titre-vivant .region-nom"); return el ? el.textContent : null; });

@@ -434,11 +434,17 @@ function poursuivre() {
     if (!c.Lieu && !fait("lieu")) return lancer("lieu", decrireLeLieu);
     if (!c.Carte && !fait("carte")) return lancer("carte", dessinerLaCarte);
     if (!c.Ennemis && !fait("ennemis")) lancer("ennemis", composerLesEnnemis);
-    else if (c.Ennemis && !pionsPrets(c)) lancer("pions", dessinerLesPions);
-    // LA GRILLE ATTEND UN JOUEUR EN MODE DEV, sans minuteur (Nico, v279).
-    if (!c.Grille) return;
+    // v313 : Nico, « une page transitoire où l'on valide les PNJ présents dans le
+    // combat avant que l'IA ne les génère » : les pions attendent ce oui.
+    else if (c.Ennemis && c.Ennemis_Valides && !pionsPrets(c)) lancer("pions", dessinerLesPions);
+    // v313 : Nico, « quand un combat commence, valide direct la taille des
+    // hexagones, c'est bon » (v279 : elle attendait un joueur en mode DEV).
+    if (!c.Grille) {
+        if (c.Carte && !fait("grille")) lancer("grille", () => window.validerGrilleCombatRP(Number(c.Taille_Depart) || 60, { auto: true }));
+        return;
+    }
     if (!c.Peint && !fait("peinture")) return lancer("peinture", peindreLeTerrain);
-    if (c.Ennemis && pionsPrets(c) && c.Peint && !c.Deploye) lancer("deploiement", deployer);
+    if (c.Ennemis && c.Ennemis_Valides && pionsPrets(c) && c.Peint && !c.Deploye) lancer("deploiement", deployer);
 }
 window.poursuivreCombatRP = poursuivre;
 
@@ -1409,7 +1415,9 @@ const MOTS_ATTENTE = [
 function etapesPreparation(c) {
     return [
         { nom: "Le champ de bataille", fait: !!c.Carte },
-        { nom: "Les ennemis", fait: pionsPrets(c) },
+        { nom: "Les ennemis", fait: !!c.Ennemis },
+        { nom: "Les ennemis validés", fait: !!c.Ennemis_Valides },
+        { nom: "Leurs pions", fait: !!c.Ennemis_Valides && pionsPrets(c) },
         { nom: "La grille", fait: !!c.Grille },
         { nom: "Le terrain étudié", fait: !!c.Peint },
         { nom: "Les positions", fait: !!c.Deploye }
@@ -1453,7 +1461,101 @@ function actualiserFenetreCombat() {
         <div class="voile-combat-rp-etapes">${etapesPreparation(c).map(e => `<span class="${e.fait ? "fait" : ""}">${e.fait ? "✔" : "…"} ${e.nom}</span>`).join("")}</div>`;
     if (voile.dataset.contenu !== contenu) { voile.dataset.contenu = contenu; voile.innerHTML = contenu; }
     actualiserBoiteGrille(c);
+    actualiserValidationEnnemis(c);
 }
+
+// --- 6.5 bis LA PAGE DES ENNEMIS À VALIDER (v313) ---------------------------
+// Nico : « j'aimerais une page transitoire où l'on valide les PNJ en présence
+// dans le combat avant que l'IA ne les génère ». MIA_ENNEMIS a composé le
+// combat : chacun le voit (au départ, en renfort), peut retoucher un nom ou une
+// apparence, et un joueur valide ; alors seulement les pions se dessinent.
+// « Tirer d'autres ennemis » renvoie la composition à l'IA.
+function htmlValidationEnnemis(c) {
+    const e = c.Ennemis || {}, t = e.Tirage || {}, visuels = e.Visuels || {};
+    const ligne = (m, i, moment) => `<li class="ennemi-a-valider">
+        <input type="text" class="nom-ennemi-valider" data-groupe="${moment}" data-i="${i}" value="${echapper(m.nom || "")}" maxlength="40" aria-label="Nom">
+        <span class="role-ennemi-valider">${echapper(ROLES[m.archetype] || m.archetype || "")} · ${echapper(m.palier || "")}${m.leader ? " · <b>chef</b>" : ""}${m.pnj ? " · PNJ" : ""}</span></li>`;
+    const depart = (t.depart || []).map((m, i) => ligne(m, i, "depart")).join("");
+    const renforts = (t.renforts || []).map((m, i) => ligne(m, i, "renforts")).join("");
+    const apparences = Object.entries(visuels).map(([cle, v]) => {
+        const qui = [...(t.depart || []), ...(t.renforts || [])].filter(m => m.visuel === cle).map(m => m.nom).join(", ");
+        return `<li class="visuel-a-valider"><span class="qui-visuel">${echapper(qui || cle)}</span>
+            <textarea class="description-visuel-valider" data-cle="${echapper(cle)}" rows="2" maxlength="600" aria-label="Apparence">${echapper(v.Description || "")}</textarea></li>`;
+    }).join("");
+    return `<div class="feuille-ennemis">
+        <div class="titre-feuille-ennemis">Qui vous fait face ?</div>
+        <p class="aide-feuille-ennemis">Voici ceux que le récit met sur votre route. Retouchez un nom ou une apparence si besoin, puis validez : leurs pions seront alors dessinés.</p>
+        <div class="colonnes-ennemis">
+          <div><div class="sous-titre-ennemis">Au départ</div><ol class="liste-ennemis-valider">${depart || "<li><i>personne</i></li>"}</ol></div>
+          <div><div class="sous-titre-ennemis">En renfort</div><ol class="liste-ennemis-valider">${renforts || "<li><i>aucun renfort</i></li>"}</ol></div>
+        </div>
+        <div class="sous-titre-ennemis">Leur apparence</div>
+        <ul class="liste-visuels-valider">${apparences}</ul>
+        <div class="boutons-feuille-ennemis">
+          <button type="button" class="relancer-ennemis" id="btn-relancer-ennemis">Tirer d'autres ennemis</button>
+          <button type="button" class="valider-ennemis" id="btn-valider-ennemis">Valider et dessiner les pions</button>
+        </div></div>`;
+}
+function actualiserValidationEnnemis(c) {
+    let f = $("validation-ennemis-rp");
+    const montrer = !!c && c.Etat === "preparation" && !!c.Ennemis && !c.Ennemis_Valides;
+    if (!montrer) { if (f) f.style.display = "none"; return; }
+    if (!f) {
+        f = document.createElement("div");
+        f.id = "validation-ennemis-rp";
+        f.className = "validation-ennemis-rp";
+        f.addEventListener("click", (e) => e.stopPropagation());
+        $("fenetre-combat").appendChild(f);
+    }
+    f.style.display = "flex";
+    // Rien n'est réécrit sous les doigts de celui qui retouche.
+    const cle = JSON.stringify(c.Ennemis);
+    if (f.dataset.cle === cle) return;
+    f.dataset.cle = cle;
+    f.innerHTML = htmlValidationEnnemis(c);
+    $("btn-valider-ennemis").onclick = () => window.validerEnnemisCombatRP();
+    $("btn-relancer-ennemis").onclick = () => window.relancerEnnemisCombatRP();
+}
+window.validerEnnemisCombatRP = async function() {
+    const c = etat();
+    if (!c || c.Etat !== "preparation" || !c.Ennemis || c.Ennemis_Valides) return false;
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const f = $("validation-ennemis-rp");
+    const noms = { depart: {}, renforts: {} }, descriptions = {};
+    if (f) {
+        f.querySelectorAll(".nom-ennemi-valider").forEach(el => { const v = el.value.trim(); if (v) noms[el.dataset.groupe][Number(el.dataset.i)] = v; });
+        f.querySelectorAll(".description-visuel-valider").forEach(el => { descriptions[el.dataset.cle] = el.value.trim(); });
+    }
+    const ok = await transaction((data) => {
+        const x = data.Combat_RP;
+        if (!x || x.Id !== c.Id || !x.Ennemis || x.Ennemis_Valides) return null;
+        const e = JSON.parse(JSON.stringify(x.Ennemis));
+        ["depart", "renforts"].forEach(g => (e.Tirage[g] || []).forEach((m, i) => { if (noms[g][i]) m.nom = noms[g][i]; }));
+        Object.entries(descriptions).forEach(([k, d]) => {
+            if (!e.Visuels[k] || !d) return;
+            e.Visuels[k].Description = d;
+            ["depart", "renforts"].forEach(g => (e.Tirage[g] || []).forEach(m => { if (m.visuel === k) m.description = d; }));
+        });
+        return { maj: { "Combat_RP.Ennemis": e, "Combat_RP.Ennemis_Valides": { Par: idJoueur(), Nom: nomJoueur(), Le: Date.now() } } };
+    });
+    actualiserTout();
+    if (ok) setTimeout(poursuivre, 0);
+    return !!ok;
+};
+window.relancerEnnemisCombatRP = async function() {
+    const c = etat();
+    if (!c || c.Etat !== "preparation" || !c.Ennemis || c.Ennemis_Valides) return false;
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const ok = await transaction((data) => {
+        const x = data.Combat_RP;
+        if (!x || x.Id !== c.Id || x.Ennemis_Valides) return null;
+        return { maj: { "Combat_RP.Ennemis": deleteField(), "Combat_RP.Tokens": {} } };
+    });
+    faits.delete(c.Id + ":ennemis");
+    actualiserTout();
+    if (ok) setTimeout(poursuivre, 0);
+    return !!ok;
+};
 
 // --- 6.6 LA BOÎTE DE LA GRILLE (mode DEV) --------------------------------
 let minuteurRegleur = null;
@@ -1475,7 +1577,8 @@ function inscrireRegleur(c) {
 }
 function actualiserBoiteGrille(c) {
     let boite = $("boite-grille-rp");
-    const montrer = !!c && !!c.Carte && !c.Grille && estDev();
+    // (v313 : la grille est validée d'office ; la boîte ne sert plus.)
+    const montrer = false && !!c && !!c.Carte && !c.Grille && estDev();
     if (!montrer) { if (boite) boite.style.display = "none"; arreterRegleur(); return; }
     if (!boite) {
         boite = document.createElement("div");

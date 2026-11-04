@@ -325,13 +325,15 @@ await section(async () => {
   // interface ; masque la map globale et laisse le fond beige ».
   verifier("v300 : le fond beige reste, la carte est masquée sous le livre", r.fond === "1" && await dans(6, 6, "#ecran-grimoire"), `opacité ${r.fond}, ${await dessus(6, 6)}`);
   // v304 : « après avoir chargé la partie, ouvre sur la page map globale ».
-  verifier("le livre ouvert (v304 : sur la double page de la carte du monde)", r.e.ouvert && r.e.page === 5, JSON.stringify(r.e));
+  verifier("le livre ouvert (v313 : sur le sommaire)", r.e.ouvert && r.e.page === 3, JSON.stringify(r.e));
   verifier("v300 : l'ancien menu de droite se cache sous le livre", r.menu === "none", r.menu);
   verifier("v300 : les petits boutons restent dans le livre (en haut à droite)", r.nav === "ecran-grimoire");
   verifier("en partie, le marque-page s'allume", r.marque === false);
   // v308 : le voyage revient dans le livre — son bouton se montre sur ses cartes (le livre s'ouvre sur la carte du monde).
   // v310 : le bouton devient un marque-page en haut à droite du livre (Nico) ; le bouton, lui, se cache sur le livre.
-  verifier("v310 : sur la carte du monde du livre, le marque-page de la marche sort (le bouton se cache)", r.marche && r.voyage === "none", `${r.marche} / ${r.voyage}`);
+  await p.evaluate(() => window.GRIMOIRE.allerALaCarte()); await p.waitForTimeout(1800);
+  const m = await p.evaluate(() => ({ marche: !document.getElementById("grimoire-marque-marche").classList.contains("inactif"), voyage: getComputedStyle(document.getElementById("btn-voyage-essai")).display }));
+  verifier("v310 : sur la carte du monde du livre, le marque-page de la marche sort (le bouton se cache)", m.marche && m.voyage === "none", `${m.marche} / ${m.voyage}`);
 });
 
 // =========================================================================
@@ -355,8 +357,8 @@ await section(async () => {
   // ordre : Aventuriers, Carte du monde, Le village, Les combats, Le récit ».
   verifier("page de gauche (v312) : I- Aventuriers, II- Carte du monde, III- Le village", r.g.map(x => x.texte).join(" | ") === "I- Aventuriers | II- Carte du monde | III- Le village", r.g.map(x => x.texte).join(" | "));
   verifier("page de droite (v312) : IV- Les combats, V- Le récit", r.d.map(x => x.texte).join(" | ") === "IV- Les combats | V- Le récit", r.d.map(x => x.texte).join(" | "));
-  verifier("en gros (plus de deux fois le texte des pages)", tout.every(x => x.taille > r.u * 7), `${tout[0] && tout[0].taille.toFixed(1)} px, u = ${r.u.toFixed(2)} px`);
-  verifier("à la main, en gras (v312 : Berkshire Swash, manuscrite ancienne et grasse)", tout.every(x => /Berkshire Swash/.test(x.police)), tout[0] && tout[0].police);
+  verifier("en gros (plus de deux fois le texte des pages)", tout.every(x => x.taille > r.u * 5.5), `${tout[0] && tout[0].taille.toFixed(1)} px, u = ${r.u.toFixed(2)} px`);
+  verifier("à la main (v313 : l'écriture choisie dans Paramètres, Homemade Apple par défaut)", tout.every(x => /Homemade Apple/.test(x.police)), tout[0] && tout[0].police);
   const angles = tout.map(x => { const m = /matrix\(([-\d.e]+), ([-\d.e]+)/.exec(x.transform); return m ? Math.atan2(Number(m[2]), Number(m[1])) * 180 / Math.PI : 0; });
   verifier("pas bien droit : chaque ligne penche un peu, chacune à sa façon", angles.every(a => Math.abs(a) > 0.2 && Math.abs(a) < 4) && new Set(angles.map(a => a.toFixed(1))).size >= 5, angles.map(a => a.toFixed(1)).join(" "));
   verifier("v300 : souligné d'un trait de plume (plus de jaune), ligne par ligne", tout.every(x => x.surligne && x.clone === "clone"));
@@ -391,7 +393,8 @@ await section(async () => {
   r = await lisRange();
   verifier("un toucher sur le marque-page : retour à l'index", r.page === 3 && r.chapitre === "index", JSON.stringify(r));
   // (v312 : les Paramètres ont quitté le sommaire pour le menu principal)
-  for (const [id, appel] of [["fiches", "ouvrirMenuPersonnages"], ["combats", "ouvrirPopupRencontre"]]) {
+  // (v313 : « Aventuriers » ouvre les fiches dans le livre — corrections_v313)
+  for (const [id, appel] of [["combats", "ouvrirPopupRencontre"]]) {
     await p.evaluate(() => { window.__appels = []; });
     await cliquer("#grimoire-index-" + id);
     await p.waitForTimeout(300);

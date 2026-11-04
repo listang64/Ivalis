@@ -3009,7 +3009,9 @@ window.sauvegarderCompetence = async function() {
         const idComp = "COMP_" + Math.random().toString(36).substring(2, 9);
         await setDoc(doc(db, "Personnages", idPerso, "Competences", idComp), dataCompetence);
         // Son illustration se dessine en tâche de fond (illustration_competence.js).
-        if (typeof window.illustrerCompetence === "function") window.illustrerCompetence(idPerso, idComp, nomCompetence);
+        // v313 : Nico, « on ne va plus générer d'image pour la compétence » (la
+        // carte du livre s'en passe). window.ILLUSTRER_COMPETENCES = true la rallume.
+        if (window.ILLUSTRER_COMPETENCES === true && typeof window.illustrerCompetence === "function") window.illustrerCompetence(idPerso, idComp, nomCompetence);
 
         window.fermerForgeCompetence();
         btn.innerText = LIBELLE_VALIDER_FORGE;

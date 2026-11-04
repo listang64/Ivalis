@@ -143,7 +143,7 @@ await section(async () => {
              nav: nav.parentNode.id, haut: rn.top, droite: innerWidth - rn.right, largeurMarque: m.getBoundingClientRect().width, k, mw: parseFloat(getComputedStyle(m).width) / k };
   });
   verifier("« Journal d'un aventurier », sans surlignage", r.texte === "Journal d'un aventurier" && !r.surligne, r.texte);
-  verifier("… un peu plus gros (6,6 % de la page au lieu de 5)", r.taille > 6 && r.taille < 8, r.taille.toFixed(2));
+  verifier("… un peu plus gros (6,6 % de la page au lieu de 5)", r.taille > 5 && r.taille < 8, r.taille.toFixed(2));   // (v313 : la taille suit l'écriture choisie)
   verifier("les petits boutons, en haut à droite (dans le livre)", r.nav === "ecran-grimoire" && r.haut < 30 && r.droite < 30, `haut ${r.haut.toFixed(0)}, droite ${r.droite.toFixed(0)}`);
   verifier("le marque-page de l'index, plus petit (66 au lieu de 92, en unités du livre)", Math.abs(r.mw - 66) < 2, r.mw.toFixed(1));
   // La marge du haut : sur un écran de PC, le livre la laisse ; sur iPad, elle y était déjà.
@@ -177,15 +177,14 @@ await section(async () => {
              navHaut: document.getElementById("menu-navigation-bas").getBoundingClientRect().top };
   });
   // v304 : « après avoir chargé la partie, ouvre sur la page map globale ».
-  verifier("le livre s'ouvre (v304 : sur la carte du monde), à la même place que dans le menu", r.e.enPartie && r.e.page === 5 && r.place.every((v, i) => Math.abs(v - avantPartie[i]) < 1.5), JSON.stringify(r.place.map(Math.round)));
+  verifier("le livre s'ouvre (v313 : sur le sommaire), à la même place que dans le menu", r.e.enPartie && r.e.page === 3 && r.place.every((v, i) => Math.abs(v - avantPartie[i]) < 1.5), JSON.stringify(r.place.map(Math.round)));
   verifier("le fond beige reste ; la carte est masquée", r.fond === "1" && await dans(5, 5, "#ecran-grimoire") && await dans(r.place[0] / 2, 400, "#ecran-grimoire"), await dessus(5, 5));
   verifier("l'ancien menu de droite se cache ; les petits boutons restent en haut à droite", r.menu === "none" && r.nav === "ecran-grimoire" && r.navHaut < 30, `${r.menu}, ${r.nav}`);
   // Une ancienne fenêtre (ici le combat) s'ouvre par-dessus le livre.
   const f = await p.evaluate(() => { const el = document.getElementById("fenetre-combat"); el.style.display = "block"; const r = el.getBoundingClientRect(); const x = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); const ok = !!(x && x.closest("#fenetre-combat")); el.style.display = "none"; return ok; });
   verifier("les anciennes fenêtres (le combat…) s'ouvrent par-dessus le livre", f);
-  await cliquer("#grimoire-index-fiches");
-  await p.waitForTimeout(200);
-  verifier("« Les fiches personnages » ouvre encore l'ancienne fenêtre", (await p.evaluate(() => window.__appels.join(","))) === "ouvrirMenuPersonnages");
+  // v313 : « Aventuriers » ouvre les fiches dans le livre (corrections_v313), plus l'ancienne fenêtre.
+  verifier("v313 : les Aventuriers sont dans le livre (grimoire_fiches.js)", await p.evaluate(() => !!window.GRIMOIRE_FICHES));
   await cliquer("#grimoire-index-carte");
   await attendreQue(async () => (await page()) === 5, 3000);
   await p.waitForTimeout(300);
@@ -221,7 +220,9 @@ await section(async () => {
   await p.waitForTimeout(1000);
   const r = await p.evaluate(() => ({ page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), n: window.grimoireEtat().nbPages,
     entete: (document.querySelector("#grimoire-suite-2 .numero-chapitre") || {}).textContent, sous: (document.querySelector("#grimoire-suite-2 .titre-chapitre") || {}).textContent }));
-  verifier("« Le récit » de l'index : les pages tournent jusqu'au chapitre en cours", r.page === 9 && r.entete === "Chapitre I" && /en cours/.test(r.sous), JSON.stringify(r));
+  verifier("« Le récit » de l'index : les pages tournent jusqu'au sommaire des chapitres (v313)", r.page === 7 && r.entete === "Chapitre I" && /en cours/.test(r.sous), JSON.stringify(r));
+  // (la suite du test lit le chapitre : on y va, comme le marque-page plume)
+  await p.evaluate(() => window.GRIMOIRE_RECIT.allerAuRecit()); await p.waitForTimeout(1500);
   await p.evaluate(() => window.grimoireAllerIndex());
   await p.waitForTimeout(900);
   const mp = await centre("#grimoire-marque-recit");

@@ -202,6 +202,13 @@ function persoDocVersFront(id, d) {
     // Or et équipement : propres à chaque personnage, jamais aux monstres (qui
     // n'utilisent pas ce chemin de conversion pour ces champs-là).
     or: parseInt(d.Or) || 0,
+    // v313 : la richesse en pièces de laiton et de bronze (30 bronzes = 1 laiton) ;
+    // l'ancien « Or » vaut des laitons tant que la fiche n'a pas ses pièces.
+    piecesLaiton: d.Pieces_Laiton !== undefined ? (parseInt(d.Pieces_Laiton) || 0) : (parseInt(d.Or) || 0),
+    piecesBronze: parseInt(d.Pieces_Bronze) || 0,
+    // v313 : l'emplacement de stockage (une arme qu'on ne tient pas), et la date de création du héros.
+    equipStock: d.Equip_Stock || null,
+    creeLe: Number(d.Cree_Le) || 0,
     equipArmure: d.Equip_Armure || null,
     equipMainDroite: d.Equip_Main_Droite || null,
     equipMainGauche: d.Equip_Main_Gauche || null,
@@ -1835,6 +1842,11 @@ function frontVersPersoDoc(donnees, idPersonnage) {
     // L'équipement de départ, tiré à la création. Sur une fiche déjà en jeu ces
     // trois champs valent ce qu'ils valaient : ils ne sont posés qu'une fois.
     Equip_Armure: donnees.equipArmure || null,
+    // v313 (grimoire_fiches.js) : le stockage, les pièces et la date de création suivent la fiche.
+    Equip_Stock: donnees.equipStock || null,
+    Pieces_Laiton: donnees.piecesLaiton !== undefined ? (parseInt(donnees.piecesLaiton) || 0) : (parseInt(donnees.or) || 0),
+    Pieces_Bronze: parseInt(donnees.piecesBronze) || 0,
+    Cree_Le: Number(donnees.creeLe) || Date.now(),
     Equip_Main_Droite: donnees.equipMainDroite || null,
     Equip_Main_Gauche: donnees.equipMainGauche || null,
     Equipement_Visible: donnees.equipement || "",
@@ -6475,7 +6487,7 @@ window.ajouterTokens = function(montant) {
 // 🔻 C'EST ICI QUE TU POURRAS CHANGER LE NOMBRE DE POINTS POUR TES TESTS 🔻
 window.TOTAL_POINTS_CREATION = 22;
 
-const NOMS_CARACS = [
+const NOMS_CARACS = window.NOMS_CARACS = [
   { id: "force", nom: "FORCE", desc: "Mesure la puissance physique.", comp: "Athlétisme" },
   { id: "dex", nom: "DEXTÉRITÉ", desc: "Mesure l'agilité, les réflexes et l'équilibre.", comp: "Acrobaties / Escamotage / Discrétion" },
   { id: "con", nom: "CONSTITUTION", desc: "Mesure la santé, l'endurance et la force vitale.", comp: "" },

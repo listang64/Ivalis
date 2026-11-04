@@ -118,6 +118,10 @@
     // LES CARTES RÉGIONALES (v308, grimoire_regions.js) : une double page par
     // région, juste après la carte du monde ; le récit vient après elles.
     let pagesRegions = [];
+    // LES AVENTURIERS (v313, grimoire_fiches.js) : les pages des clans puis les
+    // doubles pages du héros choisi (fiche, compétences, forge, inventaire, DEV),
+    // après le récit, avant les pages vierges (le sommaire y mène).
+    let pagesFiches = [];
     const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length : 0);
     // LA CARTE DU MONDE (v302) : sa double page vient juste après l'index (5-6),
     // en partie seulement ; la suite (le récit) commence alors à la page 7.
@@ -643,7 +647,7 @@
         livre.addEventListener("pointerdown", (ev) => {
             if (!pageFlip || !ouvert) return;
             if (ev.pointerType === "mouse" && ev.button !== 0) return;
-            if (ev.target && ev.target.closest && ev.target.closest("input, label, button, select, textarea, a, [data-action], .liste-parties-grimoire, .nom-livre, .nom-heros")) return;
+            if (ev.target && ev.target.closest && ev.target.closest("input, label, button, select, textarea, a, [data-action], [data-aide], .defile-fiche, .liste-parties-grimoire, .nom-livre, .nom-heros")) return;
             if (pageFlip.getState() !== "read" || defileEnCours) return;
             const p = pos(ev), pw = p.r.width / 2, h = p.r.height;
             const aGauche = p.x < pw, xp = aGauche ? p.x : p.x - pw;
@@ -872,7 +876,10 @@
         const versLaCarte = () => {
             if (!pageFlip || !enPartie) return;
             if (derniereNavigation > debut) return;          // (v308) le joueur est déjà allé ailleurs
-            const voulue = (window.GRIMOIRE_REGIONS && window.GRIMOIRE_REGIONS.pageDuGroupe()) || PAGE_CARTE;
+            // v313 : Nico, « quand on ouvre le livre, fais-le ouvrir sur le sommaire ».
+            // (v304-v308 : la carte du monde, puis la carte de la région du groupe.)
+            const voulue = 3;
+            if (chapitre !== "index") remplirChapitre("index");
             const p = pageFlip.getCurrentPageIndex();
             if (p === voulue || p === voulue + 1) return;
             if ((pageFlip.getState() !== "read" || defileEnCours) && ++essais < 25) { setTimeout(versLaCarte, 120); return; }
@@ -928,7 +935,7 @@
     function definirSuite(elements) {
         suite = (elements || []).slice();
         if (!pageFlip) return;
-        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions] : []), ...suite, ...vierges, dos];
+        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions] : []), ...suite, ...(enPartie ? pagesFiches : []), ...vierges, dos];
         const generation = ++definirSuite.generation;      // seule la dernière demande s'applique
         const appliquer = () => {
             if (generation !== definirSuite.generation) return;
@@ -1078,8 +1085,10 @@
     function allerALaCarte() { if (enPartie) allerALaPage(PAGE_CARTE); }
     const OUVRIR_INDEX = {
         carte: () => allerALaCarte(),
-        recit: () => window.GRIMOIRE_RECIT && window.GRIMOIRE_RECIT.allerAuRecit(),
-        fiches: () => window.ouvrirMenuPersonnages && window.ouvrirMenuPersonnages(),
+        // v313 : le sommaire des chapitres du récit (le marque-page plume, lui, mène à la page à lire).
+        recit: () => window.GRIMOIRE_RECIT && (window.GRIMOIRE_RECIT.allerAuSommaireDuRecit || window.GRIMOIRE_RECIT.allerAuRecit)(),
+        // v313 : les Aventuriers sont dans le livre (grimoire_fiches.js).
+        fiches: () => (window.GRIMOIRE_FICHES ? window.GRIMOIRE_FICHES.allerAuxAventuriers() : (window.ouvrirMenuPersonnages && window.ouvrirMenuPersonnages())),
         combats: () => window.ouvrirPopupRencontre && window.ouvrirPopupRencontre(),
         parametres: () => window.ouvrirParametres && window.ouvrirParametres()
     };
@@ -1114,6 +1123,8 @@
     function agir(cible) {
         if (!cible || cible.disabled) return;
         const action = cible.dataset.action;
+        // (v313) Les pages des Aventuriers ont leurs propres gestes (grimoire_fiches.js).
+        if (action === "fiches") { if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.agir(cible); return; }
         // (v312) Le marque-page du menu : la page principale (le journal), en partie ou non.
         if (action === "marque-menu") {
             if (!pageFlip || !ouvert) return;
@@ -1221,7 +1232,13 @@
         premiereDeLaSuite, PAGE_CARTE,
         // (v308) les cartes régionales : leurs pages, la prise du doigt à rendre (un pincement sur la carte)
         definirRegions: (els) => { pagesRegions = (els || []).slice(); if (enPartie) definirSuite(suite); },
+        // (v313) les pages des Aventuriers, et la place d'une page dans le livre
+        definirFiches: (els) => { pagesFiches = (els || []).slice(); if (enPartie) definirSuite(suite); },
+        pagesFiches: () => pagesFiches.slice(), indexDe: (el) => listeActuelle.indexOf(el),
+        dessins: { cadreMain, bordurePlume, hasard, souligneFond },
         pagesRegions: () => pagesRegions.slice(), annulerPrise: () => { if (brancherPrise.annuler) brancherPrise.annuler(); },
-        ouvrirSurLeGroupe: () => { if (enPartie && passerEnPartie.versLaCarte) passerEnPartie.versLaCarte(); }, IMAGES_CARTE, pagesCarte: () => pagesCarte.slice(), allerALaCarte, definirSuite, allerALaPage, unite: () => (scene ? parseFloat(scene.style.getPropertyValue("--u")) || 0 : 0)
+        // (v313) Le livre s'ouvre sur le sommaire, une seule fois : les cartes régionales
+        // qui arrivent ensuite ne le ramènent plus nulle part.
+        ouvrirSurLeGroupe: () => {}, IMAGES_CARTE, pagesCarte: () => pagesCarte.slice(), allerALaCarte, definirSuite, allerALaPage, unite: () => (scene ? parseFloat(scene.style.getPropertyValue("--u")) || 0 : 0)
     };
 })();
