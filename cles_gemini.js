@@ -15,6 +15,12 @@
 //  `usage` : "combat" prend la seconde clé (la première si elle est vide) ;
 //  tout le reste prend la première. Une clé refusée pour quota (429) ou
 //  indisponible (503) passe la main à l'autre, s'il y en a une autre.
+//
+//  v304 : Nico, « que cette IA (MIA_COMBAT) utilise la même clé API que le
+//  narrateur, ça réglera le problème » — le projet de la seconde clé n'avait
+//  plus de crédit (402). Les IA de combat prennent maintenant d'abord la clé
+//  du Narrateur ; la seconde ne sert plus que de relais (quota épuisé,
+//  service indisponible, crédit épuisé).
 //  Script simple (pas un module) : chargé avant tous les modules.
 // =========================================================================
 (function () {
@@ -28,7 +34,7 @@
     // Les clés à essayer, dans l'ordre, sans doublon ni vide.
     window.clesGeminiPour = function (usage) {
         const premiere = lire(CLE_1), seconde = lire(CLE_2);
-        const ordre = usage === "combat" ? [seconde, premiere] : [premiere, seconde];
+        const ordre = [premiere, seconde];
         return [...new Set(ordre.filter(Boolean))];
     };
 
@@ -49,7 +55,7 @@
                 body: corps
             });
             derniere = reponse;
-            if ((reponse.status === 429 || reponse.status === 503) && i < cles.length - 1) {
+            if ((reponse.status === 402 || reponse.status === 429 || reponse.status === 503) && i < cles.length - 1) {
                 console.warn(`[Gemini] Clé ${i + 1} refusée (${reponse.status}) : l'autre clé prend le relais.`);
                 continue;
             }

@@ -292,6 +292,7 @@ await section(async () => {
   await p.fill("#grimoire-mdp-partie", "sel");
   await cliquer("#grimoire-valider-partie");
   await p.waitForTimeout(1300);
+  await attendreQue(async () => (await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex())) === 5, 3000);
   const r = await p.evaluate(() => {
     const ecran = document.getElementById("ecran-grimoire");
     return { entrees: window.__entrees.slice(), e: window.grimoireEtat(), parent: ecran.parentNode.id, jeu: getComputedStyle(document.getElementById("ecran-jeu")).display,
@@ -304,7 +305,8 @@ await section(async () => {
   // v300 : Nico, « laisse le livre à la même place que dans le menu principal ; il masque l'ancienne
   // interface ; masque la map globale et laisse le fond beige ».
   verifier("v300 : le fond beige reste, la carte est masquée sous le livre", r.fond === "1" && await dans(6, 6, "#ecran-grimoire"), `opacité ${r.fond}, ${await dessus(6, 6)}`);
-  verifier("le livre, ouvert sur l'index (la double page des chapitres)", r.e.ouvert && r.e.page === 3 && r.e.chapitre === "index", JSON.stringify(r.e));
+  // v304 : « après avoir chargé la partie, ouvre sur la page map globale ».
+  verifier("le livre ouvert (v304 : sur la double page de la carte du monde)", r.e.ouvert && r.e.page === 5, JSON.stringify(r.e));
   verifier("v300 : l'ancien menu de droite se cache sous le livre", r.menu === "none", r.menu);
   verifier("v300 : les petits boutons restent dans le livre (en haut à droite)", r.nav === "ecran-grimoire");
   verifier("en partie, le marque-page s'allume", r.marque === false);
@@ -315,6 +317,9 @@ await section(async () => {
 titre("7. L'INDEX : GROS, À LA MAIN, PENCHÉ, EN GRAS, SURLIGNÉ, SUR LES DEUX PAGES");
 // =========================================================================
 await section(async () => {
+  await p.evaluate(() => window.grimoireAllerIndex());   // v304 : la partie s'ouvre sur la carte
+  await attendreQue(async () => (await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex())) === 3, 3000);
+  await p.waitForTimeout(500);
   const r = await p.evaluate(() => {
     const lis = (n) => [...document.querySelectorAll(`#grimoire-page-${n} .entree-index`)].map(b => {
       const st = getComputedStyle(b), t = b.querySelector(".entree-index-texte"), ts = getComputedStyle(t);

@@ -137,7 +137,10 @@
     const bouton = (id, texte, action, graine) =>
         `<button type="button" class="bouton-grimoire" id="${id}" data-action="${action}">${cadreMain(graine || id)}<span>${texte}</span></button>`;
     const son = () => { try { if (typeof window.jouerSonClic === "function") window.jouerSonClic(); } catch (e) {} };
-    const bruitPage = (id) => { try { if (typeof window.jouerSonEvenement === "function") window.jouerSonEvenement(id); } catch (e) {} };
+    // (v304 : muet pendant que le livre relit ses pages — StPageFlip annonce
+    // alors une « page tournée » qui n'en est pas une.)
+    let muet = false;
+    const bruitPage = (id) => { if (muet) return; try { if (typeof window.jouerSonEvenement === "function") window.jouerSonEvenement(id); } catch (e) {} };
 
     // ---------------------------------------------------------------------
     //  LES PAGES
@@ -571,11 +574,11 @@
         if (!pageFlip) return;
         const ici = pageFlip.getCurrentPageIndex();
         if (ici >= 3) return;                    // déjà sur la double page du chapitre
-        try { pageFlip.flipNext("top"); } catch (e) { pageFlip.turnToPage(3); }
+        allerALaPage(3);
         setTimeout(() => {
             const champ = pages[4].querySelector("input") || pages[3].querySelector("input");
             if (champ && window.matchMedia && !window.matchMedia("(hover: none)").matches) champ.focus();
-        }, DUREE_TOURNE + 50);
+        }, 1000);
     }
 
     // ---------------------------------------------------------------------
@@ -715,7 +718,19 @@
         if (!pageFlip) return;
         if (!ouvert) etatOuvert(true);
         const ici = pageFlip.getCurrentPageIndex();
-        if (ici !== 3 && ici !== 4) { try { pageFlip.flip(3, "top"); } catch (e) { try { pageFlip.turnToPage(3); } catch (e2) {} } }
+        // v304 : Nico, « après avoir chargé la partie, ouvre sur la page de la map globale ».
+        // Un livre encore en mouvement ignorerait le geste : on attend qu'il se pose (3 s au plus).
+        if (ici !== PAGE_CARTE && ici !== PAGE_CARTE + 1) {
+            let essais = 0;
+            const versLaCarte = () => {
+                if (!pageFlip || !enPartie) return;
+                const p = pageFlip.getCurrentPageIndex();
+                if (p === PAGE_CARTE || p === PAGE_CARTE + 1) return;
+                if (pageFlip.getState() !== "read" && ++essais < 25) { setTimeout(versLaCarte, 120); return; }
+                try { pageFlip.flip(PAGE_CARTE, "top"); } catch (e) { try { pageFlip.turnToPage(PAGE_CARTE); } catch (e2) {} }
+            };
+            setTimeout(versLaCarte, 60);
+        }
     }
     // De retour au journal (« Retour au menu ») : le livre ressort de l'écran
     // de jeu, perd les pages du récit, et les marque-pages s'éteignent.
@@ -768,7 +783,9 @@
             const ici = pageFlip.getCurrentPageIndex();
             liste.forEach(el => { if (el.parentNode !== livre) livre.appendChild(el); });
             nbPages = liste.length;
+            muet = true;
             try { pageFlip.updateFromHtml(liste); } catch (e) { console.error("Grimoire : les pages", e); }
+            muet = false;
             if (ici >= nbPages - 1) { try { pageFlip.turnToPage(Math.max(0, nbPages - 3)); } catch (e) {} }
             poser();
         };
@@ -776,13 +793,52 @@
     }
     definirSuite.generation = 0;
     // Aller à une page, en la tournant (le livre s'ouvre s'il est fermé).
+    // ALLER À UNE PAGE PAR UN LIEN (v304) : les pages défilent. Nico : « quand
+    // on clique sur un des marque-pages, une animation de plein de pages qui
+    // défilent très vite, comme si la page était loin dans le livre ; pareil
+    // dès qu'on clique sur un lien dans le livre ». Des feuilles se lèvent et
+    // tournent l'une après l'autre au-dessus du livre ; à mi-course, le livre
+    // passe d'un coup à la bonne page, que les dernières feuilles découvrent.
+    let defileEnCours = false;
     function allerALaPage(n) {
-        if (!pageFlip) return;
+        if (!pageFlip || defileEnCours) return;
         if (!ouvert) etatOuvert(true);
         const ici = pageFlip.getCurrentPageIndex();
         const cible = Math.max(1, Math.min(n, nbPages - 2));
         if (ici === cible || (cible % 2 === 0 ? ici === cible - 1 : ici === cible + 1)) return;
-        try { pageFlip.flip(cible, "top"); } catch (e) { try { pageFlip.turnToPage(cible); } catch (e2) {} }
+        // La double page voisine (ou la couverture) se tourne normalement ; le
+        // défilement rapide, c'est pour une page « loin dans le livre ».
+        const planche = (p) => Math.floor((p + 1) / 2);
+        if (Math.abs(planche(cible) - planche(ici)) <= 1 || pageFlip.getState() !== "read" || typeof Element.prototype.animate !== "function") {
+            try { pageFlip.flip(cible, "top"); } catch (e) { try { pageFlip.turnToPage(cible); } catch (e2) {} }
+            return;
+        }
+        defiler(ici, cible);
+    }
+    const DEFILE = { pas: 42, duree: 300 };
+    function defiler(ici, cible) {
+        defileEnCours = true;
+        const enAvant = cible > ici;
+        const n = Math.min(14, 6 + Math.round(Math.abs(cible - ici) / 2) * 2);
+        const couche = document.createElement("div");
+        couche.className = "defile-pages";
+        Object.assign(couche.style, { left: livre.style.left, top: livre.style.top, width: livre.style.width, height: livre.style.height });
+        scene.appendChild(couche);
+        for (let k = 0; k < n; k++) {
+            const f = document.createElement("div");
+            f.className = "feuille-defile " + (enAvant ? "vers-gauche" : "vers-droite");
+            couche.appendChild(f);
+            f.animate([
+                { transform: "rotateY(0deg)", opacity: 1, filter: "brightness(1)" },
+                { offset: 0.85, opacity: 1 },
+                { transform: `rotateY(${enAvant ? -180 : 180}deg)`, opacity: 0, filter: "brightness(0.82)" }
+            ], { duration: DEFILE.duree, delay: k * DEFILE.pas, easing: "cubic-bezier(0.45, 0.05, 0.4, 1)", fill: "forwards" });
+        }
+        bruitPage("pages-defilent");
+        const total = (n - 1) * DEFILE.pas + DEFILE.duree;
+        // Le livre saute à sa page sous les feuilles qui volent, sans son propre bruit de page.
+        setTimeout(() => { muet = true; try { pageFlip.turnToPage(cible); } catch (e) {} muet = false; }, Math.round(total * 0.5));
+        setTimeout(() => { couche.remove(); defileEnCours = false; }, total + 60);
     }
     function allerIndex() {
         if (!enPartie || !pageFlip) return;
@@ -833,19 +889,20 @@
         const action = cible.dataset.action;
         if (action === "marque-page" || action === "marque-recit" || action === "marque-carte") {
             if (!enPartie) return;               // éteints hors partie : rien, pas même le clic
-            son();
+            // (v304 : « enlève le son quand on clique sur un marque-page ou un bouton de l'index » —
+            // les pages qui défilent font leur propre bruit)
             if (action === "marque-page") allerIndex();
             else if (action === "marque-carte") allerALaCarte();
             else if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.allerAuRecit();
             return;
         }
+        if (action === "index") { choisirIndex(cible.dataset.entree); return; }
         son();
-        if (action === "index") choisirIndex(cible.dataset.entree);
         // En partie, fonder ou réveiller un autre groupe, c'est d'abord quitter
         // celle-ci : la question de la maison (app.js) est posée.
-        else if (enPartie && (action === "nouvelle" || action === "charger")) { if (typeof window.demanderRetourMenu === "function") window.demanderRetourMenu(); }
+        if (enPartie && (action === "nouvelle" || action === "charger")) { if (typeof window.demanderRetourMenu === "function") window.demanderRetourMenu(); }
         else if (action === "nouvelle" || action === "charger" || action === "compte") allerAuChapitre(action);
-        else if (action === "revenir") { try { pageFlip.flipPrev("top"); } catch (e) {} }
+        else if (action === "revenir") allerALaPage(1);
         else if (action === "valider-cle") validerCle();
         else if (action === "creer-groupe") creerGroupe();
         else if (action === "partie") choisirPartie(cible.dataset.id);

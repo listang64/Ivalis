@@ -9955,3 +9955,56 @@ part après lui, le modèle et la réflexion de la plume, la consigne, le relais
 de Flash-Lite, la ligne qui continue le paragraphe (et s'y écrit), le dé sur
 la ligne de son action. Il échoue sur la v302 (12 échecs). corrections_v300
 mis à jour (paragraphes, sélecteurs des mots, modèle de la plume).
+
+## v304 — La clé du combat, les pages qui défilent, la flèche de suite, le nouveau Narrateur
+
+Nico : « mets que cette IA-là utilise la même clé API que le narrateur » ;
+« il va finir la page en cours et laisser le joueur tourner la page lui-même
+… une toute petite flèche noire dans le coin droit de la page en bas » ; « les
+noms des joueurs : juste en gras » ; « une animation de pleins de pages qui
+défilent très vite, comme si la page était loin dans le livre » ; « après
+avoir chargé la partie, ouvre sur la page map globale » ; « enlève le son
+quand on clique sur un marque-page ou un bouton des index » ; « l'IA qui
+détermine les lancés de dés semble ne pas fonctionner… le destin hésite… je
+devrais pas voir ça » ; et son guide de style du Narrateur.
+
+- La clé : l'erreur 402 venait de MIA_COMBAT (la détection d'un combat après
+  chaque page du Narrateur, Gemini Flash-Lite), qui passait par la seconde
+  clé. Les IA du combat (MIA_COMBAT, MIA_CHAMP_DE_BATAILLE, MIA_ENNEMIS…)
+  prennent désormais la clé du Narrateur, la seconde en relais ; un 402
+  (crédits épuisés) passe la main comme un 429 ou un 503.
+- Les pages qui défilent : un marque-page ou un lien du livre qui mène loin
+  (plus d'une double page) fait voler une liasse de 6 à 14 feuilles (42 ms
+  d'écart, 0,3 s chacune), vers la gauche en avant, vers la droite en
+  arrière ; le livre saute à sa page sous les feuilles. Nouveau son de la
+  Fabrique : « pages-defilent ». La double page voisine se tourne comme
+  avant. Plus de son de clic sur les marque-pages et l'index.
+- L'ouverture sur la carte : la partie chargée, le livre tourne jusqu'à la
+  double page de la carte (5-6), dès qu'il est posé.
+- La flèche de suite : la plume n'écrit que dans la double page ouverte ; un
+  mot plus loin attend que le lecteur tourne (le livre ne tourne plus tout
+  seul). Une toute petite flèche noire au coin bas-droit de la page de droite
+  dit qu'il y a une suite.
+- Les héros en gras (<b class="nom-heros">), sans lien ni portrait ; les PNJ
+  restent touchables.
+- Le combat : la détection ne sort plus de note (« Le destin hésite… ») et
+  n'empêche pas d'écrire ; la note n'apparaît qu'en préparation ou en combat.
+- L'Arbitre des dés : consigne élargie (« DEMANDE UN JET dès qu'un héros
+  TENTE… », « DANS LE DOUTE, DEMANDE UN JET »), Gemini 3.8 Flash réflexion
+  basse (Flash-Lite en secours), 20 s au plus.
+- Le Narrateur (PROMPT_NARRATEUR_LIVRE) réécrit d'après le guide de Nico : un
+  membre à part entière du groupe, jamais un narrateur extérieur ; « je » pour
+  ses perceptions, « nous » pour le groupe ; sens, émotions, réactions des
+  compagnons ; varié, naturel, sans poésie forcée ; jamais les pensées des
+  autres ; impliqué, observateur, émotif, complice ; l'exemple du chêne. La
+  plume et l'annonce suivent la même voix. Le cerveau de la base
+  (INST_10895) passe toujours devant le code : à recoller dans Paramètres.
+
+corrections_v304.mjs (dans la suite) vérifie l'ouverture sur la carte, la
+liasse (nombre, sens, page d'arrivée, son, pas de clic), la double page
+voisine, les héros en gras, la pause de la plume, la flèche, la reprise après
+la tourne, la détection muette, la note du vrai combat, l'ordre des clés et
+le relais sur 402, l'Arbitre, les consignes du Narrateur et de la plume. Il
+échoue sur la v303 (27 échecs). Tests mis à jour : corrections_v278 (clé du
+combat), blessures (le son), v299, v300, v301, v302 (ouverture sur la carte,
+héros non cliquables, pause et flèche, détection muette).

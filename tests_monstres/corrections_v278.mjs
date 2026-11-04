@@ -154,7 +154,7 @@ await p.route('**generativelanguage.googleapis.com/**', async r => {
   const texteU = parts.filter(x => x.text).map(x => x.text).join("\n");
   const mia = (systeme.match(/Tu es (MIA_[A-Z_]+)/) || [])[1] || (/Continue l'histoire/.test(systeme) ? "NARRATEUR" : "AUTRE");
   requetes.push({ mia, cle, image: !!image, imageTaille: image ? image.inline_data.data.length : 0, texte: texteU, systeme, temperature: corps.generationConfig && corps.generationConfig.temperature });
-  if (faux.cle2EnPanne && cle === "cle-GEMINI_API_KEY_2") {
+  if ((faux.cle2EnPanne && cle === "cle-GEMINI_API_KEY_2") || (faux.cle1EnPanne && cle === "cle-GEMINI_API_KEY")) {
     r.fulfill({ status: 429, contentType: 'application/json', headers: {'Access-Control-Allow-Origin':'*'}, body: JSON.stringify({ error: { message: "quota" } }) });
     return;
   }
@@ -289,16 +289,18 @@ await section(async () => {
   verifier("il se remplit et s'enregistre dans ce navigateur", r.prerempli === "cle-GEMINI_API_KEY_2" && r.enregistree === "nouvelle-cle-2", `${r.prerempli} / ${r.enregistree}`);
   verifier("le fichier exemple JSON porte GEMINI_API_KEY_2", r.exemple.includes("GEMINI_API_KEY_2") && r.exemple.includes("GEMINI_API_KEY"), r.exemple.join(","));
   verifier("l'import d'un fichier remplit le champ de la seconde clé", r.importee === "b2", r.importee);
-  verifier("les IA du combat prennent la seconde clé, le MJ la première",
-           JSON.stringify(r.ordreCombat) === '["cle-GEMINI_API_KEY_2","cle-GEMINI_API_KEY"]' && JSON.stringify(r.ordreMJ) === '["cle-GEMINI_API_KEY","cle-GEMINI_API_KEY_2"]',
+  // v304 : « met que cette ia la utilise la même clé API que le narrateur » —
+  // les IA du combat prennent désormais la première clé, la seconde en relais.
+  verifier("les IA du combat prennent la clé du Narrateur (la première), la seconde en relais",
+           JSON.stringify(r.ordreCombat) === '["cle-GEMINI_API_KEY","cle-GEMINI_API_KEY_2"]' && JSON.stringify(r.ordreMJ) === '["cle-GEMINI_API_KEY","cle-GEMINI_API_KEY_2"]',
            JSON.stringify(r.ordreCombat) + " " + JSON.stringify(r.ordreMJ));
-  // Une seconde clé à court de quota passe la main à la première.
-  await p.evaluate(() => window.__fauxGemini({ cle2EnPanne: true }));
+  // Une première clé à court de quota passe la main à la seconde (v304).
+  await p.evaluate(() => window.__fauxGemini({ cle1EnPanne: true }));
   const avant = requetes.length;
   const ok = await p.evaluate(async () => { try { const res = await window.fetchGemini("combat", JSON.stringify({ contents: [{ parts: [{ text: "x" }] }] })); return res.status; } catch (e) { return String(e); } });
   const cles = requetes.slice(avant).map(x => x.cle);
-  await p.evaluate(() => window.__fauxGemini({ cle2EnPanne: false }));
-  verifier("une seconde clé refusée (429) : la première prend le relais", ok === 200 && cles.join(",") === "cle-GEMINI_API_KEY_2,cle-GEMINI_API_KEY", `${ok} ${cles.join(",")}`);
+  await p.evaluate(() => window.__fauxGemini({ cle1EnPanne: false }));
+  verifier("une première clé refusée (429) : la seconde prend le relais", ok === 200 && cles.join(",") === "cle-GEMINI_API_KEY,cle-GEMINI_API_KEY_2", `${ok} ${cles.join(",")}`);
   const vide = await p.evaluate(() => { const v = localStorage.getItem("ivalis_GEMINI_API_KEY_2"); localStorage.setItem("ivalis_GEMINI_API_KEY_2", ""); const c = window.cleGemini("combat"); localStorage.setItem("ivalis_GEMINI_API_KEY_2", v); return c; });
   verifier("sans seconde clé, les combats prennent la première", vide === "cle-GEMINI_API_KEY", vide);
 });
@@ -436,7 +438,7 @@ await section(async () => {
   verifier("elle lit les actions des joueurs depuis la réponse précédente, et la nouvelle réponse",
            !!combat && /Je brandis ma hache/.test(combat.texte) && /LA RÉPONSE QUE LE MAÎTRE DU JEU VIENT DE DONNER/.test(combat.texte) && /Le silence retombe|silence/.test(combat.texte) === true,
            combat ? combat.texte.slice(0, 160).replace(/\n/g, " | ") : "");
-  verifier("elle prend la seconde clé (une IA du combat), à basse température", !!combat && combat.cle === "cle-GEMINI_API_KEY_2" && combat.temperature <= 0.3, combat && `${combat.cle} ${combat.temperature}`);
+  verifier("elle prend la clé du Narrateur (v304), à basse température", !!combat && combat.cle === "cle-GEMINI_API_KEY" && combat.temperature <= 0.3, combat && `${combat.cle} ${combat.temperature}`);
   verifier("agression détectée : le combat se prépare, sur ce poste", lance && !!c && c.Etat === "preparation" && /^P_01:/.test((c.Createur || {}).id || "") && /Dame Koré/.test(c.Adversaires || ""), JSON.stringify(c && { Etat: c.Etat, Createur: c.Createur, Adversaires: c.Adversaires }));
 });
 
@@ -477,7 +479,7 @@ await section(async () => {
            directs.length === Object.keys(vis).length - 1 && directs.every(x => /described below/.test(x.prompt) && x.qualite === "low" && x.taille === "1024x1024"),
            `${directs.length} / ${Object.keys(vis).length - 1} ${directs[0] ? directs[0].prompt.slice(0, 140) : ""}`);
   verifier("les pions sont détourés et hébergés (Tokens/Ennemis)", Object.values(c.Tokens).every(u => /Tokens\/Ennemis/.test(u)), JSON.stringify(c.Tokens));
-  verifier("toutes ces IA de texte prennent la seconde clé", requetes.filter(x => /^MIA_(CHAMP|ENNEMIS)/.test(x.mia)).every(x => x.cle === "cle-GEMINI_API_KEY_2"));
+  verifier("toutes ces IA de texte prennent la clé du Narrateur (v304)", requetes.filter(x => /^MIA_(CHAMP|ENNEMIS)/.test(x.mia)).every(x => x.cle === "cle-GEMINI_API_KEY"));
 });
 
 // =========================================================================

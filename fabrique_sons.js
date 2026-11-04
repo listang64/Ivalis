@@ -451,6 +451,18 @@
             src.connect(f).connect(g).connect(s);
             src.start(t);
         },
+        // LES PAGES QUI DÉFILENT (v304) : une liasse de feuilles feuilletée
+        // très vite — une suite de petits claquements de papier, serrés, qui
+        // s'éclaircissent puis s'apaisent.
+        "pages-defilent"(ctx, s) {
+            const n = 11;
+            for (let k = 0; k < n; k++) {
+                const x = k / (n - 1);
+                bruit(ctx, s, { debut: k * 0.045 + Math.random() * 0.012, duree: 0.06 + Math.random() * 0.03, filtre: "bandpass", q: 0.9,
+                                balayage: [1400 + x * 900, 3200 + Math.random() * 900], gain: 0.2 * (1 - 0.45 * Math.abs(x - 0.4)), forme: "cloche" });
+            }
+            bruit(ctx, s, { duree: 0.6, filtre: "lowpass", freq: 900, q: 0.6, gain: 0.05, forme: "cloche" });
+        },
         // Le texte du joueur qui part en poussière vers le livre : un souffle
         // léger qui monte puis s'éloigne, semé de grains.
         "poussiere-envol"(ctx, s) {

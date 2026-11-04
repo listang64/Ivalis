@@ -172,7 +172,7 @@ titre("2. LE PORTRAIT : IL SORT DU HAUT DE LA PAGE GAUCHE, DERRIÈRE LES MARQUE-
 await section(async () => {
   const avant = await mesures();
   verifier("rentré, il est caché derrière la page", !avant.portrait && avant.bande.t >= avant.gauche.t - 1, `${avant.bande.t.toFixed(0)} / ${avant.gauche.t.toFixed(0)}`);
-  const nom = await centre('#grimoire-suite-2 .nom-livre[data-nom="Thorin"]');
+  const nom = await centre('#grimoire-suite-2 .nom-livre[data-nom="Varos"]');   // v304 : les héros ne sont plus cliquables
   await p.mouse.click(nom.x, nom.y);
   await attendreQue(async () => { const x = await mesures(); return x.bande.t < x.gauche.t - 150 * x.k; }, 4000);
   await p.waitForTimeout(250);
@@ -180,7 +180,7 @@ await section(async () => {
   const r = await p.evaluate(() => ({ img: (document.querySelector("#recit-portrait img") || { getAttribute: () => "" }).getAttribute("src"), nom: document.getElementById("recit-portrait-nom").textContent,
     ordre: (() => { const b = document.getElementById("recit-portrait"), mp = document.getElementById("grimoire-marque-page"), mr = document.getElementById("grimoire-marque-recit");
                     return !!(b.compareDocumentPosition(mp) & Node.DOCUMENT_POSITION_FOLLOWING) && !!(b.compareDocumentPosition(mr) & Node.DOCUMENT_POSITION_FOLLOWING); })() }));
-  verifier("un nom touché : la bande sort du haut de la page de gauche, avec le portrait", m.portrait && r.img === "portrait-thorin.png" && r.nom === "Thorin Ironfoot" && m.bande.t < m.gauche.t - 150 * m.k && m.bande.l > m.gauche.l - 20 * m.k && m.bande.r < m.gauche.l + m.gauche.w * 0.5, JSON.stringify({ haut: Math.round(m.bande.t), page: Math.round(m.gauche.t), g: Math.round(m.bande.l) }));
+  verifier("un nom touché : la bande sort du haut de la page de gauche, avec le portrait", m.portrait && r.nom === "Varos" && m.bande.t < m.gauche.t - 150 * m.k && m.bande.l > m.gauche.l - 20 * m.k && m.bande.r < m.gauche.l + m.gauche.w * 0.5, JSON.stringify({ haut: Math.round(m.bande.t), page: Math.round(m.gauche.t), g: Math.round(m.bande.l) }));
   const mp = await p.evaluate(() => { const r = document.getElementById("grimoire-marque-page").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height * 0.25 }; });
   verifier("derrière les marque-pages : ils restent devant, et se touchent", r.ordre && await dans(mp.x, mp.y, "#grimoire-marque-page"), await dessus(mp.x, mp.y));
   verifier("… et derrière la page (sous son bord, c'est la page)", await dans((m.bande.l + m.bande.r) / 2 + 30, m.gauche.t + 15, "#grimoire-suite-2"), await dessus((m.bande.l + m.bande.r) / 2 + 30, m.gauche.t + 15));

@@ -564,7 +564,7 @@ console.log("\n12. LE GONG");
   // (v256 : la trompette de la montée de niveau rejoint les sons d'événement ;
   //  v286 : la plume qui entoure un lieu, le vent des nuages ; v298 : les
   //  bruits de pages du grimoire.)
-  verifier("à part des dix clics de la Fabrique (victoire, défaite, gong, trompette, plume, pages, écriture, poussière, vent)", r.tout === "gong-blessure,victoire,trompette-niveau,plume-entoure,page-prise,page-tourne,plume-ecrit,poussiere-envol,vent-nuages,defaite" && r.dix === 10, r.tout);
+  verifier("à part des dix clics de la Fabrique (victoire, défaite, gong, trompette, plume, pages, écriture, pages qui défilent, poussière, vent)", r.tout === "gong-blessure,victoire,trompette-niveau,plume-entoure,page-prise,page-tourne,plume-ecrit,pages-defilent,poussiere-envol,vent-nuages,defaite" && r.dix === 10, r.tout);
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

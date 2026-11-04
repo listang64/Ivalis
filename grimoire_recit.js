@@ -111,7 +111,13 @@ function nomsConnus() {
     Object.keys(etat.pnjImages).forEach(n => { if (n) noms.add(n.trim()); });
     return [...noms].filter(n => n.length > 1).sort((a, b) => b.length - a.length);
 }
-const lien = (nom, texte) => `<a class="nom-livre" data-nom="${echapper(nom)}">${echapper(texte)}</a>`;
+// v304 : Nico, « les noms des joueurs : ne les rends pas cliquables, ne les
+// souligne pas, juste en gras, comme dans l'ancienne interface ». Les PNJ
+// gardent leur lien (leur portrait sort du livre).
+const estHeros = (nom) => herosDeLaPartie().some(h => sansAccent(h.prenom) === sansAccent(nom));
+const lien = (nom, texte) => estHeros(nom)
+    ? `<b class="nom-heros">${echapper(texte)}</b>`
+    : `<a class="nom-livre" data-nom="${echapper(nom)}">${echapper(texte)}</a>`;
 // Un texte en mots (jetons HTML) ; les noms connus deviennent des liens, un seul jeton.
 function jetonsDuTexte(texte, noms) {
     const t = String(texte || "");
@@ -279,6 +285,8 @@ function deDeMarge(jets, id) {
         return `<span class="de-marge${classe}" data-e="${echapper(id || "")}" title="Jet de ${echapper(nomCaracJoli(j.carac))} : ${j.de} ${echapper(j.mod)} = ${j.total}">${SVG_DE("de-marge-svg", j.total)}</span>`;
     }).join("");
 }
+const FLECHE_SUITE = `<span class="fleche-suite" title="La suite, page suivante" aria-label="La suite, page suivante"><svg viewBox="0 0 30 16" aria-hidden="true">`
+    + `<path d="M 2 8.6 C 9 7.4 16 8.8 25 7.9"/><path d="M 19.5 3.2 C 22 5.2 24 6.6 26.6 7.9 C 24 9.4 22.2 10.9 20 13"/></svg></span>`;
 function enteteChapitre() {
     if (etat.lecture) {
         return `<div class="entete-recit"><span class="numero-chapitre">Chapitre ${romain(etat.lecture.numero)}</span>
@@ -365,7 +373,9 @@ function paginer(entrees) {
     if (boite.innerHTML.trim() || !pages.length) pages.push(boite.innerHTML || `<p class="page-blanche"></p>`);
     boite.innerHTML = "";                  // le mesureur ne garde rien (ses mots ne sont pas ceux du livre)
     if (pages.length % 2) pages.push("");
-    return pages;
+    // LA PETITE FLÈCHE (v304) : « une toute petite flèche noire dans le coin
+    // droit de la page, en bas, pour indiquer qu'il y a une suite ».
+    return pages.map((h, j) => (j % 2 === 1 && pages.slice(j + 1).some(x => /class="mot"/.test(x))) ? h + FLECHE_SUITE : h);
 }
 
 // LE SOMMAIRE DU RÉCIT (pages 5-6) : les chapitres finis, puis celui en cours.
@@ -425,12 +435,8 @@ function rendre() {
     etat.pagesRecit = recit.length;
     if (change) g.definirSuite(etat.elements);
     appliquerEcriture();
-    // Le lecteur était sur la dernière double page : il suit le récit.
-    const pf = g.pageFlip();
-    if (pf && avant && etat.pagesRecit > avant && !etat.lecture) {
-        const ici = pf.getCurrentPageIndex();
-        if (ici >= PREMIERE_RECIT + avant - 2) setTimeout(() => allerALaDernierePage(), 120);
-    }
+    // (v304 : le livre ne tourne plus tout seul quand le récit passe à la page
+    // suivante — la plume finit la double page ouverte, le lecteur tourne.)
     majInterface();
 }
 // Les mots pas encore écrits se cachent (l'encre les écrira).
@@ -456,15 +462,42 @@ function ecrireUnMot() {
     const id = ordre.find(x => etat.ecrits[x] < (etat.totaux[x] || 0));
     if (!id) { clearInterval(etat.minuteur); etat.minuteur = null; majInterface(); return; }
     const i = etat.ecrits[id];
-    etat.ecrits[id] = i + 1;
     let mot = null;
     for (const el of etat.elements) { mot = el.querySelector(`.mot[data-e="${CSS.escape(id)}"][data-i="${i}"]`); if (mot) break; }
+    // LA PLUME FINIT LA DOUBLE PAGE OUVERTE (v304). Nico : « quand le récit
+    // va créer une nouvelle page, il tourne de suite la page ; on va faire
+    // autrement : il va finir la page en cours et laisser le joueur tourner
+    // la page lui-même pour lire la suite ». Un mot qui tombe sur une page
+    // pas encore ouverte attend que le lecteur y arrive ; un mot sur une page
+    // qu'il a déjà dépassée s'écrit d'un coup.
+    const ou = mot ? placeDuMot(mot) : "ouvert";
+    if (ou === "apres") return;
+    if (ou === "avant") {
+        while (mot && placeDuMot(mot) === "avant") {
+            mot.classList.remove("a-ecrire");
+            etat.ecrits[id] += 1;
+            mot = null;
+            for (const el of etat.elements) { mot = el.querySelector(`.mot[data-e="${CSS.escape(id)}"][data-i="${etat.ecrits[id]}"]`); if (mot) break; }
+        }
+        return;
+    }
+    etat.ecrits[id] = i + 1;
     if (mot) {
         mot.classList.remove("a-ecrire");
         mot.classList.add("ecrit");
         if (Math.random() < 0.6) son("plume-ecrit", 0.8);
-        suivreLaPlume(mot);
     }
+}
+// Où est ce mot pour le lecteur : sur la double page ouverte, avant, ou après ?
+function placeDuMot(mot) {
+    const g = G(), pf = g && g.pageFlip();
+    if (!pf || etat.lecture) return "ouvert";
+    const index = PREMIERE_SUITE + etat.elements.indexOf(mot.closest(".page-suite"));
+    const ici = pf.getCurrentPageIndex(), gauche = ici % 2 === 1 ? ici : ici - 1;
+    if (!g.ouvert() || pf.getState() !== "read" || ici < PREMIERE_RECIT) return "apres";
+    if (index < gauche) return "avant";
+    if (index > gauche + 1) return "apres";
+    return "ouvert";
 }
 // L'ordre des entrées dans le livre (celles d'abord, celles d'après ensuite).
 function construireOrdreEcriture() {
@@ -472,16 +505,6 @@ function construireOrdreEcriture() {
     etat.elements.forEach(el => el.querySelectorAll(".mot[data-e]").forEach(m => { if (!vus.includes(m.dataset.e)) vus.push(m.dataset.e); }));
     Object.keys(etat.ecrits).forEach(id => { if (!vus.includes(id)) vus.push(id); });
     return vus;
-}
-function suivreLaPlume(mot) {
-    const g = G(), pf = g && g.pageFlip();
-    if (!pf || etat.lecture || pf.getState() !== "read") return;
-    const page = mot.closest(".page-suite");
-    const index = PREMIERE_SUITE + etat.elements.indexOf(page);
-    const ici = pf.getCurrentPageIndex();
-    if (ici < PREMIERE_RECIT) return;                 // le lecteur est ailleurs : on ne le dérange pas
-    const gaucheIci = ici % 2 === 1 ? ici : ici - 1, gaucheMot = index % 2 === 1 ? index : index - 1;
-    if (gaucheMot === gaucheIci + 2) g.allerALaPage(gaucheMot);
 }
 function allerALaDernierePage() {
     const g = G();
@@ -621,7 +644,8 @@ function majInterface() {
     const g = G(), pf = g && g.pageFlip();
     const attente = jetsEnAttente(etat.messages);
     const ecrit = Object.keys(etat.ecrits).some(id => etat.ecrits[id] < (etat.totaux[id] || 0) && etat.messages.some(m => idDe(m) === id && m.Est_Narration_IA));
-    const combat = etat.combat && ["detection", "preparation", "en_cours", "narration"].includes(etat.combat.Etat);
+    // (v304 : la détection d'un combat — « le destin hésite » — ne se voit plus et ne bloque rien.)
+    const combat = etat.combat && ["preparation", "en_cours", "narration"].includes(etat.combat.Etat);
     const bloque = etat.verrou || attente.manquants.length > 0 || combat;
     const posee = pf && pf.getState() === "read";
     const heros = monHeros();
@@ -652,7 +676,9 @@ function majInterface() {
 // « le destin hésite », puis COMBATTRE (ou rejoindre la bataille).
 function majNoteCombat() {
     const c = etat.combat;
-    const voulu = c && ["detection", "preparation", "en_cours"].includes(c.Etat) ? c.Etat : null;
+    // v304 : Nico, « je ne devrais pas voir "le destin hésite" : soit j'ai un lancé
+    // à faire, soit rien ». La note ne sort que quand le combat est là.
+    const voulu = c && ["preparation", "en_cours"].includes(c.Etat) ? c.Etat : null;
     let el = etat.notes.__combat;
     if (!voulu) {
         if (el) { delete etat.notes.__combat; el.classList.remove("sortie"); setTimeout(() => el.remove(), 700); }
@@ -848,16 +874,18 @@ function poussiere(zone, cible) {
 // suite de la dernière phrase du livre, dans le même paragraphe (voir
 // paragraphesDuChapitre), et c'est le modèle du Narrateur (Gemini 3.8 Flash,
 // réflexion basse) qui tient la plume ; Flash-Lite reprend s'il est refusé.
-const PROMPT_NARRATEUR_LITE = `Tu es la plume du Narrateur d'Ivalis. Le Narrateur accompagne un groupe d'aventuriers dans un monde d'Antiquité fantastique et écrit le livre de leurs aventures : de la prose, au présent, à la première personne ; c'est un témoin, il ne décide rien à leur place.
-Un joueur vient d'écrire ce que fait ou dit son héros. Écris la ou les phrases qui l'intègrent au livre, comme si le Narrateur poursuivait sa propre page :
+// v304 : la plume écrit comme un compagnon du groupe (« je », « nous », une
+// émotion ou la réaction des autres), d'après le guide de style du propriétaire.
+const PROMPT_NARRATEUR_LITE = `Tu es la plume du Narrateur d'Ivalis. Le Narrateur est un membre à part entière d'un groupe d'aventuriers, dans un monde d'Antiquité fantastique, et il écrit le livre de leurs aventures de l'intérieur : de la prose, au présent, à la première personne (« je » pour ce qu'il ressent et fait, « nous » pour ce que le groupe vit ensemble). Il vit la scène avec eux, mais il ne décide rien à leur place.
+Un joueur vient d'écrire ce que fait ou dit son héros. Écris la ou les phrases qui l'intègrent au livre, comme si le Narrateur poursuivait sa propre page, à côté du héros :
 - Tes phrases viennent JUSTE APRÈS la dernière ligne du livre, dans le même paragraphe : enchaîne avec elle naturellement (le rythme, le lieu, le moment, une liaison si elle sert), sans répéter ce qu'elle dit et sans recommencer la scène.
 - Raconte directement l'action ou la réplique du héros (« Thorin abat son poing sur le comptoir… », « Sans attendre, Lyra… », « C'est le moment que choisit Thorin pour… », ou la réplique d'abord). Ne commence JAMAIS par « Je vois », « Je regarde », « J'observe », « Je remarque » ni aucune formule de ce genre, et varie tes débuts d'une fois sur l'autre.
-- Le « je » du Narrateur n'apparaît que s'il apporte quelque chose (une remarque, une émotion, un trait d'humour), jamais pour dire qu'il voit ou qu'il entend.
-- Garde au mieux l'essence de ce que le joueur a voulu faire ou dire, ni plus ni moins. N'invente ni la suite, ni le résultat (on ne sait pas encore si ça réussit), ni de nouveaux personnages.
+- Le Narrateur peut ensuite réagir en une demi-phrase, s'il le sent : une émotion, une sensation, la réaction visible des autres, une remarque complice (« À côté de moi, Lyra retient son souffle. », « Je ne peux pas m'empêcher de sourire. »). Son « je » n'est jamais pour dire qu'il voit ou qu'il entend : il ressent, il réagit.
+- Garde au mieux l'essence de ce que le joueur a voulu faire ou dire, ni plus ni moins. N'invente ni la suite, ni le résultat (on ne sait pas encore si ça réussit), ni de nouveaux personnages, ni les pensées du héros.
 - S'il parle, ses paroles restent entre guillemets « », à peine corrigées, avec le nom de celui qui parle dans la phrase.
-- Une à trois phrases, sans mise en forme, sans titre, sans guillemets autour de l'ensemble.`;
-const PROMPT_ANNONCE_LITE = `Tu es la plume du Narrateur d'Ivalis : il accompagne un groupe d'aventuriers et écrit le livre de leurs aventures, en prose, au présent, à la première personne.
-Une annonce du jeu (le temps qui passe, le destin, la route) doit entrer dans le livre. Écris-la en une ou deux phrases qui enchaînent avec la dernière ligne du livre, sans rien ajouter d'important, sans mise en forme, sans commencer par « Je vois ».`;
+- Une écriture fluide et naturelle, sans poésie forcée ni dramatisation excessive. Une à trois phrases, sans mise en forme, sans titre, sans guillemets autour de l'ensemble.`;
+const PROMPT_ANNONCE_LITE = `Tu es la plume du Narrateur d'Ivalis : membre à part entière d'un groupe d'aventuriers, il écrit le livre de leurs aventures de l'intérieur, en prose, au présent, à la première personne (« je », « nous »).
+Une annonce du jeu (le temps qui passe, le destin, la route) doit entrer dans le livre. Écris-la en une ou deux phrases qui enchaînent avec la dernière ligne du livre, comme le groupe la vit (« Nous marchons jusqu'à la nuit… »), sans rien ajouter d'important, sans mise en forme, sans commencer par « Je vois ».`;
 function dernieresLignes(n) {
     return construireEntrees(etat.messages).slice(-n).map(e => (e.textes || []).join(" ")).filter(Boolean).join("\n");
 }

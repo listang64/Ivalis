@@ -155,7 +155,10 @@ await section(async () => {
   await p.waitForTimeout(1300);
   await relayer([], true);
   const e = await p.evaluate(() => ({ n: window.grimoireEtat().nbPages, actif: !document.getElementById("grimoire-marque-carte").classList.contains("inactif"), page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() }));
-  verifier("en partie : la double page de la carte entre dans le livre, le marque-page s'allume", e.n === 12 && e.actif && e.page === 3, JSON.stringify(e));
+  verifier("en partie : la double page de la carte entre dans le livre, le marque-page s'allume", e.n === 12 && e.actif && e.page === 5, JSON.stringify(e));   // v304 : la partie s'ouvre sur la carte
+  await p.evaluate(() => window.grimoireAllerIndex());
+  await attendreQue(async () => (await page()) === 3, 3000);
+  await p.waitForTimeout(400);
   await cliquer("#grimoire-index-carte");
   await attendreQue(async () => (await page()) === 5, 3000);
   await p.waitForTimeout(400);

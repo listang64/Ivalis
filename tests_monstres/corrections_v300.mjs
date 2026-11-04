@@ -175,7 +175,8 @@ await section(async () => {
              menu: getComputedStyle(document.getElementById("menu-lateral")).display, nav: document.getElementById("menu-navigation-bas").parentNode.id,
              navHaut: document.getElementById("menu-navigation-bas").getBoundingClientRect().top };
   });
-  verifier("le livre s'ouvre à l'index, à la même place que dans le menu", r.e.enPartie && r.e.page === 3 && r.place.every((v, i) => Math.abs(v - avantPartie[i]) < 1.5), JSON.stringify(r.place.map(Math.round)));
+  // v304 : « après avoir chargé la partie, ouvre sur la page map globale ».
+  verifier("le livre s'ouvre (v304 : sur la carte du monde), à la même place que dans le menu", r.e.enPartie && r.e.page === 5 && r.place.every((v, i) => Math.abs(v - avantPartie[i]) < 1.5), JSON.stringify(r.place.map(Math.round)));
   verifier("le fond beige reste ; la carte est masquée", r.fond === "1" && await dans(5, 5, "#ecran-grimoire") && await dans(r.place[0] / 2, 400, "#ecran-grimoire"), await dessus(5, 5));
   verifier("l'ancien menu de droite se cache ; les petits boutons restent en haut à droite", r.menu === "none" && r.nav === "ecran-grimoire" && r.navHaut < 30, `${r.menu}, ${r.nav}`);
   // Une ancienne fenêtre (ici le combat) s'ouvre par-dessus le livre.
@@ -241,14 +242,15 @@ titre("4. LE LIVRE : LE NARRATEUR EN PROSE, LES NOMS, L'ANCIEN CHAT QUI SE TAIT"
 await section(async () => {
   const r = await p.evaluate(() => {
     const paras = [...document.querySelectorAll("#grimoire-suite-2 .para-recit")];
-    return { paras: paras.map(p => p.innerText.replace(/\s+/g, " ").trim()), noms: [...document.querySelectorAll("#grimoire-suite-2 .nom-livre")].map(a => a.dataset.nom),
+    return { paras: paras.map(p => p.innerText.replace(/\s+/g, " ").trim()), noms: [...document.querySelectorAll("#grimoire-suite-2 .nom-livre")].map(a => a.dataset.nom), heros: [...document.querySelectorAll("#grimoire-suite-2 .nom-heros")].map(b => b.textContent),
              caches: document.querySelectorAll(".mot.a-ecrire").length, bulles: document.querySelectorAll("#grimoire-suite-2 .bulle, #grimoire-suite-2 img").length };
   });
   // v303 : la ligne d'un joueur continue le paragraphe qui la précède (corrections_v303).
   verifier("la narration en paragraphes de livre (sans balises, sans bulles)", r.paras.length === 4 && /^J'ai connu des tavernes/.test(r.paras[0]) && r.bulles === 0, r.paras.length + " paragraphes");
   verifier("la ligne d'un joueur : celle du livre (récrite), pas ses mots bruts", r.paras.some(t => /trois chopes sauter de frayeur/.test(t)) && !r.paras.some(t => /je tape sur le comptoir/.test(t)));
   verifier("une ligne d'avant le livre (sans récriture) : rapportée telle quelle", r.paras.some(t => /Lyra : « je regarde les sorties »/.test(t)), r.paras[4]);
-  verifier("les PNJ et les héros nommés se touchent", ["Le Chaudron Fêlé", "Varos", "Thorin", "Lyra"].every(n => r.noms.includes(n)), r.noms.join(","));
+  // v304 : « les noms des joueurs ne sont pas cliquables… juste en gras ».
+  verifier("les PNJ nommés se touchent ; les héros sont en gras, sans lien", ["Le Chaudron Fêlé", "Varos"].every(n => r.noms.includes(n)) && !r.noms.includes("Thorin") && ["Thorin", "Lyra"].every(n => r.heros.includes(n)), r.noms.join(",") + " / " + r.heros.join(","));
   verifier("ce qui était écrit avant l'arrivée est là d'un coup (pas d'encre qui coule)", r.caches === 0, String(r.caches));
   // Une nouvelle page du Narrateur : l'ancien parchemin, l'écran d'attente et le bandeau ne s'ouvrent plus.
   await p.evaluate(() => { window.__vieux = []; window.lancerRecitDynamique("x"); window.afficherEcranAttente(); window.annoncerJetsDemandes({}); window.afficherEcranAttente("archivage"); });
@@ -415,8 +417,9 @@ await section(async () => {
   await p.evaluate(() => { window.__combat = 0; window.rejoindreCombatRP = () => { window.__combat++; }; });
   await p.evaluate(() => window.livreRecitPartie({ IA_En_Cours: false, Combat_RP: { Etat: "detection" } }));
   await p.waitForTimeout(800);
-  const d = await p.evaluate(() => { const n = document.querySelector(".note-combat"); return n ? { sortie: n.classList.contains("sortie"), texte: n.innerText.trim(), bouton: !!n.querySelector("button") } : null; });
-  verifier("le Narrateur a vu venir un combat : « Le destin hésite… » sort du livre", d && d.sortie && /destin hésite/.test(d.texte) && !d.bouton, JSON.stringify(d));
+  const d = await p.evaluate(() => { const n = document.querySelector(".note-combat"); return n ? { sortie: n.classList.contains("sortie"), texte: n.innerText.trim() } : null; });
+  // v304 : « je devrais pas voir ça, soit j'ai un lancé à faire, soit rien » — la détection reste muette.
+  verifier("la détection d'un combat ne sort plus de note (v304 : pas de « Le destin hésite… »)", !d || !d.sortie, JSON.stringify(d));
   await p.evaluate(() => window.livreRecitPartie({ IA_En_Cours: false, Combat_RP: { Etat: "preparation", Adversaires: "trois brigands" } }));
   await p.waitForTimeout(300);
   const c = await p.evaluate(() => ({ texte: document.querySelector(".note-combat").innerText.replace(/\s+/g, " ").trim(), ecriture: document.getElementById("recit-ecriture").classList.contains("sortie") }));
@@ -435,19 +438,20 @@ titre("8. UN NOM TOUCHÉ : LA BANDE DU PORTRAIT SORT DU LIVRE CÔTÉ GAUCHE");
 await section(async () => {
   await relayer(M4);
   await p.waitForTimeout(300);
-  const nom = await centre('#grimoire-suite-2 .nom-livre[data-nom="Thorin"]');
+  const nom = await centre('#grimoire-suite-2 .nom-heros');
   await p.mouse.click(nom.x, nom.y);
+  await p.waitForTimeout(700);
+  verifier("v304 : le nom d'un héros (en gras) ne sort pas de bande", !(await p.evaluate(() => document.getElementById("recit-portrait").classList.contains("sortie"))));
+  const pnj = await centre('#grimoire-suite-2 .nom-livre[data-nom="Varos"]');
+  await p.mouse.click(pnj.x, pnj.y);
   await p.waitForTimeout(700);
   const r = await p.evaluate(() => {
     const el = document.getElementById("recit-portrait"), b = el.querySelector(".bande-portrait").getBoundingClientRect(), g = document.getElementById("grimoire-suite-2").getBoundingClientRect();
     return { sortie: el.classList.contains("sortie"), img: (el.querySelector("img") || {}).getAttribute ? el.querySelector("img").getAttribute("src") : "", nom: document.getElementById("recit-portrait-nom").textContent,
              gauche: b.left < g.left + g.width * 0.5, haute: b.top < g.top };
   });
-  verifier("Thorin touché : une bande de papier sort (v301 : du haut de la page gauche), avec son portrait", r.sortie && r.img === "portrait-thorin.png" && r.nom === "Thorin Ironfoot" && r.gauche && r.haute, JSON.stringify(r));
+  verifier("Varos touché : une bande de papier sort (v301 : du haut de la page gauche)", r.sortie && r.nom === "Varos" && r.gauche && r.haute, JSON.stringify(r));
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v300_portrait.png" });
-  const varos = await centre('#grimoire-suite-2 .nom-livre[data-nom="Varos"]');
-  await p.mouse.click(varos.x, varos.y);
-  await p.waitForTimeout(600);
   const v = await p.evaluate(() => ({ sil: !!document.querySelector("#recit-portrait .silhouette"), nom: document.getElementById("recit-portrait-nom").textContent }));
   verifier("un PNJ sans portrait (les portraits sont en pause) : une silhouette à la plume", v.sil && v.nom === "Varos", JSON.stringify(v));
   await p.mouse.click(600, 20);
@@ -466,7 +470,23 @@ await section(async () => {
   await p.waitForTimeout(800);
   const avant = await page();
   await relayer(M9);
-  await attendreQue(() => p.evaluate(() => document.querySelectorAll('.mot.a-ecrire').length === 0), 20000);
+  // v304 : « il va finir la page en cours et laisser le joueur tourner la page lui-même » — la plume s'arrête au bas de la double page ouverte, une petite flèche noire dit qu'il y a une suite.
+  const ouvertes = () => p.evaluate(() => [...document.querySelectorAll(".mot.a-ecrire")].length);
+  let reste = -1;
+  for (let i = 0; i < 120; i++) { const n = await ouvertes(); if (n > 0 && n === reste) break; reste = n; await p.waitForTimeout(250); }
+  const pause = await p.evaluate(() => {
+    const ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), droite = document.querySelectorAll(".page-suite")[ici - 7 + 1];
+    return { ici, reste: document.querySelectorAll(".mot.a-ecrire").length, fleche: !!(droite && droite.querySelector(".fleche-suite")) };
+  });
+  verifier("v304 : la plume finit la double page ouverte et s'arrête ; le livre ne tourne pas tout seul", avant === 9 && pause.ici === 9 && pause.reste > 0, JSON.stringify(pause));
+  verifier("v304 : une petite flèche noire en bas à droite annonce la suite", pause.fleche);
+  if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v304_fleche_suite.png" });
+  for (let k = 0; k < 6; k++) {
+    if (!(await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length))) break;
+    await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipNext("top"));
+    await attendreQue(() => p.evaluate(() => { const ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return ![...document.querySelectorAll(".page-suite")].slice(ici - 7, ici - 5).some(pg => pg.querySelector(".mot.a-ecrire")); }), 15000);
+  }
+  await attendreQue(() => p.evaluate(() => document.querySelectorAll('.mot.a-ecrire').length === 0), 8000);
   await p.waitForTimeout(1200);
   const r = await p.evaluate(() => {
     const pages = [...document.querySelectorAll(".page-suite .page-recit")];
@@ -477,7 +497,7 @@ await section(async () => {
   verifier("le récit s'étend sur plusieurs pages, toujours en nombre pair", r.n >= 4 && r.n % 2 === 0, `${r.n} pages`);
   verifier("aucune page ne déborde ; un paragraphe coupé continue sur la page suivante", r.deborde === 0 && r.suites >= 1, JSON.stringify(r));
   verifier("jamais de ponctuation seule en haut d'une page", r.orphelins === 0);
-  verifier("le lecteur sur la dernière double page : le livre tourne avec le récit", avant === 9 && r.page >= 11 && r.page >= r.total - 3, `${avant} → ${r.page} (sur ${r.total})`);
+  verifier("v304 : le lecteur tourne lui-même, la plume reprend et finit le récit", r.page >= 11 && (await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length)) === 0, `${avant} → ${r.page} (sur ${r.total})`);
 });
 
 // =========================================================================
@@ -518,7 +538,7 @@ titre("11. LE NARRATEUR, LES PORTRAITS EN PAUSE, LES PORTES DU JEU");
 // =========================================================================
 await section(async () => {
   const ia = lire("ia_master.js"), app = lire("app.js"), index = lire("index.html");
-  verifier("le cerveau du Narrateur par défaut : témoin du groupe, « je », drôle et sombre à la fois", /const PROMPT_NARRATEUR_LIVRE = `Tu es le Narrateur d'Ivalis/.test(ia) && /tu dis « je »/.test(ia) && /humour léger/.test(ia) && /sombre et de l'épique/.test(ia) && /let instructionMJ = PROMPT_NARRATEUR_LIVRE;/.test(ia));
+  verifier("le cerveau du Narrateur par défaut : témoin du groupe, « je », drôle et sombre à la fois", /const PROMPT_NARRATEUR_LIVRE = `Tu es le Narrateur d'Ivalis/.test(ia) && /dis « je »/i.test(ia) && /humour léger/.test(ia) && /sombre et de l'épique/.test(ia) && /let instructionMJ = PROMPT_NARRATEUR_LIVRE;/.test(ia));
   verifier("le Narrateur ne lit que le livre (les lignes récrites des joueurs)", /function ligneDuLivre\(m\)/.test(ia) && /historiqueReduit\.map\(ligneDuLivre\)/.test(ia));
   verifier("les portraits des PNJ en pause (les fiches se créent toujours)", /window\.PORTRAITS_PNJ_EN_PAUSE = true;/.test(ia) && /if \(window\.PORTRAITS_PNJ_EN_PAUSE !== false\) return "";/.test(ia));
   verifier("l'archivage range le chapitre dans le livre avant de vider le chat", ia.indexOf("GRIMOIRE_RECIT.archiverChapitre(messages)") > 0 && ia.indexOf("GRIMOIRE_RECIT.archiverChapitre(messages)") < ia.indexOf("// 5. Autodestruction du chat"));

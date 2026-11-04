@@ -280,3 +280,18 @@
 .dessin-terre circle { stroke: #120b06; stroke-width: 2.1; stroke-linecap: round; }
 .dessin-terre .feuille { fill: rgba(255, 246, 222, 0.25); }
 .dessin-terre .coin { fill: rgba(18, 11, 6, 0.18); }
+
+/* LES PAGES QUI DÉFILENT (v304) : un lien ou un marque-page touché, des feuilles
+   se lèvent et tournent très vite au-dessus du livre (grimoire.js, defiler). */
+.defile-pages { position: absolute; z-index: 9; perspective: 2400px; pointer-events: auto; }
+.feuille-defile {
+  position: absolute; top: 0; width: 50%; height: 100%; opacity: 0;
+  background: url('images/grimoire/page.webp?v=1') center / 100% 100% no-repeat, #e8d4a8;
+  box-shadow: 0 0 calc(var(--u) * 1.2) rgba(60, 35, 15, 0.35);
+  backface-visibility: visible; will-change: transform;
+}
+.feuille-defile::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
+.feuille-defile.vers-gauche { left: 50%; transform-origin: left center; }
+.feuille-defile.vers-gauche::after { background: linear-gradient(to right, rgba(36, 18, 3, 0.45), rgba(36, 18, 3, 0) 35%); }
+.feuille-defile.vers-droite { left: 0; transform-origin: right center; }
+.feuille-defile.vers-droite::after { background: linear-gradient(to left, rgba(36, 18, 3, 0.45), rgba(36, 18, 3, 0) 35%); }
