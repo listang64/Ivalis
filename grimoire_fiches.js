@@ -125,8 +125,8 @@ function caracsDe(id) {
 //  LES PAGES
 // ---------------------------------------------------------------------
 let pagesClans = [];
-const pagesFiche = {};          // fiche-g, fiche-d, tal-g, tal-d, comp-g, comp-d, forge-g, forge-d, inv-g, inv-d, dev-g, dev-d
-const ORDRE_FICHE = ["fiche-g", "fiche-d", "tal-g", "tal-d", "comp-g", "comp-d", "forge-g", "forge-d", "inv-g", "inv-d"];
+const pagesFiche = {};          // fiche-g, fiche-d, tal-g, tal-d, tal2-g, tal2-d, comp-g, comp-d, forge-g, forge-d, inv-g, inv-d, dev-g, dev-d
+const ORDRE_FICHE = ["fiche-g", "fiche-d", "tal-g", "tal-d", "tal2-g", "tal2-d", "comp-g", "comp-d", "forge-g", "forge-d", "inv-g", "inv-d"];
 const ORDRE_DEV = ["dev-g", "dev-d"];
 let heros = null;               // l'identifiant du héros affiché
 let carteOuverte = null;        // la compétence montrée sur la page de droite
@@ -141,7 +141,7 @@ function page(cle, cote, classe) {
 function creerPagesFiche() {
     if (pagesFiche["fiche-g"]) return;
     ORDRE_FICHE.concat(ORDRE_DEV).forEach((cle, i) => {
-        pagesFiche[cle] = page(cle, i % 2 === 0 ? "gauche" : "droite", "page-" + cle.split("-")[0]);
+        pagesFiche[cle] = page(cle, i % 2 === 0 ? "gauche" : "droite", "page-" + cle.split("-")[0].replace(/\d+$/, ""));
     });
 }
 // Les pages dans le livre : les clans (un nombre pair), la fiche, et le DEV en mode développeur.
@@ -321,12 +321,12 @@ function lavis(teinte, graine, options) {
     const id = "filtre-lavis-" + (++numeroLavis);
     const seed = Math.floor(r() * 900) + 1;
     // Une flaque : un contour polaire bosselé autour de (cx, cy).
-    const flaque = (cx, cy, rx, ry, couleur, opacite) => {
+    const flaque = (cx, cy, rx, ry, couleur, opacite, regulier) => {
         const n = 14, pts = [];
         const phase = r() * 6.28;
         for (let i = 0; i < n; i++) {
             const a = phase + (i / n) * Math.PI * 2;
-            const k = 0.82 + r() * 0.3;
+            const k = regulier ? 0.95 + r() * 0.12 : 0.82 + r() * 0.3;
             pts.push([cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k]);
         }
         // Courbes lissées (Catmull-Rom → Bézier).
@@ -348,6 +348,28 @@ function lavis(teinte, graine, options) {
             const rx = gros ? 5 + r() * 6 : 1.4 + r() * 3.4;
             formes += flaque(8 + r() * 184, 8 + r() * 84, rx, rx * (0.7 + r() * 0.5), t.couleurs[i % t.couleurs.length], 0.55 + r() * 0.35);
         }
+    } else if (o.deborde) {
+        // (v315, Nico : « qu'elle remplisse quand même en majeure partie le
+        // rectangle ») : une grande flaque presque rectangulaire (un contour
+        // superelliptique, bosselé) qui couvre la carte, puis des reprises plus
+        // sombres par endroits.
+        const pts = [], n = 28, phase = r() * 6.28;
+        for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 2, c = Math.cos(a), si = Math.sin(a);
+            const k = 0.97 + r() * 0.08 + Math.sin(a * 3 + phase) * 0.02;
+            // |x|^4 + |y|^4 = 1 : un rectangle aux coins arrondis.
+            const sx = Math.sign(c) * Math.pow(Math.abs(c), 0.5), sy = Math.sign(si) * Math.pow(Math.abs(si), 0.5);
+            pts.push([100 + sx * 97 * k, 50 + sy * 47 * k]);
+        }
+        let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+        for (let i = 0; i < n; i++) {
+            const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+            d += ` C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)},${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)},${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+        }
+        formes += `<path d="${d} Z" fill="${t.couleurs[0]}" fill-opacity="0.8"/>`;
+        for (let i = 1; i < t.couleurs.length + 1; i++) {
+            formes += flaque(30 + r() * 140, 20 + r() * 60, 28 + r() * 30, 14 + r() * 14, t.couleurs[i % t.couleurs.length], 0.35 + r() * 0.25);
+        }
     } else {
         const n = t.couleurs.length;
         for (let i = 0; i < n; i++) {
@@ -359,7 +381,7 @@ function lavis(teinte, graine, options) {
     let style = "";
     if (o.deborde) {
         const cote = Math.floor(r() * 4);
-        const e = 6 + r() * 6, l = (96 + e).toFixed(1) + "%";
+        const e = 5 + r() * 5, l = (99 + e).toFixed(1) + "%";
         style = ["left:-" + e.toFixed(1) + "%;width:" + l, "width:" + l, "top:-" + e.toFixed(1) + "%;height:" + l, "height:" + l][cote];
         style = ` style="${style}"`;
     }
@@ -481,7 +503,9 @@ function htmlTalents(h) {
 // peut l'être (un toucher : la même demande que l'ancienne fenêtre), pâli et
 // cadenassé s'il manque la carac, « à venir » s'il n'est pas encore écrit. Un
 // appui long : son effet (pour ce héros s'il l'a).
-const LIGNES_PAR_PAGE = { gauche: [null, "force", "dex", "con"], droite: ["int", "sag", "cha"] };
+// (Leur effet écrit en toutes lettres, v315 : deux doubles pages, dans l'ordre
+// des lignes.)
+const LIGNES_PAR_PAGE = { "tal-g": [null, "force"], "tal-d": ["dex", "con"], "tal2-g": ["int", "sag"], "tal2-d": ["cha"] };
 function htmlTalentsPage(h, cote) {
     if (!window.LIGNES_TALENTS || !window.TALENTS || typeof window.etatTalent !== "function") {
         return `<div class="contenu-page page-talents"><p class="fiche-attente">Les talents ne sont pas encore chargés.</p></div>`;
@@ -504,16 +528,20 @@ function htmlTalentsPage(h, cote) {
             if (e.ok && moi) classes.push("prenable");
             if (e.verrou) classes.push("verrou");
             if (e.aVenir) classes.push("a-venir");
-            const effet = rangs > 0 && typeof window.resumeTalent === "function" ? window.resumeTalent(h, t.id) : t.texte;
+            // (v315, Nico : « on doit voir sans cliquer ce que fait le talent ») :
+            // l'effet est écrit à côté du nom — pour ce héros s'il l'a pris, la
+            // règle sinon ; l'appui long garde le détail complet.
+            let effet = t.texte;
+            if (rangs > 0 && typeof window.resumeTalent === "function") { try { effet = window.resumeTalent(h, t.id) || t.texte; } catch (er) {} }
             const texte = [effet, rangs > 0 && t.texte !== effet ? t.texte : "",
                 e.verrou || e.aVenir ? e.raison : (e.ok && moi ? "Touche pour le prendre." : "")].filter(Boolean).join("\n\n");
             const r = hasard("talent-" + t.id + h.idPersonnage);
             return `<button type="button" class="${classes.join(" ")}" data-action="fiches" data-fa="talent" data-id="${t.id}" style="--penche:${((r() * 2 - 1) * 1.2).toFixed(2)}deg"
                       ${aide(t.nom + (t.max > 1 ? ` (${rangs}/${t.max})` : ""), texte)}>
                 <span class="coche-talent">${rangs > 0 ? "✔" : e.verrou ? "🔒" : "○"}</span>
-                <span class="nom-talent-livre">${echapper(t.nom)}</span>
-                ${t.max > 1 ? `<small class="rangs-talent">${rangs}/${t.max}</small>` : ""}
-                <small class="exigence-talent">${e.aVenir ? "à venir" : echapper(window.libelleExigenceTalent(t))}</small>
+                <span class="tete-talent-livre"><span class="nom-talent-livre">${echapper(t.nom)}</span>
+                  <small class="exigence-talent">${e.aVenir ? "à venir" : echapper(window.libelleExigenceTalent(t))}${t.max > 1 ? ` · <b class="rangs-talent">${rangs}/${t.max}</b>` : ""}</small></span>
+                <span class="effet-talent-livre">${e.aVenir ? "<i>Pas encore écrit.</i>" : echapper(effet)}</span>
               </button>`;
         }).join("");
         return `<section class="ligne-talents-livre" data-ligne="${ligne.icone}">
@@ -524,11 +552,12 @@ function htmlTalentsPage(h, cote) {
             <div class="etiquettes-talents">${etiquettes}</div>
           </section>`;
     }).join("");
-    const entete = cote === "gauche"
+    const entete = cote === "tal-g"
         ? `<div class="entete-fiche"><span class="titre-page-fiche">Talents</span>
              <span class="points-talents${dispo > 0 ? " a-placer" : ""}" ${aide("Points de talent", "Un point par niveau. Un talent pris ne se retire pas.")}>${dispo > 0 ? `✦ <b>${dispo}</b> à choisir` : "Aucun point à placer"}</span></div>`
         : "";
-    const pied = cote === "droite" ? `<button type="button" class="lien-fiche retour-fiche" data-action="fiches" data-fa="retour-fiche">‹ La fiche</button>` : "";
+    const pied = cote === "tal2-d" ? `<p class="legende-talents"><span>✔</span> pris · <span class="or">○</span> cerclé d'or : à prendre (un toucher) · <span>🔒</span> la carac manque<br>Un appui long : le détail du talent.</p>
+          <button type="button" class="lien-fiche retour-fiche" data-action="fiches" data-fa="retour-fiche">‹ La fiche</button>` : "";
     return `<div class="contenu-page page-talents">${entete}${lignes}${pied}</div>`;
 }
 
@@ -1102,7 +1131,7 @@ function majPlus(force) {
     const h = herosParId(heros);
     const sig = signatureFiche(h);
     if (!h) {
-        ["fiche-g", "fiche-d", "tal-g", "tal-d", "comp-g", "comp-d", "inv-g", "inv-d"].forEach(c => { if (pagesFiche[c]) pagesFiche[c].innerHTML = `<div class="contenu-page"><p class="fiche-attente">Aucun aventurier.</p></div>`; });
+        ["fiche-g", "fiche-d", "tal-g", "tal-d", "tal2-g", "tal2-d", "comp-g", "comp-d", "inv-g", "inv-d"].forEach(c => { if (pagesFiche[c]) pagesFiche[c].innerHTML = `<div class="contenu-page"><p class="fiche-attente">Aucun aventurier.</p></div>`; });
         preparerPagesForge();
         return;
     }
@@ -1116,8 +1145,7 @@ function rendre(h) {
     const saisie = actif && actif.classList && actif.classList.contains("saisie-pieces") ? actif.dataset.metal : null;
     pagesFiche["fiche-g"].innerHTML = htmlAvatar(h);
     pagesFiche["fiche-d"].innerHTML = htmlFicheDroite(h);
-    pagesFiche["tal-g"].innerHTML = htmlTalentsPage(h, "gauche");
-    pagesFiche["tal-d"].innerHTML = htmlTalentsPage(h, "droite");
+    Object.keys(LIGNES_PAR_PAGE).forEach(c => { pagesFiche[c].innerHTML = htmlTalentsPage(h, c); });
     pagesFiche["comp-g"].innerHTML = htmlCompetencesGauche(h);
     const avant = pagesFiche["comp-d"].querySelector(".carte-encre");
     const memeCarte = avant && avant.dataset.carte === carteOuverte;

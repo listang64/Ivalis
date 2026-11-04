@@ -246,20 +246,32 @@ titre("4. LES TALENTS DANS LES PAGES DE LA FICHE");
 await section(async () => {
   const r = await p.evaluate(() => {
     const pages = window.GRIMOIRE_FICHES.pages(), i = (c) => window.GRIMOIRE.indexDe(pages[c]);
-    const g = pages["tal-g"], d = pages["tal-d"];
-    return { ordre: [i("fiche-d"), i("tal-g"), i("tal-d"), i("comp-g")], lignesG: g ? g.querySelectorAll(".ligne-talents-livre").length : 0, lignesD: d ? d.querySelectorAll(".ligne-talents-livre").length : 0,
+    const n = (c) => pages[c] ? pages[c].querySelectorAll(".ligne-talents-livre").length : 0;
+    return { ordre: [i("fiche-d"), i("tal-g"), i("tal-d"), i("tal2-g"), i("tal2-d"), i("comp-g")], lignes: ["tal-g", "tal-d", "tal2-g", "tal2-d"].map(n),
              etiquettes: document.querySelectorAll(".page-tal .talent-livre").length, total: window.TALENTS.length,
              pris: [...document.querySelectorAll(".page-tal .talent-livre.pris")].map(x => x.dataset.id), prenables: document.querySelectorAll(".page-tal .talent-livre.prenable").length,
              medaillons: document.querySelectorAll(".page-tal .talents-medaillon").length, lien: !!document.querySelector('#grimoire-fiches-fiche-d [data-fa="talents"]') };
   });
-  verifier("une double page des talents, juste après la fiche", r.ordre[1] === r.ordre[0] + 1 && r.ordre[2] === r.ordre[1] + 1 && r.ordre[3] === r.ordre[2] + 1 && r.ordre[1] % 2 === 1, JSON.stringify(r.ordre));
-  verifier("les sept lignes (Général et les six caracs), chacune sous son médaillon", r.lignesG === 4 && r.lignesD === 3 && r.medaillons === 7, `${r.lignesG}+${r.lignesD}, ${r.medaillons} médaillons`);
+  verifier("deux doubles pages des talents, juste après la fiche", r.ordre.every((x, k) => !k || x === r.ordre[k - 1] + 1) && r.ordre[1] % 2 === 1, JSON.stringify(r.ordre));
+  verifier("les sept lignes (Général et les six caracs), chacune sous son médaillon", r.lignes.join() === "2,2,2,1" && r.medaillons === 7, `${r.lignes}, ${r.medaillons} médaillons`);
   verifier("tous les talents y sont, Préparer est coché", r.etiquettes === r.total && r.pris.includes("TAL_PREPARER"), `${r.etiquettes}/${r.total}, pris ${r.pris}`);
   // Le lien de la fiche mène à la double page.
   await cliquer('#grimoire-fiches-fiche-d [data-fa="talents"]'); await p.waitForTimeout(2600); await pose();
   const ici = await p.evaluate(() => { const pf = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), t = window.GRIMOIRE.indexDe(window.GRIMOIRE_FICHES.pages()["tal-g"]); return [pf, t]; });
   verifier("« Talents » sur la fiche ouvre leur double page", Math.abs(ici[0] - ici[1]) <= 1, JSON.stringify(ici));
   await cap("v315_talents");
+  // (Nico : « on doit voir sans cliquer ce que fait le talent ».)
+  const vu = await p.evaluate(() => { const ts = [...document.querySelectorAll(".page-tal .talent-livre")];
+    const pages = ["tal-g", "tal-d"].map(c => window.GRIMOIRE_FICHES.pages()[c].querySelector(".contenu-page"));
+    const prep = document.querySelector('.page-tal .talent-livre[data-id="TAL_PREPARER"] .effet-talent-livre');
+    return { avecEffet: ts.filter(t => { const e = t.querySelector(".effet-talent-livre"); return e && e.textContent.trim().length > 8 && (t.closest("#grimoire-fiches-tal2-g, #grimoire-fiches-tal2-d") || e.getBoundingClientRect().height > 0); }).length, total: ts.length,
+             prep: prep ? prep.textContent : "", deborde: pages.map(c => c.scrollHeight - c.clientHeight) }; });
+  verifier("l'effet de chaque talent est écrit à côté de son nom, sans toucher", vu.avecEffet >= vu.total - 2 && /initiative/i.test(vu.prep), `${vu.avecEffet}/${vu.total} — Préparer : ${vu.prep}`);
+  await p.evaluate(() => window.GRIMOIRE.allerALaPage(window.GRIMOIRE.indexDe(window.GRIMOIRE_FICHES.pages()["tal2-g"]))); await p.waitForTimeout(2600); await pose();
+  await cap("v315_talents_suite");
+  const suite = await p.evaluate(() => ["tal2-g", "tal2-d"].map(c => { const x = window.GRIMOIRE_FICHES.pages()[c].querySelector(".contenu-page"); return x.scrollHeight - x.clientHeight; }));
+  verifier("… et les quatre pages tiennent sans déborder", vu.deborde.concat(suite).every(x => x <= 2), JSON.stringify(vu.deborde.concat(suite)));
+  await p.evaluate(() => window.GRIMOIRE.allerALaPage(window.GRIMOIRE.indexDe(window.GRIMOIRE_FICHES.pages()["tal-g"]))); await p.waitForTimeout(2600); await pose();
   // Un appui long : l'effet.
   const c = await centre('#grimoire-fiches-tal-g .talent-livre[data-id="TAL_PREPARER"]');
   await p.mouse.move(c.x, c.y); await p.mouse.down(); await p.waitForTimeout(650);
@@ -299,10 +311,13 @@ await section(async () => {
     const lv = c.querySelector(".lavis"), rc = c.getBoundingClientRect(), rl = lv.getBoundingClientRect();
     return { montant: !!m, symbole: !!(m && m.querySelector("svg.encart-symbole")), chiffre: m ? m.querySelector(".encart-chiffre").textContent : "", couleur: m ? getComputedStyle(m).color : "",
              sous: c.querySelectorAll(".carte-effets-encart > div").length, lavis: lv.getAttribute("class"),
-             deborde: [rc.left - rl.left, rl.right - rc.right, rc.top - rl.top, rl.bottom - rc.bottom].map(x => Math.round(x)) }; });
+             deborde: [rc.left - rl.left, rl.right - rc.right, rc.top - rl.top, rl.bottom - rc.bottom].map(x => Math.round(x)),
+             // La part du rectangle couverte : la grande flaque (son contour) rapportée à la carte.
+             couvre: (() => { const bb = lv.querySelector("path").getBBox(); return +((bb.width / 200) * (rl.width / rc.width) * (bb.height / 100) * (rl.height / rc.height)).toFixed(2); })() }; });
   verifier("les montants avec les symboles du combat (la baguette du magique, le chiffre)", c1.montant && c1.symbole && c1.chiffre === "12", JSON.stringify(c1));
   verifier("… repeints pour le papier (plus le bleu clair du combat)", c1.couleur && c1.couleur !== "rgb(127, 208, 255)" && /rgb\((\d+), (\d+), (\d+)\)/.test(c1.couleur) && RegExp.$3 < 180, c1.couleur);
   verifier("un lavis gris léger dans la carte, qui déborde sur un bord", /lavis-gris/.test(c1.lavis) && c1.deborde.some(x => x > 4), JSON.stringify(c1.deborde));
+  verifier("… et qui remplit la plus grande partie du rectangle de la carte", c1.couvre >= 0.85, String(c1.couvre));
   await p.evaluate(() => document.querySelector('#grimoire-fiches-comp-g .banniere-livre[data-id="C4"]').click()); await p.waitForTimeout(1800);
   const c4 = await p.evaluate(() => { const c = document.querySelector("#grimoire-fiches-comp-d .carte-encre");
     const d = c.querySelector(".carte-distance"), z = c.querySelector(".carte-zone svg");

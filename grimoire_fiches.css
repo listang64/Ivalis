@@ -281,7 +281,7 @@
   mix-blend-mode: multiply; }
 /* (Un SVG en position absolue garde sa taille propre : largeur et hauteur explicites.) */
 .vital-fiche .lavis { left: -5%; top: -12%; width: 110%; height: 124%; }
-.lavis-deborde { left: 4%; top: 4%; width: 92%; height: 92%; }
+.lavis-deborde { left: 1%; top: 1%; width: 98%; height: 98%; }
 
 /* La carte de compétence avec les symboles du combat (ligneEffetsCarte),
    repeints pour le papier : l'encre pour le texte, des couleurs sourdes pour
@@ -319,35 +319,43 @@
 /* =========================================================================
    v315 — LA DOUBLE PAGE DES TALENTS
    ========================================================================= */
-.page-talents { gap: calc(var(--u) * 2.2) !important; }
+.page-talents { gap: calc(var(--u) * 1.3) !important; padding-top: calc(var(--u) * 5.5) !important; padding-bottom: calc(var(--u) * 4.5) !important; }
 .points-talents { font-size: calc(var(--u) * 3.2); color: #5c3a21; white-space: nowrap; }
 .points-talents.a-placer { color: #6b1a10; }
 .points-talents b { font-size: 1.3em; }
-.ligne-talents-livre { display: flex; flex-direction: column; gap: calc(var(--u) * 1); }
+.ligne-talents-livre { display: flex; flex-direction: column; gap: calc(var(--u) * 0.6); }
 .tete-ligne-talents { display: flex; align-items: center; gap: calc(var(--u) * 1.6); border-bottom: 1px solid rgba(43, 26, 14, 0.35); padding-bottom: calc(var(--u) * 0.5); }
-.tete-ligne-talents .talents-medaillon { width: calc(var(--u) * 6); height: calc(var(--u) * 6); flex: none; filter: sepia(0.35) saturate(0.8); }
+.tete-ligne-talents .talents-medaillon { width: calc(var(--u) * 5); height: calc(var(--u) * 5); flex: none; filter: sepia(0.35) saturate(0.8); }
 .nom-ligne-talents { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important;
-  font-size: calc(var(--u) * 4.4 * var(--echelle-titres, 1)); color: #24150a; line-height: 1.1; flex: 1; }
+  font-size: calc(var(--u) * 4 * var(--echelle-titres, 1)); color: #24150a; line-height: 1.1; flex: 1; }
 .valeur-ligne-talents { font-size: calc(var(--u) * 2.8); color: #5c3a21; letter-spacing: 0.06em; }
 .compte-ligne-talents { font-size: calc(var(--u) * 2.8); color: #6b4a2b; min-width: 2.6em; text-align: right; }
-.etiquettes-talents { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 1) calc(var(--u) * 1.6); }
-.talent-livre { position: relative; isolation: isolate; display: flex !important; align-items: baseline; gap: calc(var(--u) * 0.8); text-align: left;
-  padding: calc(var(--u) * 0.7) calc(var(--u) * 1.2) !important; font-size: calc(var(--u) * 3) !important; line-height: 1.15;
+/* (v315 : une colonne, comme la table d'un manuel : le nom et l'exigence à
+   gauche, l'effet en toutes lettres à droite, lisible sans toucher.) */
+.etiquettes-talents { display: flex; flex-direction: column; gap: calc(var(--u) * 0.5); }
+.talent-livre { position: relative; isolation: isolate; display: grid !important; grid-template-columns: 1.3em 34% 1fr; align-items: baseline;
+  column-gap: calc(var(--u) * 1); text-align: left; width: 100%;
+  padding: calc(var(--u) * 0.45) calc(var(--u) * 1) !important; font-size: calc(var(--u) * 2.75) !important; line-height: 1.12;
   transform: rotate(var(--penche, 0deg)); border-radius: 3px; }
-.talent-livre .coche-talent { flex: none; width: 1.1em; text-align: center; color: #6b4a2b; }
-.talent-livre .nom-talent-livre { flex: 1; min-width: 0; }
-.talent-livre .rangs-talent { color: #6b4a2b; font-size: 0.8em; }
-.talent-livre .exigence-talent { flex: none; color: #8a6a4a; font-size: 0.72em; font-style: italic; }
-.talent-livre.pris { font-weight: 700; }
+.talent-livre .coche-talent { text-align: center; color: #6b4a2b; }
+.tete-talent-livre { display: flex; flex-direction: column; min-width: 0; }
+.talent-livre .nom-talent-livre { font-weight: 700; }
+.talent-livre .exigence-talent { color: #8a6a4a; font-size: 0.74em; font-style: italic; }
+.talent-livre .rangs-talent { font-style: normal; color: #5c3a21; }
+.effet-talent-livre { font-size: 0.86em; color: #3a2414; font-style: italic; line-height: 1.18; }
+.talent-livre.pris .effet-talent-livre { color: #24150a; font-style: normal; }
 .talent-livre.pris .coche-talent { color: #24150a; }
-.talent-livre.pris::after { content: ""; position: absolute; left: 4%; right: 6%; bottom: 8%; height: 0.32em; z-index: -1;
-  background: rgba(196, 154, 98, 0.35); border-radius: 40% 60% 50% 45%; }
+.talent-livre.pris::after { content: ""; position: absolute; left: 1%; right: 2%; top: 10%; bottom: 10%; z-index: -1;
+  background: rgba(196, 154, 98, 0.22); border-radius: 40% 60% 50% 45%; }
 .talent-livre.prenable { cursor: pointer; outline: 1.5px dashed rgba(160, 110, 20, 0.85); outline-offset: -1px;
   background: radial-gradient(ellipse at 50% 50%, rgba(230, 180, 60, 0.22), rgba(230, 180, 60, 0.04) 75%); animation: talent-livre-appel 2.4s ease-in-out infinite; }
 .talent-livre.prenable .coche-talent { color: #9a6a06; }
 .talent-livre.prenable:hover { background: radial-gradient(ellipse at 50% 50%, rgba(230, 180, 60, 0.4), rgba(230, 180, 60, 0.08) 75%); }
-.talent-livre.verrou, .talent-livre.a-venir { opacity: 0.5; }
+.talent-livre.verrou, .talent-livre.a-venir { opacity: 0.55; }
 .talent-livre.verrou .coche-talent { font-size: 0.75em; filter: grayscale(1); }
 .talent-livre.a-venir .nom-talent-livre { font-style: italic; }
 @keyframes talent-livre-appel { 50% { outline-color: rgba(160, 110, 20, 0.35); } }
+.legende-talents { margin: auto 0 0; font-size: calc(var(--u) * 2.6); color: #6b4a2b; font-style: italic; line-height: 1.4; }
+.legende-talents .or { color: #9a6a06; }
+.legende-talents + .retour-fiche { margin-top: calc(var(--u) * 1.5); }
 .retour-fiche { margin-top: auto; }

@@ -10537,3 +10537,12 @@ v278 (la liste à cocher), v297 et v305 (la nouvelle couverture ; v297 la sert e
 
 corrections_v315.mjs vérifie tout cela (19 échecs sur la v314). Tests mis à jour : v313 (les
 effets de la carte), v314 (plus de taches ; qualité medium).
+- (v315, suite) Les talents : leur effet écrit en toutes lettres à côté du nom (pour ce héros
+  s'il l'a pris, la règle sinon), une colonne façon table de manuel ; donc deux doubles pages
+  (tal-g, tal-d, tal2-g, tal2-d : Général + Force | Dextérité + Constitution, Intelligence +
+  Sagesse | Charisme + légende). La carte de compétence : le lavis gris remplit presque tout
+  le rectangle (une grande flaque superelliptique, des reprises plus sombres) et déborde
+  toujours sur un bord. corrections_v315 : les effets visibles, les quatre pages sans
+  débordement, le lavis couvrant ≥ 85 % de la carte.
+  Suite complète : rien de nouveau ; v267 échouait déjà sur la v314 (caméra du combat),
+  v274 passe seul (minuterie), v238/v249/v286 passent seuls.
