@@ -187,12 +187,19 @@
     function veiller() {
         const g = G();
         const enPartie = !!(g && g.enPartie && g.enPartie());
-        if (typeof window.placerOutilsRegionDev === "function") window.placerOutilsRegionDev(enPartie);
+        // Hors partie, rien à faire (le livre n'a pas de cartes régionales) ; on ne
+        // touche à rien tant que rien ne change.
         if (!enPartie) {
-            if (etaitEnPartie) { etaitEnPartie = false; signature = ""; regions = []; ouvertureFaite = false; demonter().then(rendreLaVue); }
-            document.getElementById("ecran-jeu") && document.getElementById("ecran-jeu").classList.remove("livre-carte");
+            if (etaitEnPartie) {
+                etaitEnPartie = false; signature = ""; regions = []; ouvertureFaite = false;
+                if (typeof window.placerOutilsRegionDev === "function") window.placerOutilsRegionDev(false);
+                const jeu = $("ecran-jeu");
+                if (jeu) jeu.classList.remove("livre-carte");
+                demonter().then(rendreLaVue);
+            }
             return;
         }
+        if (!etaitEnPartie && typeof window.placerOutilsRegionDev === "function") window.placerOutilsRegionDev(true);
         etaitEnPartie = true;
         construire();
         const pf = g.pageFlip();

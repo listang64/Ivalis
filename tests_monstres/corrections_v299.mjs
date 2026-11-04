@@ -304,6 +304,8 @@ await section(async () => {
   await cliquer("#grimoire-valider-partie");
   await p.waitForTimeout(1300);
   await attendreQue(async () => (await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex())) === 5, 3000);
+  await attendreQue(() => p.evaluate(() => window.GRIMOIRE_PAGEFLIP.getState() === "read"), 3000);
+  await p.waitForTimeout(450);   // (v308) le livre posé, le bouton du voyage se montre (veille de 0,18 s)
   const r = await p.evaluate(() => {
     const ecran = document.getElementById("ecran-grimoire");
     return { entrees: window.__entrees.slice(), e: window.grimoireEtat(), parent: ecran.parentNode.id, jeu: getComputedStyle(document.getElementById("ecran-jeu")).display,
@@ -321,7 +323,8 @@ await section(async () => {
   verifier("v300 : l'ancien menu de droite se cache sous le livre", r.menu === "none", r.menu);
   verifier("v300 : les petits boutons restent dans le livre (en haut à droite)", r.nav === "ecran-grimoire");
   verifier("en partie, le marque-page s'allume", r.marque === false);
-  verifier("les boutons posés sur la carte (le voyage) se cachent sous le livre levé", r.voyage === "none", r.voyage);
+  // v308 : le voyage revient dans le livre — son bouton se montre sur ses cartes (le livre s'ouvre sur la carte du monde).
+  verifier("v308 : sur la carte du monde du livre, le bouton du voyage se montre", r.voyage === "block", r.voyage);
 });
 
 // =========================================================================

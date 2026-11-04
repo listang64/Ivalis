@@ -10218,3 +10218,15 @@ en portrait, les boîtes du monde, ouvrir/fermer, le bouton du voyage (monde,
 région, pas dans le récit), les outils DEV dans « Nouveau », une destination
 proposée d'un toucher, la sortie de partie. Il échoue sur la v307 (13 échecs).
 Tests mis à jour : v302 (les boîtes masquées restent des liens).
+
+Après la suite complète (v308) :
+- grimoire_regions.js ne touche plus à rien hors partie (sa veille de 0,18 s
+  déplaçait la fenêtre du descriptif d'une région assez pour faire partir son
+  enregistrement trop tôt : corrections_v274). Les outils DEV régionaux changent
+  d'onglet seulement en entrant et en sortant de la partie.
+- allerALaPage : demandée pendant qu'une page tourne (ou que les pages
+  défilent), la page voulue attend que le livre se pose (3 s au plus, la
+  dernière demande l'emporte) ; l'ouverture d'une partie (vers la carte ou la
+  région du groupe) cède la place à une navigation du joueur.
+- corrections_v299 : le bouton du voyage se montre sur la carte du monde du
+  livre (le livre posé).

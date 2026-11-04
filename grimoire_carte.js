@@ -329,9 +329,8 @@ function poserOnglets() {
         aide.textContent = "Ouvre la double page d'une région pour ses outils.";
         nouveau.appendChild(tete);
         nouveau.appendChild(aide);
-        nouveau.appendChild(outilsRegion);
     }
-    placerOutilsRegion(true);
+    placerOutilsRegion(!!(G() && G().enPartie && G().enPartie()));
     onglets.addEventListener("click", (e) => {
         const b = e.target.closest("[data-onglet]");
         if (!b) return;

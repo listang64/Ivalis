@@ -805,18 +805,19 @@
         // v304 : Nico, « après avoir chargé la partie, ouvre sur la page de la map globale ».
         // v308 : « le livre suit le groupe » — sur la carte de sa région, si elle est dans le livre.
         // Un livre encore en mouvement ignorerait le geste : on attend qu'il se pose (3 s au plus).
-        let essais = 0;
+        let essais = 0, debut = Date.now();
         const versLaCarte = () => {
             if (!pageFlip || !enPartie) return;
+            if (derniereNavigation > debut) return;          // (v308) le joueur est déjà allé ailleurs
             const voulue = (window.GRIMOIRE_REGIONS && window.GRIMOIRE_REGIONS.pageDuGroupe()) || PAGE_CARTE;
             const p = pageFlip.getCurrentPageIndex();
             if (p === voulue || p === voulue + 1) return;
             if ((pageFlip.getState() !== "read" || defileEnCours) && ++essais < 25) { setTimeout(versLaCarte, 120); return; }
-            if (Math.abs(planche(voulue) - planche(p)) > 1 && pageFlip.getState() === "read") { allerALaPage(voulue); return; }
+            if (Math.abs(planche(voulue) - planche(p)) > 1 && pageFlip.getState() === "read") { allerALaPage(voulue, true); return; }
             try { pageFlip.flip(voulue, "top"); } catch (e) { try { pageFlip.turnToPage(voulue); } catch (e2) {} }
         };
         setTimeout(versLaCarte, 60);
-        passerEnPartie.versLaCarte = () => { essais = 0; setTimeout(versLaCarte, 60); };
+        passerEnPartie.versLaCarte = () => { essais = 0; debut = Date.now(); setTimeout(versLaCarte, 60); };
     }
     // De retour au journal (« Retour au menu ») : le livre ressort de l'écran
     // de jeu, perd les pages du récit, et les marque-pages s'éteignent.
@@ -893,8 +894,27 @@
     // reçoit quelques feuillets manuscrits et les tourne très vite ; arrivé, il
     // retrouve ses vraies pages (les mêmes sont à l'écran : rien ne saute).
     let defileEnCours = false;
-    function allerALaPage(n) {
-        if (!pageFlip || defileEnCours) return;
+    // (v308) Demandée pendant qu'une page tourne (ou que les pages défilent), la
+    // page voulue attend que le livre se pose : la dernière demande l'emporte.
+    let pageEnAttente = null, derniereNavigation = 0;
+    function allerALaPage(n, interne) {
+        if (!pageFlip) return;
+        if (!interne) derniereNavigation = Date.now();
+        if (defileEnCours || (pageFlip.getState() !== "read" && pageFlip.getCurrentPageIndex() > 0)) {
+            const premiere = pageEnAttente === null;
+            pageEnAttente = { n, depuis: (pageEnAttente && pageEnAttente.depuis) || Date.now() };
+            if (premiere) {
+                const reessayer = () => {
+                    if (!pageEnAttente) return;
+                    if ((defileEnCours || pageFlip.getState() !== "read") && Date.now() - pageEnAttente.depuis < 3000) { setTimeout(reessayer, 60); return; }
+                    const voulue = pageEnAttente.n;
+                    pageEnAttente = null;
+                    allerALaPage(voulue, true);
+                };
+                setTimeout(reessayer, 60);
+            }
+            return;
+        }
         if (!ouvert) etatOuvert(true);
         const ici = pageFlip.getCurrentPageIndex();
         const cible = Math.max(1, Math.min(n, nbPages - 2));
