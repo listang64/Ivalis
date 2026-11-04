@@ -12,7 +12,8 @@
 //      mot, au bruit de la plume ;
 //    · plus de tours de parole : sur les pages du récit, un morceau de
 //      parchemin sort du livre côté droit, pour écrire ce que son héros dit
-//      ou fait ; validé, le texte part en poussière vers le livre pendant que
+//      ou fait (v301 : un marque-page qui sort du haut de la page de droite) ;
+//      validé, le texte part en poussière vers le livre pendant que
 //      le Narrateur lite le récrit dans la voix du Narrateur (les 4 dernières
 //      lignes du livre lui donnent la scène) ;
 //    · le post-it « Narrateur », sur le côté droit, lance la séquence du MJ
@@ -24,8 +25,9 @@
 //      Narrateur repart tout seul ;
 //    · le Destin et le Maître du Temps s'écrivent aussi dans la voix du
 //      Narrateur ;
-//    · un nom (héros ou PNJ) touché : une bande de papier sort du livre côté
-//      gauche avec son portrait ; un toucher ailleurs la fait rentrer.
+//    · un nom (héros ou PNJ) touché : une bande de papier sort du haut de la
+//      page de gauche, derrière les marque-pages (v301), avec son portrait ;
+//      un toucher ailleurs la fait rentrer.
 //
 //  Les messages restent ceux de la partie (Messages_Chat, lus par app.js,
 //  relayés ici sans nouvelle lecture) : la ligne d'un joueur garde ses mots
@@ -481,7 +483,8 @@ function creerElements() {
     portrait.className = "recit-portrait";
     portrait.id = "recit-portrait";
     portrait.innerHTML = `<div class="bande-portrait"><div class="cadre-portrait" id="recit-portrait-image"></div><div class="nom-portrait" id="recit-portrait-nom"></div></div>`;
-    avantLivre(portrait);
+    // (v301) Sous les pages et sous les marque-pages : elle sort du haut de la page de gauche.
+    scene.insertBefore(portrait, document.getElementById("grimoire-marque-page") || livre);
     const notes = document.createElement("div");
     notes.className = "recit-notes";
     notes.id = "recit-notes";
@@ -501,7 +504,7 @@ function creerElements() {
         <textarea id="recit-saisie" rows="3" maxlength="900" placeholder="Ce que ton héros dit ou fait…"></textarea>
         <button type="submit" class="ecriture-plume" id="recit-envoyer" aria-label="Écrire dans le livre">${SVG_PLUME}</button>
       </form>`;
-    scene.appendChild(ecriture);
+    avantLivre(ecriture);                  // (v301) un marque-page : sous les pages, il sort par le haut
     const poussiere = document.createElement("div");
     poussiere.className = "recit-poussiere";
     poussiere.id = "recit-poussiere";
@@ -618,6 +621,10 @@ function majInterface() {
     elts.notes.classList.toggle("visible", !!(etat.actif && g && g.ouvert() && pf && pf.getCurrentPageIndex() > 0));
     majNotes(attente);
     majNoteCombat();
+    // Une page encore en mouvement : on regarde de nouveau quand elle s'est posée
+    // (l'événement de StPageFlip peut arriver avant son état « read »).
+    clearTimeout(etat.revoir);
+    if (etat.actif && pf && !posee) etat.revoir = setTimeout(majInterface, 120);
 }
 // LE COMBAT DU RÉCIT (v278, combat_rp.js) : son bouton vivait dans l'ancien
 // parchemin du MJ ; dans le livre, une note rouge sort du haut du livre —

@@ -57,6 +57,10 @@
     // v300 : « le marque-page index, réduis sa taille ». À côté, le marque-page
     // du récit (une plume), un peu décalé.
     const MARQUE = { x: 360, y: -30, w: 66, h: 200, penche: -6 };
+    // v301 : au-dessus des pages sortent aussi le marque-page où l'on écrit, la
+    // bande du portrait et les notes des dés (grimoire_recit.css) : jusqu'à
+    // 175 unités au-dessus de l'image du livre. La place leur est gardée.
+    const HAUT_DES_MARQUES = 175;
     // L'INDEX (v299) : les chapitres du jeu, trois par page.
     const ENTREES_INDEX = [
         ["carte", "Carte du monde"], ["recit", "Le récit"], ["fiches", "Les fiches personnages"],
@@ -312,7 +316,7 @@
         // Le marque-page dépasse au-dessus du livre : sur un écran très large,
         // le livre perd juste ce qu'il faut pour qu'il reste visible.
         const place = vh * (1 - MARGE_BAS) - 4;
-        if (place - LIVRE.h * s < -MARQUE.y * s) s = place / (LIVRE.h - MARQUE.y);
+        if (place - LIVRE.h * s < HAUT_DES_MARQUES * s) s = place / (LIVRE.h + HAUT_DES_MARQUES);
         const gauche = (vw - LIVRE.w * s) / 2, haut = vh * (1 - MARGE_BAS) - LIVRE.h * s;
         // La couverture fermée : à droite du dos, sa hauteur celle d'une page.
         const largeurCouv = PAGE.h * COUVERTURE.w / COUVERTURE.h;

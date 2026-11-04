@@ -282,12 +282,13 @@ await section(async () => {
     return { sorti: e.classList.contains("sortie"), place: document.getElementById("recit-saisie").placeholder, pap: [pap.left, pap.right, pap.top, pap.bottom], page: [droite.left, droite.right, droite.top, droite.bottom],
              postit: pi.classList.contains("sortie"), postitDepasse: rp.right > droite.right + 5, postitTexte: pi.innerText.trim() };
   });
-  verifier("sur les pages du récit, un parchemin sort du livre côté droit", r.sorti && r.pap[1] > r.page[1] && r.pap[0] > r.page[0] + (r.page[1] - r.page[0]) * 0.2 && r.pap[2] > r.page[2] + (r.page[3] - r.page[2]) * 0.6, JSON.stringify(r.pap.map(Math.round)));
+  // v301 : le parchemin est devenu un marque-page au-dessus de la page de droite (corrections_v301).
+  verifier("sur les pages du récit, le parchemin d'écriture sort (v301 : au-dessus de la page droite)", r.sorti && r.pap[0] > r.page[0] && r.pap[1] < r.page[1] && r.pap[2] < r.page[2], JSON.stringify(r.pap.map(Math.round)));
   verifier("… pour écrire ce que son héros dit ou fait", r.place === "Ce que Thorin dit ou fait…", r.place);
   verifier("le post-it « Narrateur » dépasse du côté droit du livre", r.postit && r.postitDepasse && r.postitTexte === "Narrateur", r.postitTexte);
   // Le texte de la page de droite ne passe jamais sous le parchemin : elle garde sa marge basse.
   const marge = await p.evaluate(() => { const c = document.querySelector("#grimoire-suite-3 .page-recit"); return parseFloat(getComputedStyle(c).paddingBottom) / c.getBoundingClientRect().height; });
-  verifier("la page de droite garde sa marge basse pour le parchemin", marge > 0.25, marge.toFixed(2));
+  verifier("v301 : la page de droite n'a plus à garder de marge basse", marge < 0.1, marge.toFixed(2));
   // Sur l'index, le parchemin et le post-it rentrent.
   await p.evaluate(() => window.grimoireAllerIndex());
   await p.waitForTimeout(900);
@@ -432,9 +433,9 @@ await section(async () => {
   const r = await p.evaluate(() => {
     const el = document.getElementById("recit-portrait"), b = el.querySelector(".bande-portrait").getBoundingClientRect(), g = document.getElementById("grimoire-suite-2").getBoundingClientRect();
     return { sortie: el.classList.contains("sortie"), img: (el.querySelector("img") || {}).getAttribute ? el.querySelector("img").getAttribute("src") : "", nom: document.getElementById("recit-portrait-nom").textContent,
-             gauche: b.left < g.left, haute: b.height > b.width * 1.6 };
+             gauche: b.left < g.left + g.width * 0.5, haute: b.top < g.top };
   });
-  verifier("Thorin touché : une longue bande de papier sort à gauche, avec son portrait", r.sortie && r.img === "portrait-thorin.png" && r.nom === "Thorin Ironfoot" && r.gauche && r.haute, JSON.stringify(r));
+  verifier("Thorin touché : une bande de papier sort (v301 : du haut de la page gauche), avec son portrait", r.sortie && r.img === "portrait-thorin.png" && r.nom === "Thorin Ironfoot" && r.gauche && r.haute, JSON.stringify(r));
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v300_portrait.png" });
   const varos = await centre('#grimoire-suite-2 .nom-livre[data-nom="Varos"]');
   await p.mouse.click(varos.x, varos.y);

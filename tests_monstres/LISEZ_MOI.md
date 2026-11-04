@@ -9857,3 +9857,30 @@ retour au menu.
 Il échoue sur l'ancien code (27 échecs). Tests mis à jour : corrections_v297
 (« Journal d'un aventurier »), corrections_v299 (fond gardé, menu caché,
 boutons dans le livre, souligné, plus de livre rangé), blessures (deux sons).
+
+## v301 — Le parchemin d'écriture devient un marque-page ; le portrait sort du haut de la page gauche
+
+Nico : « le parchemin où les joueurs écrivent, de la même taille mais en
+marque-page au-dessus de la page droite » ; « l'image joueur / PNJ, qu'elle
+sorte en haut de la page gauche et derrière les marque-pages ».
+
+- Le parchemin d'écriture (575 × 250, en unités du livre) est glissé sous les
+  pages de droite ; sur les pages du récit, il sort par le haut, légèrement
+  penché, son bord supérieur irrégulier ; rentré, il disparaît tout entier
+  derrière la page. La page de droite ne garde plus de marge basse.
+- La bande du portrait est glissée sous les pages de gauche ET sous les deux
+  marque-pages : elle sort par le haut, le nom puis le portrait ; les
+  marque-pages restent devant et se touchent toujours.
+- grimoire.js garde 175 unités au-dessus de l'image du livre pour ce qui en
+  sort (HAUT_DES_MARQUES) : le livre ne rapetisse que si l'écran manque de
+  hauteur.
+- Le parchemin attendait parfois un nouvel événement pour sortir (la page
+  posée après son événement « flip ») : l'interface se revérifie tant que la
+  page bouge.
+
+corrections_v301.mjs (dans la suite) vérifie : la position au-dessus de la
+page droite, la taille, sous les pages, qu'on y écrit, qu'il rentre ; la
+bande au-dessus de la page gauche, derrière les marque-pages (qui se touchent)
+et la page, qu'elle rentre ; cinq tailles d'écran (tout reste dans l'écran,
+livre posé en bas) ; les versions. Il échoue sur la v300 (9 échecs).
+corrections_v300 mis à jour (positions v301).
