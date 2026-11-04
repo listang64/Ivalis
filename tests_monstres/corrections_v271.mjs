@@ -164,7 +164,8 @@ titre("2. CE QUI SE VOIT, AUX PIXELS");
   await p.waitForTimeout(900);
   const [, f2] = await analyser(await photo(), zones);
   verifier("l'anneau est rouge tout autour du médaillon", a1.part > 0.85, `${(a1.part * 100).toFixed(0)} %`);
-  verifier("la fumée rouge emplit l'essentiel de la couronne (1,1 à 1,45 rayon)", f1.part > 0.35, `${(f1.part * 100).toFixed(0)} %`);
+  // v307 : Nico, « l'animation rouge sous les tokens leaders, réduis l'opacité à 60 % » — plus pâle, moins de pixels francs.
+  verifier("la fumée rouge emplit une bonne part de la couronne (1,1 à 1,45 rayon ; v307 : à 60 %)", f1.part > 0.2, `${(f1.part * 100).toFixed(0)} %`);
   // (v287 : l'effet réduit — les langues s'arrêtent avant une fois et demie le rayon.)
   verifier("(v287) les langues, réduites, ne vont plus au-delà d'une fois et demie le rayon", bout.part < 0.05 && bout.part < f1.part, `${(bout.part * 100).toFixed(0)} %`);
   verifier("au-delà de deux rayons, plus rien", loin.part < 0.02, `${(loin.part * 100).toFixed(1)} %`);
