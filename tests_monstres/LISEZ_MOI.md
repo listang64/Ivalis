@@ -10653,3 +10653,12 @@ corrections_v319.mjs vérifie tout cela (9 échecs sur la v318).
   « + Un nouvel aventurier » plus colorée.
 
 corrections_v320.mjs vérifie les marque-pages (5 échecs sur la v319).
+
+## v321 — Le nom des marque-pages de la création en grand
+
+- Le nom occupe toute la partie visible du marque-page (de la sortie de sous la page jusqu'au
+  bout), centré, haut de 62 % du papier. Un nom trop long pour cette hauteur (« Chasseur de
+  mages », « Élémentariste ») est réduit juste assez pour tenir en largeur (ajusterNoms, refait
+  quand les écritures sont chargées). Plus de points de suspension.
+
+corrections_v321.mjs vérifie cela, en plus des marque-pages de la v320 (2 échecs sur la v320).

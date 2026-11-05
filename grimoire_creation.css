@@ -172,7 +172,9 @@ body.creation-livre #overlay-jeu-modale { display: none !important; }
   background: linear-gradient(to right, rgba(34, 17, 5, 0.7) 0, rgba(34, 17, 5, 0.7) calc(var(--bord) * 1px * var(--s, 1)),
     rgba(34, 17, 5, 0.42) calc(var(--bord) * 1px * var(--s, 1) + 1px), rgba(34, 17, 5, 0.14) calc((var(--bord) + 22) * 1px * var(--s, 1)),
     rgba(34, 17, 5, 0) calc((var(--bord) + 55) * 1px * var(--s, 1))); }
-.nom-onglet { position: relative; z-index: 1; padding-right: calc(10px * var(--s, 1)); max-width: calc(215px * var(--s, 1)); text-align: right; line-height: 1;
+.nom-onglet { position: absolute; z-index: 1; top: 0; bottom: 0; left: calc((var(--bord) + 12) * 1px * var(--s, 1)); right: calc(12px * var(--s, 1));
+  display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1; padding: 0;
   font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important;
-  font-size: calc(var(--taille) * 1px * var(--s, 1) * var(--echelle-titres, 1)); color: #1b1009; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  font-size: calc(var(--h) * 0.62px * var(--s, 1) * var(--ajuste, 1)); color: #1b1009; white-space: nowrap; }
+.nom-onglet > span { display: block; flex: none; }
 .onglet-creation.ouvert .nom-onglet { text-decoration: underline; text-underline-offset: 0.15em; text-decoration-thickness: 1px; }

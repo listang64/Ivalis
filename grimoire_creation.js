@@ -336,11 +336,13 @@ function creerOnglets() {
             const a = (droit ? (r() * 2 - 1) * 0.8 : signe * penche).toFixed(2);
             return `<button type="button" class="onglet-creation" data-cle="${echapper(s.cle)}" title="${echapper(s.nom)}"
                 style="--x:${x.toFixed(0)};--y:${y.toFixed(0)};--h:${h.toFixed(0)};--a:${a}deg;--bord:${(1765 - x).toFixed(0)};--taille:${nom === "classes" ? 23 : 28}">
-                <span class="papier-onglet">${lavis(teinteDe(s.couleur, "onglet", 0.55), "onglet-" + s.cle)}<span class="nom-onglet">${echapper(nom === "classes" ? nomAffiche(s.classe) : s.nom)}</span></span></button>`;
+                <span class="papier-onglet">${lavis(teinteDe(s.couleur, "onglet", 0.55), "onglet-" + s.cle)}<span class="nom-onglet"><span>${echapper(nom === "classes" ? nomAffiche(s.classe) : s.nom)}</span></span></span></button>`;
         }).join("")}</div>`;
     };
     onglets.innerHTML = groupe("races", sections.races, 92, 1010) + groupe("classes", sections.classes, 80, 1030);
     scene.insertBefore(onglets, livre);
+    ajusterNoms();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(ajusterNoms).catch(() => {});
     onglets.addEventListener("click", (ev) => {
         const b = ev.target.closest(".onglet-creation");
         if (!b) return;
@@ -349,10 +351,29 @@ function creerOnglets() {
         if (s) { son(); aller(s.page); }
     });
 }
+// Le nom prend toute la place du marque-page (Nico : « en plus gros, qu'il prenne
+// tout l'espace ») : la hauteur du papier d'abord, puis réduit juste assez pour
+// tenir en largeur (« Chasseur de mages »). Le rapport ne dépend pas de l'échelle
+// du livre ; on le refait quand les écritures sont chargées.
+function ajusterNoms() {
+    if (!onglets) return false;
+    let fait = true;
+    onglets.querySelectorAll(".onglet-creation").forEach(b => {
+        const n = b.querySelector(".nom-onglet"), t = n && n.firstElementChild;
+        if (!t) return;
+        b.style.setProperty("--ajuste", "1");
+        const place = n.clientWidth, long = t.offsetWidth;
+        if (!place || !long) { fait = false; return; }
+        if (long > place) b.style.setProperty("--ajuste", (place / long * 0.97).toFixed(3));
+    });
+    if (fait) onglets.dataset.ajuste = "1";
+    return fait;
+}
 function retirerOnglets() { if (onglets && onglets.parentNode) onglets.parentNode.removeChild(onglets); onglets = null; }
 // Seuls sortent les marque-pages de la partie où l'on est ; celui de la page ouverte un peu plus.
 function majOnglets() {
     if (!onglets) return;
+    if (onglets.dataset.ajuste !== "1") ajusterNoms();
     const g = G(), pf = g && g.pageFlip && g.pageFlip();
     const ici = pf ? pf.getCurrentPageIndex() : -1;
     const dans = (liste) => { const idx = liste.map(s => g.indexDe(s.page)).filter(i => i >= 0); return idx.length && ici >= Math.min(...idx) - 1 && ici <= Math.max(...idx) + 1; };
