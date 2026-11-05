@@ -243,7 +243,8 @@ console.log("\n7. LE REPOS LONG DE L'HUMAIN : PLUS DE BONUS");
   verifier("comme tout le monde : un Gob rend 35 % de 100 (30 → 65)", gob.apres === 65, `(${gob.apres})`);
 
   const creation = fs.readFileSync('/home/user/Ivalis/creation_personnage.js', 'utf-8');
-  const blocHumain = creation.slice(creation.indexOf('if (race === "Humain")'), creation.indexOf('} else if (race === "Ondari")'));
+  // v319 : les textes des peuples sont dans le tableau window.DONNEES_RACES.
+  const blocHumain = creation.slice(creation.indexOf('{ nom: "Humain"'), creation.indexOf('{ nom: "Ondari"'));
   verifier("l'écran de création annonce toujours la jauge de 110", /Fatigue de base : 110/.test(blocHumain));
   verifier("et ne promet plus rien au repos long", !/repos/i.test(blocHumain), blocHumain.match(/[^">]{0,50}repos[^"<]{0,40}/i)?.[0] || "");
   p.rendreLeHasard();

@@ -10662,3 +10662,8 @@ corrections_v320.mjs vérifie les marque-pages (5 échecs sur la v319).
   quand les écritures sont chargées). Plus de points de suspension.
 
 corrections_v321.mjs vérifie cela, en plus des marque-pages de la v320 (2 échecs sur la v320).
+
+Suite complète (v319) : en dehors des échecs connus (fichiers effets_reels absents,
+animations_en_jeu_2, v246, v251, v254, v256, v276, fabrique_sons, stats_fiche, studio_*,
+titre_preparation), seul atouts_races échouait : il cherchait le texte de l'Humain dans
+l'ancien « if (race === "Humain") » ; il le lit maintenant dans DONNEES_RACES.
