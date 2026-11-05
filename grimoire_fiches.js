@@ -151,7 +151,9 @@ function poserLesPages() {
     const g = G();
     if (!g || typeof g.definirFiches !== "function") return;
     creerPagesFiche();
-    const els = [...pagesClans, ...ORDRE_FICHE.map(c => pagesFiche[c]), ...(modeDev() ? ORDRE_DEV.map(c => pagesFiche[c]) : [])];
+    // (v319) Pendant une création, ses pages (éphémères) suivent les clans.
+    const creation = window.GRIMOIRE_CREATION && typeof window.GRIMOIRE_CREATION.pages === "function" ? window.GRIMOIRE_CREATION.pages() : [];
+    const els = [...pagesClans, ...creation, ...ORDRE_FICHE.map(c => pagesFiche[c]), ...(modeDev() ? ORDRE_DEV.map(c => pagesFiche[c]) : [])];
     const avant = g.pagesFiches();
     if (avant.length === els.length && avant.every((el, i) => el === els[i])) return;
     g.definirFiches(els);
@@ -182,7 +184,7 @@ function pageClan(c, cote, i) {
         <svg class="fleuron fleuron-clan" viewBox="0 0 200 24" aria-hidden="true">
           <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>
         ${lignes ? `<ol class="liste-aventuriers">${lignes}</ol>` : `<p class="clan-vide">Aucun aventurier pour l'instant.</p>`}
-        ${moi ? `<button type="button" class="nouvel-aventurier" data-action="fiches" data-fa="creer">+ Un nouvel aventurier</button>` : ""}
+        ${moi ? `<button type="button" class="nouvel-aventurier" data-action="fiches" data-fa="creer">${lavis({ couleurs: ["#c9772e", "#e0a046", "#a5532a"], opacite: 0.5, nom: "nouvel" }, "nouvel-" + c.id)}${cadre("nouvel-" + c.id, 1.4)}<span>+ Un nouvel aventurier</span></button>` : ""}
       </div>`;
     return el;
 }
@@ -318,7 +320,9 @@ const TEINTES_LAVIS = {
 };
 let numeroLavis = 0;
 function lavis(teinte, graine, options) {
-    const t = TEINTES_LAVIS[teinte] || TEINTES_LAVIS.gris;
+    // (v319) une teinte peut aussi venir toute faite : { couleurs, opacite, nom }.
+    const t = (teinte && typeof teinte === "object") ? teinte : (TEINTES_LAVIS[teinte] || TEINTES_LAVIS.gris);
+    if (teinte && typeof teinte === "object") teinte = teinte.nom || "perso";
     const o = options || {};
     const r = hasard("lavis-" + teinte + "-" + graine);
     const id = "filtre-lavis-" + (++numeroLavis);
@@ -1212,7 +1216,8 @@ function agir(cible) {
     if (Date.now() - dernierAppuiLong < 700) return;          // un appui long montrait une note
     const fa = cible.dataset.fa, h = herosParId(heros);
     if (fa === "heros") { son(); ouvrirHeros(cible.dataset.id); return; }
-    if (fa === "creer") { son(); if (typeof window.ouvrirCreationHero === "function") window.ouvrirCreationHero(); return; }
+    // (v319) La création se fait dans le livre (grimoire_creation.js) ; l'ancienne fenêtre en secours.
+    if (fa === "creer") { son(); if (window.GRIMOIRE_CREATION && window.GRIMOIRE_CREATION.commencer()) return; if (typeof window.ouvrirCreationHero === "function") window.ouvrirCreationHero(); return; }
     if (!h) return;
     if (fa === "carte") {
         const id = cible.dataset.id;
@@ -1379,6 +1384,9 @@ window.GRIMOIRE_FICHES = {
     herosAffiche: () => heros,
     pages: () => ({ clans: pagesClans.slice(), ...pagesFiche }),
     majPlus: () => majPlus(true),
-    // pour les bancs : les dessins
-    dessins: { jaugeCrayon, dessinBanniere, piece }
+    // pour les bancs : les dessins ; (v319) pour la création : le lavis, le cadre, la pose des pages
+    dessins: { jaugeCrayon, dessinBanniere, piece, lavis, cadre },
+    poser: () => { majPlus(true); poserLesPages(); },
+    aller: (el) => aller(el),
+    herosParId
 };

@@ -10612,3 +10612,29 @@ tentative nette reçoit maintenant son jet même l'IA en panne).
 corrections_v318.mjs vérifie tout cela (15 échecs sur la v317). Tests mis à jour : v294
 (les nouveaux prix, le cache, la TVA décochée pour comparer, les libellés), v315 (l'ordre
 des pages).
+
+## v319 — La création de personnage dans le livre
+
+- Page du clan : « + Un nouvel aventurier » encadré à la main, une aquarelle ocre dedans.
+  Le clic ouvre la création dans le livre (grimoire_creation.js / .css) ; l'ancienne
+  fenêtre reste en secours si le module manque.
+- Les pages de la création sont éphémères : insérées après les clans, retirées dès que le
+  héros est né (ou qu'on renonce, « Renoncer à ce héros » en bas de chaque page).
+- Les peuples (window.DONNEES_RACES, tiré de creation_personnage.js) : page de gauche le
+  lore, l'encart « En jeu » et l'atout, le choix Mâle / Femelle / Se cherche ; page de
+  droite vide (les images viendront). Des marque-pages aquarelle (une couleur par peuple)
+  dépassent du bord droit, pas alignés (décalage et angle tirés une fois).
+- Les classes : l'image de fond de la classe sur la double page, page de gauche estompée
+  en dégradé sous le descriptif (paliers niv. 1 / 5 / 10 à l'encre) ; « Choisir cette
+  classe », ou la raison si le peuple l'interdit. Leurs marque-pages remplacent ceux des
+  peuples (une section à la fois).
+- Le Pisteur : une double page « Votre compagnon » (nom, description, « Il me suit ») avec
+  un loup à la plume en emblème, couronné de laurier, page de droite.
+- Les champs : les blocs de l'ancienne fenêtre (Identité, Visage, Détails, Corps,
+  Apparence, Équipement, Autres) déplacés dans deux doubles pages, puis rendus à la
+  fenêtre ; la logique (champs du peuple, validation) est la même.
+- La naissance : « Donner vie à ce héros » → page de gauche la plume et la barre d'encre
+  du portrait avec les phrases ; page d'en face la répartition des caractéristiques (sans
+  « Annuler »). Validée, les pages s'effacent et la fiche du héros s'ouvre dans le livre.
+
+corrections_v319.mjs vérifie tout cela (9 échecs sur la v318).

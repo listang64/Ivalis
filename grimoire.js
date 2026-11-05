@@ -1115,6 +1115,7 @@
         const action = cible.dataset.action;
         // (v313) Les pages des Aventuriers ont leurs propres gestes (grimoire_fiches.js).
         if (action === "fiches") { if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.agir(cible); return; }
+        if (action === "creation") { if (window.GRIMOIRE_CREATION) window.GRIMOIRE_CREATION.agir(cible); return; }
         // (v312) Le marque-page du menu : la page principale (le journal), en partie ou non.
         if (action === "marque-menu") {
             if (!pageFlip || !ouvert) return;

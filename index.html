@@ -20,7 +20,8 @@
   <link rel="stylesheet" href="grimoire_recit.css?v=14">
   <link rel="stylesheet" href="grimoire_carte.css?v=2">
   <link rel="stylesheet" href="grimoire_regions.css?v=3">
-  <link rel="stylesheet" href="grimoire_fiches.css?v=5">
+  <link rel="stylesheet" href="grimoire_fiches.css?v=6">
+  <link rel="stylesheet" href="grimoire_creation.css?v=2">
 
  
   <!-- ===================================================================== -->
@@ -2466,7 +2467,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=223"></script>
+<script src="trace_combat.js?v=224"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2476,7 +2477,7 @@
 <!-- LE GRIMOIRE (v297) : StPageFlip 2.0.7 (MIT, dans vendor/), puis le livre -->
 <script src="vendor/page-flip/page-flip.browser.js?v=2.0.7"></script>
 <script src="police_titres.js?v=1"></script>
-<script src="grimoire.js?v=17"></script>
+<script src="grimoire.js?v=18"></script>
 <!-- LES DÉPENSES DU MJ (v293) : tokens et coût en euros de chaque réponse -->
 <script src="depenses_ia.js?v=4"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
@@ -2540,7 +2541,8 @@
 <!-- LA CARTE DU MONDE DANS LE GRIMOIRE (v302) : sa double page, ses zones (DEV). -->
 <script type="module" src="grimoire_carte.js?v=4"></script>
 <script src="grimoire_regions.js?v=6"></script>
-<script type="module" src="grimoire_fiches.js?v=5"></script>
+<script type="module" src="grimoire_fiches.js?v=6"></script>
+<script type="module" src="grimoire_creation.js?v=2"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=4"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région et son titre (plus de nuages dessus, v286). -->
@@ -2579,7 +2581,7 @@
 <script src="talents.js?v=5"></script>
 <!-- Les blessures : la table et ses règles (script simple), puis l'écran. -->
 <script src="blessures.js?v=2"></script>
-<script type="module" src="creation_personnage.js?v=26"></script>
+<script type="module" src="creation_personnage.js?v=27"></script>
 <script type="module" src="classes.js?v=27"></script>
 <script type="module" src="recit_dynamique.js?v=7"></script>
 <script type="module" src="competences.js?v=69"></script>

@@ -1,0 +1,171 @@
+/* =========================================================================
+   v319 — LA CRÉATION D'UN HÉROS DANS LE LIVRE (grimoire_creation.js)
+   Les peuples, les classes (leur image en double page), le compagnon du
+   Pisteur, les champs, la naissance ; les marque-pages du bord droit.
+   --u : 1 % d'une page.
+   ========================================================================= */
+
+/* Pendant la création dans le livre, les anciennes fenêtres restent cachées
+   (leurs champs et leurs boutons sont rangés dans les pages). */
+body.creation-livre #ecran-selection-race, body.creation-livre #ecran-choix-classe, body.creation-livre #fenetre-compagnon,
+body.creation-livre #modale-creation-hero, body.creation-livre #ecran-chargement-ia, body.creation-livre #modale-creation-caracs,
+body.creation-livre #overlay-jeu-modale { display: none !important; }
+
+/* LES TEXTES */
+.page-texte-creation { gap: calc(var(--u) * 1.4) !important; }
+.sur-titre-creation { font-size: calc(var(--u) * 2.6); letter-spacing: 0.14em; text-transform: uppercase; color: #6b4a2b; }
+.sur-titre-creation span { letter-spacing: 0.04em; text-transform: none; font-style: italic; }
+.titre-creation { margin: 0; font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important;
+  font-size: calc(var(--u) * 7.4 * var(--echelle-titres, 1)); color: #24150a; line-height: 1.05; }
+.fleuron-creation { width: 42%; height: auto; align-self: flex-start; margin: calc(var(--u) * -0.4) 0 calc(var(--u) * 0.6); }
+.lore-creation { margin: 0; font-size: calc(var(--u) * 3.4); line-height: 1.45; text-align: justify; color: #2b1a0e; }
+.encart-creation { position: relative; isolation: isolate; padding: calc(var(--u) * 2) calc(var(--u) * 2.6); }
+.encart-creation > .cadre-main { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.titre-encart-creation { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 4 * var(--echelle-titres, 1)); color: #3a2210; margin-bottom: calc(var(--u) * 0.6); }
+.gameplay-creation { font-size: calc(var(--u) * 3.1); line-height: 1.4; color: #2b1a0e; }
+.gameplay-creation .atout-race { margin-top: calc(var(--u) * 1.2); padding-top: calc(var(--u) * 1); border-top: 1px dotted rgba(43, 26, 14, 0.45); font-style: italic; font-size: 1em !important; line-height: 1.4 !important; }
+.gameplay-creation .atout-race span { color: #6b1a10 !important; font-style: normal; }
+.consigne-creation { font-size: calc(var(--u) * 3.2); color: #3a2210; margin-bottom: calc(var(--u) * 1); }
+.choix-genre-creation { margin-top: calc(var(--u) * 1); }
+.boutons-genre { display: flex; gap: calc(var(--u) * 2); flex-wrap: wrap; }
+
+/* LES BOUTONS À L'ENCRE : un cadre tracé à la main, un voile doré quand on l'a choisi. */
+.page-creation .bouton-encre { position: relative; isolation: isolate; padding: calc(var(--u) * 1.2) calc(var(--u) * 3.2) !important; font-size: calc(var(--u) * 3.4) !important;
+  color: #24150a !important; border-radius: 4px; transition: transform 0.15s ease, background 0.25s ease; }
+.page-creation .bouton-encre > .cadre-main { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.page-creation .bouton-encre:hover { background: radial-gradient(ellipse at 50% 50%, rgba(196, 154, 98, 0.22), transparent 75%); }
+.page-creation .bouton-encre:active { transform: scale(0.97); }
+.page-creation .bouton-encre.choisi { background: radial-gradient(ellipse at 50% 50%, rgba(220, 170, 60, 0.42), rgba(220, 170, 60, 0.08) 75%); font-weight: 700; }
+.page-creation .bouton-encre.grand { font-size: calc(var(--u) * 3.8) !important; align-self: center; margin-top: calc(var(--u) * 1); }
+.renoncer-creation { margin-top: auto !important; align-self: flex-start; font-size: calc(var(--u) * 2.7) !important; color: #6b4a2b !important; }
+.page-race-vide { }
+
+/* LES CLASSES : l'image de fond sur toute la double page ; à gauche, voilée en
+   dégradé sous le texte (presque effacée au bord, entière vers la pliure). */
+.page-classe { overflow: hidden; }
+.fond-classe { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.fond-classe img { position: absolute; top: 0; height: 100%; width: 200%; max-width: none; object-fit: cover; }
+.fond-classe.gauche img { left: 0; }
+.fond-classe.droite img { left: -100%; }
+.fond-classe.gauche { -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.07) 0%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%);
+  mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.07) 0%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%); }
+.fond-classe.droite { -webkit-mask-image: linear-gradient(to right, #000 0%, #000 88%, rgba(0, 0, 0, 0.75) 100%); mask-image: linear-gradient(to right, #000 0%, #000 88%, rgba(0, 0, 0, 0.75) 100%); }
+.page-classe .contenu-page { z-index: 1; }
+.page-texte-classe { padding-right: calc(var(--u) * 12) !important; }
+.descriptif-creation { font-size: calc(var(--u) * 2.65); line-height: 1.32; color: #24150a; }
+.descriptif-creation .descriptif-classe-presentation { margin: 0 0 calc(var(--u) * 1.4); text-align: justify; }
+.descriptif-creation .paliers-classe { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(var(--u) * 0.6); }
+.descriptif-creation .palier-classe { display: flex; gap: calc(var(--u) * 1.6); align-items: baseline; }
+.descriptif-creation .palier-classe-niveau { flex: none; font-size: 0.8em; color: #6b1a10; font-weight: 700; min-width: 3.6em; }
+.descriptif-creation .palier-classe-titre { font-weight: 700; color: #24150a !important; }
+.descriptif-creation .palier-classe-points { margin: calc(var(--u) * 0.3) 0 0; padding-left: 1.1em; font-size: 0.92em; color: #3a2414; }
+.descriptif-creation * { text-shadow: none !important; background: none !important; }
+/* Le style.css habille ces blocs pour l'ancien écran (texte clair sur fond
+   sombre, boîtes dorées) : dans le livre, de l'encre sur le papier. */
+.descriptif-creation .descriptif-classe-presentation { color: #24150a !important; font-style: normal !important; text-align: justify !important; font-size: 1em !important; line-height: 1.38 !important; }
+.descriptif-creation .palier-classe { flex-direction: row !important; align-items: baseline !important; text-align: left !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; }
+.descriptif-creation .palier-classe-niveau { padding: 0 !important; border-radius: 0 !important; box-shadow: none !important; min-width: 3.6em !important; text-align: left !important; font-size: 0.8em !important; color: #6b1a10 !important; letter-spacing: 0.5px !important; }
+.descriptif-creation .palier-classe-titre { font-size: 1em !important; color: #24150a !important; letter-spacing: 0 !important; }
+.descriptif-creation .palier-classe-points { list-style: disc !important; padding-left: 1.1em !important; font-size: 0.92em !important; color: #3a2414 !important; }
+.descriptif-creation .palier-classe-points li { color: #3a2414 !important; }
+.choix-classe-creation { display: flex; justify-content: center; }
+.classe-bloquee { margin: 0; font-style: italic; color: #6b1a10; font-size: calc(var(--u) * 3.1); }
+
+/* LE COMPAGNON */
+.champ-creation { display: flex; flex-direction: column; gap: calc(var(--u) * 0.6); font-size: calc(var(--u) * 3); color: #5c3a21; }
+.champ-creation input, .champ-creation textarea { background: transparent; border: 0; border-bottom: 1px solid #2b1a0e; color: #1b1009; outline: none;
+  font-size: calc(var(--u) * 3.5) !important; padding: calc(var(--u) * 0.6) 0; resize: none; }
+.champ-creation textarea { border: 1px solid rgba(43, 26, 14, 0.5); border-radius: 3px; padding: calc(var(--u) * 1); line-height: 1.35;
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(1.35em - 1px), rgba(60, 35, 15, 0.18) calc(1.35em - 1px), rgba(60, 35, 15, 0.18) 1.35em); }
+.erreur-creation { margin: 0; min-height: 1.2em; color: #6b1a10; font-style: italic; font-size: calc(var(--u) * 3); }
+.page-embleme { align-items: center !important; justify-content: center; }
+.embleme-loup { width: 74%; height: auto; overflow: visible; }
+.embleme-loup path, .embleme-loup circle, .embleme-loup ellipse { fill: none; stroke: #1b1009; stroke-linecap: round; stroke-linejoin: round; }
+.embleme-loup .anneau { stroke-width: 1.6; } .embleme-loup .anneau.fin { stroke-width: 0.7; opacity: 0.6; }
+.embleme-loup .tete { stroke-width: 2.2; fill: rgba(120, 90, 60, 0.08); }
+.embleme-loup .oreille { stroke-width: 1.2; fill: rgba(27, 16, 9, 0.12); }
+.embleme-loup .oeil { stroke-width: 1.4; fill: rgba(196, 140, 40, 0.25); }
+.embleme-loup .pupille, .embleme-loup .truffe { fill: #1b1009; stroke: none; }
+.embleme-loup .trait, .embleme-loup .poil { stroke-width: 1.1; }
+.embleme-loup .hachure { stroke-width: 0.7; opacity: 0.7; }
+.embleme-loup .feuille-laurier { stroke-width: 0.9; fill: rgba(80, 100, 40, 0.18); }
+.embleme-loup .etoile { stroke-width: 1; fill: rgba(196, 150, 40, 0.35); }
+.devise-compagnon { margin: calc(var(--u) * 2) 0 0; font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 4.4 * var(--echelle-titres, 1)); color: #3a2210; text-align: center; }
+
+/* LES CHAMPS À REMPLIR (les blocs de l'ancienne fenêtre, posés sur le papier) */
+.page-formulaire-creation { gap: calc(var(--u) * 1.2) !important; }
+.blocs-creation { display: flex; flex-direction: column; gap: calc(var(--u) * 2.4); }
+.page-creation .bloc-formulaire { background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: auto !important; }
+.page-creation .bloc-formulaire h4 { margin: 0 0 calc(var(--u) * 1) !important; font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important;
+  font-size: calc(var(--u) * 4.6 * var(--echelle-titres, 1)) !important; color: #24150a !important; border-bottom: 1px solid rgba(43, 26, 14, 0.45) !important; text-align: left !important; background: none !important; }
+.page-creation .champ-formulaire { display: flex; flex-direction: column; gap: calc(var(--u) * 0.3); margin-bottom: calc(var(--u) * 1.2) !important; }
+.page-creation .champ-formulaire label { font-size: calc(var(--u) * 2.7) !important; color: #6b4a2b !important; letter-spacing: 0.06em; text-align: left; }
+.page-creation .input-perso { background: transparent !important; background-color: transparent !important; border: 0 !important; border-bottom: 1px solid #2b1a0e !important;
+  border-radius: 0 !important; box-shadow: none !important; color: #1b1009 !important; font-size: calc(var(--u) * 3.4) !important; padding: calc(var(--u) * 0.5) 0 !important;
+  width: 100% !important; opacity: 1 !important; outline: none; }
+.page-creation select.input-perso { -webkit-appearance: none; appearance: none; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, #2b1a0e 50%), linear-gradient(135deg, #2b1a0e 50%, transparent 50%) !important;
+  background-position: calc(100% - 1em) 55%, calc(100% - 0.6em) 55% !important; background-size: 0.4em 0.4em, 0.4em 0.4em !important; background-repeat: no-repeat !important; }
+.page-creation select.input-perso:disabled { cursor: default; color: #5c3a21 !important; background-image: none !important; font-style: italic; }
+.page-creation input[type="color"].input-perso { width: calc(var(--u) * 12) !important; height: calc(var(--u) * 6) !important; border: 1px solid #2b1a0e !important; border-radius: 4px !important; padding: 2px !important; cursor: pointer; }
+.actions-creation { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 1.4); margin-top: calc(var(--u) * 2); }
+.dev-creation { color: #8b1a10 !important; font-size: calc(var(--u) * 2.8) !important; }
+
+/* LA NAISSANCE : le portrait qui se dessine, puis la répartition */
+.page-naissance .contenu-page { gap: calc(var(--u) * 1.6) !important; }
+.plume-naissance { width: calc(var(--u) * 14); height: calc(var(--u) * 14); align-self: center; margin: calc(var(--u) * 3) 0 calc(var(--u) * 1); overflow: visible; }
+.plume-naissance path { fill: none; stroke: #120b06; stroke-width: 1.6; stroke-linecap: round; }
+.plume-naissance path.plein { fill: rgba(18, 11, 6, 0.12); }
+.page-naissance.en-cours .plume-naissance { animation: plume-ecrit 1.6s ease-in-out infinite; }
+@keyframes plume-ecrit { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 25% { transform: translate(6%, 2%) rotate(-4deg); } 50% { transform: translate(-4%, 4%) rotate(3deg); } 75% { transform: translate(5%, 1%) rotate(-2deg); } }
+.attente-naissance { display: flex; flex-direction: column; align-items: stretch; gap: calc(var(--u) * 1.6); }
+.page-creation #barre-progression-creation { position: relative !important; width: 100% !important; height: calc(var(--u) * 3.6) !important; margin: 0 !important; background: none !important;
+  border: 1.5px solid #1b1009 !important; border-radius: 40% 46% 42% 48% / 50% 44% 52% 46% !important; box-shadow: none !important; overflow: hidden; left: auto !important; bottom: auto !important; transform: none !important; }
+.page-creation #barre-progression-creation-remplissage { height: 100% !important; border-radius: 0 !important; box-shadow: none !important;
+  background: repeating-linear-gradient(115deg, rgba(60, 60, 58, 0.75) 0, rgba(60, 60, 58, 0.75) 2px, rgba(60, 60, 58, 0.15) 2px, rgba(60, 60, 58, 0.15) 6px) !important; }
+.page-creation #phrase-humoristique-creation { position: static !important; transform: none !important; text-align: center; font-style: italic; color: #3a2414 !important;
+  font-size: calc(var(--u) * 3.2) !important; text-shadow: none !important; background: none !important; width: auto !important; max-width: none !important; min-height: 3em; transition: opacity 0.4s ease; }
+.note-naissance { margin: 0; text-align: center; font-style: italic; color: #6b4a2b; font-size: calc(var(--u) * 2.9); }
+.page-naissance:not(.en-cours) .attente-naissance { opacity: 0.35; }
+.page-naissance.fini .note-naissance { color: #1b6e3a; }
+.repartition-creation { display: none; flex-direction: column; gap: calc(var(--u) * 1.2); }
+.page-naissance.pret .repartition-creation { display: flex; }
+.page-naissance.pret .invite-caracs { display: none; }
+.page-creation .repartition-creation h2 { margin: 0 !important; font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 6.6 * var(--echelle-titres, 1)) !important; color: #24150a !important; }
+.page-creation .repartition-creation > div { background: none !important; border-color: rgba(43, 26, 14, 0.4) !important; color: #2b1a0e !important; font-size: calc(var(--u) * 3.2) !important; margin-bottom: calc(var(--u) * 0.6) !important; }
+.page-creation .repartition-creation .ligne-creation-carac { border-bottom: 1px dotted rgba(43, 26, 14, 0.35); padding-bottom: calc(var(--u) * 0.6); }
+.page-creation .repartition-creation .btn-plus-moins { background: none !important; border: 1px solid #2b1a0e !important; color: #1b1009 !important; border-radius: 50% !important; box-shadow: none !important; }
+.page-creation .repartition-creation .aide-carac-creation { font-size: 0.82em; color: #5c3a21 !important; }
+.page-creation .repartition-creation .aide-carac-effet { background: none !important; border: 1px solid rgba(43, 26, 14, 0.35) !important; color: #3a2414 !important; }
+.page-creation .repartition-creation .groupe-boutons .btn-modale:not(#btn-valider-caracs) { display: none !important; }
+.page-creation .repartition-creation #btn-valider-caracs { background: none !important; border: 1.5px solid #1b1009 !important; color: #1b1009 !important; box-shadow: none !important;
+  font-size: calc(var(--u) * 3.8) !important; padding: calc(var(--u) * 1) calc(var(--u) * 4) !important; border-radius: 40% 46% 42% 48% / 50% 44% 52% 46% !important; }
+
+/* « + UN NOUVEL AVENTURIER » (Nico : « un peu mieux, en encadré, avec une aquarelle de couleur dedans ») */
+.page-fiches .nouvel-aventurier { font-size: calc(var(--u) * 4) !important; position: relative; isolation: isolate; text-decoration: none !important; padding: calc(var(--u) * 1.8) calc(var(--u) * 4.4) !important;
+  font-size: calc(var(--u) * 3.8) !important; color: #24150a !important; transition: transform 0.15s ease; }
+.page-fiches .nouvel-aventurier > .cadre-main { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.page-fiches .nouvel-aventurier > .lavis { left: -2%; top: -6%; width: 104%; height: 112%; }
+.page-fiches .nouvel-aventurier:hover { transform: rotate(-0.8deg) scale(1.03); }
+
+/* LES MARQUE-PAGES DU BORD DROIT : glissés sous les pages, ils dépassent sur
+   la tranche ; ceux de la partie ouverte sortent, celui de la page ouverte un peu plus. */
+.onglets-creation { position: absolute; inset: 0; pointer-events: none; }
+.onglet-creation { position: absolute; left: calc(var(--x) * 1px * var(--s, 1)); top: calc(var(--y) * 1px * var(--s, 1));
+  width: calc(205px * var(--s, 1)); height: calc(var(--h) * 1px * var(--s, 1)); padding: 0; border: 0; background: transparent; cursor: pointer;
+  transform: translateX(calc(-190px * var(--s, 1))) rotate(var(--a)); opacity: 0; pointer-events: none;
+  transition: transform 0.5s cubic-bezier(0.45, 0.05, 0.25, 1), opacity 0.4s ease;
+  filter: drop-shadow(calc(var(--u) * 0.2) calc(var(--u) * 0.35) calc(var(--u) * 0.4) rgba(40, 20, 6, 0.5)); touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.groupe-onglets.sorti .onglet-creation { transform: translateX(0) rotate(var(--a)); opacity: 1; pointer-events: auto; }
+.groupe-onglets.sorti .onglet-creation.ouvert { transform: translateX(calc(18px * var(--s, 1))) rotate(var(--a)); }
+.groupe-onglets.sorti .onglet-creation:hover { transform: translateX(calc(10px * var(--s, 1))) rotate(var(--a)); }
+.papier-onglet { position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; isolation: isolate; overflow: hidden;
+  background: url('images/grimoire/page.webp?v=1') 50% 50% / 600% auto, #e2cfa4;
+  box-shadow: inset 0 0 calc(var(--u) * 0.8) rgba(92, 54, 18, 0.45);
+  border-radius: 0 calc(var(--h) * 0.18px * var(--s, 1)) calc(var(--h) * 0.18px * var(--s, 1)) 0;
+  clip-path: polygon(0 0, 97% 0, 100% 12%, 99.5% 50%, 100% 88%, 97% 100%, 0 100%); }
+.papier-onglet > .lavis { left: 0; top: 0; width: 100%; height: 100%; z-index: 0; }
+.nom-onglet { position: relative; z-index: 1; padding-right: calc(10px * var(--s, 1)); max-width: calc(170px * var(--s, 1)); text-align: right; line-height: 1;
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important;
+  font-size: calc(var(--taille) * 1px * var(--s, 1) * var(--echelle-titres, 1)); color: #1b1009; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.onglet-creation.ouvert .nom-onglet { text-decoration: underline; text-underline-offset: 0.15em; text-decoration-thickness: 1px; }
