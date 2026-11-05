@@ -212,7 +212,7 @@ await section(async () => {
     const a = document.getElementById("grimoire-marque-page").getBoundingClientRect(), b = document.getElementById("grimoire-marque-recit");
     const rb = b.getBoundingClientRect();
     return { existe: !!b, actif: !b.classList.contains("inactif"), decale: rb.left - a.left, angleA: getComputedStyle(document.getElementById("grimoire-marque-page")).transform, angleB: getComputedStyle(b).transform,
-             plume: !!b.querySelector("svg.dessin-marque path.feuille"), haut: rb.top };
+             plume: !!b.querySelector("svg.dessin-marque path.feuille, svg.dessin-marque path.plein"), haut: rb.top };   // (v318 : la plume du papier d'écriture)
   });
   verifier("un second marque-page, à la plume, un peu décalé du premier", m.existe && m.plume && m.decale > 20 && m.decale < 120, `${m.decale.toFixed(0)} px plus loin`);
   verifier("… penché de l'autre côté, allumé en partie", angleDe(m.angleB) > 2 && angleDe(m.angleA) < -2 && m.actif, `${angleDe(m.angleB).toFixed(1)}°`);
