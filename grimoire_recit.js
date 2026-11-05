@@ -425,9 +425,11 @@ function htmlCroquis(para) {
     const place = "milieu"; r();
     const neuf = !etat.croquisVus.has(para.e);
     if (neuf) setTimeout(() => etat.croquisVus.add(para.e), 4000);
-    const largeur = Math.round(Math.max(20, Math.min(90, (Number(im.Taille) || 0.6) * 100)));
+    // (v328, Nico : « l'image du récit, en taille fixe : la moitié d'une page, centrée ;
+    // s'il n'y a pas la place, elle se dessine sur la page suivante ») : un cadre
+    // d'une demi-page de haut (grimoire_recit.css), l'image centrée dedans.
     const penche = ((r() * 2 - 1) * 2.2).toFixed(1);
-    return `<figure class="croquis-recit place-${place}${neuf ? " neuf" : ""}" data-e="${echapper(para.e)}" style="width:${largeur}%;aspect-ratio:${Number(im.Ratio) || 1};--penche:${penche}deg">`
+    return `<figure class="croquis-recit demi-page place-${place}${neuf ? " neuf" : ""}" data-e="${echapper(para.e)}" style="--penche:${penche}deg">`
         + `<img src="${echapper(im.Url)}" alt="" draggable="false"></figure>`;
 }
 function htmlPortraitPleinePage(para) {
@@ -448,8 +450,8 @@ function paginer(entrees) {
     const vide = () => !boite.querySelector(".para-recit");
     const fermer = () => { pages.push(boite.innerHTML); j++; boite = boiteDeMesure(j % 2 === 0); boite.innerHTML = ""; };
     for (const para of paragraphesDuChapitre(entrees)) {
-        // (v314) LES IMAGES : le croquis suit le texte (sur la page suivante s'il n'y tient
-        // pas, plus petit s'il ne tient sur aucune) ; le portrait d'un PNJ prend une page entière.
+        // (v314) LES IMAGES : le croquis suit le texte (v328 : toujours une demi-page ;
+        // sur la page suivante s'il n'y tient pas) ; le portrait d'un PNJ prend une page entière.
         if (para.image) {
             if (para.type === "portrait") {
                 if (boite.innerHTML.trim()) fermer();          // toujours une page à lui
@@ -465,8 +467,6 @@ function paginer(entrees) {
                 boite.removeChild(fig);
                 if (!vide() || boite.querySelector("figure")) fermer();
                 boite.appendChild(fig);
-                let t = parseFloat(fig.style.width) || 60;
-                while (deborde() && t > 20) { t -= 6; fig.style.width = t + "%"; }
             }
             continue;
         }

@@ -230,12 +230,13 @@ await section(async () => {
   for (let k = 0; k < 4; k++) msgs.push({ idDoc: "c" + k, ID_Partie: "P1", Auteur_ID: "MJ", Auteur_Nom: "MJ", Est_Narration_IA: true, Texte: `Le moment ${k + 1} : la route continue, et quelque chose arrive.`, Timestamp: 1000 + k * 10, Illustration: ill(k) });
   await relayer(msgs, true);
   await p.waitForTimeout(900);
-  const r = await p.evaluate(() => [...document.querySelectorAll(".page-recit .croquis-recit")].map(f => {
+  // (v328 : une demi-page chacun, ils s'étalent sur plusieurs doubles pages : on mesure ceux qu'on voit)
+  const r = await p.evaluate(() => [...document.querySelectorAll(".page-recit .croquis-recit")].filter(f => f.offsetWidth > 0 && f.getBoundingClientRect().width > 0).map(f => {
     const c = f.closest(".contenu-page"), rc = c.getBoundingClientRect(), rf = f.getBoundingClientRect(), st = getComputedStyle(c);
     const gauche = rc.left + parseFloat(st.paddingLeft), droite = rc.right - parseFloat(st.paddingRight);
     return { classe: f.className, ecart: Math.round(((rf.left + rf.right) / 2 - (gauche + droite) / 2) / Math.max(1, droite - gauche) * 1000) / 10 };
   }));
-  verifier(`chaque croquis est au milieu de la page (${r.length} croquis)`, r.length >= 3 && r.every(x => /place-milieu/.test(x.classe) && Math.abs(x.ecart) <= 2.5), JSON.stringify(r));
+  verifier(`chaque croquis est au milieu de la page (${r.length} croquis visibles)`, r.length >= 2 && r.every(x => /place-milieu/.test(x.classe) && Math.abs(x.ecart) <= 2.5), JSON.stringify(r));
   await cap("v318_croquis");
 });
 

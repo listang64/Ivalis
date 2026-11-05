@@ -10774,3 +10774,18 @@ v325 remettent à zéro le compteur de la partie ouverte.
 
 corrections_v327.mjs vérifie tout cela (10 échecs sur la v326). v268, v278, v279, v280, v287,
 v309 repassent.
+
+## v328 — L'image du récit en taille fixe : une demi-page
+
+- Nico : « l'image créée pour le récit, en taille fixe : la moitié d'une page, centrée ; s'il
+  n'y a pas la place, elle se dessine sur la page suivante ».
+- Le croquis est un cadre d'une demi-page de haut (65 unités sur 130, toute la largeur du
+  texte) ; l'image y est centrée dans les deux sens (object-fit: contain), qu'elle soit en
+  paysage ou carrée. La « Taille » tirée au hasard ne compte plus.
+- La mise en page : s'il ne tient pas sous le texte, il passe en haut de la page suivante, à
+  sa taille (on ne le rétrécit plus).
+
+corrections_v328.mjs le vérifie (deux croquis, puis quatorze longueurs de texte : toujours
+une demi-page, poussé sur la page suivante quand la place manque, jamais coupé ; 2 échecs sur
+la v327). Test mis à jour : v318 (les croquis s'étalent sur plusieurs doubles pages : on mesure
+ceux qu'on voit).

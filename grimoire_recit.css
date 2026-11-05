@@ -337,6 +337,10 @@
    page à la suite du texte ; elle monte dans le papier la première fois. Le
    portrait d'un PNJ nouveau tient une page entière, son nom dessous. */
 .croquis-recit { display: block; margin: calc(var(--u) * 1.6) auto calc(var(--u) * 1.2); padding: 0; transform: rotate(var(--penche, 0deg)); }
+/* v328 : une taille fixe, la moitié d'une page (la page fait 130 unités de haut :
+   65), sur toute la largeur du texte ; l'image centrée dedans, dans les deux sens. */
+.croquis-recit.demi-page { flex: none; width: 100%; height: calc(var(--u) * 65); display: flex; align-items: center; justify-content: center; }
+.croquis-recit.demi-page img { width: 100%; height: 100%; object-fit: contain; object-position: center center; }
 .croquis-recit.place-gauche { margin-left: 0; }
 .croquis-recit.place-droite { margin-right: 0; }
 .croquis-recit img, .portrait-pleine-page img { display: block; width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; filter: sepia(0.25) contrast(1.05); }
