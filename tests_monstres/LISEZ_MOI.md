@@ -10753,3 +10753,24 @@ blanc au lieu du magenta), v315 (le décor « seulement ce que le moment demande
 
 corrections_v326.mjs vérifie tout cela (11 échecs sur la v325). Tests mis à jour : v318, v323,
 v325 remettent à zéro le compteur de la partie ouverte.
+
+## v327 — Les renforts sont des alliés des ennemis du récit
+
+- Nico : « les personnages qui arrivent en renfort (le soutien) doivent être cohérents : des
+  ennemis alliés à l'ennemi du récit ».
+- MIA_ENNEMIS (combat_rp.js) : les idées de renforts sont TOUTES des alliés des ennemis du
+  récit venus les aider (leur bande, leurs gardes, leurs bêtes, leurs mercenaires), jamais un
+  passant, un neutre ou un hostile à eux ; au moins une idée de soutien de leur camp ; chacune
+  avec "lien" (pourquoi elle est de leur côté).
+- L'habillage : la même règle ; un SOUTIEN est le soutien DE CETTE BANDE (guérisseur, chaman,
+  prêtre, porte-étendard, sonneur de cor ; pour une meute, une bête de la meute) ; chaque
+  renfort garde son "lien" (creature.lien).
+- Sans habillage (l'IA en panne), un renfort prend une des idées de renforts du récit (nom,
+  apparence, lien) au lieu de « Soigneur 7 ».
+- Plus de cinq visuels : le visuel en trop prend celui d'une créature du même rôle (un soutien
+  ne prend plus le dessin d'un molosse), sinon le premier.
+- MIA_BESTIAIRE (monstres.js, les renforts et pièges en combat) : la même règle, et le rôle
+  SOUTIEN décrit comme le soutien de cette bande.
+
+corrections_v327.mjs vérifie tout cela (10 échecs sur la v326). v268, v278, v279, v280, v287,
+v309 repassent.

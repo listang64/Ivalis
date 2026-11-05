@@ -976,7 +976,7 @@ const NOMS_SECOURS = {
 const AMBIANCE_ARCHETYPES = {
     "DPS CAC":           "guerrier ou bête féroce au corps à corps, rapide et agressif",
     "TANK CAC":          "créature massive et résistante qui encaisse (ours, golem, colosse...)",
-    "SOUTIEN":           "soigneur ou soutien du groupe (chaman, oracle, prêtre corrompu...)",
+    "SOUTIEN":           "soutien DE CETTE BANDE ennemie (son guérisseur, son chaman, son prêtre, son porte-étendard, son sonneur de cor...)",
     "DPS MAGE CAC":      "combattant magique de mêlée (moine élémentaire, lame enchantée...)",
     "DPS DISTANCE":      "tireur à distance (archer, frondeur, lanceur de javelots — v312 : jamais d'arbalète, l'Antiquité n'en a pas)",
     "DPS MAGE DISTANCE": "lanceur de sorts à distance (mage noir, nécromancien, invocateur...)"
@@ -1045,6 +1045,7 @@ ${recit ? `\nLE COMBAT EN COURS, DANS LE RÉCIT : ${recit}` : ""}${deja.length ?
 
 RÈGLES :
 - Ce sont des gens ou des bêtes de CE monde : un peuple d'Elyria (selon la région, et le récit s'il y en a un), ou une bête de la faune locale ou de la mythologie. S'il y a déjà des ennemis sur le terrain ou un combat du récit, les nouveaux sont de LEUR bande (même peuple, même cause).
+- (v327) LES RENFORTS SONT DES ALLIÉS DES ENNEMIS : ils arrivent pour aider ceux qui sont déjà sur le terrain (ou les adversaires du récit) — compagnons de leur bande, leurs gardes, leurs bêtes, leurs mercenaires. Jamais un passant, un innocent, un être neutre ou hostile à eux. Un SOUTIEN est le soutien DE CETTE BANDE (« Guérisseuse des esclavagistes », « Chamane de la meute »), jamais un soigneur neutre ou d'un autre camp ; pour une meute de bêtes, une bête de la même meute (le vieux mâle qui hurle).
 - Le nom dit qui il est : son peuple, sa bande ou son métier (« Frondeur gob », « Hoplite de la Cendre », « Esclavagiste d'Arcaï »), ou un nom propre de son peuple avec un surnom. Jamais de nom médiéval ou de jeu vidéo générique (gobelin, troll, arbalétrier, chevalier, « Ombre sanglante »).
 - Le nom colle au rôle indiqué (un TANK est massif ; un DPS MAGE DISTANCE est un lanceur de sorts…).
 - 1 à 3 mots maximum, en français, sans numéro ni chiffre.

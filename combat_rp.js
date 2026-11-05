@@ -616,9 +616,9 @@ LE MONDE (v287) — tu reçois l'univers, les peuples et la région :
 - L'APPARENCE D'UN PEUPLE (v309) : quand un peuple a une APPARENCE dans la liste (le Grimoire des Races), la description physique la suit fidèlement (peau, traits, taille, signes du peuple), puis y ajoute ce qui est propre à cet individu. Jamais l'apparence d'une race d'un autre univers.
 - LE NOM DIT QUI ILS SONT DANS LE RÉCIT : le nom que le récit leur donne ; sinon leur bande, leur peuple, leur métier ou leur fonction dans l'histoire (« Contrebandier gob », « Mercenaire de la Cendre », « Garde du Concordia »), ou un vrai nom propre de leur peuple avec un surnom (« Draxos le Balafré »). Jamais un nom de bestiaire générique sans lien avec le récit (« Ombre sanglante », « Brute », « Guerrier noir »).
 - Si l'un d'eux est un des PNJ NOMMÉS listés, recopie son nom EXACT dans "pnj" (sinon laisse vide) et reprends son apparence.
-- "renforts" : 2 à 4 idées de renforts plausibles pour CET affrontement (des compagnons de la même bande, des gardes appelés, des bêtes du lieu…), chacune avec un nom et une description physique.
+- "renforts" : 2 à 4 idées de renforts pour CET affrontement. (v327) Ce sont TOUS des ALLIÉS DES ENNEMIS DU RÉCIT qui viennent LES aider : des compagnons de la même bande restés en arrière et alertés par le bruit, des gardes de leur camp appelés à l'aide, leurs bêtes de guerre ou de chasse (les molosses des chasseurs d'esclaves), leur réserve, leurs mercenaires. Jamais un passant, un innocent, une créature neutre ou hostile aux ennemis, ni une bête sauvage sans lien avec eux (sauf si les ennemis SONT des bêtes : alors d'autres bêtes de la même meute ou du même nid). Au moins une idée de SOUTIEN de leur camp (leur guérisseur, leur chaman, leur porte-étendard, leur sonneur de cor, leur dresseur). Chacune avec un nom, une description physique, et "lien" : en une phrase, pourquoi elle est du côté des ennemis (« la sœur du capitaine, guérisseuse de la bande, accourue à son cri »).
 
-Réponds UNIQUEMENT en JSON : {"nombre": 2, "ennemis": [{"nom": "...", "description_physique": "...", "pnj": ""}], "renforts": [{"nom": "...", "description_physique": "..."}]}`;
+Réponds UNIQUEMENT en JSON : {"nombre": 2, "ennemis": [{"nom": "...", "description_physique": "...", "pnj": ""}], "renforts": [{"nom": "...", "description_physique": "...", "lien": "..."}]}`;
 
 const PROMPT_HABILLAGE = `Tu es MIA_ENNEMIS, l'IA qui habille les créatures d'un combat tactique (Antique Fantastique). Le tirage des apparitions a fixé la composition exacte du combat : des créatures numérotées, chacune avec son moment (au départ ou en renfort), son rôle de combat et sa stature. Donne à CHACUNE un nom et une apparence.
 
@@ -626,6 +626,8 @@ RÈGLES :
 - Les créatures du DÉPART sont les ennemis du récit, dans l'ordre (le LEADER prend le chef). Garde leur nom et leur apparence ; un PNJ nommé garde son nom EXACT dans "pnj".
 - S'il y a plus de créatures au départ que d'ennemis dans le récit, invente des compagnons crédibles.
 - Les RENFORTS viennent des idées de renforts (ou de ton imagination) : plausibles dans ce lieu et pour cet affrontement.
+- (v327) LES RENFORTS SONT DANS LE CAMP DES ENNEMIS DU RÉCIT : ils arrivent pour LES aider — des compagnons de leur bande, leurs gardes, leurs bêtes, leurs mercenaires. Jamais un passant, un innocent, un être neutre ou hostile aux ennemis, ni une bête sauvage sans lien avec eux (sauf si les ennemis sont des bêtes : d'autres bêtes de la même meute). Donne à chaque renfort "lien" : en une phrase, pourquoi il est du côté des ennemis.
+- (v327) UN SOUTIEN est le soutien DE CETTE BANDE : son guérisseur, son chaman, son prêtre, son porte-étendard, son sonneur de cor, son dresseur (« Guérisseuse des esclavagistes », « Chamane de la meute ») — jamais un soigneur neutre ou d'un autre camp. Pour une meute de bêtes : un vieux mâle qui hurle et galvanise les autres, une mère qui protège la portée…
 - Le rôle de combat oriente l'arme et l'allure (archer, mage, brute au contact, soigneur…) ; la stature donne la taille et la puissance (Petit = mineur, Normal = combattant ordinaire, Boss = légendaire).
 - LE MONDE (v287) : tu reçois l'univers, les peuples d'Elyria et la région. Les compagnons et les renforts sont du MÊME groupe que les ennemis du récit (même bande, même cause, même peuple le plus souvent) ; une bête vient de la faune de la région ou de la mythologie. Tout est ANTIQUE (tenues, armes, armures de l'Antiquité, jamais médiévales).
 - LE NOM DIT QUI IL EST DANS LE RÉCIT : celui que le récit lui donne ; sinon sa bande, son peuple, son métier ou sa fonction dans l'histoire (« Contrebandier gob », « Archer de la Cendre », « Esclavagiste d'Arcaï »), ou un nom propre de son peuple avec un surnom (« Draxos le Balafré »). Le leader porte un titre de chef de CETTE bande (« Capitaine des contrebandiers »). Jamais un nom de bestiaire générique sans lien avec le récit (« Ombre sanglante », « Brute », « Lame noire »).
@@ -634,11 +636,11 @@ RÈGLES :
 - L'APPARENCE D'UN PEUPLE (v309) : quand un peuple a une APPARENCE dans la liste (le Grimoire des Races), la description physique la suit fidèlement (peau, traits, taille, signes du peuple), puis y ajoute ce qui est propre à cet individu.
 - "visuel" : une clé courte, commune aux créatures qui se RESSEMBLENT (trois loups gris identiques partagent la même clé) ; au plus 5 visuels différents. Chaque visuel a une description physique précise de la tête et du haut du corps (elle servira à sculpter un médaillon).
 
-Réponds UNIQUEMENT en JSON : {"creatures": [{"numero": 1, "nom": "...", "visuel": "loup", "pnj": ""}], "visuels": [{"cle": "loup", "description_physique": "..."}]}`;
+Réponds UNIQUEMENT en JSON : {"creatures": [{"numero": 1, "nom": "...", "visuel": "loup", "pnj": "", "lien": ""}], "visuels": [{"cle": "loup", "description_physique": "..."}]}`;
 
 const ROLES = {
     "DPS CAC": "combattant au contact", "TANK CAC": "brute massive qui encaisse au contact",
-    "SOUTIEN": "soigneur ou soutien", "DPS MAGE CAC": "lanceur de sorts au contact",
+    "SOUTIEN": "soutien de leur camp (leur guérisseur, chaman, prêtre, porte-étendard ou sonneur de cor)", "DPS MAGE CAC": "lanceur de sorts au contact",
     "DPS DISTANCE": "tireur à distance (arc, fronde, javelots)", "DPS MAGE DISTANCE": "lanceur de sorts à distance"
 };
 const momentDe = (m) => m.surReleve ? "renfort (quand le leader se relève)" : m.quandVide ? "renfort (quand le terrain se vide)"
@@ -695,11 +697,16 @@ function habiller(tous, habits, analyse, pnjs) {
     const recit = (analyse && analyse.ennemis) || [];
     const pnjParNom = new Map(pnjs.map(x => [normaliser(x.Nom_PNJ), x]));
     const cles = new Map();
+    const roleDuVisuel = new Map();
     const visuels = {};
     const pris = new Set();
+    // (v327) Sans habillage, un renfort prend une des idées de renforts (des alliés
+    // des ennemis, nommés d'après le récit), dans l'ordre — plus de « Soigneur 7 ».
+    const idees = ((analyse && analyse.renforts) || []).filter(x => x && x.nom);
+    let rangRenfort = 0;
     const creatures = tous.map((x, i) => {
         const h = parNumero.get(i + 1) || {};
-        const r = x.moment === "départ" ? (recit[i] || {}) : {};
+        const r = x.moment === "départ" ? (recit[i] || {}) : (!h.nom && idees.length ? idees[rangRenfort++ % idees.length] : {});
         let nom = String(h.nom || r.nom || "").trim() || `${(ROLES[x.m.archetype] || "Créature").split(" ")[0].replace(/^./, l => l.toUpperCase())} ${i + 1}`;
         while (pris.has(normaliser(nom))) nom += " le Second";
         pris.add(normaliser(nom));
@@ -708,7 +715,9 @@ function habiller(tous, habits, analyse, pnjs) {
         // partagent celui que l'IA leur donne, dans la limite des cinq.
         let brute = pnj ? "pnj:" + pnj.Nom_PNJ : String(h.visuel || "").trim() || (r.nom ? "recit:" + r.nom : x.m.archetype + ":" + x.m.palier);
         if (!cles.has(brute)) {
-            if (cles.size >= R.visuelsMax) brute = [...cles.keys()][cles.size - 1];
+            // (v327) Plus de place pour un visuel : celui d'une créature du même rôle
+            // (un soutien ne prend pas le dessin d'un molosse), sinon le premier.
+            if (cles.size >= R.visuelsMax) { const semblable = roleDuVisuel.get(x.m.archetype); brute = semblable || [...cles.keys()][0]; }
             else {
                 const cle = "v" + (cles.size + 1);
                 cles.set(brute, cle);
@@ -719,7 +728,9 @@ function habiller(tous, habits, analyse, pnjs) {
             }
         }
         const cle = cles.get(brute);
-        return { ...x.m, nom, visuel: cle, description: visuels[cle] ? visuels[cle].Description : "", ...(pnj ? { pnj: pnj.Nom_PNJ, portrait: pnj.URL_Cloudinary || "" } : {}) };
+        if (!roleDuVisuel.has(x.m.archetype)) roleDuVisuel.set(x.m.archetype, brute);
+        const lien = String(h.lien || r.lien || "").trim();
+        return { ...x.m, nom, visuel: cle, description: visuels[cle] ? visuels[cle].Description : "", ...(lien ? { lien } : {}), ...(pnj ? { pnj: pnj.Nom_PNJ, portrait: pnj.URL_Cloudinary || "" } : {}) };
     });
     return { creatures, visuels };
 }
