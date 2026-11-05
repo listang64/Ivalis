@@ -10679,3 +10679,5 @@ l'ancien « if (race === "Humain") » ; il le lit maintenant dans DONNEES_RACES.
 
 corrections_v322.mjs vérifie l'ordre au départ, quand le récit grandit, pendant et après
 une création, et que le marque-page du récit mène toujours au texte en cours.
+Tests mis à jour pour v322 (le récit n'est plus page 7) : v300, v304, v306, v307, v308 lisent la
+première page du récit dans le livre (GRIMOIRE.premiereDeLaSuite()) au lieu des pages 7, 9, 11.

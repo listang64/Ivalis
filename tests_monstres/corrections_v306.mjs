@@ -86,6 +86,9 @@ const titre = (t) => console.log("\n" + t);
 const section = async (f) => { try { await f(); } catch (e) { verifier("la section a pu tourner", false, String(e && e.message || e).slice(0, 180)); } };
 const etat = () => p.evaluate(() => window.grimoireEtat());
 const page = () => p.evaluate(() => window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex());
+
+// (v322) Le récit vient après les aventuriers : sa première page se lit dans le livre.
+const P0 = () => p.evaluate(() => window.GRIMOIRE.premiereDeLaSuite());
 const attendreQue = async (f, ms = 6000) => { for (let i = 0; i < ms / 100; i++) { if (await f()) return true; await p.waitForTimeout(100); } return false; };
 const cliquer = (sel) => p.evaluate((sel) => document.querySelector(sel).click(), sel);
 const centre = (sel) => p.evaluate((sel) => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height }; }, sel);
@@ -200,7 +203,7 @@ await section(async () => {
   const tournes = r.etats.filter(e => e === "flipping").length;
   verifier("le livre les tourne une à une (de vraies tournes de pages, souples)", tournes >= 3, `${tournes} tournes`);
   verifier("… très vite (0,12 s la page depuis la v310), puis le réglage revient (0,5 s)", r.durees.some(x => x === 120) && r.apres === 500, JSON.stringify([...new Set(r.durees)]));
-  verifier("arrivé au récit : les vraies pages sont revenues, les feuillets repartis", r.page === 9 && r.reste === 0 && r.n === n0, JSON.stringify({ page: r.page, reste: r.reste, n: r.n, n0 }));
+  verifier("arrivé au récit : les vraies pages sont revenues, les feuillets repartis", r.page === (await P0()) + 2 && r.reste === 0 && r.n === n0, JSON.stringify({ page: r.page, reste: r.reste, n: r.n, n0 }));
   verifier("un seul bruit (les pages qui défilent), pas de clic", r.sons.join(",") === "pages-defilent" && r.clics === 0, r.sons.join(","));
   // En arrière : le marque-page de l'index.
   await p.evaluate(() => document.getElementById("grimoire-marque-page").click());
@@ -214,7 +217,7 @@ await section(async () => {
     await attendreQue(() => p.evaluate(() => !window.GRIMOIRE.defileEnCours()), 6000);
   } else {
     await p.evaluate(() => window.GRIMOIRE_RECIT.allerAuRecit());
-    await attendreQue(() => p.evaluate(() => !window.GRIMOIRE.defileEnCours() && window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() === 9), 6000);
+    await attendreQue(() => p.evaluate(() => !window.GRIMOIRE.defileEnCours() && window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() === window.GRIMOIRE.premiereDeLaSuite() + 2), 6000);
   }
   await p.waitForTimeout(500);
 });

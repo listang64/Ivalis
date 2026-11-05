@@ -161,7 +161,7 @@ await section(async () => {
   verifier("… toujours sorti quand la ligne part dans le livre", await sorti("recit-ecriture"));
   const plume = appelsIA.filter(a => /CE QU'ÉCRIT SON JOUEUR/.test(a.txt)).slice(-1)[0];
   verifier("la plume enchaîne avec le récit, en ouvrant un nouveau paragraphe (pour aérer)", plume && /en ouvrant un nouveau paragraphe \(pour aérer le texte\)/.test(plume.sys));
-  await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.turnToPage(9));
+  await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.turnToPage(window.GRIMOIRE.premiereDeLaSuite() + 2));
   await relayer(M.concat([{ idDoc: "m2", ...ajout.data, Timestamp: 2000 }]));
   await p.waitForTimeout(300);
   const r = await p.evaluate(() => { const paras = [...document.querySelectorAll(".page-suite .para-recit")]; return { n: paras.length, dernier: paras[paras.length - 1].dataset.e, ecriture: document.getElementById("recit-ecriture").classList.contains("sortie") }; });
@@ -203,12 +203,12 @@ titre("3. LES PAGES D'APRÈS S'ÉCRIVENT TOUT DE SUITE (LE LIVRE NE TOURNE PAS S
 await section(async () => {
   const phrase = "Nous marchons longtemps dans la poussière dorée de la route d'Arcaï, et je note chaque pas, chaque juron de Thorin, chaque silence de Lyra, comme on garde des pierres précieuses dans une bourse trop petite.";
   const long = Array.from({ length: 9 }, (_, i) => `${i + 1}. ${phrase}`).join("<br>");
-  await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.turnToPage(9));
+  await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.turnToPage(window.GRIMOIRE.premiereDeLaSuite() + 2));
   await relayer(M.concat([{ idDoc: "m9", ID_Partie: "P1", Auteur_ID: "MJ", Auteur_Nom: "MJ", Est_Narration_IA: true, Texte: long, Timestamp: 9000 }]));
   await attendreQue(() => p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length === 0), 20000);
   const r = await p.evaluate(() => ({ ici: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), pages: window.GRIMOIRE_RECIT.etat().pagesRecit, reste: document.querySelectorAll(".mot.a-ecrire").length,
     apres: [...document.querySelectorAll(".page-suite")].slice(4).some(pg => pg.querySelector(".mot.ecrit, .mot:not(.a-ecrire)")) }));
-  verifier("tout le récit s'est écrit, même sur les pages pas encore ouvertes ; le livre est resté page 9", r.ici === 9 && r.pages >= 4 && r.reste === 0 && r.apres, JSON.stringify(r));
+  verifier("tout le récit s'est écrit, même sur les pages pas encore ouvertes ; le livre est resté page 9", r.ici === (await p.evaluate(() => window.GRIMOIRE.premiereDeLaSuite() + 2)) && r.pages >= 4 && r.reste === 0 && r.apres, JSON.stringify(r));
 });
 
 // =========================================================================
@@ -221,13 +221,13 @@ await section(async () => {
   await p.evaluate(() => document.getElementById("grimoire-marque-recit").click());
   await attendreQue(() => p.evaluate(() => !window.GRIMOIRE.defileEnCours() && window.GRIMOIRE_PAGEFLIP.getState() === "read"), 6000);
   await p.waitForTimeout(400);
-  const derniere = await p.evaluate(() => { const n = window.GRIMOIRE_RECIT.etat().pagesRecit, d = 9 + Math.max(n, 2) - 1; return d % 2 === 1 ? d : d - 1; });
+  const derniere = await p.evaluate(() => { const n = window.GRIMOIRE_RECIT.etat().pagesRecit, d = window.GRIMOIRE.premiereDeLaSuite() + 2 + Math.max(n, 2) - 1; return d % 2 === 1 ? d : d - 1; });
   const un = await page();
   verifier("une fois : la dernière double page du récit", un === derniere, `${un} (attendu ${derniere})`);
   await p.evaluate(() => document.getElementById("grimoire-marque-recit").click());
   await attendreQue(() => p.evaluate(() => !window.GRIMOIRE.defileEnCours() && window.GRIMOIRE_PAGEFLIP.getState() === "read"), 6000);
   await p.waitForTimeout(400);
-  verifier("deux fois : l'index des chapitres (le sommaire, page 7)", (await page()) === 7, String(await page()));
+  verifier("deux fois : l'index des chapitres (le sommaire, page 7)", (await page()) === (await p.evaluate(() => window.GRIMOIRE.premiereDeLaSuite())), String(await page()));
   await p.evaluate(() => document.getElementById("grimoire-marque-recit").click());
   await attendreQue(() => p.evaluate(() => !window.GRIMOIRE.defileEnCours() && window.GRIMOIRE_PAGEFLIP.getState() === "read"), 6000);
   await p.waitForTimeout(400);

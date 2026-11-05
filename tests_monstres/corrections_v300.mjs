@@ -89,6 +89,9 @@ const titre = (t) => console.log("\n" + t);
 const section = async (f) => { try { await f(); } catch (e) { verifier("la section a pu tourner", false, String(e && e.message || e).slice(0, 180)); } };
 const etat = () => p.evaluate(() => window.grimoireEtat());
 const page = () => p.evaluate(() => window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex());
+
+// (v322) Le récit vient après les aventuriers : sa première page se lit dans le livre.
+const P0 = () => p.evaluate(() => window.GRIMOIRE.premiereDeLaSuite());
 const attendreQue = async (f, ms = 6000) => { for (let i = 0; i < ms / 100; i++) { if (await f()) return true; await p.waitForTimeout(100); } return false; };
 const cliquer = (sel) => p.evaluate((sel) => document.querySelector(sel).click(), sel);
 const centre = (sel) => p.evaluate((sel) => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height }; }, sel);
@@ -220,7 +223,7 @@ await section(async () => {
   await p.waitForTimeout(1000);
   const r = await p.evaluate(() => ({ page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), n: window.grimoireEtat().nbPages,
     entete: (document.querySelector("#grimoire-suite-2 .numero-chapitre") || {}).textContent, sous: (document.querySelector("#grimoire-suite-2 .titre-chapitre") || {}).textContent }));
-  verifier("« Le récit » de l'index : les pages tournent jusqu'au sommaire des chapitres (v313)", r.page === 7 && r.entete === "Chapitre I" && /en cours/.test(r.sous), JSON.stringify(r));
+  verifier("« Le récit » de l'index : les pages tournent jusqu'au sommaire des chapitres (v313)", r.page === (await P0()) && r.entete === "Chapitre I" && /en cours/.test(r.sous), JSON.stringify(r));
   // (la suite du test lit le chapitre : on y va, comme le marque-page plume)
   await p.evaluate(() => window.GRIMOIRE_RECIT.allerAuRecit()); await p.waitForTimeout(1500);
   await p.evaluate(() => window.grimoireAllerIndex());
@@ -228,14 +231,14 @@ await section(async () => {
   const mp = await centre("#grimoire-marque-recit");
   await p.mouse.click(mp.x, mp.y - mp.h * 0.3);
   await p.waitForTimeout(1000);
-  verifier("le marque-page à la plume y va aussi", (await page()) === 9, String(await page()));
-  await p.evaluate(() => window.GRIMOIRE.allerALaPage(7));
+  verifier("le marque-page à la plume y va aussi", (await page()) === (await P0()) + 2, String(await page()));
+  await p.evaluate(() => window.GRIMOIRE.allerALaPage(window.GRIMOIRE.premiereDeLaSuite()));
   await p.waitForTimeout(900);
   const s = await p.evaluate(() => ({ titre: (document.querySelector("#grimoire-suite-0 .titre-sommaire") || {}).textContent, lignes: [...document.querySelectorAll(".ligne-sommaire")].map(l => l.innerText.replace(/\s+/g, " ").trim()) }));
   verifier("avant le chapitre, le sommaire du récit : le chapitre en cours", s.titre === "Le récit" && s.lignes.join("|") === "I Le chapitre en cours", JSON.stringify(s));
   await cliquer('.ligne-sommaire[data-recit="courant"]');
   await p.waitForTimeout(1000);
-  verifier("… qui ramène au chapitre", (await page()) === 9);
+  verifier("… qui ramène au chapitre", (await page()) === (await P0()) + 2);
 });
 
 // =========================================================================
@@ -483,10 +486,10 @@ await section(async () => {
   // la petite flèche dit qu'il y a une suite, et la suite est déjà écrite.
   await attendreQue(() => p.evaluate(() => document.querySelectorAll('.mot.a-ecrire').length === 0), 20000);
   const pause = await p.evaluate(() => {
-    const ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), droite = document.querySelectorAll(".page-suite")[ici - 7 + 1];
+    const ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() - window.GRIMOIRE.premiereDeLaSuite() + 7, droite = document.querySelectorAll(".page-suite")[ici - 7 + 1];
     return { ici, reste: document.querySelectorAll(".mot.a-ecrire").length, fleche: !!(droite && droite.querySelector(".fleche-suite")) };
   });
-  verifier("v307 : le livre ne tourne pas seul, et les pages suivantes sont déjà écrites", avant === 9 && pause.ici === 9 && pause.reste === 0, JSON.stringify(pause));
+  verifier("v307 : le livre ne tourne pas seul, et les pages suivantes sont déjà écrites", avant === (await P0()) + 2 && pause.ici === 9 && pause.reste === 0, JSON.stringify(pause));
   verifier("v304 : une petite flèche noire en bas à droite annonce la suite", pause.fleche);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v304_fleche_suite.png" });
   await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipNext("top"));
@@ -515,7 +518,7 @@ await section(async () => {
   const titreIA = appelsIA.find(a => /donnes leur titre aux chapitres/.test(a.sys));
   verifier("un chapitre fini se range : son numéro, son titre écrit d'après ce qui a été vécu", res && res.titre === "La tournée du nain" && st.ajouts[0] && st.ajouts[0].Numero === 1 && st.ajouts[0].ID_Partie === "P1" && titreIA && /trois chopes/.test(titreIA.txt), JSON.stringify(st.ajouts[0]));
   verifier("… et ses pages à part (Recits_Textes) : seul le chapitre ouvert se charge", st.sets.length === 1 && st.sets[0].chemin === "Recits_Textes/" + res.id && st.sets[0].n >= 4 && /narration/.test(st.sets[0].types), JSON.stringify(st.sets));
-  await p.evaluate(() => window.GRIMOIRE.allerALaPage(7));
+  await p.evaluate(() => window.GRIMOIRE.allerALaPage(window.GRIMOIRE.premiereDeLaSuite()));
   await p.waitForTimeout(900);
   const s = await p.evaluate(() => [...document.querySelectorAll(".ligne-sommaire")].map(l => l.innerText.replace(/\s+/g, " ").trim()));
   verifier("le sommaire : « I La tournée du nain », puis le chapitre II en cours", s.join("|") === "I La tournée du nain|II Le chapitre en cours", s.join("|"));
@@ -525,7 +528,7 @@ await section(async () => {
   const l = await p.evaluate(() => ({ page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), lecture: window.GRIMOIRE_RECIT.etat().lecture,
     titre: (document.querySelector("#grimoire-suite-2 .titre-chapitre") || {}).textContent, num: (document.querySelector("#grimoire-suite-2 .numero-chapitre") || {}).textContent,
     texte: document.getElementById("grimoire-suite-2").innerText, ecriture: document.getElementById("recit-ecriture").classList.contains("sortie") }));
-  verifier("un chapitre relu : chargé à la demande, ses pages, son titre", l.page === 9 && l.lecture === res.id && l.num === "Chapitre I" && l.titre === "La tournée du nain" && /J'ai connu des tavernes/.test(l.texte), JSON.stringify({ ...l, texte: "" }));
+  verifier("un chapitre relu : chargé à la demande, ses pages, son titre", l.page === (await P0()) + 2 && l.lecture === res.id && l.num === "Chapitre I" && l.titre === "La tournée du nain" && /J'ai connu des tavernes/.test(l.texte), JSON.stringify({ ...l, texte: "" }));
   verifier("… on ne l'écrit plus (pas de parchemin)", !l.ecriture);
   await cliquer('.lien-recit[data-recit="courant"]');
   await p.waitForTimeout(900);

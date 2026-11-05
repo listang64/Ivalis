@@ -81,6 +81,9 @@ const titre = (t) => console.log("\n" + t);
 const section = async (f) => { try { await f(); } catch (e) { verifier("la section a pu tourner", false, String(e && e.message || e).slice(0, 180)); } };
 const etat = () => p.evaluate(() => window.grimoireEtat());
 const page = () => p.evaluate(() => window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex());
+
+// (v322) Le récit vient après les aventuriers : sa première page se lit dans le livre.
+const P0 = () => p.evaluate(() => window.GRIMOIRE.premiereDeLaSuite());
 const attendreQue = async (f, ms = 6000) => { for (let i = 0; i < ms / 100; i++) { if (await f()) return true; await p.waitForTimeout(100); } return false; };
 const cliquer = (sel) => p.evaluate((sel) => document.querySelector(sel).click(), sel);
 const centre = (sel) => p.evaluate((sel) => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height }; }, sel);
@@ -167,7 +170,7 @@ await section(async () => {
   verifier("le marque-page du récit : de vraies pages, écrites à la main, défilent (v306)", a.feuilles >= 4 && a.ecrites && a.enCours && a.depart === 3, JSON.stringify(a));
   await p.waitForTimeout(1100);
   let z = await apres();
-  verifier("… le livre arrive au récit (page 9), les pages de passage s'en vont", z.page === 9 && !z.reste, JSON.stringify(z));
+  verifier("… le livre arrive au récit (page 9), les pages de passage s'en vont", z.page === (await P0()) + 2 && !z.reste, JSON.stringify(z));
   verifier("le bruit : des pages qui défilent, et plus de son de clic", z.sons.join(",") === "pages-defilent" && z.clics === 0, JSON.stringify(z));
   // Le récit (9) → l'index (3) : le marque-page de l'index, à l'envers.
   const b2 = await surLeClic("#grimoire-marque-page");
@@ -178,7 +181,7 @@ await section(async () => {
   const c = await surLeClic("#grimoire-index-recit");
   await p.waitForTimeout(1100);
   z = await apres();
-  verifier("un lien de l'index (« Le récit », v313 : son sommaire des chapitres, page 7) : même défilement, sans clic", c.feuilles >= 4 && z.page === 7 && z.clics === 0 && !z.sons.includes("clic"), JSON.stringify([c, z]));
+  verifier("un lien de l'index (« Le récit », v313 : son sommaire des chapitres, page 7) : même défilement, sans clic", c.feuilles >= 4 && z.page === (await P0()) && z.clics === 0 && !z.sons.includes("clic"), JSON.stringify([c, z]));
   // La double page voisine se tourne normalement (pas de liasse) : l'index → la carte.
   await p.evaluate(() => window.grimoireAllerIndex());
   await p.waitForTimeout(1100);
@@ -224,7 +227,7 @@ await section(async () => {
   let reste = -1;
   for (let i = 0; i < 120; i++) { const n = await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length); if (n === 0 || n === reste) break; reste = n; await p.waitForTimeout(250); }
   const r = await p.evaluate(() => {
-    const ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), pages = [...document.querySelectorAll(".page-suite")];
+    const ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() - window.GRIMOIRE.premiereDeLaSuite() + 7, pages = [...document.querySelectorAll(".page-suite")];   // (v322 : le récit après les aventuriers)
     const visibles = pages.slice(ici - 7, ici - 5), suivantes = pages.slice(ici - 5);
     const droite = pages[ici - 7 + 1], f = droite && droite.querySelector(".fleche-suite");
     const a = f && f.getBoundingClientRect(), d = droite.getBoundingClientRect(), st = f && getComputedStyle(f.querySelector("path"));
@@ -233,7 +236,7 @@ await section(async () => {
              flechesGauche: pages.filter((pg, j) => j % 2 === 0 && pg.querySelector(".fleche-suite")).length };
   });
   // v307 : les pages d'après s'écrivent directement (« quand il tournera la page, les mots seront déjà écrits »).
-  verifier("le livre ne tourne pas tout seul ; les pages d'après s'écrivent quand même (v307)", avant === 9 && r.ici === 9 && r.ouvertesFinies && !r.suiteEnAttente, JSON.stringify(r));
+  verifier("le livre ne tourne pas tout seul ; les pages d'après s'écrivent quand même (v307)", avant === (await P0()) + 2 && r.ici === 9 && r.ouvertesFinies && !r.suiteEnAttente, JSON.stringify(r));
   verifier("une toute petite flèche noire au coin bas-droit de la page de droite", r.fleche && r.fleche.coinBas && r.fleche.coinDroit && r.fleche.petite && /rgb\(18, 11, 6\)/.test(r.fleche.noir) && r.flechesGauche === 0, JSON.stringify(r.fleche));
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v304_fleche_suite.png" });
   await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipNext("top"));
@@ -241,9 +244,9 @@ await section(async () => {
   const enCours = await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length);
   await p.waitForTimeout(1200);
   const plusTard = await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length);
-  verifier("le joueur tourne la page : la suite est déjà écrite", (await page()) === 11 && enCours === 0 && plusTard === 0, `${enCours} → ${plusTard} mots à écrire`);
+  verifier("le joueur tourne la page : la suite est déjà écrite", (await page()) === (await P0()) + 4 && enCours === 0 && plusTard === 0, `${enCours} → ${plusTard} mots à écrire`);
   for (let k = 0; k < 5 && (await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length)); k++) {
-    await attendreQue(() => p.evaluate(() => { const ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return ![...document.querySelectorAll(".page-suite")].slice(ici - 7, ici - 5).some(pg => pg.querySelector(".mot.a-ecrire")); }), 15000);
+    await attendreQue(() => p.evaluate(() => { const ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() - window.GRIMOIRE.premiereDeLaSuite() + 7; return ![...document.querySelectorAll(".page-suite")].slice(ici - 7, ici - 5).some(pg => pg.querySelector(".mot.a-ecrire")); }), 15000);
     if (await p.evaluate(() => document.querySelectorAll(".mot.a-ecrire").length)) await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipNext("top"));
     await p.waitForTimeout(900);
   }
