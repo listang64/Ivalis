@@ -1898,6 +1898,7 @@ Réponds avec l'outil 'deciderJets'. Liste vide seulement si aucune action ne m�
             throw new Error(`${modele} : réponse sans décision`);
         } finally { if (minuteur) clearTimeout(minuteur); }
     };
+    window.__erreurArbitre = "";
     try {
         let bruts;
         try { bruts = await essayer(MODELE_ARBITRE, DELAI_ARBITRE_MS * 0.6); }
@@ -1919,10 +1920,55 @@ Réponds avec l'outil 'deciderJets'. Liste vide seulement si aucune action ne m�
         });
         return jets;
     } catch (e) {
-        console.warn("[MIA_DES] Arbitrage impossible, le MJ raconte directement :", e && e.message || e);
+        window.__erreurArbitre = String(e && e.message || e);
+        console.warn("[MIA_DES] Arbitrage IA impossible (le filet des mots prend le relais) :", e && e.message || e);
         return [];
     }
 }
+
+// LE FILET DES MOTS (v317). Nico : « je n'ai pas encore vu une seule fois le
+// MJ demander des jets de dés pour les actions de mes joueurs, pourtant il y a
+// eu plein de situations qui en nécessitaient ». L'Arbitre IA ne parlait
+// qu'une fois, et s'il échouait (délai, refus, réponse sans décision) ou
+// répondait « aucun jet », le Narrateur racontait directement. Maintenant, une
+// lecture sans IA de chaque action, en plus : une tentative nette (se cacher,
+// crocheter, convaincre, fouiller, escalader…) demande son jet, avec la
+// caractéristique de sa MANIÈRE, si l'IA n'en a pas demandé pour ce héros.
+// Jamais pour un combat ; jamais pour une simple parole ou une question.
+const MOTS_DES_JETS = [
+    // (l'ordre compte : la manière la plus précise d'abord)
+    ["DEXTÉRITÉ", "facile", /\b(me|se|nous|te) (cache|cacher|dissimul\w*|faufil\w*|glisse\w* (discretement|sans bruit))|\bcrochet\w*|\b(subtilis|escamot|chapard|derob)\w*|\bvol(e|er|ons) (sa|la|une|le|son|leur) (bourse|cle|dague|clef)|\bdesamorc\w*|\bsans (faire de )?bruit|\bdiscretement|\ben silence|\bfurtiv\w*|\bsur la pointe des pieds|\b(saute|sauter|bondi\w*|enjamb\w*)\b|\bacrobat\w*|\ben equilibre|\besquiv\w* (le|la|les) (piege|fleche|pierre|chute)|\bfil(e|er) (le|la|les|cet|cette) /],
+    ["FORCE", "moyenne", /\b(enfonc|defonc|soulev|arrach|tord)\w*|\bforc(e|er|ons) (la|le|les|cette|ce|cet) |\b(brise|briser|casse|casser) (la|le|les|cette|ce) (porte|serrure|cadenas|chaine|barreau|grille|coffre|planche|mur)|\b(escalad|grimp)\w*|\bnag(e|er|eons)\b|\bpouss(e|er|ons) (la|le|les|cette|ce|cet) (rocher|pierre|dalle|chariot|charrette|statue|meuble|tonneau|caisse|bloc)|\bretien(s|t|dre) (la|le) (porte|corde|pont)|\bbras de fer|\bde toutes (mes|ses|nos) forces/],
+    ["CHARISME", "moyenne", /\b(convainc|persuad|intimid|menac|seduir|seduit|charm|marchand|negoci|baratin|amadou|flatt|soudoy|corromp|bluff|embobin|enjol|haranguer|harangu)\w*|\b(mens|ment|mentir|mentons)\b|\bje lui fais croire|\bfaire croire|\b(baisser|baisse|negocier) (le|son) prix/],
+    ["INTELLIGENCE", "moyenne", /\b(dechiffr|decrypt|deduir|deduit|enquet|analys)\w*|\b(me|se|nous) (souvien|souvenir|rappel\w*)|\benigme|\b(identifi|reconnai)\w* (la|le|les|ce|cette|ces) (rune|runes|symbole|symboles|sort|magie|plante|plantes|poison|blason|ecriture|inscription|langue|creature)|\b(etudi|examin)\w* (le|la|les|ce|cette|ces) (rune|runes|symbole|grimoire|parchemin|inscription|mecanisme|carte)/],
+    ["SAGESSE", "moyenne", /\b(fouill|inspect|scrut|guett|epi|epie|pist)\w*|\bcherch\w* (un |une |des |les )?(indice|trace|traces|passage|piege|piste|mecanisme|issue|cachette)|\bexamin\w*|\bobserv\w* (attentivement|discretement|les alentours|la foule|le garde|ses gestes)|\becout\w* (aux portes|a la porte|a travers|derriere|contre|discretement|leur conversation|la conversation|ce qu'ils disent|ce qui se dit)|\btend\w* l'oreille|\bguet\b|\b(rep[eè]r|repere)\w*|\bsuivr\w* (la piste|les traces|ses traces)|\b(soign|panse|panser|bande|bander|recoud)\w*|\b(devin|sond)\w* (ses|son|leur|les) (intention|pensee|mensonge|coeur)|\bdit[- ]il la verite|\bment[- ]il\b|\bcalm\w* (le|la|l') ?(cheval|chien|bete|animal|monture|loup)/],
+    ["CONSTITUTION", "moyenne", /\bresist\w* (au|a la|aux|a l') ?(poison|froid|chaleur|douleur|fatigue|sommeil|alcool|faim|soif|fievre|maladie|venin)|\bretien\w* (mon|son|notre) souffle|\b(cul sec|d'une traite)|\bmarche forcee|\btenir le coup|\bcontinu\w* malgre (la|le) (douleur|blessure|fatigue)/]
+];
+// Un combat se joue sur le plateau : pas de jet ici.
+const MOTS_DU_COMBAT = /\b(attaqu|frapp|transperc|egorg|poignard|decapit|assomm|abatt)\w*|\b(tire|tirer|decoche|decocher) (une fleche |un trait )?sur\b|\blance\w* (un sort|une boule|une lance|une dague) (sur|contre)|\bje (le|la|les) (tue|frappe|charge)\b|\bdegain\w*.{0,30}\b(et|pour) (frappe|attaque|charge)/;
+const sansAccentDes = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[’`]/g, "'");
+function jetsParLesMots(etat, heros) {
+    const vus = new Set(), jets = [];
+    // (la dernière action de chaque héros compte, s'il en a écrit plusieurs)
+    [...etat.actions].reverse().forEach(m => {
+        const h = heros.find(x => x.idPersonnage === m.Auteur_ID);
+        if (!h || vus.has(h.idPersonnage)) return;
+        const t = " " + sansAccentDes(sansBalises(m.Texte)) + " ";
+        // Une parole rapportée entre guillemets ne compte pas comme une action
+        // (« je ne mens jamais ») — sauf si c'est tout ce qu'il a écrit.
+        const horsParoles = t.replace(/«[^»]*»|"[^"]*"/g, " ");
+        const lu = horsParoles.trim().length > 6 ? horsParoles : t;
+        if (MOTS_DU_COMBAT.test(lu)) { vus.add(h.idPersonnage); return; }
+        const trouve = MOTS_DES_JETS.find(([, , re]) => re.test(lu));
+        if (!trouve) return;
+        vus.add(h.idPersonnage);
+        const [carac, difficulte, re] = trouve;
+        const mot = (lu.match(re) || [""])[0].trim();
+        jets.push({ idPerso: h.idPersonnage, heros: h.prenom, caracteristique: carac, difficulte, action: mot.slice(0, 60), parLesMots: true });
+    });
+    return jets.reverse();
+}
+window.__jetsParLesMotsBanc = jetsParLesMots;   // (v317) pour les bancs
 
 window.__arbitreDesBanc = demanderArbitreDes;   // (v312) pour les bancs
 const nomCaracJoli = (nom) => nom.charAt(0) + nom.slice(1).toLowerCase();
@@ -1941,9 +1987,18 @@ async function arbitrerAvantLeMJ(messages) {
     }
     if (!etat.actions.length) return true;
     const t0 = Date.now();
-    const jets = await demanderArbitreDes(etat, heros);
-    console.log(`[MIA_DES] ${jets.length ? jets.map(j => `${j.heros} : ${j.caracteristique} (${j.difficulte})`).join(", ") : "aucun jet"} — ${Date.now() - t0} ms`);
+    const parIA = await demanderArbitreDes(etat, heros);
+    // (v317) Le filet des mots : un héros qui tente nettement quelque chose
+    // reçoit son jet, même si l'IA s'est tue ou a échoué.
+    const parMots = jetsParLesMots(etat, heros).filter(j => !parIA.some(x => x.idPerso === j.idPerso)
+        && !etat.demandes.some(d => d.idPerso === j.idPerso && normCarac(d.caracteristique) === normCarac(j.caracteristique)));
+    const jets = [...parIA, ...parMots];
+    window.DERNIER_ARBITRAGE = { le: Date.now(), ms: Date.now() - t0, actions: etat.actions.map(m => `${m.Auteur_Nom} : ${sansBalises(m.Texte)}`),
+        parIA: parIA.map(j => `${j.heros} : ${j.caracteristique}`), parLesMots: parMots.map(j => `${j.heros} : ${j.caracteristique} (« ${j.action} »)`),
+        erreur: window.__erreurArbitre || "" };
+    console.log(`[MIA_DES] ${jets.length ? jets.map(j => `${j.heros} : ${j.caracteristique} (${j.difficulte})${j.parLesMots ? " — par les mots" : ""}`).join(", ") : "aucun jet"} — ${Date.now() - t0} ms`, window.DERNIER_ARBITRAGE);
     if (!jets.length) return true;
+    jets.forEach(j => { delete j.parLesMots; });
     const date = window.DATE_EN_JEU_ACTUELLE || {};
     const lignes = jets.map(j => `🎲 ${j.heros} : jet de ${nomCaracJoli(j.caracteristique)} — difficulté ${j.difficulte}${j.action ? ` (${j.action})` : ""}`);
     await addDoc(collection(db, "Messages_Chat"), {
@@ -1953,6 +2008,8 @@ async function arbitrerAvantLeMJ(messages) {
     });
     return false;
 }
+
+window.__arbitrerAvantLeMJBanc = (messages) => arbitrerAvantLeMJ(messages);   // (v317) pour les bancs
 
 // L'ANNONCE À LA TABLE : quand l'Arbitre demande des jets, un bandeau doré
 // le dit à tout le monde, quelques secondes (app.js l'appelle à l'arrivée du

@@ -298,7 +298,10 @@ titre("5. LES GARDE-FOUS : PANNE, PAS D'ACTION, APRÈS UN COMBAT, MÊME JET DEUX
 // =========================================================================
 await section(async () => {
   await preparerTable();
-  await ecrireMessage({ id: "c1", Auteur_ID: "H1", Auteur_Nom: "Thorin", Texte: "J'escalade la colonne." });
+  // (v317 : une tentative nette — « j'escalade la colonne » — reçoit maintenant
+  // son jet par le filet des mots même quand MIA_DES est en panne ; une action
+  // sans risque, elle, laisse le MJ raconter.)
+  await ecrireMessage({ id: "c1", Auteur_ID: "H1", Auteur_Nom: "Thorin", Texte: "Je m'assieds au pied de la colonne." });
   await p.evaluate((o) => window.__faux(o), { arbitreEnPanne: true });
   const t = await tour();
   verifier("MIA_DES en panne : le MJ raconte quand même", t.reqs.some(x => x.qui === "MIA_DES") && t.reqs.some(x => x.qui === "NARRATEUR"));

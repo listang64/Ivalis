@@ -10564,3 +10564,24 @@ effets de la carte), v314 (plus de taches ; qualité medium).
   de coin, des bords plus foncés.
 
 corrections_v316.mjs vérifie tout cela (13 échecs sur la v315).
+
+## v317 — Les jets de dés demandés pour de bon : le filet des mots sous l'Arbitre IA
+
+Nico : « je n'ai pas encore vu une seule fois le MJ demander des jets de dés pour les
+actions de mes joueurs ». L'Arbitre IA (MIA_DES) parlait seul : s'il échouait (délai,
+refus, réponse sans décision) ou répondait « aucun jet », le Narrateur racontait
+directement, sans rien laisser voir.
+- jetsParLesMots (ia_master.js) : une lecture sans IA de la dernière action de chaque héros ;
+  une tentative nette demande son jet, par la caractéristique de sa manière (se cacher,
+  crocheter, voler, sauter, sans bruit → DEX ; enfoncer, forcer, escalader, nager → FOR ;
+  convaincre, mentir, intimider, marchander → CHA ; déchiffrer, se souvenir, enquêter → INT ;
+  fouiller, chercher un indice, écouter aux portes, pister, soigner → SAG ; résister au
+  poison, retenir son souffle → CON). Jamais pour un combat, une parole entre guillemets,
+  une question, un regard, ouvrir ou pousser une porte ordinaire.
+- arbitrerAvantLeMJ : les jets de l'IA, plus ceux du filet pour les héros que l'IA n'a pas
+  servis ; window.DERNIER_ARBITRAGE garde le diagnostic (actions lues, jets par l'IA, par
+  les mots, l'erreur de l'IA s'il y en a eu une) ; la console le dit aussi.
+
+corrections_v317.mjs vérifie tout cela (3 sections en échec sur la v316). Test mis à jour :
+v295 (« MIA_DES en panne : le MJ raconte quand même », avec une action sans risque : une
+tentative nette reçoit maintenant son jet même l'IA en panne).
