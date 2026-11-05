@@ -56,8 +56,10 @@ const R = window.REGLAGES_ILLUSTRATIONS = window.REGLAGES_ILLUSTRATIONS || {
     ecart: 2,                 // au plus une illustration toutes les N réponses du Narrateur
     qualite: "medium",        // v315 : « low » donnait un trait pixelisé (l'avatar rhabillé : medium)
     tailleMin: 0.42, tailleMax: 0.82,   // largeur de l'illustration, en part de la page
-    portraitsMax: 2           // portraits pleine page par réponse, au plus
+    portraitsMax: 2,          // portraits pleine page par réponse, au plus
+    forcerApres: 3            // (v326) 3 réponses du Narrateur sans croquis : un gros plan d'un héros, d'office
 };
+if (R.forcerApres === undefined) R.forcerApres = 3;
 
 const lireCles = () => (typeof window.clesApiIvalis === "function" ? window.clesApiIvalis() : {});
 const aLesCles = () => { const c = lireCles(); return !!(c.openai && c.cloudName && c.cloudKey && c.cloudSecret) && typeof window.fetchGemini === "function"; };
@@ -132,6 +134,29 @@ function acteursDuCroquis(avis, texteMJ) {
     return res;
 }
 window.acteursDuCroquisIllustrateur = acteursDuCroquis;   // (pour les bancs)
+// LE GROS PLAN FORCÉ (v326) : un héros de la partie qui a son portrait — de
+// préférence un que le Narrateur vient de citer —, en gros plan, saisi dans ce
+// moment (la phrase du récit qui parle de lui part avec).
+function grosPlanForce(texteMJ) {
+    const tous = herosDeLaPartie();
+    const avecImage = tous.filter(h => h.urlPortraitReference || h.urlCloudinary);
+    const cites = avecImage.filter(h => nommeDans(texteMJ || "", h.prenom));
+    const choix = cites.length ? cites : avecImage;
+    if (!choix.length) return null;
+    const h = choix[Math.floor(Math.random() * choix.length)];
+    const phrases = String(texteMJ || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").split(/(?<=[.!?…»])\s+/).filter(Boolean);
+    const siennes = phrases.filter(ph => nommeDans(ph, h.prenom));
+    const extrait = (siennes.length ? siennes.slice(-2) : phrases.slice(-1)).join(" ").slice(0, 500);
+    return {
+        illustrer: true, moment: "gros plan", sujet: "personnage", force: true,
+        description: `A dramatic close-up of ${h.prenom} at this very moment of the story: head and shoulders filling the frame, a strong, expressive face reacting to what is happening.`,
+        acteurs: [{ id: "H" + (tous.indexOf(h) + 1), nom: h.prenom, type: "heros", place: "center",
+                    action: "close-up, head and shoulders, caught in the moment", expression: "the emotion of this moment of the story" }],
+        mise_en_scene: "close-up portrait, the head and shoulders filling the frame, three-quarter view, slightly low angle; deep solid black shadows on one side of the face, bold cross-hatching; a solid black disc behind the head",
+        extrait, pnj_nommes: []
+    };
+}
+window.grosPlanForceIllustrateur = grosPlanForce;   // (pour les bancs)
 const decrireHeros = (h) => [h.genre ? (/f/i.test(h.genre) ? "a woman" : "a man") : "", h.race, h.classe].filter(Boolean).join(", ");
 window.herosDuCroquisIllustrateur = herosDuCroquis;   // (pour les bancs)
 // Le chroniqueur (le « je » du Narrateur) n'est jamais dessiné : ses phrases
@@ -151,7 +176,6 @@ window.sansLeNarrateurBanc = sansLeNarrateur;
 
 // LA CADENCE : les réponses du Narrateur depuis la dernière illustration (par partie).
 const cleCadence = () => "ivalis_illus_ecart_" + (window.ID_PARTIE_COURANTE || "");
-const lireEcart = () => { try { return Number(localStorage.getItem(cleCadence()) || 99); } catch (e) { return 99; } };
 const ecrireEcart = (n) => { try { localStorage.setItem(cleCadence(), String(n)); } catch (e) {} };
 
 // ---------------------------------------------------------------------
@@ -335,11 +359,19 @@ async function portraitDuPnj(p, fiche) {
 window.illustrerLeRecit = async function (options) {
     const o = options || {};
     if (!R.actif || !o.idMessage || !o.texteMJ || !aLesCles()) return null;
-    const ecart = lireEcart() + 1;
-    ecrireEcart(ecart);
+    // (v326) Les réponses du Narrateur sans croquis, comptées dans les messages de la
+    // partie (ia_master.js) : le même compte sur tous les postes. Sinon, ce poste-ci.
+    // (Sans compte enregistré sur ce poste : le croquis est permis, mais rien n'est
+    // encore forcé — le premier passage compte pour un.)
+    const brut = (() => { try { return localStorage.getItem(cleCadence()); } catch (e) { return null; } })();
+    const partage = Number.isFinite(o.narrationsSansCroquis);
+    const ecart = partage ? o.narrationsSansCroquis + 1 : (brut === null ? 99 : (Number(brut) || 0) + 1);
+    const ecartForce = partage ? ecart : (brut === null ? 1 : (Number(brut) || 0) + 1);
+    ecrireEcart(ecartForce);
     let avis;
     try { avis = await demanderAgent(o.texteJoueurs || "", o.texteMJ); }
-    catch (e) { console.warn("[MIA_ILLUSTRATEUR]", e); return null; }
+    catch (e) { console.warn("[MIA_ILLUSTRATEUR]", e); avis = { illustrer: false, pnj_nommes: [] }; }
+    avis = avis && typeof avis === "object" ? avis : { illustrer: false };
     const ref = doc(db, "Messages_Chat", o.idMessage);
     const resultat = { illustration: null, portraits: [] };
 
@@ -351,47 +383,58 @@ window.illustrerLeRecit = async function (options) {
     const promessesPortraits = sansPortrait.map(p => portraitDuPnj(p, fiches[p.nom]).catch(e => { console.warn("[MIA_ILLUSTRATEUR] Portrait de " + p.nom, e); return null; }));
 
     // LE CROQUIS DU MOMENT.
-    if (avis.illustrer && avis.description && ecart >= R.ecart) {
+    const croquer = async (a, force) => {
         // (v318) Le chroniqueur du carnet ne se dessine jamais : les phrases de la
         // description qui parlent de lui (ou d'un « I/me/we ») sont retirées.
-        avis.description = sansLeNarrateur(avis.description);
+        a.description = sansLeNarrateur(a.description);
         const refs = [];
-        const acteurs = acteursDuCroquis(avis, o.texteMJ);
-        if (acteurs.perdus.length) {
-            console.warn(`[MIA_ILLUSTRATEUR] Héros introuvable(s) dans la partie : ${acteurs.perdus.join(", ")} — pas de croquis (plutôt rien que des inconnus).`);
-            avis.illustrer = false;
-        }
+        const acteurs = acteursDuCroquis(a, o.texteMJ);
+        // (v326) Un héros qu'on ne retrouve pas n'est pas dessiné — ni personne à sa
+        // place ; les autres le sont (avant, tout le croquis tombait).
+        if (acteurs.perdus.length) console.warn(`[MIA_ILLUSTRATEUR] Héros introuvable(s) dans la partie, laissé(s) hors du croquis : ${acteurs.perdus.join(", ")}.`);
         const heros = acteurs.heros;
+        if (acteurs.perdus.length && !heros.length && !acteurs.pnj.length && !acteurs.autres.length) {
+            console.warn("[MIA_ILLUSTRATEUR] Plus personne à dessiner : pas de croquis.");
+            return null;
+        }
         heros.forEach(h => refs.push({ nom: h.prenom, qui: decrireHeros(h), url: h.urlPortraitReference || h.urlCloudinary || "", heros: true, scene: acteurs.scene[h.prenom] || "" }));
         // Les héros du croquis se nomment dans la description (le dessinateur
         // relie ainsi chaque prénom à son image).
-        const manquants = heros.filter(h => !nommeDans(avis.description, h.prenom)).map(h => h.prenom);
-        if (manquants.length) avis.description += ` (With ${manquants.join(" and ")}.)`;
+        const manquants = heros.filter(h => !nommeDans(a.description, h.prenom)).map(h => h.prenom);
+        if (manquants.length) a.description += ` (With ${manquants.join(" and ")}.)`;
         acteurs.pnj.forEach(n => { const f = Object.values(fiches).find(x => memeNom(x.Nom_PNJ, n)); if (f && f.URL_Cloudinary) refs.push({ nom: f.Nom_PNJ, qui: f.Race || "", url: f.URL_Cloudinary, scene: acteurs.scene[n] || "" }); });
-        if (avis.illustrer) try {
+        try {
             // (Un héros qui n'a encore aucun portrait se dit en mots ; celui dont le
             // portrait existe mais ne se lit pas arrête le croquis.)
             const sansImage = heros.filter(h => !(h.urlPortraitReference || h.urlCloudinary));
-            if (sansImage.length) avis.description += " " + sansImage.map(h => `${h.prenom} is ${decrireHeros(h) || "an adventurer"}.`).join(" ");
+            if (sansImage.length) a.description += " " + sansImage.map(h => `${h.prenom} is ${decrireHeros(h) || "an adventurer"}.`).join(" ");
             // (v318) Qui est dessiné, et combien : personne d'autre.
-            const pnjDuCroquis = acteurs.pnj;
+            const noms = [...heros.map(h => h.prenom), ...acteurs.pnj];
             const autres = acteurs.autres.slice(0, 4);
-            const noms = [...heros.map(h => h.prenom), ...pnjDuCroquis];
             const nombre = noms.length + autres.length;
             const qui = nombre
                 ? ` EXACTLY ${nombre} figure${nombre > 1 ? "s" : ""} in the whole drawing: ${[...noms, ...autres].join(", ")}. No other person or creature anywhere: no narrator, no chronicler, no onlooker, no crowd, no figure in the distance.`
                 : " No person at all in the drawing: no narrator, no onlooker, no figure in the distance.";
-            const miseEnScene = String(avis.mise_en_scene || "").trim();
-            const extrait = String(avis.extrait || "").replace(/\s+/g, " ").trim().slice(0, 600);
-            const img = await dessiner(avis.description + qui, refs, avis.sujet === "personnage" ? "personnage" : "scene", { herosAttendus: heros.length - sansImage.length, miseEnScene, extrait });
+            const miseEnScene = String(a.mise_en_scene || "").trim();
+            const extrait = String(a.extrait || "").replace(/\s+/g, " ").trim().slice(0, 600);
+            const img = await dessiner(a.description + qui, refs, a.sujet === "personnage" ? "personnage" : "scene", { herosAttendus: heros.length - sansImage.length, miseEnScene, extrait });
             const taille = +(R.tailleMin + Math.random() * (R.tailleMax - R.tailleMin)).toFixed(3);
-            resultat.illustration = { Url: img.url, Ratio: img.ratio, Taille: taille, Moment: String(avis.moment || ""), Sujet: avis.sujet === "personnage" ? "personnage" : "scene", Le: Date.now(),
+            const illustration = { Url: img.url, Ratio: img.ratio, Taille: taille, Moment: String(a.moment || ""), Sujet: a.sujet === "personnage" ? "personnage" : "scene", Le: Date.now(),
                 // (v323) Pour vérifier après coup : les portraits joints, la consigne envoyée.
-                References: img.references || [], Consigne: String(img.consigne || "").slice(0, 1800) };
-            await updateDoc(ref, { Illustration: resultat.illustration });
+                References: img.references || [], Consigne: String(img.consigne || "").slice(0, 1800), ...(force ? { Force: true } : {}) };
+            await updateDoc(ref, { Illustration: illustration });
             ecrireEcart(0);
-            console.log(`🖋️ [MIA_ILLUSTRATEUR] Un croquis (${resultat.illustration.Moment}) : ${avis.description}`);
-        } catch (e) { console.warn("[MIA_ILLUSTRATEUR] Le croquis :", e); }
+            console.log(`🖋️ [MIA_ILLUSTRATEUR] Un croquis${force ? " forcé (gros plan)" : ""} (${illustration.Moment}) : ${a.description}`);
+            return illustration;
+        } catch (e) { console.warn("[MIA_ILLUSTRATEUR] Le croquis :", e); return null; }
+    };
+    if (avis.illustrer && avis.description && ecart >= R.ecart) resultat.illustration = await croquer(avis, false);
+    else console.log(`🖋️ [MIA_ILLUSTRATEUR] Pas de croquis cette fois (${!avis.illustrer ? "l'agent n'a pas vu de moment" : ecart < R.ecart ? "le dernier est trop récent" : "sans description"}) — ${ecartForce} réponse(s) du Narrateur sans croquis.`);
+    // (v326) Nico : « s'il n'y a pas eu de dessin après 3 réponses du MJ, ça force le
+    // dessin, sur un gros plan d'un des aventuriers ».
+    if (!resultat.illustration && R.forcerApres > 0 && ecartForce >= R.forcerApres) {
+        const gros = grosPlanForce(o.texteMJ);
+        if (gros) resultat.illustration = await croquer(gros, true);
     }
     resultat.portraits = (await Promise.all(promessesPortraits)).filter(Boolean);
     if (resultat.portraits.length) {

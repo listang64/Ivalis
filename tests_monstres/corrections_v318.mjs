@@ -200,7 +200,7 @@ const illustrer = (avis, texteMJ) => p.evaluate(async ([avis, texteMJ]) => {
   window.televerserImageDetoureeIvalis = async (source, dossier) => `https://res.cloudinary.com/x/image/upload/q_auto,f_auto/v1/${dossier}/croquis.png`;
   window.imageVersBlobPng = async () => new Blob(["png"], { type: "image/png" });
   window.fetchGemini = async () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(avis) }] } }] }), { status: 200 });
-  localStorage.removeItem("ivalis_illus_ecart_P1");
+  localStorage.removeItem("ivalis_illus_ecart_P1"); localStorage.removeItem("ivalis_illus_ecart_" + (window.ID_PARTIE_COURANTE || ""));
   const id = "mi" + Math.random().toString(36).slice(2, 7);
   await window.illustrerLeRecit({ idMessage: id, texteMJ, texteJoueurs: "", pnjConnus: { Varos: { Nom_PNJ: "Varos", URL_Cloudinary: "https://x/PNJ/v.png", Race: "Humain" } } });
   return (window.__docs || {})["Messages_Chat/" + id] || null;

@@ -190,7 +190,7 @@ const illustrer = (avis, texteMJ) => p.evaluate(async ([avis, texteMJ]) => {
   window.__fonds = []; window.imageVersBlobPng = async (url, fond) => { window.__blobs.push(url); window.__fonds.push(fond || ""); return new Blob(["png"], { type: "image/png" }); };
   window.__agent = "";
   window.fetchGemini = async (nom, corps) => { window.__agent = corps; return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(avis) }] } }] }), { status: 200 }); };
-  localStorage.removeItem("ivalis_illus_ecart_P1");
+  localStorage.removeItem("ivalis_illus_ecart_P1"); localStorage.removeItem("ivalis_illus_ecart_" + (window.ID_PARTIE_COURANTE || ""));
   const id = "mi" + Math.random().toString(36).slice(2, 7);
   await window.illustrerLeRecit({ idMessage: id, texteMJ, texteJoueurs: "", pnjConnus: {} });
   return { doc: (window.__docs || {})["Messages_Chat/" + id] || null, blobs: window.__blobs.slice(), fonds: window.__fonds.slice(), depots: window.__depots.slice(), agent: window.__agent };

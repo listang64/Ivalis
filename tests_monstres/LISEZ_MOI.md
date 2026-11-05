@@ -10732,3 +10732,24 @@ l'avatar aussi » attendait ses taches).
 corrections_v325.mjs vérifie tout cela (9 échecs sur la v324). Tests mis à jour : v314 (fond
 blanc au lieu du magenta), v315 (le décor « seulement ce que le moment demande »), v318
 (l'encre noire sur blanc).
+
+## v326 — Le gros plan forcé après 3 réponses du Narrateur sans croquis
+
+- Nico : « j'ai l'impression que l'IA ne dessine plus rien ; s'il n'y a pas eu de dessin après
+  3 réponses du MJ, force le dessin sur un gros plan d'un des aventuriers ».
+- Le compte est tenu dans les messages de la partie (ia_master.js : les réponses du Narrateur
+  depuis le dernier message qui porte une Illustration) et transmis à illustrerLeRecit
+  (narrationsSansCroquis) : le même pour tous les postes. Avant, chaque poste comptait les
+  réponses qu'il avait lui-même déclenchées : à plusieurs joueurs, le compte avançait mal.
+  Sans ce compte (un banc), le compteur du poste ; sans compteur enregistré, rien n'est forcé
+  au premier passage.
+- À la 3e réponse sans croquis, si l'agent n'en propose pas (ou ne répond pas, ou que son
+  croquis échoue) : grosPlanForce — un héros qui a son portrait (de préférence un que le
+  Narrateur vient de citer), tête et épaules, une expression forte, disque noir derrière ; la
+  phrase du récit qui parle de lui part avec. L'illustration porte Force: true.
+- Un héros cité par l'agent mais introuvable dans la partie n'annule plus tout le croquis :
+  il est laissé de côté (personne à sa place), les autres sont dessinés.
+- La console dit pourquoi il n'y a pas de croquis (pas de moment vu, trop récent…).
+
+corrections_v326.mjs vérifie tout cela (11 échecs sur la v325). Tests mis à jour : v318, v323,
+v325 remettent à zéro le compteur de la partie ouverte.

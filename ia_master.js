@@ -2203,6 +2203,10 @@ window.declencherTourIA = async function(options) {
 
         const historiqueComplet = historiqueReduit.map(ligneDuLivre).join("\n");
         const historique4 = historiqueReduit.slice(-4).map(ligneDuLivre).join("\n");
+        // (v326) Les réponses du Narrateur depuis le dernier croquis (MIA_ILLUSTRATEUR) :
+        // compté dans les messages, le même pour tous les postes.
+        const narrationsSansCroquis = (() => { let n = 0; for (let i = messagesFiltres.length - 1; i >= 0; i--) { const m = messagesFiltres[i] || {};
+            if (m.Illustration && m.Illustration.Url) break; if (m.Est_Narration_IA) n++; } return n; })();
         // =========================================================================
 
         const env = await preparerEnvironnement(lieuActuel);
@@ -2422,7 +2426,7 @@ window.declencherTourIA = async function(options) {
             // quand le moment le mérite, et le portrait en pied des PNJ nommés qui
             // n'en ont pas. Pendant la lecture, sans rien retenir.
             if (typeof window.illustrerLeRecit === "function" && idMessage) {
-                window.illustrerLeRecit({ idMessage, texteMJ: reponseTexte, texteJoueurs: historique4,
+                window.illustrerLeRecit({ idMessage, texteMJ: reponseTexte, texteJoueurs: historique4, narrationsSansCroquis,
                                           pnjConnus: { ...pnjAffiches, ...Object.fromEntries(nouveauxPnj.map(p => [p.Nom_PNJ, p])) } })
                     .catch(e => console.error("[MIA_ILLUSTRATEUR] :", e));
             }
