@@ -200,7 +200,7 @@ await section(async () => {
   verifier("le marque-page du Narrateur, moins large (150 au lieu de 190)", Math.abs(r.largeur - 150) < 6, r.largeur.toFixed(1));
   verifier("… son coin du haut arraché (une déchirure en dents de scie dans l'angle)", (r.clip.match(/%/g) || []).length > 20, r.clip.slice(0, 80));
   verifier("le papier où l'on écrit : vieilli, taché de café", r.ecriture >= 4, String(r.ecriture));
-  verifier("le papier de l'avatar aussi", r.usure >= 3, String(r.usure));
+  verifier("le papier de l'avatar : vieilli (v324 : sans ses taches de café, à la demande de Nico)", r.usure >= 1, String(r.usure));
   // (v315 : les taches de café du récit sont retirées, à la demande de Nico.)
   verifier("(v315) plus de taches de café sur les pages du récit", r.pages >= 6 && r.taches === 0, `${r.taches} / ${r.pages} pages`);
 });

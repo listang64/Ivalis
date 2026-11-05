@@ -325,11 +325,10 @@
     radial-gradient(ellipse at 50% 55%, transparent 52%, rgba(95, 55, 18, 0.32) 100%),
     url('images/grimoire/page.webp?v=1') 60% 70% / 260% auto, #e2cd9f;
 }
+/* v324 : plus de taches de café sur le papier de l'avatar (Nico : « retire les
+   taches de café sales des post-it où il y a l'avatar ») ; les bords roussis restent. */
 .papier-usure {
   background:
-    radial-gradient(circle at 30% 18%, transparent 0 12%, rgba(120, 70, 25, 0.2) 12.6%, rgba(120, 70, 25, 0.08) 14.5%, transparent 16%),
-    radial-gradient(ellipse 22% 9% at 62% 88%, rgba(110, 65, 20, 0.15), transparent 100%),
-    radial-gradient(circle at 75% 60%, rgba(100, 60, 20, 0.1) 0 1.5%, transparent 2%),
     radial-gradient(ellipse at 50% 50%, transparent 48%, rgba(95, 55, 18, 0.35) 100%),
     url('images/grimoire/page.webp?v=1') 40% 60% / 340% auto, #d6bb88;
 }

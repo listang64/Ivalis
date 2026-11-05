@@ -10703,3 +10703,12 @@ première page du récit dans le livre (GRIMOIRE.premiereDeLaSuite()) au lieu de
 
 corrections_v323.mjs vérifie tout cela (14 échecs sur la v322 : aucune image ne partait pour
 Fargus). v314, v315, v318 repassent.
+
+## v324 — Le papier de l'avatar sans taches de café
+
+- Le papier de l'avatar, à gauche du livre (.papier-usure) : ses taches de café (l'anneau,
+  l'auréole, la goutte) sont retirées ; ses bords roussis, son papier et ses bords déchirés
+  restent. Le papier d'écriture des joueurs ne change pas.
+
+corrections_v324.mjs le vérifie (3 échecs sur la v323). Test mis à jour : v314 (« le papier de
+l'avatar aussi » attendait ses taches).
