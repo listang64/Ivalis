@@ -62,7 +62,18 @@ const R = window.REGLAGES_ILLUSTRATIONS = window.REGLAGES_ILLUSTRATIONS || {
 const lireCles = () => (typeof window.clesApiIvalis === "function" ? window.clesApiIvalis() : {});
 const aLesCles = () => { const c = lireCles(); return !!(c.openai && c.cloudName && c.cloudKey && c.cloudSecret) && typeof window.fetchGemini === "function"; };
 const sansAccent = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
-const memeNom = (a, b) => { const x = sansAccent(a), y = sansAccent(b); return !!x && !!y && (x === y || x.split(/\s+/)[0] === y.split(/\s+/)[0]); };
+// v323 : un nom se reconnaît à ses mots. Le héros « A- Fargus » est « Fargus »
+// dans le récit : comparer le premier mot (« a- » contre « fargus ») le perdait,
+// aucune image de référence ne partait, et le dessinateur inventait des gens.
+const MOTS_VIDES = new Set(["the", "and", "les", "des", "une", "von", "van", "del", "der", "grand", "petit", "old", "young", "dark", "sir", "dame"]);
+const motsDuNom = (t) => sansAccent(t).replace(/[^a-z0-9]+/g, " ").split(" ").filter(m => m.length >= 3 && !MOTS_VIDES.has(m));
+const memeNom = (a, b) => {
+    const x = sansAccent(a), y = sansAccent(b);
+    if (!x || !y) return false;
+    if (x === y || x.split(/\s+/)[0] === y.split(/\s+/)[0]) return true;
+    const mx = motsDuNom(a), my = new Set(motsDuNom(b));
+    return mx.some(m => my.has(m));
+};
 // (v315 : les deux listes, réunies — PERSOS_JOUEURS_PARTIE peut être un tableau vide.)
 function herosDeLaPartie() {
     const vus = new Set();
@@ -78,7 +89,9 @@ function herosDeLaPartie() {
 const nommeDans = (texte, prenom) => {
     const t = " " + sansAccent(texte).replace(/[^a-z0-9]+/g, " ") + " ";
     const n = sansAccent(prenom).replace(/[^a-z0-9]+/g, " ").trim();
-    return !!n && t.includes(" " + n + " ");
+    if (!n) return false;
+    if (t.includes(" " + n + " ")) return true;
+    return motsDuNom(prenom).some(m => t.includes(" " + m + " "));      // (v323) « Fargus » pour « A- Fargus »
 };
 // LES HÉROS DU CROQUIS : ceux que l'agent nomme, ceux que sa description
 // nomme ; s'il parle d'eux sans les nommer (« the heroes », « the group »…),
@@ -91,6 +104,34 @@ function herosDuCroquis(avis, texteMJ) {
     }
     return choisis.slice(0, 4);
 }
+// LES ACTEURS DU CROQUIS (v323) : la mise en scène de l'agent, figure par
+// figure, chaque héros relié à sa fiche (son identifiant H1…, sinon son nom).
+// Un héros qu'on ne retrouve pas : `perdus` (le croquis ne part pas : plutôt
+// rien qu'un inconnu à sa place).
+function acteursDuCroquis(avis, texteMJ) {
+    const tous = herosDeLaPartie();
+    const liste = Array.isArray(avis.acteurs) ? avis.acteurs.filter(a => a && (a.nom || a.id)) : [];
+    const res = { heros: [], pnj: [], autres: [], perdus: [], scene: {} };
+    const enScene = (a) => [a.place, a.action, a.expression].map(x => String(x || "").trim()).filter(Boolean).join("; ");
+    if (!liste.length) {
+        res.heros = herosDuCroquis(avis, texteMJ);
+        res.pnj = (avis.pnj_dans_le_croquis || []).filter(Boolean).map(String);
+        res.autres = (Array.isArray(avis.autres) ? avis.autres : []).filter(Boolean).map(String).slice(0, 4);
+        return res;
+    }
+    liste.slice(0, 6).forEach(a => {
+        const id = String(a.id || "").trim().toUpperCase(), nom = String(a.nom || "").trim();
+        const type = String(a.type || "").toLowerCase();
+        const parId = /^H\d+$/.test(id) ? tous[Number(id.slice(1)) - 1] : null;
+        const h = parId || (type !== "pnj" && type !== "autre" ? tous.find(x => memeNom(x.prenom, nom)) : null);
+        if (h) { if (!res.heros.includes(h)) { res.heros.push(h); res.scene[h.prenom] = enScene(a); } return; }
+        if (type === "heros" || /^H\d+$/.test(id)) { res.perdus.push(nom || id); return; }
+        if (type === "pnj") { res.pnj.push(nom); res.scene[nom] = enScene(a); return; }
+        res.autres.push(nom + (enScene(a) ? ` (${enScene(a)})` : ""));
+    });
+    return res;
+}
+window.acteursDuCroquisIllustrateur = acteursDuCroquis;   // (pour les bancs)
 const decrireHeros = (h) => [h.genre ? (/f/i.test(h.genre) ? "a woman" : "a man") : "", h.race, h.classe].filter(Boolean).join(", ");
 window.herosDuCroquisIllustrateur = herosDuCroquis;   // (pour les bancs)
 // Le chroniqueur (le « je » du Narrateur) n'est jamais dessiné : ses phrases
@@ -127,14 +168,16 @@ LE NARRATEUR N'APPARAÎT JAMAIS : la réponse est écrite à la première person
 PERSONNE D'AUTRE : le croquis ne montre QUE les héros que tu cites, les PNJ que tu cites et, seulement s'ils sont indispensables et décrits dans la réponse, des êtres sans nom (« a wolf », « two guards ») que tu listes dans "autres". Aucun figurant, aucune foule, aucun témoin, aucune silhouette au loin. Indique le nombre total de personnages et de créatures dessinés dans "nombre".
 
 LES HÉROS : cite TOUS ceux qui apparaissent DANS le croquis (leur prénom exact, dans la liste fournie), et dans la description, désigne chacun par son prénom exact (jamais « a warrior », « the adventurers » : « Kaya », « Thorin »). N'ajoute AUCUN personnage anonyme qui ne serait pas dans la réponse du Narrateur.
+
+LA MISE EN SCÈNE : chaque héros de la liste a un identifiant (H1, H2…). Dans "acteurs", liste CHAQUE figure du croquis, une par une, dans l'ordre de gauche à droite : un héros par son identifiant ("id": "H1") et son prénom, un PNJ par son nom ("type": "pnj"), un être sans nom par ce qu'il est ("type": "autre", "nom": "a wolf"). Pour chacune, en anglais : "place" (left, center, right, foreground, background), "action" (ce qu'elle fait, sa posture), "expression" (son visage, son émotion). Puis "mise_en_scene", en anglais : le cadrage (plan large, plan moyen, gros plan, plongée…), comment les figures se tiennent l'une par rapport à l'autre, et l'objet clé s'il y en a un. Le dessinateur reçoit le portrait de chaque héros et de chaque PNJ connu : il dessine la scène telle que tu la mets en scène.
 LES PNJ NOMMÉS : liste TOUS les personnages non-joueurs désignés par un VRAI nom propre dans la réponse du Narrateur (pas les héros, pas « l'aubergiste », pas un nom inventé par un héros pour bluffer), avec leur race (parmi celles du monde, Humain par défaut) et une description physique précise tirée du texte (ou plausible). Indique aussi ceux qui apparaissent dans le croquis.
 
 Réponds UNIQUEMENT en JSON :
-{"illustrer": true, "moment": "drôle|dramatique|attachant|lieu", "sujet": "scene|personnage", "description": "...", "heros": ["Kaya"], "pnj_dans_le_croquis": ["Varos"], "autres": [], "nombre": 2, "pnj_nommes": [{"nom": "Varos", "race": "Humain", "description_physique": "..."}]}
+{"illustrer": true, "moment": "drôle|dramatique|attachant|lieu", "sujet": "scene|personnage", "description": "...", "acteurs": [{"id": "H1", "nom": "Kaya", "type": "heros", "place": "left", "action": "crouching behind a fallen trunk, one hand raised to stop the others", "expression": "tense, eyes wide"}, {"nom": "Varos", "type": "pnj", "place": "right", "action": "...", "expression": "..."}], "mise_en_scene": "medium shot, slightly low angle; Kaya in the foreground turned toward Varos…", "heros": ["Kaya"], "pnj_dans_le_croquis": ["Varos"], "autres": [], "nombre": 2, "pnj_nommes": [{"nom": "Varos", "race": "Humain", "description_physique": "..."}]}
 ou {"illustrer": false, "pnj_nommes": [...]}`;
 
 async function demanderAgent(texteJoueurs, texteMJ) {
-    const heros = herosDeLaPartie().map(h => `${h.prenom}${h.genre ? ` (${/f/i.test(h.genre) ? "femme" : "homme"})` : ""}${h.race ? ", " + h.race : ""}`).join(" ; ");
+    const heros = herosDeLaPartie().map((h, i) => `H${i + 1} = ${h.prenom}${h.genre ? ` (${/f/i.test(h.genre) ? "femme" : "homme"})` : ""}${h.race ? ", " + h.race : ""}${h.classe ? ", " + h.classe : ""}`).join(" ; ");
     const corps = JSON.stringify({
         systemInstruction: { parts: [{ text: PROMPT_AGENT }] },
         contents: [{ role: "user", parts: [{ text: `--- LES HÉROS ---\n${heros || "(aucun)"}\n\n--- LES DERNIERS MESSAGES DES JOUEURS ---\n${texteJoueurs || "(rien)"}\n\n--- LA RÉPONSE DU NARRATEUR ---\n${texteMJ}` }] }],
@@ -188,11 +231,13 @@ async function dessiner(prompt, references, cadrage, options) {
     }
     console.log(`🖋️ [MIA_ILLUSTRATEUR] ${blobs.length} référence(s) jointe(s)${blobs.length ? " : " + blobs.map(b => b.nom).join(", ") : ""}.`);
     const refsTexte = blobs.length ? ` The ${blobs.length} attached reference image${blobs.length > 1 ? "s show" : " shows"} the EXACT character${blobs.length > 1 ? "s" : ""} to draw, in this order: `
-        + blobs.map((b, i) => `image ${i + 1} is ${b.nom}${b.qui ? " (" + b.qui + ")" : ""}`).join("; ")
+        + blobs.map((b, i) => `image ${i + 1} is ${b.nom}${b.qui ? " (" + b.qui + ")" : ""}${b.scene ? " — in the scene: " + b.scene : ""}`).join("; ")
         + ". Each of them must be clearly recognisable as the person in their reference image: same face, hairstyle, hair colour, beard or not, build, "
         + "age, clothing and equipment — only translated into the ink sketch style. Do not copy the references' backgrounds or colours. "
         + "Do not add any other person than those named here and in the description." : "";
-    const texte = `${STYLE_CROQUIS}${refsTexte} The sketch shows: ${prompt}`;
+    const mise = o.miseEnScene ? ` STAGING: ${o.miseEnScene}.` : "";
+    const texte = `${STYLE_CROQUIS}${refsTexte}${mise} The sketch shows: ${prompt}`;
+    console.log(`🖋️ [MIA_ILLUSTRATEUR] La consigne du dessinateur : ${texte.slice(STYLE_CROQUIS.length).trim()}`);
     const modeles = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1"];
     const delais = [5000, 15000, 30000];
     let json = null;
@@ -231,7 +276,7 @@ async function dessiner(prompt, references, cadrage, options) {
     if (!depot) throw new Error("MIA_ILLUSTRATEUR : dépôt impossible");
     // (Un trait d'encre : la compression automatique la plus fine, pas d'escalier.)
     const url = String(depot).replace("/upload/q_auto,f_auto/", "/upload/q_auto:best,f_auto/");
-    return { url, ratio: ratioDe(taille) };
+    return { url, ratio: ratioDe(taille), references: blobs.map(b => b.nom), consigne: texte.slice(STYLE_CROQUIS.length).trim() };
 }
 
 // ---------------------------------------------------------------------
@@ -299,29 +344,37 @@ window.illustrerLeRecit = async function (options) {
         // description qui parlent de lui (ou d'un « I/me/we ») sont retirées.
         avis.description = sansLeNarrateur(avis.description);
         const refs = [];
-        const heros = herosDuCroquis(avis, o.texteMJ);
-        heros.forEach(h => refs.push({ nom: h.prenom, qui: decrireHeros(h), url: h.urlPortraitReference || h.urlCloudinary || "", heros: true }));
+        const acteurs = acteursDuCroquis(avis, o.texteMJ);
+        if (acteurs.perdus.length) {
+            console.warn(`[MIA_ILLUSTRATEUR] Héros introuvable(s) dans la partie : ${acteurs.perdus.join(", ")} — pas de croquis (plutôt rien que des inconnus).`);
+            avis.illustrer = false;
+        }
+        const heros = acteurs.heros;
+        heros.forEach(h => refs.push({ nom: h.prenom, qui: decrireHeros(h), url: h.urlPortraitReference || h.urlCloudinary || "", heros: true, scene: acteurs.scene[h.prenom] || "" }));
         // Les héros du croquis se nomment dans la description (le dessinateur
         // relie ainsi chaque prénom à son image).
         const manquants = heros.filter(h => !nommeDans(avis.description, h.prenom)).map(h => h.prenom);
         if (manquants.length) avis.description += ` (With ${manquants.join(" and ")}.)`;
-        (avis.pnj_dans_le_croquis || []).forEach(n => { const f = Object.values(fiches).find(x => memeNom(x.Nom_PNJ, n)); if (f && f.URL_Cloudinary) refs.push({ nom: f.Nom_PNJ, qui: f.Race || "", url: f.URL_Cloudinary }); });
-        try {
+        acteurs.pnj.forEach(n => { const f = Object.values(fiches).find(x => memeNom(x.Nom_PNJ, n)); if (f && f.URL_Cloudinary) refs.push({ nom: f.Nom_PNJ, qui: f.Race || "", url: f.URL_Cloudinary, scene: acteurs.scene[n] || "" }); });
+        if (avis.illustrer) try {
             // (Un héros qui n'a encore aucun portrait se dit en mots ; celui dont le
             // portrait existe mais ne se lit pas arrête le croquis.)
             const sansImage = heros.filter(h => !(h.urlPortraitReference || h.urlCloudinary));
             if (sansImage.length) avis.description += " " + sansImage.map(h => `${h.prenom} is ${decrireHeros(h) || "an adventurer"}.`).join(" ");
             // (v318) Qui est dessiné, et combien : personne d'autre.
-            const pnjDuCroquis = (avis.pnj_dans_le_croquis || []).filter(Boolean).map(String);
-            const autres = (Array.isArray(avis.autres) ? avis.autres : []).filter(Boolean).map(String).slice(0, 4);
+            const pnjDuCroquis = acteurs.pnj;
+            const autres = acteurs.autres.slice(0, 4);
             const noms = [...heros.map(h => h.prenom), ...pnjDuCroquis];
             const nombre = noms.length + autres.length;
             const qui = nombre
                 ? ` EXACTLY ${nombre} figure${nombre > 1 ? "s" : ""} in the whole drawing: ${[...noms, ...autres].join(", ")}. No other person or creature anywhere: no narrator, no chronicler, no onlooker, no crowd, no figure in the distance.`
                 : " No person at all in the drawing: no narrator, no onlooker, no figure in the distance.";
-            const img = await dessiner(avis.description + qui, refs, avis.sujet === "personnage" ? "personnage" : "scene", { herosAttendus: heros.length - sansImage.length });
+            const miseEnScene = String(avis.mise_en_scene || "").trim();
+            const img = await dessiner(avis.description + qui, refs, avis.sujet === "personnage" ? "personnage" : "scene", { herosAttendus: heros.length - sansImage.length, miseEnScene });
             const taille = +(R.tailleMin + Math.random() * (R.tailleMax - R.tailleMin)).toFixed(3);
-            resultat.illustration = { Url: img.url, Ratio: img.ratio, Taille: taille, Moment: String(avis.moment || ""), Sujet: avis.sujet === "personnage" ? "personnage" : "scene", Le: Date.now() };
+            resultat.illustration = { Url: img.url, Ratio: img.ratio, Taille: taille, Moment: String(avis.moment || ""), Sujet: avis.sujet === "personnage" ? "personnage" : "scene", Le: Date.now(),
+                // (v323) Pour vérifier après coup : les portraits joints, la consigne envoyée.
+                References: img.references || [], Consigne: String(img.consigne || "").slice(0, 1800) };
             await updateDoc(ref, { Illustration: resultat.illustration });
             ecrireEcart(0);
             console.log(`🖋️ [MIA_ILLUSTRATEUR] Un croquis (${resultat.illustration.Moment}) : ${avis.description}`);

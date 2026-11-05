@@ -10681,3 +10681,25 @@ corrections_v322.mjs vérifie l'ordre au départ, quand le récit grandit, penda
 une création, et que le marque-page du récit mène toujours au texte en cours.
 Tests mis à jour pour v322 (le récit n'est plus page 7) : v300, v304, v306, v307, v308 lisent la
 première page du récit dans le livre (GRIMOIRE.premiereDeLaSuite()) au lieu des pages 7, 9, 11.
+
+## v323 — L'illustrateur : chaque héros relié à son image, et la mise en scène
+
+- La panne : le héros « A- Fargus » est « Fargus » dans le récit et pour l'agent. Le nom se
+  comparait par son premier mot (« a- » contre « fargus ») : le héros n'était pas reconnu,
+  aucune image de référence ne partait, et l'IA d'image (images/generations, sans images)
+  dessinait d'après la seule description, en inventant des figurants. Les noms se comparent
+  maintenant par leurs mots (au moins 3 lettres, sans les mots banals « grand », « old »…).
+- La mise en scène (l'idée de Nico) : l'agent reçoit les héros avec un identifiant (H1 = A-
+  Fargus…) et rend "acteurs" — chaque figure, de gauche à droite : le héros par son
+  identifiant, un PNJ par son nom, un être sans nom ; sa place, son geste, son visage — et
+  "mise_en_scene" (le cadrage, comment ils se tiennent, l'objet clé).
+- Le dessinateur reçoit les portraits de référence en binaire (/images/edits, image[]), et
+  pour chacun : « image 1 is A- Fargus (a man, Requin, Protecteur) — in the scene: center;
+  spinning around…; urgent… », puis « STAGING: … », puis le compte exact des figures.
+- Un héros de la scène qu'on ne retrouve pas dans la partie : pas de croquis (plutôt rien
+  qu'un inconnu à sa place). L'ancienne réponse de l'agent (sans "acteurs") marche encore.
+- Pour vérifier après coup : l'illustration du message garde References (les portraits
+  joints) et Consigne (le texte envoyé au dessinateur) ; la console l'écrit aussi.
+
+corrections_v323.mjs vérifie tout cela (14 échecs sur la v322 : aucune image ne partait pour
+Fargus). v314, v315, v318 repassent.
