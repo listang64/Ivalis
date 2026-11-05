@@ -10803,3 +10803,24 @@ ceux qu'on voit).
   avant ne changent pas.
 
 corrections_v329.mjs le vérifie (5 échecs sur la v328).
+
+## v330 — Les PNJ : un portrait seulement s'ils sont là, et jamais un double
+
+- Nico : « il m'a dessiné le PNJ nommé car son nom était dans un parchemin : seulement si le
+  PNJ est visible par les joueurs » ; « le fameux Valerius : l'IA m'a recréé un nouveau
+  personnage, maître Valerius, avec une nouvelle image ; c'est le même personnage ».
+- PRÉSENTS : MIA_ILLUSTRATEUR ne fait le portrait pleine page que des PNJ qu'il marque
+  "present": true (physiquement là, vus des héros) — un nom lu sur un parchemin, un sceau, une
+  lettre, une rumeur : "present": false, pas de portrait ni de fiche. La détection des
+  nouveaux PNJ (MIA_PNJ, ia_master.js) suit la même règle.
+- LE CŒUR DU NOM : memeNomPNJ (ia_master.js) compare les noms sans leurs titres (maître,
+  seigneur, capitaine, dame, prêtre, grand…) : « Maître Valerius », « Valerius le Rouge » sont
+  Valerius ; le premier mot ne compte que s'il n'est pas un titre (« Grand Prêtre Orsin » n'est
+  pas « Grand Maître Varos »). L'illustrateur s'en sert aussi.
+- PNJ EXISTANT, OÙ QU'IL SOIT (pnjExistant) : les PNJ de la partie (lus une fois ; les fiches
+  portent maintenant ID_Partie), puis ceux du monde qui portent ce nom, son cœur ou un de ses
+  mots. MIA_PNJ ne crée pas de double, MIA_CASTING reprend la fiche et le portrait connus,
+  l'illustrateur ne refait pas de portrait.
+
+corrections_v330.mjs vérifie tout cela (11 échecs sur la v329). Test mis à jour : v314 (ses
+PNJ du croquis sont marqués présents).

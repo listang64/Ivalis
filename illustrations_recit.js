@@ -67,12 +67,17 @@ const sansAccent = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "
 // v323 : un nom se reconnaît à ses mots. Le héros « A- Fargus » est « Fargus »
 // dans le récit : comparer le premier mot (« a- » contre « fargus ») le perdait,
 // aucune image de référence ne partait, et le dessinateur inventait des gens.
-const MOTS_VIDES = new Set(["the", "and", "les", "des", "une", "von", "van", "del", "der", "grand", "petit", "old", "young", "dark", "sir", "dame"]);
+const MOTS_VIDES = new Set(["the", "and", "les", "des", "une", "von", "van", "del", "der", "grand", "grande", "petit", "old", "young", "dark", "sir", "dame",
+    "maitre", "seigneur", "capitaine", "pretre", "pretresse", "sage", "vieux", "vieille", "pere", "mere", "frere", "soeur", "messire", "sire", "le", "la"]);
 const motsDuNom = (t) => sansAccent(t).replace(/[^a-z0-9]+/g, " ").split(" ").filter(m => m.length >= 3 && !MOTS_VIDES.has(m));
 const memeNom = (a, b) => {
     const x = sansAccent(a), y = sansAccent(b);
     if (!x || !y) return false;
-    if (x === y || x.split(/\s+/)[0] === y.split(/\s+/)[0]) return true;
+    if (x === y) return true;
+    // (v330) Le premier mot seulement s'il n'est pas un titre (« Grand Prêtre Orsin » ≠ « Grand Maître Varos »).
+    const px = x.split(/\s+/)[0], py = y.split(/\s+/)[0];
+    if (px === py && !MOTS_VIDES.has(px.replace(/[^a-z0-9]/g, ""))) return true;
+    if (typeof window.memeNomPNJIvalis === "function" && window.memeNomPNJIvalis(a, b)) return true;   // (les titres : maître, seigneur…)
     const mx = motsDuNom(a), my = new Set(motsDuNom(b));
     return mx.some(m => my.has(m));
 };
@@ -196,10 +201,10 @@ PERSONNE D'AUTRE : le croquis ne montre QUE les héros que tu cites, les PNJ que
 LES HÉROS : cite TOUS ceux qui apparaissent DANS le croquis (leur prénom exact, dans la liste fournie), et dans la description, désigne chacun par son prénom exact (jamais « a warrior », « the adventurers » : « Kaya », « Thorin »). N'ajoute AUCUN personnage anonyme qui ne serait pas dans la réponse du Narrateur.
 
 LA MISE EN SCÈNE : chaque héros de la liste a un identifiant (H1, H2…). Dans "acteurs", liste CHAQUE figure du croquis, une par une, dans l'ordre de gauche à droite : un héros par son identifiant ("id": "H1") et son prénom, un PNJ par son nom ("type": "pnj"), un être sans nom par ce qu'il est ("type": "autre", "nom": "a wolf"). Pour chacune, en anglais : "place" (left, center, right, foreground, background), "action" (ce qu'elle fait, sa posture), "expression" (son visage, son émotion). Puis "mise_en_scene", en anglais, comme un directeur artistique : le cadrage et l'angle (plan large, plan moyen, gros plan, contre-plongée, par-dessus l'épaule…), le point focal (où l'œil va d'abord), qui est au premier plan et qui au fond, comment les figures se tiennent l'une par rapport à l'autre, l'objet clé, et ce qui donne de la force à l'image (une grande masse noire, une silhouette à contre-jour, un disque noir derrière le sujet…). Une image lisible d'un coup d'œil. Le dessinateur reçoit le portrait de chaque héros et de chaque PNJ connu : il dessine la scène telle que tu la mets en scène.
-LES PNJ NOMMÉS : liste TOUS les personnages non-joueurs désignés par un VRAI nom propre dans la réponse du Narrateur (pas les héros, pas « l'aubergiste », pas un nom inventé par un héros pour bluffer), avec leur race (parmi celles du monde, Humain par défaut) et une description physique précise tirée du texte (ou plausible). Indique aussi ceux qui apparaissent dans le croquis.
+LES PNJ NOMMÉS : liste les personnages non-joueurs PRÉSENTS dans la scène (v330 : physiquement là, que les héros voient ou à qui ils parlent ; mets "present": true) et désignés par un VRAI nom propre dans la réponse du Narrateur — jamais un nom lu sur un parchemin, une lettre, un sceau ou une inscription, ni entendu dans une rumeur ou un souvenir (alors "present": false) ; un personnage déjà connu sous un autre titre (« Maître Valerius » pour « Valerius ») garde son nom connu (pas les héros, pas « l'aubergiste », pas un nom inventé par un héros pour bluffer), avec leur race (parmi celles du monde, Humain par défaut) et une description physique précise tirée du texte (ou plausible). Indique aussi ceux qui apparaissent dans le croquis.
 
 Réponds UNIQUEMENT en JSON :
-{"illustrer": true, "moment": "drôle|dramatique|attachant|lieu", "sujet": "scene|personnage", "description": "...", "acteurs": [{"id": "H1", "nom": "Kaya", "type": "heros", "place": "left", "action": "crouching behind a fallen trunk, one hand raised to stop the others", "expression": "tense, eyes wide"}, {"nom": "Varos", "type": "pnj", "place": "right", "action": "...", "expression": "..."}], "mise_en_scene": "medium shot, slightly low angle; Kaya in the foreground turned toward Varos…", "extrait": "Varos éclate de rire quand Kaya glisse sur l'amphore.", "heros": ["Kaya"], "pnj_dans_le_croquis": ["Varos"], "autres": [], "nombre": 2, "pnj_nommes": [{"nom": "Varos", "race": "Humain", "description_physique": "..."}]}
+{"illustrer": true, "moment": "drôle|dramatique|attachant|lieu", "sujet": "scene|personnage", "description": "...", "acteurs": [{"id": "H1", "nom": "Kaya", "type": "heros", "place": "left", "action": "crouching behind a fallen trunk, one hand raised to stop the others", "expression": "tense, eyes wide"}, {"nom": "Varos", "type": "pnj", "place": "right", "action": "...", "expression": "..."}], "mise_en_scene": "medium shot, slightly low angle; Kaya in the foreground turned toward Varos…", "extrait": "Varos éclate de rire quand Kaya glisse sur l'amphore.", "heros": ["Kaya"], "pnj_dans_le_croquis": ["Varos"], "autres": [], "nombre": 2, "pnj_nommes": [{"nom": "Varos", "present": true, "race": "Humain", "description_physique": "..."}]}
 ou {"illustrer": false, "pnj_nommes": [...]}`;
 
 async function demanderAgent(texteJoueurs, texteMJ) {
@@ -326,7 +331,13 @@ async function fichesPnj(noms, connus) {
     const trouves = {};
     // (ceux qui ont déjà leur portrait suffisent ; les autres, on cherche leur fiche pour la compléter)
     Object.values(connus || {}).forEach(p => { if (p && p.Nom_PNJ && p.URL_Cloudinary) noms.forEach(n => { if (memeNom(n, p.Nom_PNJ)) trouves[n] = { ...p }; }); });
-    const restent = noms.filter(n => !trouves[n]);
+    let restent = noms.filter(n => !trouves[n]);
+    // (v330) « Maître Valerius » est Valerius : on le cherche par le cœur de son nom.
+    if (restent.length && typeof window.pnjExistantIvalis === "function") {
+        const vus = await Promise.all(restent.map(n => window.pnjExistantIvalis(n).catch(() => null)));
+        vus.forEach((f, i) => { if (f) trouves[restent[i]] = { ...f }; });
+        restent = restent.filter(n => !trouves[n]);
+    }
     if (restent.length) {
         try {
             // (le nom exact ; les PNJ de la scène, eux, arrivent par `connus`)
@@ -380,7 +391,8 @@ window.illustrerLeRecit = async function (options) {
     const resultat = { illustration: null, portraits: [] };
 
     // LES PNJ NOMMÉS SANS PORTRAIT : en pleine page (au plus deux).
-    const nommes = (Array.isArray(avis.pnj_nommes) ? avis.pnj_nommes : []).filter(p => p && p.nom
+    // (v330) Seulement ceux qui sont LÀ : un nom lu sur un parchemin ne fait pas de portrait.
+    const nommes = (Array.isArray(avis.pnj_nommes) ? avis.pnj_nommes : []).filter(p => p && p.nom && p.present === true
         && !herosDeLaPartie().some(h => memeNom(h.prenom, p.nom)));
     const fiches = nommes.length ? await fichesPnj(nommes.map(p => p.nom), o.pnjConnus) : {};
     const sansPortrait = nommes.filter(p => !(fiches[p.nom] && fiches[p.nom].URL_Cloudinary)).slice(0, R.portraitsMax);

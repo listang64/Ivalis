@@ -218,7 +218,7 @@ await section(async () => {
     window.__agent = [];
     window.fetchGemini = async (usage, corps) => { window.__agent.push({ usage, corps: JSON.parse(corps) });
       const rep = { illustrer: true, moment: "drôle", sujet: "scene", description: "Kaya slips on a wet amphora while Varos the innkeeper laughs.", heros: ["Kaya"], pnj_dans_le_croquis: ["Varos"],
-                    pnj_nommes: [{ nom: "Varos", race: "Humain", description_physique: "Un aubergiste ventru à la barbe grise." }, { nom: "Kaya", race: "Humain" }] };
+                    pnj_nommes: [{ nom: "Varos", present: true, race: "Humain", description_physique: "Un aubergiste ventru à la barbe grise." }, { nom: "Kaya", present: true, race: "Humain" }] };
       return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(rep) }] } }] }), { status: 200 }); };
     localStorage.removeItem("ivalis_illus_ecart_P1");
   });

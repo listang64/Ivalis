@@ -593,11 +593,56 @@ const MAX_PNJ_RATTRAPES = 3;  // nouveaux noms rattrapés dans sa réponse
 
 // Le même PNJ ? Sans accents ni majuscules ; « Myrto » est « Myrto la Porteuse ».
 const sansAccentPNJ = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+// v330 : un titre n'est pas un nom. Nico : « le fameux Valerius, l'IA m'a recréé
+// un nouveau personnage, maître Valerius, avec une nouvelle image ; c'est le même
+// personnage ». On compare le CŒUR des noms (sans maître, seigneur, capitaine…) :
+// « Maître Valerius » est « Valerius », et « Valerius le Rouge » aussi.
+const TITRES_PNJ = new Set(["maitre", "maistre", "seigneur", "dame", "sire", "messire", "sieur", "capitaine", "commandant", "general", "centurion",
+    "pere", "mere", "frere", "soeur", "dom", "don", "lord", "lady", "master", "mistress", "pretre", "pretresse", "grand", "grande", "vieux", "vieille",
+    "jeune", "petit", "petite", "sage", "magistrat", "senateur", "archonte", "roi", "reine", "prince", "princesse", "chef", "oncle", "tante",
+    "le", "la", "les", "de", "du", "des", "et", "l", "d", "von", "van", "the", "of"]);
+const coeurDuNom = (nom) => sansAccentPNJ(nom).replace(/[^a-z0-9]+/g, " ").split(" ").filter(m => m.length >= 3 && !TITRES_PNJ.has(m));
 function memeNomPNJ(a, b) {
     const x = sansAccentPNJ(a), y = sansAccentPNJ(b);
     if (!x || !y) return false;
-    return x === y || x.split(/\s+/)[0] === y.split(/\s+/)[0];
+    if (x === y) return true;
+    // (le premier mot, s'il n'est pas un titre : « Myrto » est « Myrto la Porteuse »,
+    // mais « Grand Prêtre Orsin » n'est pas « Grand Maître Varos »)
+    const px = x.split(/\s+/)[0], py = y.split(/\s+/)[0];
+    if (px === py && !TITRES_PNJ.has(px.replace(/[^a-z0-9]/g, ""))) return true;
+    const cy = new Set(coeurDuNom(b));
+    return coeurDuNom(a).some(m => cy.has(m));
 }
+window.memeNomPNJIvalis = memeNomPNJ;   // (pour les bancs)
+// UN PNJ DÉJÀ CONNU, OÙ QU'IL SOIT (v330) : les PNJ de cette partie (lus une
+// fois, puis gardés), et ceux du monde qui portent ce nom, son cœur ou un de ses
+// mots (« Maître Valerius » → « Valerius »). Rend sa fiche, ou null.
+let pnjDeLaPartie = null, pnjDeLaPartieId = "";
+async function lirePnjDeLaPartie() {
+    const id = window.ID_PARTIE_COURANTE || "";
+    if (pnjDeLaPartie && pnjDeLaPartieId === id) return pnjDeLaPartie;
+    pnjDeLaPartie = []; pnjDeLaPartieId = id;
+    if (!id) return pnjDeLaPartie;
+    try { (await getDocs(query(collection(db, "Monde_PNJ"), where("ID_Partie", "==", id)))).forEach(d => pnjDeLaPartie.push({ ...d.data(), __id: d.id })); }
+    catch (e) { console.warn("[MIA_PNJ] Les PNJ de la partie :", e); }
+    return pnjDeLaPartie;
+}
+async function pnjExistant(nom) {
+    if (!nom) return null;
+    const dansLaPartie = (await lirePnjDeLaPartie()).find(x => memeNomPNJ(nom, x.Nom_PNJ));
+    if (dansLaPartie) return dansLaPartie;
+    const mots = String(nom).split(/\s+/).filter(m => m.length >= 3 && !TITRES_PNJ.has(sansAccentPNJ(m).replace(/[^a-z0-9]/g, "")));
+    const variantes = [...new Set([String(nom).trim(), mots.join(" "), ...mots].filter(Boolean))].slice(0, 10);
+    if (!variantes.length) return null;
+    try {
+        const snap = await getDocs(query(collection(db, "Monde_PNJ"), where("Nom_PNJ", "in", variantes)));
+        let trouve = null;
+        snap.forEach(d => { const x = d.data() || {}; if (!trouve && memeNomPNJ(nom, x.Nom_PNJ)) trouve = { ...x, __id: d.id }; });
+        return trouve;
+    } catch (e) { console.warn("[MIA_PNJ] Recherche de " + nom + " :", e); return null; }
+}
+const retenirPnjDeLaPartie = (fiche) => { if (pnjDeLaPartie && fiche && fiche.Nom_PNJ) pnjDeLaPartie.push(fiche); };
+window.pnjExistantIvalis = pnjExistant;
 // Le nom (ou son prénom, le premier mot) apparaît-il dans le texte, en mot entier ?
 function nomCiteDans(nom, texte) {
     const t = sansAccentPNJ(texte);
@@ -644,8 +689,10 @@ async function enregistrerFichePNJ(pnj, idLieuActuel) {
     await setDoc(doc(db, "Monde_PNJ", docId), {
         Description_Physique: pnj.physique || "", ID_Batiment: idBatimentGlobal, ID_Lieu: idLieuGlobal,
         Nom_PNJ: pnj.nom, Occupation: pnj.occupation || "", Race: pnj.race || "Humain", Secret_Mental: pnj.secret || "",
-        Statut: "Vivant", Style_De_Parole: pnj.style_parole || "", URL_Cloudinary: ""
+        Statut: "Vivant", Style_De_Parole: pnj.style_parole || "", URL_Cloudinary: "",
+        ID_Partie: window.ID_PARTIE_COURANTE || ""     // (v330 : pour le retrouver, où qu'il aille)
     });
+    retenirPnjDeLaPartie({ Nom_PNJ: pnj.nom, URL_Cloudinary: "", __id: docId });
     return docId;
 }
 
@@ -761,6 +808,8 @@ Voici les Héros : ${JSON.stringify(nomsHeros)}.
 
 Lis le texte du Maître du Jeu. Y a-t-il de NOUVEAUX personnages expressément NOMMÉS (VRAI prénom ou nom propre de personne) qui viennent d'apparaître ?
 Règles : Ignore les descriptions génériques ("un garde", "le tavernier", "la prêtresse"), les titres seuls, les foules, les dieux et les lieux. Ne liste JAMAIS les Héros. Trois noms au plus.
+PRÉSENTS (v330) : ne liste que les personnages PHYSIQUEMENT LÀ, que les héros voient ou à qui ils parlent. Un nom lu sur un parchemin, une lettre, un sceau, une inscription, entendu dans une rumeur, un souvenir ou cité par quelqu'un, d'une personne absente : NE LE LISTE PAS.
+Un personnage DÉJÀ connu sous un autre titre (« Maître Valerius » pour « Valerius ») n'est pas nouveau : NE LE LISTE PAS.
 IMPORTANCE (v312) : ne liste un nom que si ce personnage COMPTE dans la scène — il parle avec les héros ou agit envers eux, il a un rôle à jouer (une information, une demande, un marché, un conflit, une menace), on risque de le revoir. Un figurant nommé au passage (un paysan, un passant, un serviteur, un client de taverne, un enfant qui court) : NE LE LISTE PAS.
 Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste vide.`;
 
@@ -803,6 +852,10 @@ Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste 
     const dejaConnu = (nom) => nomsHeros.includes(nom) || nomsPnjExistants.some(n => memeNomPNJ(n, nom));
     nouveauxNomsDetectes = [...new Set(nouveauxNomsDetectes.map(n => String(n || "").trim()).filter(Boolean))]
         .filter(nom => !dejaConnu(nom)).slice(0, MAX_PNJ_RATTRAPES);
+    // (v330) Déjà connu ailleurs dans la partie ou le monde : pas de double.
+    const retrouves = await Promise.all(nouveauxNomsDetectes.map(n => pnjExistant(n).catch(() => null)));
+    retrouves.forEach((f, i) => { if (f) console.log(`[MIA_PNJ] « ${nouveauxNomsDetectes[i]} » est ${f.Nom_PNJ}, déjà connu : pas de nouvelle fiche ni de nouveau portrait.`); });
+    nouveauxNomsDetectes = nouveauxNomsDetectes.filter((n, i) => !retrouves[i]);
     signaler(suivi.surNoms, nouveauxNomsDetectes.slice());
 
     // 🛑 SI AUCUN NOUVEAU PNJ N'EST DÉTECTÉ, ON S'ARRÊTE ICI ! 🛑
@@ -2356,6 +2409,14 @@ window.declencherTourIA = async function(options) {
                 pnjAffiches[cle] = { Nom_PNJ: f.nom, URL_Cloudinary: "" };
                 console.log(`[MIA_CASTING] ✅ Le MJ fait entrer ${f.nom} : sa fiche sera rangée, son portrait se peint.`);
                 entree.promesse = (async () => {
+                    // (v330) Un visage préparé qui est en fait un PNJ connu (« Maître Valerius ») : le sien.
+                    const connu = await pnjExistant(f.nom).catch(() => null);
+                    if (connu) {
+                        console.log(`[MIA_CASTING] ${f.nom} est ${connu.Nom_PNJ}, déjà connu : son portrait, pas de double.`);
+                        const cree = { Nom_PNJ: connu.Nom_PNJ, URL_Cloudinary: connu.URL_Cloudinary || "" };
+                        pnjAffiches[cle] = cree; await ecrireMessage(null, {});
+                        return cree;
+                    }
                     const promesseUrl = genererEtStockerImagePNJ(f.physique, f.race).catch(e => { console.error("[MIA_CASTING] Portrait :", e); return ""; });
                     const lieu = await lieuDuRecit;
                     const docId = lieu ? await enregistrerFichePNJ(f, lieu) : null;
