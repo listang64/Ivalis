@@ -3092,6 +3092,27 @@ function encreSansBlanc(data, blanc = 232, noir = 70) {
     return data;
 }
 window.encreSansBlancIvalis = encreSansBlanc;   // (pour les bancs)
+// LES BORDS ADOUCIS (v329) : Nico, « dis à l'IA d'éviter les bordures nettes : ça
+// fait une image carrée pas belle ». Même si le dessin va jusqu'au bord, l'encre
+// s'efface vers les quatre côtés, sur une bande irrégulière (comme un croquis qui
+// se perd à la main) : plus de rectangle sur la page.
+function adoucirLesBords(data, w, h, bande = 0.16) {
+    const lisse = (t) => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+    // Une bande qui ondule, différente sur chaque côté.
+    const onde = (t, graine) => 0.65 + 0.2 * Math.sin(t * 0.021 + graine) + 0.15 * Math.sin(t * 0.0073 + graine * 2.3);
+    const largeurX = new Float32Array(h), largeurY = new Float32Array(w);
+    const gauche = new Float32Array(h), droite = new Float32Array(h), haut = new Float32Array(w), bas = new Float32Array(w);
+    for (let y = 0; y < h; y++) { gauche[y] = bande * w * onde(y, 1.1); droite[y] = bande * w * onde(y, 4.7); }
+    for (let x = 0; x < w; x++) { haut[x] = bande * h * onde(x, 2.9); bas[x] = bande * h * onde(x, 6.1); }
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const f = lisse(x / gauche[y]) * lisse((w - 1 - x) / droite[y]) * lisse(y / haut[x]) * lisse((h - 1 - y) / bas[x]);
+            if (f < 1) { const i = (y * w + x) * 4 + 3; data[i] = Math.round(data[i] * f); }
+        }
+    }
+    return data;
+}
+window.adoucirLesBordsIvalis = adoucirLesBords;
 async function detourerFondBlanc(imageSource) {
     return new Promise((resolve) => {
         const img = new Image();
@@ -3104,6 +3125,7 @@ async function detourerFondBlanc(imageSource) {
                 ctx.drawImage(img, 0, 0);
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 encreSansBlanc(imageData.data);
+                adoucirLesBords(imageData.data, canvas.width, canvas.height);   // (v329)
                 ctx.putImageData(imageData, 0, 0);
                 resolve(canvas.toDataURL("image/png"));
             } catch (e) { console.warn("Le blanc du croquis n'a pas pu être retiré :", e); resolve(imageSource); }

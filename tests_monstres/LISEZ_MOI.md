@@ -10789,3 +10789,17 @@ corrections_v328.mjs le vérifie (deux croquis, puis quatorze longueurs de texte
 une demi-page, poussé sur la page suivante quand la place manque, jamais coupé ; 2 échecs sur
 la v327). Test mis à jour : v318 (les croquis s'étalent sur plusieurs doubles pages : on mesure
 ceux qu'on voit).
+
+## v329 — Les croquis sans bords nets
+
+- Nico : « dis à l'IA d'éviter les bordures nettes : ça fait une image carrée pas belle ».
+- La consigne du dessinateur : une vignette, pas un rectangle — un îlot d'encre irrégulier au
+  milieu d'une grande marge blanche, qui s'efface vers ses bords en traits cassés ; rien ne
+  touche les bords de l'image, pas de scène pleine page, pas de cadre ; au moins un sixième de
+  blanc de chaque côté.
+- Au dépôt (app.js, adoucirLesBords, après encreSansBlanc) : même si le dessin va jusqu'au
+  bord, l'encre s'efface vers les quatre côtés sur une bande qui ondule (de 5 % à 16 % de la
+  largeur, différente sur chaque côté) : plus de rectangle sur la page. Les croquis déjà posés
+  avant ne changent pas.
+
+corrections_v329.mjs le vérifie (5 échecs sur la v328).
