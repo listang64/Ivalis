@@ -10667,3 +10667,15 @@ Suite complète (v319) : en dehors des échecs connus (fichiers effets_reels abs
 animations_en_jeu_2, v246, v251, v254, v256, v276, fabrique_sons, stats_fiche, studio_*,
 titre_preparation), seul atouts_races échouait : il cherchait le texte de l'Humain dans
 l'ancien « if (race === "Humain") » ; il le lit maintenant dans DONNEES_RACES.
+
+## v322 — Le récit toujours à la fin du livre, six pages vierges après
+
+- En partie, le livre va dans cet ordre : couverture, titre, journal, sommaire, carte du
+  monde, cartes régionales, les aventuriers (clans, fiche du héros, pages éphémères de la
+  création), puis le récit (son sommaire et ses pages), six pages vierges et le dos.
+  Avant, les aventuriers venaient entre le récit et les pages vierges.
+- premiereDeLaSuite compte maintenant les pages des aventuriers : le récit retrouve ses
+  pages (marque-page, page à lire, mots cliquables) quand elles changent.
+
+corrections_v322.mjs vérifie l'ordre au départ, quand le récit grandit, pendant et après
+une création, et que le marque-page du récit mène toujours au texte en cours.

@@ -122,10 +122,12 @@
     // région, juste après la carte du monde ; le récit vient après elles.
     let pagesRegions = [];
     // LES AVENTURIERS (v313, grimoire_fiches.js) : les pages des clans puis les
-    // doubles pages du héros choisi (fiche, compétences, forge, inventaire, DEV),
-    // après le récit, avant les pages vierges (le sommaire y mène).
+    // doubles pages du héros choisi (fiche, compétences, forge, inventaire, DEV).
+    // v322 : avant le récit. Nico : « que le texte en cours soit toujours à la
+    // fin, et toujours 6 pages vierges après la dernière page de récit » ; le
+    // livre en partie : carte, régions, aventuriers, récit, 6 vierges, le dos.
     let pagesFiches = [];
-    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length : 0);
+    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesFiches.length : 0);
     // LA CARTE DU MONDE (v302) : sa double page vient juste après l'index (5-6),
     // en partie seulement ; la suite (le récit) commence alors à la page 7.
     // Nico : « page de gauche cette partie de la map, page de droite celle-là ;
@@ -925,7 +927,7 @@
     function definirSuite(elements) {
         suite = (elements || []).slice();
         if (!pageFlip) return;
-        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions] : []), ...suite, ...(enPartie ? pagesFiches : []), ...vierges, dos];
+        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesFiches] : []), ...suite, ...vierges, dos];
         const generation = ++definirSuite.generation;      // seule la dernière demande s'applique
         const appliquer = () => {
             if (generation !== definirSuite.generation) return;
