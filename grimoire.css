@@ -396,3 +396,10 @@ body > #conteneur-parametres { z-index: 95; }
 .journal-entete { font-size: calc(var(--u) * 6.6 * var(--echelle-titres, 1)); }
 .page-chapitre h2 { font-size: calc(var(--u) * 7 * var(--echelle-titres, 1)); }
 .titre-reglages-son, .titre-acces-reserve { font-size: calc(21px * var(--echelle-titres, 1)) !important; }
+
+/* v318 — Le marque-page du récit : la plume du papier d'écriture (même dessin,
+   même trait), et un marque-page un peu plus petit que les autres. */
+.marque-page.marque-plume { width: calc(52px * var(--s, 1)) !important; height: calc(164px * var(--s, 1)) !important; top: calc(-10px * var(--s, 1)) !important; }
+.dessin-marque.dessin-plume { left: 12%; top: 16%; width: 76%; }
+.dessin-marque.dessin-plume path { stroke: #120b06; stroke-width: 1.6; fill: none; stroke-linecap: round; }
+.dessin-marque.dessin-plume path.plein { fill: rgba(18, 11, 6, 0.12); }

@@ -392,3 +392,8 @@
     url('images/grimoire/page.webp?v=1') 60% 70% / 260% auto, #e2cd9f;
   box-shadow: inset 0 0 calc(var(--u) * 2.2) rgba(92, 54, 18, 0.5);
 }
+
+/* v318 — Nico : « pour le récit, mets-moi l'écriture en Palatino » (le global
+   « * { Almendra !important } » de style.css l'imposait sinon). */
+.page-recit .para-recit, .page-recit .para-recit * {
+  font-family: 'Palatino', 'Palatino Linotype', 'Book Antiqua', 'Palladio', 'URW Palladio L', 'P052', serif !important; }

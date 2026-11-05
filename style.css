@@ -6320,3 +6320,8 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 .ennemi-a-valider .nom-ennemi-valider { border: 0; font-size: 18px; font-weight: 700; color: #1b1009; }
 .ennemi-a-valider:has(.garder-ennemi:not(:checked)) .nom-ennemi-valider { text-decoration: line-through; color: #8a6a4a; }
 .note-feuille-ennemis { min-height: 1.2em; margin: 8px 0 0; text-align: center; color: #6b120a; font-style: italic; }
+
+/* v318 — LES DÉPENSES : la case de la TVA, les lignes « Hors MJ » (images, combat). */
+.depenses-tva { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; font-size: 14px; color: #3a2210; cursor: pointer; }
+.depenses-tva input { width: 18px; height: 18px; accent-color: #8c6a45; }
+.depenses-ligne.hors-tour td { background: rgba(120, 140, 160, 0.08); }

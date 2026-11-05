@@ -372,3 +372,21 @@
 /* (Dans le livre, le bandeau de la Forge — cap, fatigue, initiative — ne colle
    plus en haut de la page qui défile : sans fond, il recouvrait les effets.) */
 .forge-dans-livre .forge-bandeau { position: static !important; }
+
+/* =========================================================================
+   v318 — LA FORGE DANS LE LIVRE : le bandeau défile avec la page, des lavis
+   légers dans ses bulles, plus de rond « + » (le codex est toujours ouvert à
+   droite), et le codex sans fond blanc : chaque effet dans un cadre d'encre,
+   sur un voile beige léger.
+   ========================================================================= */
+.forge-dans-livre .forge-bandeau, .forge-dans-livre .forge-medaillons { position: static !important; top: auto !important; }
+.forge-dans-livre .forge-cap, .forge-dans-livre .forge-medaillon, .forge-dans-livre .forge-btn-aide { position: relative !important; isolation: isolate; }
+.lavis-bulle { display: none; }
+.forge-dans-livre .lavis-bulle { display: block; left: -6%; top: -10%; width: 112%; height: 120%; }
+.forge-dans-livre .forge-ajouter { display: none !important; }
+.page-codex .forge-grimoire-liste, .page-codex .forge-grimoire-liste * { background-image: none !important; background-color: transparent !important; }
+.page-codex .forge-grimoire-groupe { display: flex; flex-direction: column; gap: calc(var(--u) * 1.2); }
+.page-codex .forge-grimoire-ligne { position: relative; border: 1px solid rgba(27, 16, 9, 0.55) !important; border-radius: 3% 6% 4% 5% / 12% 8% 14% 10% !important;
+  background: radial-gradient(ellipse at 40% 50%, rgba(196, 154, 98, 0.16), rgba(196, 154, 98, 0.05) 70%, transparent 100%) !important; }
+.page-codex .forge-grimoire-ligne.desactive { opacity: 0.5; }
+.forge-dans-livre .forge-cout { background: none !important; border-top: 1px solid rgba(27, 16, 9, 0.45) !important; border-bottom: 1px solid rgba(27, 16, 9, 0.45) !important; }

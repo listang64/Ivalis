@@ -93,6 +93,20 @@ function herosDuCroquis(avis, texteMJ) {
 }
 const decrireHeros = (h) => [h.genre ? (/f/i.test(h.genre) ? "a woman" : "a man") : "", h.race, h.classe].filter(Boolean).join(", ");
 window.herosDuCroquisIllustrateur = herosDuCroquis;   // (pour les bancs)
+// Le chroniqueur (le « je » du Narrateur) n'est jamais dessiné : ses phrases
+// sortent de la description (v318).
+function sansLeNarrateur(description) {
+    const lui = /\b(narrator|chronicler|storyteller|journal[- ]writer|the writer|I|me|my|myself|we|us|our|ourselves)\b/i;
+    const phrases = String(description || "").split(/(?<=[.!?])\s+/).filter(Boolean);
+    const garde = phrases.filter(ph => !lui.test(ph));
+    if (garde.length) return garde.join(" ").trim();
+    // Tout parlait de lui : on garde la phrase, sans lui (« the narrator holds a
+    // torch behind Kaya » → « Kaya »… le reste de la scène suffit au dessin).
+    return phrases.map(ph => ph.replace(/\b(the )?(narrator|chronicler|storyteller)( of the journal)?\b[^,;.]*?\b(behind|beside|next to|near|with|watching|while)\b/gi, "")
+        .replace(/\b(the )?(narrator|chronicler|storyteller)\b/gi, "").replace(/\b(I|me|my|we|us|our)\b/gi, "").replace(/\s{2,}/g, " ").trim())
+        .filter(Boolean).join(" ");
+}
+window.sansLeNarrateurBanc = sansLeNarrateur;
 
 // LA CADENCE : les réponses du Narrateur depuis la dernière illustration (par partie).
 const cleCadence = () => "ivalis_illus_ecart_" + (window.ID_PARTIE_COURANTE || "");
@@ -108,11 +122,15 @@ QUAND DESSINER : seulement un moment qui marque — drôle (une maladresse, une 
 
 QUOI DESSINER : soit une SCÈNE (les personnages en action), soit UN PERSONNAGE en particulier (un héros, un PNJ), soit un LIEU saisissant. Ne dessine QUE ce qui est strictement important pour raconter le moment : les personnages concernés et, seulement s'il est indispensable, l'objet ou l'élément avec lequel ils agissent. PAS de décor ni d'arrière-plan, sauf si le lieu est lui-même le sujet ou qu'il est nécessaire pour comprendre le moment. Décris concrètement ce que montre le croquis, en anglais, en une ou deux phrases (qui, quoi, l'attitude) — pas d'abstraction, pas de texte dans l'image.
 
+LE NARRATEUR N'APPARAÎT JAMAIS : la réponse est écrite à la première personne par le chroniqueur du groupe (le « je », le « nous »). Ce chroniqueur ne se dessine JAMAIS : ne le décris pas, ne le compte pas, n'écris jamais « the narrator », « I », « me », « we » ni « us » dans la description. « Nous » ne désigne que les héros présents.
+
+PERSONNE D'AUTRE : le croquis ne montre QUE les héros que tu cites, les PNJ que tu cites et, seulement s'ils sont indispensables et décrits dans la réponse, des êtres sans nom (« a wolf », « two guards ») que tu listes dans "autres". Aucun figurant, aucune foule, aucun témoin, aucune silhouette au loin. Indique le nombre total de personnages et de créatures dessinés dans "nombre".
+
 LES HÉROS : cite TOUS ceux qui apparaissent DANS le croquis (leur prénom exact, dans la liste fournie), et dans la description, désigne chacun par son prénom exact (jamais « a warrior », « the adventurers » : « Kaya », « Thorin »). N'ajoute AUCUN personnage anonyme qui ne serait pas dans la réponse du Narrateur.
 LES PNJ NOMMÉS : liste TOUS les personnages non-joueurs désignés par un VRAI nom propre dans la réponse du Narrateur (pas les héros, pas « l'aubergiste », pas un nom inventé par un héros pour bluffer), avec leur race (parmi celles du monde, Humain par défaut) et une description physique précise tirée du texte (ou plausible). Indique aussi ceux qui apparaissent dans le croquis.
 
 Réponds UNIQUEMENT en JSON :
-{"illustrer": true, "moment": "drôle|dramatique|attachant|lieu", "sujet": "scene|personnage", "description": "...", "heros": ["Kaya"], "pnj_dans_le_croquis": ["Varos"], "pnj_nommes": [{"nom": "Varos", "race": "Humain", "description_physique": "..."}]}
+{"illustrer": true, "moment": "drôle|dramatique|attachant|lieu", "sujet": "scene|personnage", "description": "...", "heros": ["Kaya"], "pnj_dans_le_croquis": ["Varos"], "autres": [], "nombre": 2, "pnj_nommes": [{"nom": "Varos", "race": "Humain", "description_physique": "..."}]}
 ou {"illustrer": false, "pnj_nommes": [...]}`;
 
 async function demanderAgent(texteJoueurs, texteMJ) {
@@ -134,10 +152,13 @@ async function demanderAgent(texteJoueurs, texteMJ) {
 //  2. LE CROQUIS : gpt-image, l'encre sur le magenta, détouré
 // ---------------------------------------------------------------------
 const STYLE_CROQUIS = "A quick pen-and-ink sketch drawn with a quill in the margin of an old adventurer's travel journal: "
-    + "confident dark brown-black iron-gall ink lines, loose hatching and cross-hatching for the shadows, a few small ink blots, "
+    + "confident pure BLACK ink lines, loose hatching and cross-hatching in black for the shadows, a few small black ink blots, "
     + "lively and expressive like a master's study sketch, crisp clean high-resolution lines. "
     + "Draw ONLY what matters for the moment: the characters and, if essential, the one object or element they act with. "
-    + "No background, no scenery, no ground line, unless the place itself is the subject. Ink only: no colour, no grey wash, no paper texture, no frame, no border, "
+    + "No background, no scenery, no ground line, unless the place itself is the subject. "
+    + "ONLY BLACK LINES ON MAGENTA: absolutely NO WHITE anywhere — no white fill, no white paper, no white highlight, no white halo or outline "
+    + "around the figures; the inside of faces, skin, clothes, hair and objects is NOT filled: it stays the same flat magenta, so that "
+    + "everything that is not a black ink line is magenta (pure line art). No colour, no grey wash, no paper texture, no frame, no border, "
     + "no text, no letters, no signature. The drawing floats alone on a flat, clean, pure fluorescent magenta (#FF00FF) background used "
     + "as a chroma key: every empty area is that exact magenta, with no gradient, no ground shadow, no paper. The magenta is only a "
     + "chroma key: the ink lines never take any purple, pink or magenta tint. "
@@ -274,6 +295,9 @@ window.illustrerLeRecit = async function (options) {
 
     // LE CROQUIS DU MOMENT.
     if (avis.illustrer && avis.description && ecart >= R.ecart) {
+        // (v318) Le chroniqueur du carnet ne se dessine jamais : les phrases de la
+        // description qui parlent de lui (ou d'un « I/me/we ») sont retirées.
+        avis.description = sansLeNarrateur(avis.description);
         const refs = [];
         const heros = herosDuCroquis(avis, o.texteMJ);
         heros.forEach(h => refs.push({ nom: h.prenom, qui: decrireHeros(h), url: h.urlPortraitReference || h.urlCloudinary || "", heros: true }));
@@ -287,7 +311,15 @@ window.illustrerLeRecit = async function (options) {
             // portrait existe mais ne se lit pas arrête le croquis.)
             const sansImage = heros.filter(h => !(h.urlPortraitReference || h.urlCloudinary));
             if (sansImage.length) avis.description += " " + sansImage.map(h => `${h.prenom} is ${decrireHeros(h) || "an adventurer"}.`).join(" ");
-            const img = await dessiner(avis.description, refs, avis.sujet === "personnage" ? "personnage" : "scene", { herosAttendus: heros.length - sansImage.length });
+            // (v318) Qui est dessiné, et combien : personne d'autre.
+            const pnjDuCroquis = (avis.pnj_dans_le_croquis || []).filter(Boolean).map(String);
+            const autres = (Array.isArray(avis.autres) ? avis.autres : []).filter(Boolean).map(String).slice(0, 4);
+            const noms = [...heros.map(h => h.prenom), ...pnjDuCroquis];
+            const nombre = noms.length + autres.length;
+            const qui = nombre
+                ? ` EXACTLY ${nombre} figure${nombre > 1 ? "s" : ""} in the whole drawing: ${[...noms, ...autres].join(", ")}. No other person or creature anywhere: no narrator, no chronicler, no onlooker, no crowd, no figure in the distance.`
+                : " No person at all in the drawing: no narrator, no onlooker, no figure in the distance.";
+            const img = await dessiner(avis.description + qui, refs, avis.sujet === "personnage" ? "personnage" : "scene", { herosAttendus: heros.length - sansImage.length });
             const taille = +(R.tailleMin + Math.random() * (R.tailleMax - R.tailleMin)).toFixed(3);
             resultat.illustration = { Url: img.url, Ratio: img.ratio, Taille: taille, Moment: String(avis.moment || ""), Sujet: avis.sujet === "personnage" ? "personnage" : "scene", Le: Date.now() };
             await updateDoc(ref, { Illustration: resultat.illustration });

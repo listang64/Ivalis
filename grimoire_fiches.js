@@ -126,7 +126,9 @@ function caracsDe(id) {
 // ---------------------------------------------------------------------
 let pagesClans = [];
 const pagesFiche = {};          // fiche-g, fiche-d, tal-g, tal-d, tal2-g, tal2-d, comp-g, comp-d, forge-g, forge-d, inv-g, inv-d, dev-g, dev-d
-const ORDRE_FICHE = ["fiche-g", "fiche-d", "tal-g", "tal-d", "tal2-g", "tal2-d", "comp-g", "comp-d", "forge-g", "forge-d", "inv-g", "inv-d"];
+// v318 — Nico : « l'image et les caracs en premier, ensuite les compétences,
+// l'inventaire, les talents, la Forge, puis le panneau DEV ».
+const ORDRE_FICHE = ["fiche-g", "fiche-d", "comp-g", "comp-d", "inv-g", "inv-d", "tal-g", "tal-d", "tal2-g", "tal2-d", "forge-g", "forge-d"];
 const ORDRE_DEV = ["dev-g", "dev-d"];
 let heros = null;               // l'identifiant du héros affiché
 let carteOuverte = null;        // la compétence montrée sur la page de droite
@@ -311,6 +313,7 @@ const TEINTES_LAVIS = {
     vert: { couleurs: ["#6fa64f", "#8dbb6a"], opacite: 0.19 },
     beige: { couleurs: ["#c49a62", "#dcbc8c", "#a87d4c"], opacite: 0.3 },
     gris: { couleurs: ["#6f6c66", "#8d8981", "#5b5852"], opacite: 0.2 },
+    bleu: { couleurs: ["#5f86b0", "#7fa2c4"], opacite: 0.2 },
     sang: { couleurs: ["#a3201a", "#7d1610", "#c0352a"], opacite: 0.42, tachete: true }
 };
 let numeroLavis = 0;
@@ -842,6 +845,12 @@ async function ouvrirForge() {
     const menu = document.getElementById("forge-menu-caracs");
     ranger(menu, d.querySelector("#forge-livre-codex"));
     document.body.classList.add("forge-livre");
+    // v318 — Nico : « une couleur aquarelle dans ses bulles, quelque chose de
+    // léger » : un lavis sous le cap, la fatigue, l'initiative et l'aide.
+    [[".forge-cap", "beige"], [".forge-medaillon-fatigue", "jaune"], [".forge-medaillon-initiative", "bleu"], [".forge-btn-aide", "vert"]].forEach(([sel, teinte]) => {
+        const el = gauche.querySelector(sel);
+        if (el && !el.querySelector(":scope > .lavis-bulle")) el.insertAdjacentHTML("afterbegin", lavis(teinte, "forge-" + teinte).replace('class="lavis ', 'class="lavis lavis-bulle '));
+    });
     aller(g);
     try { await window.ouvrirCreationCompetence(); } catch (err) { console.error("Le livre : la Forge", err); }
     cacherModalesForge();

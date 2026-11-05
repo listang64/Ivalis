@@ -247,12 +247,13 @@ await section(async () => {
   const r = await p.evaluate(() => {
     const pages = window.GRIMOIRE_FICHES.pages(), i = (c) => window.GRIMOIRE.indexDe(pages[c]);
     const n = (c) => pages[c] ? pages[c].querySelectorAll(".ligne-talents-livre").length : 0;
-    return { ordre: [i("fiche-d"), i("tal-g"), i("tal-d"), i("tal2-g"), i("tal2-d"), i("comp-g")], lignes: ["tal-g", "tal-d", "tal2-g", "tal2-d"].map(n),
+    // (v318 : l'ordre de Nico — la fiche, les compétences, l'inventaire, les talents, la Forge.)
+    return { ordre: [i("inv-d"), i("tal-g"), i("tal-d"), i("tal2-g"), i("tal2-d"), i("forge-g")], lignes: ["tal-g", "tal-d", "tal2-g", "tal2-d"].map(n),
              etiquettes: document.querySelectorAll(".page-tal .talent-livre").length, total: window.TALENTS.length,
              pris: [...document.querySelectorAll(".page-tal .talent-livre.pris")].map(x => x.dataset.id), prenables: document.querySelectorAll(".page-tal .talent-livre.prenable").length,
              medaillons: document.querySelectorAll(".page-tal .talents-medaillon").length, lien: !!document.querySelector('#grimoire-fiches-fiche-d [data-fa="talents"]') };
   });
-  verifier("deux doubles pages des talents, juste après la fiche", r.ordre.every((x, k) => !k || x === r.ordre[k - 1] + 1) && r.ordre[1] % 2 === 1, JSON.stringify(r.ordre));
+  verifier("deux doubles pages des talents (après l'inventaire depuis la v318)", r.ordre.every((x, k) => !k || x === r.ordre[k - 1] + 1) && r.ordre[1] % 2 === 1, JSON.stringify(r.ordre));
   verifier("les sept lignes (Général et les six caracs), chacune sous son médaillon", r.lignes.join() === "2,2,2,1" && r.medaillons === 7, `${r.lignes}, ${r.medaillons} médaillons`);
   verifier("tous les talents y sont, Préparer est coché", r.etiquettes === r.total && r.pris.includes("TAL_PREPARER"), `${r.etiquettes}/${r.total}, pris ${r.pris}`);
   // Le lien de la fiche mène à la double page.

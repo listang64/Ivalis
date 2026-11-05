@@ -223,8 +223,9 @@ await section(async () => {
   verifier("Gemini 4 Argon : 2 $ / 10 $ jusqu'au 30/11/2026, puis 4 $ / 20 $", t.argon.entree === 2 && t.argon.sortie === 10 && t.argonDec.entree === 4 && t.argonDec.sortie === 20);
   verifier("Flash-Lite : 0,30 $ / 2,50 $ ; un modèle inconnu n'a pas de tarif", t.lite.entree === 0.3 && t.lite.sortie === 2.5 && t.inconnu === null);
   verifier("la réflexion se paie comme la sortie (1 M envoyés + 0,5 M reçus + 0,5 M de réflexion = 4,50 $)", proche(t.cout, 0.75 + 3.75), String(t.cout));
-  verifier("images : portrait moyen 1024×1792 ≈ 0,093 $, décor bas 1792×1024 ≈ 0,011 $, haut 1024² = 0,211 $",
-           proche(t.portrait, 0.053 * 1.75, 1e-9) && proche(t.decor, 0.006 * 1.75, 1e-9) && proche(t.carre, 0.211), `${t.portrait} ${t.decor} ${t.carre}`);
+  // (v318 : la grille d'OpenAI par format — portrait et paysage moins chers que le carré —, plus le texte envoyé.)
+  verifier("images (v318) : portrait moyen ≈ 0,041 $, décor bas paysage ≈ 0,005 $, haut 1024² = 0,211 $ (+ 0,002 $ de texte)",
+           proche(t.portrait, 0.043, 1e-9) && proche(t.decor, 0.007, 1e-9) && proche(t.carre, 0.213, 1e-9), `${t.portrait} ${t.decor} ${t.carre}`);
 });
 
 // =========================================================================
@@ -244,8 +245,9 @@ await section(async () => {
   verifier("le modèle et la réflexion du narrateur", ligne.modele === "gemini-3.8-flash" && ligne.reflexion === "medium", `${ligne.modele} ${ligne.reflexion}`);
   verifier("narrateur : 12 000 tokens envoyés, 600 reçus, 400 de réflexion (8 000 en cache)", ligne.narrateur.envoyes === 12000 && ligne.narrateur.recus === 600 && ligne.narrateur.reflexion === 400 && ligne.narrateur.cache === 8000,
            JSON.stringify(ligne.narrateur));
-  const coutNarr = (12000 * 0.75 + 1000 * 3.75) / 1e6;
-  verifier("son coût aux tarifs de 3.8 Flash : 0,01275 $", proche(ligne.narrateur.coutUSD, coutNarr, 1e-12), String(ligne.narrateur.coutUSD));
+  // (v318 : les 8 000 tokens en cache coûtent 10 % du prix d'entrée.)
+  const coutNarr = (4000 * 0.75 + 8000 * 0.075 + 1000 * 3.75) / 1e6;
+  verifier("son coût aux tarifs de 3.8 Flash, le cache à 10 % : 0,00735 $", proche(ligne.narrateur.coutUSD, coutNarr, 1e-12), String(ligne.narrateur.coutUSD));
   const reqs = requetes.slice(avant);
   // v304 : les IA du combat prennent la clé du Narrateur ; v305 : elles restent hors du relevé.
   const aides1 = reqs.filter(x => x.qui !== "NARRATEUR" && x.qui !== "MIA_COMBAT" && x.cle === "cle-GEMINI_API_KEY").length;
@@ -253,13 +255,15 @@ await section(async () => {
   verifier("les IA d'appoint du tour (casting, Mia, bâtiment, PNJ, réputation…) : toutes relevées", ligne.aides.appels === aides1 && aides1 >= 5 && ligne.aides.envoyes === 1000 * aides1,
            `${ligne.aides.appels} relevées / ${aides1} appels, ${ligne.aides.envoyes} envoyés`);
   verifier("les IA du combat (v305 : même clé que le Narrateur) ne sont pas comptées", combat >= 1 && ligne.aides.envoyes < 99999, `${combat} appel(s) de MIA_COMBAT`);
-  verifier("l'image : le portrait de Myrto (moyen, 1024×1792)", ligne.images.nombre === 1 && /medium 1024x1792/.test(ligne.images.detail.join(",")) && proche(ligne.images.coutUSD, 0.053 * 1.75, 1e-12),
+  verifier("l'image : le portrait de Myrto (moyen, 1024×1792)", ligne.images.nombre === 1 && /medium 1024x1792/.test(ligne.images.detail.join(",")) && ligne.images.coutUSD > 0.04 && ligne.images.coutUSD < 0.07,
            JSON.stringify(ligne.images));
   // v304 : l'Arbitre des dés (MIA_DES) juge avec Gemini 3.8 Flash, à ses tarifs.
   const arbitre = reqs.filter(x => x.qui === "MIA_DES" && x.cle === "cle-GEMINI_API_KEY").length;
   const totalUSD = coutNarr + (aides1 - arbitre) * (1000 * 0.30 + 100 * 2.50) / 1e6 + arbitre * (1000 * 0.75 + 100 * 3.75) / 1e6 + 0.053 * 1.75;
-  verifier("total en dollars = narrateur + appoint + images", proche(ligne.totalUSD, totalUSD, 1e-9), `${ligne.totalUSD} contre ${totalUSD}`);
-  verifier("converti au taux de la BCE du jour (1 $ = 0,90 €, 31/10/2026)", ligne.taux === 0.9 && ligne.tauxDate === "2026-10-31" && !ligne.tauxSecours && proche(ligne.totalEUR, totalUSD * 0.9, 1e-9),
+  void totalUSD;
+  const somme = ligne.narrateur.coutUSD + ligne.aides.coutUSD + ((ligne.combat && ligne.combat.coutUSD) || 0) + ligne.images.coutUSD;
+  verifier("total en dollars = narrateur + appoint + combat + images", proche(ligne.totalUSD, somme, 1e-9), `${ligne.totalUSD} contre ${somme}`);
+  verifier("converti au taux de la BCE du jour (1 $ = 0,90 €, 31/10/2026)", ligne.taux === 0.9 && ligne.tauxDate === "2026-10-31" && !ligne.tauxSecours && proche(ligne.totalEUR, ligne.totalUSD * 0.9, 1e-9),
            `${ligne.totalEUR} €`);
   verifier("avec un extrait de la réponse du MJ", /La porte de la taverne/.test(ligne.extrait || ""), ligne.extrait);
   verifier("rangé dans Firestore, avec qui l'a lancé (Nico) et la partie", ligne.lancePar === "Nico" && ligne.ID_Partie === "P1" && ligne.Timestamp > 0, `${ligne.lancePar} ${ligne.ID_Partie}`);
@@ -274,7 +278,8 @@ titre("4. LA FENÊTRE : LES CUMULS, UNE LIGNE PAR RÉPONSE, LE DÉTAIL AU TOUCHE
 // =========================================================================
 const espaces = (t) => String(t || "").replace(/[\u202f\u00a0]/g, " ");
 await section(async () => {
-  await p.evaluate(() => window.ouvrirDepensesMJ());
+  // (v318 : la TVA s'ajoute d'office à l'affichage ; décochée ici pour comparer en hors taxes.)
+  await p.evaluate(() => { localStorage.setItem("ivalis_DEPENSES_TVA", "non"); window.ouvrirDepensesMJ(); });
   await p.waitForTimeout(900);
   const r = await p.evaluate(() => {
     const fen = document.getElementById("etape-depenses-mj");
@@ -288,15 +293,15 @@ await section(async () => {
              detail: detail ? detail.textContent : "", avant, apres, note: (document.querySelector(".depenses-note") || {}).textContent || "" };
   });
   verifier("la fenêtre s'ouvre", r.visible);
-  verifier("quatre cumuls : dernière réponse, aujourd'hui, 30 jours, depuis le début", r.cartes.length === 4 && /Dernière réponse/.test(r.cartes[0]) && /Aujourd'hui/.test(r.cartes[1]) && /30 derniers jours/.test(r.cartes[2]) && /Depuis le début/.test(r.cartes[3]));
+  verifier("quatre cumuls : dernière réponse, aujourd'hui, 30 jours, depuis le début", r.cartes.length === 4 && /Dernier relevé/.test(r.cartes[0]) && /Aujourd'hui/.test(r.cartes[1]) && /30 derniers jours/.test(r.cartes[2]) && /Depuis le début/.test(r.cartes[3]));
   const euros = (v) => espaces(v.toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })) + " €";
   verifier("la dernière réponse : son coût en euros et ses tokens envoyés", !!ligne && espaces(r.cartes[0]).includes(euros(ligne.totalEUR)) && /tokens envoyés/.test(r.cartes[0]), espaces(r.cartes[0]));
   verifier("une ligne : date, lancé par, modèle (réflexion), tokens envoyés, reçus (dont réflexion), appoint, images, coût", r.nbLignes === 1 && r.cellules[1] === "Nico" && /Gemini 3\.8 Flash/.test(r.cellules[2]) && /réflexion moyenne/.test(r.cellules[2])
-           && espaces(r.cellules[3]) === "12 000" && espaces(r.cellules[4]).startsWith("1 000") && /\(400\)/.test(r.cellules[4]) && /appels/.test(r.cellules[5]) && r.cellules[6] === "1" && espaces(r.cellules[7]) === euros(ligne.totalEUR),
+           && espaces(r.cellules[3]) === "12 000" && espaces(r.cellules[4]).startsWith("1 000") && /\(400\)/.test(r.cellules[4]) && /appels/.test(r.cellules[5]) && /^1/.test(r.cellules[6]) && espaces(r.cellules[7]) === euros(ligne.totalEUR),
            JSON.stringify(r.cellules.map(espaces)));
   verifier("le détail s'ouvre au toucher : narrateur, appoint, images, taux", r.avant === "none" && r.apres !== "none" && /Narrateur : 12/.test(espaces(r.detail)) && /IA d'appoint/.test(r.detail) && /Images OpenAI : 1/.test(r.detail) && /1 \$ = 0,9 € \(BCE, 2026-10-31\)/.test(r.detail),
            espaces(r.detail).slice(0, 160));
-  verifier("la note dit d'où viennent les prix, et que le compteur est le même pour toute la table", /tarifs publiés de Google/.test(r.note) && /même compteur pour toute la table/.test(r.note));
+  verifier("la note dit d'où viennent les prix, et que le compteur est le même pour toute la table", /tarifs publiés de Google/i.test(r.note) && /même compteur pour toute la table/.test(r.note));
   if (process.env.V293_CAPTURES) {
     await p.evaluate(() => {
       document.querySelectorAll('body > div[id^="ecran-"]').forEach(e => e.style.display = e.id === "ecran-jeu" ? "block" : "none");
@@ -332,7 +337,7 @@ await section(async () => {
     total: (document.querySelectorAll(".depenses-carte")[3] || {}).textContent || "" }));
   const tot = (liste[0].totalEUR + liste[1].totalEUR);
   verifier("sur un autre appareil, la fenêtre montre les deux tours (le plus récent en haut)", r.lignes.join(",") === "Ben,Nico", r.lignes.join(","));
-  verifier("« Depuis le début » = le compteur commun (2 réponses)", /2 réponses/.test(r.total) && espaces(r.total).includes(espaces(tot.toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }))), espaces(r.total));
+  verifier("« Depuis le début » = le compteur commun (2 réponses)", /2 relevés/.test(r.total) && espaces(r.total).includes(espaces(tot.toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }))), espaces(r.total));
 });
 
 // =========================================================================

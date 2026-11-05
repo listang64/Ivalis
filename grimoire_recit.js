@@ -415,13 +415,14 @@ function paragraphesDuChapitre(entrees) {
     }
     return paras;
 }
-// LES CROQUIS (v314, illustrations_recit.js) : une taille tirée par l'IA, une place
-// tirée ici (à gauche, au milieu, à droite), le tout stable d'un affichage à l'autre.
+// LES CROQUIS (v314, illustrations_recit.js) : une taille tirée par l'IA, centrés
+// sur la page (v318), le tout stable d'un affichage à l'autre.
 // Un croquis déjà vu ne se redessine pas.
 etat.croquisVus = etat.croquisVus || new Set();
 function htmlCroquis(para) {
     const im = para.image, r = hasard("croquis-" + para.e);
-    const place = ["gauche", "milieu", "droite"][Math.floor(r() * 3)];
+    // (v318, Nico : « centre l'image sur la page ») : toujours au milieu.
+    const place = "milieu"; r();
     const neuf = !etat.croquisVus.has(para.e);
     if (neuf) setTimeout(() => etat.croquisVus.add(para.e), 4000);
     const largeur = Math.round(Math.max(20, Math.min(90, (Number(im.Taille) || 0.6) * 100)));

@@ -42,9 +42,29 @@
         { motif: /^gemini-4-argon/,    periodes: [{ jusqua: "2026-11-30", entree: 2.00, sortie: 10.00 }, { entree: 4.00, sortie: 20.00 }] },
         { motif: /flash-lite/,         periodes: [{ entree: 0.30, sortie: 2.50 }] }
     ];
-    // Les images d'OpenAI (gpt-image-2) : le prix d'une image 1024 × 1024 selon
-    // la qualité, au prorata de la surface pour les autres tailles (estimation).
-    const PRIX_IMAGE_1024 = { low: 0.006, medium: 0.053, high: 0.211 };
+    // LES IMAGES D'OPENAI (v318, relevé le 05/11/2026). Nico : « le coût en
+    // euros n'est pas tout à fait juste, je paie un peu plus ; mets-moi les coûts
+    // des images ». gpt-image est facturé en tokens : le texte envoyé (5 $ le
+    // million), les images jointes en référence (8 $), l'image produite (30 $).
+    // La réponse d'OpenAI dit ses tokens (usage) : c'est elle qui compte. Sans
+    // usage, la grille d'OpenAI (prix d'une image produite, par qualité et par
+    // format) plus une estimation des références jointes.
+    const TARIFS_IMAGE = {
+        "gpt-image-2":   { texte: 5, imageEntree: 8,  imageSortie: 30 },
+        "gpt-image-1.5": { texte: 5, imageEntree: 8,  imageSortie: 32 },
+        "gpt-image-1":   { texte: 5, imageEntree: 10, imageSortie: 40 }
+    };
+    const GRILLE_IMAGE = {
+        "1024x1024": { low: 0.006, medium: 0.053, high: 0.211 },
+        "1024x1536": { low: 0.005, medium: 0.041, high: 0.165 },
+        "1536x1024": { low: 0.005, medium: 0.041, high: 0.165 }
+    };
+    const TOKENS_PAR_REFERENCE = 1600;   // une image jointe (fidélité haute), estimation
+    // LA TVA (v318) : les factures de Google et d'OpenAI d'un particulier en
+    // France portent 20 % de TVA ; une case dans la fenêtre l'ajoute (cochée).
+    const CLE_TVA = "ivalis_DEPENSES_TVA";
+    window.tvaDepenses = () => { try { return localStorage.getItem(CLE_TVA) === "non" ? 0 : 0.20; } catch (e) { return 0.20; } };
+    window.basculerTvaDepenses = (avec) => { try { localStorage.setItem(CLE_TVA, avec ? "oui" : "non"); } catch (e) {} window.afficherDepensesMJ && window.afficherDepensesMJ(); };
 
     const jour = (d) => new Date(d || Date.now()).toISOString().slice(0, 10);
 
@@ -64,18 +84,31 @@
         cache: Number((u && u.cachedContentTokenCount) || 0)
     });
 
+    // (v318) Les tokens déjà en cache chez Google coûtent 10 % du prix d'entrée.
     window.coutGeminiUSD = function (modele, usage, date) {
         const t = window.tarifGemini(modele, date);
         if (!t) return null;
         const u = usage && "envoyes" in usage ? usage : lireUsage(usage);
-        return (u.envoyes * t.entree + (u.recus + u.reflexion) * t.sortie) / 1e6;
+        const cache = Math.min(u.cache || 0, u.envoyes);
+        return ((u.envoyes - cache) * t.entree + cache * t.entree * 0.1 + (u.recus + u.reflexion) * t.sortie) / 1e6;
     };
 
-    window.coutImageUSD = function (qualite, taille) {
-        const base = PRIX_IMAGE_1024[qualite] != null ? PRIX_IMAGE_1024[qualite] : PRIX_IMAGE_1024.medium;
-        const m = String(taille || "1024x1024").match(/(\d+)\s*x\s*(\d+)/);
-        const surface = m ? (Number(m[1]) * Number(m[2])) / (1024 * 1024) : 1;
-        return base * surface;
+    // Une image : `usage` (la réponse d'OpenAI) si on l'a ; sinon la grille, et
+    // les références jointes estimées.
+    window.coutImageUSD = function (qualite, taille, modele, usage, references) {
+        const tarif = TARIFS_IMAGE[String(modele || "").replace(/-\d{4}-\d{2}-\d{2}$/, "")] || TARIFS_IMAGE["gpt-image-2"];
+        if (usage && (usage.input_tokens != null || usage.output_tokens != null)) {
+            const d = usage.input_tokens_details || {};
+            const imagesIn = Number(d.image_tokens || 0);
+            const texteIn = d.text_tokens != null ? Number(d.text_tokens) : Math.max(0, Number(usage.input_tokens || 0) - imagesIn);
+            return (texteIn * tarif.texte + imagesIn * tarif.imageEntree + Number(usage.output_tokens || 0) * tarif.imageSortie) / 1e6;
+        }
+        // (un format hors de la grille suit son orientation : portrait, paysage, carré)
+        const format = String(taille || "1024x1024").replace(/\s/g, "");
+        const [w, h] = (format.match(/(\d+)x(\d+)/) || [0, 1024, 1024]).slice(1).map(Number);
+        const grille = GRILLE_IMAGE[format] || GRILLE_IMAGE[h > w ? "1024x1536" : w > h ? "1536x1024" : "1024x1024"];
+        const base = grille[qualite] != null ? grille[qualite] : grille.medium;
+        return base + (Number(references) || 0) * TOKENS_PAR_REFERENCE * tarif.imageEntree / 1e6 + 400 * tarif.texte / 1e6;
     };
 
     // ---------------------------------------------------------------------
@@ -146,6 +179,23 @@
 
     const ouverts = [];
     let compteur = 0;
+    // (v318) HORS DES TOURS DU MJ : les images (avatars, pions, cartes du combat,
+    // croquis, portraits) et les IA (combat, illustrateur…) qui travaillent en
+    // dehors d'un tour se rangent dans un relevé « hors MJ », refermé après une
+    // minute et demie de calme.
+    let horsTour = null;
+    const CALME_HORS_TOUR_MS = 90 * 1000;
+    function releveHorsTour() {
+        if (!horsTour) {
+            horsTour = { id: "H" + Date.now() + "_" + (++compteur), debut: Date.now(), modele: "", reflexion: "", horsTour: true,
+                         narrateur: [], aides: [], combat: [], images: [], enAttente: [] };
+        }
+        clearTimeout(horsTour.minuteur);
+        const r = horsTour;
+        r.minuteur = setTimeout(() => { if (horsTour === r) horsTour = null; window.DEPENSES_IA.finTour(r, {}, true); }, CALME_HORS_TOUR_MS);
+        return r;
+    }
+    window.DEPENSES_HORS_TOUR = { ouvert: () => horsTour, fermer: () => { const r = horsTour; horsTour = null; if (r) { clearTimeout(r.minuteur); return window.DEPENSES_IA.finTour(r, {}, true); } return null; } };
     const cleCombat = () => {
         try {
             const c1 = (localStorage.getItem("ivalis_GEMINI_API_KEY") || "").trim(), c2 = (localStorage.getItem("ivalis_GEMINI_API_KEY_2") || "").trim();
@@ -157,7 +207,7 @@
         // Un tour commence : `info.modele`, `info.reflexion` (les réglages du narrateur).
         debutTour(info) {
             const releve = { id: "T" + Date.now() + "_" + (++compteur), debut: Date.now(), modele: (info && info.modele) || "", reflexion: (info && info.reflexion) || "",
-                             narrateur: [], aides: [], images: [], enAttente: [] };
+                             narrateur: [], aides: [], combat: [], images: [], enAttente: [] };
             ouverts.push(releve);
             window.rafraichirTauxDollarEuro();
             // Un tour qui ne se referme jamais (erreur) se referme seul.
@@ -170,10 +220,10 @@
             if (r && usage) r.narrateur.push({ modele, ...lireUsage(usage) });
         },
         // Le tour est fini (IA d'arrière-plan comprises) : le relevé est rangé.
-        async finTour(releve, extra) {
+        async finTour(releve, extra, horsDuTour) {
             const i = ouverts.indexOf(releve);
-            if (i < 0) return null;
-            ouverts.splice(i, 1);
+            if (i < 0 && !horsDuTour) return null;
+            if (i >= 0) ouverts.splice(i, 1);
             clearTimeout(releve.minuteur);
             await Promise.allSettled(releve.enAttente);
             const date = new Date(releve.debut);
@@ -183,11 +233,12 @@
                 if (cout == null) a.inconnus.push(x.modele); else a.coutUSD += cout;
                 return a;
             }, { appels: 0, envoyes: 0, recus: 0, reflexion: 0, cache: 0, coutUSD: 0, inconnus: [] });
-            const narrateur = somme(releve.narrateur), aides = somme(releve.aides);
-            const images = { nombre: releve.images.length, coutUSD: releve.images.reduce((a, x) => a + x.coutUSD, 0), detail: releve.images.map(x => `${x.qualite} ${x.taille}`) };
-            if (!narrateur.appels && !aides.appels && !images.nombre) return null;
+            const narrateur = somme(releve.narrateur), aides = somme(releve.aides), combat = somme(releve.combat || []);
+            const images = { nombre: releve.images.length, coutUSD: releve.images.reduce((a, x) => a + x.coutUSD, 0),
+                             detail: releve.images.map(x => `${x.quoi ? x.quoi + " " : ""}${x.qualite} ${x.taille}${x.exact ? "" : " ~"}`) };
+            if (!narrateur.appels && !aides.appels && !combat.appels && !images.nombre) return null;
             const taux = await window.rafraichirTauxDollarEuro();
-            const totalUSD = narrateur.coutUSD + aides.coutUSD + images.coutUSD;
+            const totalUSD = narrateur.coutUSD + aides.coutUSD + combat.coutUSD + images.coutUSD;
             const compte = window.COMPTE_JOUEUR || {};
             let joueur = "";
             try { joueur = localStorage.getItem("ID_JOUEUR_COURANT") || ""; } catch (e) {}
@@ -195,11 +246,12 @@
                 id: releve.id, date: date.toISOString(), Timestamp: releve.debut, modele: releve.modele, reflexion: releve.reflexion,
                 ID_Partie: window.ID_PARTIE_COURANTE || "", lancePar: compte.nom || joueur || "?",
                 extrait: String((extra && extra.extrait) || "").replace(/\s+/g, " ").trim().slice(0, 90),
-                narrateur, aides, images, totalUSD, taux: taux.taux, tauxDate: taux.date || "", tauxSecours: !!taux.secours,
+                narrateur, aides, combat, images, totalUSD, taux: taux.taux, tauxDate: taux.date || "", tauxSecours: !!taux.secours,
+                ...(releve.horsTour ? { horsTour: true } : {}),
                 totalEUR: totalUSD * taux.taux
             };
             await ranger(ligne);
-            console.log(`[Dépenses] Tour du MJ : ${narrateur.envoyes + aides.envoyes} tokens envoyés, ${(ligne.totalEUR).toFixed(4)} €.`);
+            console.log(`[Dépenses] ${releve.horsTour ? "Hors MJ" : "Tour du MJ"} : ${narrateur.envoyes + aides.envoyes + combat.envoyes} tokens envoyés, ${images.nombre} image(s), ${(ligne.totalEUR).toFixed(4)} € HT.`);
             if (document.getElementById("etape-depenses-mj")?.style.display === "block") window.afficherDepensesMJ();
             return ligne;
         },
@@ -214,30 +266,38 @@
     const lireOptionsImage = (options) => {
         const b = options && options.body;
         try {
-            if (typeof b === "string") { const j = JSON.parse(b); return { qualite: j.quality || "medium", taille: j.size || "1024x1024" }; }
-            if (b && typeof b.get === "function") return { qualite: b.get("quality") || "medium", taille: b.get("size") || "1024x1024" };
+            if (typeof b === "string") { const j = JSON.parse(b); return { qualite: j.quality || "medium", taille: j.size || "1024x1024", modele: j.model || "", references: 0 }; }
+            if (b && typeof b.get === "function") return { qualite: b.get("quality") || "medium", taille: b.get("size") || "1024x1024", modele: b.get("model") || "",
+                references: typeof b.getAll === "function" ? (b.getAll("image[]").length || b.getAll("image").length) : 0 };
         } catch (e) {}
-        return { qualite: "medium", taille: "1024x1024" };
+        return { qualite: "medium", taille: "1024x1024", modele: "", references: 0 };
     };
+    // (v318) Tout compte : pendant un tour du MJ, dans son relevé (les IA du
+    // combat à part) ; en dehors, dans le relevé « hors MJ ».
     window.fetch = async function (entree, options) {
         const reponse = await vraiFetch(entree, options);
         try {
-            const releve = ouverts[ouverts.length - 1];
             const url = typeof entree === "string" ? entree : (entree && entree.url) || "";
-            if (releve && reponse && reponse.ok) {
-                if (/generativelanguage\.googleapis\.com\/.*:generateContent/.test(url)) {
+            const gemini = /generativelanguage\.googleapis\.com\/.*:generateContent/.test(url);
+            const image = /api\.openai\.com\/v1\/images\//.test(url);
+            if ((gemini || image) && reponse && reponse.ok) {
+                const releve = ouverts[ouverts.length - 1] || releveHorsTour();
+                if (gemini) {
                     const cle = (url.match(/[?&]key=([^&]+)/) || [])[1] || "";
                     const combat = cleCombat();
                     const duCombat = (options && options.ivalisUsage === "combat") || (combat && decodeURIComponent(cle) === combat);
-                    if (!duCombat) {
-                        const modele = (url.match(/models\/([^:]+):/) || [])[1] || "";
-                        releve.enAttente.push(reponse.clone().json().then(d => {
-                            if (d && d.usageMetadata) releve.aides.push({ modele, ...lireUsage(d.usageMetadata) });
-                        }).catch(() => {}));
-                    }
-                } else if (/api\.openai\.com\/v1\/images\//.test(url)) {
-                    const { qualite, taille } = lireOptionsImage(options);
-                    releve.images.push({ qualite, taille, coutUSD: window.coutImageUSD(qualite, taille) });
+                    const modele = (url.match(/models\/([^:]+):/) || [])[1] || "";
+                    releve.enAttente.push(reponse.clone().json().then(d => {
+                        if (d && d.usageMetadata) (duCombat ? releve.combat : releve.aides).push({ modele, ...lireUsage(d.usageMetadata) });
+                    }).catch(() => {}));
+                } else {
+                    const { qualite, taille, modele, references } = lireOptionsImage(options);
+                    const ligne = { qualite, taille, modele, coutUSD: window.coutImageUSD(qualite, taille, modele, null, references), exact: false };
+                    releve.images.push(ligne);
+                    // La réponse dit ses tokens : le coût exact remplace l'estimation.
+                    releve.enAttente.push(reponse.clone().json().then(d => {
+                        if (d && d.usage) { ligne.coutUSD = window.coutImageUSD(qualite, taille, modele, d.usage); ligne.exact = true; }
+                    }).catch(() => {}));
                 }
             }
         } catch (e) {}
@@ -276,16 +336,21 @@
         const liste = lignes.slice().reverse();
         const maintenant = Date.now();
         const aujourdhui = jour();
-        const cumul = (filtre) => liste.filter(filtre).reduce((a, l) => ({ eur: a.eur + (l.totalEUR || 0), tokens: a.tokens + (l.narrateur.envoyes + l.aides.envoyes), tours: a.tours + 1 }), { eur: 0, tokens: 0, tours: 0 });
-        const carte = (titre, c) => `<div class="depenses-carte"><div class="depenses-carte-titre">${titre}</div><div class="depenses-carte-euros">${euros(c.eur)}</div>`
-            + `<div class="depenses-carte-detail">${c.tours} réponse${c.tours > 1 ? "s" : ""} · ${nb(c.tokens)} tokens envoyés (en tout)</div></div>`;
+        // (v318) La TVA (20 %), si la case est cochée : ajoutée à l'affichage.
+        const tva = window.tvaDepenses(), ttc = (eur) => (eur || 0) * (1 + tva);
+        const envoyesDe = (l) => (l.narrateur.envoyes || 0) + (l.aides.envoyes || 0) + ((l.combat && l.combat.envoyes) || 0);
+        const cumul = (filtre) => liste.filter(filtre).reduce((a, l) => ({ eur: a.eur + (l.totalEUR || 0), tokens: a.tokens + envoyesDe(l), tours: a.tours + 1,
+            images: a.images + ((l.images && l.images.nombre) || 0) }), { eur: 0, tokens: 0, tours: 0, images: 0 });
+        const carte = (titre, c) => `<div class="depenses-carte"><div class="depenses-carte-titre">${titre}</div><div class="depenses-carte-euros">${euros(ttc(c.eur))}</div>`
+            + `<div class="depenses-carte-detail">${c.tours} relevé${c.tours > 1 ? "s" : ""} · ${nb(c.tokens)} tokens envoyés${c.images != null ? ` · ${c.images} image${c.images > 1 ? "s" : ""}` : ""}</div></div>`;
         const derniere = liste[0];
         let html = `<div class="depenses-cartes">`
-            + carte("Dernière réponse", derniere ? { eur: derniere.totalEUR, tokens: derniere.narrateur.envoyes + derniere.aides.envoyes, tours: 1 } : { eur: 0, tokens: 0, tours: 0 })
+            + carte("Dernier relevé", derniere ? { eur: derniere.totalEUR, tokens: envoyesDe(derniere), tours: 1, images: (derniere.images && derniere.images.nombre) || 0 } : { eur: 0, tokens: 0, tours: 0, images: 0 })
             + carte("Aujourd'hui", cumul(l => jour(l.date) === aujourdhui))
             + carte("30 derniers jours", cumul(l => maintenant - new Date(l.date).getTime() < 30 * 86400000))
-            + carte("Depuis le début", compteur ? { eur: compteur.totalEUR || 0, tokens: compteur.tokensEnvoyes || 0, tours: compteur.tours || 0 } : cumul(() => true))
-            + `</div>`;
+            + carte("Depuis le début", compteur ? { eur: compteur.totalEUR || 0, tokens: compteur.tokensEnvoyes || 0, tours: compteur.tours || 0, images: compteur.images || 0 } : cumul(() => true))
+            + `</div>`
+            + `<label class="depenses-tva"><input type="checkbox" id="depenses-tva" ${tva ? "checked" : ""} onchange="basculerTvaDepenses(this.checked)"> Compter la TVA (20 %) : les prix affichés sont ${tva ? "TTC" : "hors taxes"}</label>`;
         if (!commun) html += `<p class="depenses-alerte">Le compteur commun n'a pas pu être lu : seuls les tours gardés sur cet appareil s'affichent.</p>`;
         if (!liste.length) {
             html += `<p class="depenses-vide">Aucune réponse du MJ relevée sur cet appareil pour l'instant.</p>`;
@@ -297,18 +362,21 @@
                 const d = new Date(l.date);
                 const quand = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
                 const inconnus = [...new Set([...(l.narrateur.inconnus || []), ...(l.aides.inconnus || [])])];
-                html += `<tr class="depenses-ligne" data-id="${echapper(l.id)}" onclick="this.nextElementSibling.classList.toggle('ouvert')">`
-                    + `<td>${quand}</td><td>${echapper(l.lancePar || "?")}</td><td>${echapper(nomModele(l.modele))}${reflexionFr(l.reflexion) ? `<br><small>réflexion ${reflexionFr(l.reflexion)}</small>` : ""}</td>`
+                const combat = l.combat || { appels: 0, envoyes: 0, recus: 0, reflexion: 0, coutUSD: 0 };
+                html += `<tr class="depenses-ligne${l.horsTour ? " hors-tour" : ""}" data-id="${echapper(l.id)}" onclick="this.nextElementSibling.classList.toggle('ouvert')">`
+                    + `<td>${quand}</td><td>${echapper(l.lancePar || "?")}</td><td>${l.horsTour ? "<b>Hors MJ</b><br><small>images, combat…</small>" : echapper(nomModele(l.modele)) + (reflexionFr(l.reflexion) ? `<br><small>réflexion ${reflexionFr(l.reflexion)}</small>` : "")}</td>`
                     + `<td class="depenses-nombre">${nb(l.narrateur.envoyes)}</td>`
                     + `<td class="depenses-nombre">${nb(l.narrateur.recus + l.narrateur.reflexion)}${l.narrateur.reflexion ? `<br><small>(${nb(l.narrateur.reflexion)})</small>` : ""}</td>`
-                    + `<td class="depenses-nombre">${l.aides.appels} appel${l.aides.appels > 1 ? "s" : ""}<br><small>${nb(l.aides.envoyes + l.aides.recus + l.aides.reflexion)} tokens</small></td>`
-                    + `<td class="depenses-nombre">${l.images.nombre}</td>`
-                    + `<td class="depenses-cout">${euros(l.totalEUR)}</td></tr>`
+                    + `<td class="depenses-nombre">${l.aides.appels + combat.appels} appel${l.aides.appels + combat.appels > 1 ? "s" : ""}<br><small>${nb(l.aides.envoyes + l.aides.recus + l.aides.reflexion + combat.envoyes + combat.recus + combat.reflexion)} tokens</small></td>`
+                    + `<td class="depenses-nombre">${l.images.nombre}${l.images.nombre ? `<br><small>${euros(ttc(l.images.coutUSD * l.taux))}</small>` : ""}</td>`
+                    + `<td class="depenses-cout">${euros(ttc(l.totalEUR))}</td></tr>`
                     + `<tr class="depenses-detail"><td colspan="8">`
                     + (l.extrait ? `<div class="depenses-extrait">« ${echapper(l.extrait)}… »</div>` : "")
                     + `<div>Narrateur : ${nb(l.narrateur.envoyes)} envoyés, ${nb(l.narrateur.recus)} reçus, ${nb(l.narrateur.reflexion)} de réflexion${l.narrateur.cache ? ` (${nb(l.narrateur.cache)} déjà en cache)` : ""} → ${euros(l.narrateur.coutUSD * l.taux)} (${dollars(l.narrateur.coutUSD)})</div>`
                     + `<div>IA d'appoint (casting, PNJ, bâtiments, réputation…) : ${l.aides.appels} appel(s), ${nb(l.aides.envoyes)} envoyés, ${nb(l.aides.recus + l.aides.reflexion)} reçus → ${euros(l.aides.coutUSD * l.taux)} (${dollars(l.aides.coutUSD)})</div>`
-                    + `<div>Images OpenAI : ${l.images.nombre}${l.images.nombre ? ` (${echapper(l.images.detail.join(", "))})` : ""} → ${euros(l.images.coutUSD * l.taux)} (${dollars(l.images.coutUSD)}, estimation)</div>`
+                    + (combat.appels ? `<div>IA du combat : ${combat.appels} appel(s), ${nb(combat.envoyes)} envoyés, ${nb(combat.recus + combat.reflexion)} reçus → ${euros(combat.coutUSD * l.taux)} (${dollars(combat.coutUSD)})</div>` : "")
+                    + `<div>Images OpenAI : ${l.images.nombre}${l.images.nombre ? ` (${echapper(l.images.detail.join(", "))})` : ""} → ${euros(l.images.coutUSD * l.taux)} (${dollars(l.images.coutUSD)}${(l.images.detail || []).some(d => / ~$/.test(d)) ? ", en partie estimé" : ""})</div>`
+                    + (tva ? `<div>TVA 20 % : ${euros(l.totalEUR * tva)} — total TTC ${euros(ttc(l.totalEUR))}</div>` : "")
                     + (inconnus.length ? `<div class="depenses-alerte">Tarif inconnu pour : ${echapper(inconnus.join(", "))} (tokens comptés, coût non compté).</div>` : "")
                     + `<div class="depenses-taux">1 $ = ${String(l.taux).replace(".", ",")} €${l.tauxSecours ? " (taux de secours, la BCE n'a pas répondu)" : l.tauxDate ? ` (BCE, ${l.tauxDate})` : ""}</div>`
                     + `</td></tr>`;
@@ -316,7 +384,8 @@
             html += `</tbody></table></div>`;
         }
         const t = window.tauxDollarEuro();
-        html += `<p class="depenses-note">Coûts calculés aux tarifs publiés de Google (Gemini) et d'OpenAI (images, estimation selon la qualité et la taille), convertis au taux de la BCE `
+        html += `<p class="depenses-note">Tout compte : chaque réponse du MJ (le narrateur et ses IA d'appoint), et, hors des réponses, les images (avatars, pions, cartes du combat, croquis, portraits) et les IA du combat (lignes « Hors MJ »). `
+            + `Tarifs publiés de Google (Gemini 3.8 Flash : 0,75 $ / 3,75 $ le million de tokens jusqu'au 31/12/2026, puis 1,50 $ / 7,50 $) et d'OpenAI (images : le coût exact lu dans la réponse — texte envoyé, images de référence, image produite —, sinon la grille de prix). Convertis au taux de la BCE `
             + `(aujourd'hui 1 $ = ${String(t.taux).replace(".", ",")} €${t.secours ? ", taux de secours" : t.date ? `, ${t.date}` : ""}). Le même compteur pour toute la table, quel que soit celui qui lance le MJ. Touchez une ligne pour le détail.</p>`;
         zone.innerHTML = html;
     };

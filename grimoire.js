@@ -303,29 +303,13 @@
     // Le dessin du marque-page du récit (v300 ; refait en v312 : Nico, « refais le
     // dessin de la plume ») : une plume d'oie penchée, son rachis courbe, ses
     // barbes fines de part et d'autre, une encoche, et le bec taillé.
+    // v318 — Nico : « pour le marque-page du récit, fais le dessin de plume
+    // exactement comme celui du papier où les joueurs écrivent » : le même dessin
+    // (SVG_PLUME, grimoire_recit.js), au même trait.
     function dessinPlume() {
-        const r = hasard("plume-v312");
-        // Le rachis : du bec (en bas à gauche) vers la pointe (en haut à droite).
-        const P = (t) => { const x = 16 + 30 * t + 4 * Math.sin(Math.PI * t), y = 72 - 62 * t; return [x, y]; };
-        let barbes = "";
-        for (let i = 0; i < 15; i++) {
-            const t = 0.3 + i * 0.045;
-            if (Math.abs(t - 0.62) < 0.03) continue;                 // l'encoche
-            const [x, y] = P(t), l = 9 * Math.sin(Math.PI * (t - 0.22) / 0.82) + 2 * r();
-            barbes += `<path class="ligne" d="M ${x.toFixed(1)} ${y.toFixed(1)} q ${(-l * 0.6).toFixed(1)} ${(-1 - r()).toFixed(1)} ${(-l).toFixed(1)} ${(-l * 0.55).toFixed(1)}"/>`;
-            barbes += `<path class="ligne" d="M ${x.toFixed(1)} ${y.toFixed(1)} q ${(l * 0.5).toFixed(1)} ${(0.5 + r()).toFixed(1)} ${(l * 0.8).toFixed(1)} ${(-l * 0.15).toFixed(1)}"/>`;
-        }
-        const pts = Array.from({ length: 11 }, (_, i) => P(0.28 + i * 0.072)), haut = P(1);
-        const gauche = pts.map(([x, y], i) => `${(x - 7 * Math.sin(Math.PI * i / 10) - 1).toFixed(1)} ${(y - 3 * Math.sin(Math.PI * i / 10)).toFixed(1)}`);
-        const droite = pts.slice().reverse().map(([x, y], i) => `${(x + 5 * Math.sin(Math.PI * i / 10) + 0.5).toFixed(1)} ${(y + 1.5 * Math.sin(Math.PI * i / 10)).toFixed(1)}`);
-        const [x0, y0] = P(0), [x1, y1] = P(0.28);
-        return `<svg class="dessin-marque dessin-plume" viewBox="0 0 60 80" aria-hidden="true">
-                  <path class="feuille" d="M ${gauche.join(" L ")} L ${haut[0].toFixed(1)} ${haut[1].toFixed(1)} L ${droite.join(" L ")} Z"/>
-                  ${barbes}
-                  <path class="coin" d="M ${x0} ${y0} Q ${((x0 + x1) / 2 + 1.5).toFixed(1)} ${((y0 + y1) / 2).toFixed(1)} ${x1.toFixed(1)} ${y1.toFixed(1)} L ${haut[0].toFixed(1)} ${haut[1].toFixed(1)}"/>
-                  <path class="coin" d="M ${x0} ${y0} l -2.2 3.4 M ${x0} ${y0} l 1.6 -0.6"/></svg>`;
+        return `<svg class="dessin-marque dessin-plume" viewBox="0 0 40 40" aria-hidden="true">`
+            + `<path class="plein" d="M34 3 C24 8 15 18 11 31 C18 24 28 16 34 3 Z"/><path d="M34 3 C26 14 18 24 7 37"/></svg>`;
     }
-
     // Le dessin du marque-page de la carte (v302) : une terre, au trait noir —
     // le globe, ses méridiens et parallèles, et des terres esquissées.
     function dessinTerre() {

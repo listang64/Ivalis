@@ -10585,3 +10585,30 @@ directement, sans rien laisser voir.
 corrections_v317.mjs vérifie tout cela (3 sections en échec sur la v316). Test mis à jour :
 v295 (« MIA_DES en panne : le MJ raconte quand même », avec une action sans risque : une
 tentative nette reçoit maintenant son jet même l'IA en panne).
+
+## v318 — L'illustrateur sans inconnus, la Forge retouchée, Palatino, le marque-page plume, les vraies dépenses, l'ordre des pages
+
+- MIA_ILLUSTRATEUR : le chroniqueur (le « je », le « nous » du Narrateur) n'est jamais
+  dessiné (consigne à l'agent, et sansLeNarrateur retire de la description les phrases qui
+  parlent de lui) ; le dessinateur reçoit le compte exact des figures et leurs noms
+  (« EXACTLY 3 figures: Kaya, Varos, a stray wolf »), personne d'autre ; un lieu : « No person
+  at all ». Que du noir sur le magenta : aucun blanc, l'intérieur des figures reste magenta.
+  Le croquis toujours centré sur la page.
+- La Forge du livre : le bandeau défile avec la page ; un lavis léger dans ses bulles (cap
+  beige, fatigue jaune, initiative bleue, aide verte ; caché hors du livre) ; plus de rond
+  « + » ; le codex sans fond blanc (chaque effet dans un cadre d'encre, voile beige léger).
+- Le récit en Palatino (Palatino, Palatino Linotype, Book Antiqua…, !important).
+- Le marque-page du récit : exactement la plume du papier d'écriture (SVG_PLUME), un peu
+  plus petit que les autres.
+- L'ordre des pages de la fiche : avatar et caracs, compétences, inventaire, talents (deux
+  doubles pages), Forge, puis le DEV.
+- Les dépenses (depenses_ia.js) : tout compte — hors d'un tour du MJ aussi (relevé « Hors
+  MJ » refermé après 90 s de calme : avatars, pions, cartes du combat, croquis, portraits,
+  IA du combat) ; les images au coût exact lu dans la réponse d'OpenAI (texte 5 $, images de
+  référence 8 $, image produite 30 $ le million), sinon la grille d'OpenAI par format (et
+  1 600 tokens par référence jointe) ; les IA du combat comptées à part ; les tokens en
+  cache chez Gemini à 10 % ; la TVA de 20 % ajoutée à l'affichage (case cochée d'office).
+
+corrections_v318.mjs vérifie tout cela (15 échecs sur la v317). Tests mis à jour : v294
+(les nouveaux prix, le cache, la TVA décochée pour comparer, les libellés), v315 (l'ordre
+des pages).
