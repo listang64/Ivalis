@@ -226,7 +226,7 @@ await section(async () => {
   const a = await p.evaluate(() => window.__agent[0]);
   verifier("après le Narrateur, l'agent lit les messages des joueurs et la réponse du Narrateur", !!a && /je cours vers le comptoir/.test(a.corps.contents[0].parts[0].text) && /Varos éclate de rire/.test(a.corps.contents[0].parts[0].text) && /drôle|dramatique/.test(a.corps.systemInstruction.parts[0].text));
   const croquis = imagesIA.find(x => /edits/.test(x.url) && /pen-and-ink/.test(x.corps));
-  verifier("le croquis : à la plume, sur fond magenta (détouré), qualité « medium » (v315)", !!croquis && /#FF00FF/.test(croquis.corps) && /name="quality"\r\n\r\nmedium/.test(croquis.corps), croquis ? croquis.url : imagesIA.map(x => x.url).join(","));
+  verifier("le croquis : à l'encre, sur fond blanc (v325 : le blanc retiré), qualité « medium » (v315)", !!croquis && /PURE WHITE BACKGROUND \(#FFFFFF\)/.test(croquis.corps) && /name="quality"\r\n\r\nmedium/.test(croquis.corps), croquis ? croquis.url : imagesIA.map(x => x.url).join(","));
   verifier("les héros du croquis en référence, avec leur nom (comme pour les avatars)", !!croquis && (croquis.corps.match(/name="image\[\]"/g) || []).length === 1 && /image 1 is Kaya/.test(croquis.corps), "");
   verifier("une scène : en paysage (1536 × 1024)", !!croquis && /name="size"\r\n\r\n1536x1024/.test(croquis.corps));
   const m = await p.evaluate(() => window.__docs["Messages_Chat/m1"]);

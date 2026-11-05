@@ -3075,7 +3075,47 @@ window.promptCompagnon = function(compagnon, style) {
 
 // Une image venue de l'IA : déposée sur Cloudinary (pour pouvoir en lire les
 // pixels), détourée de son fond magenta, puis redéposée à la même adresse.
-async function televerserImageDetouree(imageSource, dossier, cles) {
+// LE BLANC RETIRÉ (v325, les croquis du carnet) : Nico, « dis-lui de dessiner en
+// noir sur fond blanc, et fais un algo qui retire tout le blanc de l'image ».
+// Chaque pixel devient de l'encre : sa noirceur fait son opacité (le blanc du
+// papier disparaît, même enfermé dans une figure ; un gris de hachure reste à
+// demi), sa couleur est celle de l'encre. Posé sur le parchemin, on ne voit
+// que les traits.
+const ENCRE_CROQUIS = [22, 13, 6];
+function encreSansBlanc(data, blanc = 232, noir = 70) {
+    for (let i = 0; i < data.length; i += 4) {
+        const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        const a = lum >= blanc ? 0 : lum <= noir ? 1 : (blanc - lum) / (blanc - noir);
+        data[i] = ENCRE_CROQUIS[0]; data[i + 1] = ENCRE_CROQUIS[1]; data[i + 2] = ENCRE_CROQUIS[2];
+        data[i + 3] = Math.round(255 * Math.pow(a, 0.85) * (data[i + 3] / 255));
+    }
+    return data;
+}
+window.encreSansBlancIvalis = encreSansBlanc;   // (pour les bancs)
+async function detourerFondBlanc(imageSource) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.onload = () => {
+            try {
+                const canvas = document.createElement("canvas");
+                canvas.width = img.width; canvas.height = img.height;
+                const ctx = canvas.getContext("2d", { willReadFrequently: true });
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                encreSansBlanc(imageData.data);
+                ctx.putImageData(imageData, 0, 0);
+                resolve(canvas.toDataURL("image/png"));
+            } catch (e) { console.warn("Le blanc du croquis n'a pas pu être retiré :", e); resolve(imageSource); }
+        };
+        img.onerror = () => resolve(imageSource);
+        img.src = imageSource;
+    });
+}
+window.detourerFondBlancIvalis = detourerFondBlanc;
+// `options.fond` : "blanc" pour un dessin noir sur blanc (le blanc s'en va) ;
+// sinon le fond magenta des avatars et des pions.
+async function televerserImageDetouree(imageSource, dossier, cles, options) {
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const form1 = new FormData();
     form1.append("file", imageSource); form1.append("api_key", cles.cloudKey);
@@ -3087,7 +3127,7 @@ async function televerserImageDetouree(imageSource, dossier, cles) {
         const json1 = await (await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/upload`, { method: "POST", body: form1 })).json();
         if (json1.secure_url) { urlSecurisee = json1.secure_url; publicId = json1.public_id; }
     } catch (e) { console.error("Compagnon : pont Cloudinary impossible :", e); }
-    const detouree = await detourerFondMagenta(urlSecurisee);
+    const detouree = options && options.fond === "blanc" ? await detourerFondBlanc(urlSecurisee) : await detourerFondMagenta(urlSecurisee);
     const form2 = new FormData();
     form2.append("file", detouree); form2.append("api_key", cles.cloudKey);
     form2.append("timestamp", timestamp);

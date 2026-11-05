@@ -359,7 +359,7 @@ await section(async () => {
   verifier("… Thorin, qui n'a pas encore de portrait, décrit en mots", !!cr && /Thorin is a man|Thorin is Nain|Thorin is [^.]*Nain/.test(cr.corps), "");
   verifier("le dessinateur doit les rendre reconnaissables, sans personne d'autre", !!cr && /clearly recognisable/.test(cr.corps) && /Do not add any other person/.test(cr.corps));
   verifier("qualité « medium » (plus de trait pixelisé), dépôt en q_auto:best", !!cr && /name="quality"\r\n\r\nmedium/.test(cr.corps) && !!a.msg && /q_auto:best/.test(a.msg.Illustration.Url), a.msg ? a.msg.Illustration.Url : "");
-  verifier("seulement l'essentiel : pas de décor si le lieu n'est pas le sujet", !!cr && /No background, no scenery/.test(cr.corps) && /strictement important/.test(lire("illustrations_recit.js")));
+  verifier("seulement l'essentiel : le décor seulement ce que le moment demande (v325)", !!cr && /only as much setting as the moment needs/.test(cr.corps) && /strictement important/.test(lire("illustrations_recit.js")));
   // L'agent parle du groupe sans le nommer : les héros que cite le Narrateur.
   n = imagesIA.length;
   await illustrer({ illustrer: true, moment: "drôle", sujet: "scene", description: "The adventurers flee from an angry goat.", heros: [], pnj_nommes: [] }, "La chèvre poursuit Kaya à travers le marché.");

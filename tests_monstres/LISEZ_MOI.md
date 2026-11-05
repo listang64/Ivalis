@@ -10712,3 +10712,23 @@ Fargus). v314, v315, v318 repassent.
 
 corrections_v324.mjs le vérifie (3 échecs sur la v323). Test mis à jour : v314 (« le papier de
 l'avatar aussi » attendait ses taches).
+
+## v325 — Les croquis du carnet : noir sur blanc, le blanc retiré, des traits épais, une vraie mise en scène
+
+- Le dessinateur dessine en noir sur un fond blanc pur (plus de magenta). Au dépôt,
+  detourerFondBlanc (app.js, televerserImageDetouree(…, { fond: "blanc" })) retire le blanc :
+  chaque pixel devient de l'encre brun-noir, sa noirceur fait son opacité (le blanc disparaît,
+  même enfermé dans une figure ; un gris de hachure reste à demi). Sur la page, il ne reste
+  que l'encre. Les portraits de référence partent sur du blanc.
+- Le style (d'après les trois exemples de Nico, décrits en mots) : traits épais et sûrs, fortes
+  variations d'épaisseur, hachures et contre-hachures, masses noires pleines, quelques traits
+  libres et éclaboussures ; une composition de cinéma (point focal, silhouettes lisibles,
+  angle, premier plan / fond, au besoin une forme graphique derrière le sujet — un disque noir).
+  Le décor : seulement ce que le moment demande.
+- L'agent : LE moment précis (un instant figé, pas un résumé), fidèle au texte (qui fait quoi
+  à qui, qui est caché ou camouflé) ; il en recopie la phrase (« extrait »), qui part telle
+  quelle au dessinateur ; sa mise en scène est celle d'un directeur artistique.
+
+corrections_v325.mjs vérifie tout cela (9 échecs sur la v324). Tests mis à jour : v314 (fond
+blanc au lieu du magenta), v315 (le décor « seulement ce que le moment demande »), v318
+(l'encre noire sur blanc).

@@ -212,7 +212,7 @@ await section(async () => {
   const cr = imagesIA.slice(n).find(x => /pen-and-ink/.test(x.corps));
   verifier("le dessinateur reçoit le compte exact et les noms (Kaya, Varos, le loup), personne d'autre", !!cr && /EXACTLY 3 figures in the whole drawing: Kaya, Varos, a stray wolf/.test(cr.corps) && /no narrator, no chronicler, no onlooker, no crowd/.test(cr.corps), cr ? "" : "aucun croquis");
   verifier("la phrase du chroniqueur (« I watch from the doorway ») ne part pas au dessinateur", !!cr && !/I watch|doorway/.test(cr.corps));
-  verifier("que des traits NOIRS sur le magenta, aucun blanc (l'intérieur des figures reste magenta)", !!cr && /pure BLACK ink lines/.test(cr.corps) && /absolutely NO WHITE anywhere/.test(cr.corps) && /stays the same flat magenta/.test(cr.corps) && !/brown-black/.test(cr.corps));
+  verifier("que de l'encre NOIRE (v325 : sur un fond blanc, retiré au dépôt), pas de couleur", !!cr && /PURE BLACK INK ON A PURE WHITE BACKGROUND/.test(cr.corps) && /no colour at all/.test(cr.corps) && !/brown-black/.test(cr.corps));
   // Un lieu sans personne.
   const n2 = imagesIA.length;
   await illustrer({ illustrer: true, moment: "lieu", sujet: "scene", description: "A ruined temple of Hera half swallowed by the dunes at dusk.", heros: [], pnj_dans_le_croquis: [], autres: [], nombre: 0, pnj_nommes: [] }, "Le temple d'Héra se dresse, à moitié englouti par les dunes.");

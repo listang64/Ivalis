@@ -161,6 +161,8 @@ const PROMPT_AGENT = `Tu es MIA_ILLUSTRATEUR, l'illustrateur du carnet de voyage
 
 QUAND DESSINER : seulement un moment qui marque — drôle (une maladresse, une réplique, une situation absurde), dramatique (un danger, une perte, un affrontement, une révélation), ou attachant (un geste tendre, une rencontre, un instant de camaraderie), ou un lieu saisissant. Une réponse banale (on marche, on parle de la route, on achète du pain) : NE DESSINE PAS. Dans le doute, ne dessine pas.
 
+LE MOMENT PRÉCIS (v325) : pas un résumé de la réponse — UN instant, le plus fort, figé comme une photo : celui où tout bascule (le pied qui heurte la jambière du héros camouflé, la lame qui sort du fourreau, le regard qui croise un autre). Reste FIDÈLE au texte : qui fait quoi à qui, avec quoi ; qui est caché, camouflé, couché, debout ; qui voit qui. Un héros caché ou déguisé se dessine caché ou déguisé. Recopie dans "extrait" la ou les phrases exactes du texte qui racontent cet instant (en français, 1 à 3 phrases).
+
 QUOI DESSINER : soit une SCÈNE (les personnages en action), soit UN PERSONNAGE en particulier (un héros, un PNJ), soit un LIEU saisissant. Ne dessine QUE ce qui est strictement important pour raconter le moment : les personnages concernés et, seulement s'il est indispensable, l'objet ou l'élément avec lequel ils agissent. PAS de décor ni d'arrière-plan, sauf si le lieu est lui-même le sujet ou qu'il est nécessaire pour comprendre le moment. Décris concrètement ce que montre le croquis, en anglais, en une ou deux phrases (qui, quoi, l'attitude) — pas d'abstraction, pas de texte dans l'image.
 
 LE NARRATEUR N'APPARAÎT JAMAIS : la réponse est écrite à la première personne par le chroniqueur du groupe (le « je », le « nous »). Ce chroniqueur ne se dessine JAMAIS : ne le décris pas, ne le compte pas, n'écris jamais « the narrator », « I », « me », « we » ni « us » dans la description. « Nous » ne désigne que les héros présents.
@@ -169,11 +171,11 @@ PERSONNE D'AUTRE : le croquis ne montre QUE les héros que tu cites, les PNJ que
 
 LES HÉROS : cite TOUS ceux qui apparaissent DANS le croquis (leur prénom exact, dans la liste fournie), et dans la description, désigne chacun par son prénom exact (jamais « a warrior », « the adventurers » : « Kaya », « Thorin »). N'ajoute AUCUN personnage anonyme qui ne serait pas dans la réponse du Narrateur.
 
-LA MISE EN SCÈNE : chaque héros de la liste a un identifiant (H1, H2…). Dans "acteurs", liste CHAQUE figure du croquis, une par une, dans l'ordre de gauche à droite : un héros par son identifiant ("id": "H1") et son prénom, un PNJ par son nom ("type": "pnj"), un être sans nom par ce qu'il est ("type": "autre", "nom": "a wolf"). Pour chacune, en anglais : "place" (left, center, right, foreground, background), "action" (ce qu'elle fait, sa posture), "expression" (son visage, son émotion). Puis "mise_en_scene", en anglais : le cadrage (plan large, plan moyen, gros plan, plongée…), comment les figures se tiennent l'une par rapport à l'autre, et l'objet clé s'il y en a un. Le dessinateur reçoit le portrait de chaque héros et de chaque PNJ connu : il dessine la scène telle que tu la mets en scène.
+LA MISE EN SCÈNE : chaque héros de la liste a un identifiant (H1, H2…). Dans "acteurs", liste CHAQUE figure du croquis, une par une, dans l'ordre de gauche à droite : un héros par son identifiant ("id": "H1") et son prénom, un PNJ par son nom ("type": "pnj"), un être sans nom par ce qu'il est ("type": "autre", "nom": "a wolf"). Pour chacune, en anglais : "place" (left, center, right, foreground, background), "action" (ce qu'elle fait, sa posture), "expression" (son visage, son émotion). Puis "mise_en_scene", en anglais, comme un directeur artistique : le cadrage et l'angle (plan large, plan moyen, gros plan, contre-plongée, par-dessus l'épaule…), le point focal (où l'œil va d'abord), qui est au premier plan et qui au fond, comment les figures se tiennent l'une par rapport à l'autre, l'objet clé, et ce qui donne de la force à l'image (une grande masse noire, une silhouette à contre-jour, un disque noir derrière le sujet…). Une image lisible d'un coup d'œil. Le dessinateur reçoit le portrait de chaque héros et de chaque PNJ connu : il dessine la scène telle que tu la mets en scène.
 LES PNJ NOMMÉS : liste TOUS les personnages non-joueurs désignés par un VRAI nom propre dans la réponse du Narrateur (pas les héros, pas « l'aubergiste », pas un nom inventé par un héros pour bluffer), avec leur race (parmi celles du monde, Humain par défaut) et une description physique précise tirée du texte (ou plausible). Indique aussi ceux qui apparaissent dans le croquis.
 
 Réponds UNIQUEMENT en JSON :
-{"illustrer": true, "moment": "drôle|dramatique|attachant|lieu", "sujet": "scene|personnage", "description": "...", "acteurs": [{"id": "H1", "nom": "Kaya", "type": "heros", "place": "left", "action": "crouching behind a fallen trunk, one hand raised to stop the others", "expression": "tense, eyes wide"}, {"nom": "Varos", "type": "pnj", "place": "right", "action": "...", "expression": "..."}], "mise_en_scene": "medium shot, slightly low angle; Kaya in the foreground turned toward Varos…", "heros": ["Kaya"], "pnj_dans_le_croquis": ["Varos"], "autres": [], "nombre": 2, "pnj_nommes": [{"nom": "Varos", "race": "Humain", "description_physique": "..."}]}
+{"illustrer": true, "moment": "drôle|dramatique|attachant|lieu", "sujet": "scene|personnage", "description": "...", "acteurs": [{"id": "H1", "nom": "Kaya", "type": "heros", "place": "left", "action": "crouching behind a fallen trunk, one hand raised to stop the others", "expression": "tense, eyes wide"}, {"nom": "Varos", "type": "pnj", "place": "right", "action": "...", "expression": "..."}], "mise_en_scene": "medium shot, slightly low angle; Kaya in the foreground turned toward Varos…", "extrait": "Varos éclate de rire quand Kaya glisse sur l'amphore.", "heros": ["Kaya"], "pnj_dans_le_croquis": ["Varos"], "autres": [], "nombre": 2, "pnj_nommes": [{"nom": "Varos", "race": "Humain", "description_physique": "..."}]}
 ou {"illustrer": false, "pnj_nommes": [...]}`;
 
 async function demanderAgent(texteJoueurs, texteMJ) {
@@ -192,19 +194,27 @@ async function demanderAgent(texteJoueurs, texteMJ) {
 }
 
 // ---------------------------------------------------------------------
-//  2. LE CROQUIS : gpt-image, l'encre sur le magenta, détouré
+//  2. LE CROQUIS : gpt-image, l'encre sur le blanc (v325), le blanc retiré
 // ---------------------------------------------------------------------
-const STYLE_CROQUIS = "A quick pen-and-ink sketch drawn with a quill in the margin of an old adventurer's travel journal: "
-    + "confident pure BLACK ink lines, loose hatching and cross-hatching in black for the shadows, a few small black ink blots, "
-    + "lively and expressive like a master's study sketch, crisp clean high-resolution lines. "
-    + "Draw ONLY what matters for the moment: the characters and, if essential, the one object or element they act with. "
-    + "No background, no scenery, no ground line, unless the place itself is the subject. "
-    + "ONLY BLACK LINES ON MAGENTA: absolutely NO WHITE anywhere — no white fill, no white paper, no white highlight, no white halo or outline "
-    + "around the figures; the inside of faces, skin, clothes, hair and objects is NOT filled: it stays the same flat magenta, so that "
-    + "everything that is not a black ink line is magenta (pure line art). No colour, no grey wash, no paper texture, no frame, no border, "
-    + "no text, no letters, no signature. The drawing floats alone on a flat, clean, pure fluorescent magenta (#FF00FF) background used "
-    + "as a chroma key: every empty area is that exact magenta, with no gradient, no ground shadow, no paper. The magenta is only a "
-    + "chroma key: the ink lines never take any purple, pink or magenta tint. "
+// v325 — Nico : « le dessin est très mal fait et peu lisible ; je veux des traits
+// plus gros et une meilleure mise en scène artistique » (trois exemples : un
+// croquis de rue à la plume, une illustration gravée aux hachures avec un
+// disque noir derrière, un portrait au trait libre avec des taches d'encre) ;
+// « dis-lui de dessiner en noir sur fond blanc, et fais un algo qui retire
+// tout le blanc ». Le dessin vient en noir sur blanc ; le dépôt retire le blanc
+// (app.js, detourerFondBlanc) : sur la page, il ne reste que l'encre.
+const STYLE_CROQUIS = "A bold, expressive black ink illustration drawn with a dip pen and a brush pen in an adventurer's travel journal. "
+    + "THICK, CONFIDENT LINES: heavy black outlines with strong line-weight variation (thick contours, thinner inner details), "
+    + "readable at a glance even when printed small — never faint, never scratchy, never thin grey pencil lines. "
+    + "Volumes and shadows built with dense parallel hatching and cross-hatching, and some SOLID BLACK masses for the deepest shadows, "
+    + "for a strong black-and-white contrast, like a classic pen-and-ink book illustration or an engraving; "
+    + "a few loose gestural strokes and small ink splatters for life; the edges of the drawing may stay unfinished and fade out. "
+    + "ARTISTIC STAGING: a cinematic composition built around the action of the moment — a clear focal point, readable silhouettes, "
+    + "the figures large in the frame, a meaningful camera angle (low angle, over-the-shoulder, close-up…), depth with a foreground and a background "
+    + "only when it serves the story; when it helps, a simple graphic shape behind the subject (a solid black disc, a hatched moon, a burst of strokes). "
+    + "Draw ONLY what tells the moment: the characters and what they act with, and only as much setting as the moment needs (a few strokes suggest it). "
+    + "PURE BLACK INK ON A PURE WHITE BACKGROUND (#FFFFFF): no colour at all, no grey wash, no paper texture, no stains, no frame, no border, "
+    + "no text, no letters, no signature, no monogram. Every empty area is plain flat white. "
     + "Universe: Mythic Ancient Fantasy (Greco-Roman antiquity with magic — bronze, leather and linen, crested helmets, chitons and cloaks; "
     + "never medieval plate armour, never a crossbow or any firearm).";
 
@@ -216,11 +226,11 @@ async function dessiner(prompt, references, cadrage, options) {
     const cles = lireCles();
     const taille = CADRAGES[cadrage] || "1024x1024";
     // LES RÉFÉRENCES, comme l'avatar rhabillé : le portrait mis en PNG carré sur
-    // le magenta (imageVersBlobPng), joint dans l'ordre que le texte annonce.
+    // le blanc (v325 ; imageVersBlobPng), joint dans l'ordre que le texte annonce.
     const blobs = [];
     for (const r of references || []) {
         if (!r.url || typeof window.imageVersBlobPng !== "function") continue;
-        const b = await window.imageVersBlobPng(r.url).catch(() => null);
+        const b = await window.imageVersBlobPng(r.url, "#FFFFFF").catch(() => null);   // (v325 : sur du blanc, comme le dessin)
         if (b) blobs.push({ ...r, blob: b });
         else console.warn(`[MIA_ILLUSTRATEUR] Le portrait de ${r.nom} est illisible (${r.url}).`);
         if (blobs.length >= 4) break;
@@ -233,9 +243,11 @@ async function dessiner(prompt, references, cadrage, options) {
     const refsTexte = blobs.length ? ` The ${blobs.length} attached reference image${blobs.length > 1 ? "s show" : " shows"} the EXACT character${blobs.length > 1 ? "s" : ""} to draw, in this order: `
         + blobs.map((b, i) => `image ${i + 1} is ${b.nom}${b.qui ? " (" + b.qui + ")" : ""}${b.scene ? " — in the scene: " + b.scene : ""}`).join("; ")
         + ". Each of them must be clearly recognisable as the person in their reference image: same face, hairstyle, hair colour, beard or not, build, "
-        + "age, clothing and equipment — only translated into the ink sketch style. Do not copy the references' backgrounds or colours. "
+        + "age, clothing and equipment — only translated into the black ink style. Do not copy the references' backgrounds, colours or poses: "
+        + "pose them as the staging says. "
         + "Do not add any other person than those named here and in the description." : "";
-    const mise = o.miseEnScene ? ` STAGING: ${o.miseEnScene}.` : "";
+    const mise = (o.miseEnScene ? ` STAGING: ${o.miseEnScene}.` : "")
+        + (o.extrait ? ` The moment, exactly as the journal tells it (French; its writer, the "je"/"nous", is never drawn): « ${o.extrait} ». Stay faithful to it: who does what to whom, who hides, who sees whom.` : "");
     const texte = `${STYLE_CROQUIS}${refsTexte}${mise} The sketch shows: ${prompt}`;
     console.log(`🖋️ [MIA_ILLUSTRATEUR] La consigne du dessinateur : ${texte.slice(STYLE_CROQUIS.length).trim()}`);
     const modeles = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1"];
@@ -272,7 +284,7 @@ async function dessiner(prompt, references, cadrage, options) {
     if (!json) throw new Error("MIA_ILLUSTRATEUR : aucune image");
     const source = json.data[0].url || ("data:image/png;base64," + json.data[0].b64_json);
     const depot = typeof window.televerserImageDetoureeIvalis === "function"
-        ? await window.televerserImageDetoureeIvalis(source, cadrage === "portrait" ? "PNJ" : "Recit/Illustrations", cles) : "";
+        ? await window.televerserImageDetoureeIvalis(source, cadrage === "portrait" ? "PNJ" : "Recit/Illustrations", cles, { fond: "blanc" }) : "";
     if (!depot) throw new Error("MIA_ILLUSTRATEUR : dépôt impossible");
     // (Un trait d'encre : la compression automatique la plus fine, pas d'escalier.)
     const url = String(depot).replace("/upload/q_auto,f_auto/", "/upload/q_auto:best,f_auto/");
@@ -370,7 +382,8 @@ window.illustrerLeRecit = async function (options) {
                 ? ` EXACTLY ${nombre} figure${nombre > 1 ? "s" : ""} in the whole drawing: ${[...noms, ...autres].join(", ")}. No other person or creature anywhere: no narrator, no chronicler, no onlooker, no crowd, no figure in the distance.`
                 : " No person at all in the drawing: no narrator, no onlooker, no figure in the distance.";
             const miseEnScene = String(avis.mise_en_scene || "").trim();
-            const img = await dessiner(avis.description + qui, refs, avis.sujet === "personnage" ? "personnage" : "scene", { herosAttendus: heros.length - sansImage.length, miseEnScene });
+            const extrait = String(avis.extrait || "").replace(/\s+/g, " ").trim().slice(0, 600);
+            const img = await dessiner(avis.description + qui, refs, avis.sujet === "personnage" ? "personnage" : "scene", { herosAttendus: heros.length - sansImage.length, miseEnScene, extrait });
             const taille = +(R.tailleMin + Math.random() * (R.tailleMax - R.tailleMin)).toFixed(3);
             resultat.illustration = { Url: img.url, Ratio: img.ratio, Taille: taille, Moment: String(avis.moment || ""), Sujet: avis.sujet === "personnage" ? "personnage" : "scene", Le: Date.now(),
                 // (v323) Pour vérifier après coup : les portraits joints, la consigne envoyée.
