@@ -90,6 +90,80 @@ const hasard = (graine) => {
     return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
 };
 const idDe = (m) => m.idDoc || m.id || ("t" + (m.Timestamp || 0));
+
+// LE PAPIER OÙ L'ON ÉCRIT, ABÎMÉ (v316, Nico : « améliore le réalisme de la
+// texture du post-it où les joueurs écrivent : des bords abîmés, plus
+// réalistes »). Un contour déchiré calculé une fois (graine fixe) : le haut
+// arraché en dents irrégulières, de petites fibres qui dépassent, un coin mangé,
+// des entailles sur les côtés (le bas reste droit, il est sous les pages). Le
+// même contour sert de découpe (clip-path) et de dessin : un liseré clair, les
+// fibres blanches du papier à l'endroit de la déchirure, et un roussi brun juste
+// derrière. En plus : le grain du papier, un pli de coin, les bords foncés.
+function contourDechire(graine) {
+    const r = hasard(graine);
+    for (let i = 0; i < 7; i++) r();
+    const pts = [];
+    // Le coin haut gauche, mangé en biais.
+    const coin = 4 + r() * 3;
+    pts.push([0, coin + 6]);
+    for (let k = 1; k <= 4; k++) pts.push([coin * k / 4 + (r() - 0.5) * 0.6, coin + 6 - (coin + 4) * k / 4 + (r() - 0.5) * 1.2]);
+    // Le haut, arraché : une marche au hasard, des dents fines, deux accrocs.
+    let x = coin, y = 2 + r() * 1.5;
+    const accrocs = [20 + r() * 25, 60 + r() * 25];
+    while (x < 99) {
+        x += 0.8 + r() * 1.9;
+        y = Math.max(0.2, Math.min(5.5, y + (r() - 0.5) * 1.6));
+        let yy = y + (r() < 0.35 ? r() * 1.1 : 0);
+        if (accrocs.some(a => Math.abs(a - x) < 1.2)) yy += 3 + r() * 3;
+        pts.push([Math.min(100, x), yy]);
+    }
+    // Le côté droit : presque droit, deux ou trois entailles.
+    let yd = 3;
+    while (yd < 96) {
+        yd += 6 + r() * 10;
+        if (yd > 96) break;
+        const entaille = r() < 0.45;
+        pts.push([100 - (r() * 0.5), yd]);
+        if (entaille) { pts.push([100 - 1 - r() * 1.6, yd + 1 + r()]); pts.push([100 - r() * 0.4, yd + 2.4 + r() * 1.2]); }
+    }
+    pts.push([100, 100], [0, 100]);
+    // Le côté gauche, de bas en haut.
+    let yg = 100;
+    while (yg > coin + 10) {
+        yg -= 6 + r() * 10;
+        if (yg < coin + 8) break;
+        const entaille = r() < 0.4;
+        pts.push([r() * 0.5, yg]);
+        if (entaille) { pts.push([1 + r() * 1.4, yg - 1 - r()]); pts.push([r() * 0.4, yg - 2.4 - r() * 1.2]); }
+    }
+    return pts.map(([a, b]) => [+a.toFixed(2), +b.toFixed(2)]);
+}
+function papierDechire(papier) {
+    if (!papier) return;
+    const pts = contourDechire("papier-ecriture");
+    papier.style.clipPath = "polygon(" + pts.map(([a, b]) => `${a}% ${b}%`).join(", ") + ")";
+    // (le haut et les côtés seuls, d'un trait ouvert — gauche, haut, droite :
+    // il ne traverse pas le bas, sous les pages)
+    const iBas = pts.findIndex(([a, b]) => a === 0 && b === 100);
+    const haut = [...pts.slice(iBas + 1), ...pts.slice(0, iBas - 1)];
+    const d = "M" + haut.map(([a, b]) => `${a},${b}`).join(" L");
+    // Les fibres : de petits poils clairs qui dépassent de la déchirure du haut.
+    const r = hasard("fibres-papier");
+    let fibres = "";
+    haut.filter(([a, b]) => b < 9 && a > 2 && a < 98).forEach(([a, b]) => {
+        if (r() < 0.55) return;
+        const l = 0.6 + r() * 1.4, ang = -Math.PI / 2 + (r() - 0.5) * 1.6;
+        fibres += `M${a},${(b + 0.4).toFixed(2)} l${(Math.cos(ang) * l * 0.4).toFixed(2)},${(Math.sin(ang) * l).toFixed(2)} `;
+    });
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "bords-papier");
+    svg.setAttribute("viewBox", "0 0 100 100");
+    svg.setAttribute("preserveAspectRatio", "none");
+    svg.setAttribute("aria-hidden", "true");
+    svg.innerHTML = `<path class="roussi" d="${d}"/><path class="dechirure" d="${d}"/><path class="fibres" d="${fibres}"/>
+        <path class="pli" d="M${(93 + r() * 2).toFixed(1)},100 L100,${(84 + r() * 4).toFixed(1)}"/>`;
+    papier.insertBefore(svg, papier.firstChild);
+}
 const estJet = (m) => /^🎲 Jet de /.test(sansBalises(m.Texte));
 const caracDuJet = (m) => ((sansBalises(m.Texte).match(/^🎲 Jet de (.+?) pour /) || [])[1] || "").trim();
 
@@ -658,6 +732,7 @@ function creerElements() {
         <button type="button" class="ecriture-micro" id="recit-micro" aria-label="Dicter à voix haute" title="Dicter à voix haute">${SVG_TETE_PARLE}</button>
         <button type="submit" class="ecriture-plume" id="recit-envoyer" aria-label="Écrire dans le livre">${SVG_PLUME}</button>
       </form>`;
+    papierDechire(ecriture.querySelector(".papier-ecriture"));
     avantLivre(ecriture);                  // (v301) un marque-page : sous les pages, il sort par le haut
     const poussiere = document.createElement("div");
     poussiere.className = "recit-poussiere";

@@ -2958,6 +2958,24 @@ window.outilsForge = {
 // encore de la technique d'avant.
 const LIBELLE_VALIDER_FORGE = "✔️ Forger cette compétence";
 
+// LA TECHNIQUE EN COURS, telle qu'elle serait forgée (v316) : l'aperçu de
+// l'encart dans la Forge du livre la lit à chaque retouche. Rien n'est écrit.
+window.carteEnCoursDeForge = function() {
+    const fs = window.forgeState;
+    if (!fs || !Array.isArray(fs.actions) || !fs.actions.length) return null;
+    const lire = (id) => { const el = document.getElementById(id); return el ? el.innerText : ""; };
+    const nom = (document.getElementById("forge-nom") || {}).value || "";
+    return {
+        Nom: nom.trim() || "Technique sans nom",
+        Arme: fs.armePrincipale || "",
+        Fatigue: parseInt(lire("forge-fatigue-val")) || 0,
+        ...(fs.bilan && fs.bilan.fatigueSurpuissance ? { Fatigue_Surpuissance: fs.bilan.fatigueSurpuissance } : {}),
+        Initiative: parseInt(lire("forge-initiative-val")) || 0,
+        Effets_Compiles: compilerEffetsTexte(),
+        Composants: { actions: fs.actions.map(a => ({ idInst: a.idInst, baseEffetId: a.baseEffet && a.baseEffet.id, count: a.count, mods: { ...a.mods }, zoneHexes: a.zoneHexes || [] })) }
+    };
+};
+
 window.sauvegarderCompetence = async function() {
     const nomCompetence = document.getElementById("forge-nom").value.trim();
     const arme = window.forgeState.armePrincipale || "Non spécifié";

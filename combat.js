@@ -6201,7 +6201,12 @@ window.distanceEncartCarte = function(dataCarte, lanceur) {
 // à son titre (« Peur », « Brûlé », « Bouclier magique ») ; les autres restent
 // (« 2 hexagones » d'une Poussée). Une nouvelle chance qu'on ajoutera un jour
 // au bestiaire suivra la règle sans qu'on y pense.
-window.ligneEffetsCarte = function(dataCarte, lanceur) {
+// `options.pourcentages` (v316, Nico : « le détail de pourcentage des effets,
+// pour informatif ») : la carte du livre et l'aperçu de la Forge écrivent aussi
+// les descriptions chiffrées en % (« 10 % de chance d'enflammer ») ; l'encart
+// du combat, lui, reste court.
+window.ligneEffetsCarte = function(dataCarte, lanceur, options) {
+    const avecPourcentages = !!(options && options.pourcentages);
     const effets = (dataCarte && dataCarte.Effets_Compiles) || [];
     const lignes = [];
     const couleurs = window.couleursChiffres();
@@ -6315,9 +6320,14 @@ window.ligneEffetsCarte = function(dataCarte, lanceur) {
         const chiffre = nature ? sansBalises(eff.desc).match(/(\d+(?:[.,]\d+)?)/) : null;
         if (nature && chiffre) {
             lignes.push(ligneMontant(nature, nom, montantReel(chiffre[1]).replace(".", ","), toursPour(i), !!eff.isMod));
+            // (v316) Ce que le montant porte en % (une chance, une part), écrit dessous.
+            if (avecPourcentages) {
+                const pc = sansBalises(eff.desc).split(/(?<=[.;])\s+/).filter(x => /%/.test(x)).join(" ");
+                if (pc) lignes.push(`<div class="encart-detail-pourcent" style="margin-left: ${eff.isMod ? 32 : 14}px; color: #cfc6b6; font-style: italic; font-size: 15px;">${pc}</div>`);
+            }
             return;
         }
-        const montreDesc = eff.desc && !/%/.test(eff.desc);
+        const montreDesc = eff.desc && (avecPourcentages || !/%/.test(eff.desc));
         lignes.push(ligneEffet(nom, montreDesc ? eff.desc : "", !!eff.isMod));
     });
 

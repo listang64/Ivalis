@@ -701,18 +701,15 @@ function lignesEffets(data, porteur) {
     }
     return html;
 }
-function htmlCarte(h, id) {
-    let data = ((window.CACHE_COMPETENCES_GLOBAL || {})[h.idPersonnage] || {})[id];
-    const technique = !data && typeof window.carteTechniqueClasse === "function" ? window.carteTechniqueClasse(id) : null;
-    data = data || technique;
-    if (!data) return "";
-    const e = etatCompetences(h);
-    const memorisee = e.deck.includes(id), bloquee = e.bloquees.get(id);
+// LE CORPS DE LA CARTE, partagé par la carte de la fiche et l'aperçu de la
+// Forge (v316) : l'en-tête, l'arme, la distance, la zone et les effets — avec
+// le détail des pourcentages (« pour informatif », Nico), que l'encart du
+// combat, lui, ne dit pas.
+function corpsDeCarte(data, h, graine) {
     const fatigue = typeof window.coutFatigueCarte === "function" ? window.coutFatigueCarte(data, h) : (data.Fatigue || 0);
     const arme = typeof window.libelleArmeCarte === "function" ? window.libelleArmeCarte(data.Arme) : "";
     const puissance = typeof window.fatigueDeSurpuissance === "function" ? window.fatigueDeSurpuissance(data, h) : (Number(data.Fatigue) || fatigue);
     const surpuissance = typeof window.texteSurpuissance === "function" ? window.texteSurpuissance(puissance) : "";
-    const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev();
     // LES SYMBOLES DU COMBAT (v315, Nico : « les mêmes symboles qu'en mode
     // combat, dans le visuel qui lance l'attaque ») : les montants de l'encart
     // (ligneEffetsCarte, combat.js : l'explosion, la baguette, la tête qui
@@ -723,15 +720,14 @@ function htmlCarte(h, id) {
     const zone = typeof window.dessinZoneCarte === "function" ? window.dessinZoneCarte(data, "#7a5634", 12) : "";
     let effets = null;
     if (typeof window.ligneEffetsCarte === "function") {
-        try { effets = window.ligneEffetsCarte(data, h); } catch (e) { console.warn("Le livre : les effets de la carte", e); }
+        try { effets = window.ligneEffetsCarte(data, h, { pourcentages: true }); } catch (e) { console.warn("Le livre : les effets de la carte", e); }
     }
     const corps = effets !== null
         ? `<div class="carte-effets carte-effets-encart">${effets}</div>`
         : `<ul class="carte-effets">${lignesEffets(data, h)}</ul>`;
     const noteSurpuissance = surpuissance && !(effets && effets.includes("encart-surpuissance"));
-    return `<div class="carte-encre" data-carte="${echapper(id)}">
-        ${lavis("gris", "carte-" + id, { deborde: true })}
-        ${cadre("carte-" + id, 1.2)}${cadre("carte2-" + id, 2.2)}
+    return `${lavis("gris", graine, { deborde: true })}
+        ${cadre(graine, 1.2)}${cadre(graine + "-2", 2.2)}
         <div class="carte-entete">
           <span class="carte-init" ${aide("Initiative", "Plus elle est haute, plus la technique part tôt dans le tour.")}>${echapper(data.Initiative || 0)}</span>
           <span class="carte-titre">${echapper(data.Nom || "Technique")}</span>
@@ -746,11 +742,38 @@ function htmlCarte(h, id) {
           ${zone ? `<div class="carte-zone" ${aide("Zone", "Les cases touchées autour du point visé (la case grise : le lanceur).")}>${zone}</div>` : ""}
           ${corps}
         </div>
-        ${noteSurpuissance ? `<p class="carte-note surpuissance">Surpuissance ${echapper(surpuissance)}</p>` : ""}
+        ${noteSurpuissance ? `<p class="carte-note surpuissance">Surpuissance ${echapper(surpuissance)}</p>` : ""}`;
+}
+function htmlCarte(h, id) {
+    let data = ((window.CACHE_COMPETENCES_GLOBAL || {})[h.idPersonnage] || {})[id];
+    const technique = !data && typeof window.carteTechniqueClasse === "function" ? window.carteTechniqueClasse(id) : null;
+    data = data || technique;
+    if (!data) return "";
+    const e = etatCompetences(h);
+    const memorisee = e.deck.includes(id), bloquee = e.bloquees.get(id);
+    const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev();
+    return `<div class="carte-encre" data-carte="${echapper(id)}">
+        ${corpsDeCarte(data, h, "carte-" + id)}
         ${technique ? `<p class="carte-note">Technique de classe : une fois par combat, hors mémoire.</p>`
           : (moi ? `<button type="button" class="lien-fiche bouton-memoriser" data-action="fiches" data-fa="memoriser" data-id="${echapper(id)}">${memorisee ? "Oublier pour le combat" : "Mémoriser pour le combat"}</button>` : "")}
         ${bloquee ? `<p class="carte-note bloquee">${echapper(bloquee)}</p>` : ""}
       </div>`;
+}
+// L'APERÇU DANS LA FORGE (v316) : la technique en cours, écrite comme sa carte
+// le sera dans la fiche — symboles, zone et pourcentages —, sous l'enclume, à
+// chaque retouche.
+function majApercuForge() {
+    if (!forgeDansLeLivre) return;
+    const ici = document.getElementById("forge-livre-apercu");
+    if (!ici) return;
+    const h = herosParId(heros);
+    let data = null;
+    try { data = typeof window.carteEnCoursDeForge === "function" ? window.carteEnCoursDeForge() : null; } catch (e) { console.warn("Le livre : l'aperçu de la Forge", e); }
+    if (!data || !h) { ici.innerHTML = `<p class="fiche-attente">L'encart de la technique s'écrira ici, effet après effet.</p>`; return; }
+    const sig = JSON.stringify(data);
+    if (sig === majApercuForge.sig && ici.querySelector(".carte-encre")) return;
+    majApercuForge.sig = sig;
+    ici.innerHTML = `<div class="titre-apercu-forge">L'encart</div><div class="carte-encre deja-ecrite apercu-forge">${corpsDeCarte(data, h, "forge-apercu")}</div>`;
 }
 function htmlCompetencesDroite(h) {
     const carte = carteOuverte ? htmlCarte(h, carteOuverte) : "";
@@ -803,7 +826,8 @@ async function ouvrirForge() {
     const g = pagesFiche["forge-g"], d = pagesFiche["forge-d"];
     g.innerHTML = `<div class="contenu-page page-forge defile-fiche"><div class="entete-fiche"><span class="titre-page-fiche">La Forge</span>
         <button type="button" class="lien-fiche fermer-forge" data-action="fiches" data-fa="fermer-forge">Refermer</button></div>
-        <div class="forge-dans-livre" id="forge-livre-gauche"></div></div>`;
+        <div class="forge-dans-livre" id="forge-livre-gauche"></div>
+        <div class="apercu-forge-livre" id="forge-livre-apercu"></div></div>`;
     d.innerHTML = `<div class="contenu-page page-forge page-codex"><div class="entete-fiche"><span class="titre-page-fiche">Le codex</span>
         <span class="compte-tags" id="forge-livre-tags"></span></div>
         <div class="codex-armes" id="forge-livre-armes">
@@ -822,6 +846,7 @@ async function ouvrirForge() {
     try { await window.ouvrirCreationCompetence(); } catch (err) { console.error("Le livre : la Forge", err); }
     cacherModalesForge();
     majCodex();
+    majApercuForge();
 }
 function cacherModalesForge() {
     ["modale-creation-competence", "modale-menu-ajout", "overlay-jeu-modale"].forEach(id => {
@@ -845,6 +870,7 @@ function majCodex() {
 }
 function fermerForge(versCompetences) {
     if (!forgeDansLeLivre) return;
+    majApercuForge.sig = "";
     forgeDansLeLivre = false;
     document.body.classList.remove("forge-livre");
     [...ranges.keys()].filter(el => el.closest && el.closest(".page-forge")).forEach(remettre);
@@ -869,9 +895,8 @@ function brancherForge() {
         return r;
     };
     if (typeof rafraichir === "function") window.rafraichirForge = function () {
-        const r = rafraichir.apply(this, arguments);
-        if (forgeDansLeLivre && !majCodex.encours) setTimeout(majCodex, 0);
-        return r;
+        try { return rafraichir.apply(this, arguments); }
+        finally { if (forgeDansLeLivre && !majCodex.encours) setTimeout(() => { majCodex(); majApercuForge(); }, 0); }
     };
     if (typeof armeMenu === "function") window.ouvrirMenuArme = function () {
         if (forgeDansLeLivre) { const a = document.getElementById("forge-livre-armes"); if (a) { a.hidden = false; a.classList.remove("appelle"); void a.offsetWidth; a.classList.add("appelle"); } return; }

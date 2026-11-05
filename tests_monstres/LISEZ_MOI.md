@@ -10546,3 +10546,21 @@ effets de la carte), v314 (plus de taches ; qualité medium).
   débordement, le lavis couvrant ≥ 85 % de la carte.
   Suite complète : rien de nouveau ; v267 échouait déjà sur la v314 (caméra du combat),
   v274 passe seul (minuterie), v238/v249/v286 passent seuls.
+
+## v316 — Le détail des pourcentages (fiche, Forge), le papier où l'on écrit, abîmé
+
+- ligneEffetsCarte(data, lanceur, { pourcentages: true }) (combat.js) : écrit aussi les
+  descriptions chiffrées en % (et, sous un montant, ce qu'il porte en % : « 20 % de chance de
+  renverser ») ; sans l'option (l'encart du combat), rien ne change.
+- La carte de la fiche (grimoire_fiches.js, corpsDeCarte) l'emploie ; la Forge du livre montre
+  sous l'enclume l'aperçu de l'encart de la technique en cours (window.carteEnCoursDeForge,
+  competences.js : ce qui serait forgé, sans rien écrire), à chaque retouche.
+- Dans le livre, le bandeau de la Forge (cap, fatigue, initiative) ne colle plus en haut de la
+  page qui défile (il recouvrait les effets).
+- Le papier où l'on écrit (grimoire_recit.js, papierDechire) : une découpe déchirée calculée
+  (graine fixe) — le haut arraché en dents irrégulières avec deux accrocs, le coin haut gauche
+  mangé, des entailles sur les côtés —, le liseré de fibres claires et le roussi qui suivent la
+  déchirure, des fibres qui dépassent ; le grain du papier (bruit SVG), des rousseurs, un pli
+  de coin, des bords plus foncés.
+
+corrections_v316.mjs vérifie tout cela (13 échecs sur la v315).
