@@ -10638,3 +10638,18 @@ des pages).
   « Annuler »). Validée, les pages s'effacent et la fiche du héros s'ouvre dans le livre.
 
 corrections_v319.mjs vérifie tout cela (9 échecs sur la v318).
+
+## v320 — Les marque-pages de la création sortent de sous les pages
+
+- Les marque-pages des peuples et des classes ont leur racine sous la page de droite
+  (cachée par elle, avec l'ombre de la page posée dessus), passent sur la tranche et
+  dépassent de la couverture. Ils pivotent là où ils sortent de la page.
+- Pas tous droits : environ un sur trois presque droit (moins de 1°), les autres penchés
+  (2,6° à 6° pour les peuples, 2° à 4,2° pour les classes, d'un côté ou de l'autre).
+- Retouches v319 : l'atout du peuple à la taille du texte ; le descriptif des classes à
+  l'encre (plus de boîtes dorées ni de texte clair hérités de l'ancien écran), un peu plus
+  serré pour que « Choisir cette classe » tienne sur la page ; les noms des marque-pages
+  plus grands ; le laurier du loup refait (une branche par côté) ; l'aquarelle du bouton
+  « + Un nouvel aventurier » plus colorée.
+
+corrections_v320.mjs vérifie les marque-pages (5 échecs sur la v319).

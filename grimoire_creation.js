@@ -314,7 +314,8 @@ function reecrireClasses() {
 // ---------------------------------------------------------------------
 //  LES MARQUE-PAGES DU BORD DROIT
 // ---------------------------------------------------------------------
-// Glissés sous les pages, ils dépassent sur la tranche du livre, à droite ;
+// Glissés sous les pages (Nico : « comme s'ils sortaient »), ils passent sur la
+// tranche et dépassent de la couverture, à droite ;
 // pas tous alignés (Nico : « pour plus de naturel »). En unités de l'image du
 // livre (2000 × 1117) : la tranche va de x 1765 à x 1999.
 function creerOnglets() {
@@ -328,9 +329,13 @@ function creerOnglets() {
         const n = liste.length, pas = (bas - haut) / n, h = Math.min(96, pas * 0.86);
         return `<div class="groupe-onglets" data-groupe="${nom}">${liste.map((s, i) => {
             const r = hasard("onglet-" + nom + s.cle);
-            const x = 1748 + r() * 26, y = haut + i * pas + (pas - h) / 2 + (r() * 2 - 1) * Math.min(10, pas * 0.12), a = ((r() * 2 - 1) * 2.4).toFixed(2);
+            // La racine sous la page de droite (bord à x 1765), le bout au-delà de la
+            // couverture (x ≈ 1960) ; un sur trois à peu près droit, les autres penchés.
+            const x = 1694 + r() * 34, y = haut + i * pas + (pas - h) / 2 + (r() * 2 - 1) * Math.min(10, pas * 0.12);
+            const signe = r() < 0.5 ? -1 : 1, droit = r() < 0.35, penche = nom === "classes" ? 2 + r() * 2.2 : 2.6 + r() * 3.4;
+            const a = (droit ? (r() * 2 - 1) * 0.8 : signe * penche).toFixed(2);
             return `<button type="button" class="onglet-creation" data-cle="${echapper(s.cle)}" title="${echapper(s.nom)}"
-                style="--x:${x.toFixed(0)};--y:${y.toFixed(0)};--h:${h.toFixed(0)};--a:${a}deg;--taille:${nom === "classes" ? 23 : 28}">
+                style="--x:${x.toFixed(0)};--y:${y.toFixed(0)};--h:${h.toFixed(0)};--a:${a}deg;--bord:${(1765 - x).toFixed(0)};--taille:${nom === "classes" ? 23 : 28}">
                 <span class="papier-onglet">${lavis(teinteDe(s.couleur, "onglet", 0.55), "onglet-" + s.cle)}<span class="nom-onglet">${echapper(nom === "classes" ? nomAffiche(s.classe) : s.nom)}</span></span></button>`;
         }).join("")}</div>`;
     };

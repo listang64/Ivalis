@@ -148,12 +148,14 @@ body.creation-livre #overlay-jeu-modale { display: none !important; }
 .page-fiches .nouvel-aventurier > .lavis { left: -2%; top: -6%; width: 104%; height: 112%; }
 .page-fiches .nouvel-aventurier:hover { transform: rotate(-0.8deg) scale(1.03); }
 
-/* LES MARQUE-PAGES DU BORD DROIT : glissés sous les pages, ils dépassent sur
-   la tranche ; ceux de la partie ouverte sortent, celui de la page ouverte un peu plus. */
+/* LES MARQUE-PAGES DU BORD DROIT : glissés sous les pages, ils passent sur
+   la tranche et dépassent de la couverture ; ceux de la partie ouverte sortent, celui de la page ouverte un peu plus. */
 .onglets-creation { position: absolute; inset: 0; pointer-events: none; }
 .onglet-creation { position: absolute; left: calc(var(--x) * 1px * var(--s, 1)); top: calc(var(--y) * 1px * var(--s, 1));
-  width: calc(205px * var(--s, 1)); height: calc(var(--h) * 1px * var(--s, 1)); padding: 0; border: 0; background: transparent; cursor: pointer;
-  transform: translateX(calc(-190px * var(--s, 1))) rotate(var(--a)); opacity: 0; pointer-events: none;
+  width: calc(300px * var(--s, 1)); height: calc(var(--h) * 1px * var(--s, 1)); padding: 0; border: 0; background: transparent; cursor: pointer;
+  /* Il pivote là où il sort de sous la page : sa racine reste cachée. */
+  transform-origin: calc(var(--bord) * 1px * var(--s, 1)) 50%;
+  transform: translateX(calc(-270px * var(--s, 1))) rotate(var(--a)); opacity: 0; pointer-events: none;
   transition: transform 0.5s cubic-bezier(0.45, 0.05, 0.25, 1), opacity 0.4s ease;
   filter: drop-shadow(calc(var(--u) * 0.2) calc(var(--u) * 0.35) calc(var(--u) * 0.4) rgba(40, 20, 6, 0.5)); touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .groupe-onglets.sorti .onglet-creation { transform: translateX(0) rotate(var(--a)); opacity: 1; pointer-events: auto; }
@@ -165,7 +167,12 @@ body.creation-livre #overlay-jeu-modale { display: none !important; }
   border-radius: 0 calc(var(--h) * 0.18px * var(--s, 1)) calc(var(--h) * 0.18px * var(--s, 1)) 0;
   clip-path: polygon(0 0, 97% 0, 100% 12%, 99.5% 50%, 100% 88%, 97% 100%, 0 100%); }
 .papier-onglet > .lavis { left: 0; top: 0; width: 100%; height: 100%; z-index: 0; }
-.nom-onglet { position: relative; z-index: 1; padding-right: calc(10px * var(--s, 1)); max-width: calc(170px * var(--s, 1)); text-align: right; line-height: 1;
+/* L'ombre de la page posée dessus, là où il sort (le bord de la page à --bord). */
+.papier-onglet::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: linear-gradient(to right, rgba(34, 17, 5, 0.7) 0, rgba(34, 17, 5, 0.7) calc(var(--bord) * 1px * var(--s, 1)),
+    rgba(34, 17, 5, 0.42) calc(var(--bord) * 1px * var(--s, 1) + 1px), rgba(34, 17, 5, 0.14) calc((var(--bord) + 22) * 1px * var(--s, 1)),
+    rgba(34, 17, 5, 0) calc((var(--bord) + 55) * 1px * var(--s, 1))); }
+.nom-onglet { position: relative; z-index: 1; padding-right: calc(10px * var(--s, 1)); max-width: calc(215px * var(--s, 1)); text-align: right; line-height: 1;
   font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important;
   font-size: calc(var(--taille) * 1px * var(--s, 1) * var(--echelle-titres, 1)); color: #1b1009; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .onglet-creation.ouvert .nom-onglet { text-decoration: underline; text-underline-offset: 0.15em; text-decoration-thickness: 1px; }
