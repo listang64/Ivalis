@@ -30,8 +30,10 @@
     const ZONE_VERS_REGION = { 1: 1, 2: 2, 3: 5, 4: 6, 5: 10, 6: 11, 7: 3, 8: 7, 9: 8, 10: 13, 11: 12 };
     window.ZONE_VERS_REGION = ZONE_VERS_REGION;      // (v313) les régions voisines (voyage_groupe.js)
     // Les marges de la carte sur sa page (fractions de la page).
-    const MARGE = { x: 0.075, y: 0.075 };
-    const PAYSAGE = 1.15;                         // au-delà, la carte s'étale sur la double page
+    // v331 — Nico : « les nouvelles maps régionales en pleine page de droite, sans
+    // zoom » : toujours la page de droite (même une carte en paysage), presque
+    // jusqu'à ses bords ; la page de gauche garde le nom de la région.
+    const MARGE = { x: 0.035, y: 0.035 };
     const G = () => window.GRIMOIRE || null;
     const $ = (id) => document.getElementById(id);
     const echapper = (t) => String(t == null ? "" : t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -51,7 +53,7 @@
             .filter(x => x.carte && x.carte.image);
     }
     const urlDe = (carte) => (typeof window.urlImageCarteRegionale === "function" ? window.urlImageCarteRegionale(carte.image) : carte.image);
-    const paysage = (r) => (r.aspect || 0) > PAYSAGE;
+    const paysage = () => false;      // (v331) plus de double page : la page de droite
 
     // La place de la carte, en pourcentages de la zone des deux pages (le livre).
     function placeDe(r) {

@@ -123,6 +123,8 @@ let reglagePion = false;       // DEV : la croix rouge et l'image qu'on glisse
 // Lieu_Actuel posé sur une carte régionale, v273).
 function positionEffective() {
     const p = partie && partie.Position_Groupe;
+    // (v331) En attente d'un téléport (sa carte s'est vidée, son lieu a disparu) : nulle part.
+    if (p && p.Attente) return null;
     if (p && Number(p.Region) > 0) {
         return { Region: Number(p.Region), x: Number.isFinite(Number(p.x)) && p.x !== null ? Number(p.x) : null,
                  y: Number.isFinite(Number(p.y)) && p.y !== null ? Number(p.y) : null };
@@ -145,6 +147,13 @@ function centreMonde(numero) {
 const nomRegion = (n) => { const c = (window.CARTES_REGIONALES || {})[n]; return (c && c.nom) || `Région ${n}`; };
 const aspectRegion = (n) => (typeof window.aspectCarteRegionale === "function" ? window.aspectCarteRegionale(n) : 1.6);
 window.positionGroupe = () => { const p = positionEffective(); return p ? { ...p } : null; };
+// (v331) La position telle que la base la dit, même en attente, et son lieu.
+window.positionGroupeBrute = () => {
+    const p = partie && partie.Position_Groupe;
+    if (!p && !(partie && partie.Lieu_Actuel)) return null;
+    return { ...(p || {}), Lieu: (partie && partie.Lieu_Actuel) || "" };
+};
+window.groupeEnAttente = () => !!(partie && partie.Position_Groupe && partie.Position_Groupe.Attente);
 
 // --- LES TRACÉS ------------------------------------------------------------
 // Une polyligne, et ses longueurs cumulées (dans l'espace donné).
@@ -916,6 +925,23 @@ async function teleporter(cible) {
     catch (e) { console.error("Téléport du groupe :", e); annoncer("Le téléport n'a pas pu s'écrire (connexion ?)."); return false; }
 }
 window.teleporterGroupe = teleporter;
+// (v331) LE GROUPE EN ATTENTE : Nico, « si plus rien sur la map, la position du
+// groupe est en attente le temps que je le téléporte ailleurs ». Il garde sa
+// région (le MJ sait encore où l'on est), mais plus de place ni de lieu : pas de
+// pion, pas de voyage, jusqu'au téléport DEV (qui réécrit sa position).
+window.mettreGroupeEnAttente = async function(region) {
+    if (!window.ID_PARTIE_COURANTE) return false;
+    const pos = { Region: Number(region) || Number(partie && partie.Position_Groupe && partie.Position_Groupe.Region) || 0, x: null, y: null, Attente: true };
+    partie = { ...partie, Position_Groupe: pos, Lieu_Actuel: "" };
+    delete partie.Voyage_Groupe;
+    voyage = null;
+    arreterAnimation();
+    quitterChoix();
+    dessinerTout();
+    annoncer("Le groupe est en attente : plus rien sur sa carte. DEV : téléporte-le où il doit être.");
+    try { await updateDoc(refPartie(), { Position_Groupe: pos, Lieu_Actuel: "", Voyage_Groupe: deleteField() }); return true; }
+    catch (e) { console.error("Le groupe en attente :", e); return false; }
+};
 
 // =========================================================================
 //  L'ÉCRAN

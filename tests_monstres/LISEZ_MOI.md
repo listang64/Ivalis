@@ -10824,3 +10824,30 @@ corrections_v329.mjs le vérifie (5 échecs sur la v328).
 
 corrections_v330.mjs vérifie tout cela (11 échecs sur la v329). Test mis à jour : v314 (ses
 PNJ du croquis sont marqués présents).
+
+## v331 — Les nouvelles cartes régionales, sans zoom ; supprimer les lieux en DEV ; le groupe en attente
+
+- Nico : « on va changer les maps régionales et leur zoom : les nouvelles images en pleine page
+  de droite, sans zoom ; dans le bouton DEV, supprimer village et lieux, avec tout ce qui est
+  lié dans la base ; si plus rien sur la map, la position du groupe est en attente le temps
+  que je le téléporte ».
+- LES IMAGES (cartes_regionales.js, NOUVELLES_CARTES_REGIONALES) : la forêt des murmures (1),
+  la vallée de souffre (2), le désert d'Etheria (5). Elles priment sur l'image de la fiche.
+  Tant que la fiche parle de l'ancienne image, son usure, ses morceaux retirés, ses terrains
+  praticables, son titre et ses proportions sont ignorés (le nom et le descriptif restent) ; un
+  poste DEV la remet à neuf une fois (Image = la nouvelle ; Usure, Coupe, Terrains, Titre,
+  Aspect effacés) : les frontières sont à refaire sur la nouvelle carte.
+- EN PLEINE PAGE DE DROITE (grimoire_regions.js) : plus de double page, même pour une carte
+  en paysage ; marge de 3,5 % ; le nom de la région sur la page de gauche.
+- SANS ZOOM : dans le livre, la molette, le pincement et le glissé ne font plus rien ; tous les
+  doigts sont pour le livre (tourner la page), sauf avec un outil DEV en main.
+- SUPPRIMER EN DEV (villages_regionaux.js) : « Supprimer » (le lieu choisi, village ou POI) et
+  « Supprimer tous les lieux de cette carte » ; chaque lieu emporte ses bâtiments
+  (Monde_Batiment, ID_Lieu) et les PNJ qui y vivent (Monde_PNJ, au lieu ou dans un de ses
+  bâtiments). Les images Cloudinary restent.
+- LE GROUPE EN ATTENTE (voyage_groupe.js, mettreGroupeEnAttente) : si sa carte n'a plus aucun
+  lieu, ou que son lieu a été supprimé, Position_Groupe = { Region, x: null, y: null,
+  Attente: true }, Lieu_Actuel vidé, voyage annulé : plus de pion ni de voyage ; le MJ sait
+  encore la région. Le téléport DEV réécrit la position (plus d'attente).
+
+corrections_v331.mjs vérifie tout cela.

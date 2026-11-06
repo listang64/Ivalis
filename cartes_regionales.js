@@ -51,7 +51,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import {
-    collection, doc, onSnapshot, setDoc
+    collection, doc, onSnapshot, setDoc, deleteField
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 const COLLECTION = "Cartes_Regionales";
@@ -66,11 +66,11 @@ const SEUIL_GLISSE = 5;
 
 // La liste de Nico : le numéro de la boîte cliquable, le nom, l'image.
 window.CARTES_REGIONALES_DEFAUT = {
-    1:  { nom: "La forêt des murmures",      image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1792834858/IMG_1894_zpqvai.jpg" },
-    2:  { nom: "La vallée de souffre",       image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1792834786/IMG_1892_fr8spy.jpg" },
+    1:  { nom: "La forêt des murmures",      image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793949573/IMG_2229_oi0hov.png" },
+    2:  { nom: "La vallée de souffre",       image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793949573/IMG_2230_p6phe7.png" },
     3:  { nom: "Le mont Pletia",             image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1792834937/IMG_1900_ccinzy.jpg" },
     4:  { nom: "Volcanisse",                 image: null },
-    5:  { nom: "Le désert d'Etheria",        image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1792834787/IMG_1893_cubyml.jpg" },
+    5:  { nom: "Le désert d'Etheria",        image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793949572/IMG_2231_qn6rj9.png" },
     6:  { nom: "L'enclave d'argenté",        image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1792834858/IMG_1897_troqrx.jpg" },
     7:  { nom: "L'île aux marchés",          image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1792834858/IMG_1903_fhehdr.png" },
     8:  { nom: "Les doigts d'Atrium",        image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1792834616/IMG_1979_gcjlls.png" },
@@ -80,6 +80,21 @@ window.CARTES_REGIONALES_DEFAUT = {
     12: { nom: "La crique du Pendu",         image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1792834616/IMG_1977_aqqcdv.png" },
     13: { nom: "Les îlots maudits",          image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1792834643/IMG_1981_y7wld9.png" }
 };
+
+// LES NOUVELLES CARTES (v331). Nico : « on va changer les maps régionales ; je te
+// donne les nouvelles images, en pleine page de droite, sans zoom ». Elles priment
+// sur l'image de la fiche. Tout ce qui était posé sur l'ancienne image (l'usure,
+// les morceaux retirés, les terrains praticables, le titre, ses proportions) ne
+// la regarde plus : un poste DEV remet la fiche à neuf (une fois), et en
+// attendant, on n'en tient pas compte. Les villages et les lieux, Nico les
+// supprime en DEV (villages_regionaux.js), et refait les frontières.
+window.NOUVELLES_CARTES_REGIONALES = {
+    1: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793949573/IMG_2229_oi0hov.png",   // la forêt des murmures
+    2: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793949573/IMG_2230_p6phe7.png",   // la vallée de souffre
+    5: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793949572/IMG_2231_qn6rj9.png"    // le désert d'Etheria
+};
+// La fiche parle-t-elle encore de l'ancienne image ?
+const ficheDeLAncienneImage = (n, fiche) => !!window.NOUVELLES_CARTES_REGIONALES[n] && (fiche || {}).Image !== window.NOUVELLES_CARTES_REGIONALES[n];
 
 // Ce que la base a dit de chaque carte (sa fiche brute).
 let fichesBase = {};
@@ -105,12 +120,15 @@ function composerCartes() {
     numeros.forEach(n => {
         if (!(n > 0)) return;
         const defaut = window.CARTES_REGIONALES_DEFAUT[n] || {};
-        const fiche = fichesBase[n] || {};
+        const brute = fichesBase[n] || {};
+        // (v331) Une nouvelle carte : la fiche de l'ancienne n'en garde que le nom et les textes.
+        const ancienne = ficheDeLAncienneImage(n, brute);
+        const fiche = ancienne ? { Nom: brute.Nom, Description: brute.Description, Descriptif_RP: brute.Descriptif_RP } : brute;
         const titre = fiche.Titre || {};
         cartes[n] = {
             numero: n,
             nom: fiche.Nom || defaut.nom || `Région ${n}`,
-            image: fiche.Image || defaut.image || null,
+            image: window.NOUVELLES_CARTES_REGIONALES[n] || fiche.Image || defaut.image || null,
             description: fiche.Description || "",
             titre: {
                 x: Number.isFinite(Number(titre.x)) ? borne(Number(titre.x), 0, 1) : TITRE_DEFAUT.x,
@@ -178,6 +196,7 @@ window.appliquerCartesRegionalesDeLaBase = function(liste, options) {
         }
     }
     semerFichesManquantes();
+    remettreANeufLesNouvellesCartes();
     // Un descriptif a pu changer ailleurs : sa fenêtre suit (descriptifs_regions.js).
     try { window.dispatchEvent(new CustomEvent("cartes-regionales-maj")); } catch (e) { /* vieux navigateur */ }
 };
@@ -196,6 +215,24 @@ function semerFichesManquantes() {
             .catch(e => console.error("Fiche de la carte régionale " + n + " :", e));
     });
 }
+// (v331) Un poste en DEV remet à neuf la fiche d'une carte qui a changé d'image :
+// la nouvelle image, et plus d'usure, de morceaux retirés, de terrains, de titre
+// ni de proportions de l'ancienne (le nom et les textes restent).
+const remisesANeuf = new Set();
+function remettreANeufLesNouvellesCartes() {
+    if (!estDev() || !ecouteRecue) return;
+    Object.entries(window.NOUVELLES_CARTES_REGIONALES).forEach(([cle, image]) => {
+        const n = Number(cle);
+        if (!fichesBase[n] || !ficheDeLAncienneImage(n, fichesBase[n]) || remisesANeuf.has(n)) return;
+        remisesANeuf.add(n);
+        console.log(`🗺️ [Cartes régionales] ${window.CARTES_REGIONALES[n] ? window.CARTES_REGIONALES[n].nom : n} : nouvelle image, la fiche est remise à neuf (usure, terrains, titre).`);
+        setDoc(doc(db, COLLECTION, String(n)), { Numero: n, Image: image, Usure: deleteField(), Coupe: deleteField(), Terrains: deleteField(),
+                                                 Titre: deleteField(), Aspect: deleteField(), Prochain_Terrain: 1 }, { merge: true })
+            .catch(e => { remisesANeuf.delete(n); console.error("Remise à neuf de la carte régionale " + n + " :", e); });
+    });
+}
+window.remettreANeufCartesRegionalesBanc = () => { remisesANeuf.clear(); remettreANeufLesNouvellesCartes(); };
+
 // LE DESCRIPTIF RP D'UNE RÉGION (v274) : le texte que le maître du jeu (l'IA)
 // recevra plus tard, quand les joueurs sont dans cette région. Il vit dans la
 // fiche de la carte (champ Description). Une boîte sans carte connue reçoit
@@ -342,6 +379,7 @@ function cadrer(garder) {
 window.recadrerCarteRegionale = () => { if (etat.ouverte) cadrer(true); };
 window.zoomerCarteRegion = function(facteur, x, y) {
     if (!etat.ouverte || !etat.largeur) return etat.zoom;
+    if (etat.dansLeLivre) return etat.zoom;      // (v331) Nico : « enlève la possibilité de zoom » — la carte reste à sa page
     const vue = tailleVue();
     const cx = (x === undefined ? vue.l / 2 : x - vue.gauche), cy = (y === undefined ? vue.h / 2 : y - vue.haut);
     const avant = etat.zoom;
@@ -354,7 +392,7 @@ window.zoomerCarteRegion = function(facteur, x, y) {
     return etat.zoom;
 };
 window.glisserCarteRegion = function(dx, dy) {
-    if (!etat.ouverte) return;
+    if (!etat.ouverte || etat.dansLeLivre) return;
     etat.panX += dx; etat.panY += dy;
     bornerPan();
     poserCarte();
@@ -382,7 +420,7 @@ let geste = null;
 function brancherGestes(vue) {
     vue.addEventListener("wheel", (e) => {
         e.preventDefault();
-        if (!etat.ouverte || etat.enTransition) return;
+        if (!etat.ouverte || etat.enTransition || etat.dansLeLivre) return;    // (v331) pas de zoom dans le livre
         if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && !e.ctrlKey) { window.glisserCarteRegion(-e.deltaX, 0); return; }
         window.zoomerCarteRegion(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX, e.clientY);
     }, { passive: false });
@@ -394,8 +432,9 @@ function brancherGestes(vue) {
         // outil, c'est la page qu'on prend (le livre écoute plus haut). Zoomée, ou
         // à deux doigts, la carte garde le geste.
         if (etat.dansLeLivre) {
-            const libre = !etat.outil && !etat.editionTitre && etat.zoom <= etat.base * 1.02;
-            if (libre && pointeurs.size === 0) { pointeurs.set(e.pointerId, { x: e.clientX, y: e.clientY, livre: true }); return; }
+            // (v331) Plus de zoom : sans outil, tous les doigts sont pour le livre (tourner la page).
+            const libre = !etat.outil && !etat.editionTitre;
+            if (libre) { pointeurs.set(e.pointerId, { x: e.clientX, y: e.clientY, livre: true }); return; }
             if (pointeurs.size === 1 && [...pointeurs.values()][0].livre && window.GRIMOIRE && window.GRIMOIRE.annulerPrise) window.GRIMOIRE.annulerPrise();
             e.stopPropagation();
             pointeurs.forEach((p, id) => { p.livre = false; try { vue.setPointerCapture(id); } catch (err) {} });

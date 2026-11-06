@@ -39,7 +39,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import {
-    collection, doc, onSnapshot, setDoc, deleteDoc, query, where
+    collection, doc, onSnapshot, setDoc, deleteDoc, query, where, getDocs
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 const COLLECTION_LIEUX = "Monde_Lieux";
@@ -765,17 +765,80 @@ window.redessinerVillageRegion = async function(id) {
         dessiner();
     }
 };
+// LA SUPPRESSION EN CASCADE (v331). Nico : « dans le bouton DEV, la possibilité de
+// supprimer village et lieux, et que ça supprime aussi tout ce qui est lié dans la
+// base ; et si plus rien sur la map, la position du groupe est en attente le temps
+// que je le téléporte ailleurs ». Un lieu (village ou POI) emporte ses bâtiments
+// (Monde_Batiment) et les PNJ qui y vivent (Monde_PNJ, au lieu ou dans un de ses
+// bâtiments). Rend ce qui est parti.
+async function supprimerLieuEnBase(id) {
+    const parti = { lieu: id, batiments: [], pnj: [] };
+    const effacer = async (col, ident) => { try { await deleteDoc(doc(db, col, ident)); return true; } catch (e) { console.error(`[DEV] Suppression ${col}/${ident} :`, e); return false; } };
+    try {
+        const bats = await getDocs(query(collection(db, "Monde_Batiment"), where("ID_Lieu", "==", id)));
+        bats.forEach(d => parti.batiments.push(d.id));
+    } catch (e) { console.error("[DEV] Les bâtiments du lieu :", e); }
+    const pnj = new Set();
+    try { (await getDocs(query(collection(db, "Monde_PNJ"), where("ID_Lieu", "==", id)))).forEach(d => pnj.add(d.id)); }
+    catch (e) { console.error("[DEV] Les PNJ du lieu :", e); }
+    for (let i = 0; i < parti.batiments.length; i += 10) {
+        try { (await getDocs(query(collection(db, "Monde_PNJ"), where("ID_Batiment", "in", parti.batiments.slice(i, i + 10))))).forEach(d => pnj.add(d.id)); }
+        catch (e) { console.error("[DEV] Les PNJ des bâtiments :", e); }
+    }
+    parti.pnj = [...pnj];
+    for (const p of parti.pnj) await effacer("Monde_PNJ", p);
+    for (const b of parti.batiments) await effacer("Monde_Batiment", b);
+    await effacer(COLLECTION_LIEUX, id);
+    console.log(`🗑️ [DEV] Lieu ${id} supprimé : ${parti.batiments.length} bâtiment(s), ${parti.pnj.length} PNJ.`);
+    return parti;
+}
+window.supprimerLieuEnBaseIvalis = supprimerLieuEnBase;
+// Plus rien sur la carte du groupe (ou il était dans un lieu supprimé) : il attend
+// d'être téléporté (voyage_groupe.js).
+function groupeEnAttenteSiBesoin(numero, idsPartis) {
+    const pos = typeof window.positionGroupeBrute === "function" ? window.positionGroupeBrute() : null;
+    if (!pos || typeof window.mettreGroupeEnAttente !== "function") return false;
+    const dansUnLieuParti = !!pos.Lieu && idsPartis.includes(pos.Lieu);
+    const carteVide = Number(pos.Region) === Number(numero) && villagesDeLaCarte(numero).length === 0;
+    if (!dansUnLieuParti && !carteVide) return false;
+    window.mettreGroupeEnAttente(Number(pos.Region) || Number(numero));
+    return true;
+}
 window.supprimerVillageRegion = async function(id, options) {
     const v = villages[id || selection];
     if (!v || !estDev() || enCours) return false;
     if (!(options && options.sansConfirmer) && typeof window.confirm === "function"
-        && !window.confirm(`Supprimer le village « ${v.nom} » ? Il disparaît de la carte et de la base.`)) return false;
+        && !window.confirm(`Supprimer « ${v.nom} » ? Il disparaît de la carte et de la base, avec ses bâtiments et les PNJ qui y vivent.`)) return false;
     delete villages[v.id];
     if (selection === v.id) selection = null;
     dessiner();
-    try { await deleteDoc(doc(db, COLLECTION_LIEUX, v.id)); }
-    catch (e) { console.error("[MIA_VILLAGE] Suppression :", e); }
+    enCours = true; actualiserDev();
+    try { await supprimerLieuEnBase(v.id); }
+    finally { enCours = false; actualiserDev(); }
+    groupeEnAttenteSiBesoin(v.numero, [v.id]);
+    message(`✔️ « ${v.nom} » supprimé (et ce qui en dépendait)`);
     return true;
+};
+// Tous les villages et lieux de la carte ouverte (une carte qui change d'image).
+window.supprimerTousLesLieuxRegion = async function(options) {
+    const numero = carteOuverte();
+    if (!numero || !estDev() || enCours) return 0;
+    const liste = villagesDeLaCarte(numero);
+    if (!liste.length) { message("Aucun village ni lieu sur cette carte."); return 0; }
+    if (!(options && options.sansConfirmer) && typeof window.confirm === "function"
+        && !window.confirm(`Supprimer les ${liste.length} villages et lieux de cette carte ? Ils disparaissent de la base, avec leurs bâtiments et leurs PNJ.`)) return 0;
+    enCours = true; actualiserDev();
+    attente(true, "Suppression des lieux… Patientez", `0 sur ${liste.length}`);
+    try {
+        for (let i = 0; i < liste.length; i++) {
+            attente(true, "Suppression des lieux… Patientez", `« ${liste[i].nom} » (${i + 1} sur ${liste.length})`);
+            delete villages[liste[i].id];
+            await supprimerLieuEnBase(liste[i].id);
+        }
+    } finally { enCours = false; attente(false); selection = null; dessiner(); actualiserDev(); }
+    groupeEnAttenteSiBesoin(numero, liste.map(v => v.id));
+    message(`✔️ ${liste.length} lieu(x) supprimé(s) de cette carte`);
+    return liste.length;
 };
 
 // --- LA POPUP DEV ---------------------------------------------------------------
@@ -801,10 +864,11 @@ function actualiserDev() {
     if (generer) generer.disabled = enCours;
     const v = selection && villages[selection];
     const info = $("villages-dev-selection");
-    if (info) info.textContent = v ? `« ${v.nom} »${v.peuple ? " · " + v.peuple : ""} · ${v.securite}` : `${villagesDeLaCarte(numero).length} village(s) sur cette carte — un clic en choisit un`;
-    const redessiner = $("btn-village-redessiner"), supprimer = $("btn-village-supprimer");
+    if (info) info.textContent = v ? `« ${v.nom} »${v.peuple ? " · " + v.peuple : ""} · ${v.securite}` : `${villagesDeLaCarte(numero).length} village(s) et lieu(x) sur cette carte — un clic en choisit un`;
+    const redessiner = $("btn-village-redessiner"), supprimer = $("btn-village-supprimer"), tous = $("btn-lieux-tout-supprimer");
     if (redessiner) redessiner.disabled = enCours || !v;
     if (supprimer) supprimer.disabled = enCours || !v;
+    if (tous) tous.disabled = enCours || villagesDeLaCarte(numero).length === 0;
 }
 window.actualiserDevVillages = actualiserDev;
 

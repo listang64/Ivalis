@@ -1386,7 +1386,7 @@
             <!-- LES VILLAGES (v273, villages_regionaux.js) : des pastilles à placer,
                  puis MIA_VILLAGE les dessine sur la carte et les crée en base. -->
             <div id="regions-dev-villages" class="popup-regions-villages" style="display: none;">
-              <div class="popup-regions-sous-titre">Villages</div>
+              <div class="popup-regions-sous-titre">Villages et lieux</div>
               <div class="popup-regions-ligne">
                 <input type="number" id="nombre-villages-region" class="popup-regions-nombre" min="1" max="12" value="3" aria-label="Nombre de villages">
                 <button type="button" id="btn-generer-villages" class="popup-regions-bouton" onclick="jouerSonClic(); window.genererPastillesVillages(document.getElementById('nombre-villages-region').value)">Générer les villages</button>
@@ -1399,6 +1399,8 @@
                 <button type="button" id="btn-village-redessiner" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.redessinerVillageRegion()" disabled>Redessiner</button>
                 <button type="button" id="btn-village-supprimer" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.supprimerVillageRegion()" disabled>Supprimer</button>
               </div>
+              <!-- v331 : tous les villages et lieux de la carte, avec leurs bâtiments et leurs PNJ -->
+              <button type="button" id="btn-lieux-tout-supprimer" class="popup-regions-bouton secondaire" onclick="jouerSonClic(); window.supprimerTousLesLieuxRegion()" disabled>Supprimer tous les lieux de cette carte</button>
               <div id="villages-dev-etat" class="popup-regions-total"></div>
             </div>
             <!-- LES TERRAINS PRATICABLES (v275, terrains_regionaux.js) : les boîtes
@@ -2467,7 +2469,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=235"></script>
+<script src="trace_combat.js?v=236"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2540,7 +2542,7 @@
 <script type="module" src="grimoire_recit.js?v=18"></script>
 <!-- LA CARTE DU MONDE DANS LE GRIMOIRE (v302) : sa double page, ses zones (DEV). -->
 <script type="module" src="grimoire_carte.js?v=4"></script>
-<script src="grimoire_regions.js?v=6"></script>
+<script src="grimoire_regions.js?v=7"></script>
 <script type="module" src="grimoire_fiches.js?v=6"></script>
 <script type="module" src="grimoire_creation.js?v=4"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
@@ -2550,18 +2552,18 @@
 <script src="nuages_realistes.js?v=3"></script>
 <!-- Les bords de parchemin des cartes (v282) : calculés à part (un Worker). -->
 <script src="bords_parchemin.js?v=6"></script>
-<script type="module" src="cartes_regionales.js?v=15"></script>
+<script type="module" src="cartes_regionales.js?v=16"></script>
 <!-- L'usure du parchemin de la carte du monde (v283) : le pinceau DEV et sa base. -->
 <script type="module" src="usure_monde.js?v=1"></script>
 <!-- Le lore du monde, par région (v273), puis les villages des cartes régionales et MIA_VILLAGE. -->
 <script src="lore_ivalis.js?v=4"></script>
-<script type="module" src="villages_regionaux.js?v=7"></script>
+<script type="module" src="villages_regionaux.js?v=8"></script>
 <!-- Les descriptifs RP des régions (v274) : le mode DEV et sa fenêtre pleine page. -->
 <script type="module" src="descriptifs_regions.js?v=1"></script>
 <!-- Le déplacement des PJ (v275) : les terrains praticables des cartes régionales,
      puis le groupe, son bouton voyage, les tracés, les votes, la marche et les nuits. -->
 <script type="module" src="terrains_regionaux.js?v=2"></script>
-<script type="module" src="voyage_groupe.js?v=13"></script>
+<script type="module" src="voyage_groupe.js?v=14"></script>
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
 <script type="module" src="environnement_mj.js?v=5"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->
