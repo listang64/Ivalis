@@ -194,11 +194,12 @@ await section(async () => {
              g: st(".gauche").backgroundImage, d: st(".droite").backgroundImage, gVisible: st(".gauche").visibility, evts: getComputedStyle(pl).pointerEvents };
   });
   const g = await geo();
-  verifier("une carte en paysage (le désert d'Etheria) : l'ombre de la pliure est posée sur le livre, par-dessus la carte",
-           !!r && r.parent === "grimoire-livre" && r.z > r.zVue && r.paysage && /linear-gradient/.test(r.g) && /linear-gradient/.test(r.d) && r.gVisible === "visible", JSON.stringify(r));
+  // (v331 : toutes les cartes en page de droite — la pliure reste, sans le mode paysage.)
+  verifier("le désert d'Etheria (v331 : en page de droite) : l'ombre de la pliure est posée sur le livre, par-dessus la carte",
+           !!r && r.parent === "grimoire-livre" && r.z > r.zVue && !r.paysage && /linear-gradient/.test(r.g) && /linear-gradient/.test(r.d) && r.gVisible === "visible", JSON.stringify(r));
   verifier("… au milieu du livre (le dos), sans prendre le doigt", !!g.pliure && Math.abs((g.pliure.l + g.pliure.w / 2) - (g.livre.l + g.livre.w / 2)) < 2 && r.evts === "none",
            g.pliure ? `${(g.pliure.l + g.pliure.w / 2).toFixed(0)} / ${(g.livre.l + g.livre.w / 2).toFixed(0)}` : "absente");
-  const dessus = await p.evaluate(([x, y]) => { const el = document.elementFromPoint(x, y); return el ? (el.closest("#region-pliure") ? "pliure" : el.closest("#vue-carte-region") ? "carte" : el.id || el.className) : "rien"; }, [g.livre.l + g.livre.w / 2 + 3, g.livre.t + g.livre.h / 2]);
+  const dessus = await p.evaluate(([x, y]) => { const el = document.elementFromPoint(x, y); return el ? (el.closest("#region-pliure") ? "pliure" : el.closest("#vue-carte-region") ? "carte" : el.id || el.className) : "rien"; }, [g.livre.l + g.livre.w * 0.75, g.livre.t + g.livre.h / 2]);   // (v331 : la carte est sur la page de droite)
   verifier("… et la carte se touche encore à travers elle", dessus === "carte", dessus);
   // Pendant une tourne, elle part avec la carte vivante.
   await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipNext("top"));
@@ -224,9 +225,10 @@ await section(async () => {
   let a = await pages();
   const desert = a.filter(x => x.region === "5"), autres = a.filter(x => x.region !== "5");
   verifier("chaque image de carte des pages a son bord de parchemin (masque et usure, la même graine que la carte)",
-           a.flatMap(x => x.cadres).length >= 6 && a.flatMap(x => x.cadres).every(c => c.masque === 'url("blo' && c.usure), JSON.stringify(a.map(x => x.cadres.length)));
-  verifier("sous la carte vivante (le désert), l'image des pages s'efface : un trou montre le papier", desert.length === 2 && desert.every(x => x.sous && x.cadres.every(c => c.vis === "hidden")), JSON.stringify(desert.map(x => [x.sous, x.cadres.map(c => c.vis)])));
-  verifier("… les autres régions gardent leur image (elles tournent avec les pages)", autres.length >= 6 && autres.every(x => !x.sous && x.cadres.every(c => c.vis === "visible")));
+           // (v331 : une image par région, sur sa page de droite)
+           a.flatMap(x => x.cadres).length >= 4 && a.every(x => x.cadres.length === (/-droite$/.test(x.id) ? 1 : 0)) && a.flatMap(x => x.cadres).every(c => c.masque === 'url("blo' && c.usure), JSON.stringify(a.map(x => x.cadres.length)));
+  verifier("sous la carte vivante (le désert), l'image des pages s'efface : un trou montre le papier", desert.length === 2 && desert.every(x => x.sous && x.cadres.every(c => c.vis === "hidden")) && desert.some(x => x.cadres.length), JSON.stringify(desert.map(x => [x.sous, x.cadres.map(c => c.vis)])));
+  verifier("… les autres régions gardent leur image (elles tournent avec les pages)", autres.length >= 6 && autres.every(x => !x.sous && x.cadres.every(c => c.vis === "visible")) && autres.some(x => x.cadres.length));
   // Le DEV peint l'usure, et la valide : les pages se brûlent aussi.
   await p.evaluate(() => localStorage.setItem("ivalis_DEV_MODE", "on"));
   await p.evaluate(() => { window.choisirOutilRegion("pinceau"); window.reglerTaillePinceauRegion(60); });

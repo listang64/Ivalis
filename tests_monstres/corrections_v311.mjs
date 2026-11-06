@@ -316,7 +316,7 @@ await section(async () => {
   const base = await p.evaluate(() => { const s = (window.__journal || window.__sets || []).filter(x => /Cartes_Regionales\/5/.test(x.chemin)); const d = (window.__docs || {})["Cartes_Regionales/5"] || {};
     return { coupe: d.Coupe || (s.length ? s[s.length - 1].data.Coupe : null), local: (window.CARTES_REGIONALES[5] || {}).coupe, pages: [...document.querySelectorAll('#grimoire-livre .page-region[data-region="5"] .region-carte-cadre')].map(c => !!c.__coupeParchemin), vivante: !!document.getElementById("carte-region").__coupeParchemin }; });
   verifier("« Valider les morceaux retirés » : enregistré dans la fiche de la carte (Coupe)", ok && !!base.coupe && base.coupe.colonnes > 0 && typeof base.coupe.cases === "string" && !!base.local, JSON.stringify({ coupe: !!base.coupe, local: !!base.local }));
-  verifier("la carte vivante et les pages du livre sont découpées", base.vivante && base.pages.length === 2 && base.pages.every(Boolean), JSON.stringify(base.pages));
+  verifier("la carte vivante et les pages du livre sont découpées", base.vivante && base.pages.length === 1 && base.pages.every(Boolean)   /* (v331 : l'image de la carte sur sa seule page de droite) */, JSON.stringify(base.pages));
   const [rr, gg] = await pixel(v.x + 110, v.y + 5);
   verifier("au milieu d'un morceau retiré, on voit le papier de la page (plus la carte verte)", rr > gg + 8, `${rr},${gg}`);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v311_ciseaux_valide.png" });

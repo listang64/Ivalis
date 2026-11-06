@@ -58,7 +58,7 @@ await p.route('**/firebase-app.js', r => r.fulfill({ contentType: 'text/javascri
 await p.route('**/firebase-firestore.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_FIRESTORE }));
 await p.route('**res.cloudinary.com**', r => {
   const u = r.request().url();
-  const corps = /map_wx8s89/.test(u) ? MONDE : /IMG_1[89]|IMG_2189/.test(u) ? REGION : `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>`;
+  const corps = /map_wx8s89/.test(u) ? MONDE : /IMG_1[89]|IMG_2189|IMG_22(29|30|31)/.test(u) ? REGION : `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>`;
   r.fulfill({ contentType: 'image/svg+xml', headers: {'Access-Control-Allow-Origin':'*'}, body: corps });
 });
 const erreurs = []; p.on('pageerror', e => erreurs.push(e.message));

@@ -123,7 +123,7 @@ await p.route('**/firebase-firestore.js', r => r.fulfill({ contentType: 'text/ja
 await p.route('**res.cloudinary.com**', r => {
   const u = r.request().url();
   const cle = Object.keys(IMAGES).find(k => u.includes(k));
-  const corps = /map_wx8s89/.test(u) ? MONDE : /IMG_1[89]|IMG_2189/.test(u) ? REGION : cle ? IMAGES[cle] : `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>`;
+  const corps = /map_wx8s89/.test(u) ? MONDE : /IMG_1[89]|IMG_2189|IMG_22(29|30|31)/.test(u) ? REGION : cle ? IMAGES[cle] : `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>`;
   r.fulfill({ contentType: 'image/svg+xml', headers: {'Access-Control-Allow-Origin':'*'}, body: corps });
 });
 // GEMINI SIMULÉ : MIA_TERRAIN (une image jointe), MIA_POI (sa consigne), le
