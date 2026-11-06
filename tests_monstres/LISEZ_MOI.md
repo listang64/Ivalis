@@ -10851,3 +10851,18 @@ PNJ du croquis sont marqués présents).
   encore la région. Le téléport DEV réécrit la position (plus d'attente).
 
 corrections_v331.mjs vérifie tout cela.
+
+## v332 — Plus de brûlure ni de découpage du parchemin
+
+- Nico : « sur les trois maps, tu m'as fait comme un cadre autour, je ne veux pas ; retire toute
+  trace des brûlures de parchemin et du découpage de carte, sur les maps et dans les menus ».
+- Le « cadre » : le bord de parchemin brûlé que bords_parchemin.js pose par défaut autour de
+  chaque carte (les nouvelles cartes n'avaient pas d'usure peinte : bord brûlé partout).
+- bords_parchemin.js et usure_monde.js ne sont plus chargés (index.html) : plus de bord brûlé,
+  d'usure ni de morceaux retirés, ni sur les cartes régionales (pages du livre et carte
+  vivante), ni sur la carte du monde. Le code qui les appelait se tait quand le module manque.
+- Les menus DEV : plus de « 🔥 L'usure du parchemin » (carte du monde), ni de pinceau de
+  brûlure, de ciseaux, de gomme, de « Valider l'usure » sur une carte régionale. Le titre, les
+  villages et lieux, les terrains restent.
+
+corrections_v332.mjs le vérifie (6 échecs sur la v331).
