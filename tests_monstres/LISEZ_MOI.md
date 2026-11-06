@@ -10871,3 +10871,27 @@ Tests devenus caducs avec v332 (ils vérifient la brûlure, l'usure ou les morce
 boutons du pinceau), v286 (« le pinceau ne peint plus que l'usure »), v310 (section 2, les bords
 brûlés des pages) et v311 (les ciseaux), les contrôles qui touchent à la brûlure. Le reste de ces
 fichiers (cartes, villages, terrains, voyage) passe ; v275, v308, v331 et v332 passent en entier.
+
+## v333 — Charger une partie : la page tourne vers le sommaire
+
+- Nico : « quand on charge une partie, ça téléporte direct à la page du sommaire au lieu d'avoir
+  l'animation de page tournée ».
+- Deux causes :
+  1. le chapitre « Charger » occupe déjà les pages 3-4, celles du sommaire : passerEnPartie y
+     écrivait le sommaire sur place, sans tourner de page ;
+  2. StPageFlip date le début d'un geste à la dernière image dessinée. Lancé juste après une
+     tâche lourde (l'entrée en partie prépare une trentaine de pages), le geste semblait déjà
+     fini et la page arrivait d'un coup. Ça touchait toutes les pages tournées juste après un
+     gros calcul.
+- grimoire.js, tournerVersLeSommaire : une copie des pages « Charger » se glisse un instant devant
+  les pages 3-4, le sommaire s'écrit dans les vraies pages, et la copie tourne pour le
+  découvrir. Le livre retrouve ensuite ses vraies pages (rien ne saute) et la copie disparaît.
+  definirSuite attend la fin du geste avant de relire les pages.
+- grimoire.js, demarrerPageFlip : le geste de StPageFlip part maintenant de sa première image
+  (startedAt fixé à la première image dessinée, plus à la dernière d'avant).
+- Remettre le livre à la taille de l'écran (poser → pageFlip.update) ne fait plus le bruit d'une
+  page qui tourne : au chargement, on entendait quatre ou cinq pages pour une seule.
+
+corrections_v333.mjs le vérifie (10 échecs sur la v332). Le banc dessine sans carte graphique,
+environ une image par demi-seconde : on y suit donc les états de StPageFlip (« flipping » puis
+« read », au moins 300 ms entre les deux), pas la fluidité du geste.

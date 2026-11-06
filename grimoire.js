@@ -484,7 +484,8 @@
         livre.style.top = ZONE.y * m.s + "px";
         livre.style.width = ZONE.w * m.s + "px";
         livre.style.height = ZONE.h * m.s + "px";
-        if (pageFlip) { try { pageFlip.update(); } catch (e) {} }
+        // (v333) remettre le livre à la taille de l'écran n'est pas tourner une page : sans bruit
+        if (pageFlip) { const avant = muet; muet = true; try { pageFlip.update(); } catch (e) {} muet = avant; }
     }
 
     // ---------------------------------------------------------------------
@@ -612,6 +613,18 @@
             startPage: pageDepart || 0
         });
         pageFlip.loadFromHTML(livre.querySelectorAll(".page-grimoire"));
+        // v333 : UNE PAGE TOURNE EN ENTIER. StPageFlip date le début d'un geste à
+        // la dernière image dessinée : lancé juste après une tâche lourde (l'entrée
+        // en partie prépare une trentaine de pages), le geste semblait déjà fini et
+        // la page « se téléportait ». Le geste part désormais de sa première image.
+        try {
+            const rendu = pageFlip.getRender();
+            if (rendu && typeof rendu.startAnimation === "function" && typeof rendu.render === "function") {
+                const debuter = rendu.startAnimation.bind(rendu), dessiner = rendu.render.bind(rendu);
+                rendu.startAnimation = (...a) => { debuter(...a); if (rendu.animation) rendu.animation.startedAt = null; };
+                rendu.render = (t) => { if (rendu.animation && rendu.animation.startedAt === null) rendu.animation.startedAt = t; dessiner(t); };
+            }
+        } catch (e) {}
         pageFlip.on("flip", (e) => surTourne(Number(e.data)));
         // LES BRUITS DE PAGES (fabrique_sons.js) : le doigt qui saisit une page
         // (v298), puis la page qui se pose de l'autre côté — le vieux bruit de
@@ -851,7 +864,12 @@
         ecran.style.display = "block";
         ecran.classList.add("visible", "en-partie");
         ecran.classList.remove("disparait");
-        remplirChapitre("index");
+        // v333 : Nico, « quand on charge une partie, ça téléporte direct à la page
+        // du sommaire au lieu d'avoir l'animation de page tournée ». Ouvert sur le
+        // chapitre « Charger » (pages 3-4), le sommaire attend : versLaCarte le
+        // fera venir en tournant la page (tournerVersLeSommaire).
+        const surLeChapitre = !!pageFlip && chapitre !== "index" && [3, 4].includes(pageFlip.getCurrentPageIndex());
+        if (!surLeChapitre) remplirChapitre("index");
         majMarquePage();
         placerNavigation();
         poser();
@@ -871,10 +889,16 @@
             // v313 : Nico, « quand on ouvre le livre, fais-le ouvrir sur le sommaire ».
             // (v304-v308 : la carte du monde, puis la carte de la région du groupe.)
             const voulue = 3;
-            if (chapitre !== "index") remplirChapitre("index");
             const p = pageFlip.getCurrentPageIndex();
+            const pret = pageFlip.getState() === "read" && !defileEnCours;
+            if (chapitre !== "index") {
+                // (v333) le chapitre « Charger » est encore ouvert : la page tourne vers le sommaire
+                if ((p === voulue || p === voulue + 1) && !pret && ++essais < 25) { setTimeout(versLaCarte, 120); return; }
+                if ((p === voulue || p === voulue + 1) && pret && tournerVersLeSommaire()) return;
+                remplirChapitre("index");
+            }
             if (p === voulue || p === voulue + 1) return;
-            if ((pageFlip.getState() !== "read" || defileEnCours) && ++essais < 25) { setTimeout(versLaCarte, 120); return; }
+            if (!pret && ++essais < 25) { setTimeout(versLaCarte, 120); return; }
             if (Math.abs(planche(voulue) - planche(p)) > 1 && pageFlip.getState() === "read") { allerALaPage(voulue, true); return; }
             try { pageFlip.flip(voulue, "top"); } catch (e) { try { pageFlip.turnToPage(voulue); } catch (e2) {} }
         };
@@ -931,7 +955,7 @@
         const generation = ++definirSuite.generation;      // seule la dernière demande s'applique
         const appliquer = () => {
             if (generation !== definirSuite.generation) return;
-            if (pageFlip.getState() !== "read") { setTimeout(appliquer, 80); return; }
+            if (pageFlip.getState() !== "read" || defileEnCours) { setTimeout(appliquer, 80); return; }
             let ici = pageFlip.getCurrentPageIndex();
             // (v308) les pages ouvertes gardent leur place si des cartes régionales entrent ou sortent avant elles
             const ouverteAvant = listeActuelle[ici];
@@ -1042,6 +1066,54 @@
             defileEnCours = false;
             surTourne(pageFlip.getCurrentPageIndex());   // la page d'arrivée compte, elle
         }
+    }
+    // LE SOMMAIRE QUI ARRIVE EN TOURNANT LA PAGE (v333). Les pages 3-4 portent
+    // le chapitre ouvert (« Charger ») : leur copie se glisse un instant devant
+    // elles, le sommaire s'écrit dans les vraies, et la copie tourne pour le
+    // découvrir. Arrivé, le livre retrouve ses vraies pages (rien ne saute).
+    function tournerVersLeSommaire() {
+        if (!pageFlip || defileEnCours || pageFlip.getState() !== "read") return false;
+        const ici = pageFlip.getCurrentPageIndex();
+        if (ici !== 3 && ici !== 4) return false;
+        const copie = (el) => {
+            const c = el.cloneNode(true);
+            c.removeAttribute("id");
+            c.querySelectorAll("[id]").forEach(x => x.removeAttribute("id"));
+            c.classList.add("copie-chapitre");
+            return c;
+        };
+        const vieilles = [copie(pages[3]), copie(pages[4])];
+        const vrai = listeActuelle.slice();
+        if (vrai[3] !== pages[3] || vrai[4] !== pages[4]) return false;
+        remplirChapitre("index");
+        const temp = [...vrai.slice(0, 3), ...vieilles, ...vrai.slice(3)];
+        defileEnCours = true;
+        muet = true;
+        vieilles.forEach(el => livre.appendChild(el));
+        try {
+            pageFlip.updateFromHtml(temp);
+            if (pageFlip.getCurrentPageIndex() !== 3) pageFlip.turnToPage(3);
+        } catch (e) { finir(); return true; }
+        muet = false;                                    // le bruit de la page qui tourne
+        let vu = false, depart = Date.now();
+        try { pageFlip.flip(5, "top"); } catch (e) { finir(); return true; }
+        const attendre = () => {
+            if (!pageFlip) return;
+            const etat = pageFlip.getState();
+            if (etat !== "read") vu = true;
+            if ((etat !== "read" || (!vu && Date.now() - depart < 400)) && Date.now() - depart < 4000) { setTimeout(attendre, 30); return; }
+            finir();
+        };
+        setTimeout(attendre, 30);
+        function finir() {
+            muet = true;
+            try { pageFlip.updateFromHtml(vrai); pageFlip.turnToPage(3); } catch (e) {}
+            vieilles.forEach(el => el.remove());
+            muet = false;
+            defileEnCours = false;
+            surTourne(pageFlip.getCurrentPageIndex());
+        }
+        return true;
     }
     // UN FEUILLET MANUSCRIT : des lignes d'écriture au hasard, un peu de
     // ratures, parfois un croquis ; on ne les lit pas, elles passent trop vite.
