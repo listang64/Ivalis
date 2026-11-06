@@ -179,6 +179,20 @@ await section(async () => {
   verifier("les images des cartes dans les pages : aucun masque, aucune brûlure", r.cadres >= 4 && r.cadresMasques === 0 && r.usurePages === 0 && r.marques === 0, JSON.stringify(r));
   verifier("la carte vivante (le désert, nouvelle image) : pas de cadre brûlé autour", !r.vivanteMasque && r.vivanteUsure === 0, JSON.stringify(r));
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v332_desert.png" });
+  // On tourne les pages, aller et retour, plusieurs fois (le bord apparaissait après quelques tournes).
+  for (let k = 0; k < 3; k++) {
+    await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipNext("top")); await p.waitForTimeout(1300); await pose();
+    await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipPrev("top")); await p.waitForTimeout(1300); await pose();
+  }
+  await p.waitForTimeout(2500);
+  const apres = await p.evaluate(() => {
+    const tous = [...document.querySelectorAll("#grimoire-livre *, #vue-carte-region, #vue-carte-region *")];
+    const masques = tous.filter(el => { const cs = getComputedStyle(el); return (cs.maskImage && cs.maskImage !== "none") || (cs.webkitMaskImage && cs.webkitMaskImage !== "none"); })
+      .filter(el => el.closest(".page-region, #vue-carte-region")).map(el => el.id || el.className);
+    return { masques, usure: document.querySelectorAll(".parchemin-usure, .bord-parchemin").length, module: typeof window.BordsParchemin };
+  });
+  verifier("après des pages tournées, aller et retour : toujours aucun bord ni masque sur les cartes", apres.masques.length === 0 && apres.usure === 0 && apres.module === "undefined", JSON.stringify(apres));
+  if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v332_apres_tournes.png" });
 });
 
 // =========================================================================
