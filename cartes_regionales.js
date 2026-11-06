@@ -94,7 +94,8 @@ window.NOUVELLES_CARTES_REGIONALES = {
     5: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793949572/IMG_2231_qn6rj9.png"    // le désert d'Etheria
 };
 // La fiche parle-t-elle encore de l'ancienne image ?
-const ficheDeLAncienneImage = (n, fiche) => !!window.NOUVELLES_CARTES_REGIONALES[n] && (fiche || {}).Image !== window.NOUVELLES_CARTES_REGIONALES[n];
+// (Une fiche qui ne nomme aucune image n'a rien de l'ancienne à oublier.)
+const ficheDeLAncienneImage = (n, fiche) => !!window.NOUVELLES_CARTES_REGIONALES[n] && !!(fiche || {}).Image && fiche.Image !== window.NOUVELLES_CARTES_REGIONALES[n];
 
 // Ce que la base a dit de chaque carte (sa fiche brute).
 let fichesBase = {};

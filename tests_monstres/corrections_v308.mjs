@@ -74,7 +74,7 @@ let iaEnPanne = false, refusPlume = false, panneCle1 = false;
 await p.route('**', r => { const u = r.request().url();
   if (u.startsWith(base)) return r.continue();
   if (/BG_tjiigl/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: TABLE });
-  if (/res\.cloudinary\.com\/.*IMG_(1894|1892|1900|1893|1897|1903|1979|2189|1984|1977|1981)_/.test(u)) { imagesDemandees.push(u); return r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: /IMG_1893|IMG_1903/.test(u) ? CARTE_PAYSAGE : CARTE_PORTRAIT }); }
+  if (/res\.cloudinary\.com\/.*IMG_(1894|1892|1900|1893|1897|1903|1979|2189|1984|1977|1981|2229|2230|2231)_/.test(u)) { imagesDemandees.push(u); return r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: /IMG_1893|IMG_1903|IMG_2231/.test(u) ? CARTE_PAYSAGE : CARTE_PORTRAIT }); }
   return r.abort(); });
 await p.route('**/firebase-app.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_APP }));
 await p.route('**/firebase-firestore.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_FIRESTORE }));
@@ -182,7 +182,8 @@ await section(async () => {
   verifier("le nom de chaque région, à la plume, sur sa page de gauche", r.pages.filter(x => x.cote === "g").map(x => x.nom).join(" | ") === "La forêt des murmures | Le désert d'Etheria | Le mont Pletia | L'île aux marchés", r.pages.filter(x => x.cote === "g").map(x => x.nom).join(" | "));
   // (v322 : les aventuriers viennent entre les régions et le récit.)
   verifier("le récit vient après elles et les aventuriers (le sommaire page 15 + les fiches)", r.suite === 15 + r.fiches, `sommaire ${r.suite}, ${r.fiches} pages d'aventuriers, ${r.n} pages`);
-  verifier("des cartes en paysage (le désert, l'île) sur la double page, les autres sur la page de droite", r.regions.map(x => x.paysage ? "P" : "p").join("") === "pPpP", r.regions.map(x => x.paysage).join(","));
+  // (v331, Nico : « les maps régionales en pleine page de droite ») : plus de double page, même en paysage.
+  verifier("v331 : toutes les cartes sur la page de droite, même en paysage (le désert, l'île)", r.regions.every(x => !x.paysage), r.regions.map(x => x.paysage).join(","));
 });
 
 // =========================================================================
@@ -200,10 +201,10 @@ await section(async () => {
   await p.waitForTimeout(500);
   const v = await vueDuLivre();
   verifier("le groupe est dans le désert d'Etheria : sa double page (9) porte sa carte", (await page()) === 9 && v && v.numero === 5, `page ${await page()}`);
-  verifier("la carte vivante (cartes_regionales.js) est posée dans le livre, sur la double page (paysage)", v.parent === "grimoire-livre" && v.dansLeLivre && v.affichee && !v.cachee && v.place[0] < 0.06 && v.place[2] > 0.9, JSON.stringify(v.place.map(x => +x.toFixed(3))));
+  verifier("la carte vivante (cartes_regionales.js) est posée dans le livre, sur la page de droite (v331)", v.parent === "grimoire-livre" && v.dansLeLivre && v.affichee && !v.cachee && v.place[0] > 0.5 && v.place[2] < 0.5, JSON.stringify(v.place.map(x => +x.toFixed(3))));
   verifier("… toute la carte tient dans sa place (à sa taille de page)", Math.abs(v.zoom - v.base) < 1e-6 && v.carte[2] <= v.carte[4] + 1 && v.carte[3] <= v.carte[5] + 1, JSON.stringify(v.carte.map(Math.round)));
   const t = await p.evaluate(() => { const el = document.querySelector("#region-titre-vivant .region-nom"); return el ? el.textContent : null; });
-  verifier("en paysage : le nom à la plume, posé en haut à gauche sur la carte", t === "Le désert d'Etheria", t);
+  verifier("v331 : plus de titre posé sur la carte (le nom est sur la page de gauche)", t === null, t);
   const pion = await p.evaluate(() => { const el = document.getElementById("pion-groupe-region"); if (!el) return null; const r = el.getBoundingClientRect(), v = document.getElementById("vue-carte-region").getBoundingClientRect();
     return { vu: getComputedStyle(el).display !== "none" && r.width > 0, dedans: r.left >= v.left && r.right <= v.right && r.top >= v.top && r.bottom <= v.bottom }; });
   verifier("le pion du groupe est sur la carte du livre", pion && pion.vu && pion.dedans, JSON.stringify(pion));
@@ -221,14 +222,9 @@ await section(async () => {
   await p.mouse.wheel(0, -600);
   await p.waitForTimeout(300);
   const v1 = await vueDuLivre();
-  verifier("la molette zoome dans la carte (sans tourner la page)", v1.zoom > v0.zoom * 1.5 && (await page()) === 9, `${v0.zoom.toFixed(3)} → ${v1.zoom.toFixed(3)}`);
-  const pan0 = await p.evaluate(() => window.cadrageCarteRegion().panX);
-  await p.mouse.move(c.x, c.y); await p.mouse.down();
-  for (let i = 1; i <= 10; i++) { await p.mouse.move(c.x - 18 * i, c.y - 4 * i); await p.waitForTimeout(16); }
-  await p.mouse.up();
-  await p.waitForTimeout(700);
-  const pan1 = await p.evaluate(() => window.cadrageCarteRegion().panX);
-  verifier("zoomée, un doigt fait glisser la carte ; la page ne tourne pas", pan1 < pan0 - 60 && (await page()) === 9, `${pan0.toFixed(0)} → ${pan1.toFixed(0)}, page ${await page()}`);
+  // (v331, Nico : « enlève la possibilité de zoom ») : la molette ne zoome plus ; un doigt tourne la page.
+  verifier("v331 : la molette ne zoome plus (et la page ne tourne pas)", Math.abs(v1.zoom - v0.zoom) < 1e-6 && (await page()) === 9, `${v0.zoom.toFixed(3)} → ${v1.zoom.toFixed(3)}`);
+  // (v331 : sans zoom, plus de carte zoomée à glisser.)
   await p.mouse.move(c.x, c.y);
   await p.mouse.wheel(0, 2400);
   await p.waitForTimeout(300);
