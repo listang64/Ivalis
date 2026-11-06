@@ -196,7 +196,7 @@ await section(async () => {
   const g = await geo();
   // (v331 : toutes les cartes en page de droite — la pliure reste, sans le mode paysage.)
   verifier("le désert d'Etheria (v331 : en page de droite) : l'ombre de la pliure est posée sur le livre, par-dessus la carte",
-           !!r && r.parent === "grimoire-livre" && r.z > r.zVue && !r.paysage && /linear-gradient/.test(r.g) && /linear-gradient/.test(r.d) && r.gVisible === "visible", JSON.stringify(r));
+           !!r && r.parent === "grimoire-livre" && r.z > r.zVue && !r.paysage && /linear-gradient/.test(r.g) && /linear-gradient/.test(r.d), JSON.stringify(r));   // (v331 : la carte à droite — seule la moitié droite de la pliure la couvre)
   verifier("… au milieu du livre (le dos), sans prendre le doigt", !!g.pliure && Math.abs((g.pliure.l + g.pliure.w / 2) - (g.livre.l + g.livre.w / 2)) < 2 && r.evts === "none",
            g.pliure ? `${(g.pliure.l + g.pliure.w / 2).toFixed(0)} / ${(g.livre.l + g.livre.w / 2).toFixed(0)}` : "absente");
   const dessus = await p.evaluate(([x, y]) => { const el = document.elementFromPoint(x, y); return el ? (el.closest("#region-pliure") ? "pliure" : el.closest("#vue-carte-region") ? "carte" : el.id || el.className) : "rien"; }, [g.livre.l + g.livre.w * 0.75, g.livre.t + g.livre.h / 2]);   // (v331 : la carte est sur la page de droite)
