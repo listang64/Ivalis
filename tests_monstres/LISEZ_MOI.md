@@ -10866,3 +10866,8 @@ corrections_v331.mjs vérifie tout cela.
   villages et lieux, les terrains restent.
 
 corrections_v332.mjs le vérifie (6 échecs sur la v331).
+Tests devenus caducs avec v332 (ils vérifient la brûlure, l'usure ou les morceaux retirés, retirés
+à la demande de Nico) : v282, v283, v284, v285, v290 en entier ; dans v272 (l'usure validée, les
+boutons du pinceau), v286 (« le pinceau ne peint plus que l'usure »), v310 (section 2, les bords
+brûlés des pages) et v311 (les ciseaux), les contrôles qui touchent à la brûlure. Le reste de ces
+fichiers (cartes, villages, terrains, voyage) passe ; v275, v308, v331 et v332 passent en entier.
