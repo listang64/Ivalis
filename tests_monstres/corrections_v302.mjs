@@ -177,7 +177,8 @@ await section(async () => {
   // (v312 : plus de marque-page de la terre ; le sommaire suffit)
   await p.evaluate(() => window.GRIMOIRE_RECIT.allerAuRecit());
   await p.waitForTimeout(1000);
-  verifier("le récit suit (son chapitre commence maintenant page 9)", (await page()) === 9, String(await page()));
+  // (v322 : les aventuriers viennent avant le récit — son chapitre commence deux pages après sa première page.)
+  verifier("le récit suit (son chapitre commence deux pages après le sommaire du récit)", (await page()) === (await p.evaluate(() => window.GRIMOIRE.premiereDeLaSuite() + 2)), String(await page()));
 });
 
 // =========================================================================
