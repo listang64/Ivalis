@@ -10895,3 +10895,5 @@ fichiers (cartes, villages, terrains, voyage) passe ; v275, v308, v331 et v332 p
 corrections_v333.mjs le vérifie (10 échecs sur la v332). Le banc dessine sans carte graphique,
 environ une image par demi-seconde : on y suit donc les états de StPageFlip (« flipping » puis
 « read », au moins 300 ms entre les deux), pas la fluidité du geste.
+v315 attend désormais que le sommaire soit écrit (il l'est quand la page tourne, juste après
+« Valider »). v301 et v303 échouent à l'identique sur la v332 (un contrôle chacun, antérieurs).

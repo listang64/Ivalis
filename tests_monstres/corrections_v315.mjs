@@ -182,6 +182,8 @@ await p.route(/res\.cloudinary\.com\/x\/image\/upload\/v1\/(Recit|PNJ)\//, r => 
 titre("1. LE SOMMAIRE : LES CHIFFRES ROMAINS DE L'ENCRE DES TITRES");
 // =========================================================================
 await section(async () => {
+  // (v333) le sommaire s'écrit quand la page tourne vers lui, un peu après « Valider »
+  for (let i = 0; i < 60 && !(await p.evaluate(() => !!document.querySelector(".numero-index"))); i++) await p.waitForTimeout(100);
   const r = await p.evaluate(() => { const n = document.querySelector(".numero-index"), e = n && n.closest(".entree-index");
     return n ? { n: getComputedStyle(n).color, e: getComputedStyle(e).color } : null; });
   verifier("I-, II-, III- : la même couleur que les titres du sommaire", !!r && r.n === r.e, JSON.stringify(r));
