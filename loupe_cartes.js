@@ -45,6 +45,7 @@
     const LIVRE_L = 1514, LIVRE_H = 984;                  // la double page (unités du livre)
     const ZOOM_MAX = 4;
     const GROSSISSEMENT = 1.7;
+    const GROSSISSEMENT_REPOS = 1.6;   // (v336) au repos, dans le verre : ce qui est dessous, grossi
     const DUREE = { glisse: 520, plongee: 680 };
     const G = () => window.GRIMOIRE || null;
     const $ = (id) => document.getElementById(id);
@@ -54,6 +55,7 @@
     let el = null;                  // les éléments
     let plan = { zoom: 1, base: 1, x: 0, y: 0 };      // la carte du monde en grand
     let anim = null;
+    let fige = null;                // (bancs) figer l'animation à t (0 à 1)
 
     // --- OÙ EST LE LECTEUR --------------------------------------------------
     function carteOuverte() {
@@ -87,7 +89,10 @@
         bouton.id = "loupe-bouton";
         bouton.className = "loupe-bouton cachee";
         bouton.title = bouton.ariaLabel = "Regarder la carte à la loupe";
-        bouton.innerHTML = `<img src="${IMAGE_LOUPE}" alt="" draggable="false">`;
+        // (v336) Le verre au repos : ce qui est dessous (la table, le livre, la carte), grossi
+        // et bombé comme à travers une lentille ; le cadre de laiton par-dessus.
+        bouton.innerHTML = `<span class="loupe-lentille"><span class="loupe-lentille-bombe"><span class="loupe-lentille-contenu"></span></span><span class="loupe-lentille-verre"></span></span>`
+            + `<img class="loupe-cadre" src="${IMAGE_LOUPE}" alt="" draggable="false">`;
         bouton.addEventListener("click", (e) => { e.stopPropagation(); ouvrir(); });
         const ecranLoupe = document.createElement("div");
         ecranLoupe.id = "loupe-ecran";
@@ -95,6 +100,7 @@
         ecranLoupe.innerHTML = `
             <div class="loupe-verre">
               <div class="loupe-papier net"></div><div class="loupe-papier flou"></div>
+              <div class="loupe-dessous"></div>
               <div class="loupe-scene"><div class="loupe-plan" id="loupe-plan">
                 <div class="loupe-planche" id="loupe-planche">
                   <div class="loupe-moitie gauche"><img alt="" draggable="false"></div>
@@ -110,7 +116,8 @@
         ecran.appendChild(bouton);
         ecran.appendChild(ecranLoupe);
         el = {
-            bouton, ecran: ecranLoupe,
+            bouton, ecran: ecranLoupe, lentille: bouton.querySelector(".loupe-lentille"), cadre: bouton.querySelector(".loupe-cadre"),
+            dessous: ecranLoupe.querySelector(".loupe-dessous"),
             verre: ecranLoupe.querySelector(".loupe-verre"),
             net: ecranLoupe.querySelector(".loupe-papier.net"), flou: ecranLoupe.querySelector(".loupe-papier.flou"),
             scene: ecranLoupe.querySelector(".loupe-scene"), plan: ecranLoupe.querySelector(".loupe-plan"),
@@ -141,7 +148,8 @@
     // La loupe au repos : dans le coin haut droit, sous les petits boutons, le manche dehors.
     function repos() {
         const { l } = ecranTaille();
-        const r = Math.max(26, Math.min(40, l * 0.03));
+        // (v336) Nico : « double sa taille au repos » (26 à 40 avant).
+        const r = Math.max(52, Math.min(80, l * 0.06));
         return { c: { x: l - r * 1.75, y: 74 + r * 1.6 }, r, a: -38 };
     }
     const centre = () => { const { l, h } = ecranTaille(); return { x: l / 2, y: h / 2 }; };
@@ -155,6 +163,86 @@
         img.style.transform = `translate(${(c.x - ox).toFixed(2)}px, ${(c.y - oy).toFixed(2)}px) rotate(${a.toFixed(2)}deg) scale(${k.toFixed(4)})`;
         if (opacite !== undefined) img.style.opacity = String(opacite);
     }
+    // --- LA LENTILLE (v336) : ce qu'il y a sous le verre, grossi et bombé ---------
+    // Les images visibles à cet endroit (la table, le livre, la carte de la double
+    // page), recopiées à leur place à l'écran ; le verre les grossit autour de son
+    // centre, et un filtre (une carte de déplacement) les bombe comme une lentille.
+    function imagesDessous() {
+        const l = [$("grimoire-table"), document.querySelector("#ecran-grimoire .grimoire-fond-livre")];
+        const ici = carteOuverte();
+        if (ici && ici.type === "monde") l.push(...document.querySelectorAll("#grimoire-livre .page-carte .image-carte"));
+        else if (ici && ici.type === "region") {
+            const v = $("vue-carte-region");
+            if (v && !v.classList.contains("en-tourne") && !v.classList.contains("en-grand")) l.push($("carte-region-image"));
+        }
+        const E = ecranTaille();
+        return l.filter(x => x && x.isConnected && getComputedStyle(x).display !== "none").map(x => {
+            const r = x.getBoundingClientRect(), cs = getComputedStyle(x);
+            return { src: x.currentSrc || x.src || "", x: r.left - E.x, y: r.top - E.y, w: r.width, h: r.height, fit: cs.objectFit || "fill", pos: cs.objectPosition || "50% 50%" };
+        }).filter(i => i.src && i.w > 0 && i.h > 0);
+    }
+    const htmlImages = (items, dx, dy) => items.map(i => `<img src="${i.src.replace(/"/g, "&quot;")}" alt="" draggable="false" style="left:${(i.x - dx).toFixed(1)}px;top:${(i.y - dy).toFixed(1)}px;width:${i.w.toFixed(1)}px;height:${i.h.toFixed(1)}px;object-fit:${i.fit};object-position:${i.pos}">`).join("");
+    function filtreLentille() {
+        if ($("loupe-filtre-bombe")) return;
+        // La carte de déplacement : chaque point du verre lit plus près du centre,
+        // d'autant plus qu'il est près du centre (le bombé d'une lentille).
+        const N = 128, K = 0.34, S = 0.5;
+        const toile = document.createElement("canvas"); toile.width = toile.height = N;
+        const ctx = toile.getContext("2d"), im = ctx.createImageData(N, N);
+        for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+            const u = (i + 0.5) / N - 0.5, v = (j + 0.5) / N - 0.5, d2 = (u * u + v * v) / 0.25;
+            const f = d2 < 1 ? K * (1 - d2) : 0, k = (j * N + i) * 4;
+            im.data[k] = Math.round(255 * Math.max(0, Math.min(1, 0.5 - u * f / S)));
+            im.data[k + 1] = Math.round(255 * Math.max(0, Math.min(1, 0.5 - v * f / S)));
+            im.data[k + 2] = 128; im.data[k + 3] = 255;
+        }
+        ctx.putImageData(im, 0, 0);
+        const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+        svg.setAttribute("width", "0"); svg.setAttribute("height", "0"); svg.setAttribute("aria-hidden", "true");
+        svg.style.position = "absolute"; svg.style.width = svg.style.height = "0";
+        svg.innerHTML = `<filter id="loupe-filtre-bombe" x="0" y="0" width="1" height="1" filterUnits="objectBoundingBox" primitiveUnits="objectBoundingBox" color-interpolation-filters="sRGB">
+            <feImage href="${toile.toDataURL("image/png")}" x="0" y="0" width="1" height="1" preserveAspectRatio="none" result="bombe"/>
+            <feDisplacementMap in="SourceGraphic" in2="bombe" scale="${S}" xChannelSelector="R" yChannelSelector="G"/></filter>`;
+        document.body.appendChild(svg);
+    }
+    function poserLentille(a) {
+        const lent = el.lentille;
+        if (!lent) return;
+        filtreLentille();
+        const d = 2 * a.r, x0 = a.c.x - a.r, y0 = a.c.y - a.r;
+        Object.assign(lent.style, { left: x0 + "px", top: y0 + "px", width: d + "px", height: d + "px" });
+        const items = imagesDessous();
+        const sig = JSON.stringify([Math.round(d), Math.round(x0), Math.round(y0), items.map(i => [i.src, Math.round(i.x), Math.round(i.y), Math.round(i.w), Math.round(i.h)])]);
+        if (lent.__sig === sig) return;
+        lent.__sig = sig;
+        const contenu = lent.querySelector(".loupe-lentille-contenu");
+        contenu.innerHTML = htmlImages(items, x0, y0);
+        decoder(contenu);
+        contenu.style.transformOrigin = `${a.r}px ${a.r}px`;
+        contenu.style.transform = `scale(${GROSSISSEMENT_REPOS})`;
+    }
+    // Pendant les animations, la même chose sous le verre de l'écran de la loupe.
+    // Les images neuves sont décodées tout de suite (img.decode) : sans quoi les
+    // premières images de la glisse montraient un verre vide.
+    const decoder = (racine) => racine.querySelectorAll("img").forEach(i => { try { if (i.decode) i.decode().catch(() => {}); } catch (e) {} });
+    function remplirDessous() {
+        const items = imagesDessous();
+        const sig = JSON.stringify(items.map(i => [i.src, Math.round(i.x), Math.round(i.y), Math.round(i.w), Math.round(i.h)]));
+        if (el.dessous.__sig === sig) return;
+        el.dessous.__sig = sig;
+        el.dessous.innerHTML = htmlImages(items, 0, 0);
+        decoder(el.dessous);
+    }
+    // Au repos, tout ce que la glisse montrera est déjà prêt (et décodé).
+    function preparer() {
+        remplirDessous();
+        const v = $("carte-region-image"), src = v && (v.currentSrc || v.src);
+        if (src && el.statique.getAttribute("src") !== src) { el.statique.src = src; decoder(el.ecran); }
+    }
+    const poserDessous = (c, m, opacite) => {
+        el.dessous.style.transform = `translate(${(c.x * (1 - m)).toFixed(2)}px, ${(c.y * (1 - m)).toFixed(2)}px) scale(${m.toFixed(4)})`;
+        el.dessous.style.opacity = String(opacite);
+    };
     function poserVerre(c, r) {
         const rr = r * 1.015;
         el.verre.style.clipPath = el.verre.style.webkitClipPath = `circle(${rr.toFixed(2)}px at ${c.x.toFixed(2)}px ${c.y.toFixed(2)}px)`;
@@ -300,6 +388,8 @@
         return new Promise((fini) => {
             const t0 = performance.now();
             const pas = (ici) => {
+                // (bancs) une animation figée à un instant donné, pour la regarder
+                if (fige !== null) { try { rendre(doux(sens < 0 ? 1 - fige : fige)); } catch (e) {} anim = requestAnimationFrame(pas); return; }
                 const brut = Math.min(1, (ici - t0) / duree);
                 const t = doux(sens < 0 ? 1 - brut : brut);
                 try { rendre(t); } catch (e) { console.error("La loupe :", e); }
@@ -314,7 +404,9 @@
         const c = { x: lerp(a.c.x, C.x, t), y: lerp(a.c.y, C.y, t) }, r = lerp(a.r, rayonCentre(), t);
         poserImage(el.image, c, r, lerp(a.a, 16, t), 1);
         poserVerre(c, r);
-        poserScene(transformeLivre(S, B, c, lerp(1.25, GROSSISSEMENT, t)));
+        const m = lerp(GROSSISSEMENT_REPOS, GROSSISSEMENT, t);
+        poserScene(transformeLivre(S, B, c, m));
+        poserDessous(c, m, 1);
         el.flou.style.opacity = "0";
         el.reflet.style.opacity = "1";
     }
@@ -326,6 +418,7 @@
         const d = transformeLivre(S, B, C, GROSSISSEMENT);
         const s = Math.exp(lerp(Math.log(d.s), 0, t));
         poserScene({ s, x: lerp(d.x, 0, t), y: lerp(d.y, 0, t) });
+        poserDessous(C, GROSSISSEMENT * Math.exp(t * 0.9), 1 - t);
         el.flou.style.opacity = String(t);
         el.reflet.style.opacity = String(1 - t);
     }
@@ -354,6 +447,7 @@
         if (c.type === "monde") { remplirPlanche(); basePlanche(); plan.zoom = plan.base; poserPlanche(); S = rectPlanche(); }
         else { const cad = window.cadrageCarteRegion(); S = contenir(cad.largeur / cad.hauteur, E.l, E.h); }
         poserStatique(S);
+        remplirDessous();
         const B = rectLivre();
         rendreGlisse(S, B, 0);
         await jouer(DUREE.glisse, (t) => rendreGlisse(S, B, t), 1);
@@ -389,6 +483,7 @@
             poserStatique(S);
             if (window.rendreCarteRegionaleALaPage) window.rendreCarteRegionaleALaPage();
         }
+        remplirDessous();
         const B = rectLivre();
         rendrePlongee(S, B, 1);
         await jouer(DUREE.plongee, (t) => rendrePlongee(S, B, t), -1);
@@ -436,7 +531,8 @@
         const montrer = !!ici;
         el.bouton.classList.toggle("cachee", !montrer);
         const a = repos();
-        poserImage(el.bouton.querySelector("img"), a.c, a.r, a.a);
+        poserImage(el.cadre, a.c, a.r, a.a);
+        if (montrer) { poserLentille(a); preparer(); }
     }
     window.addEventListener("keydown", (e) => { if (e.key === "Escape" && etat === "ouverte") fermer(); });
     window.addEventListener("resize", () => setTimeout(veiller, 60));
@@ -444,7 +540,7 @@
 
     window.LOUPE_CARTES = {
         ouvrir, fermer, fermerVite, etat: () => etat, cible: () => (cible ? { ...cible } : null),
-        planche: () => ({ ...plan }), zoomerPlanche: (f, x, y) => { if (etat === "ouverte" && cible && cible.type === "monde") zoomerPlanche(f, x, y); },
+        planche: () => ({ ...plan }), figer: (t) => { fige = (t === null || t === undefined) ? null : Math.max(0, Math.min(1, Number(t))); }, zoomerPlanche: (f, x, y) => { if (etat === "ouverte" && cible && cible.type === "monde") zoomerPlanche(f, x, y); },
         LOUPE, IMAGE_LOUPE
     };
 })();

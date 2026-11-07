@@ -174,8 +174,8 @@ const L = () => p.evaluate(() => {
            visible: !!e && e.classList.contains("visible"), ouverte: !!e && e.classList.contains("ouverte"),
            vueParent: vue && vue.parentNode && (vue.parentNode.id || vue.parentNode.className), enGrand: !!window.carteRegionaleEnGrand && window.carteRegionaleEnGrand() };
 });
-const imageBouton = () => p.evaluate(() => { const i = document.querySelector("#loupe-bouton img"); if (!i) return null; const r = i.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, vw: innerWidth }; });
-const clicLoupe = async () => { const r = await p.evaluate(() => { const ld = window.LOUPE_CARTES, c = ld.LOUPE, img = document.querySelector("#loupe-bouton img");
+const imageBouton = () => p.evaluate(() => { const i = document.querySelector("#loupe-bouton .loupe-cadre"); if (!i) return null; const r = i.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, vw: innerWidth }; });
+const clicLoupe = async () => { const r = await p.evaluate(() => { const ld = window.LOUPE_CARTES, c = ld.LOUPE, img = document.querySelector("#loupe-bouton .loupe-cadre");
   // le centre du verre, à l'écran
   const m = new DOMMatrix(getComputedStyle(img).transform), o = getComputedStyle(img).transformOrigin.split(" ").map(parseFloat);
   const w = 600, h = 600 * c.h / c.l, px = c.cx * w - o[0], py = c.cy * h - o[1];
@@ -197,6 +197,15 @@ await section(async () => {
   verifier("sur la carte du monde, la loupe sort", !a.cachee && a.bouton, JSON.stringify(a));
   verifier("…dans le coin haut droit, son manche dépasse de l'écran", !!ib && ib.x + ib.w > ib.vw && ib.y < 200 && ib.x > ib.vw * 0.75, JSON.stringify(ib));
   verifier("…et l'image de la loupe est bien chargée", loupeDemandee > 0, String(loupeDemandee));
+  // (v336) deux fois plus grande, et une vraie lentille dedans
+  const lt = await p.evaluate(() => { const l = document.querySelector("#loupe-bouton .loupe-lentille"), r = l.getBoundingClientRect(), c = l.querySelector(".loupe-lentille-contenu");
+    return { d: r.width, imgs: c.querySelectorAll("img").length, zoom: getComputedStyle(c).transform, filtre: getComputedStyle(l.querySelector(".loupe-lentille-bombe")).filter,
+             svg: !!document.getElementById("loupe-filtre-bombe"), verre: getComputedStyle(l.querySelector(".loupe-lentille-verre")).backgroundImage,
+             touche: (() => { const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!(e && e.closest(".loupe-lentille")); })() }; });
+  verifier("v336 : au repos, la loupe est deux fois plus grande (verre de 104 px et plus)", lt.d >= 104, JSON.stringify(lt));
+  verifier("v336 : dans le verre, la table, le livre et la carte, grossis 1,6 fois", lt.imgs >= 2 && /matrix\(1\.6, 0, 0, 1\.6/.test(lt.zoom), JSON.stringify(lt));
+  verifier("v336 : …bombés comme une lentille (filtre de déplacement), avec reflet", lt.svg && /loupe-filtre-bombe/.test(lt.filtre) && /radial-gradient/.test(lt.verre), JSON.stringify(lt));
+  verifier("v336 : c'est le verre qu'on touche", lt.touche, JSON.stringify(lt));
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v334_monde_repos.png" });
 });
 
@@ -208,15 +217,29 @@ await section(async () => {
   await p.waitForTimeout(2500); await monteeSur(5); await pose(); await p.waitForTimeout(900);
   verifier("sur la carte du désert, la loupe est là aussi", !(await L()).cachee, JSON.stringify(await L()));
   const avant = await vueDuLivre();
+  await p.evaluate(() => window.LOUPE_CARTES.figer(0.55));
   await clicLoupe();
-  await p.waitForTimeout(260);
+  await p.waitForTimeout(400);
   const pendant = await p.evaluate(() => { const v = document.querySelector(".loupe-verre"), i = document.querySelector(".loupe-image");
     return { clip: getComputedStyle(v).clipPath, image: getComputedStyle(i).transform, statique: getComputedStyle(document.getElementById("loupe-statique")).display, scene: getComputedStyle(document.querySelector(".loupe-scene")).transform }; });
   verifier("touchée, elle glisse : le verre (un cercle) découpe la carte grossie", /circle/.test(pendant.clip) && pendant.statique === "block" && pendant.scene !== "none", JSON.stringify(pendant));
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v334_glisse.png" });
+  // Figée à mi-glisse : dans le verre, la carte du livre grossie (la loupe la regarde).
+  const sousVerre = await p.evaluate(() => {
+    const v = getComputedStyle(document.querySelector(".loupe-verre")).clipPath, m = /circle\(([\d.]+)px at ([\d.]+)px ([\d.]+)px\)/.exec(v);
+    const st = document.getElementById("loupe-statique").getBoundingClientRect();
+    if (!m) return null; const r = +m[1], cx = +m[2], cy = +m[3];
+    // la part de l'image fixe de la carte qui tombe dans le verre
+    let dedans = 0, total = 0;
+    for (let x = st.left; x < st.right; x += 6) for (let y = st.top; y < st.bottom; y += 6) { total++; if (Math.hypot(x - cx, y - cy) < r) dedans++; }
+    return { r, cx, cy, dedans, total, dessous: document.querySelectorAll(".loupe-dessous img").length };
+  });
+  verifier("à mi-glisse, la carte grossie est dans le verre, sur le livre grossi", !!sousVerre && sousVerre.dedans > 50 && sousVerre.dessous >= 2, JSON.stringify(sousVerre));
+  await p.evaluate(() => window.LOUPE_CARTES.figer(null));
   await p.waitForTimeout(560);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v334_plongee.png" });
   await attendreQue(async () => (await L()).etat === "ouverte", 4000);
+  await p.waitForTimeout(700);                       // la croix et le post-it finissent d'entrer
   const o = await L();
   verifier("puis la carte s'ouvre en grand", o.etat === "ouverte" && o.ouverte && o.cible && o.cible.type === "region" && o.cible.numero === 5, JSON.stringify(o));
   verifier("…la vue vivante (pions, villages, voyage) quitte sa page pour l'écran", o.enGrand && o.vueParent === "loupe-plan", JSON.stringify(o));
@@ -283,7 +306,8 @@ await section(async () => {
     const rp = pl.getBoundingClientRect(), rz = z && z.getBoundingClientRect();
     return { imgs: [...pl.querySelectorAll(".loupe-moitie img")].map(i => i.getAttribute("src")), cartes: window.GRIMOIRE.IMAGES_CARTE,
              zones: z && z.parentNode.id, groupe: gr && gr.parentNode.id, rp: [rp.left, rp.top, rp.width, rp.height], rz: rz && [rz.left, rz.top, rz.width, rz.height], vw: innerWidth, vh: innerHeight }; });
-  verifier("les deux images de la double page, posées comme dans le livre", r.imgs[0] === r.cartes.gauche && r.imgs[1] === r.cartes.droite, JSON.stringify(r.imgs));
+  // (v335) les images des pages d'abord, puis une version fine (3200) pour le zoom
+  verifier("les deux images de la double page, posées comme dans le livre", /IMG_2203_gvfqfv/.test(r.imgs[0]) && /IMG_2207_sz48ll/.test(r.imgs[1]), JSON.stringify(r.imgs));
   verifier("les boîtes de clic et le calque du groupe sont dans la carte en grand", r.zones === "loupe-planche" && r.groupe === "loupe-planche", JSON.stringify(r));
   verifier("…sur toute la planche, qui tient l'écran", JSON.stringify(r.rz.map(Math.round)) === JSON.stringify(r.rp.map(Math.round)) && (Math.abs(r.rp[2] - r.vw) < 1.5 || Math.abs(r.rp[3] - r.vh) < 1.5), JSON.stringify(r));
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v334_monde_en_grand.png" });

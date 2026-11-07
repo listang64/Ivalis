@@ -10955,3 +10955,25 @@ contrôles de brûlure caducs (v332).
   titres) sont en fractions de l'image : rien ne bouge.
 
 corrections_v335.mjs le vérifie (11 échecs sur la v334).
+
+## v336 — La loupe deux fois plus grande, une vraie lentille
+
+- Nico : « double sa taille au repos, et fais un effet grossissant lentille à l'intérieur, de base,
+  histoire que ce soit plus réaliste ».
+- Au repos, le verre fait 52 à 80 px de rayon (26 à 40 avant), toujours dans le coin haut droit.
+- Dans le verre, au repos : ce qu'il y a dessous (la table, le livre, la carte de la double page —
+  leurs images recopiées à leur place), grossi 1,6 fois autour du centre et bombé comme une
+  lentille (un filtre SVG, une carte de déplacement : le centre grossit plus que le bord) ; un
+  reflet, un éclat, l'ombre du bord. C'est le disque du verre qu'on touche (le manche et le cadre
+  laissent passer le doigt : le marque-page de la marche, à côté, reste accessible).
+- La glisse part de là : les mêmes images sous le verre (.loupe-dessous), qui grossissent en
+  continuité, puis s'effacent dans la plongée sous le papier flou. Tout est préparé et décodé
+  pendant que la loupe est au repos (sinon les premières images de la glisse avaient un verre vide).
+- Pour les bancs : LOUPE_CARTES.figer(t) arrête l'animation à l'instant t (0 à 1) ; le test
+  vérifie qu'à mi-glisse la carte grossie est bien dans le verre.
+
+corrections_v334.mjs couvre la loupe (mis à jour : le cadre est .loupe-cadre, la mi-glisse figée).
+Tests devenus caducs avec v335 : dans v272, tout ce qui passe par l'ancienne carte du monde du fond
+d'écran (le clic sur ses régions, les nuages, la plongée, le cadrage hors du livre, le titre sur la
+carte hors du livre) — elle n'est plus affichée, à la demande de Nico. Le contrôle de l'URL de
+l'image y attend maintenant 3072. Les autres tests des cartes et des combats passent (v261 à v334).

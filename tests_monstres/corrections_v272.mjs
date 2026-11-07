@@ -102,7 +102,7 @@ await section(async () => {
            r.noms[0] === "La forêt des murmures" && r.noms[1] === "L'île aux marchés" && r.noms[2] === "Les îlots maudits", r.noms.join(" / "));
   verifier("Volcanisse (4) et Arcaï (9) attendent leur image", JSON.stringify(r.sansImage) === "[4,9]");
   verifier("chaque boîte 1 à 13 a son action ; en jeu, elle prend le clic", r.actions.length === 13 && r.active);
-  verifier("l'image est servie compressée et limitée (Cloudinary)", /\/upload\/w_4096,c_limit,q_auto,f_auto\//.test(r.url), r.url);
+  verifier("l'image est servie compressée et limitée (Cloudinary ; 3072 depuis v335)", /\/upload\/w_3072,c_limit,q_auto,f_auto\//.test(r.url), r.url);
 });
 
 // =========================================================================
