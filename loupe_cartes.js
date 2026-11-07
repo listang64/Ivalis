@@ -184,10 +184,19 @@
 
     // --- LA CARTE DU MONDE EN GRAND : la planche, son zoom ----------------------
     function remplirPlanche() {
-        const g = G(), imgs = (g && g.IMAGES_CARTE) || {};
-        const [a, b] = el.planche.querySelectorAll("img");
-        if (imgs.gauche && a.getAttribute("src") !== imgs.gauche) a.src = imgs.gauche;
-        if (imgs.droite && b.getAttribute("src") !== imgs.droite) b.src = imgs.droite;
+        // (v335) Les images des pages d'abord (déjà chargées : la glisse n'attend rien),
+        // puis une version plus fine (3200 de large) pour le zoom, chargée à la demande.
+        const g = G(), pagesImg = (g && (g.IMAGES_CARTE_PAGES || g.IMAGES_CARTE)) || {}, brutes = (g && g.IMAGES_CARTE) || {};
+        const fine = (u) => (u && /\/upload\//.test(u) && !/\/upload\/[a-z]_/.test(u)) ? u.replace("/upload/", "/upload/w_3200,c_limit,q_auto,f_auto/") : u;
+        el.planche.querySelectorAll("img").forEach((img, i) => {
+            const cote = i === 0 ? "gauche" : "droite", fin = fine(brutes[cote]);
+            if (!pagesImg[cote] || img.dataset.fine === fin) return;
+            if (img.getAttribute("src") !== pagesImg[cote]) img.src = pagesImg[cote];
+            if (!fin || fin === pagesImg[cote]) return;
+            const pre = new Image();
+            pre.onload = () => { img.src = fin; img.dataset.fine = fin; };
+            pre.src = fin;
+        });
     }
     function basePlanche() {
         const { l, h } = ecranTaille();

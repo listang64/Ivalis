@@ -962,6 +962,8 @@ function contexteDuJeu() {
         plateau: {
             etatCase: (q, r) => {
                 if (!window.PLATEAU_VTT || typeof window.PLATEAU_VTT.getCaseState !== "function") {
+                    // (v335) le plateau se charge au premier besoin (combat.js)
+                    if (typeof window.assurerPlateauCombat === "function") window.assurerPlateauCombat();
                     return { bloquee: false, supprimee: false, difficile: false };
                 }
                 const e = window.PLATEAU_VTT.getCaseState(q, r) || {};

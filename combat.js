@@ -455,6 +455,8 @@ window.validerPopupRencontre = function() {
 window.COMBAT_INDEX_PERSO = 0;
 
 window.ouvrirCombat = function() {
+    // (v335) Le plateau (la carte, la grille, les pions) se prépare maintenant, pas avant.
+    if (typeof window.assurerPlateauCombat === "function") window.assurerPlateauCombat();
     if (typeof window.fermerToutesLesFenetres === "function") {
         window.fermerToutesLesFenetres();
     }
@@ -2147,6 +2149,14 @@ function urlsVTTIdentiques(currentSrc, targetUrl) {
 }
 
 // L'écouteur qui tourne en arrière-plan chez tous les joueurs
+// (v335) Le plateau de combat au premier besoin (plus à l'entrée en partie, app.js) :
+// la toile, puis l'écoute du terrain (Combat_VTT) qui y pose la carte et les pions.
+window.assurerPlateauCombat = function() {
+    if (!window.ID_PARTIE_COURANTE) return false;
+    if (window.UNSUBSCRIBE_VTT && window.PLATEAU_VTT) return true;
+    window.ecouterTerrainVTT();
+    return true;
+};
 window.ecouterTerrainVTT = function() {
     if (!window.ID_PARTIE_COURANTE) return;
     if (window.UNSUBSCRIBE_VTT) window.UNSUBSCRIBE_VTT(); 

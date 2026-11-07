@@ -109,10 +109,15 @@ const clic = () => { if (typeof window.jouerSonClic === "function") window.jouer
 
 // L'image servie par Cloudinary, compressée et limitée (un iPad n'a pas à
 // décoder un 8K) : 4096 de large au plus, assez pour le zoom ×4.
-window.urlImageCarteRegionale = function(url) {
-    if (!url || !/res\.cloudinary\.com\/.+\/upload\//.test(url) || /\/upload\/[a-z]_/.test(url)) return url;
-    return url.replace("/upload/", "/upload/w_4096,c_limit,q_auto,f_auto/");
-};
+// (v335) 3072 de large (4096 avant) : sur iPad, une carte en portrait de 4096 pesait
+// près de 90 Mo une fois décodée, et le livre en porte plusieurs. Les positions sont
+// toutes en fractions de l'image : rien ne bouge.
+const reduireCloudinary = (url, l) => (!url || !/res\.cloudinary\.com\/.+\/upload\//.test(url) || /\/upload\/[a-z]_/.test(url))
+    ? url : url.replace("/upload/", `/upload/w_${l},c_limit,q_auto,f_auto/`);
+window.urlImageCarteRegionale = (url) => reduireCloudinary(url, 3072);
+// (v335) L'image posée sur la page du livre : une demi-page, 1400 de large suffit.
+window.urlPageCarteRegionale = (url) => reduireCloudinary(url, 1400);
+window.reduireImageCloudinaryIvalis = reduireCloudinary;
 
 // --- LES FICHES ------------------------------------------------------------
 function composerCartes() {

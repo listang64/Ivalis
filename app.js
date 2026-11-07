@@ -3829,10 +3829,12 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
   // ecouterPartiesEnCours) : chaque écriture du combat la payait quand même.
   arreterEcoutePartiesEnCours();
 
-  // NOUVEAU : On précharge la carte de combat VTT en cache pour l'iPad
-  if (typeof window.ecouterTerrainVTT === "function") {
-      window.ecouterTerrainVTT();
-  }
+  // (v335) LA CARTE DE COMBAT ATTEND LE COMBAT. Nico : « inutile de charger la map
+  // combat à l'ouverture du livre, on le fera quand on ouvre le combat ». Son
+  // plateau (une toile de la taille de la carte, l'image, la grille) restait en
+  // mémoire tout le temps de la partie, sous le livre. Il se prépare maintenant
+  // au premier besoin : window.assurerPlateauCombat (combat.js) — à l'ouverture du
+  // combat, au combat du récit qui se prépare ou se joue, au cerveau qui joue.
 
   // NOUVEAU : Un petit marqueur pour ignorer la première lecture (la sauvegarde historique)
   let estPremierScanPartie = true;

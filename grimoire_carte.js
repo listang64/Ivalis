@@ -402,7 +402,7 @@ function entrer() {
     suivreLeLivre();
     // Les deux images de la carte se chargent tout de suite (la page ne doit pas attendre).
     const g = G();
-    if (g && g.IMAGES_CARTE) Object.values(g.IMAGES_CARTE).forEach(src => { const i = new Image(); i.decoding = "async"; i.src = src; });
+    if (g && (g.IMAGES_CARTE_PAGES || g.IMAGES_CARTE)) Object.values(g.IMAGES_CARTE_PAGES || g.IMAGES_CARTE).forEach(src => { const i = new Image(); i.decoding = "async"; i.src = src; });
     dessiner();
 }
 (function demarrer() {

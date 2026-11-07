@@ -453,6 +453,7 @@ const pionsPrets = (c) => !!(c && c.Ennemis && Object.keys(c.Ennemis.Visuels || 
 // --- 4.1 LA REMISE À ZÉRO : l'arène de côté, le plateau vidé -------------
 const CHAMPS_ARENE = ["URL_Map", "Taille_Hex", "Opacite_Grille", "Tuiles_Supprimees", "Tuiles_Murs", "Tuiles_Difficiles", "Tuiles_Spawn_Ennemis"];
 async function remettreAZero() {
+    if (typeof window.assurerPlateauCombat === "function") window.assurerPlateauCombat();   // (v335)
     const c = etat();
     const snap = await getDoc(refVTT());
     const vtt = snap && snap.exists() ? snap.data() : {};
@@ -1024,6 +1025,7 @@ async function peindreLeTerrain() {
 // Le plateau de CE poste doit porter la carte, la grille et ses couches avant
 // d'y poser qui que ce soit.
 async function plateauPret(c) {
+    if (typeof window.assurerPlateauCombat === "function") window.assurerPlateauCombat();   // (v335)
     const vtt = (await getDoc(refVTT())).data() || {};
     if (typeof window.appliquerTerrain === "function") window.appliquerTerrain(vtt.URL_Map || c.Carte, Number(vtt.Taille_Hex) || 60, vtt.Opacite_Grille !== undefined ? vtt.Opacite_Grille : 0.8);
     const img = $("image-map-vtt");
@@ -1680,6 +1682,8 @@ window.actualiserCombatRPAffichage = actualiserTout;
 window.appliquerCombatRPDeLaPartie = function(p) {
     partieVue = p || {};
     const c = etat(partieVue);
+    // (v335) Un combat du récit se prépare ou se joue : le plateau de combat se charge.
+    if (c && ["preparation", "en_cours"].includes(c.Etat) && typeof window.assurerPlateauCombat === "function") window.assurerPlateauCombat();
     actualiserRecit(c);
     actualiserTout();
     if (!c) return;

@@ -52,7 +52,9 @@
             .map(zone => ({ zone, numero: ZONE_VERS_REGION[zone], carte: cartes[ZONE_VERS_REGION[zone]] }))
             .filter(x => x.carte && x.carte.image);
     }
-    const urlDe = (carte) => (typeof window.urlImageCarteRegionale === "function" ? window.urlImageCarteRegionale(carte.image) : carte.image);
+    // (v335) Sur la page, une image légère (1400 de large) ; la carte vivante a la sienne.
+    const urlDe = (carte) => (typeof window.urlPageCarteRegionale === "function" ? window.urlPageCarteRegionale(carte.image)
+        : typeof window.urlImageCarteRegionale === "function" ? window.urlImageCarteRegionale(carte.image) : carte.image);
     const paysage = () => false;      // (v331) plus de double page : la page de droite
 
     // La place de la carte, en pourcentages de la zone des deux pages (le livre).

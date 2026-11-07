@@ -10931,3 +10931,27 @@ v315 attend désormais que le sommaire soit écrit (il l'est quand la page tourn
 corrections_v334.mjs le vérifie (9 échecs sur la v333 ; le banc dessine une loupe aux mêmes mesures).
 v313 attend lui aussi le sommaire (écrit quand la page tourne, depuis v333). v310 garde ses trois
 contrôles de brûlure caducs (v332).
+
+## v335 — Alléger le jeu (iPad : tout rame, l'ancienne interface apparaît, les cartes manquent)
+
+- Nico (capture iPad) : après le chargement d'une partie, tout rame, on voit l'ancienne carte
+  derrière le livre, des morceaux du livre et les cartes des pages ne s'affichent plus. « Je pense
+  qu'on peut virer l'ancienne map du fond d'écran, les effets dessus ; inutile de charger la map
+  combat à l'ouverture du livre, on le fera quand on ouvre le combat. »
+- La cause : la mémoire graphique de l'iPad saturée ; Safari cesse alors de dessiner des tuiles
+  (des morceaux du livre manquent, ce qui est dessous apparaît).
+- L'ANCIENNE CARTE DU MONDE (index.html, style.css) : plus d'image (map_wx8s89, 2400 px étirée sur
+  3840 × 2160), plus de sable (#table-monde, un calque de 19 200 × 10 800), plus d'ombre floue, le
+  conteneur caché (display: none). Le conteneur vide reste pour le vieux code qui le cherche.
+- LA CARTE DE COMBAT : app.js n'appelle plus ecouterTerrainVTT à l'entrée en partie (la toile du
+  plateau, l'image de la carte, la grille restaient en mémoire sous le livre). combat.js :
+  window.assurerPlateauCombat(), appelé par ouvrirCombat, par le combat du récit en préparation ou
+  en cours (combat_rp.js : appliquerCombatRPDeLaPartie, remettreAZero, plateauPret) et par le
+  cerveau qui lit le terrain (regime_cerveau.js).
+- DES IMAGES DE CARTES PLUS LÉGÈRES : les cartes régionales sur les pages en 1400 de large
+  (urlPageCarteRegionale), la carte vivante en 3072 (4096 avant : près de 90 Mo décodée pour une
+  carte en portrait), la carte du monde des pages en 1600 ; la loupe charge une version fine de la
+  carte du monde (3200) au moment où on l'ouvre. Toutes les positions (villages, terrains, groupe,
+  titres) sont en fractions de l'image : rien ne bouge.
+
+corrections_v335.mjs le vérifie (11 échecs sur la v334).

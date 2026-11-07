@@ -137,6 +137,9 @@
         gauche: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793744008/IMG_2203_gvfqfv.png",
         droite: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793744008/IMG_2207_sz48ll.png"
     };
+    // (v335) Sur les pages, une image légère (1600 de large) ; la loupe prend les originaux.
+    const reduite = (url, l) => /\/upload\/[a-z]_/.test(url) ? url : url.replace("/upload/", `/upload/w_${l},c_limit,q_auto,f_auto/`);
+    const IMAGES_CARTE_PAGES = { gauche: reduite(IMAGES_CARTE.gauche, 1600), droite: reduite(IMAGES_CARTE.droite, 1600) };
     let pagesCarte = [];
     const pages = {};
 
@@ -340,7 +343,7 @@
         const el = document.createElement("div");
         el.className = `page-grimoire page-papier ${cote} page-carte`;
         el.id = "grimoire-carte-" + cote;
-        el.innerHTML = `<div class="contenu-carte"><img class="image-carte" src="${IMAGES_CARTE[cote]}" alt="La carte du monde" draggable="false"></div>`;
+        el.innerHTML = `<div class="contenu-carte"><img class="image-carte" src="${IMAGES_CARTE_PAGES[cote]}" alt="La carte du monde" draggable="false"></div>`;
         return el;
     }
 
@@ -1304,6 +1307,6 @@
         pagesRegions: () => pagesRegions.slice(), annulerPrise: () => { if (brancherPrise.annuler) brancherPrise.annuler(); },
         // (v313) Le livre s'ouvre sur le sommaire, une seule fois : les cartes régionales
         // qui arrivent ensuite ne le ramènent plus nulle part.
-        ouvrirSurLeGroupe: () => {}, IMAGES_CARTE, pagesCarte: () => pagesCarte.slice(), allerALaCarte, definirSuite, allerALaPage, unite: () => (scene ? parseFloat(scene.style.getPropertyValue("--u")) || 0 : 0)
+        ouvrirSurLeGroupe: () => {}, IMAGES_CARTE, IMAGES_CARTE_PAGES, pagesCarte: () => pagesCarte.slice(), allerALaCarte, definirSuite, allerALaPage, unite: () => (scene ? parseFloat(scene.style.getPropertyValue("--u")) || 0 : 0)
     };
 })();
