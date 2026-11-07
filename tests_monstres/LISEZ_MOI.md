@@ -10929,3 +10929,5 @@ v315 attend désormais que le sommaire soit écrit (il l'est quand la page tourn
   on peut voyager, doré pendant le choix de la destination.
 
 corrections_v334.mjs le vérifie (9 échecs sur la v333 ; le banc dessine une loupe aux mêmes mesures).
+v313 attend lui aussi le sommaire (écrit quand la page tourne, depuis v333). v310 garde ses trois
+contrôles de brûlure caducs (v332).

@@ -172,6 +172,8 @@ const ici = () => p.evaluate(() => { const i = window.GRIMOIRE_PAGEFLIP.getCurre
 titre("1. LE LIVRE S'OUVRE SUR LE SOMMAIRE ; I- AVENTURIERS MÈNE AUX CLANS");
 // =========================================================================
 await section(async () => {
+  // (v333) le sommaire arrive en tournant la page, un peu après « Valider »
+  for (let i = 0; i < 60 && (await p.evaluate(() => window.grimoireEtat().chapitre)) !== "index"; i++) await p.waitForTimeout(100);
   const r = await p.evaluate(() => ({ page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), chapitre: window.grimoireEtat().chapitre }));
   verifier("à l'entrée en partie, le livre est ouvert sur le sommaire (pages 3-4)", r.page === 3 && r.chapitre === "index", JSON.stringify(r));
   await pose(); await p.waitForTimeout(600);
