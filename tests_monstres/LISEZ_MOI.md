@@ -10977,3 +10977,15 @@ Tests devenus caducs avec v335 : dans v272, tout ce qui passe par l'ancienne car
 d'écran (le clic sur ses régions, les nuages, la plongée, le cadrage hors du livre, le titre sur la
 carte hors du livre) — elle n'est plus affichée, à la demande de Nico. Le contrôle de l'URL de
 l'image y attend maintenant 3072. Les autres tests des cartes et des combats passent (v261 à v334).
+
+## v337 — La loupe reste quand on passe d'une carte à l'autre
+
+- Nico : « que la loupe ne disparaisse pas quand on change de page sur une autre page de map ; là
+  elle s'en va pour revenir, et ça fait ramer l'animation de la page qui tourne ».
+- loupe_cartes.js (veiller) : pendant qu'une page tourne ou que les pages défilent, la loupe ne
+  bouge plus et son verre garde son image : plus rien n'est mesuré ni recopié pendant la tourne.
+  Une fois la page posée : sur une double page de carte (le monde ou une région, même avant que la
+  carte vivante soit montée), elle reste et son verre se met à jour ; ailleurs, elle se range.
+
+corrections_v337.mjs le vérifie (3 échecs sur la v336 : la loupe se rangeait 38 fois sur 124
+relevés pendant la tourne d'une région à l'autre).

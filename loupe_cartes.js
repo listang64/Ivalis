@@ -528,11 +528,27 @@
             return;
         }
         if (etat !== "repos") return;
-        const montrer = !!ici;
+        // (v337) Nico : « que la loupe ne disparaisse pas quand on change de page sur une
+        // autre page de map : elle s'en va pour revenir, et ça fait ramer l'animation ».
+        // Pendant qu'une page tourne (ou que les pages défilent), la loupe ne bouge pas et
+        // son verre garde son image (rien n'est mesuré ni recopié : la page tourne seule).
+        const pf = g.pageFlip && g.pageFlip();
+        if (!pf || pf.getState() !== "read" || (g.defileEnCours && g.defileEnCours())) return;
+        // Posé sur une double page de carte (le monde, une région), même si la carte vivante
+        // de la région n'est pas encore montée : elle reste. Ailleurs, elle se range.
+        const montrer = !!ici || surUnePageDeCarte();
         el.bouton.classList.toggle("cachee", !montrer);
         const a = repos();
         poserImage(el.cadre, a.c, a.r, a.a);
-        if (montrer) { poserLentille(a); preparer(); }
+        if (ici) { poserLentille(a); preparer(); }
+    }
+    function surUnePageDeCarte() {
+        const g = G(), pf = g && g.pageFlip && g.pageFlip();
+        if (!g || !pf || !g.enPartie() || !g.ouvert()) return false;
+        const ici = pf.getCurrentPageIndex(), gauche = ici % 2 === 1 ? ici : ici - 1;
+        if (gauche === g.PAGE_CARTE) return true;
+        const R = window.GRIMOIRE_REGIONS;
+        return !!(R && R.actif() && R.regions().some(x => x.page === gauche));
     }
     window.addEventListener("keydown", (e) => { if (e.key === "Escape" && etat === "ouverte") fermer(); });
     window.addEventListener("resize", () => setTimeout(veiller, 60));
