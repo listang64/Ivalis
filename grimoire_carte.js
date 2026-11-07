@@ -88,8 +88,11 @@ function projeter(p, a, b) {
 // Un point de l'écran, sur la double page (unités de l'image du livre).
 function pointDepuisEcran(x, y) {
     const g = G(), livre = g && g.livre();
-    if (!livre) return { x: 0, y: 0 };
-    const r = livre.getBoundingClientRect();
+    // (v334) Sous la loupe, le calque quitte le livre pour la carte en grand (zoomée) :
+    // c'est lui, toujours posé sur toute la double page, qui donne la mesure.
+    const repere = calque && calque.isConnected && calque.closest && calque.closest("#loupe-ecran") ? calque : livre;
+    if (!repere) return { x: 0, y: 0 };
+    const r = repere.getBoundingClientRect();
     return { x: (x - r.left) * LARGEUR / (r.width || LARGEUR), y: (y - r.top) * HAUTEUR / (r.height || HAUTEUR) };
 }
 window.pointZoneLivreDepuisEcran = pointDepuisEcran;

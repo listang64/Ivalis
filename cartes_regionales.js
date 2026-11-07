@@ -284,6 +284,9 @@ const etat = {
     editionTitre: false
 };
 window.carteRegionaleOuverte = () => etat.ouverte;
+// (v334) LA LOUPE (loupe_cartes.js) : la carte du livre s'ouvre en grand, sur tout
+// l'écran ; elle s'y zoome (jamais plus petite que l'écran) et s'y glisse.
+window.carteRegionaleEnGrand = () => !!(etat.ouverte && etat.enGrand);
 window.carteRegionaleDansLeLivre = () => !!(etat.ouverte && etat.dansLeLivre);
 window.cadrageCarteRegion = () => ({ numero: etat.ouverte, zoom: etat.zoom, base: etat.base, panX: etat.panX, panY: etat.panY,
                                      largeur: etat.largeur, hauteur: etat.hauteur, zoomMax: etat.base * ZOOM_MAX });
@@ -378,9 +381,33 @@ function cadrer(garder) {
 // moins que la hauteur de l'écran, jamais plus que ZOOM_MAX fois.
 // (v308) Le livre a bougé (ouverture, écran) : la carte se recale sur sa page.
 window.recadrerCarteRegionale = () => { if (etat.ouverte) cadrer(true); };
+// (v334) En grand : la vue quitte sa page pour le conteneur de la loupe (tout
+// l'écran), et y revient. Les pions, villages, terrains et voyages vivent dans la
+// vue : ils suivent. La carte repart de sa taille de base (toute la carte visible).
+window.agrandirCarteRegionale = (conteneur) => {
+    const vue = $("vue-carte-region");
+    if (!etat.ouverte || !etat.dansLeLivre || !vue || !conteneur) return false;
+    if (!etat.enGrand) etat.enGrand = { parent: vue.parentNode, style: { left: vue.style.left, top: vue.style.top, width: vue.style.width, height: vue.style.height } };
+    if (vue.parentNode !== conteneur) conteneur.appendChild(vue);
+    Object.assign(vue.style, { left: "0", top: "0", width: "100%", height: "100%" });
+    vue.classList.add("en-grand");
+    cadrer(false);
+    return true;
+};
+window.rendreCarteRegionaleALaPage = () => {
+    const vue = $("vue-carte-region"), avant = etat.enGrand;
+    if (!avant || !vue) return false;
+    etat.enGrand = null;
+    if (avant.parent && avant.parent.isConnected && vue.parentNode !== avant.parent) avant.parent.appendChild(vue);
+    Object.assign(vue.style, avant.style);
+    vue.classList.remove("en-grand");
+    pointeurs.clear(); geste = null;
+    if (etat.ouverte) cadrer(false);
+    return true;
+};
 window.zoomerCarteRegion = function(facteur, x, y) {
     if (!etat.ouverte || !etat.largeur) return etat.zoom;
-    if (etat.dansLeLivre) return etat.zoom;      // (v331) Nico : « enlève la possibilité de zoom » — la carte reste à sa page
+    if (etat.dansLeLivre && !etat.enGrand) return etat.zoom;      // (v331) Nico : « enlève la possibilité de zoom » — la carte reste à sa page
     const vue = tailleVue();
     const cx = (x === undefined ? vue.l / 2 : x - vue.gauche), cy = (y === undefined ? vue.h / 2 : y - vue.haut);
     const avant = etat.zoom;
@@ -393,7 +420,7 @@ window.zoomerCarteRegion = function(facteur, x, y) {
     return etat.zoom;
 };
 window.glisserCarteRegion = function(dx, dy) {
-    if (!etat.ouverte || etat.dansLeLivre) return;
+    if (!etat.ouverte || (etat.dansLeLivre && !etat.enGrand)) return;
     etat.panX += dx; etat.panY += dy;
     bornerPan();
     poserCarte();
@@ -421,7 +448,7 @@ let geste = null;
 function brancherGestes(vue) {
     vue.addEventListener("wheel", (e) => {
         e.preventDefault();
-        if (!etat.ouverte || etat.enTransition || etat.dansLeLivre) return;    // (v331) pas de zoom dans le livre
+        if (!etat.ouverte || etat.enTransition || (etat.dansLeLivre && !etat.enGrand)) return;    // (v331) pas de zoom dans le livre (v334 : en grand, si)
         if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && !e.ctrlKey) { window.glisserCarteRegion(-e.deltaX, 0); return; }
         window.zoomerCarteRegion(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX, e.clientY);
     }, { passive: false });
@@ -432,7 +459,8 @@ function brancherGestes(vue) {
         // (v308) DANS LE LIVRE : la carte à sa taille de page, un seul doigt, sans
         // outil, c'est la page qu'on prend (le livre écoute plus haut). Zoomée, ou
         // à deux doigts, la carte garde le geste.
-        if (etat.dansLeLivre) {
+        if (etat.enGrand) e.stopPropagation();          // (v334) en grand, la carte garde tous ses gestes
+        else if (etat.dansLeLivre) {
             // (v331) Plus de zoom : sans outil, tous les doigts sont pour le livre (tourner la page).
             const libre = !etat.outil && !etat.editionTitre;
             if (libre) { pointeurs.set(e.pointerId, { x: e.clientX, y: e.clientY, livre: true }); return; }
@@ -702,6 +730,7 @@ window.ouvrirCarteRegionale = async function(numero, options) {
         // Posée sur la page, à la place de la carte : ni plongée, ni nuages.
         const vue = $("vue-carte-region");
         etat.dansLeLivre = true;
+        if (etat.enGrand) { etat.enGrand = null; vue.classList.remove("en-grand"); }
         if (vue.parentNode !== livre.conteneur) livre.conteneur.appendChild(vue);
         vue.classList.add("dans-le-livre");
         Object.assign(vue.style, livre.place || {});
@@ -785,6 +814,7 @@ window.fermerCarteRegionale = async function(options) {
     if (etat.dansLeLivre && !(options && options.livre) && window.GRIMOIRE_REGIONS && window.GRIMOIRE_REGIONS.actif()) return window.GRIMOIRE_REGIONS.versLeMonde();
     if (!etat.ouverte || etat.enTransition) return false;
     const sansTransition = !!(options && options.sansTransition) || !!(options && options.livre);
+    if (etat.enGrand) window.rendreCarteRegionaleALaPage();     // (v334) la loupe se referme avec elle
     etat.enTransition = true;
     // Un titre en cours d'édition s'enregistre en partant.
     if (etat.editionTitre) window.basculerEditionTitreRegion(false);

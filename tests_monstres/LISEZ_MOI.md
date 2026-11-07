@@ -10897,3 +10897,35 @@ environ une image par demi-seconde : on y suit donc les états de StPageFlip («
 « read », au moins 300 ms entre les deux), pas la fluidité du geste.
 v315 attend désormais que le sommaire soit écrit (il l'est quand la page tourne, juste après
 « Valider »). v301 et v303 échouent à l'identique sur la v332 (un contrôle chacun, antérieurs).
+
+## v334 — La loupe des cartes du livre
+
+- Nico : une loupe (son image, IMG_2235) qui sort discrètement du coin haut droit sur les pages des
+  cartes ; touchée, elle glisse au centre, l'intérieur grossit, on plonge dans le verre et la carte
+  de la double page s'ouvre en grand, sur une texture de page du livre floutée ; une croix noire à
+  la main, en haut à droite, joue l'animation à l'envers. Sur la carte du monde et les cartes
+  régionales ; zoom et dézoom, jamais plus petit que la taille de base ; tout y marche (Nico y fera
+  les limites des cartes) ; un post-it à l'envers descend du haut de l'écran, les pas de la marche
+  dessus, pour lancer un déplacement.
+- loupe_cartes.js / loupe_cartes.css (nouveaux). L'image de la loupe : 2416 × 1135, fond
+  transparent, le verre centré en (567,8 ; 563,5), rayon 433 (mesuré sur l'image de Nico).
+  · Au repos : sous les petits boutons du livre, le manche hors de l'écran ; rangée hors des cartes.
+  · La glisse : un cercle (clip-path) découpe une scène où la carte, posée en grand, est ramenée à
+    sa place dans le livre puis grossie 1,7 fois autour du centre du verre ; la loupe va au centre.
+  · La plongée : le verre grandit jusqu'à couvrir l'écran, la scène revient à sa taille réelle, le
+    papier flou apparaît ; la croix et le post-it sortent.
+  · La croix (ou Échap) : tout à l'envers, depuis la carte telle qu'on la regarde (zoomée ou non).
+- En grand, une carte régionale : la vue vivante de cartes_regionales.js quitte sa page pour l'écran
+  (agrandirCarteRegionale / rendreCarteRegionaleALaPage) ; pions, villages, POI, voyage, terrains
+  DEV la suivent ; le zoom et le glissé (désactivés dans le livre depuis v331) y reviennent, bornés à
+  la taille de base. pointImageCarteRegion reste juste.
+- En grand, la carte du monde : ses deux images posées comme la double page (1514 × 984), et les
+  calques vivants déplacés dans la planche : les boîtes de clic et leur édition DEV
+  (grimoire_carte.js — pointZoneLivreDepuisEcran mesure alors sur le calque) et le groupe et ses
+  routes (grimoire_regions.js). Molette, pincement et glissé ; un appui sans glisser reste un clic.
+- Le livre change de page sous la loupe (une région touchée sur la carte du monde, le groupe qui
+  arrive ailleurs) : elle se range d'elle-même, la vue et les calques rentrent dans le livre.
+- Le post-it appelle basculerModeVoyage (comme le marque-page de la marche) ; il ne sort que quand
+  on peut voyager, doré pendant le choix de la destination.
+
+corrections_v334.mjs le vérifie (9 échecs sur la v333 ; le banc dessine une loupe aux mêmes mesures).

@@ -1,0 +1,79 @@
+/* =========================================================================
+   IVALIS — LA LOUPE DES CARTES DU LIVRE (v334, loupe_cartes.js)
+   Au repos dans le coin haut droit ; touchée, elle glisse au centre, on
+   plonge dans son verre, et la carte s'ouvre en grand sur le papier flou.
+   Sous les petits boutons du livre (le DEV, le son…), au-dessus des pages.
+   ========================================================================= */
+.loupe-bouton {
+  position: absolute; left: 0; top: 0; width: 0; height: 0; padding: 0; border: 0; background: none;
+  z-index: 9000; overflow: visible; cursor: pointer;
+  transition: transform 0.6s cubic-bezier(0.45, 0.05, 0.25, 1), opacity 0.35s ease;
+}
+.loupe-bouton img {
+  position: absolute; left: 0; top: 0; width: 600px; height: auto; max-width: none;
+  pointer-events: auto; user-select: none; -webkit-user-drag: none;
+  filter: drop-shadow(3px 6px 6px rgba(20, 10, 4, 0.55));
+  transition: filter 0.25s ease;
+}
+.loupe-bouton:hover img, .loupe-bouton:focus-visible img { filter: drop-shadow(3px 6px 6px rgba(20, 10, 4, 0.55)) drop-shadow(0 0 10px rgba(255, 214, 140, 0.75)); }
+.loupe-bouton:focus { outline: none; }
+/* Rangée : elle repart par le coin haut droit. */
+.loupe-bouton.cachee { transform: translate(300px, -260px); pointer-events: none; }
+.loupe-bouton.cachee img { pointer-events: none; }
+/* Prise en main : l'image de l'écran de la loupe la remplace, au même endroit. */
+.loupe-bouton.prise { opacity: 0; transition: none; pointer-events: none; }
+.loupe-bouton.prise img { pointer-events: none; }
+
+.loupe-ecran { position: absolute; inset: 0; z-index: 9001; display: none; overflow: hidden; pointer-events: none; }
+.loupe-ecran.visible { display: block; pointer-events: auto; }
+.loupe-ecran.ouverte { pointer-events: auto; }
+.loupe-verre { position: absolute; inset: 0; overflow: hidden; }
+/* Le papier : une texture de page du livre, sur tout l'écran ; floutée en grand. */
+.loupe-papier { position: absolute; inset: -40px; background: url('images/grimoire/page.webp?v=1') center / cover no-repeat, #e2cfa4; }
+.loupe-papier.flou { filter: blur(5px) saturate(0.95); opacity: 0; }
+.loupe-papier.flou::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 140px rgba(70, 40, 14, 0.45); }
+.loupe-scene { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 0 0; }
+.loupe-plan { position: absolute; inset: 0; touch-action: none; }
+.loupe-planche { position: absolute; left: 0; top: 0; width: 1514px; height: 984px; transform-origin: 0 0; }
+.loupe-moitie { position: absolute; top: 0; width: 757px; height: 984px; }
+.loupe-moitie.gauche { left: 0; } .loupe-moitie.droite { left: 757px; }
+.loupe-moitie img { width: 100%; height: 100%; object-fit: contain; object-position: center; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+/* Les calques vivants de la carte du monde, sur toute la planche (grimoire_carte.js, grimoire_regions.js). */
+#loupe-planche > #calque-zones-livre, #loupe-planche > #calque-groupe-livre { left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; }
+.loupe-statique { position: absolute; display: none; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+/* La carte régionale en grand : la vue vivante, sur tout l'écran (cartes_regionales.js). */
+.loupe-plan > .vue-carte-region.en-grand { position: absolute; z-index: 2; overflow: hidden; }
+/* Le verre : un reflet, un peu d'ombre au bord (l'effet grossissant est dans la scène). */
+.loupe-reflet { position: absolute; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.34) 0, rgba(255, 255, 255, 0.08) 22%, rgba(255, 255, 255, 0) 46%),
+              radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) 62%, rgba(40, 22, 8, 0.32) 100%);
+  box-shadow: inset 0 0 26px rgba(30, 16, 6, 0.45); }
+.loupe-ecran.ouverte .loupe-reflet { display: none; }
+.loupe-image { position: absolute; left: 0; top: 0; width: 600px; height: auto; max-width: none; pointer-events: none; user-select: none;
+  filter: drop-shadow(6px 12px 14px rgba(20, 10, 4, 0.55)); will-change: transform; }
+
+/* LA CROIX, noire, à la main, en haut à droite (sous les petits boutons). */
+.loupe-croix { position: absolute; right: 18px; top: 70px; width: 58px; height: 58px; padding: 0; border: 0; background: none; cursor: pointer;
+  opacity: 0; transform: scale(0.6) rotate(-20deg); transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.3, 1.4, 0.5, 1); pointer-events: none; z-index: 5; }
+.loupe-ecran.ouverte .loupe-croix { opacity: 1; transform: none; pointer-events: auto; }
+.loupe-croix svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 1px 0 rgba(255, 246, 222, 0.6)); }
+.loupe-croix path { fill: none; stroke: #0d0905; stroke-width: 5.2; stroke-linecap: round; stroke-linejoin: round; }
+.loupe-croix path.repasse { stroke-width: 2.4; opacity: 0.75; }
+.loupe-croix:hover, .loupe-croix:focus-visible { transform: scale(1.08) rotate(4deg); outline: none; }
+.loupe-croix:active { transform: scale(0.94); }
+
+/* LE POST-IT DU VOYAGE : à l'envers, il descend du haut de l'écran (le bout
+   taillé en bas), les pas du marque-page de la marche dessus. */
+.loupe-postit { position: absolute; top: 0; left: 60%; width: 74px; height: 128px; padding: 0; border: 0; background: none; cursor: pointer; z-index: 5;
+  transform-origin: 50% 0; transform: translateY(-112%) rotate(4deg); opacity: 0; pointer-events: none;
+  transition: transform 0.5s cubic-bezier(0.45, 0.05, 0.25, 1), opacity 0.3s ease, filter 0.3s ease;
+  filter: drop-shadow(2px 5px 5px rgba(40, 20, 6, 0.5)); }
+.loupe-ecran.ouverte .loupe-postit:not(.inactif) { transform: translateY(-14%) rotate(4deg); opacity: 1; pointer-events: auto; }
+.loupe-ecran.ouverte .loupe-postit:not(.inactif):hover, .loupe-ecran.ouverte .loupe-postit:not(.inactif):focus-visible { transform: translateY(-4%) rotate(3deg); outline: none; }
+.loupe-ecran.ouverte .loupe-postit.choix:not(.inactif) { transform: translateY(-2%) rotate(3deg);
+  filter: drop-shadow(0 0 8px rgba(255, 196, 92, 0.95)) drop-shadow(2px 5px 5px rgba(40, 20, 6, 0.55)); }
+.loupe-postit-papier { position: absolute; inset: 0; display: block;
+  background: url('images/grimoire/page.webp?v=1') 20% 75% / 420% auto, #e2cfa4;
+  box-shadow: inset 0 0 10px rgba(92, 54, 18, 0.55), inset -3px 0 6px rgba(92, 54, 18, 0.3);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 91%, 0 100%); }
+.loupe-postit-papier .dessin-marque { left: 8%; top: 22%; width: 84%; }
