@@ -64,7 +64,7 @@ let iaEnPanne = false, refusPlume = false, panneCle1 = false;
 await p.route('**', r => { const u = r.request().url();
   if (u.startsWith(base)) return r.continue();
   if (/BG_tjiigl/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: TABLE });
-  if (/res\.cloudinary\.com\/.*IMG_(1894|1892|1900|1893|1897|1903|1979|2189|1984|1977|1981|2229|2230|2231)_/.test(u)) { imagesDemandees.push(u); return r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: /IMG_1893|IMG_1903|IMG_2231/.test(u) ? CARTE_PAYSAGE : CARTE_PORTRAIT }); }
+  if (/res\.cloudinary\.com\/.*IMG_(1894|1892|1900|1893|1897|1903|1979|2189|1984|1977|1981|2229|2230|2231|2238|2239|2240|2241|2242|2243|2244|2248)_/.test(u)) { imagesDemandees.push(u); return r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: /IMG_1893|IMG_1903|IMG_2231/.test(u) ? CARTE_PAYSAGE : CARTE_PORTRAIT }); }
   return r.abort(); });
 await p.route('**/firebase-app.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_APP }));
 await p.route('**/firebase-firestore.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_FIRESTORE }));
@@ -170,16 +170,17 @@ await section(async () => {
     window.appliquerCartesRegionalesDeLaBase([
       { id: "5", data: { Numero: 5, Nom: "Le désert d'Etheria", Description: "Le sable chante.", Image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1792834787/IMG_1893_cubyml.jpg", Usure: usure, Terrains: terrains, Aspect: 1.9, Titre: { x: 0.2, y: 0.3, taille: 0.1 } } },
       { id: "1", data: { Numero: 1, Nom: "La forêt des murmures", Image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793949573/IMG_2229_oi0hov.png", Usure: usure, Terrains: terrains } },
-      { id: "3", data: { Numero: 3, Nom: "Le mont Pletia", Image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1792834937/IMG_1900_ccinzy.jpg", Usure: usure, Terrains: terrains } }]);
+      // (v338) Le mont Pletia a aussi sa nouvelle carte : la région qui ne change pas d'image, c'est Volcanisse (4).
+      { id: "4", data: { Numero: 4, Nom: "Volcanisse", Image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1792834937/IMG_1900_ccinzy.jpg", Usure: usure, Terrains: terrains } }]);
     const c = window.CARTES_REGIONALES;
     return { images: [1, 2, 5].map(n => c[n].image), desert: { usure: c[5].usure, terrains: c[5].terrains.length, aspect: c[5].aspect, titre: c[5].titre, description: c[5].description },
-             foretDejaNeuve: { usure: !!c[1].usure, terrains: c[1].terrains.length }, pletia: { image: c[3].image, usure: !!c[3].usure, terrains: c[3].terrains.length } };
+             foretDejaNeuve: { usure: !!c[1].usure, terrains: c[1].terrains.length }, pletia: { image: c[4].image, usure: !!c[4].usure, terrains: c[4].terrains.length } };
   });
   verifier("la forêt des murmures, la vallée de souffre, le désert d'Etheria : les nouvelles images", r.images.every((u, i) => u.includes(Object.values(NOUVELLES)[i])), JSON.stringify(r.images));
   verifier("la fiche du désert parle encore de l'ancienne image : son usure, ses terrains, son titre, ses proportions sont ignorés", r.desert.usure === null && r.desert.terrains === 0 && r.desert.aspect === null && r.desert.titre.x === 0.5, JSON.stringify(r.desert));
   verifier("… mais son nom et son descriptif restent", r.desert.description === "Le sable chante.");
   verifier("une fiche déjà faite pour la nouvelle image garde ce qu'on y a posé", r.foretDejaNeuve.usure && r.foretDejaNeuve.terrains === 1, JSON.stringify(r.foretDejaNeuve));
-  verifier("une région qui ne change pas d'image (le mont Pletia) ne bouge pas", /IMG_1900/.test(r.pletia.image) && r.pletia.usure && r.pletia.terrains === 1, JSON.stringify(r.pletia));
+  verifier("une région qui ne change pas d'image (Volcanisse) ne bouge pas", /IMG_1900/.test(r.pletia.image) && r.pletia.usure && r.pletia.terrains === 1, JSON.stringify(r.pletia));
   const d = await p.evaluate(() => { localStorage.setItem("ivalis_DEV_MODE", "on"); window.__sets = []; window.remettreANeufCartesRegionalesBanc();
     return (window.__sets || []).filter(x => /^Cartes_Regionales\//.test(x.chemin)).map(x => ({ chemin: x.chemin, image: x.data.Image, usure: x.data.Usure, terrains: x.data.Terrains, titre: x.data.Titre, aspect: x.data.Aspect, nom: x.data.Nom })); });
   verifier("en DEV, la fiche du désert est remise à neuf (la nouvelle image, plus d'usure ni de terrains ni de titre)", d.length === 1 && d[0].chemin === "Cartes_Regionales/5" && /IMG_2231/.test(d[0].image) && d[0].usure === null && d[0].terrains === null && d[0].titre === null && d[0].aspect === null && d[0].nom === undefined, JSON.stringify(d));
@@ -192,8 +193,13 @@ titre("2. EN PLEINE PAGE DE DROITE, MÊME EN PAYSAGE");
 await section(async () => {
   await attendreQue(() => p.evaluate(() => window.GRIMOIRE_REGIONS.regions().length === 4), 6000);
   await attendreQue(() => p.evaluate(() => !!window.GRIMOIRE_REGIONS.pageDuGroupe()), 8000); await pose();
-  await p.evaluate(() => window.GRIMOIRE.allerALaPage(window.GRIMOIRE_REGIONS.pageDuGroupe()));
-  await p.waitForTimeout(2500); await monteeSur(5); await pose(); await p.waitForTimeout(500);
+  // (v338) Sous charge, le chargement de la partie (la tourne vers le sommaire, v333) peut encore
+  // emmener le livre ailleurs après notre demande : on la refait tant qu'on n'est pas sur la carte.
+  for (let essai = 0; essai < 4; essai++) {
+    await p.evaluate(() => window.GRIMOIRE.allerALaPage(window.GRIMOIRE_REGIONS.pageDuGroupe()));
+    await p.waitForTimeout(2500); await monteeSur(5); await pose(); await p.waitForTimeout(500);
+    if (await p.evaluate(() => window.carteRegionaleOuverte() === 5)) break;
+  }
   const r = await p.evaluate(() => ({ paysages: window.GRIMOIRE_REGIONS.regions().map(x => x.paysage),
     gauche: (document.querySelector('.page-region.gauche[data-region="5"] .region-nom') || {}).textContent || "",
     imageGauche: !!document.querySelector('.page-region.gauche[data-region="5"] img.region-carte-img'), imageDroite: !!document.querySelector('.page-region.droite[data-region="5"] img.region-carte-img') }));

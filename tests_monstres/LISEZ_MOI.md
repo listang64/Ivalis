@@ -10989,3 +10989,33 @@ l'image y attend maintenant 3072. Les autres tests des cartes et des combats pas
 
 corrections_v337.mjs le vérifie (3 échecs sur la v336 : la loupe se rangeait 38 fois sur 124
 relevés pendant la tourne d'une région à l'autre).
+
+## v338 — Le reste des cartes régionales, en pleine page de droite
+
+- Nico : « implante-moi le reste des cartes régionales, toujours sur leur page de droite ».
+- LES IMAGES (cartes_regionales.js, NOUVELLES_CARTES_REGIONALES et CARTES_REGIONALES_DEFAUT) :
+  - le mont Pletia (3) : IMG_2239 ;
+  - l'enclave d'argenté (6) : IMG_2238 ;
+  - l'île aux marchés (7) : IMG_2240 ;
+  - les doigts d'Atrium (8) : IMG_2242 ;
+  - la pointe des sentinelles (10) : IMG_2248 ;
+  - la province d'Aurelya (11) : IMG_2244 ;
+  - la crique du Pendu (12) : IMG_2241 ;
+  - les îlots maudits (13) : IMG_2243.
+- Comme en v331 :
+  - Ces images priment sur celle de la fiche.
+  - Tant que la fiche nomme l'ancienne image, on ignore son usure, ses morceaux retirés, ses terrains praticables, son titre et ses proportions. Le nom et le descriptif restent.
+  - Le premier poste en DEV remet chaque fiche à neuf une fois. Il faut donc refaire les frontières (terrains) sur les nouvelles cartes.
+  - Les villages et les lieux posés sur les anciennes cartes se suppriment en DEV.
+- Volcanisse (4) et Arcaï (9) n'ont toujours pas de carte.
+- TESTS :
+  - Les bancs servent maintenant aussi les nouvelles images (le motif IMG_(…) des tests v272 à v337).
+  - corrections_v331.mjs :
+    - La région « qui ne change pas d'image » est maintenant Volcanisse.
+    - Le test était instable : sous charge, la tourne du chargement (v333) emmenait encore le livre ailleurs après sa demande d'aller sur le désert. Il refait maintenant sa demande tant que la carte n'est pas ouverte (cinq passages sur cinq).
+
+corrections_v338.mjs vérifie :
+- les huit nouvelles images, la fiche de l'ancienne image ignorée, la remise à neuf DEV des huit fiches ;
+- les onze régions dans le livre : la carte sur la page de droite (allégée, 1400 de large), le nom seul à gauche, aucune ancienne image demandée ;
+- la carte vivante du mont Pletia avec sa nouvelle image.
+Sur la v337 : 8 échecs.
