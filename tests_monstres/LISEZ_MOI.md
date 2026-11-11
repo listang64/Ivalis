@@ -11484,3 +11484,11 @@ Mis à jour pour la nouvelle règle : corrections_v347 (Rempart), v349 (Nuée), 
 maudit.mjs le vérifie : paliers, textes, PV ; les DOT cumulés (et la réinitialisation pour un autre) ; le prix du sang (8 PV pour 75, jamais sous 1, rien sans l'atout) ; le Vaudou (validation, liens, une fois, dégâts reflétés sans armure, soins reflétés, le prix du sang reflété, le KO par le lien, rejeu) ; la vraie page (grille, fiche, Magie du sang accessible au seul Maudit de niveau 3, cartes extraites : surpuissance classique pour un Sorcier, rien pour le Maudit, ×1,2 avec la Magie du sang, le rond).
 corrections_v362.mjs : choisissable, la Forge, l'extraction, le Vaudou dans fabriquerPas, la version.
 classes_feminin, corrections_v343, v358, v359, v360 : une seule classe « bientôt ».
+
+## v363 — Correctif : les fiches bloquées (« Maximum call stack size exceeded »)
+
+- Nico : « je ne peux même pas aller sur la liste des personnages dans le bouton sommaire ; mon frère Adrien ne peut même pas créer de personnage ». La console : une boucle sans fin talents.js → atoutRace → bonusEquipement (objets.js) → bonusEquip → talents.js…
+- La cause : bonusEquipement lisait atoutRace (le Berserker, v360 ; le Protecteur, v347). atoutRace lit les talents ; un talent qui dépend d'une caractéristique (Maître des éléments…) la calcule avec l'équipement (caracPourTalents → bonusEquip → bonusEquipement) : la boucle.
+- objets.js : bonusEquipement lit la classe seule (atoutClasse) — c'est elle qui porte ces deux règles. Les talents faisaient déjà de même (ils évitent atoutRace).
+
+corrections_v363.mjs le vérifie : le code (plus d'appel à atoutRace), et dans la vraie page un héros avec « Maître des éléments » (Sorcier, Berserker à deux armes à deux mains, Protecteur, sans classe) : plus d'erreur, le talent et le −10 % du Berserker comptent. Sur l'objets.js d'avant, le test retrouve « Maximum call stack size exceeded ».

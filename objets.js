@@ -894,13 +894,17 @@ window.bonusEquipement = function(perso) {
     // (v360) Le Berserker de niveau 9 : deux armes à deux mains, −10 % de
     // résistances ; sans elles, +2 à chacune de ses attaques (cartes et
     // attaques d'opportunité).
-    if (typeof window.atoutRace === "function" && (window.atoutRace(perso) || {}).deuxArmesDeuxMains) {
+    // (v363) LA CLASSE SEULE (atoutClasse), JAMAIS atoutRace : atoutRace lit les
+    // talents, dont certains relisent l'équipement (caracPourTalents →
+    // bonusEquip → ici) — une boucle sans fin qui bloquait les fiches.
+    const atoutDeClasse = typeof window.atoutClasse === "function" ? (window.atoutClasse(perso) || {}) : {};
+    if (atoutDeClasse.deuxArmesDeuxMains) {
         if (window.deuxArmesDeuxMains(perso)) { total.resPhys -= 10; total.resMag -= 10; }
         else { total.degats += 2; total.degatsOpportunite += 2; }
     }
     // (v347) Le Protecteur de niveau 5 : les boucliers lourds ne lui coûtent
     // plus rien de plus à chaque case (leur seul malus).
-    const sansMalusLourd = typeof window.atoutRace === "function" && !!(window.atoutRace(perso) || {}).bouclierLourdSansMalus;
+    const sansMalusLourd = !!atoutDeClasse.bouclierLourdSansMalus;
     window.objetsEquipes(perso).forEach(objet => {
         const bonus = objet.bonus || {};
         window.CLES_BONUS.forEach(cle => {
