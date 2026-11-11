@@ -204,9 +204,6 @@ await section(async () => {
   verifier("la souris sur la Dextérité, sans clic : sa bulle s'ouvre", /Dextérité/.test(dessus), dessus.slice(0, 100));
   await p.mouse.move(c.x - 250, c.y + 250, { steps: 4 }); await p.waitForTimeout(300);
   verifier("la souris s'en va : la bulle se referme", !(await visible()));
-}); await p.waitForTimeout(500);
-  const dernier = await p.evaluate(() => typeof window.GRIMOIRE_FICHES === "object");
-  verifier("le survol ne compte pas comme un appui long (le clic reste libre)", dernier);
 });
 
 // =========================================================================
