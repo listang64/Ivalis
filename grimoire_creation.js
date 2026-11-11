@@ -49,6 +49,23 @@ const COULEURS_RACES = {
     "Humain": "#c09a52", "Ondari": "#3f8f8a", "Vargen": "#9a5a2e", "Ankylar": "#b8452a",
     "Ophior": "#6b8f3e", "Gob": "#a3a836", "Ethéré": "#9b86c4"
 };
+// LES FONDS DES PEUPLES (v339). Nico : « on applique les fonds d'images des pages des
+// races, comme pour les pages des classes, avec le même dégradé sur les pages de gauche ».
+const CLOUD = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/";
+const FONDS_RACES = {
+    "Humain":  CLOUD + "v1794172729/IMG_2249_jpyc1w.png",
+    "Ankylar": CLOUD + "v1794172729/IMG_2250_wackd6.png",
+    "Ethéré":  CLOUD + "v1794172729/IMG_2251_k796su.png",
+    "Gob":     CLOUD + "v1794172728/IMG_2252_l9cpn9.png",
+    "Ondari":  CLOUD + "v1794172728/IMG_2253_ldiw3i.png",
+    "Ophior":  CLOUD + "v1794172728/IMG_2254_exllln.png",
+    "Vargen":  CLOUD + "v1794172728/IMG_2255_b6q4ex.png"
+};
+const fondRace = (r) => (r && (r.imageFond || FONDS_RACES[r.nom] || FONDS_RACES[sansAccent(r.nom).replace(/^\w/, c => c.toUpperCase())])) || "";
+// Le fond sur la double page : à gauche voilé en dégradé sous le texte, à droite entier
+// (les mêmes calques que les classes, grimoire_creation.css).
+const htmlFond = (url, cote) => url ? `<div class="fond-classe ${cote}" aria-hidden="true"><img src="${echapper(url)}" alt="" draggable="false" loading="lazy" decoding="async"></div>` : "";
+window.FONDS_RACES_LIVRE = FONDS_RACES;
 const COULEURS_CLASSES = {
     "Pisteur": "#5f7d3a", "Assassin": "#4f4f5a", "Chasseur de mages": "#4f6d8a", "Sentinelle": "#b0884a",
     "Profanateur": "#6b2e4a", "Géomancien": "#8a6a3e", "Protecteur": "#a87a3a", "Oracle": "#c4ac52",
@@ -102,7 +119,7 @@ const renoncer = `<button type="button" class="lien-fiche renoncer-creation" dat
 
 function htmlRace(r, i, n) {
     const choisi = window.RACE_SELECTIONNEE_TEMP === r.nom && actif && etat.raceChoisie;
-    return `<div class="contenu-page page-texte-creation defile-fiche">
+    return `${htmlFond(fondRace(r), "gauche")}<div class="contenu-page page-texte-creation page-texte-race defile-fiche">
         <div class="sur-titre-creation">Les peuples d'Ivalis <span>· ${i + 1} / ${n}</span></div>
         <h2 class="titre-creation">Les ${echapper(pluriel(r.nom))}</h2>
         ${FLEURON}
@@ -118,8 +135,8 @@ function htmlRace(r, i, n) {
         ${renoncer}
       </div>`;
 }
-// La page de droite d'un peuple : les images viendront (Nico : « tu ne mets rien »).
-const htmlRaceDroite = () => `<div class="contenu-page page-race-vide"></div>`;
+// La page de droite d'un peuple : la suite de son image de fond (v339).
+const htmlRaceDroite = (r) => `${htmlFond(fondRace(r), "droite")}<div class="contenu-page page-race-vide"></div>`;
 
 // ---------------------------------------------------------------------
 //  LES CLASSES
@@ -273,7 +290,7 @@ function construire() {
     races.forEach((r, i) => {
         const g = page("race-" + i, "gauche", "page-race"), d = page("race-" + i + "-d", "droite", "page-race page-race-droite");
         g.dataset.race = r.nom;
-        g.innerHTML = htmlRace(r, i, races.length); d.innerHTML = htmlRaceDroite();
+        g.innerHTML = htmlRace(r, i, races.length); d.innerHTML = htmlRaceDroite(r);
         pages.push(g, d);
         sections.races.push({ cle: r.nom, nom: r.nom, page: g, couleur: COULEURS_RACES[r.nom] || "#a08060" });
     });
@@ -553,8 +570,18 @@ setInterval(() => {
     } catch (e) { console.warn("Le livre : la création", e); }
 }, 250);
 
+// (v339) La dernière double page des classes ne se tourne pas vers la droite :
+// les champs ne s'ouvrent qu'en choisissant une classe (sinon le héros part sans elle).
+function bloqueEnAvant(index) {
+    if (!actif) return false;
+    const derniere = sections.classes[sections.classes.length - 1], g = G();
+    if (!derniere || !g || typeof g.indexDe !== "function") return false;
+    const i = g.indexDe(derniere.page);
+    return i >= 0 && (index === i || index === i + 1);
+}
+
 window.GRIMOIRE_CREATION = {
-    commencer, terminer, agir,
+    commencer, terminer, agir, bloqueEnAvant,
     pages: () => (actif ? pages.slice() : []),
     actif: () => actif,
     page: (cle) => pg[cle] || null,

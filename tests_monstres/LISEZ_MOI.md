@@ -11019,3 +11019,23 @@ corrections_v338.mjs vérifie :
 - les onze régions dans le livre : la carte sur la page de droite (allégée, 1400 de large), le nom seul à gauche, aucune ancienne image demandée ;
 - la carte vivante du mont Pletia avec sa nouvelle image.
 Sur la v337 : 8 échecs.
+
+## v339 — Villages dans le paysage, dernière classe, PV lisibles, descriptifs des régions, plus d'Illusion, fonds des peuples
+
+- LES VILLAGES (villages_regionaux.js). Nico : « les lieux sont nickel, mais les villages ne s'intègrent pas bien dans le paysage de la map ».
+  - Les lieux (poi_creation.js) lisaient le terrain du point (MIA_TERRAIN) et le descriptif de la région avant d'être inventés ; les villages non.
+  - Les villages lisent maintenant le même terrain (lireTerrainA, sous la pastille) et le même descriptif.
+  - Leur « visuel » est bâti dans ce terrain, en hameau de quelques maisons.
+  - Le dessin demande un petit village à l'échelle de la carte, posé dans le paysage (création et redessin).
+  - Le terrain lu reste sur la fiche (Terrain_Village).
+- LA DERNIÈRE CLASSE (grimoire.js, grimoire_creation.js, bloqueEnAvant). Sur la dernière double page des classes, le geste vers la droite ne tourne plus rien. La dernière, l'Élémentariste, arrive bientôt : on passait aux champs sans classe.
+- LES PV SOUS LE PION (style.css). Au cadrage d'entrée du combat, un pion fait une vingtaine de pixels, et ses chiffres tombaient à 1 px. Les jauges ne descendent plus sous 56 × 14 px : les chiffres se lisent (≈ 11 px) et grandissent encore au zoom.
+- LES DESCRIPTIFS DES RÉGIONS (grimoire_regions.js, descriptifs_regions.js). En DEV, la page de gauche de chaque région du livre a un bouton « ✎ Descriptif pour le MJ ». Il ouvre la fenêtre du descriptif, sans le mode de la carte du monde.
+- PLUS D'ILLUSION (app.js effetRetire, moteur_effets.js, talents.js, lia_forge.js). Nico : « enlève l'effet de combat Illusion, pour les joueurs comme pour les monstres ».
+  - L'effet n'est plus proposé par la Forge, le générateur de monstres ni LIA. Il est reconnu à son nom.
+  - Une ancienne carte qui le porte se joue sans poser de leurre.
+  - Le talent « Dégâts illusoires » est retiré, et son point est rendu.
+- LES FONDS DES PEUPLES (grimoire_creation.js, FONDS_RACES). Chaque peuple a son image sur la double page, voilée à gauche du même dégradé que les classes.
+- LE PROTECTEUR (classes.js). Il a un nouveau fond (IMG_2257). Une base qui garde l'ancien (Hoplite_fond) prend le nouveau.
+
+corrections_v339.mjs vérifie tout cela, sur la vraie page.

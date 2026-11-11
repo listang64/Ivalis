@@ -46,6 +46,8 @@ function cadre() {
 }
 function actualiser() {
     const on = window.modeDescriptifRegions();
+    // (v339) Le bouton des pages des régions dans le livre (grimoire_regions.js) : DEV seulement.
+    if (document.body) document.body.classList.toggle("dev-descriptifs-regions", estDev());
     cadre().style.display = on ? "block" : "none";
     const bouton = $("btn-mode-descriptifs");
     if (bouton) {
@@ -126,8 +128,11 @@ function enregistrer() {
     return fenetre.enregistrement;
 }
 
-window.ouvrirDescriptifRegion = function(numero) {
-    if (!window.modeDescriptifRegions()) return false;
+window.ouvrirDescriptifRegion = function(numero, options) {
+    // (v339) Depuis la page d'une région du livre (`direct`), le DEV suffit : plus
+    // besoin du mode de la carte du monde.
+    const direct = !!(options && options.direct) && estDev();
+    if (!window.modeDescriptifRegions() && !direct) return false;
     const n = Number(numero);
     if (!(n > 0) || typeof window.descriptifRegion !== "function") return false;
     const el = construire();
@@ -154,6 +159,8 @@ window.fermerDescriptifRegion = async function() {
     return true;
 };
 window.descriptifRegionOuvert = () => fenetre.numero;
+// (v339) Le bouton « ✎ Descriptif pour le MJ » des pages des régions (grimoire_regions.js).
+window.editerDescriptifRegion = (numero) => window.ouvrirDescriptifRegion(numero, { direct: true });
 
 // --- AU CHARGEMENT ---------------------------------------------------------------
 (function demarrer() {

@@ -80,6 +80,13 @@
     const style = (o) => Object.entries(o).map(([k, v]) => `${k}:${v}`).join(";");
     const TRAIT = `<svg class="region-trait" viewBox="0 0 200 20" aria-hidden="true"><path d="M4 12 C40 4 70 16 100 10 C130 4 160 15 196 8"/><path d="M92 13 C98 9 102 9 108 13"/></svg>`;
     const carteImg = (url, boite, alt) => `<div class="region-moitie"><div class="region-carte-cadre" style="${style(boite)}"><img class="region-carte-img" src="${url}" alt="${alt}" draggable="false"></div></div>`;
+    // (v339) LE DESCRIPTIF POUR LE MJ. Nico : « je n'ai plus accès, avec cette
+    // nouvelle interface, au descriptif des régions que l'on envoie au MJ ». En DEV,
+    // la page de gauche de chaque région l'ouvre (descriptifs_regions.js) ; le bouton
+    // ne se voit qu'en DEV (body.dev-descriptifs-regions).
+    const boutonDescriptif = (r) => `<button type="button" class="bouton-descriptif-region" data-region="${Number(r.numero)}"
+        title="Le descriptif RP de la région, lu par le maître du jeu"
+        onclick="event.stopPropagation(); if (window.jouerSonClic) window.jouerSonClic(); window.editerDescriptifRegion && window.editerDescriptifRegion(${Number(r.numero)})">✎ Descriptif pour le MJ</button>`;
     function remplir(r) {
         const [g, d] = r.pages;
         const nom = echapper(r.nom), url = echapper(r.url);
@@ -89,7 +96,7 @@
             g.innerHTML = carteImg(url, boites.gauche, "") + `<div class="region-titre-sur-carte"><span class="region-nom">${nom}</span>${TRAIT}</div>`;
             d.innerHTML = carteImg(url, boites.droite, "");
         } else {
-            g.innerHTML = `<div class="region-titre-page"><span class="region-sur">Carte de la région</span><span class="region-nom">${nom}</span>${TRAIT}</div>`;
+            g.innerHTML = `<div class="region-titre-page"><span class="region-sur">Carte de la région</span><span class="region-nom">${nom}</span>${TRAIT}${boutonDescriptif(r)}</div>`;
             d.innerHTML = carteImg(url, boites.droite, nom);
         }
         r.usureSig = null;

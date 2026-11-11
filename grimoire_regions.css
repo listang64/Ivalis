@@ -47,3 +47,11 @@
 .route-groupe-livre.provisoire { opacity: 0.55; }
 .croix-groupe-livre { fill: none; stroke: #7a0d0d; stroke-width: 4; stroke-linecap: round; }
 .pion-groupe-livre { filter: drop-shadow(2px 4px 3px rgba(30, 15, 5, 0.6)); }
+
+/* (v339) Le descriptif RP de la région pour le MJ : un bouton à l'encre sous le titre, en DEV seulement. */
+.bouton-descriptif-region { display: none; margin-top: calc(var(--u) * 2.4); padding: calc(var(--u) * 0.9) calc(var(--u) * 2.6);
+    font-family: 'IM Fell English', 'Almendra', serif; font-style: italic; font-size: calc(var(--u) * 3.2); color: #7a1d12;
+    background: rgba(255, 246, 225, 0.55); border: 1px dashed rgba(122, 29, 18, 0.7); border-radius: 6px; cursor: pointer;
+    pointer-events: auto; touch-action: manipulation; }
+.bouton-descriptif-region:hover { background: rgba(255, 238, 205, 0.85); }
+body.dev-descriptifs-regions .bouton-descriptif-region { display: inline-block; }

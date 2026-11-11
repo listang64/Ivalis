@@ -51,7 +51,7 @@ window.CLASSES_PAR_DEFAUT = [
     C(7,  "Géomancien",        "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2168_fmgyk1.jpg",
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438698/G%C3%A9omancien_fond_b72j1c.png"),
     C(8,  "Protecteur",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2159_iligqv.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438697/Hoplite_fond_jzi0f3.png"),
+                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794173198/IMG_2257_ucdhvf.png"),
     C(9,  "Oracle",            "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2169_hbb5xu.jpg",
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438698/Oracle_fond_n7togf.png"),
     C(10, "Vampire",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2173_yygc0q.jpg",
@@ -319,16 +319,22 @@ window.CLASSES_DOC_RENOMMEES = { CLASSE_NECROMANCIEN: { id: "CLASSE_SORCIER", no
                                  CLASSE_HOPLITE: { id: "CLASSE_PROTECTEUR", nom: "Protecteur" } };
 window.CLASSES_RETIREES = ["CLASSE_ENSORCELEUR"];
 
+// LES FONDS REMPLACÉS (v339, Nico : « remplace l'image de la classe Protecteur ») :
+// la base qui garde encore l'ancienne image prend celle d'ici. Un fond changé depuis
+// (une autre image en base) reste le sien.
+window.ANCIENS_FONDS_CLASSES = ["Hoplite_fond_jzi0f3"];
+const fondPerime = (url) => !!url && window.ANCIENS_FONDS_CLASSES.some(a => String(url).includes(a));
 window.classeDepuisDocument = function(idBase, d) {
     const renommee = window.CLASSES_DOC_RENOMMEES[idBase];
     const id = renommee ? renommee.id : idBase;
     const connue = window.CLASSES_PAR_DEFAUT.find(c => c.id === id) || {};
+    const fondBase = d && d.Image_Fond && !(fondPerime(d.Image_Fond) && connue.imageFond) ? d.Image_Fond : "";
     return {
         id,
         ordre: Number(d && d.Ordre) || connue.ordre || 99,
         nom: renommee ? renommee.nom : ((d && d.Nom) || connue.nom || id),
         imageTarot: window.optimiserImageClasse((d && d.Image_Tarot) || connue.imageTarot || ""),
-        imageFond: window.optimiserImageClasse((d && d.Image_Fond) || connue.imageFond || "")
+        imageFond: window.optimiserImageClasse(fondBase || connue.imageFond || "")
     };
 };
 window.documentDepuisClasse = (c) => ({ Nom: c.nom, Image_Tarot: c.imageTarot, Image_Fond: c.imageFond, Ordre: c.ordre });

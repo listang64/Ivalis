@@ -188,7 +188,7 @@ RÈGLES ABSOLUES
 4. Empoisonnement exige une attaque sur la technique.
 5. Durée étalement dégâts : seulement sur une attaque, un soin, une Zone ou une Distance, et jamais avec Persistance terrain sur la même technique.
 6. Persistance terrain : jamais sur un soin.
-7. Sur une action Poussée : pas de Zone, de Persistance terrain ni d'étalement. Sur une Illusion : pas de Zone.
+7. Sur une action Poussée : pas de Zone, de Persistance terrain ni d'étalement.
 8. Distance : seulement avec Arme polyvalente, Arme légère Distance ou Magie — ou sur un soin.${regleLumiere}
 10. N'utilise QUE des identifiants (id) de la liste fournie : aucun autre effet n'existe pour ce héros.
 11. Une Attaque Magique est TOUJOURS liée à un élément (champ element de l'action) : Feu, Foudre, Glace ou Arcane, selon le récit. Feu, Foudre et Glace lui offrent déjà 5 % de chance de Brûlé, Électrifié ou Glacé : n'ajoute ce sous-effet que pour monter cette chance. L'Arcane n'offre aucun état, mais aucune créature n'y résiste. Une Distorsion mentale n'a ni élément ni état lié : ce sont des dégâts bruts mentaux, que la cible ne peut ni esquiver ni parer, et qu'aucune armure ne réduit.
