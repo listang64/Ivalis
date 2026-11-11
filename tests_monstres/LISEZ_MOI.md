@@ -11065,3 +11065,15 @@ Tests mis à jour par la v339 :
   - Les pages plus loin attendent : rien de lourd d'un coup sur iPad.
 
 corrections_v341.mjs le vérifie : à l'ouverture, en tournant, au saut par marque-page, sur les classes et sur les pages réécrites. corrections_v339.mjs lit maintenant data-src.
+
+## v342 — Revenir en arrière par les pages de gauche des peuples et des classes
+
+- Nico : « pour les races comme pour les classes, on ne peut pas tourner les pages de gauche pour revenir sur la page d'avant ». Il demande aussi le même préchargement des images pour les classes : c'était déjà le cas depuis v341, et c'est vérifié ici.
+- La cause : le texte de ces pages défile (.defile-fiche) sur toute la page, et le livre ignorait tout geste parti de là.
+- grimoire.js (brancherPrise) : sur les pages de la création, un geste surtout horizontal tourne la page. Un geste vertical laisse défiler le texte. Ailleurs (les fiches), rien ne change.
+- grimoire_creation.css : touch-action: pan-y sur ces textes. Le navigateur garde le défilement vertical et laisse l'horizontal au livre (iPad).
+
+corrections_v342.mjs le vérifie :
+- revenir en arrière à la souris et au doigt, sur les peuples et sur les classes, jusqu'au dernier peuple depuis la première classe ;
+- un geste vertical ne tourne rien ;
+- les images des classes, la précédente, l'ouverte et la suivante, sont chargées à l'avance.

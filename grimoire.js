@@ -655,7 +655,13 @@
         livre.addEventListener("pointerdown", (ev) => {
             if (!pageFlip || !ouvert) return;
             if (ev.pointerType === "mouse" && ev.button !== 0) return;
-            if (ev.target && ev.target.closest && ev.target.closest("input, label, button, select, textarea, a, [data-action], [data-aide], .defile-fiche, .liste-parties-grimoire, .nom-livre, .nom-heros")) return;
+            if (ev.target && ev.target.closest && ev.target.closest("input, label, button, select, textarea, a, [data-action], [data-aide], .liste-parties-grimoire, .nom-livre, .nom-heros")) return;
+            // (v342) Nico : « pour les races comme pour les classes, on ne peut pas tourner les
+            // pages de gauche pour revenir sur la page d'avant » : leur texte défile sur toute
+            // la page, et le geste n'y partait jamais. Sur les pages de la création, un geste
+            // surtout horizontal tourne la page ; un geste vertical laisse défiler le texte.
+            const defile = ev.target && ev.target.closest ? ev.target.closest(".defile-fiche") : null;
+            if (defile && !defile.closest(".page-creation")) return;
             if (pageFlip.getState() !== "read" || defileEnCours) return;
             const p = pos(ev), pw = p.r.width / 2, h = p.r.height;
             const aGauche = p.x < pw, xp = aGauche ? p.x : p.x - pw;
@@ -671,14 +677,19 @@
             // refermer » : la première double page ne se tourne pas vers la couverture.
             if (aGauche && pageFlip.getCurrentPageIndex() <= 2) return;
             const coinY = p.y >= h / 2 ? h - 1 : 1;
-            prise = { id: ev.pointerId, x0: p.x, y0: p.y, dy: coinY - p.y, partie: false };
-            try { livre.setPointerCapture(ev.pointerId); } catch (e) {}
+            prise = { id: ev.pointerId, x0: p.x, y0: p.y, dy: coinY - p.y, partie: false, horizontal: !!defile };
+            if (!defile) { try { livre.setPointerCapture(ev.pointerId); } catch (e) {} }
         });
         livre.addEventListener("pointermove", (ev) => {
             if (!prise || ev.pointerId !== prise.id) return;
             const p = pos(ev);
             if (!prise.partie) {
                 if (Math.hypot(p.x - prise.x0, p.y - prise.y0) < 8) return;
+                // (v342) Dans un texte qui défile : vertical, c'est le défilement ; horizontal, la page.
+                if (prise.horizontal) {
+                    if (Math.abs(p.y - prise.y0) > Math.abs(p.x - prise.x0)) { prise = null; return; }
+                    try { livre.setPointerCapture(ev.pointerId); } catch (e) {}
+                }
                 prise.partie = true;
                 pageFlip.startUserTouch({ x: prise.x0, y: prise.y0 + prise.dy });
             }
