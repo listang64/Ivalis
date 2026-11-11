@@ -23,7 +23,7 @@
   -webkit-mask-image: -webkit-radial-gradient(white, black); background: #2a1a0e; }
 .loupe-lentille-bombe { position: absolute; inset: 0; display: block; filter: url(#loupe-filtre-bombe); }
 .loupe-lentille-contenu { position: absolute; inset: 0; display: block; }
-.loupe-lentille-contenu img, .loupe-dessous img { position: absolute; max-width: none; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+.loupe-lentille-contenu > img, .loupe-dessous > img { position: absolute; max-width: none; pointer-events: none; user-select: none; -webkit-user-drag: none; }
 .loupe-lentille-verre { position: absolute; inset: 0; display: block; border-radius: 50%; pointer-events: none;
   background: radial-gradient(circle at 33% 27%, rgba(255, 255, 255, 0.42) 0, rgba(255, 255, 255, 0.12) 18%, rgba(255, 255, 255, 0) 40%),
               radial-gradient(circle at 70% 78%, rgba(255, 244, 220, 0.16) 0, rgba(255, 244, 220, 0) 22%),
@@ -54,6 +54,8 @@
 /* Les calques vivants de la carte du monde, sur toute la planche (grimoire_carte.js, grimoire_regions.js). */
 #loupe-planche > #calque-zones-livre, #loupe-planche > #calque-groupe-livre { left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; }
 .loupe-statique { position: absolute; display: none; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+/* (v344) La copie figée des lieux, du pion, de la route, posée sur l'image fixe. */
+.loupe-statique-calques { z-index: 1; }
 /* La carte régionale en grand : la vue vivante, sur tout l'écran (cartes_regionales.js). */
 .loupe-plan > .vue-carte-region.en-grand { position: absolute; z-index: 2; overflow: hidden; }
 /* Le verre : un reflet, un peu d'ombre au bord (l'effet grossissant est dans la scène). */

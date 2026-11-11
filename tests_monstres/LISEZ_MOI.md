@@ -11092,3 +11092,27 @@ corrections_v342.mjs le vérifie :
 - La dernière classe du livre est maintenant la Prêtresse de la lumière. Elle reste bloquée vers la droite (v339).
 
 corrections_v343.mjs le vérifie : avec une base qui garde les deux classes en attente et ignore les nouvelles, et dans le livre au féminin.
+
+## v344 — Les lieux des cartes régionales tournent avec leur page ; la loupe les grossit dès le début
+
+- Nico demande que les icônes et images des cartes régionales des pages d'avant et d'après soient préchargées, pour que rien ne « pop » d'un coup. Pareil à la loupe : « qu'on ait l'impression que ça ne charge pas, mais que ça fait partie intégrante de la carte ». Et : « dès qu'on clique pour tourner la page, les icônes et images disparaissent ».
+- La cause : les lieux (dessins et noms), le pion du groupe et sa route vivaient seulement dans la carte vivante (cartes_regionales.js). Celle-ci est posée sur la page ouverte, se cache dès qu'une page tourne, et ne se monte qu'une fois la page posée. Les pages, elles, ne portaient que l'image nue.
+- villages_regionaux.js : calqueVillagesFixe(numero, aspect) produit la même couche de lieux, en pourcentages de l'image et sans geste. Le dessin d'un lieu est mis en commun (elementVillage).
+- cartes_regionales.js :
+  - copieCarteRegionale() fait une copie figée de la carte vivante (lieux, pion, route, « ! »), sans l'image ni les outils DEV. Ses identifiants sont renommés, et les noms en arc suivent.
+  - carteRegionalePrete() dit si ses images sont chargées.
+- grimoire_regions.js :
+  - Chaque page de région porte ses lieux (refaits quand ils changent).
+  - Leurs dessins, et l'image fine de la carte vivante, se chargent pour la double page ouverte, la précédente et la suivante.
+  - La page ouverte garde la copie figée de la carte vivante, qui reste pendant que la page tourne. Elle part quand une autre carte est ouverte.
+  - L'image de la page ne s'efface sous la carte vivante qu'une fois celle-ci prête.
+- loupe_cartes.js : la copie figée est posée sur l'image fixe pendant la glisse et la plongée, à l'ouverture comme à la fermeture. Au repos, le verre la grossit aussi.
+- Limite connue : le pion du groupe n'est sur une page que si elle a été ouverte. Sur la page du groupe vue de loin, il paraît à l'arrivée.
+
+corrections_v344.mjs le vérifie :
+- les lieux sur chaque page, exactement sous ceux de la carte vivante ;
+- le préchargement autour de la page ouverte ;
+- la tourne : la page qui part garde son lieu et le pion, celle qui arrive a déjà le sien ;
+- la loupe : au repos, pendant la glisse (à la place exacte), ouverte, et en refermant ;
+- un lieu nouveau sur sa page ; aucun identifiant en double.
+corrections_v339 accepte maintenant des versions plus récentes des fichiers.

@@ -247,7 +247,7 @@ await section(async () => {
 
 {
   const html = lire("index.html");
-  verifier("version 343 ; classes.js v29, app.js v145, grimoire_creation.js v7", /VERSION_IVALIS = 343;/.test(lire("trace_combat.js")) && JSON.parse(lire("version.json")).version === 343
+  verifier("version 343 ou plus ; classes.js v29, app.js v145, grimoire_creation.js v7", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 343 && JSON.parse(lire("version.json")).version >= 343
            && ['classes.js?v=29"', 'app.js?v=145"', 'grimoire_creation.js?v=7"'].every(x => html.includes(x)));
 }
 console.log(erreurs.length ? "\nErreurs de page : " + erreurs.slice(0, 5).join(" | ") : "");

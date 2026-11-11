@@ -5671,6 +5671,9 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 .vue-carte-region:active { cursor: grabbing; }
 .vue-carte-region.outil-pinceau, .vue-carte-region.outil-gomme { cursor: crosshair; }
 .carte-region { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+/* (v344) Une copie figée de la carte vivante (pages du livre, loupe) : rien n'y réagit au doigt. */
+.copie-carte-region, .copie-carte-region * { pointer-events: none !important; }
+.copie-carte-region { will-change: auto; }
 /* v285 : le titre au-dessus du parchemin — hors du calque que les brûlures
    découpent, posé sur un calque jumeau (même taille, même cadrage). */
 .carte-region-dessus { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }

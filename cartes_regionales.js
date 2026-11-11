@@ -408,6 +408,32 @@ window.agrandirCarteRegionale = (conteneur) => {
     cadrer(false);
     return true;
 };
+// (v344) UNE COPIE FIGÉE DE LA CARTE VIVANTE : ses lieux, le pion du groupe, sa route,
+// le « ! » d'un lieu à découvrir… tels qu'on les voit, sans l'image ni les outils DEV.
+// Elle reste sur la page du livre quand la carte vivante se cache (la page tourne), et
+// la loupe la grossit pendant son animation. Les identifiants sont renommés (`suffixe`),
+// les liens des noms en arc les suivent.
+let numeroCopie = 0;
+window.copieCarteRegionale = (suffixe) => {
+    const carte = $("carte-region");
+    if (!carte || !etat.ouverte || !etat.largeur) return null;
+    const copie = carte.cloneNode(true);
+    copie.querySelectorAll(".carte-region-image, canvas, .carte-region-pastilles, .village-cercle, .croix-groupe").forEach(x => x.remove());
+    const fin = "-" + (suffixe || "copie") + "-" + (++numeroCopie);
+    const renommes = {};
+    copie.querySelectorAll("[id]").forEach(x => { renommes[x.id] = x.id + fin; x.id = x.id + fin; });
+    copie.querySelectorAll("textPath, use").forEach(x => ["href", "xlink:href"].forEach(att => {
+        const h = x.getAttribute(att);
+        if (h && h[0] === "#" && renommes[h.slice(1)]) x.setAttribute(att, "#" + renommes[h.slice(1)]);
+    }));
+    copie.removeAttribute("id");
+    copie.classList.add("copie-carte-region");
+    Object.assign(copie.style, { width: etat.largeur + "px", height: etat.hauteur + "px", transform: "none", pointerEvents: "none" });
+    copie.style.setProperty("--zoom-region", "1");
+    return { element: copie, numero: etat.ouverte, largeur: etat.largeur, hauteur: etat.hauteur };
+};
+// Toutes les images de la carte vivante sont-elles prêtes (chargées) ?
+window.carteRegionalePrete = () => [...document.querySelectorAll("#carte-region img")].every(i => !i.getAttribute("src") || i.complete);
 window.rendreCarteRegionaleALaPage = () => {
     const vue = $("vue-carte-region"), avant = etat.enGrand;
     if (!avant || !vue) return false;

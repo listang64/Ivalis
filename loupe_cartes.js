@@ -181,6 +181,21 @@
             return { src: x.currentSrc || x.src || "", x: r.left - E.x, y: r.top - E.y, w: r.width, h: r.height, fit: cs.objectFit || "fill", pos: cs.objectPosition || "50% 50%" };
         }).filter(i => i.src && i.w > 0 && i.h > 0);
     }
+    // (v344) Nico : « quand on fait la loupe, qu'on ait l'impression que ça ne charge pas
+    // mais que ça fait partie intégrante de la carte ». Les lieux, le pion et la route
+    // d'une carte régionale vivent dans sa carte vivante : la loupe en grossit une copie
+    // figée (copieCarteRegionale), posée sur l'image, au repos comme pendant l'animation.
+    // Sans elle, ils n'apparaissaient qu'à la fin, quand la carte vivante prenait la place.
+    function copieVivante(dx, dy) {
+        const carte = $("carte-region"), v = $("vue-carte-region"), ici = carteOuverte();
+        if (!ici || ici.type !== "region" || !carte || !v || v.classList.contains("en-tourne") || typeof window.copieCarteRegionale !== "function") return null;
+        const c = window.copieCarteRegionale("loupe");
+        if (!c) return null;
+        const r = carte.getBoundingClientRect(), E = ecranTaille();
+        Object.assign(c.element.style, { position: "absolute", left: (r.left - E.x - dx).toFixed(1) + "px", top: (r.top - E.y - dy).toFixed(1) + "px", transformOrigin: "0 0", transform: `scale(${(r.width / c.largeur).toFixed(6)})` });
+        return c.element;
+    }
+    const signatureVivante = () => { const carte = $("carte-region"); return carte ? carte.innerHTML.length : 0; };
     const htmlImages = (items, dx, dy) => items.map(i => `<img src="${i.src.replace(/"/g, "&quot;")}" alt="" draggable="false" style="left:${(i.x - dx).toFixed(1)}px;top:${(i.y - dy).toFixed(1)}px;width:${i.w.toFixed(1)}px;height:${i.h.toFixed(1)}px;object-fit:${i.fit};object-position:${i.pos}">`).join("");
     function filtreLentille() {
         if ($("loupe-filtre-bombe")) return;
@@ -212,11 +227,13 @@
         const d = 2 * a.r, x0 = a.c.x - a.r, y0 = a.c.y - a.r;
         Object.assign(lent.style, { left: x0 + "px", top: y0 + "px", width: d + "px", height: d + "px" });
         const items = imagesDessous();
-        const sig = JSON.stringify([Math.round(d), Math.round(x0), Math.round(y0), items.map(i => [i.src, Math.round(i.x), Math.round(i.y), Math.round(i.w), Math.round(i.h)])]);
+        const sig = JSON.stringify([Math.round(d), Math.round(x0), Math.round(y0), items.map(i => [i.src, Math.round(i.x), Math.round(i.y), Math.round(i.w), Math.round(i.h)]), signatureVivante()]);
         if (lent.__sig === sig) return;
         lent.__sig = sig;
         const contenu = lent.querySelector(".loupe-lentille-contenu");
         contenu.innerHTML = htmlImages(items, x0, y0);
+        const copie = copieVivante(x0, y0);
+        if (copie) contenu.appendChild(copie);
         decoder(contenu);
         contenu.style.transformOrigin = `${a.r}px ${a.r}px`;
         contenu.style.transform = `scale(${GROSSISSEMENT_REPOS})`;
@@ -227,10 +244,12 @@
     const decoder = (racine) => racine.querySelectorAll("img").forEach(i => { try { if (i.decode) i.decode().catch(() => {}); } catch (e) {} });
     function remplirDessous() {
         const items = imagesDessous();
-        const sig = JSON.stringify(items.map(i => [i.src, Math.round(i.x), Math.round(i.y), Math.round(i.w), Math.round(i.h)]));
+        const sig = JSON.stringify([items.map(i => [i.src, Math.round(i.x), Math.round(i.y), Math.round(i.w), Math.round(i.h)]), signatureVivante()]);
         if (el.dessous.__sig === sig) return;
         el.dessous.__sig = sig;
         el.dessous.innerHTML = htmlImages(items, 0, 0);
+        const copie = copieVivante(0, 0);
+        if (copie) el.dessous.appendChild(copie);
         decoder(el.dessous);
     }
     // Au repos, tout ce que la glisse montrera est déjà prêt (et décodé).
@@ -424,12 +443,21 @@
     }
     // Le contenu des animations : une image fixe de la carte, à la place S.
     function poserStatique(S) {
+        oterCopieStatique();
         if (cible.type === "monde") { el.statique.style.display = "none"; el.planche.style.display = ""; return; }
         const src = ($("carte-region-image") && $("carte-region-image").currentSrc) || ($("carte-region-image") && $("carte-region-image").src) || "";
         if (src && el.statique.getAttribute("src") !== src) el.statique.src = src;
         Object.assign(el.statique.style, { display: "block", left: S.x + "px", top: S.y + "px", width: S.w + "px", height: S.h + "px" });
         el.planche.style.display = "none";
+        // (v344) Les lieux, le pion, la route : posés sur l'image, à la même échelle.
+        const c = typeof window.copieCarteRegionale === "function" ? window.copieCarteRegionale("loupe-statique") : null;
+        if (c) {
+            c.element.classList.add("loupe-statique-calques");
+            Object.assign(c.element.style, { position: "absolute", left: S.x + "px", top: S.y + "px", transformOrigin: "0 0", transform: `scale(${(S.w / c.largeur).toFixed(6)})` });
+            el.statique.after(c.element);
+        }
     }
+    const oterCopieStatique = () => { if (el) el.plan.querySelectorAll(".loupe-statique-calques").forEach(x => x.remove()); };
 
     async function ouvrir() {
         if (etat !== "repos") return false;
@@ -460,7 +488,8 @@
         el.image.style.opacity = "0";
         if (c.type === "monde") calquesDansLaPlanche(true);
         else if (!(window.agrandirCarteRegionale && window.agrandirCarteRegionale(el.plan))) { fermerVite(); return false; }
-        el.statique.style.display = "none";
+        // (v344) L'image fixe et sa copie s'effacent une fois la carte vivante posée par-dessus.
+        requestAnimationFrame(() => requestAnimationFrame(() => { if (etat === "ouverte") { el.statique.style.display = "none"; oterCopieStatique(); } }));
         etat = "ouverte";
         el.ecran.classList.add("ouverte");
         majPostit();
@@ -506,6 +535,7 @@
         cible = null;
         el.ecran.classList.remove("visible", "ouverte");
         el.statique.style.display = "none";
+        oterCopieStatique();
         poserScene(null);
         el.bouton.classList.remove("prise");
         majPostit();

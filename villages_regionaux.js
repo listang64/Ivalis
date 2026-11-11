@@ -166,19 +166,8 @@ function dessiner() {
     couche.classList.toggle("dev", dev);
     villagesDeLaCarte(numero).forEach(v => {
         const b = boite(v, c);
-        const el = document.createElement("div");
-        el.className = "village-region" + (selection === v.id ? " selectionne" : "");
-        el.dataset.id = v.id;
-        Object.assign(el.style, { left: b.gauche + "px", top: b.haut + "px", width: b.cote + "px", height: b.cote + "px" });
-        if (v.calque) {
-            const img = document.createElement("img");
-            img.className = "village-calque" + (v.plein ? "" : " ancien");
-            img.alt = "";
-            img.draggable = false;
-            img.src = v.calque;
-            el.appendChild(img);
-        }
-        el.appendChild(etiquette(v, b.cote));
+        const el = elementVillage(v, b);
+        if (selection === v.id) el.classList.add("selectionne");
         // Entouré à la main, en rouge (v286) : en train de se tracer, tracé, ou qui s'efface.
         if (selection === v.id) el.appendChild(cercleMain(v, b.cote, traitSelection, "trace", debutTrait));
         else if (sortante && sortante.id === v.id) el.appendChild(cercleMain(v, b.cote, sortante.trait, "efface", sortante.debut));
@@ -200,6 +189,47 @@ function dessiner() {
     actualiserDev();
 }
 window.dessinerVillagesRegion = dessiner;
+// Un lieu sur la carte : son dessin et son nom, dans sa boîte (en pixels de l'image).
+// `o.differer` : l'adresse du dessin attend dans data-src (les pages du livre la posent
+// à l'avance, v344) ; `o.suffixe` : des identifiants à part pour une copie.
+function elementVillage(v, b, o) {
+    const opts = o || {};
+    const el = document.createElement("div");
+    el.className = "village-region";
+    el.dataset.id = v.id;
+    Object.assign(el.style, { left: b.gauche + "px", top: b.haut + "px", width: b.cote + "px", height: b.cote + "px" });
+    if (v.calque) {
+        const img = document.createElement("img");
+        img.className = "village-calque" + (v.plein ? "" : " ancien");
+        img.alt = "";
+        img.draggable = false;
+        if (opts.differer) img.dataset.src = v.calque; else img.src = v.calque;
+        el.appendChild(img);
+    }
+    el.appendChild(etiquette(v, b.cote, opts.suffixe));
+    return el;
+}
+// (v344) LES LIEUX D'UNE CARTE, FIGÉS : la même couche que la carte vivante, pour une
+// image de `largeur` × `hauteur` pixels, sans geste ni sélection. Les pages des
+// régions du livre la portent : les lieux tournent avec elles (grimoire_regions.js).
+// Tout y est en pourcentages de l'image (largeur / hauteur = `aspect`) : la couche suit
+// la taille de sa page, même cachée (une page du livre n'a pas de taille hors de vue).
+window.calqueVillagesFixe = function(numero, aspect, suffixe) {
+    const couche = document.createElement("div");
+    couche.className = "carte-region-villages";
+    const c = { largeur: 1000 * (aspect || 1), hauteur: 1000 };
+    const pct = (px, total) => (parseFloat(px) / total * 100).toFixed(4) + "%";
+    villagesDeLaCarte(numero).forEach(v => {
+        const b = boite(v, c), el = elementVillage(v, b, { differer: true, suffixe });
+        Object.assign(el.style, { left: pct(el.style.left, c.largeur), top: pct(el.style.top, c.hauteur), width: pct(el.style.width, c.largeur), height: pct(el.style.height, c.hauteur) });
+        const nom = el.querySelector(".village-nom");
+        if (nom) Object.assign(nom.style, { left: pct(nom.style.left, b.cote), top: pct(nom.style.top, b.cote), width: pct(nom.style.width, b.cote), height: pct(nom.style.height, b.cote) });
+        couche.appendChild(el);
+    });
+    return couche;
+};
+// Ce qui change la couche d'une carte (pour ne la refaire qu'alors).
+window.signatureVillagesCarte = (numero) => JSON.stringify(villagesDeLaCarte(numero).map(v => [v.id, v.nom, v.x, v.y, v.taille, v.plein, v.calque]));
 
 // LE NOM DU LIEU, sous son dessin (v281). Nico : « en écriture marron foncé,
 // style plume sur parchemin, le nom du lieu en arc de cercle inversé sur le
@@ -216,7 +246,7 @@ function courbureEtiquette(id) {
     return Math.max(0, u * 1.3 - 0.3);           // un sur quatre environ : droit
 }
 window.courbureEtiquetteLieu = courbureEtiquette;
-function etiquette(v, cote) {
+function etiquette(v, cote, suffixe) {
     // Assez large pour tout le nom (le long d'un chemin, ce qui dépasse ne
     // s'écrit pas) ; le creux de l'arc, au milieu, reste mesuré.
     const police = cote * 0.24;
@@ -232,7 +262,7 @@ function etiquette(v, cote) {
     svg.setAttribute("viewBox", `0 0 ${largeur} ${hauteur}`);
     svg.setAttribute("aria-hidden", "true");
     Object.assign(svg.style, { left: ((cote - largeur) / 2) + "px", top: haut + "px", width: largeur + "px", height: hauteur + "px" });
-    const idChemin = "arc-nom-" + String(v.id).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const idChemin = "arc-nom-" + String(v.id).replace(/[^a-zA-Z0-9_-]/g, "_") + (suffixe || "");
     // Un arc « inversé » (∪) : les bouts remontent, le milieu descend.
     svg.innerHTML = `<defs><path id="${idChemin}" d="M ${largeur * 0.04} ${base} Q ${largeur / 2} ${base + 2 * fleche} ${largeur * 0.96} ${base}"/></defs>`
         + `<text class="village-nom-texte" font-size="${police}"><textPath href="#${idChemin}" xlink:href="#${idChemin}" startOffset="50%" text-anchor="middle"></textPath></text>`;

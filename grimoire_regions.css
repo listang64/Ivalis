@@ -9,6 +9,13 @@
 .page-region .region-carte-cadre .region-carte-img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; max-width: none; display: block; }
 /* Sous la carte vivante, l'image de la page s'efface : un trou brûlé montre le papier du livre. */
 .page-region.sous-la-vue .region-carte-cadre { visibility: hidden; }
+/* (v344) Les lieux de la carte, sur la page (ils tournent avec elle) ; sur la page
+   ouverte, la copie figée de la carte vivante (le pion, la route…) les remplace. */
+.page-region .region-calques { position: absolute; inset: 0; pointer-events: none; }
+.page-region .region-calques * { pointer-events: none !important; }
+.page-region .region-lieux { position: absolute; inset: 0; }
+.page-region .region-calques.avec-instantane .region-lieux { display: none; }
+.page-region .region-calques .copie-carte-region { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: auto; }
 .region-titre-page { position: absolute; left: 10%; right: 10%; top: 30%; display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 1.6); text-align: center; }
 .region-sur { font-family: 'IM Fell English', 'Almendra', serif; font-style: italic; font-size: calc(var(--u) * 3.6); color: rgba(58, 34, 16, 0.75); letter-spacing: 0.08em; }
 .region-nom { font-family: 'Almendra', serif; font-weight: 700; font-style: italic; font-size: calc(var(--u) * 8.4); line-height: 1.1; color: #1d1209;

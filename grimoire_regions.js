@@ -100,7 +100,78 @@
             d.innerHTML = carteImg(url, boites.droite, nom);
         }
         r.usureSig = null;
+        r.lieuxSig = null;          // (v344) les lieux de la page se reposent (poserLieux)
         bruler(r);
+    }
+    // --- (v344) LES LIEUX SUR LES PAGES ----------------------------------------
+    // Nico : « pour les maps régionales, précharger les icônes et les images des pages
+    // d'avant et d'après, que ça ne pop pas d'un coup » ; « dès qu'on clique pour
+    // tourner la page, les icônes et images disparaissent ». Les lieux (dessins et
+    // noms) vivaient seulement dans la carte vivante, posée sur la page ouverte et
+    // cachée dès qu'une page tourne. Chaque page de région porte maintenant les siens
+    // (calqueVillagesFixe, en pourcentages de l'image) ; la page ouverte garde en plus
+    // une copie figée de la carte vivante (le pion du groupe, sa route, le « ! »…).
+    // Les images se chargent pour la double page ouverte, la précédente et la suivante.
+    const cadreDe = (r) => r.pages && r.pages[1] && r.pages[1].querySelector(".region-carte-cadre");
+    function calquesDe(r) {
+        const cadre = cadreDe(r);
+        if (!cadre) return null;
+        let k = cadre.querySelector(".region-calques");
+        if (!k) { k = document.createElement("div"); k.className = "region-calques"; k.setAttribute("aria-hidden", "true"); cadre.appendChild(k); }
+        return k;
+    }
+    function poserLieux(r) {
+        if (!r.aspect || typeof window.calqueVillagesFixe !== "function" || typeof window.signatureVillagesCarte !== "function") return;
+        const k = calquesDe(r);
+        if (!k) return;
+        const sig = window.signatureVillagesCarte(r.numero) + "|" + r.aspect;
+        if (r.lieuxSig === sig && k.querySelector(".region-lieux")) return;
+        r.lieuxSig = sig;
+        const lieux = document.createElement("div");
+        lieux.className = "region-lieux";
+        lieux.appendChild(window.calqueVillagesFixe(r.numero, r.aspect, "-page-" + r.numero));
+        const ancien = k.querySelector(".region-lieux");
+        if (ancien) ancien.replaceWith(lieux); else k.prepend(lieux);
+        if (r.prechargee) chargerImagesDe(r);
+    }
+    const prechargees = new Set();
+    function chargerImagesDe(r) {
+        r.prechargee = true;
+        const k = calquesDe(r);
+        if (k) k.querySelectorAll("img[data-src]").forEach(img => {
+            if (img.getAttribute("src") === img.dataset.src) return;
+            img.src = img.dataset.src;
+            if (typeof img.decode === "function") img.decode().catch(() => {});
+        });
+        // L'image de la carte vivante (plus fine que celle de la page) : dans le cache.
+        const carte = (window.CARTES_REGIONALES || {})[r.numero];
+        const url = carte && carte.image && (typeof window.urlImageCarteRegionale === "function" ? window.urlImageCarteRegionale(carte.image) : carte.image);
+        if (url && !prechargees.has(url)) { prechargees.add(url); const i = new Image(); i.decoding = "async"; i.crossOrigin = "anonymous"; i.src = url; }
+    }
+    // La copie figée de la carte vivante, sur la page ouverte : refaite quand elle change.
+    function copierLaVue(r) {
+        const k = calquesDe(r), carte = $("carte-region");
+        if (!k || !carte || typeof window.copieCarteRegionale !== "function") return;
+        const sig = carte.innerHTML.length + "|" + carte.childElementCount;
+        let copie = k.querySelector(".copie-carte-region.instantane");
+        if (copie && copie.__sig === sig) return poserEchelle(k);
+        const c = window.copieCarteRegionale("page");
+        if (!c || c.numero !== r.numero) return;
+        c.element.classList.add("instantane");
+        c.element.__sig = sig;
+        if (copie) copie.replaceWith(c.element); else k.appendChild(c.element);
+        k.classList.add("avec-instantane");
+        poserEchelle(k);
+    }
+    function poserEchelle(k) {
+        const copie = k.querySelector(".copie-carte-region.instantane"), w = k.clientWidth;
+        if (copie && w > 0) copie.style.transform = `scale(${(w / (parseFloat(copie.style.width) || w)).toFixed(6)})`;
+    }
+    function oublierLaVue(r) {
+        const k = calquesDe(r);
+        if (!k || !k.classList.contains("avec-instantane")) return;
+        k.querySelectorAll(".copie-carte-region.instantane").forEach(x => x.remove());
+        k.classList.remove("avec-instantane");
     }
     // LE PARCHEMIN BRÛLÉ SUR LES PAGES (v310). Nico : « l'effet de brûlure de la
     // map au pinceau se fait très très mal sur la page ». La carte vivante est
@@ -363,7 +434,19 @@
         poserGroupeSurLeMonde(lu && surLaCarteDuMonde());
         // (v310) La pliure du livre par-dessus la carte vivante ; sous elle, l'image
         // de la page s'efface (ses trous brûlés montrent le papier, pas la carte).
-        regions.forEach(x => x.pages.forEach(pg => pg.classList.toggle("sous-la-vue", lu && montee === x.numero)));
+        // (v344) …mais seulement une fois la carte vivante prête (ses images chargées) :
+        // sinon, un instant, ni l'une ni l'autre.
+        const prete = typeof window.carteRegionalePrete !== "function" || window.carteRegionalePrete();
+        regions.forEach(x => x.pages.forEach(pg => pg.classList.toggle("sous-la-vue", lu && montee === x.numero && prete)));
+        // (v344) Les lieux sur chaque page ; les images autour de la page ouverte ; la
+        // copie figée de la carte vivante sur sa page (elle y reste pendant qu'elle tourne).
+        const ici = pf ? pf.getCurrentPageIndex() : -1;
+        regions.forEach(x => {
+            poserLieux(x);
+            if (Math.abs(pageDe(x) - ici) <= 3) chargerImagesDe(x);
+            if (lu && montee === x.numero && prete && window.carteRegionaleOuverte && window.carteRegionaleOuverte() === x.numero) copierLaVue(x);
+            else if (lu && montee !== x.numero) oublierLaVue(x);
+        });
         poserPliure(lu && montee && r && montee === r.numero ? r : null);
         // (v310) La place de la carte a changé de taille (écran tourné, livre posé) : on recadre.
         if (vue && montee) {
