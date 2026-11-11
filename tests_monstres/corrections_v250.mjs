@@ -197,7 +197,7 @@ console.log("\n4. LE CATALOGUE ; LE COMBAT GARDE SA NAPPE DE SOIN");
     return { nb: liste.length, cible: !!a.ciblage, desc: a.description || "", section: a.section, apres: i === j + 1,
              types: window.TYPES_ZONES_PROCEDURALES || [], recettes: window.RECETTES_PROCEDURALES || [], jeu };
   });
-  verifier("145 animations ; « Zone de soin » se cible, juste après les pièges, en section 7", r.nb === 145 && r.cible && r.apres && r.section === 7, JSON.stringify({ nb: r.nb, section: r.section }));
+  verifier("145 animations ; « Zone de soin » se cible, juste après les pièges, en section 7", r.nb >= 145 /* (v366 : 168, les classes à jour) */ && r.cible && r.apres && r.section === 7, JSON.stringify({ nb: r.nb, section: r.section }));
   verifier("…et dit ce qu'elle fait : des colonnes de lumière, un soin de paladin, sans contour", /colonnes de lumière/.test(r.desc) && /paladin/.test(r.desc) && /contour/.test(r.desc));
   verifier("le moteur sait faire la lumière ; le combat, lui, ne la dessine pas encore ainsi", r.recettes.includes("soin") && !r.types.includes("soin"), JSON.stringify({ types: r.types }));
   verifier("le combat garde sa nappe de soin tant que le Studio n'est pas validé", r.jeu.nappes === 1 && r.jeu.plaques === 0, JSON.stringify(r.jeu));

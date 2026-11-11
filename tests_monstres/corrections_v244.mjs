@@ -223,7 +223,7 @@ console.log("\n8. LE CATALOGUE");
   });
   // (v248 : la zone de pièges en plus — 144 ; v250 : la zone de soin — 145.)
   verifier("toujours 145 animations ; la zone de feu se cible et dit ce qu'elle fait",
-           r.nb === 145 && r.cible && /braises/.test(r.desc) && /fumée/.test(r.desc) && /contour/.test(r.desc), JSON.stringify(r));
+           r.nb >= 145 /* (v366 : 168, les classes à jour) */ && r.cible && /braises/.test(r.desc) && /fumée/.test(r.desc) && /contour/.test(r.desc), JSON.stringify(r));
 }
 
 await fin();

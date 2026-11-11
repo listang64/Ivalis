@@ -193,7 +193,7 @@ console.log("\n5. LE CATALOGUE");
   });
   // (v248 : la zone de pièges en plus — 144 ; v250 : la zone de soin — 145.)
   verifier("toujours 145 animations ; poison et foudre se ciblent et disent ce qu'ils font (sans contour)",
-           r.nb === 145 && !!r.poison.ciblage && !!r.foudre.ciblage && /bulles/.test(r.poison.description || "") && /miasme/.test(r.poison.description || "")
+           r.nb >= 145 /* (v366 : 168, les classes à jour) */ && !!r.poison.ciblage && !!r.foudre.ciblage && /bulles/.test(r.poison.description || "") && /miasme/.test(r.poison.description || "")
            && /arcs/.test(r.foudre.description || "") && /contour/.test(r.poison.description || "") && /contour/.test(r.foudre.description || ""), JSON.stringify({ nb: r.nb }));
   verifier("le moteur connaît les quatre éléments", ["glace", "feu", "poison", "electrique"].every(t => r.types.includes(t)), r.types.join());
 }

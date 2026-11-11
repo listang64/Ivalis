@@ -2282,7 +2282,7 @@
             }
         },
         {
-            id: "charme-fratricide", nom: "Niv.5 Charme fratricide", sens: "vers l'ennemi",
+            id: "charme-fratricide", nom: "Niv.3 Charme fratricide", sens: "vers l'ennemi",
             description: "Trois cœurs roses filent vers l'ennemi : il rosit, des cœurs tournent autour de lui. Il est charmé.",
             async jouer(sc, o) {
                 const { a, b } = lieux(sc);
@@ -2294,7 +2294,7 @@
             }
         },
         {
-            id: "charme-frappe", nom: "Niv.5 Charmé : frappe son allié", sens: "vers l'ennemi",
+            id: "charme-frappe", nom: "Niv.3 Charmé : frappe son allié", sens: "vers l'ennemi",
             description: "L'ennemi charmé, tout rose, se retourne contre le combattant de son propre camp et le frappe.",
             async jouer(sc, o) {
                 const al = autreEnnemi(o, sc, Math.PI / 2);
@@ -2308,7 +2308,7 @@
             }
         },
         {
-            id: "charme-perdu", nom: "Niv.5 Charme perdu", sens: "vers l'ennemi",
+            id: "charme-perdu", nom: "Niv.3 Charme perdu", sens: "vers l'ennemi",
             description: "L'ennemi charmé cherche un allié à frapper, regarde à gauche, à droite… personne : le charme tombe à vide.",
             async jouer(sc, o) {
                 const { b } = lieux(sc);
@@ -2322,7 +2322,7 @@
             }
         },
         {
-            id: "transfert", nom: "Niv.10 Transfert", sens: "vers l'ennemi",
+            id: "transfert", nom: "Niv.5 Transfert", sens: "vers l'ennemi",
             description: "Deux tourbillons violets s'ouvrent sous le héros et l'ennemi ; ils s'y engloutissent et réapparaissent chacun à la place de l'autre. Le héros regagne 10 PV.",
             async jouer(sc, o) {
                 const { a, b } = lieux(sc);
@@ -2347,7 +2347,7 @@
     ajouter(8, "Protecteur", [
         {
             id: "provocation-protecteur", nom: "Niv.1 Provocation de ses attaques", sens: "vers l'ennemi",
-            description: "Le Protecteur frappe ; une fois sur sept environ (15 %), sa frappe provoque : un « ! » rouge et un fil rouge rivent l'ennemi à lui.",
+            description: "Le Protecteur frappe ; une fois sur dix (10 %, 20 % au niveau 5), sa frappe provoque : un « ! » rouge et un fil rouge rivent l'ennemi à lui.",
             async jouer(sc, o) {
                 const { a, b } = lieux(sc);
                 await frapper(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-8" });
@@ -2360,7 +2360,7 @@
             }
         },
         {
-            id: "rempart", nom: "Niv.5 Rempart", sens: "sur soi",
+            id: "rempart", nom: "Niv.3 Rempart", sens: "sur soi",
             description: "Une chaîne dorée relie le Protecteur à l'allié voisin ; un écu s'élève au-dessus de l'allié, une aura d'or l'entoure (3 manches).",
             async jouer(sc, o) {
                 const { a } = lieux(sc);
@@ -2375,7 +2375,7 @@
             }
         },
         {
-            id: "rempart-actif", nom: "Niv.5 Rempart actif", sens: "sur soi",
+            id: "rempart-actif", nom: "Niv.3 Rempart actif", sens: "sur soi",
             description: "L'allié protégé est frappé : la moitié du coup remonte la chaîne dorée et le Protecteur l'encaisse à sa place.",
             async jouer(sc, o) {
                 const { a, b } = lieux(sc);
@@ -2396,7 +2396,7 @@
             }
         },
         {
-            id: "rempart-rompu", nom: "Niv.5 Rempart rompu", sens: "sur soi",
+            id: "rempart-rompu", nom: "Niv.3 Rempart rompu", sens: "sur soi",
             description: "L'allié s'éloigne : la chaîne dorée se tend, puis casse en maillons qui retombent.",
             async jouer(sc, o) {
                 const { a, v } = lieux(sc);
@@ -2419,7 +2419,7 @@
             }
         },
         {
-            id: "resonance-bouclier", nom: "Niv.10 Résonance du bouclier", sens: "vers l'ennemi",
+            id: "resonance-bouclier", nom: "Niv.9 Résonance du bouclier", sens: "vers l'ennemi",
             description: "Le Protecteur frappe le sol de son bouclier : une onde d'or balaie les cases voisines ; l'ennemi au contact est étourdi et perd 5 % de ses PV.",
             async jouer(sc, o) {
                 const { a, b, v } = lieux(sc);
@@ -2498,7 +2498,7 @@
             }
         },
         {
-            id: "prise-en-charge", nom: "Niv.10 Prise en charge", sens: "sur soi",
+            id: "prise-en-charge", nom: "Niv.9 Prise en charge", sens: "sur soi",
             description: "Un allié est à terre, à côté : le Médicus s'agenouille, une lueur verte le relève (30 % de ses PV), et les ennemis au contact sont repoussés d'une case.",
             async jouer(sc, o) {
                 const { a, b, v } = lieux(sc);
@@ -2524,43 +2524,8 @@
 
     ajouter(8, "Chasseur de mages", [
         {
-            id: "lumiere-classe", nom: "Niv.1 Lumière (sort de classe)", sens: "vers l'ennemi",
-            description: "Le Chasseur de mages forge une lance de lumière et la projette : elle transperce l'ennemi et sa résistance magique dans un éclat doré.",
-            async jouer(sc, o) {
-                const { a, b, v } = lieux(sc);
-                o.son("lumiere");
-                await Promise.all([o.eclat(sc.lanceur, OR, 500), rassembler(o, sc.calque, a, { couleur: "#fff3a0", n: 8, duree: 400 })]);
-                await o.projectile(sc.calque, a, b, { taille: 0.85, arc: 0, oriente: true, easing: "linear", duree: Math.min(420, 160 + v.d * 0.4), traine: ["#fff6c0", "#ffd700"],
-                    style: "height:auto; aspect-ratio:6/1; background:linear-gradient(90deg, rgba(255,240,180,0), #fff6c0 50%, #ffffff); clip-path:polygon(0 40%, 80% 25%, 100% 50%, 80% 75%, 0 60%); filter:drop-shadow(0 0 8px #ffd700);" });
-                o.son("impact-magique");
-                o.jauge(sc.calque, sc.cible, 40, 30, 40, "-10", COULEURS.degats, COULEURS.degats);
-                o.attendre(400).then(() => o.texte(sc.calque, sc.cible, "Résistance percée", "#ffd700"));
-                await Promise.all([o.onde(sc.calque, b, { couleur: "#ffe680", taille: 0.9, duree: 600, echelle: 2, fond: "radial-gradient(circle, rgba(255,250,220,0.8), transparent 65%)" }),
-                    o.eclat(sc.cible, "brightness(1.9) sepia(0.4)", 600), o.secouer(sc.cible, b.t * 0.08, 300, v)]);
-            }
-        },
-        {
-            id: "lumiere-aveuglante", nom: "Niv.1 Lumière aveuglante", sens: "vers l'ennemi",
-            description: "La lumière éclate sur l'ennemi et ses voisins : un flash blanc, leurs yeux se voilent (8 %). « ☀️ Éblouis ! »",
-            async jouer(sc, o) {
-                const { a, b } = lieux(sc);
-                const autre = autreEnnemi(o, sc, Math.PI / 2);
-                o.son("lumiere");
-                await orbe(o, sc.calque, a, b, { couleur: "#ffe680", coeur: "#ffffff", taille: 0.3 });
-                o.son("aveugle");
-                const flash = o.poser(sc.calque, b.x, b.y, `width:${b.t * 4.5}px; height:${b.t * 4.5}px; border-radius:50%; z-index:${Z.ciel};
-                    background:radial-gradient(circle, rgba(255,255,255,0.95), rgba(255,250,210,0.6) 35%, rgba(255,250,210,0) 70%);`);
-                o.jouerPuisRetirer(flash, [{ opacity: 0, transform: "translate(-50%,-50%) scale(0.3)" }, { opacity: 1, transform: "translate(-50%,-50%) scale(1)", offset: 0.25 },
-                                           { opacity: 0, transform: "translate(-50%,-50%) scale(1.2)" }], { duration: 900 });
-                await o.attendre(250);
-                o.texte(sc.calque, sc.cible, "☀️ Éblouis !", "#ffd700");
-                await Promise.all([sc.cible, autre.el].map(el => o.teinter(el, [{ filter: "brightness(2.2)" }, { filter: "brightness(0.5) blur(1px)", offset: 0.4 },
-                                                                                 { filter: "brightness(0.5) blur(1px)", offset: 0.8 }, { filter: "none" }], { duration: 1500 })));
-            }
-        },
-        {
             id: "bouclier-anti-magie", nom: "Niv.5 Bouclier anti-magie", sens: "sur soi",
-            description: "Une barrière hexagonale de lumière se dresse et tourne autour du Chasseur (la manche en cours et la suivante).",
+            description: "Une barrière hexagonale de lumière se dresse et tourne autour du Chasseur (2 manches) ; 20 d'énergie restent bloqués tant qu'elle tient.",
             async jouer(sc, o) {
                 const { a } = lieux(sc);
                 o.son("anti-magie");
@@ -2587,25 +2552,6 @@
                 o.son("impact-magique");
                 await encaisser(o, sc.calque, sc.cible, sc.lanceur, { valeur: "-12", filtre: VIOLET });
                 await o.effacer(d);
-            }
-        },
-        {
-            id: "appel-lumiere", nom: "Niv.10 Appel de la lumière", sens: "sur soi",
-            description: "Le Chasseur appelle le ciel : un éclat blanc inonde tout le champ de bataille, des rayons partent de lui ; les ennemis sont aveuglés 2 manches.",
-            async jouer(sc, o) {
-                const { a } = lieux(sc);
-                o.son("appel-lumiere");
-                await o.eclat(sc.lanceur, "brightness(1.8) drop-shadow(0 0 16px #ffffff)", 500);
-                for (let i = 0; i < 8; i++) {
-                    const ang = (i / 8) * Math.PI * 2;
-                    o.rayon(sc.calque, a, { x: a.x + Math.cos(ang) * a.t * 3, y: a.y + Math.sin(ang) * a.t * 3, t: a.t },
-                            { fond: "linear-gradient(90deg, rgba(255,255,240,0.95), rgba(255,240,180,0))", couleur: "#fff6c0", epaisseur: 0.12, duree: 1100, retard: i * 30 });
-                }
-                o.voile(sc.calque, { fond: "radial-gradient(circle, rgba(255,255,255,0.9), rgba(255,250,220,0.75))", duree: 1300, retard: 200 });
-                await o.attendre(900);
-                o.texte(sc.calque, sc.cible, "Aveuglé : 2 manches", COULEURS.etat);
-                o.texte(sc.calque, sc.lanceur, "Appel de la lumière", "#ffd700");
-                await o.teinter(sc.cible, [{ filter: "none" }, { filter: "brightness(0.5) blur(1px)", offset: 0.3 }, { filter: "brightness(0.5) blur(1px)", offset: 0.8 }, { filter: "none" }], { duration: 1400 });
             }
         }
     ]);
@@ -2651,7 +2597,7 @@
             }
         },
         {
-            id: "sursis", nom: "Niv.10 Sursis", sens: "sur soi",
+            id: "sursis", nom: "Niv.9 Dernier sursis", sens: "sur soi",
             description: "À 0 PV, le Profanateur reste debout, grisé, un sablier au-dessus de lui ; les coups le traversent sans effet. « Sursis 💀 »",
             async jouer(sc, o) {
                 const { a, b } = lieux(sc);
@@ -2671,7 +2617,7 @@
             }
         },
         {
-            id: "sursis-soin-refuse", nom: "Niv.10 Soin refusé en sursis", sens: "sur soi",
+            id: "sursis-soin-refuse", nom: "Niv.9 Soin refusé en sursis", sens: "sur soi",
             description: "Des éclats de soin viennent au Profanateur en sursis… et se ternissent, retombent en cendres grises. « Sursis : aucun soin 💀 »",
             async jouer(sc, o) {
                 const { a } = lieux(sc);
@@ -2684,7 +2630,7 @@
             }
         },
         {
-            id: "sursis-fin", nom: "Niv.10 Fin du sursis", sens: "sur soi",
+            id: "sursis-fin", nom: "Niv.9 Fin du sursis", sens: "sur soi",
             description: "Le sablier se vide et se renverse ; le Profanateur, à bout, s'effondre.",
             async jouer(sc, o) {
                 const { a, b } = lieux(sc);
@@ -2737,7 +2683,7 @@
             }
         },
         {
-            id: "releve-zombies-2", nom: "Niv.10 Relève des zombies à 2 cases", sens: "sur soi",
+            id: "releve-zombies-2", nom: "Niv.1 Relève des zombies à 2 cases", sens: "sur soi",
             description: "Un grand sceau vert s'étend jusqu'à deux cases du Profanateur ; deux ennemis tombés y sont saisis et se relèvent, zombies.",
             async jouer(sc, o) {
                 const { a } = lieux(sc);
@@ -2810,35 +2756,32 @@
             }
         },
         {
-            id: "tir-precis", nom: "Niv.5 Tir précis", sens: "vers l'ennemi",
-            description: "Une mire se resserre sur l'ennemi, la flèche part, droite et sûre : il est cloué au sol. « 🎯 Tir précis ! »",
+            id: "tir-precis", nom: "Niv.3 Lancer de bolas", sens: "vers l'ennemi",
+            description: "Le Pisteur fait tournoyer ses bolas et les lâche : elles filent en tournant et s'enroulent autour des jambes de l'ennemi, immobilisé à coup sûr (aucune esquive) pour 2 manches.",
             async jouer(sc, o) {
                 const { a, b, v } = lieux(sc);
-                const mire = o.poser(sc.calque, b.x, b.y, `width:${b.t * 1.6}px; height:${b.t * 1.6}px; z-index:${Z.ciel}; border-radius:50%;
-                    border:3px solid #ff4040; box-shadow:0 0 8px #ff4040, inset 0 0 8px #ff4040;`,
-                    `<div style="position:absolute; left:50%; top:0; bottom:0; width:2px; background:#ff4040; transform:translateX(-50%)"></div>
-                     <div style="position:absolute; top:50%; left:0; right:0; height:2px; background:#ff4040; transform:translateY(-50%)"></div>`);
-                o.son("arc-tendu");
-                await o.teinter(mire, [{ transform: `${BASE} scale(1.6)`, opacity: 0 }, { transform: `${BASE} scale(0.75)`, opacity: 1 }], { duration: 600, easing: "ease-in", fill: "forwards" });
-                o.son("tir");
-                const L = a.t * 0.9;
-                await o.projectile(sc.calque, a, { x: b.x + v.ux * (b.t * 0.05 - L / 2), y: b.y + v.uy * (b.t * 0.05 - L / 2), t: b.t },
-                    { taille: 0.9, arc: 0, oriente: true, easing: "linear", duree: Math.min(380, 140 + v.d * 0.4), forme: "0",
-                      contenu: DESSIN_FLECHE, style: "height:auto; aspect-ratio:7/1; background:none;" });
-                mire.remove();
-                const fleche = flechePlantee(o, sc.calque, b, v, { longueur: L });
-                o.texte(sc.calque, sc.cible, "🎯 Tir précis !", "#ff6060");
-                coupRecu(o, sc.calque, sc.cible, a, { son: "fleche-impact", valeur: "-8", force: 0.08, n: 6 });
-                o.son("chaines", 300);
-                const anneau = o.poser(sc.calque, b.x, b.y, `width:${b.t * 1.2}px; height:${b.t * 1.2}px; border-radius:50%; z-index:${Z.sol}; border:5px dotted #8a8a8a;`);
+                const BOLAS = `<svg viewBox="-50 -50 100 100" width="100%" height="100%" style="overflow:visible; filter:drop-shadow(0 2px 2px rgba(0,0,0,.6))">
+                    <path d="M-34 0 Q 0 -14 34 0" fill="none" stroke="#a0804a" stroke-width="4"/><path d="M-34 0 Q 0 14 34 0" fill="none" stroke="#a0804a" stroke-width="4"/>
+                    <circle cx="-36" cy="0" r="12" fill="#6a5a48" stroke="#2a2018" stroke-width="3"/><circle cx="36" cy="0" r="12" fill="#6a5a48" stroke="#2a2018" stroke-width="3"/></svg>`;
+                o.son("tourbillon");
+                const main = o.poser(sc.calque, a.x, a.y - a.t * 0.45, `width:${a.t * 0.75}px; height:${a.t * 0.75}px; z-index:${Z.ciel};`, BOLAS);
+                await o.jouerPuisRetirer(main, [{ transform: "translate(-50%,-50%) rotate(0deg)" }, { transform: "translate(-50%,-50%) rotate(1080deg)" }], { duration: 650, easing: "ease-in" });
+                o.son("lame-souffle");
+                const vol = o.poser(sc.calque, a.x, a.y, `width:${a.t * 0.7}px; height:${a.t * 0.7}px; z-index:${Z.ciel};`, BOLAS);
+                await o.jouerPuisRetirer(vol, [{ transform: "translate(-50%,-50%) rotate(0deg)" },
+                    { transform: `translate(calc(-50% + ${b.x - a.x}px), calc(-50% + ${b.y - a.y}px)) rotate(1440deg)` }], { duration: Math.min(620, 260 + v.d * 0.6), easing: "linear" });
+                o.son("chaines");
+                const anneau = o.poser(sc.calque, b.x, b.y, `width:${b.t * 1.2}px; height:${b.t * 1.2}px; border-radius:50%; z-index:${Z.sol}; border:5px dotted #a0804a;`);
                 o.surgir(anneau);
-                o.attendre(500).then(() => etat(o, sc.calque, sc.cible, "Immobilisé"));
-                await o.attendre(1300);
-                await Promise.all([o.effacer(anneau), fondre(o, fleche.el, 400)]);
+                o.texte(sc.calque, sc.cible, "🪢 Bolas !", "#e0c070");
+                await o.secouer(sc.cible, b.t * 0.06, 400, v);
+                etat(o, sc.calque, sc.cible, "Immobilisé (2 manches)");
+                await o.attendre(1100);
+                await o.effacer(anneau);
             }
         },
         {
-            id: "lien-sang-soin", nom: "Niv.10 Lien de sang — soin", sens: "sur soi",
+            id: "lien-sang-soin", nom: "Niv.9 Lien de sang — soin", sens: "sur soi",
             description: "Un lien rouge et or relie le Pisteur à son compagnon blessé ; un cœur le parcourt, et le compagnon retrouve tous ses PV.",
             async jouer(sc, o) {
                 const { a } = lieux(sc);
@@ -2856,7 +2799,7 @@
             }
         },
         {
-            id: "lien-sang-releve", nom: "Niv.10 Lien de sang — relève", sens: "sur soi",
+            id: "lien-sang-releve", nom: "Niv.9 Lien de sang — relève", sens: "sur soi",
             description: "Le compagnon est à terre : le lien de sang le saisit, un cœur bat le long du fil, et il se relève avec tous ses PV.",
             async jouer(sc, o) {
                 const { a } = lieux(sc);
@@ -2881,7 +2824,7 @@
 
     ajouter(8, "Géomancien", [
         {
-            id: "mur-terre", nom: "Niv.5 Mur de terre", sens: "sur soi",
+            id: "mur-terre", nom: "Niv.3 Mur de terre", sens: "sur soi",
             description: "Sur toutes les cases touchées à la fois, la roche du jeu sort de terre en tremblant ; un nuage de poussière roule à son pied et des cailloux volent de partout avant de s'effacer en fondu. Les murs voisins se soudent en muraille et restent sur la carte. Un combattant sur une case murée est repoussé.",
             ciblage: { genre: "mur", min: 1, max: 8,
                        consigne: "Touche les cases où lever un mur, comme en combat (8 au plus ; pas sur ton pion) — touche-en une de nouveau pour l'enlever — puis « Lancer »." },
@@ -2911,7 +2854,7 @@
             }
         },
         {
-            id: "mur-terre-repousse", nom: "Niv.5 Mur de terre sous un combattant", sens: "vers l'ennemi",
+            id: "mur-terre-repousse", nom: "Niv.3 Mur de terre sous un combattant", sens: "vers l'ennemi",
             description: "Le mur jaillit sous le combattant qui se tenait sur la case visée (par défaut, l'ennemi) : il est éjecté sur une case voisine et la roche se dresse à sa place, pour de bon.",
             ciblage: { genre: "mur", min: 1, max: 1,
                        consigne: "Touche la case d'un combattant (l'ennemi) : le mur jaillira sous lui. Puis « Lancer »." },
@@ -2937,7 +2880,7 @@
             }
         },
         {
-            id: "mur-effondre", nom: "Niv.5 Mur de terre effondré → gravats", sens: "vers l'ennemi",
+            id: "mur-effondre", nom: "Niv.3 Mur de terre effondré → gravats", sens: "vers l'ennemi",
             description: "Le mur visé (un mur levé sur la carte, ou une case libre où il se dresse d'abord) se fissure, tremble, puis s'écroule dans un gros nuage de poussière, des cailloux volant de partout avant de s'effacer en fondu ; à son pied, l'éboulis gagne la case — terre retournée, pierres cassées, poussière — et reste (deux murs tombés côte à côte ne font qu'un éboulis) ; ses voisins gardent un moignon cassé.",
             ciblage: { genre: "effondre", min: 1, max: 4,
                        consigne: "Touche un mur de terre levé sur la carte (ou une case libre : un mur s'y dressera d'abord) — 4 au plus — puis « Lancer »." },
@@ -3016,29 +2959,30 @@
 
     ajouter(8, "Sentinelle", [
         {
-            id: "fureur-sentinelle", nom: "Niv.10 Fureur de la sentinelle", sens: "vers l'ennemi",
-            description: "La Sentinelle tournoie et frappe chaque ennemi au contact, puis recule d'une case.",
+            id: "fureur-sentinelle", nom: "Niv.5 Assaut de la sentinelle", sens: "vers l'ennemi",
+            description: "La Sentinelle frappe le sol : une onde repousse d'une case tous ceux qui la touchent (alliés compris), puis elle frappe chaque ennemi repoussé (70 % de chance ; esquive ou parade possible).",
             async jouer(sc, o) {
                 const { a, b } = lieux(sc);
-                const autre = { pos: o.voisine(sc.lanceur, a, o.tourner(axe(a, b), -Math.PI * 0.66)) };
-                autre.el = o.figurant(sc.calque, sc.cible, autre.pos, {});
-                await o.attendre(300);
-                o.son("tourbillon");
-                o.texte(sc.calque, sc.lanceur, "Fureur !", COULEURS.critique);
-                const tour = o.bouger(sc.lanceur, [{ transform: "rotate(0deg) scale(1)" }, { transform: "rotate(360deg) scale(1.12)", offset: 0.7 }, { transform: "rotate(360deg) scale(1)" }],
-                                      { duration: 700, easing: "ease-in-out" });
-                await o.attendre(250);
-                const toucher = (el, pos, k) => Promise.all([entaille(o, sc.calque, pos, axe(a, pos).angle, { retard: k * 150 }),
-                    o.attendre(k * 150).then(() => coupRecu(o, sc.calque, el, a, { valeur: "-7" }))]);
-                await Promise.all([tour, toucher(sc.cible, b, 0), toucher(autre.el, autre.pos, 1)]);
-                await marcher(sc, o, { cases: 1, duree: 320, son: "pas", dir: (v) => o.tourner(v, Math.PI) });
+                const al = allie(o, sc, Math.PI * 0.75);
+                o.son("onde-choc");
+                o.texte(sc.calque, sc.lanceur, "Assaut !", COULEURS.critique);
+                await Promise.all([o.bouger(sc.lanceur, [{ transform: "scale(1)" }, { transform: "scale(1.12)", offset: 0.4 }, { transform: "scale(1)" }], { duration: 450 }),
+                    o.onde(sc.calque, a, { couleur: "#e0c070", taille: 1, echelle: 3, bord: 4, duree: 700 }), poussiere(o, sc.calque, a, { n: 10, dist: 0.8 })]);
+                o.son("poussee");
+                const loin = { x: al.pos.x + (al.pos.x - a.x) * 0.6, y: al.pos.y + (al.pos.y - a.y) * 0.6 };
+                o.bouger(al.el, [{ transform: "translate(0,0)" }, { transform: `translate(${loin.x - al.pos.x}px, ${loin.y - al.pos.y}px)` }], { duration: 380, easing: "ease-out", fill: "forwards" });
+                o.texte(sc.calque, sc.cible, "Repoussé !", COULEURS.etat);
+                await repousser(sc, o, sc.cible, [], a);
+                o.texte(sc.calque, sc.lanceur, "Attaque d'opportunité (70 %)", COULEURS.neutre, { taille: 13 });
+                await frapper(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-6" });
+                await o.effacer(al.el);
             }
-        }
+        },
     ]);
 
     ajouter(8, "Oracle", [
         {
-            id: "retour-arriere", nom: "Niv.10 Retour arrière", sens: "vers l'ennemi",
+            id: "retour-arriere", nom: "Niv.9 Retour arrière", sens: "vers l'ennemi",
             description: "Un sablier se renverse à l'envers, le temps reflue sur l'Oracle ; il prend un repos long, son énergie remonte, puis sa compétence part.",
             async jouer(sc, o) {
                 const { a, b } = lieux(sc);
@@ -3075,7 +3019,7 @@
             }
         },
         {
-            id: "baiser-vampire", nom: "Niv.5 Baiser du vampire", sens: "vers l'ennemi",
+            id: "baiser-vampire", nom: "Niv.3 Baiser du vampire", sens: "vers l'ennemi",
             description: "Le Vampire fond sur l'ennemi et le mord : deux points rouges, puis des filets de sang remontent jusqu'à lui et le soignent.",
             async jouer(sc, o) {
                 const { a, b } = lieux(sc);
@@ -3096,7 +3040,7 @@
             }
         },
         {
-            id: "nuee", nom: "Niv.10 Nuée de chauve-souris", sens: "sur soi",
+            id: "nuee", nom: "Niv.9 Nuée de chauve-souris", sens: "sur soi",
             description: "Le Vampire éclate en chauves-souris qui tournoient autour de sa case ; il n'est plus qu'une ombre (esquive 40 %, 2 manches).",
             async jouer(sc, o) {
                 const { a } = lieux(sc);
@@ -3110,7 +3054,7 @@
             }
         },
         {
-            id: "esquive-nuee", nom: "Niv.10 Esquive en nuée", sens: "sur soi",
+            id: "esquive-nuee", nom: "Niv.9 Esquive en nuée", sens: "sur soi",
             description: "En nuée, le Vampire est frappé : les chauves-souris s'écartent sous la lame, puis se reforment.",
             async jouer(sc, o) {
                 const { a, b } = lieux(sc);
@@ -3124,6 +3068,533 @@
                 await Promise.all([elan, entaille(o, sc.calque, a, axe(b, a).angle, { couleur: "#cccccc" }),
                     o.gerbe(sc.calque, a.x, a.y, { nombre: 10, dist: a.t * 1.2, couleurs: ["#1a0a1a"], texte: "🦇", taille: 18, tailleMin: 12, duree: 600 })]);
                 await rassembler(o, sc.calque, a, { contenu: "🦇", n: 8, taille: 0.3, duree: 500, rayon: 1.2 });
+            }
+        }
+    ]);
+
+    // =====================================================================
+    //  LES CLASSES REFONDUES (v347 à v364) : CE QUI MANQUAIT AU STUDIO (v366)
+    // =====================================================================
+    //  Nico : « Check toutes les classes, compare avec le studio d'animation,
+    //  pour le mettre à jour et y mettre les effets et compétences qui n'y
+    //  sont pas encore. » Les niveaux suivent ATOUTS_CLASSES (1, 3, 5, 9) ; le
+    //  rang de chacune est dans ORDRE, plus bas.
+    const SANG_TEINTE = "sepia(1) saturate(6) hue-rotate(-40deg) brightness(0.8)";
+    const RAGE_TEINTE = "sepia(1) saturate(7) hue-rotate(-35deg) brightness(1.05) drop-shadow(0 0 10px #ff2a1a)";
+    const LUMIERE_TEINTE = "brightness(1.6) drop-shadow(0 0 12px #fff3a0)";
+    // Le rond chiffré au coin d'un pion (le cumul des DOT du Maudit, combat.js).
+    const rondChiffre = (o, calque, pos, n, couleur) => {
+        const t = pos.t * 0.36;
+        return o.poser(calque, pos.x + pos.t * 0.38, pos.y - pos.t * 0.38, `width:${t}px; height:${t}px; border-radius:50%; z-index:${Z.ciel};
+            display:flex; align-items:center; justify-content:center; font:bold ${t * 0.6}px sans-serif; color:#fff;
+            background:${couleur}; border:2px solid #fff; box-shadow:0 0 8px ${couleur};`, String(n));
+    };
+    // Une petite flamme de « +1 » : le chiffre d'un bonus passif qui s'ajoute.
+    const bonus = (o, sc, pion, texte, couleur) => o.texte(sc.calque, pion, texte, couleur || COULEURS.attention, { taille: 15 });
+
+    ajouter(8, "Assassin", [
+        {
+            id: "maitre-poisons", nom: "Niv.3 Maître des poisons", sens: "vers l'ennemi",
+            description: "Le poison de l'Assassin ne s'arrête pas au coup : à chaque fin de manche, deux manches durant, il mord encore la cible (bulles vertes, chiffre).",
+            async jouer(sc, o) {
+                await frapper(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-6", entaille: { couleur: "#b5ff4c", lueur: "#7dd321", lueur2: "#4e8a12" } });
+                await effetPoison(o, sc.calque, sc.cible, { texte: "Maître des poisons : 2 manches" });
+                for (const v of ["-4", "-4"]) {
+                    await o.attendre(300);
+                    o.texte(sc.calque, sc.cible, "Fin de manche", COULEURS.neutre, { taille: 13 });
+                    await ticPoison(o, sc.calque, sc.cible, { valeur: v });
+                }
+            }
+        },
+        {
+            id: "instinct-cumulable", nom: "Niv.9 Instinct du tueur cumulable", sens: "sur soi",
+            description: "Deux ennemis tombent coup sur coup : l'aura rouge de l'Assassin flambe deux fois, +25 % de critique chaque fois (« +50 % »), chacun avec ses 2 manches.",
+            async jouer(sc, o) {
+                const { a, b } = lieux(sc);
+                const autre = autreEnnemi(o, sc, Math.PI / 2);
+                for (const [k, el, pos] of [[1, sc.cible, b], [2, autre.el, autre.pos]]) {
+                    o.son("chute");
+                    o.icone(sc.calque, pos, "💀", { duree: 900 });
+                    await aTerre(o, el, 80, { duree: 450 });
+                    o.son("instinct");
+                    o.texte(sc.calque, sc.lanceur, `+${25 * k} % critique`, COULEURS.critique);
+                    await Promise.all([o.aura(sc.calque, a, { couleur: "#c01020", taille: 1.2 + k * 0.2, fond: "radial-gradient(circle, rgba(0,0,0,0) 45%, rgba(60,0,0,0.45) 80%)", pulsations: 2, duree: 1100 }),
+                        o.eclat(sc.lanceur, "brightness(1.2) drop-shadow(0 0 10px #ff2020)", 900)]);
+                }
+                await deTerre(o, sc.cible, 80, { duree: 500 });
+            }
+        }
+    ]);
+
+    ajouter(8, "Chasseur de mages", [
+        {
+            id: "frappe-anti-mage", nom: "Niv.1 Fléau des mages (+2 contre Mage et Soutien)", sens: "vers l'ennemi",
+            description: "Le Chasseur frappe un mage : un éclat doré marque la cible, « +2 » s'ajoute au coup. Sa peau, elle, boit la magie (+10 % de résistance magique, +20 % au niveau 3).",
+            async jouer(sc, o) {
+                const { b } = lieux(sc);
+                o.icone(sc.calque, b, "🔮", { duree: 900, lueur: "#b070ff" });
+                await o.attendre(300);
+                await frapper(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-9", entaille: { couleur: "#fff6c0", lueur: "#ffd700", lueur2: "#ffd700" } });
+                bonus(o, sc, sc.cible, "+2 contre les mages", "#ffd700");
+                await o.eclat(sc.cible, "brightness(1.6) sepia(0.5) drop-shadow(0 0 8px #ffd700)", 600);
+                o.son("resiste");
+                o.texte(sc.calque, sc.lanceur, "+10 % résistance magique", "#c9a8ff");
+                await o.aura(sc.calque, centre(sc.lanceur, sc.calque), { couleur: "#c9a8ff", taille: 1.2, pulsations: 1, duree: 900 });
+            }
+        },
+        {
+            id: "briseur-arcane", nom: "Niv.9 Briseur d'arcane", sens: "vers l'ennemi",
+            description: "Le Chasseur tend la main : la barrière magique de l'ennemi (sa résistance) se fissure et vole en éclats, et c'est elle qui le frappe — 1,5 fois sa résistance magique en dégâts bruts.",
+            async jouer(sc, o) {
+                const { a, b, v } = lieux(sc);
+                o.son("anti-magie");
+                await rassembler(o, sc.calque, a, { couleur: "#fff3a0", n: 8, duree: 380 });
+                o.rayon(sc.calque, a, b, { fond: "linear-gradient(90deg, rgba(255,250,210,0.95), rgba(200,160,255,0.9))", couleur: "#c9a8ff", epaisseur: 0.1, duree: 600 });
+                await o.attendre(250);
+                const d = barriere(o, sc.calque, b, { duree: 900, tours: 40 });
+                await o.attendre(500);
+                o.son("bris-verre");
+                d.remove();
+                o.gerbe(sc.calque, b.x, b.y, { nombre: 14, dist: b.t * 0.9, couleurs: ["#fff3c0", "#c9a8ff", "#ffffff"], taille: 7, carre: true, duree: 700 });
+                o.son("impact-brut", 120);
+                o.texte(sc.calque, sc.cible, "Briseur d'arcane", "#c9a8ff");
+                o.jauge(sc.calque, sc.cible, 40, 22, 40, "-18 (brut)", COULEURS.degats, COULEURS.degats);
+                await Promise.all([o.secouer(sc.cible, b.t * 0.14, 420, v), o.eclat(sc.cible, "brightness(1.9) saturate(0.3)", 600)]);
+            }
+        }
+    ]);
+
+    ajouter(8, "Profanateur", [
+        {
+            id: "glace-physique", nom: "Niv.3 Glace en dégâts physiques", sens: "vers l'ennemi",
+            description: "Les sorts de glace du Profanateur frappent comme une lame de givre : c'est l'armure qui les retient, plus la résistance magique (« Physique ❄️ »).",
+            async jouer(sc, o) {
+                const { a, b, v } = lieux(sc);
+                o.son("glace-tir");
+                await o.projectile(sc.calque, a, b, { taille: 0.7, arc: 0, oriente: true, easing: "ease-in", duree: Math.min(420, 160 + v.d * 0.4), traine: ["#e6fbff", "#9fe6ff"],
+                    style: "height:auto; aspect-ratio:5/1; background:linear-gradient(90deg, rgba(200,240,255,0), #bdf3ff 55%, #ffffff); clip-path:polygon(0 35%, 75% 20%, 100% 50%, 75% 80%, 0 65%); filter:drop-shadow(0 0 6px #9fe6ff);" });
+                o.son("glace-impact");
+                o.son("coup-physique", 80);
+                o.texte(sc.calque, sc.cible, "Physique ❄️", "#bdf3ff");
+                await Promise.all([coupRecu(o, sc.calque, sc.cible, a, { son: false, valeur: "-8" }), o.eclat(sc.cible, GIVRE, 600),
+                    o.gerbe(sc.calque, b.x, b.y, { nombre: 8, dist: b.t * 0.5, couleurs: ["#ffffff", "#bdf3ff"], taille: 5, carre: true, duree: 600 })]);
+            }
+        }
+    ]);
+
+    ajouter(8, "Géomancien", [
+        {
+            id: "coulee-lave", nom: "Niv.9 Coulée de lave", sens: "vers l'ennemi",
+            description: "La terre se fend depuis la case voisine du Géomancien : une ligne de lave de 3 cases court vers l'ennemi et brûle qui s'y tient (5 dégâts magiques, 50 % Brûlé). Elle reste toute la rencontre.",
+            async jouer(sc, o) {
+                const { a, v } = lieux(sc);
+                const pts = o.chemin(sc.lanceur, a, v, 3, { partout: true });
+                o.son("mur-terre");
+                await o.secouer(sc.lanceur, 3, 300);
+                o.son("zone-feu");
+                const cases = await zone(o, sc.calque, pts, "feu", { cascade: 160, duree: 900 });
+                const touche = pts.map(pt => pionSur(sc, o, pt)).find(Boolean) || sc.cible;
+                o.jauge(sc.calque, touche, 40, 35, 40, "-5", COULEURS.degats, COULEURS.degats);
+                await effetBrule(o, sc.calque, touche);
+                o.texte(sc.calque, sc.lanceur, "Coulée de lave : toute la rencontre", "#ff9a40");
+                await o.attendre(500);
+                await effacerTout(o, cases, { duree: 450 });
+            }
+        }
+    ]);
+
+    ajouter(8, "Sentinelle", [
+        {
+            id: "defenseur-sentinelle", nom: "Niv.3 Défenseur (30 %, 50 % au niveau 9)", sens: "vers l'ennemi",
+            description: "Un ennemi entre dans la zone de la Sentinelle : elle le frappe au passage (30 % de chance, 50 % au niveau 9). « 🛡️ Défenseur ! »",
+            async jouer(sc, o) {
+                const { a } = lieux(sc);
+                o.son("pas");
+                await o.bouger(sc.cible, [{ transform: "translate(0,0)" }, { transform: `translate(${(a.x - centre(sc.cible, sc.calque).x) * 0.25}px, ${(a.y - centre(sc.cible, sc.calque).y) * 0.25}px)` }],
+                               { duration: 380, easing: "ease-out", fill: "forwards" });
+                o.icone(sc.calque, a, "🛡️", { duree: 900, lueur: "#ffd700" });
+                o.texte(sc.calque, sc.lanceur, "Défenseur !", "#ffd700");
+                await frapper(o, sc.calque, sc.lanceur, sc.cible, { valeur: "-7" });
+                await o.bouger(sc.cible, [{ transform: `translate(${(a.x - centre(sc.cible, sc.calque).x) * 0.25}px, ${(a.y - centre(sc.cible, sc.calque).y) * 0.25}px)` }, { transform: "translate(0,0)" }],
+                               { duration: 380, easing: "ease-in-out", fill: "forwards" });
+            }
+        }
+    ]);
+
+    ajouter(8, "Oracle", [
+        {
+            id: "arcane-ralentit", nom: "Niv.1 L'arcane qui ralentit", sens: "vers l'ennemi",
+            description: "Une attaque arcanique de l'Oracle frappe : un sablier s'abat sur la cible, son initiative baisse (−5, −10 ou −15 selon la fatigue du sort), ce tour et le suivant.",
+            async jouer(sc, o) {
+                const { a, b } = lieux(sc);
+                o.son("mots");
+                await orbe(o, sc.calque, a, b, { couleur: "#9fd8ff", coeur: "#ffffff", taille: 0.32 });
+                o.son("impact-magique");
+                o.jauge(sc.calque, sc.cible, 40, 32, 40, "-8", COULEURS.degats, COULEURS.degats);
+                o.son("rembobiner", 200);
+                o.icone(sc.calque, b, "⏳", { duree: 1300, tourne: 180 });
+                await o.attendre(350);
+                o.texte(sc.calque, sc.cible, "-10 initiative (2 tours)", COULEURS.attention);
+                await o.teinter(sc.cible, [{ filter: "none" }, { filter: "saturate(0.3) brightness(0.85) hue-rotate(160deg)", offset: 0.4 }, { filter: "none" }], { duration: 1200 });
+            }
+        },
+        {
+            id: "retour-passe", nom: "Niv.5 Retour dans le passé", sens: "sur soi",
+            description: "Un grand sablier se renverse au-dessus du champ de bataille : le temps reflue, chacun reprend la place qu'il occupait trois tours plus tôt (des silhouettes bleutées les y attendent).",
+            async jouer(sc, o) {
+                const { a, b, v } = lieux(sc);
+                const recul = (el, pos, dir) => o.voisine(el, pos, dir);
+                const pH = recul(sc.lanceur, a, o.tourner(v, Math.PI)), pE = recul(sc.cible, b, v);
+                o.son("rembobiner");
+                o.icone(sc.calque, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, t: a.t * 1.6 }, "⌛", { duree: 1600, tourne: -540, taille: 0.7 });
+                o.voile(sc.calque, { fond: "radial-gradient(circle, rgba(160,210,255,0.15), rgba(40,70,140,0.35))", duree: 1700 });
+                const fantomes = [o.figurant(sc.calque, sc.lanceur, pH, { opacite: 0.45, filtre: "hue-rotate(180deg) saturate(0.5) brightness(1.3)" }),
+                                  o.figurant(sc.calque, sc.cible, pE, { opacite: 0.45, filtre: "hue-rotate(180deg) saturate(0.5) brightness(1.3)" })];
+                o.texte(sc.calque, sc.lanceur, "Retour dans le passé", "#9fd8ff");
+                await o.attendre(700);
+                await Promise.all([o.parcourir(sc.lanceur, a, [pH], { duree: 500 }), o.parcourir(sc.cible, b, [pE], { duree: 500 })]);
+                fantomes.forEach(f => f && f.remove());
+                await Promise.all([o.arriver(sc.lanceur, pH), o.arriver(sc.cible, pE)]);
+                await o.attendre(300);
+            }
+        }
+    ]);
+
+    ajouter(8, "Inquisiteur", [
+        {
+            id: "flammes-inquisiteur", nom: "Niv.1 Le feu de l'Inquisiteur", sens: "vers l'ennemi",
+            description: "Son attaque magique de feu frappe plus fort (+1) et embrase plus souvent : 10 % de Brûlé au lieu de 5 %.",
+            async jouer(sc, o) {
+                const { a, b } = lieux(sc);
+                o.son("feu-lancer");
+                await orbe(o, sc.calque, a, b, { couleur: "#ff7a1a", coeur: "#ffe08a", taille: 0.4, traine: ["#ffb040", "#ff4500"] });
+                o.son("feu-explosion");
+                o.jauge(sc.calque, sc.cible, 40, 31, 40, "-9", COULEURS.degats, COULEURS.degats);
+                bonus(o, sc, sc.lanceur, "+1 feu", "#ff9a40");
+                await Promise.all([gerbeDeFeu(o, sc.calque, b), o.secouer(sc.cible, b.t * 0.08, 300)]);
+                await effetBrule(o, sc.calque, sc.cible);
+                o.texte(sc.calque, sc.cible, "10 % de Brûlé", COULEURS.neutre, { taille: 13 });
+                await o.attendre(300);
+            }
+        },
+        {
+            id: "inquisiteur-feu-resiste", nom: "Niv.3 Résiste au feu (Ondari : immunisé)", sens: "sur soi",
+            description: "Une boule de feu ennemie éclate sur l'Inquisiteur : les flammes lèchent sa robe sans prendre. « 🔥 Résiste » (un Ondari Inquisiteur n'est jamais Brûlé : « Immunisé »).",
+            async jouer(sc, o) {
+                const { a } = lieux(sc);
+                o.son("feu-lancer");
+                await sortEnnemi(o, sc, { couleur: "#ff7a1a", coeur: "#ffe08a", taille: 0.36 });
+                o.son("feu-explosion");
+                await Promise.all([gerbeDeFeu(o, sc.calque, a, { taille: 0.7 }), o.eclat(sc.lanceur, ORANGE, 500)]);
+                o.son("resiste");
+                o.texte(sc.calque, sc.lanceur, "🔥 Résiste au Brûlé", COULEURS.neutre);
+                await o.aura(sc.calque, a, { couleur: "#ffb040", taille: 1.2, pulsations: 2, duree: 1100 });
+            }
+        },
+        {
+            id: "combustion", nom: "Niv.5 Combustion instantanée", sens: "sur soi",
+            description: "L'Inquisiteur lève le poing : une onde de chaleur part de lui et, sur toute la carte, les ennemis s'embrasent (75 % de Brûlé, 2 manches ; 50 % s'ils résistent au feu).",
+            async jouer(sc, o) {
+                const { a } = lieux(sc);
+                const autre = autreEnnemi(o, sc, Math.PI / 2);
+                o.son("feu-lancer");
+                await Promise.all([rassembler(o, sc.calque, a, { couleur: "#ff9a40", n: 10, duree: 450 }), o.eclat(sc.lanceur, ORANGE, 600)]);
+                o.son("feu-explosion");
+                o.onde(sc.calque, a, { couleur: "#ff7a1a", taille: 1, echelle: 6, bord: 4, duree: 900, fond: "radial-gradient(circle, rgba(255,140,40,0.35), transparent 70%)" });
+                o.voile(sc.calque, { fond: "radial-gradient(circle, rgba(255,120,30,0.1), rgba(160,40,0,0.35))", duree: 1300 });
+                o.texte(sc.calque, sc.lanceur, "Combustion instantanée", "#ff9a40");
+                await o.attendre(450);
+                await Promise.all([effetBrule(o, sc.calque, sc.cible), o.attendre(150).then(() => effetBrule(o, sc.calque, autre.el))]);
+                await o.attendre(300);
+            }
+        },
+        {
+            id: "terreur-ardente", nom: "Niv.9 Terreur ardente", sens: "vers l'ennemi",
+            description: "Les flammes des ennemis Brûlés se changent en visions : l'Inquisiteur grandit dans le brasier, l'ennemi brûlé est pris de Peur (à coup sûr) et s'enfuit loin de lui.",
+            async jouer(sc, o) {
+                const { a, b, v } = lieux(sc);
+                teinte(o, sc.cible, ORANGE, 300);
+                o.son("brule");
+                o.icone(sc.calque, b, "🔥", { duree: 1000 });
+                await o.attendre(400);
+                o.son("peur");
+                o.bouger(sc.lanceur, [{ transform: "scale(1)" }, { transform: "scale(1.25)" }], { duration: 520, easing: "cubic-bezier(.3,.8,.3,1.2)", fill: "forwards" });
+                o.gerbe(sc.calque, a.x, a.y, { nombre: 12, dist: a.t * 0.8, monte: a.t * 0.6, couleurs: ["#ffd25a", "#ff4500", "#3a1850"], taille: 9, duree: 900, etale: 250 });
+                o.onde(sc.calque, a, { couleur: "#ff4500", taille: 1, echelle: 3.5, duree: 800 });
+                await o.attendre(450);
+                etat(o, sc.calque, sc.cible, "Terreur ardente : Peur !");
+                const frayeur = traitsDeFrayeur(o, sc.calque, b, { duree: 900 });
+                await o.secouer(sc.cible, 3, 500);
+                o.son("course");
+                o.bouger(sc.lanceur, [{ transform: "scale(1.25)" }, { transform: "scale(1)" }], { duration: 600, easing: "ease-in-out", fill: "forwards" });
+                await Promise.all([frayeur, marcher(sc, o, { qui: sc.cible, cases: 2, duree: 240, tangue: 12, dir: () => v, pause: 150,
+                                                             apres: () => deteindre(o, sc.cible, ORANGE, 350) })]);
+            }
+        }
+    ]);
+
+    ajouter(8, "Prêtre de la lumière", [
+        {
+            id: "lumiere-aveuglante", nom: "Niv.1 Maîtrise de la lumière", sens: "vers l'ennemi",
+            description: "Un sort de foudre du Prêtre éclate en lumière sur l'ennemi et ses voisins : un flash blanc, leurs yeux se voilent (33 % d'Aveuglement). « ☀️ Éblouis ! »",
+            async jouer(sc, o) {
+                const { a, b } = lieux(sc);
+                const autre = autreEnnemi(o, sc, Math.PI / 2);
+                o.son("foudre");
+                await o.eclair(sc.calque, a, b, { couleur: "#fff6c0", duree: 420 });
+                o.son("aveugle");
+                const flash = o.poser(sc.calque, b.x, b.y, `width:${b.t * 4.5}px; height:${b.t * 4.5}px; border-radius:50%; z-index:${Z.ciel};
+                    background:radial-gradient(circle, rgba(255,255,255,0.95), rgba(255,250,210,0.6) 35%, rgba(255,250,210,0) 70%);`);
+                o.jouerPuisRetirer(flash, [{ opacity: 0, transform: "translate(-50%,-50%) scale(0.3)" }, { opacity: 1, transform: "translate(-50%,-50%) scale(1)", offset: 0.25 },
+                                           { opacity: 0, transform: "translate(-50%,-50%) scale(1.2)" }], { duration: 900 });
+                await o.attendre(250);
+                o.texte(sc.calque, sc.cible, "☀️ Éblouis !", "#ffd700");
+                await Promise.all([sc.cible, autre.el].map(el => o.teinter(el, [{ filter: "brightness(2.2)" }, { filter: "brightness(0.5) blur(1px)", offset: 0.4 },
+                                                                                 { filter: "brightness(0.5) blur(1px)", offset: 0.8 }, { filter: "none" }], { duration: 1500 })));
+            }
+        },
+        {
+            id: "garde-lumiere", nom: "Niv.1 Purification par la lumière", sens: "sur soi",
+            description: "Le Prêtre purifie un allié : un sceau doré, puis une Lumière protectrice reste sur lui. Au prochain état néfaste, elle s'interpose et l'annule (« ✨ Annulé par la lumière »).",
+            async jouer(sc, o) {
+                const al = allie(o, sc, -Math.PI / 2);
+                o.son("purification");
+                const s = sceau(o, sc.calque, al.pos, "#ffe680", { duree: 1400 });
+                await lueurSoin(o, sc.calque, al.el, { couleur: "#fff3a0", couleurs: ["#fff3a0", "#ffffff"], filtre: LUMIERE_TEINTE });
+                o.son("bouclier");
+                o.texte(sc.calque, al.el, "Lumière protectrice", "#ffd700");
+                o.aura(sc.calque, al.pos, { couleur: "#ffe680", taille: 1.25, pulsations: 2, duree: 1200, trait: "dashed" });
+                await o.effacer(s);
+                // Plus tard : l'ennemi tente un état sur lui.
+                o.son("tenebres");
+                await orbe(o, sc.calque, centre(sc.cible, sc.calque), al.pos, { couleur: "#6a2aa0", coeur: "#a070d0", taille: 0.3 });
+                o.son("dissipe");
+                await Promise.all([o.onde(sc.calque, al.pos, { couleur: "#fff3a0", taille: 1, echelle: 2, duree: 600 }), o.eclat(al.el, LUMIERE_TEINTE, 600)]);
+                o.texte(sc.calque, al.el, "✨ Annulé par la lumière", "#ffd700");
+                await o.attendre(700);
+                await o.effacer(al.el);
+            }
+        },
+        {
+            id: "insensible-aveugle", nom: "Niv.3 Insensible à l'Aveuglement", sens: "sur soi",
+            description: "Un éclat aveuglant explose sur le Prêtre : ses yeux restent clairs, la lumière est la sienne. « ☀️ Insensible »",
+            async jouer(sc, o) {
+                const { a } = lieux(sc);
+                o.son("aveugle");
+                const flash = o.poser(sc.calque, a.x, a.y, `width:${a.t * 3}px; height:${a.t * 3}px; border-radius:50%; z-index:${Z.ciel};
+                    background:radial-gradient(circle, rgba(255,255,255,0.95), rgba(255,250,210,0.5) 40%, rgba(255,250,210,0) 70%);`);
+                await o.jouerPuisRetirer(flash, [{ opacity: 0, transform: "translate(-50%,-50%) scale(0.3)" }, { opacity: 1, transform: "translate(-50%,-50%) scale(1)", offset: 0.3 },
+                                                 { opacity: 0, transform: "translate(-50%,-50%) scale(1.2)" }], { duration: 800 });
+                o.son("resiste");
+                o.texte(sc.calque, sc.lanceur, "☀️ Insensible à l'Aveuglement", COULEURS.neutre);
+                await o.eclat(sc.lanceur, LUMIERE_TEINTE, 700);
+            }
+        },
+        {
+            id: "appel-lumiere", nom: "Niv.5 Appel de la lumière", sens: "sur soi",
+            description: "Le Prêtre appelle le ciel : un éclat blanc inonde tout le champ de bataille, des rayons partent de lui ; tous les autres combattants, alliés compris, sont aveuglés 2 manches.",
+            async jouer(sc, o) {
+                const { a } = lieux(sc);
+                const al = allie(o, sc, -Math.PI / 2);
+                o.son("appel-lumiere");
+                await o.eclat(sc.lanceur, "brightness(1.8) drop-shadow(0 0 16px #ffffff)", 500);
+                for (let i = 0; i < 8; i++) {
+                    const ang = (i / 8) * Math.PI * 2;
+                    o.rayon(sc.calque, a, { x: a.x + Math.cos(ang) * a.t * 3, y: a.y + Math.sin(ang) * a.t * 3, t: a.t },
+                            { fond: "linear-gradient(90deg, rgba(255,255,240,0.95), rgba(255,240,180,0))", couleur: "#fff6c0", epaisseur: 0.12, duree: 1100, retard: i * 30 });
+                }
+                o.voile(sc.calque, { fond: "radial-gradient(circle, rgba(255,255,255,0.9), rgba(255,250,220,0.75))", duree: 1300, retard: 200 });
+                await o.attendre(900);
+                o.texte(sc.calque, sc.cible, "Aveuglé : 2 manches", COULEURS.etat);
+                o.texte(sc.calque, sc.lanceur, "Appel de la lumière : sauf lui", "#ffd700");
+                o.texte(sc.calque, al.el, "Aveuglé : 2 manches", COULEURS.etat);
+                await Promise.all([sc.cible, al.el].map(el => o.teinter(el, [{ filter: "none" }, { filter: "brightness(0.5) blur(1px)", offset: 0.3 },
+                                                                              { filter: "brightness(0.5) blur(1px)", offset: 0.8 }, { filter: "none" }], { duration: 1400 })));
+                await o.effacer(al.el);
+            }
+        },
+        {
+            id: "aura-soin", nom: "Niv.9 Aura de soin (+3 PV au contact)", sens: "sur soi",
+            description: "En fin de manche, une douce lumière rayonne du Prêtre : chaque allié à son contact reprend 3 PV.",
+            async jouer(sc, o) {
+                const { a } = lieux(sc);
+                const al = allie(o, sc, -Math.PI / 2), al2 = allie(o, sc, Math.PI * 0.75);
+                o.texte(sc.calque, sc.lanceur, "Fin de manche", COULEURS.neutre, { taille: 13 });
+                o.son("soin-tic");
+                await o.aura(sc.calque, a, { couleur: "#fff3a0", taille: 2.6, fond: "radial-gradient(circle, rgba(255,250,200,0.3), transparent 70%)", pulsations: 2, duree: 1000, sol: true });
+                o.son("soin");
+                for (const x of [al, al2]) o.jauge(sc.calque, x.el, 30, 33, 40, "+3", COULEURS.soin, COULEURS.soin);
+                await Promise.all([lueurSoin(o, sc.calque, al.el, { n: 4 }), lueurSoin(o, sc.calque, al2.el, { n: 4 })]);
+                await Promise.all([o.effacer(al.el), o.effacer(al2.el)]);
+            }
+        },
+        {
+            id: "desintegration", nom: "Niv.9 Désintégration par la foudre", sens: "vers l'ennemi",
+            description: "Sur un ennemi à 2 cases, à moitié mort ou moins : la foudre tombe du ciel, il se défait en cendres lumineuses et tombe sur le coup (son XP, mais aucun butin). 75 de fatigue, puis 60 bloqués la manche suivante.",
+            async jouer(sc, o) {
+                const { a, b } = lieux(sc);
+                o.son("appel");
+                await Promise.all([o.eclat(sc.lanceur, "brightness(1.7) drop-shadow(0 0 14px #9fd8ff)", 600), rassembler(o, sc.calque, a, { couleur: "#9fd8ff", n: 10, duree: 450 })]);
+                o.son("foudre");
+                o.eclair(sc.calque, { x: b.x, y: b.y - b.t * 3, t: b.t }, b, { largeur: 0.8, duree: 700, couleur: "#ffffff" });
+                o.eclair(sc.calque, { x: b.x - b.t, y: b.y - b.t * 2.5, t: b.t }, b, { largeur: 0.6, duree: 600, retard: 120 });
+                o.voile(sc.calque, { fond: "rgba(220,240,255,0.55)", duree: 500 });
+                await o.attendre(350);
+                o.son("decharge");
+                o.texte(sc.calque, sc.cible, "Désintégré !", "#9fd8ff");
+                await Promise.all([o.gerbe(sc.calque, b.x, b.y, { nombre: 18, dist: b.t * 0.8, monte: b.t * 0.9, couleurs: ["#ffffff", "#9fd8ff", "#606878"], taille: 6, duree: 1100, etale: 400 }),
+                    o.teinter(sc.cible, [{ opacity: 1, filter: "none" }, { opacity: 0.6, filter: "brightness(2.5) saturate(0)", offset: 0.3 }, { opacity: 0, filter: "brightness(3) blur(3px)" }],
+                              { duration: 1100, fill: "forwards" })]);
+                o.texte(sc.calque, sc.lanceur, "-75 ⚡, puis 60 bloqués", COULEURS.attention, { taille: 14 });
+                await o.attendre(500);
+                await o.teinter(sc.cible, [{ opacity: 0, filter: "none" }, { opacity: 1, filter: "none" }], { duration: 300, fill: "forwards" });
+            }
+        }
+    ]);
+
+    ajouter(8, "Berserker", [
+        {
+            id: "rage", nom: "Niv.3 Rage", sens: "sur soi",
+            description: "Sous les coups, le Berserker voit rouge : sa peau s'empourpre, une aura de braise l'entoure. En Rage, +15 aux défenses et ×1,2 aux dégâts, mais plus d'esquive ni de parade.",
+            async jouer(sc, o) {
+                const { a } = lieux(sc);
+                await frapper(o, sc.calque, sc.cible, sc.lanceur, { valeur: "-12" });
+                o.son("critique-charge");
+                teinte(o, sc.lanceur, RAGE_TEINTE, 500);
+                o.icone(sc.calque, a, "💢", { duree: 1300, lueur: "#ff2a1a" });
+                etat(o, sc.calque, sc.lanceur, "Rage !");
+                await Promise.all([o.aura(sc.calque, a, { couleur: "#ff2a1a", fond: "radial-gradient(circle, rgba(0,0,0,0) 45%, rgba(120,10,0,0.45) 80%)", pulsations: 3, duree: 1500 }),
+                    o.gerbe(sc.calque, a.x, a.y, { nombre: 12, dist: a.t * 0.8, monte: a.t * 0.4, couleurs: ["#ff4500", "#ffd25a", "#400000"], taille: 6, duree: 900, etale: 400 }),
+                    o.secouer(sc.lanceur, 3, 900)]);
+                o.texte(sc.calque, sc.lanceur, "Dégâts ×1,2 — sans esquive ni parade", COULEURS.critique, { taille: 14 });
+                await o.attendre(600);
+                await deteindre(o, sc.lanceur, RAGE_TEINTE, 500);
+            }
+        },
+        {
+            id: "regeneration-insolente", nom: "Niv.5 Régénération insolente", sens: "sur soi",
+            description: "Le Berserker éclate de rire au milieu de la mêlée : chaque ennemi est Provoqué (80 %, 2 manches) et lui reprend 20 PV.",
+            async jouer(sc, o) {
+                const { a, b } = lieux(sc);
+                const autre = autreEnnemi(o, sc, Math.PI / 2);
+                o.son("provocation");
+                o.icone(sc.calque, a, "😤", { duree: 1200 });
+                o.onde(sc.calque, a, { couleur: "#ff4040", taille: 1, duree: 800, echelle: 4, bord: 4 });
+                await o.attendre(350);
+                for (const [el, pos] of [[sc.cible, b], [autre.el, autre.pos]]) {
+                    o.icone(sc.calque, pos, "❗", { duree: 1200, lueur: "#ff4040" });
+                    etat(o, sc.calque, el, "Provoqué !");
+                    o.bouger(el, [{ transform: "rotate(0deg)" }, { transform: "rotate(-12deg)" }, { transform: "rotate(9deg)" }, { transform: "rotate(0deg)" }], { duration: 600 });
+                }
+                await o.attendre(600);
+                o.son("soin");
+                o.jauge(sc.calque, sc.lanceur, 15, 35, 40, "+20", COULEURS.soin, COULEURS.soin);
+                await lueurSoin(o, sc.calque, sc.lanceur);
+            }
+        },
+        {
+            id: "deux-armes-deux-mains", nom: "Niv.9 Deux armes à deux mains", sens: "vers l'ennemi",
+            description: "Une arme lourde dans chaque main : le Berserker abat les deux l'une après l'autre (−10 % à ses résistances). Sans elles, +2 à ses dégâts.",
+            async jouer(sc, o) {
+                const { b, v } = lieux(sc);
+                o.son("lourd-elan");
+                const e1 = o.elan(sc.lanceur, centre(sc.lanceur, sc.calque), b, { portee: 0.5, duree: 420 });
+                await o.attendre(260);
+                o.son("lourd-impact");
+                await Promise.all([e1, entaille(o, sc.calque, b, v.angle, { taille: 1.8, epaisseur: 9 }), coupRecu(o, sc.calque, sc.cible, sc.lanceur, { son: false, valeur: "-11", force: 0.18 })]);
+                o.son("lourd-elan");
+                const e2 = o.elan(sc.lanceur, centre(sc.lanceur, sc.calque), b, { portee: 0.5, duree: 420 });
+                await o.attendre(260);
+                o.son("lourd-impact");
+                await Promise.all([e2, entaille(o, sc.calque, b, v.angle + Math.PI / 2, { taille: 1.8, epaisseur: 9 }), coupRecu(o, sc.calque, sc.cible, sc.lanceur, { son: false, valeur: "-11", force: 0.18 })]);
+                o.texte(sc.calque, sc.lanceur, "−10 % résistances", COULEURS.neutre, { taille: 13 });
+                await o.attendre(400);
+            }
+        }
+    ]);
+
+    ajouter(8, "Maudit", [
+        {
+            id: "dot-cumules", nom: "Niv.1 Malédiction avancée (DOT cumulés)", sens: "vers l'ennemi",
+            description: "La même malédiction, lancée deux fois, ne se remplace pas : elle s'empile. Un rond chiffré s'allume au coin de la cible (1, puis 2) et chaque fin de manche mord d'autant.",
+            async jouer(sc, o) {
+                const { a, b } = lieux(sc);
+                let rond = null;
+                for (const n of [1, 2]) {
+                    o.son("tenebres");
+                    await orbe(o, sc.calque, a, b, { couleur: "#5a1030", coeur: "#c83a6a", taille: 0.32 });
+                    o.son("marque");
+                    if (rond) rond.remove();
+                    rond = rondChiffre(o, sc.calque, b, n, "#a0204a");
+                    o.surgir(rond, { duree: 300 });
+                    o.texte(sc.calque, sc.cible, n === 1 ? "Malédiction" : "Malédiction ×2", COULEURS.etat);
+                    await o.attendre(400);
+                }
+                o.texte(sc.calque, sc.cible, "Fin de manche", COULEURS.neutre, { taille: 13 });
+                await pulsationEtalement(o, sc.calque, sc.cible);
+                o.jauge(sc.calque, sc.cible, 40, 32, 40, "-4 ×2", COULEURS.degats, COULEURS.degats);
+                await o.attendre(400);
+                await o.effacer(rond);
+            }
+        },
+        {
+            id: "magie-du-sang", nom: "Niv.3 Magie du sang", sens: "vers l'ennemi",
+            description: "Le Maudit paie son sort de son sang (10 % du coût en PV) : des gouttes rouges quittent ses veines et nourrissent l'orbe, qui frappe ×1,2.",
+            async jouer(sc, o) {
+                const { a, b } = lieux(sc);
+                o.son("saignement");
+                o.jauge(sc.calque, sc.lanceur, 40, 37, 40, "-3 PV", COULEURS.degats, COULEURS.degats);
+                await Promise.all([o.eclat(sc.lanceur, SANG_TEINTE, 600),
+                    rassembler(o, sc.calque, a, { couleur: "#c01020", n: 8, duree: 500, rayon: 0.6 })]);
+                o.son("tenebres");
+                await orbe(o, sc.calque, a, b, { couleur: "#8a0a1a", coeur: "#ff5060", taille: 0.44, traine: ["#c01020", "#400008"] });
+                o.son("impact-magique");
+                o.texte(sc.calque, sc.lanceur, "Magie du sang ×1,2", "#ff5060");
+                o.jauge(sc.calque, sc.cible, 40, 26, 40, "-14", COULEURS.degats, COULEURS.degats);
+                await Promise.all([o.secouer(sc.cible, b.t * 0.1, 400), o.eclat(sc.cible, SANG_TEINTE, 600),
+                    o.gerbe(sc.calque, b.x, b.y, { nombre: 10, dist: b.t * 0.6, couleurs: ["#c4141c", "#ff6b6b"], taille: 6, duree: 700 })]);
+            }
+        },
+        {
+            id: "vaudou", nom: "Niv.5 Vaudou", sens: "vers l'ennemi",
+            description: "Un fil de sang lie le Maudit à l'ennemi pour 2 manches : chaque blessure du Maudit se reflète sur lui (sans ses défenses), et chaque soin aussi.",
+            async jouer(sc, o) {
+                const { a, b } = lieux(sc);
+                o.son("lien");
+                o.icone(sc.calque, b, "🪡", { duree: 1200 });
+                const fil = o.lien(sc.calque, a, b, { couleur: "#a0204a", epaisseur: 4 });
+                etat(o, sc.calque, sc.cible, "Lié par le Vaudou (2 manches)");
+                await o.attendre(700);
+                // Le Maudit prend un coup… l'ennemi aussi.
+                const autre = autreEnnemi(o, sc, Math.PI / 2);
+                await frapper(o, sc.calque, autre.el, sc.lanceur, { valeur: "-6" });
+                o.son("marque");
+                await o.filer(sc.calque, a, b, { couleur: "#ff2050", taille: 0.18, duree: 500 });
+                await encaisser(o, sc.calque, sc.cible, sc.lanceur, { valeur: "-6", filtre: SANG_TEINTE });
+                o.texte(sc.calque, sc.cible, "Vaudou : reflété", COULEURS.etat, { taille: 13 });
+                await o.attendre(500);
+                await Promise.all([o.effacer(fil), o.effacer(autre.el)]);
+            }
+        },
+        {
+            id: "possession", nom: "Niv.9 Possession", sens: "vers l'ennemi",
+            description: "L'âme du Maudit quitte son corps (qui reste inerte, grisé) et s'engouffre dans un monstre à 6 cases : pendant 3 manches, il se bat pour le camp du Maudit. 80 d'énergie restent bloqués.",
+            async jouer(sc, o) {
+                const { a, b } = lieux(sc);
+                o.son("tenebres");
+                await o.eclat(sc.lanceur, "brightness(0.6) drop-shadow(0 0 12px #8a50c0)", 500);
+                teinte(o, sc.lanceur, "grayscale(1) brightness(0.65)", 400);
+                o.texte(sc.calque, sc.lanceur, "Inerte", COULEURS.neutre, { taille: 13 });
+                o.son("aspiration");
+                await o.projectile(sc.calque, a, b, { taille: 0.5, arc: 0.4, duree: 750, traine: ["#c9a8ff", "#5a2a90"],
+                    style: "background:radial-gradient(circle at 45% 40%, #ffffff, #c9a8ff 40%, rgba(90,42,144,0) 75%); filter:blur(1px); box-shadow:0 0 18px #8a50c0;" });
+                o.son("charme");
+                o.aura(sc.calque, b, { couleur: "#8a50c0", fond: "radial-gradient(circle, rgba(90,40,140,0.35), transparent 70%)", pulsations: 2, duree: 1200, tourne: 360 });
+                await o.teinter(sc.cible, [{ filter: "none" }, { filter: "hue-rotate(250deg) saturate(1.6) brightness(1.1)" }], { duration: 500, fill: "forwards" });
+                etat(o, sc.calque, sc.cible, "Possédé : 3 manches");
+                o.texte(sc.calque, sc.lanceur, "80 ⚡ bloqués", COULEURS.attention, { taille: 14 });
+                await o.attendre(900);
+                await Promise.all([deteindre(o, sc.cible, "hue-rotate(250deg) saturate(1.6) brightness(1.1)", 400), deteindre(o, sc.lanceur, "grayscale(1) brightness(0.65)", 400)]);
             }
         }
     ]);
@@ -3377,14 +3848,19 @@
         // 8. Classes
         "tenebres", "tenebres-etalees", "charme-fratricide", "charme-frappe", "charme-perdu", "transfert",
         "provocation-protecteur", "rempart", "rempart-actif", "rempart-rompu", "resonance-bouclier",
-        "instinct-tueur", "assaut-mortel",
+        "instinct-tueur", "maitre-poisons", "assaut-mortel", "instinct-cumulable",
         "soin-urgence", "prise-en-charge",
-        "lumiere-classe", "lumiere-aveuglante", "bouclier-anti-magie", "renvoi", "appel-lumiere",
-        "releve-zombies", "zombie-marche-attaque", "pointes-glace", "sursis", "sursis-soin-refuse", "sursis-fin", "releve-zombies-2",
+        "frappe-anti-mage", "bouclier-anti-magie", "renvoi", "briseur-arcane",
+        "releve-zombies", "releve-zombies-2", "zombie-marche-attaque", "glace-physique", "pointes-glace", "sursis", "sursis-soin-refuse", "sursis-fin",
         "compagnon-apparition", "compagnon-attaque", "compagnon-terre", "tir-precis", "lien-sang-soin", "lien-sang-releve",
-        "mur-terre", "mur-terre-repousse", "mur-effondre", "traverse-murs", "zones-sans-danger",
-        "fureur-sentinelle", "retour-arriere",
+        "mur-terre", "mur-terre-repousse", "mur-effondre", "traverse-murs", "zones-sans-danger", "coulee-lave",
+        "defenseur-sentinelle", "fureur-sentinelle",
+        "arcane-ralentit", "retour-passe", "retour-arriere",
         "insensible-gel", "baiser-vampire", "nuee", "esquive-nuee",
+        "flammes-inquisiteur", "inquisiteur-feu-resiste", "combustion", "terreur-ardente",
+        "lumiere-aveuglante", "garde-lumiere", "insensible-aveugle", "appel-lumiere", "aura-soin", "desintegration",
+        "rage", "regeneration-insolente", "deux-armes-deux-mains",
+        "dot-cumules", "magie-du-sang", "vaudou", "possession",
         // 9. Talents
         "adrenaline", "inertie-martiale", "impact-cinetique", "elan-partage", "bouclier-sages", "degats-illusoires", "immunise", "pugiliste", "diversion"
     ];

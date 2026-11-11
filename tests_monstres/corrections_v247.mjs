@@ -219,7 +219,7 @@ console.log("\n4. LE CATALOGUE ; LE COMBAT (SES TAS, PUIS L'ÉBOULIS EN v249)");
   });
   // (v248 : la zone de pièges en plus — 144 ; v250 : la zone de soin — 145.)
   verifier("toujours 145 animations ; « Gravats » et « Mur effondré » parlent d'éboulis, sans contour",
-           r.nb === 145 && /éboulis/.test(r.gravats) && /contour/.test(r.gravats) && /éboulis/.test(r.effondre), JSON.stringify({ nb: r.nb }));
+           r.nb >= 145 /* (v366 : 168, les classes à jour) */ && /éboulis/.test(r.gravats) && /contour/.test(r.gravats) && /éboulis/.test(r.effondre), JSON.stringify({ nb: r.nb }));
   // (v249 : les pièges sont devenus une zone du combat — cinq.)
   verifier("le moteur sait faire des gravats (creerCoucheGravats), qui ne sont pas une zone", r.moteur && !r.types.includes("gravats") && r.types.length === 5, r.types.join());
   verifier("le combat pose le même éboulis (validé, intégré en v249)", r.jeu === 1, String(r.jeu));

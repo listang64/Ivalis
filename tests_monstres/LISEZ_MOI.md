@@ -11515,3 +11515,14 @@ corrections_v364.mjs : les points d'accroche et la version. maudit.mjs : le nive
 - **Le genre** : « Se cherche » disparaît ; il reste Mâle et Femelle.
 
 corrections_v365.mjs le vérifie. Les anciens tests qui attendaient le féminin (choix_classe, classes_feminin, corrections_v313, v319, v343, pisteur, géomancien, profanateur) attendent désormais le masculin.
+
+## v366 — La Forge qui ne s'ouvrait plus ; le studio d'animation à jour des classes
+
+- **La Forge (bug)** : une Forge commencée dans le livre, laissée pour le sommaire, puis rouverte par « Forger » : `ouvrirForge` réécrivait ses deux pages alors que les champs de la Forge (nom, menu des effets…) y étaient encore rangés. Ils étaient détruits (« Erreur ouverture Forge : Cannot set properties of null », puis `rafraichirForge` et le codex). Désormais, une Forge encore ouverte est d'abord refermée (ses champs rentrent dans leur fenêtre), puis rouverte neuve.
+- **Le studio d'animation** : chaque classe comparée à ses paliers (ATOUTS_CLASSES, niveaux 1, 3, 5, 9).
+  - Niveaux corrigés : Charme Niv.3, Transfert Niv.5, Rempart Niv.3, Résonance Niv.9, Prise en charge Niv.9, Dernier sursis Niv.9, Relève à 2 cases Niv.1, Mur de terre Niv.3, Lien de sang Niv.9, Retour arrière Niv.9, Baiser Niv.3, Nuée Niv.9 ; Provocation du Protecteur 10 % (20 % au niveau 5).
+  - Refaites : le Lancer de bolas (l'ancien Tir précis) et l'Assaut de la sentinelle (l'ancienne Fureur : elle repousse, puis frappe).
+  - Le Chasseur de mages perd la Lumière (sort de classe). La Lumière aveuglante devient la Maîtrise de la lumière du Prêtre ; l'Appel de la lumière passe au Prêtre (Niv.5, alliés compris).
+  - Nouvelles : Assassin (Maître des poisons, Instinct cumulable), Chasseur (fléau des mages, Briseur d'arcane), Profanateur (glace physique), Géomancien (Coulée de lave), Sentinelle (Défenseur), Oracle (l'arcane qui ralentit, Retour dans le passé), Inquisiteur (son feu, sa résistance, Combustion instantanée, Terreur ardente), Prêtre (Purification et Lumière protectrice, insensible à l'Aveuglement, aura de soin, Désintégration), Berserker (Rage, Régénération insolente, deux armes à deux mains), Maudit (DOT cumulés avec leur rond chiffré, Magie du sang, Vaudou, Possession).
+
+corrections_v366.mjs le vérifie : la Forge commencée puis rouverte (sur l'ancien code, il retrouve les trois erreurs de la console) ; les animations de chaque classe, les niveaux, l'ordre. studio_catalogue_1 et studio_animation comptent 168 animations ; _studio_commun connaît les nouveaux déplacements (Assaut, Terreur ardente, Retour dans le passé). studio_catalogue_2 joue les 24 nouvelles jusqu'au bout.

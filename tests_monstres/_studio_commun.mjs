@@ -160,8 +160,11 @@ export async function jouerTout(p, ids, vitesse) {
 // le pion reste sur sa nouvelle case). Le Transfert échange les deux.
 export const DEPLACENT_HEROS = ["marche", "marche-difficile", "marche-gelee", "marche-vargen", "bond", "repli", "pas-retraite", "fuite-peur",
   "fuite-confusion", "entree-zone", "hemorragie-interne", "attaque-opportunite", "confusion-fuite", "traverse-murs", "zones-sans-danger",
-  "fureur-sentinelle", "diversion", "transfert"];
-export const DEPLACENT_ENNEMI = ["poussee", "peur", "saignement", "prise-en-charge", "mur-terre-repousse", "transfert"];
+  "diversion", "transfert", "retour-passe"];
+// (v366) L'Assaut de la sentinelle repousse l'ennemi (la Sentinelle reste sur sa case) ; la
+// Terreur ardente le fait fuir ; le Retour dans le passé ramène chacun à sa place d'avant.
+export const DEPLACENT_ENNEMI = ["poussee", "peur", "saignement", "prise-en-charge", "mur-terre-repousse", "transfert",
+  "fureur-sentinelle", "terreur-ardente", "retour-passe"];
 export function verifierDeplacements(verifier, r) {
   const mauvais = (f) => r.filter(f).map(x => x.id).join(", ");
   const attendu = (x) => ({ heros: DEPLACENT_HEROS.includes(x.id), ennemi: DEPLACENT_ENNEMI.includes(x.id) });

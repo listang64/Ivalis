@@ -830,6 +830,10 @@ async function ouvrirForge() {
     if (typeof window.ouvrirCreationCompetence !== "function") return;
     const champ = document.getElementById("champ-id-personnage");
     if (champ) champ.value = h.idPersonnage;
+    // (v366) Une Forge restée ouverte dans le livre (commencée, puis le sommaire) :
+    // ses champs sont DANS ces pages ; on les remet d'abord dans leur fenêtre, sinon
+    // la réécriture des pages les détruirait (« Erreur ouverture Forge … null »).
+    if (forgeDansLeLivre) fermerForge(false);
     const g = pagesFiche["forge-g"], d = pagesFiche["forge-d"];
     g.innerHTML = `<div class="contenu-page page-forge defile-fiche"><div class="entete-fiche"><span class="titre-page-fiche">La Forge</span>
         <button type="button" class="lien-fiche fermer-forge" data-action="fiches" data-fa="fermer-forge">Refermer</button></div>
