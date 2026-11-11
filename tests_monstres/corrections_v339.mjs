@@ -358,7 +358,7 @@ titre("7. LES VERSIONS");
 // =========================================================================
 {
   const html = lire("index.html"), version = JSON.parse(lire("version.json")).version;
-  verifier("version 339 (trace_combat.js, version.json)", /VERSION_IVALIS = 339;/.test(lire("trace_combat.js")) && version === 339, String(version));
+  verifier("version 339 ou plus (trace_combat.js, version.json)", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 339 && version >= 339, String(version));
   const attendus = { "style.css": 130, "grimoire.js": 22, "grimoire_creation.js": 5, "grimoire_creation.css": 5, "grimoire_regions.js": 9, "grimoire_regions.css": 4,
                      "descriptifs_regions.js": 2, "app.js": 144, "moteur_effets.js": 102, "talents.js": 6, "lia_forge.js": 8, "classes.js": 28, "villages_regionaux.js": 9 };
   const faux = Object.entries(attendus).filter(([f, n]) => !html.includes(`${f}?v=${n}"`));

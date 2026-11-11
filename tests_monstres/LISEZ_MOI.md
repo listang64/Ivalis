@@ -11047,3 +11047,9 @@ Tests mis à jour par la v339 :
 - corrections_v270.mjs : tolérance sur la proportion du texte (la taille minimale des jauges).
 - illusions_multiples.mjs est retiré : l'effet Illusion n'existe plus.
 - illusion_cerveau.mjs reste : le noyau sait toujours lire un leurre.
+
+## v340 — Shadows Into Light, l'écriture des titres par défaut
+
+- Nico : « mets la police pour les titres : Shadows Into Light, par défaut » (police_titres.js).
+- Un poste resté sur l'ancienne écriture par défaut (Homemade Apple) passe une fois à la nouvelle. Une écriture choisie ensuite dans Paramètres reste.
+- corrections_v299 et corrections_v312 attendent maintenant Shadows Into Light.
