@@ -41,7 +41,7 @@ import { clonerEtat, combattant, creerDes, combattantIllusion,
          verifierEtatCombat, compterPasMarche, reductionInertie, FORMAT_ETAT, tomber, enSursis,
          reposDuRetourArriere, entreeDeFile, ZOMBIE, COMPAGNON, compagnonDe,
          placerCompagnons, MUR_TERRE, murEn, plateauDeCombat, franchissablePour, frapperMurs,
-         cleGravats, APPLICATEURS, ETAT_PLAIE_ROUVERTE, gainReposLong } from './combat_etat.js';
+         cleGravats, APPLICATEURS, ETAT_PLAIE_ROUVERTE, gainReposLong, MAINTIEN_SURSIS } from './combat_etat.js';
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones, zonesDeFinDeManche,
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
@@ -579,6 +579,18 @@ export function reservesDeFinDeManche(etat) {
         if (!c || !Array.isArray(c.etats)) return;
         c.etats.filter(e => e && e.maintien).forEach(m => {
             if (c.aTerre) { etapes.push(...relacherMaintien(etat, id, m.maintien)); return; }
+            // (v354) La réserve du Dernier sursis : le sursis fini, elle s'en va ;
+            // à court d'énergie, le sursis s'arrête — il tombe KO.
+            if (m.maintien === MAINTIEN_SURSIS && !enSursis(c)) { etapes.push(...relacherMaintien(etat, id, m.maintien)); return; }
+            if (m.maintien === MAINTIEN_SURSIS && !m.dejaPaye && nombre(c.fatigue) < nombre(m.reserve)) {
+                etapes.push(...relacherMaintien(etat, id, m.maintien, "Dernier sursis : à court d'énergie"));
+                c.sursis = null;
+                c.aTerre = true;
+                c.pv = 0;
+                etapes.push({ type: "sursis", cible: id, tours: 0, pvApres: 0 },
+                            { type: "chute", cible: id, acteur: id, finSursis: true });
+                return;
+            }
             if (m.dejaPaye) {
                 c.etats = c.etats.map(e => (e === m ? { ...e, dejaPaye: false } : e));
                 etapes.push({ type: "etats", cible: id, liste: c.etats });

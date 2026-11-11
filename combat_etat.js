@@ -894,6 +894,14 @@ function releverEnLeader(etat, c, acteur, options) {
     return [...recompenses, etape];
 }
 
+// LE DERNIER SURSIS (Profanateur, niveau 9 — v353 ; v354 : sa réserve). Nico :
+// « réserve : 30 de fatigue pendant toute la durée de l'effet » ; ses réponses :
+// 30 payés quand le sursis commence, puis 30 bloqués et consommés à chaque
+// manche tant qu'il dure (reservesDeFinDeManche, cerveau_combat.js) ; sans
+// l'énergie pour la payer, pas de sursis — il tombe KO.
+export const RESERVE_SURSIS = 30;
+export const MAINTIEN_SURSIS = "SURSIS";
+
 export function tomber(etat, id, acteur, options) {
     const c = combattant(etat, id);
     if (!c || c.aTerre) return [];
@@ -905,12 +913,20 @@ export function tomber(etat, id, acteur, options) {
     const autreLeader = Object.values(etat.combattants || {}).some(x => x && x !== c && x.estMonstre && x.leader && !x.aTerre && nombre(x.pv) > 0);
     if (c.estMonstre && c.releveEnLeader && !c.leader && !autreLeader) return releverEnLeader(etat, c, acteur, options);
     const tours = nombre(c.atouts && c.atouts.sursis);
-    if (tours > 0 && !c.sursisUtilise) {
+    if (tours > 0 && !c.sursisUtilise && nombre(c.fatigue) >= RESERVE_SURSIS) {
         const entame = ((etat.file || [])[0] || {}).id === id;
         c.sursis = { tours, entame };
         c.sursisUtilise = true;
         c.aTerre = false;
-        return [{ type: "sursis", cible: id, acteur: acteur || id, tours, entame, pvApres: 0, debut: true }];
+        // (v354) La réserve : 30 tout de suite, puis 30 par manche tant qu'il tient.
+        c.fatigue = nombre(c.fatigue) - RESERVE_SURSIS;
+        c.etats = [...(c.etats || []).filter(e => !(e && e.maintien === MAINTIEN_SURSIS)),
+                   { nom: "Dernier sursis (réserve)", maintien: MAINTIEN_SURSIS, reserve: RESERVE_SURSIS, duree: 99, dejaPaye: true,
+                     sansRelache: true, liens: [],
+                     desc: `${RESERVE_SURSIS} d'énergie bloqués puis consommés à chaque manche du sursis ; à court, il tombe KO.` }];
+        return [{ type: "sursis", cible: id, acteur: acteur || id, tours, entame, pvApres: 0, debut: true },
+                { type: "fatigue", cible: id, fatigueApres: c.fatigue, tic: "Dernier sursis" },
+                { type: "etats", cible: id, liste: c.etats }];
     }
     c.aTerre = true;
     const chute = [{ type: "chute", cible: id, acteur: acteur || id }];

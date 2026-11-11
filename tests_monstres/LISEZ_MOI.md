@@ -11303,3 +11303,22 @@ sentinelle.mjs est mis à jour :
 - paliers ;
 - l'Assaut : poussées puis attaques, 70 % sur 300 graines, poussée bloquée jamais frappée, parade ;
 - la fin des soins reçus.
+
+## v354 — La refonte des classes : le Profanateur
+
+- Nico (sa fiche du Profanateur) :
+  - niveau 1 : Nécromancie (zombie de 15 PV, 7 dégâts physiques, 2 cases, ses résistances, ni parade ni esquive, 3 tours, rayon de 2 cases) — déjà en place ;
+  - niveau 3 : la glace magique en dégâts physiques, +1 compétence ;
+  - niveau 5 : Pointes de glace — déjà en place ;
+  - niveau 9 : Dernier sursis (2 tours à 0 PV avant le KO ; réserve de 30 pendant toute la durée).
+- app.js : les paliers passent à 1, 3, 5 et 9.
+  - glacePhysique passe du niveau 1 au niveau 3, avec +1 compétence (nouveau).
+  - sursis passe du niveau 10 au niveau 9.
+- LA RÉSERVE DU SURSIS (ses réponses : 30 par manche, bloqués puis consommés ; sans eux, pas de sursis) :
+  - combat_etat.js (tomber) : à 0 PV, le sursis ne part que s'il a 30 d'énergie. Sinon, KO.
+  - Il paie 30 tout de suite. Un état « Dernier sursis (réserve) » se pose (maintien SURSIS, sans Relâcher).
+  - cerveau_combat.js (reservesDeFinDeManche) : à chaque manche suivante du sursis, 30 sont bloqués puis consommés. À court d'énergie, le sursis s'arrête et il tombe KO. Le sursis fini, la réserve s'en va.
+
+corrections_v354.mjs le vérifie : le départ (100 → 70, 30 pile, refus à 29 et KO), la réserve bloquée (cartes), la consommation, le KO à court d'énergie, le rejeu, la fin du sursis, les paliers, les textes.
+
+profanateur.mjs est mis à jour.

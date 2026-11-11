@@ -1010,12 +1010,17 @@ window.ATOUTS_CLASSES = {
     // l'ancien Nécromancien (2 tours debout à zéro PV, une fois par combat).
     // (v260, Nico : « les zombies se font à deux cases de distance dès le
     // lvl1 » : le rayon de 2 cases passe du niveau 10 au niveau 1.)
+    // v354, la refonte des classes (Nico) : la Nécromancie au niveau 1 ; la
+    // glace en dégâts physiques et +1 compétence au niveau 3 ; les Pointes de
+    // glace au niveau 5 ; le Dernier sursis au niveau 9, avec sa réserve de 30
+    // par manche (RESERVE_SURSIS, combat_etat.js ; sans elle, pas de sursis).
     "Profanateur": [
-        { niveau: 1,  zombies: true, glacePhysique: true, rayonZombies: 2 },
+        { niveau: 1,  zombies: true, rayonZombies: 2 },
+        { niveau: 3,  glacePhysique: true, competences: 1 },
         // Niveau 5 : les Pointes de glace (un cône de pics, une fois par combat).
         { niveau: 5,  techniques: ["CLASSE_POINTES_GLACE"] },
-        // Niveau 10 : le sursis.
-        { niveau: 10, sursis: 2 }
+        // Niveau 9 : le Dernier sursis.
+        { niveau: 9,  sursis: 2 }
     ],
     // LE PISTEUR : un compagnon animal qui combat à ses côtés (25 PV, 15 %
     // d'esquive, 6 dégâts bruts, 3 cases — un document Monstres de son camp
@@ -1618,7 +1623,7 @@ window.texteAtout = function(cle, valeur) {
             return `Résiste (−${window.RESISTANCE_ETAT_PCT || 25} % de chance) : ${liste.join(", ")}`
                 + (elementaires.length ? ` (−${window.REDUCTION_SORT_RESISTE || 15} % des sorts de ${elementaires.map(e => e.nom).join(", ")})` : "");
         }
-        case "sursis":         return `Tombé à 0 PV, tient encore ${n} tour${n > 1 ? "s" : ""} avant d'être KO (une fois par combat)`;
+        case "sursis":         return `Dernier sursis : tombé à 0 PV, tient encore ${n} tour${n > 1 ? "s" : ""} avant d'être KO (une fois par combat ; réserve de 30 d'énergie par manche)`;
         case "effets":         return (valeur || []).map(id => `Effet de combat : ${nomEffet(id)}`).join(" · ");
         case "techniques":     return (valeur || []).map(id => `Technique : ${((window.TECHNIQUES_CLASSE || {})[id] || {}).Nom || id}`).join(" · ");
         case "critiqueSurKO":  return `Instinct du tueur : ${plus(n)} % de critique pendant 2 manches après un KO`;

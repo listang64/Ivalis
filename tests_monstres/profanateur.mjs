@@ -39,7 +39,7 @@ const REGLES = {
     defPhysique: w.defPhysiqueCombattant, defMagique: w.defMagiqueCombattant,
     critique: w.critiqueCombattant, atouts: w.atoutRace, bonusEquip: w.bonusEquip
 };
-const XP = { 1: 0, 4: 1800, 5: 2500, 9: 6400, 10: 7900 };
+const XP = { 1: 0, 2: 700, 3: 1200, 4: 1800, 5: 2500, 8: 5200, 9: 6400, 10: 7900 };
 const fiche = (id, extra = {}) => ({
     idPersonnage: id, prenom: id, race: "Humain", classe: "", camp: id.startsWith("M") ? "Ennemi" : "Allié",
     estMonstre: id.startsWith("M"), joueur: "", xp: 0,
@@ -74,14 +74,18 @@ console.log("\n1. LES PALIERS");
     // physiques ». (L'Humain a désormais sa compétence en plus : on lit la
     // classe seule.)
     const c1 = w.atoutClasse(profanateur(1));
-    verifier("niveau 1 : les zombies et la glace physique, plus rien d'autre", c1.zombies === true && c1.glacePhysique === true
+    // (v354, la refonte des classes : la glace physique et +1 compétence au niveau 3, le sursis au 9.)
+    verifier("niveau 1 : les zombies, plus rien d'autre", c1.zombies === true && !c1.glacePhysique
              && !c1.diviseurEtalement && !c1.competences && !c1.pvMax && !c1.dotBonus, JSON.stringify(c1));
+    const c3 = w.atoutClasse(profanateur(3)), c2 = w.atoutClasse(profanateur(2));
+    verifier("niveau 3 : la glace physique et +1 compétence (pas au 2)", c3.glacePhysique === true && c3.competences === 1 && !c2.glacePhysique && !c2.competences);
     // v239 (Nico) : « Profanateur lvl5 : Pointes de glace ».
     verifier("niveau 5 : la technique Pointes de glace", a5.zombies === true && !a5.sursis
              && JSON.stringify(a5.techniques) === '["CLASSE_POINTES_GLACE"]' && !(a1.techniques || []).length, JSON.stringify(a5.techniques));
     verifier("niveau 10 : le sursis (2 tours)", a10.sursis === 2 && a10.zombies === true);
-    verifier("plus de PV ni de compétence en plus", w.pvMaxCombattant(profanateur(1)) === 100
-             && w.competencesMaxCombattant(profanateur(1, { race: "Ondari" })) === 6);
+    verifier("niveau 9 : le sursis ; niveau 8 : pas encore", w.atoutClasse(profanateur(9)).sursis === 2 && !w.atoutClasse(profanateur(8)).sursis);
+    verifier("plus de PV ; +1 compétence dès le niveau 3", w.pvMaxCombattant(profanateur(1)) === 100
+             && w.competencesMaxCombattant(profanateur(1, { race: "Ondari" })) === 6 && w.competencesMaxCombattant(profanateur(3, { race: "Ondari" })) === 7);
     verifier("écrit en clair : les zombies, la glace physique", /zombies/.test(w.texteAtout("zombies", true))
              && /glace font des dégâts physiques/.test(w.texteAtout("glacePhysique", true)), w.texteAtout("glacePhysique", true));
     const e = monde(10);
@@ -261,7 +265,8 @@ console.log("\n5. NIVEAU 10 : LE SURSIS");
     const p = r.etat.combattants.P;
     verifier("à 0 PV : debout, 2 tours de sursis", p.pv === 0 && !p.aTerre && p.sursis && p.sursis.tours === 2, JSON.stringify(p.sursis));
     const n9 = monde(9);
-    verifier("niveau 9 : il tombe", coup(n9, "M2", "P", 500).etat.combattants.P.aTerre);
+    verifier("niveau 9 : le sursis aussi (v354)", !coup(n9, "M2", "P", 500).etat.combattants.P.aTerre);
+    verifier("niveau 8 : il tombe", coup(monde(8), "M2", "P", 500).etat.combattants.P.aTerre);
 }
 
 console.log("\n5 bis. LES RENFORTS : UNE PLACE PAR CRÉATURE PERDUE, AU DÉBUT DE LA MANCHE SUIVANTE");
@@ -449,8 +454,9 @@ console.log("\n8. LA FICHE DE CLASSE");
              niveaux: [...d.querySelectorAll(".palier-classe-niveau")].map(x => x.textContent.trim()) };
   });
   await p.screenshot({ path: "/tmp/claude-0/profanateur_classe.png" });
-  verifier("Niv. 1 / 5 / 10 : Relève des morts (zombie 15 PV / 7 dégâts / 2 cases) et glace physique, Pointes de glace, sursis 2 tours",
-           JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]' && /Relève des morts/.test(r.texte) && !/divisée par/.test(r.texte)
+  verifier("Niv. 1 / 3 / 5 / 9 : Nécromancie (zombie 15 PV / 7 dégâts / 2 cases), glace physique, Pointes de glace, Dernier sursis 2 tours",
+           JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 3","Niv. 5","Niv. 9"]' && /Nécromancie/.test(r.texte) && !/divisée par/.test(r.texte)
+           && /Dernier sursis/.test(r.texte) && /Réserve : 30/.test(r.texte)
            && /Pointes de glace/.test(r.texte) && /75 %/.test(r.texte)
            && /glace font des dégâts physiques/.test(r.texte) && /15 PV/.test(r.texte)
            && /7 dégâts/.test(r.texte) && /2 cases/.test(r.texte) && /2 tours/.test(r.texte), JSON.stringify(r.niveaux));

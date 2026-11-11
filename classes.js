@@ -172,20 +172,23 @@ window.DESCRIPTIFS_CLASSES = {
             + "funèbre frappe comme une lame et hérisse la terre de pics, ses ennemis tombés se "
             + "relèvent pour le servir, et la mort elle-même doit attendre son tour avant de le prendre.",
         paliers: [
-            { niveau: 1, titre: "Passif : Relève des morts · Glace funèbre",
+            { niveau: 1, titre: "Passif : Nécromancie",
               points: ["Un ennemi qu'il tue, ou qui tombe à côté de lui, se relève en zombie à son service",
                        "15 PV · morsure de 7 dégâts physiques · 2 cases par tour · joue en dernier",
                        "Il ne reste sur le terrain que 3 tours, puis retombe en poussière",
                        "Ses zombies se relèvent jusqu'à 2 cases autour de lui",
-                       "Garde ses résistances, mais plus d'esquive ni de parade",
-                       "Ses attaques magiques de glace font des dégâts physiques au lieu de magiques"] },
+                       "Garde ses résistances, mais plus d'esquive ni de parade"] },
+            { niveau: 3, titre: "Glace funèbre",
+              points: ["Ses attaques magiques de glace font des dégâts physiques au lieu de magiques",
+                       "+1 compétence à créer"] },
             { niveau: 5, titre: "Technique : Pointes de glace",
               points: ["Initiative 100 · aucune fatigue · une fois par combat",
                        "Des pics de glace jaillissent en cône devant lui (2, 3 puis 4 cases) et y restent 3 manches",
                        "Qui s'y tient ou y entre : 75 % de chance d'être Glacé (2 manches), et 5 % de ses PV max en moins"] },
-            { niveau: 10, titre: "Sursis",
+            { niveau: 9, titre: "Passif : Dernier sursis",
               points: ["Tombé à 0 PV, il tient encore 2 tours debout avant d'être mis KO",
-                       "Les coups sont ignorés, aucun soin possible · une fois par combat"] }
+                       "Les coups sont ignorés, aucun soin possible · une fois par combat",
+                       "Réserve : 30 d'énergie au début, puis 30 par manche tant qu'il dure — sans eux, il tombe KO"] }
         ]
     },
     CLASSE_SENTINELLE: {
