@@ -251,7 +251,7 @@ await section(async () => {
 {
   const html = lire("index.html");
   verifier("version 343 ou plus ; classes.js v29, app.js v145, grimoire_creation.js v7", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 343 && JSON.parse(lire("version.json")).version >= 343
-           && ['classes.js?v=29"', 'app.js?v=145"', 'grimoire_creation.js?v=7"'].every(x => html.includes(x)));
+           && [['classes', 29], ['app', 145], ['grimoire_creation', 7]].every(([f, v]) => Number((new RegExp('src="' + f + '\\.js\\?v=(\\d+)"').exec(html) || [])[1]) >= v));
 }
 console.log(erreurs.length ? "\nErreurs de page : " + erreurs.slice(0, 5).join(" | ") : "");
 console.log(`\n${echecs ? echecs + " ÉCHEC(S)" : "TOUS LES CONTRÔLES PASSENT"}`);
