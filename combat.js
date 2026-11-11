@@ -817,12 +817,64 @@ window.bonusRetourArriere = function(perso) {
     if (!window.retourArriereEnAttente(perso) || typeof window.gainReposLong !== "function") return 0;
     return window.gainReposLong(perso);
 };
+// =========================================================================
+//  LA RÉSERVE MAINTENUE, EN PRÉPARATION (v347)
+// =========================================================================
+//  Une technique maintenue (le Rempart du Protecteur : RESERVES_TECHNIQUES,
+//  moteur_pur.js) bloque sa part d'énergie pour la manche : ni carte ni pas ne
+//  peut la dépenser, et elle est consommée en fin de manche. Le bouton
+//  « Relâcher » du volet l'arrête : choisi en préparation, il part avec la
+//  carte du héros dans la file (`relacher`), et le cerveau l'applique à
+//  l'ouverture de la manche — d'ici là, la part n'est déjà plus bloquée.
+window.RELACHES_EN_ATTENTE = window.RELACHES_EN_ATTENTE || {};   // id du héros → [ids des techniques]
+const enPreparation = () => ((window.PARTIE_DATA || {}).Phase_Combat || "Preparation") === "Preparation";
+window.techniquesMaintenues = function(perso) {
+    return ((perso && perso.Etats_Alteres) || []).filter(e => e && e.maintien && (parseInt(e.duree) || 0) > 0);
+};
+window.relacheEnAttente = function(perso, idCarte) {
+    if (!perso || !enPreparation()) return false;
+    return (window.RELACHES_EN_ATTENTE[perso.idPersonnage] || []).includes(idCarte);
+};
+// La part bloquée dans sa jauge pour cette manche.
+window.reserveMaintenueBloquee = function(perso) {
+    return window.techniquesMaintenues(perso)
+        .filter(e => !e.dejaPaye && !window.relacheEnAttente(perso, e.maintien))
+        .reduce((t, e) => t + (parseInt(e.reserve) || 0), 0);
+};
+window.basculerRelacher = function(idPersonnage, idCarte) {
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    if (!enPreparation()) return;
+    const liste = window.RELACHES_EN_ATTENTE[idPersonnage] || [];
+    window.RELACHES_EN_ATTENTE[idPersonnage] = liste.includes(idCarte) ? liste.filter(x => x !== idCarte) : [...liste, idCarte];
+    window.chargerCompetencesCombat(idPersonnage, window.COULEUR_PERSO_COURANT);
+    window.mettreAJourJaugeFatigue(0);
+    // Sa carte est déjà dans la file : l'entrée suit le choix.
+    const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+    if (perso && ((window.PARTIE_DATA || {}).File_Attente_Combat || []).some(i => i.idPersonnage === idPersonnage)
+        && typeof window.modifierPartieOuEchec === "function") {
+        window.modifierPartieOuEchec((data) => {
+            const file = (data.File_Attente_Combat || []).map(i => {
+                if (i.idPersonnage !== idPersonnage) return i;
+                const { relacher, ...reste } = i;
+                return { ...reste, ...relachesDe(perso) };
+            });
+            return { maj: { File_Attente_Combat: file } };
+        }).catch(e => console.warn("Relâcher :", e));
+    }
+};
+// Ce que l'entrée de file emporte : les techniques à relâcher.
+const relachesDe = (perso) => {
+    const liste = (window.RELACHES_EN_ATTENTE[perso && perso.idPersonnage] || [])
+        .filter(id => window.techniquesMaintenues(perso).some(e => e.maintien === id));
+    return liste.length ? { relacher: liste } : {};
+};
+
 // L'énergie avec laquelle ce héros choisit sa compétence.
 window.fatiguePourChoisir = function(perso) {
     if (!perso) return window.COMBAT_FATIGUE_ACTUELLE || 0;
     const max = typeof window.fatigueMaxCombattant === "function" ? window.fatigueMaxCombattant(perso) : 100;
     const actuelle = perso.fatigueActuelle !== undefined ? (parseInt(perso.fatigueActuelle) || 0) : max;
-    return actuelle + window.bonusRetourArriere(perso);
+    return actuelle + window.bonusRetourArriere(perso) - window.reserveMaintenueBloquee(perso);
 };
 
 window.chargerCompetencesCombat = function(idPersonnage, couleur) {
@@ -873,6 +925,18 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         window.COULEUR_PERSO_COURANT = couleur || "#4a1c1c";
 
         let htmlDeck = "";
+        // (v347) LES TECHNIQUES MAINTENUES : leur réserve, et « Relâcher ».
+        window.techniquesMaintenues(persoActuel).forEach(e => {
+            const relache = window.relacheEnAttente(persoActuel, e.maintien);
+            const bloque = !e.dejaPaye && !relache;
+            const nom = String(e.nom || "").replace(/[<>&"]/g, "");
+            const idC = String(e.maintien).replace(/[^A-Z0-9_]/gi, "");
+            htmlDeck += `<div class="encart-maintien${relache ? " relache" : ""}" data-maintien="${idC}" title="${String(e.desc || "").replace(/"/g, "&quot;")}">
+                <span class="maintien-nom">🏰 ${nom}</span>
+                <span class="maintien-reserve">${relache ? "relâché à la prochaine manche" : bloque ? `⚡ ${parseInt(e.reserve) || 0} bloqués cette manche` : "manche déjà payée"} · ${parseInt(e.duree) || 0} manche${(parseInt(e.duree) || 0) > 1 ? "s" : ""}</span>
+                ${enPreparation() ? `<button type="button" class="maintien-relacher" onclick="event.stopPropagation(); window.basculerRelacher('${persoActuel.idPersonnage}', '${idC}')">${relache ? "Le garder" : "Relâcher"}</button>` : ""}
+            </div>`;
+        });
         const IMAGE_CADRE_NORMAL = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png";
         const IMAGE_CADRE_EPUISE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783286721/ban_epuis%C3%A9_otc70l.png";
 
@@ -1671,7 +1735,8 @@ window.gererClicCarteCombat = function(idCarte) {
     const persoActuel = window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO];
     const fatigueMax = window.fatigueMaxCombattant(persoActuel);
     const fatiguePerso = ((persoActuel && persoActuel.fatigueActuelle !== undefined) ? parseInt(persoActuel.fatigueActuelle) : fatigueMax)
-        + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0);
+        + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0)
+        - (typeof window.reserveMaintenueBloquee === "function" ? window.reserveMaintenueBloquee(persoActuel) : 0);
 
     const dataCarte = window.COMPETENCES_CACHE[idCarte];
     const cout = (typeof window.coutFatigueCarte === "function" ? window.coutFatigueCarte(dataCarte, persoActuel) : (parseInt(dataCarte && dataCarte.Fatigue) || 0));
@@ -1684,7 +1749,8 @@ window.gererClicCarteCombat = function(idCarte) {
     // coût auprès du déplacement, puisqu'elle ne pourra de toute façon pas partir.
     const abordable = cout + (window.MOUVEMENT_COUT_TOTAL || 0)
         <= (window.COMBAT_FATIGUE_ACTUELLE || 0)
-           + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0);
+           + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0)
+           - (typeof window.reserveMaintenueBloquee === "function" ? window.reserveMaintenueBloquee(persoActuel) : 0);
 
     if (window.CARTE_EN_APERCU !== idCarte) {
         window.COUT_COMPETENCE_SELECTIONNEE = abordable ? cout : 0;
@@ -3174,7 +3240,7 @@ function construireHaloVTT(options) {
 // l'image d'un bandeau de carte. Ceux-là prennent un médaillon de LA COULEUR
 // DE LEUR BULLE (COULEUR_ETAT), avec un symbole, et leur nom au survol.
 window.SYMBOLES_ETATS = {
-    "Charmé": "💘", "Ténèbres étalées": "🌑", "Mur de bouclier": "🛡️", "Rempart": "🏰",
+    "Charmé": "💘", "Ténèbres étalées": "🌑", "Mur de bouclier": "🛡️", "Rempart": "🏰", "Rempart maintenu": "🏰",
     "Nuée de chauve-souris": "🦇", "Bouclier anti-magie": "💠", "Plaie rouverte": "🩸",
     "Instinct du tueur": "🗡️", "Bouclier des Sages": "📜", "Étalement": "💢", "Soin étalé": "💚",
     "Élan": "💨", "Repli": "↩️", "Provocation": "😤", "Peur": "😱", "Béni": "✨",
@@ -3322,6 +3388,7 @@ window.COULEUR_ETAT = {
     "Mur de bouclier": "#c9a24a",  // bronze — l'Hoplite derrière son bouclier
     "Instinct du tueur": "#c62828",
     "Rempart":        "#e8c46a",   // or — protégé par un Hoplite à ses côtés
+    "Rempart maintenu": "#e8c46a", // or — le Protecteur qui le tient (v347)
     "Nuée de chauve-souris": "#6a1b9a",  // pourpre — le Vampire dispersé en nuée
     "Charmé":         "#ec407a",   // rose — retourné contre les siens par le Sorcier
     "Engagé":         "#e53935",   // rouge — pris dans la mêlée (v260)
@@ -5055,7 +5122,8 @@ window.jouerCarteCombat = async function(idCarte) {
                 idCarte: idCarte, // NOUVEAU : Sauvegarde la carte choisie !
                 initiative: initiativeCarte,
                 timestamp: new Date().getTime(),
-                ...(avecRetourArriere ? { retourArriere: true } : {})
+                ...(avecRetourArriere ? { retourArriere: true } : {}),
+                ...relachesDe(persoActuel)
             });
 
             file.sort((a, b) => {
@@ -5142,7 +5210,8 @@ window.jouerReposLong = async function() {
                 // Le Bouclier des Sages (talent) : son repos long passe en tête.
                 initiative: (typeof window.atoutRace === "function"
                              && Number((window.atoutRace(persoActuel) || {}).bouclierDesSages) > 0) ? 100 : 0,
-                timestamp: new Date().getTime()
+                timestamp: new Date().getTime(),
+                ...relachesDe(persoActuel)
             });
 
             file.sort((a, b) => {
@@ -6878,7 +6947,8 @@ window.actualiserEtatCarteCombat = function(simulationAction = null) {
         const fatigueRestante = (persoActuel.fatigueActuelle !== undefined
             ? parseInt(persoActuel.fatigueActuelle)
             : (window.COMBAT_FATIGUE_ACTUELLE || 0))
-            + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0);
+            + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0)
+            - (typeof window.reserveMaintenueBloquee === "function" ? window.reserveMaintenueBloquee(persoActuel) : 0);
         if (coutSel > fatigueRestante) {
             window.COUT_COMPETENCE_SELECTIONNEE = 0;
             document.querySelectorAll('.banniere-carte-combat').forEach(el => {

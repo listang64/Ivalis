@@ -77,11 +77,15 @@ console.log("\n2. LE DÉTAIL D'UN HÉROS");
     const d = w.detailBonusRaceClasse({ race: "Humain", classe: "Hoplite", xp: XP[5] });   // (ex-Hoplite : le Protecteur)
     verifier("Humain : +10 de fatigue maximum, +1 compétence (v237)", d.race.nom === "Humain" && JSON.stringify(d.race.lignes) === '["+10 de fatigue maximum","+1 compétence"]',
              JSON.stringify(d.race.lignes));
-    verifier("Hoplite niveau 5 : paliers 1 et 5 atteints, 10 à venir",
-             JSON.stringify(d.classe.paliers.map(p => [p.niveau, p.atteint])) === '[[1,true],[5,true],[10,false]]');
-    verifier("le palier 1 dit +7 % de parade et 15 % de provocation (classe lue « Protecteur »)",
+    // (v347, la refonte du Protecteur : paliers 1, 3, 5 et 9.)
+    verifier("Hoplite niveau 5 : paliers 1, 3 et 5 atteints, 9 à venir",
+             JSON.stringify(d.classe.paliers.map(p => [p.niveau, p.atteint])) === '[[1,true],[3,true],[5,true],[9,false]]');
+    verifier("le palier 1 dit +8 % de parade et 10 % de provocation (classe lue « Protecteur »)",
              d.classe.nom === "Protecteur"
-             && JSON.stringify(d.classe.paliers[0].lignes) === '["+7 % de parade","15 % de chance de provoquer la cible de chacune de ses attaques"]', JSON.stringify(d.classe.paliers[0].lignes));
+             && JSON.stringify(d.classe.paliers[0].lignes) === '["+8 % de parade","10 % de chance de provoquer la cible de chacune de ses attaques"]', JSON.stringify(d.classe.paliers[0].lignes));
+    verifier("le palier 5 dit +10 % de provocation et les boucliers lourds sans malus",
+             JSON.stringify(d.classe.paliers[2].lignes) === '["10 % de chance de provoquer la cible de chacune de ses attaques","Les boucliers lourds ne lui donnent plus aucun malus"]',
+             JSON.stringify(d.classe.paliers[2].lignes));
     const sans = w.detailBonusRaceClasse({ race: "", classe: "Élémentariste" });
     verifier("une classe sans bonus définis : aucun palier", sans.classe.paliers.length === 0 && sans.race.lignes.length === 0);
 }

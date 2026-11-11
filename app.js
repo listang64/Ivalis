@@ -948,15 +948,18 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  techniques: ["CLASSE_CHARME_FRATRICIDE"] },
         { niveau: 10, techniques: ["CLASSE_TRANSFERT"] }
     ],
-    // LE PROTECTEUR (ex-Hoplite, renommé — CLASSES_RENOMMEES) : +7 % de
-    // parade, et 15 % de chance de provoquer la cible de chacune de ses
-    // attaques (provocationAttaques, appliquerEquipementALaCarte) ; le Rempart
-    // au niveau 5, la Résonance du bouclier au niveau 10. (Le Mur de bouclier
-    // n'est plus donné.)
+    // LE PROTECTEUR (ex-Hoplite, renommé — CLASSES_RENOMMEES). v347, la refonte
+    // des classes (Nico) : +8 % de parade et 10 % de chance de provoquer la
+    // cible de chacune de ses attaques (provocationAttaques,
+    // appliquerEquipementALaCarte) au niveau 1 ; le Rempart au niveau 3 ; au
+    // niveau 5, 10 % de provocation en plus (20 % en tout) et plus aucun malus
+    // des boucliers lourds (bouclierLourdSansMalus, objets.js) ; la Résonance
+    // du bouclier au niveau 9. (Le Mur de bouclier n'est plus donné.)
     "Protecteur": [
-        { niveau: 1,  parade: 7, provocationAttaques: 15 },
-        { niveau: 5,  techniques: ["CLASSE_REMPART"] },
-        { niveau: 10, techniques: ["CLASSE_RESONANCE_BOUCLIER"] }
+        { niveau: 1,  parade: 8, provocationAttaques: 10 },
+        { niveau: 3,  techniques: ["CLASSE_REMPART"] },
+        { niveau: 5,  provocationAttaques: 10, bouclierLourdSansMalus: true },
+        { niveau: 9,  techniques: ["CLASSE_RESONANCE_BOUCLIER"] }
     ],
     // L'ASSASSIN : un KO lui donne +15 de critique pour 2 manches (Instinct du
     // tueur, combat_etat.js) ; l'Assaut mortel au niveau 5 ; au niveau 10, son
@@ -1094,16 +1097,24 @@ window.TECHNIQUES_CLASSE = {
         Nom: "Mur de bouclier", classe: "Protecteur", niveau: 5, Initiative: 100, Fatigue: 0, cible: "soi",
         desc: "+60 % de parade sur soi jusqu'à la fin de la manche. Une fois par combat."
     },
+    // (v347) LE REMPART EST MAINTENU : sa réserve (15 d'énergie par manche,
+    // 4 manches) est bloquée dans la jauge puis consommée à chaque fin de
+    // manche ; à court d'énergie, il tombe ; « Relâcher » l'arrête. La règle
+    // vit dans le moteur (RESERVES_TECHNIQUES, moteur_pur.js) ; `reserve` ici
+    // ne sert qu'à l'écran.
     CLASSE_REMPART: {
-        Nom: "Rempart", classe: "Protecteur", niveau: 5, Initiative: 105, Fatigue: 0, cible: "allieAdjacent",
-        desc: "Sur un allié adjacent, pour 3 manches : chaque attaque qu'il reçoit est partagée en deux, "
-            + "moitié des dégâts pour lui, moitié pour le Protecteur, chacun avec ses défenses. Il faut rester "
-            + "côte à côte. Pas les états altérés. Une fois par combat."
+        Nom: "Rempart", classe: "Protecteur", niveau: 3, Initiative: 105, Fatigue: 15, cible: "allieAdjacent",
+        reserve: { parTour: 15, tours: 4 },
+        desc: "Sur un allié adjacent, pour 4 manches : chaque attaque qu'il reçoit est divisée en deux attaques "
+            + "indépendantes, à moitié des dégâts — une pour lui, une pour le Protecteur, chacun avec ses jets "
+            + "d'esquive et de parade et ses défenses. Il faut rester côte à côte. Pas les états altérés. "
+            + "Réserve : 15 d'énergie par manche, bloqués puis consommés, tant qu'il est maintenu (à court "
+            + "d'énergie, il tombe ; on peut le relâcher en préparation). Une fois par combat."
     },
     CLASSE_RESONANCE_BOUCLIER: {
-        Nom: "Résonance du bouclier", classe: "Protecteur", niveau: 10, Initiative: 100, Fatigue: 0, cible: "soi",
-        desc: "Étourdit tous les ennemis au contact (2 manches) et leur inflige 5 % de leurs PV max en dégâts "
-            + "physiques, à coup sûr. Une fois par combat."
+        Nom: "Résonance du bouclier", classe: "Protecteur", niveau: 9, Initiative: 50, Fatigue: 0, cible: "soi",
+        desc: "Tous les ennemis au contact : 80 % de chance d'être étourdis (2 manches) et des dégâts physiques "
+            + "égaux à 15 % des PV max du Protecteur, à coup sûr. Une fois par combat."
     },
     CLASSE_BOUCLIER_ANTIMAGIE: {
         Nom: "Bouclier anti-magie", classe: "Chasseur de mages", niveau: 5, Initiative: 200, Fatigue: 0, cible: "soi",
@@ -1564,6 +1575,7 @@ window.texteAtout = function(cle, valeur) {
         case "lumiereAveugle": return `Sorts de lumière : ${n} % de chance d'aveugler la cible`;
         case "maitriseLumiere": return `Maîtrise de la lumière : ${n} % de chance d'aveugler avec un sort de foudre (sans s'ajouter à l'Aveuglement)`;
         case "provocationAttaques": return `${n} % de chance de provoquer la cible de chacune de ses attaques`;
+        case "bouclierLourdSansMalus": return "Les boucliers lourds ne lui donnent plus aucun malus";
         case "bonusSoin":      return `${plus(n)} à chacun de ses soins`;
         // Les clés des talents (talents.js).
         case "degatsPhysiques": return `${plus(n)} dégât${Math.abs(n) > 1 ? "s" : ""} physique${Math.abs(n) > 1 ? "s" : ""}`;

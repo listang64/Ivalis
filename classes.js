@@ -104,16 +104,19 @@ window.DESCRIPTIFS_CLASSES = {
             + "bouclier le camarade qui combat à ses côtés.",
         paliers: [
             { niveau: 1, titre: "Discipline de la phalange",
-              points: ["+7 % de parade",
-                       "15 % de chance de provoquer la cible de chacune de ses attaques"] },
-            { niveau: 5, titre: "Technique : Rempart",
-              points: ["Initiative 105 · aucune fatigue · sur un allié adjacent, 3 manches",
-                       "Chaque attaque qu'il reçoit est partagée : moitié pour lui, moitié pour le Protecteur",
+              points: ["+8 % de parade",
+                       "10 % de chance de provoquer la cible de chacune de ses attaques"] },
+            { niveau: 3, titre: "Technique : Rempart",
+              points: ["Initiative 105 · réserve 15 par manche, sur 4 manches · sur un allié adjacent",
+                       "Chaque attaque qu'il reçoit est divisée en deux attaques indépendantes, à moitié des dégâts : une pour lui, une pour le Protecteur",
                        "Il faut rester côte à côte · une fois par combat"] },
-            { niveau: 10, titre: "Technique : Résonance du bouclier",
-              points: ["Initiative 100 · aucune fatigue",
-                       "Étourdit tous les ennemis au contact (2 manches)",
-                       "… et leur inflige 5 % de leurs PV max en dégâts physiques · une fois par combat"] }
+            { niveau: 5, titre: "Bouclier de la phalange",
+              points: ["+10 % de chance de provoquer (20 % en tout)",
+                       "Les boucliers lourds ne lui donnent plus aucun malus"] },
+            { niveau: 9, titre: "Technique : Résonance du bouclier",
+              points: ["Initiative 50 · aucune fatigue",
+                       "Tous les ennemis au contact : 80 % de chance d'être étourdis (2 manches)",
+                       "… et des dégâts physiques égaux à 15 % des PV max du Protecteur · une fois par combat"] }
         ]
     },
     CLASSE_PISTEUR: {

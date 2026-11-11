@@ -49,7 +49,8 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, appliquerCharme,
          pointesDeGlace, orientationCone,
          actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle, ligneDeVue, caseLibre, aLEtat,
-         carteToutEtalee, resisteA, prisMalgreResistance } from './moteur_pur.js';
+         carteToutEtalee, resisteA, prisMalgreResistance,
+         reserveMaintenueDe, reserveDeTechnique, relacherMaintien, chanceFaceA, CHANCE_ETOURDI_RESONANCE } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles,
@@ -280,6 +281,11 @@ export function validerIntention(etat, intention, plateau) {
             if (cout > nombre(acteur.fatigue)) return refus(`Mur de terre : il faut ${cout} d'énergie, il en reste ${nombre(acteur.fatigue)}`);
         }
         if (tete.carte && tete.carte !== idCarte) return refus(`la carte de ce tour est ${tete.carte}`);
+        // (v347) Une technique maintenue paie sa réserve de la manche au lancement.
+        const reserveTech = reserveDeTechnique(idCarte);
+        if (reserveTech && reserveTech.parTour > nombre(acteur.fatigue) - reserveMaintenueDe(acteur)) {
+            return refus(`il faut ${reserveTech.parTour} d'énergie pour la réserve, il en reste ${nombre(acteur.fatigue) - reserveMaintenueDe(acteur)}`);
+        }
         if (idCarte === "CLASSE_REMPART") {
             const allie = combattant(etat, intention.cible);
             if (!allie) return refus("Rempart sans allié");
@@ -386,8 +392,10 @@ export function validerIntention(etat, intention, plateau) {
         // (L'Inertie martiale allège la mêlée après une charge : on juge sur
         // le prix réellement payé.)
         const cout = Math.max(0, nombre(intention.coutFatigue) - reductionInertie(etat, acteur.id, intention));
-        if (cout > acteur.fatigue) {
-            return refus(`il faut ${cout} d'énergie, il en reste ${acteur.fatigue}`);
+        // (v347) La réserve d'une technique maintenue est bloquée : elle ne paie pas la carte.
+        const dispo = nombre(acteur.fatigue) - reserveMaintenueDe(acteur);
+        if (cout > dispo) {
+            return refus(`il faut ${cout} d'énergie, il en reste ${dispo}`);
         }
     }
 
@@ -531,6 +539,9 @@ export function cloturerTour(etat, des) {
         //
         // Comme toute étape, elle porte le RÉSULTAT et non l'opération : rejouée
         // deux fois sur trois écrans, elle donne le même chiffre.
+        // (v347) LA RÉSERVE DES TECHNIQUES MAINTENUES se consomme d'abord : elle
+        // était bloquée pendant la manche, elle part avant que l'énergie remonte.
+        etapes.push(...reservesDeFinDeManche(etat));
         etapes.push(...regenererFinDeManche(etat));
         etapes.push(...regenererPvFinDeManche(etat));
         etapes.push(...ticsDeFinDeManche(etat));
@@ -547,6 +558,34 @@ export function cloturerTour(etat, des) {
         etapes.push({ type: "manche", numero: etat.manche });
     }
     return { fini: partie.id, etapes };
+}
+
+// LA RÉSERVE MAINTENUE EN FIN DE MANCHE (v347, voir RESERVES_TECHNIQUES,
+// moteur_pur.js). La manche du lancement était payée : rien. Les suivantes :
+// la part bloquée est consommée ; à court d'énergie (ou le lanceur à terre),
+// la technique tombe, et ce qu'elle tenait chez les autres avec elle.
+export function reservesDeFinDeManche(etat) {
+    const etapes = [];
+    (etat.ordre || Object.keys(etat.combattants || {})).forEach(id => {
+        const c = combattant(etat, id);
+        if (!c || !Array.isArray(c.etats)) return;
+        c.etats.filter(e => e && e.maintien).forEach(m => {
+            if (c.aTerre) { etapes.push(...relacherMaintien(etat, id, m.maintien)); return; }
+            if (m.dejaPaye) {
+                c.etats = c.etats.map(e => (e === m ? { ...e, dejaPaye: false } : e));
+                etapes.push({ type: "etats", cible: id, liste: c.etats });
+                return;
+            }
+            const part = nombre(m.reserve);
+            if (nombre(c.fatigue) < part) {
+                etapes.push(...relacherMaintien(etat, id, m.maintien, `${m.nom} : à court d'énergie`));
+                return;
+            }
+            c.fatigue = nombre(c.fatigue) - part;
+            etapes.push({ type: "fatigue", cible: id, fatigueApres: c.fatigue, tic: m.nom });
+        });
+    });
+    return etapes;
 }
 
 // Le pourcentage de la jauge que ce combattant reprend à chaque fin de manche.
@@ -864,12 +903,22 @@ export function ouvrirManche(etat, file, des) {
     const rangee = placerCompagnons(suivant, propre);
     propre.splice(0, propre.length, ...rangee);
 
+    // (v347) « RELÂCHER », choisi en préparation : la technique maintenue
+    // s'arrête avant que la manche ne se joue — sa réserve n'est plus bloquée.
+    const etapesRelache = [];
+    file.forEach(f => {
+        const id = f && (f.id || f.idPersonnage);
+        (Array.isArray(f && f.relacher) ? f.relacher : []).forEach(idCarte => {
+            etapesRelache.push(...relacherMaintien(suivant, id, idCarte, "Relâché"));
+        });
+    });
+
     suivant.file = propre;
     suivant.phase = "Resolution";
     suivant.ontJoue = [];
     const etapesRepos = reposDuRetourArriere(suivant);
 
-    const etapes = [{ type: "tour", file: propre, phase: "Resolution",
+    const etapes = [...etapesRelache, { type: "tour", file: propre, phase: "Resolution",
                       manche: suivant.manche, ontJoue: [] }, ...etapesRepos];
     return fabriquerPas(etat, suivant, etapes, `manche|${suivant.manche}`, null, des);
 }
@@ -1090,14 +1139,14 @@ export function appliquerIntention(etat, intention, plateau) {
             etapes.push(...fureurDeLaSentinelle(suivant, intention.acteur, des, plateau));
         }
         // LA RÉSONANCE DU BOUCLIER frappe comme une carte, à coup sûr : chaque
-        // ennemi au contact, 5 % de ses PV max en physique, et Étourdi.
+        // ennemi au contact prend 15 % des PV max du Protecteur en physique
+        // (v347) ; l'Étourdi, 80 % de chance — moins 25 sur qui y résiste —,
+        // un dé par ennemi, dans l'ordre des ids.
         if (intention.idCarte === "CLASSE_RESONANCE_BOUCLIER") {
-            const action = actionResonanceBouclier(intention.acteur, ennemisAuContact(suivant, intention.acteur));
-            // Son Étourdi à coup sûr : à 75 % sur qui y résiste (v260).
-            Object.keys(action.jets.parCible).sort().forEach(v => {
-                const x = combattant(suivant, v);
-                if (resisteA(x, "Étourdi")) action.jets.parCible[v].etats["Étourdi"] = prisMalgreResistance(x, "Étourdi", des);
-            });
+            const ennemis = ennemisAuContact(suivant, intention.acteur);
+            const etourdis = Object.fromEntries(ennemis.map(e => e.id).sort().map(v =>
+                [v, des.d100() <= chanceFaceA(combattant(suivant, v), "Étourdi", CHANCE_ETOURDI_RESONANCE)]));
+            const action = actionResonanceBouclier(combattant(suivant, intention.acteur), ennemis, etourdis);
             const rc = resoudreCarte(suivant, action, plateau);
             suivant = clonerEtat(rc.etat);
             etapes.push(...rc.etapes);

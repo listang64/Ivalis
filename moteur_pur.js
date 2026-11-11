@@ -512,6 +512,17 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
             const c = pourCible(id);
             // Un soin ne s'esquive pas.
             if (c.esquive === undefined) c.esquive = attaque.isHeal ? false : jetDeDefense(id);
+            // LE REMPART (v347, Nico : « divise l'attaque en deux attaques, chacun
+            // la reçoit comme une attaque indépendante ») : le Protecteur qui
+            // couvre la cible a SES jets d'esquive et de parade pour sa moitié.
+            if (c.rempart === undefined && !attaque.isHeal && !attaque.isShield) {
+                const p = protecteurRempart(etat, combattant(etat, id));
+                if (p) {
+                    const esq = esquiveDe(p), par = paradeDe(p);
+                    const evite = des.d100() <= Math.max(esq, par);
+                    c.rempart = { id: p.id, esquive: evite, parade: evite && par > esq };
+                }
+            }
             if ((attaque.purifChance || 0) > 0 && c.purifie === undefined) {
                 c.purifie = critique || des.d100() <= attaque.purifChance;
                 // Le tirage de l'état retiré se fait ICI, avec les autres dés :
@@ -1632,7 +1643,57 @@ export function projectileDe(action) {
 export const ETAT_MUR_BOUCLIER = "Mur de bouclier";
 export const ETAT_REMPART = "Rempart";
 export const PARADE_MUR_BOUCLIER = 60;
-export const MANCHES_REMPART = 3;
+// (v347, la refonte du Protecteur : 4 manches, et une réserve maintenue.)
+export const MANCHES_REMPART = 4;
+
+// =========================================================================
+//  LA RÉSERVE MAINTENUE (v347)
+// =========================================================================
+//  Nico : « une mécanique commune, à implanter partout où il y a besoin : tant
+//  qu'elle est maintenue, la technique bloque et consomme tant de fatigue par
+//  tour ». Une technique de RESERVES_TECHNIQUES coûte sa part au lancement
+//  (la manche où elle part), puis, à chaque manche qu'elle dure encore, cette
+//  part est BLOQUÉE dans la jauge (ni carte ni pas ne peut la dépenser :
+//  reserveMaintenueDe) et CONSOMMÉE en fin de manche (reservesDeFinDeManche,
+//  cerveau_combat.js). À court d'énergie, elle tombe ; « Relâcher », choisi en
+//  préparation, l'arrête à l'ouverture de la manche (relacherMaintien).
+//
+//  Elle vit sur le LANCEUR, en un état « … maintenu » (`maintien` : l'id de la
+//  technique, `reserve` : la part, `dejaPaye` : la manche du lancement est
+//  payée, `liens` : les états qu'elle tient chez les autres — le Rempart posé
+//  sur l'allié). Elle vieillit comme tout état : ses manches sont celles de
+//  la technique.
+export const RESERVES_TECHNIQUES = {
+    CLASSE_REMPART: { parTour: 15, tours: MANCHES_REMPART, nom: "Rempart maintenu" }
+};
+export const reserveDeTechnique = (idCarte) => RESERVES_TECHNIQUES[idCarte] || null;
+// Ce que ses techniques maintenues bloquent dans sa jauge pour la manche en
+// cours (la manche du lancement est déjà payée).
+export function reserveMaintenueDe(c) {
+    return ((c && c.etats) || []).reduce((t, e) =>
+        t + (e && e.maintien && !e.dejaPaye && nombre(e.duree, 1) > 0 ? nombre(e.reserve) : 0), 0);
+}
+// Arrête une technique maintenue : son état chez le lanceur, et ce qu'elle
+// tenait chez les autres. Mute l'état, rend les étapes.
+export function relacherMaintien(etat, idLanceur, idCarte, raison) {
+    const etapes = [];
+    const c = combattant(etat, idLanceur);
+    if (!c) return etapes;
+    const tenus = (c.etats || []).filter(e => e && e.maintien === idCarte);
+    if (!tenus.length) return etapes;
+    c.etats = (c.etats || []).filter(e => !(e && e.maintien === idCarte));
+    etapes.push({ type: "etats", cible: idLanceur, liste: c.etats, relache: idCarte });
+    tenus.forEach(m => (m.liens || []).forEach(l => {
+        const x = combattant(etat, l.cible);
+        if (!x || !Array.isArray(x.etats)) return;
+        const apres = x.etats.filter(e => !(e && e.nom === l.nom && (!e.idProtecteur || e.idProtecteur === idLanceur)));
+        if (apres.length === x.etats.length) return;
+        x.etats = apres;
+        etapes.push({ type: "etats", cible: l.cible, liste: x.etats });
+    }));
+    if (raison) etapes.push({ type: "message", cible: idLanceur, acteur: idLanceur, texte: raison, couleur: "#e8c46a" });
+    return etapes;
+}
 // La Nuée de chauve-souris (Vampire, niveau 10) : l'esquive au moins à 40 %,
 // pour la manche en cours et la suivante.
 export const ETAT_NUEE = "Nuée de chauve-souris";
@@ -1710,11 +1771,14 @@ export const ETAT_ANTIMAGIE = "Bouclier anti-magie";
 export const MANCHES_ANTIMAGIE = 2;
 export const DESC_ANTIMAGIE = "Tout coup magique qui le frappe repart en entier sur son lanceur.";
 
-// LE PROTECTEUR (ex-Hoplite). Résonance du bouclier (niveau 10) : chaque
-// ennemi au contact est Étourdi (2 manches) et prend 5 % de ses PV max en
-// dégâts physiques (son armure réduit, son bouclier encaisse d'abord) — à
-// coup sûr, sans esquive ni critique.
-export const PART_PV_RESONANCE = 5;
+// LE PROTECTEUR (ex-Hoplite). Résonance du bouclier (niveau 9 depuis la v347) :
+// chaque ennemi au contact a 80 % de chance d'être Étourdi (2 manches ; sa
+// résistance à l'Étourdi retire ses 25 points — le dé est tiré par le cerveau)
+// et prend des dégâts physiques égaux à 15 % des PV max du PROTECTEUR (son
+// armure réduit, son bouclier encaisse d'abord) — à coup sûr, sans esquive ni
+// critique.
+export const PART_PV_RESONANCE = 15;
+export const CHANCE_ETOURDI_RESONANCE = 80;
 export const MANCHES_ETOURDI_RESONANCE = 2;
 export const DESC_ETOURDI = "-30% Esquive/Parade, 20% de chance d'échec d'attaque.";
 export function ennemisAuContact(etat, idLanceur) {
@@ -1724,15 +1788,16 @@ export function ennemisAuContact(etat, idLanceur) {
         x && x.id !== idLanceur && !x.aTerre && !x.estIllusion
         && (x.camp || "Allié") !== (c.camp || "Allié") && distanceHex(c, x) === 1);
 }
-export function actionResonanceBouclier(idLanceur, ennemis) {
+// `etourdis` : { id: true|false }, le dé de chacun (tiré par le cerveau).
+export function actionResonanceBouclier(lanceur, ennemis, etourdis) {
     const ids = ennemis.map(e => e.id);
+    const degats = Math.ceil(nombre(lanceur && lanceur.pvMax) * PART_PV_RESONANCE / 100);
     return {
-        type: "carte", idLanceur, idCarte: "CLASSE_RESONANCE_BOUCLIER", coutFatigue: 0, critique: false,
-        jets: { parCible: Object.fromEntries(ids.map(id => [id, { esquive: false, etats: { "Étourdi": true } }])) },
-        attaques: ennemis.map(e => ({ nom: "Résonance du bouclier", typeRes: "Physique",
-                                      valeurBrute: Math.ceil(nombre(e.pvMax) * PART_PV_RESONANCE / 100),
+        type: "carte", idLanceur: lanceur && lanceur.id, idCarte: "CLASSE_RESONANCE_BOUCLIER", coutFatigue: 0, critique: false,
+        jets: { parCible: Object.fromEntries(ids.map(id => [id, { esquive: false, etats: { "Étourdi": !!(etourdis && etourdis[id]) } }])) },
+        attaques: ennemis.map(e => ({ nom: "Résonance du bouclier", typeRes: "Physique", valeurBrute: degats,
                                       isRanged: false, rangeMax: 1, isHeal: false, isShield: false, cibles: [e.id] })),
-        alterations: ids.length ? [{ nom: "Étourdi", chance: 100, duree: MANCHES_ETOURDI_RESONANCE,
+        alterations: ids.length ? [{ nom: "Étourdi", chance: CHANCE_ETOURDI_RESONANCE, duree: MANCHES_ETOURDI_RESONANCE,
                                      desc: DESC_ETOURDI, isRanged: false, rangeMax: 1, cibles: ids }] : []
     };
 }
@@ -1759,6 +1824,22 @@ function casePlusProcheLibre(etat, plateau, depart, idIgnore) {
         anneau = suivant;
     }
     return null;
+}
+
+// LA RÉSERVE AU LANCEMENT (v347) : la part de la manche où la technique part
+// est payée tout de suite ; l'état « … maintenu » se pose chez le lanceur.
+function poserMaintien(c, idCarte, liens) {
+    const r = reserveDeTechnique(idCarte);
+    if (!r) return [];
+    const etapes = [];
+    c.fatigue = Math.max(0, nombre(c.fatigue) - r.parTour);
+    etapes.push({ type: "fatigue", cible: c.id, fatigueApres: c.fatigue, tic: r.nom });
+    c.etats = [...(c.etats || []).filter(e => !(e && e.maintien === idCarte)),
+               { nom: r.nom, maintien: idCarte, reserve: r.parTour, duree: r.tours, dejaPaye: true, liens,
+                 desc: `${r.parTour} d'énergie bloqués puis consommés à chaque manche tant qu'il est maintenu `
+                     + "(à court d'énergie, il tombe ; il se relâche en préparation)." }];
+    etapes.push({ type: "etats", cible: c.id, liste: c.etats, pose: r.nom });
+    return etapes;
 }
 
 // Ce qu'une technique de classe fait à l'état. Rend { etat, etapes } comme
@@ -1792,6 +1873,7 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
             allie.etats = [...(allie.etats || []).filter(e => e && e.nom !== ETAT_REMPART),
                            { nom: ETAT_REMPART, duree: MANCHES_REMPART, idProtecteur: id }];
             etapes.push({ type: "etats", cible: allie.id, liste: allie.etats, pose: ETAT_REMPART });
+            etapes.push(...poserMaintien(c, action.idCarte, [{ cible: allie.id, nom: ETAT_REMPART }]));
         }
     } else if (action.idCarte === "CLASSE_SOIN_URGENCE") {
         (suivant.ordre || Object.keys(suivant.combattants || {})).forEach(idAllie => {
@@ -2215,12 +2297,17 @@ export function resoudreCarte(etat, action, plateau) {
             // chaque effet séparément, elle esquive le coup. Sauf la Distorsion
             // mentale (v260) : elle ne s'esquive ni ne se pare, même quand un
             // autre coup de la carte a été évité.
-            if (des.esquive && !attaque.distorsion) {
+            // LE REMPART (v347) : deux attaques indépendantes — celle du
+            // Protecteur part même si la cible esquive la sienne (plus bas).
+            const protecteurCoup = (!attaque.isHeal && !attaque.isShield) ? protecteurRempart(suivant, cible) : null;
+            const cibleEsquive = !!(des.esquive && !attaque.distorsion);
+            if (cibleEsquive) {
                 etapes.push({ type: "esquive", cible: idCible, acteur: idLanceur,
                               parade: !!des.parade });
-                return;
+                if (!protecteurCoup) return;
+            } else {
+                touchees.add(idCible);
             }
-            touchees.add(idCible);
 
             // --- BOUCLIER -----------------------------------------------
             // AVANT le soin, et c'est capital : l'extraction (moteur_effets.js)
@@ -2417,26 +2504,30 @@ export function resoudreCarte(etat, action, plateau) {
                 etapes.push(...tomber(suivant, idCible, idLanceur));
             };
 
-            // LE REMPART (Hoplite, niveau 10) : la cible a un protecteur debout
-            // à côté d'elle. L'attaque est partagée en deux attaques
-            // indépendantes — moitié des dégâts chacune, chacun avec ses
-            // propres défenses (pas de jet d'esquive pour l'Hoplite : le coup a
-            // déjà porté). L'Hoplite prend la moitié arrondie au-dessus.
-            const protecteur = protecteurRempart(suivant, cible);
+            // LE REMPART (Protecteur, niveau 3) : la cible a un protecteur
+            // debout à côté d'elle. L'attaque est divisée en deux attaques
+            // indépendantes — moitié des dégâts chacune (le Protecteur prend la
+            // moitié arrondie au-dessus), chacun avec ses défenses. v347 : le
+            // Protecteur a ses propres jets d'esquive et de parade (des.rempart,
+            // tirerDesCarte) ; sa moitié part même si la cible a esquivé la
+            // sienne. (Un coup sans jets — une technique à coup sûr — le touche.)
+            const protecteur = protecteurCoup;
             if (protecteur) {
                 const brut = decimal(attaqueAvecBonus.valeurBrute);
                 const partHoplite = Math.ceil(brut / 2);
+                const jetP = (des.rempart && des.rempart.id === protecteur.id) ? des.rempart : null;
                 etapes.push({ type: "message", cible: protecteur.id, acteur: idLanceur,
                               texte: "🛡️ Rempart", couleur: "#e8c46a" });
-                frapper(idCible, cible, { ...attaqueAvecBonus, valeurBrute: brut - partHoplite });
-                frapper(protecteur.id, protecteur, { ...attaqueAvecBonus, valeurBrute: partHoplite });
+                if (!cibleEsquive) frapper(idCible, cible, { ...attaqueAvecBonus, valeurBrute: brut - partHoplite });
+                if (jetP && jetP.esquive) etapes.push({ type: "esquive", cible: protecteur.id, acteur: idLanceur, parade: !!jetP.parade, rempart: true });
+                else frapper(protecteur.id, protecteur, { ...attaqueAvecBonus, valeurBrute: partHoplite });
             } else {
                 frapper(idCible, cible, attaqueAvecBonus);
             }
 
             // LA LUMIÈRE QUI AVEUGLE (Chasseur de mages) : la cible touchée,
-            // avec son noir.
-            if (des.lumiereAveugle && des.noirLumiere && !aveuglesParLaLumiere.has(idCible)) {
+            // avec son noir. (Pas la cible qui a esquivé sa moitié du Rempart.)
+            if (!cibleEsquive && des.lumiereAveugle && des.noirLumiere && !aveuglesParLaLumiere.has(idCible)) {
                 aveuglesParLaLumiere.add(idCible);
                 const etapesNoir = [];
                 Object.keys(des.noirLumiere).forEach(v => {
@@ -2875,6 +2966,8 @@ if (typeof window !== "undefined") {
         // La triche des créatures, réglée depuis le tableau des monstres (v252).
         bonusMonstreDe, appliquerBonusMonstre, reglerBonusMonstres, bonusMonstresActuels, BONUS_MONSTRE_DEFAUT,
         // Le leader (v262), réglé depuis le même tableau.
-        reglerLeader, leaderActuel, LEADER_DEFAUT, chanceEtatDe
+        reglerLeader, leaderActuel, LEADER_DEFAUT, chanceEtatDe,
+        // La réserve maintenue (v347), lue par l'écran de préparation.
+        RESERVES_TECHNIQUES, reserveMaintenueDe
     };
 }

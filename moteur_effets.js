@@ -3910,8 +3910,8 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
         if (bonusDegatsPct > 0) attaque.valeurBrute = Math.round(attaque.valeurBrute * (1 + bonusDegatsPct / 100));
     });
 
-    // LE PROTECTEUR PROVOQUE : chacune de ses attaques a 15 % de chance de
-    // provoquer les ennemis qu'elle frappe. Une carte qui provoquait déjà
+    // LE PROTECTEUR PROVOQUE : chacune de ses attaques a 10 % de chance de
+    // provoquer les ennemis qu'elle frappe (20 % dès le niveau 5, v347). Une carte qui provoquait déjà
     // garde la meilleure des deux chances.
     const provoc = Number(atouts.provocationAttaques) || 0;
     if (provoc > 0) {

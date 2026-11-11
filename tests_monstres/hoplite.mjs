@@ -22,6 +22,12 @@
 // physiques des PV max de la cible. Hoplite : changer son nom par
 // Protecteur. » Le Mur de bouclier n'est plus donné ; le moteur le sait
 // toujours jouer (section 2, palier rendu le temps de la section).
+//
+// v347, la refonte des classes (Nico) : niveau 1 +8 % de parade et 10 % de
+// provocation ; niveau 3 le Rempart (4 tours, réserve 15 par tour, des jets
+// pour chacun) ; niveau 5 +10 % de provocation et plus de malus des boucliers
+// lourds ; niveau 9 la Résonance (initiative 50, 80 % d'Étourdi, 15 % des PV
+// max du Protecteur). La réserve et les jets du Rempart : corrections_v347.mjs.
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -44,7 +50,7 @@ const REGLES = {
     defPhysique: w.defPhysiqueCombattant, defMagique: w.defMagiqueCombattant,
     critique: w.critiqueCombattant, atouts: w.atoutRace, bonusEquip: w.bonusEquip
 };
-const XP = { 1: 0, 4: 1800, 5: 2500, 9: 6400, 10: 7900 };
+const XP = { 1: 0, 2: 700, 3: 1200, 4: 1800, 5: 2500, 8: 5200, 9: 6400, 10: 7900 };
 
 const fiche = (id, extra = {}) => ({
     idPersonnage: id, prenom: id, race: "Humain", classe: "", camp: id.startsWith("M") ? "Ennemi" : "Allié",
@@ -77,28 +83,35 @@ const frapper = (e, cible, valeur, extra = {}) => resoudreCarte(e, {
 console.log("\n=========================================================");
 console.log("  L'HOPLITE");
 // =========================================================================
-console.log("\n1. LE PROTECTEUR (EX-HOPLITE) : +7 PARADE, 15 % DE PROVOCATION ; RANG 5 REMPART, RANG 10 RÉSONANCE");
+console.log("\n1. LE PROTECTEUR (v347) : +8 PARADE, 10 % DE PROVOCATION ; NIV. 3 REMPART ; NIV. 5 +10 % ; NIV. 9 RÉSONANCE");
 // =========================================================================
 {
-    const a1 = w.atoutClasse(hoplite(1)), a5 = w.atoutClasse(hoplite(5)), a10 = w.atoutClasse(hoplite(10));
-    verifier("niveau 1 : +7 parade, 15 % de provocation, pas de technique",
-             a1.parade === 7 && a1.provocationAttaques === 15 && !a1.defPhysique && !(a1.techniques || []).length, JSON.stringify(a1));
-    verifier("niveau 5 : le Rempart (plus de Mur de bouclier)", JSON.stringify(a5.techniques) === '["CLASSE_REMPART"]', JSON.stringify(a5.techniques));
-    verifier("niveau 10 : + la Résonance du bouclier",
-             JSON.stringify(a10.techniques) === '["CLASSE_REMPART","CLASSE_RESONANCE_BOUCLIER"]', JSON.stringify(a10.techniques));
+    const a1 = w.atoutClasse(hoplite(1)), a2 = w.atoutClasse(hoplite(2)), a3 = w.atoutClasse(hoplite(3)), a4 = w.atoutClasse(hoplite(4));
+    const a5 = w.atoutClasse(hoplite(5)), a8 = w.atoutClasse(hoplite(8)), a9 = w.atoutClasse(hoplite(9)), a10 = w.atoutClasse(hoplite(10));
+    verifier("niveau 1 : +8 parade, 10 % de provocation, pas de technique",
+             a1.parade === 8 && a1.provocationAttaques === 10 && !a1.defPhysique && !(a1.techniques || []).length && !a1.bouclierLourdSansMalus, JSON.stringify(a1));
+    verifier("niveau 2 : rien de plus ; niveau 3 : le Rempart (plus de Mur de bouclier)",
+             !(a2.techniques || []).length && JSON.stringify(a3.techniques) === '["CLASSE_REMPART"]', JSON.stringify(a3.techniques));
+    verifier("niveau 4 : encore 10 % ; niveau 5 : 20 % de provocation, boucliers lourds sans malus",
+             a4.provocationAttaques === 10 && a5.provocationAttaques === 20 && a5.bouclierLourdSansMalus === true && a5.parade === 8, JSON.stringify(a5));
+    verifier("niveau 8 : pas encore la Résonance ; niveau 9 : + la Résonance du bouclier",
+             JSON.stringify(a8.techniques) === '["CLASSE_REMPART"]'
+             && JSON.stringify(a9.techniques) === '["CLASSE_REMPART","CLASSE_RESONANCE_BOUCLIER"]', JSON.stringify(a9.techniques));
+    verifier("niveau 10 : les mêmes (la classe s'arrête au 9)", JSON.stringify(a10) === JSON.stringify(a9));
     verifier("une fiche « Hoplite » est un Protecteur", w.nomActuelClasse("Hoplite") === "Protecteur"
              && w.estDeLaClasse({ classe: "Hoplite" }, "Protecteur"));
-    verifier("la parade de la fiche monte de 7, la défense physique ne bouge plus",
-             w.paradeCombattant(hoplite(1)) === w.paradeCombattant(fiche("X")) + 7
+    verifier("la parade de la fiche monte de 8, la défense physique ne bouge plus",
+             w.paradeCombattant(hoplite(1)) === w.paradeCombattant(fiche("X")) + 8
              && w.defPhysiqueCombattant(hoplite(1)) === w.defPhysiqueCombattant(fiche("X")));
     const e = monde(10);
-    verifier("en combat : +7 de parade, techniques dans l'atout",
-             e.combattants.H.def.parade === 7 && e.combattants.H.def.physique === 0
+    verifier("en combat : +8 de parade, techniques dans l'atout",
+             e.combattants.H.def.parade === 8 && e.combattants.H.def.physique === 0
              && e.combattants.H.atouts.techniques.length === 2, JSON.stringify(e.combattants.H.def));
     const res = w.TECHNIQUES_CLASSE.CLASSE_RESONANCE_BOUCLIER;
-    verifier("les cartes : Rempart init 105 niveau 5, Résonance niveau 10, fatigue 0",
-             w.carteTechniqueClasse("CLASSE_REMPART").Initiative === 105 && w.TECHNIQUES_CLASSE.CLASSE_REMPART.niveau === 5
-             && res.niveau === 10 && res.Fatigue === 0 && res.classe === "Protecteur");
+    verifier("les cartes : Rempart init 105 niveau 3 (réserve 15), Résonance init 50 niveau 9, fatigue 0",
+             w.carteTechniqueClasse("CLASSE_REMPART").Initiative === 105 && w.TECHNIQUES_CLASSE.CLASSE_REMPART.niveau === 3
+             && w.carteTechniqueClasse("CLASSE_REMPART").Fatigue === 15
+             && res.niveau === 9 && res.Initiative === 50 && res.Fatigue === 0 && res.classe === "Protecteur");
     // (Un Ondari : l'Humain a une compétence de plus depuis la v237.)
     verifier("la limite en main ne bouge pas (6)", w.competencesMaxCombattant(hoplite(10, { race: "Ondari" })) === 6);
 }
@@ -113,7 +126,7 @@ console.log("\n2. MUR DE BOUCLIER : +60 DE PARADE JUSQU'À LA FIN DE LA MANCHE, 
     verifier("l'intention est acceptée", validerIntention(e, i).ok, validerIntention(e, i).raison);
     const pas = appliquerIntention(e, i);
     const h = pas.etat.combattants.H;
-    verifier("+60 de parade sur soi (7 + 60)", paradeDe(h) === 67, String(paradeDe(h)));
+    verifier("+60 de parade sur soi (8 + 60)", paradeDe(h) === 68, String(paradeDe(h)));
     verifier("la technique est marquée « utilisée »", JSON.stringify(h.techniquesUtilisees) === '["CLASSE_MUR_BOUCLIER"]');
     verifier("elle occupe le tour : la file avance", pas.etat.file[0] && pas.etat.file[0].id === "M",
              JSON.stringify(pas.etat.file.map(f => f.id)));
@@ -121,10 +134,10 @@ console.log("\n2. MUR DE BOUCLIER : +60 DE PARADE JUSQU'À LA FIN DE LA MANCHE, 
     verifier("l'état reste cohérent", verifierEtatCombat(pas.etat).length === 0, verifierEtatCombat(pas.etat).join(" | "));
     const rejoue = appliquerEntree(e, pas.entree).combattants.H;
     verifier("rejoué depuis le journal : même parade, même usage",
-             paradeDe(rejoue) === 67 && JSON.stringify(rejoue.techniquesUtilisees) === '["CLASSE_MUR_BOUCLIER"]');
+             paradeDe(rejoue) === 68 && JSON.stringify(rejoue.techniquesUtilisees) === '["CLASSE_MUR_BOUCLIER"]');
     const fin = clonerEtat(pas.etat);
     vieillirLesEtats(fin);
-    verifier("à la fin de la manche, il tombe", paradeDe(fin.combattants.H) === 7, String(paradeDe(fin.combattants.H)));
+    verifier("à la fin de la manche, il tombe", paradeDe(fin.combattants.H) === 8, String(paradeDe(fin.combattants.H)));
     const encore = enTete(clonerEtat(pas.etat), "H", "CLASSE_MUR_BOUCLIER");
     verifier("une seconde fois dans le combat : refusée", !validerIntention(encore, intention("CLASSE_MUR_BOUCLIER")).ok,
              validerIntention(encore, intention("CLASSE_MUR_BOUCLIER")).raison);
@@ -137,7 +150,7 @@ console.log("\n2. MUR DE BOUCLIER : +60 DE PARADE JUSQU'À LA FIN DE LA MANCHE, 
 }
 
 // =========================================================================
-console.log("\n2 bis. RÉSONANCE DU BOUCLIER : LES ENNEMIS AU CONTACT ÉTOURDIS, 5 % DE LEURS PV MAX");
+console.log("\n2 bis. RÉSONANCE DU BOUCLIER (v347) : 80 % D'ÉTOURDI, 15 % DES PV MAX DU PROTECTEUR");
 // =========================================================================
 {
     // H en (0,0) ; M au contact en (1,-1) ; N au contact en (-1,0) avec 50 % d'armure ;
@@ -151,39 +164,49 @@ console.log("\n2 bis. RÉSONANCE DU BOUCLIER : LES ENNEMIS AU CONTACT ÉTOURDIS,
     enTete(e, "H", "CLASSE_RESONANCE_BOUCLIER");
     const i = intention("CLASSE_RESONANCE_BOUCLIER");
     verifier("niveau 10, des ennemis au contact : acceptée", validerIntention(e, i).ok, validerIntention(e, i).raison || "");
-    verifier("niveau 9 : il ne l'a pas", !validerIntention(enTete(monde(9), "H", "CLASSE_RESONANCE_BOUCLIER"), i).ok);
+    verifier("niveau 9 : acceptée ; niveau 8 : il ne l'a pas", validerIntention(enTete(monde(9, { M: { q: 1, r: -1 } }), "H", "CLASSE_RESONANCE_BOUCLIER"), i).ok
+             && !validerIntention(enTete(monde(8, { M: { q: 1, r: -1 } }), "H", "CLASSE_RESONANCE_BOUCLIER"), i).ok);
     const seul = enTete(monde(10, { M: { q: 4, r: 0 } }), "H", "CLASSE_RESONANCE_BOUCLIER");
     verifier("personne au contact : refusée (pas gâchée)", !validerIntention(seul, i).ok, validerIntention(seul, i).raison);
     const pas = appliquerIntention(e, i);
     const c = pas.etat.combattants;
     const etourdi = (x) => (x.etats || []).find(t => t.nom === "Étourdi");
-    verifier(`M (200 PV) : ${PART_PV_RESONANCE} % → 10 physiques, Étourdi 2 manches`, c.M.pv === 190 && etourdi(c.M) && etourdi(c.M).duree === 2,
-             `${c.M.pv} ${JSON.stringify(c.M.etats)}`);
-    verifier("MN (100 PV, 50 % d'armure) : 5 → 3 (l'armure compte), Étourdi", c.MN.pv === 97 && !!etourdi(c.MN), String(c.MN.pv));
+    const etat2 = (x) => !!etourdi(x) || pas.entree.etapes.some(t => t.type === "etatRate" && t.cible === x.id);
+    verifier(`M (200 PV) : ${PART_PV_RESONANCE} % des 100 PV max du Protecteur → 15 physiques ; Étourdi (2 manches) ou raté`,
+             c.M.pv === 185 && etat2(c.M) && (!etourdi(c.M) || etourdi(c.M).duree === 2), `${c.M.pv} ${JSON.stringify(c.M.etats)}`);
+    verifier("MN (100 PV, 50 % d'armure) : 15 → 8 (l'armure compte)", c.MN.pv === 92 && etat2(c.MN), String(c.MN.pv));
     verifier("ni l'allié au contact, ni un ennemi loin, ni lui", c.A.pv === 100 && !etourdi(c.A) && !etourdi(c.B) && c.H.pv === 100);
-    verifier("à coup sûr, sans fatigue, une fois par combat", c.H.fatigue === 100
+    verifier("les dégâts à coup sûr, sans fatigue, une fois par combat", c.H.fatigue === 100
              && !validerIntention(enTete(clonerEtat(pas.etat), "H", "CLASSE_RESONANCE_BOUCLIER"), i).ok);
     const rejoue = appliquerEntree(e, pas.entree).combattants;
-    verifier("rejoué depuis le journal : mêmes PV, mêmes états", rejoue.M.pv === 190 && rejoue.MN.pv === 97 && !!etourdi(rejoue.M));
+    verifier("rejoué depuis le journal : mêmes PV, mêmes états", rejoue.M.pv === 185 && rejoue.MN.pv === 92
+             && JSON.stringify(rejoue.M.etats) === JSON.stringify(c.M.etats));
+    // Un Protecteur à 140 PV max : 21 de dégâts.
+    const gros = clonerEtat(e); gros.combattants.H.pvMax = 140;
+    verifier("un Protecteur à 140 PV max : 21 dégâts (15 % de SES PV max)",
+             appliquerIntention(enTete(gros, "H", "CLASSE_RESONANCE_BOUCLIER"), i).etat.combattants.M.pv === 179);
     const titre = misEnScene(pas.entree.etapes.find(x => x.type === "techniqueClasse"), pas.etat);
     verifier("à l'écran : « 🛡️ Résonance du bouclier »", titre && /Résonance du bouclier/.test(titre.texte));
     // v260 : plus d'immunité — qui RÉSISTE à l'Étourdi a un dé du cerveau, à 75 %.
     const imm = clonerEtat(e); imm.combattants.M.atouts.resistances = ["Étourdi"];
     const pasR = appliquerIntention(enTete(imm, "H", "CLASSE_RESONANCE_BOUCLIER"), i);
     const ri = pasR.etat.combattants.M;
-    verifier("qui résiste prend les dégâts ; l'Étourdi à 75 % (pris, ou « résisté » dit)", ri.pv === 190
+    verifier("qui résiste prend les dégâts ; l'Étourdi (pris, ou « résisté » dit)", ri.pv === 185
              && (etourdi(ri) ? true : pasR.entree.etapes.some(x => x.type === "etatRate" && x.cible === "M")));
-    // Sur cent graines, il prend environ trois fois sur quatre.
-    let pris = 0;
-    for (let g = 1; g <= 200; g++) {
-        const s = clonerEtat(imm); s.graine = g;
+    // Sur 400 graines : environ 80 % sans résistance, 55 % (80 − 25) avec.
+    let pris = 0, prisR = 0;
+    for (let g = 1; g <= 400; g++) {
+        const s = clonerEtat(e); s.graine = g;
         if (etourdi(appliquerIntention(enTete(s, "H", "CLASSE_RESONANCE_BOUCLIER"), i).etat.combattants.M)) pris++;
+        const r = clonerEtat(imm); r.graine = g;
+        if (etourdi(appliquerIntention(enTete(r, "H", "CLASSE_RESONANCE_BOUCLIER"), i).etat.combattants.M)) prisR++;
     }
-    verifier("…environ 3 fois sur 4 (sur 200 graines)", Math.abs(pris / 200 - 0.75) < 0.08, `${pris}/200`);
+    verifier("…l'Étourdi prend environ 4 fois sur 5 (sur 400 graines)", Math.abs(pris / 400 - 0.8) < 0.06, `${pris}/400`);
+    verifier("…et environ 55 % du temps sur qui y résiste (80 − 25)", Math.abs(prisR / 400 - 0.55) < 0.07, `${prisR}/400`);
 }
 
 // =========================================================================
-console.log("\n3. REMPART : SUR UN ALLIÉ ADJACENT, POUR 3 MANCHES");
+console.log("\n3. REMPART : SUR UN ALLIÉ ADJACENT, POUR 4 MANCHES (v347)");
 // =========================================================================
 let protege;
 {
@@ -196,15 +219,15 @@ let protege;
     verifier("sans cible : refusé", !ok(undefined).ok);
     const pas = appliquerIntention(e, intention("CLASSE_REMPART", "A"));
     const etat = pas.etat.combattants.A.etats.find(x => x.nom === "Rempart");
-    verifier("l'allié porte le Rempart, 3 manches, protégé par H",
-             !!etat && etat.duree === 3 && etat.idProtecteur === "H", JSON.stringify(etat));
+    verifier("l'allié porte le Rempart, 4 manches, protégé par H",
+             !!etat && etat.duree === 4 && etat.idProtecteur === "H", JSON.stringify(etat));
     verifier("la technique est marquée « utilisée »", pas.etat.combattants.H.techniquesUtilisees.includes("CLASSE_REMPART"));
     protege = pas.etat;
     const t = clonerEtat(protege);
-    vieillirLesEtats(t); vieillirLesEtats(t);
-    const reste2 = t.combattants.A.etats.some(x => x.nom === "Rempart");
+    vieillirLesEtats(t); vieillirLesEtats(t); vieillirLesEtats(t);
+    const reste3 = t.combattants.A.etats.some(x => x.nom === "Rempart");
     vieillirLesEtats(t);
-    verifier("il tient 3 manches, puis s'éteint", reste2 && !t.combattants.A.etats.some(x => x.nom === "Rempart"));
+    verifier("il tient 4 manches, puis s'éteint", reste3 && !t.combattants.A.etats.some(x => x.nom === "Rempart"));
 }
 
 // =========================================================================
@@ -371,9 +394,9 @@ console.log("\n5. LA FICHE PERSO : LES TECHNIQUES DE CLASSE À PART");
   });
   await p.screenshot({ path: "/tmp/claude-0/hoplite_fiche.png" });
   verifier("une section « Techniques de classe », après le grimoire", r.section && r.apresLeGrimoire, JSON.stringify(r));
-  verifier("niveau 5 : Rempart acquis, Résonance du bouclier verrouillée (niveau 10)",
+  verifier("niveau 5 : Rempart acquis, Résonance du bouclier verrouillée (niveau 9)",
            JSON.stringify(r.techniques.map(t => [t.id, t.verrouillee])) === '[["CLASSE_REMPART",false],["CLASSE_RESONANCE_BOUCLIER",true]]'
-           && /Niveau 10 requis/.test(r.techniques[1].badge), JSON.stringify(r.techniques));
+           && /Niveau 9 requis/.test(r.techniques[1].badge), JSON.stringify(r.techniques));
   verifier("elles ne comptent pas dans les mémorisées (1 / 6)", r.memorisees === "1", r.memorisees);
   verifier("mêmes bannières que les techniques forgées (même cadre)",
            r.techniques.every(t => t.banniere) && /ban_cible/.test(r.cadreJoueur) && /bandeau_carte_normal/.test(r.techniques[0].cadre), r.techniques[0].cadre);
@@ -498,14 +521,15 @@ console.log("\n7. LA FICHE DE CLASSE : LE DESCRIPTIF DU PROTECTEUR");
              niveaux: [...d.querySelectorAll(".palier-classe-niveau")].map(x => x.textContent.trim()), texte: d.textContent };
   });
   await p.screenshot({ path: "/tmp/claude-0/hoplite_classe.png" });
-  verifier("présentation et paliers Niv. 1 / 5 / 10", r.visible && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]');
-  verifier("Rempart, Résonance, +7 % de parade et provocation y sont dits — plus de Mur",
-           /Rempart/.test(r.texte) && /Résonance du bouclier/.test(r.texte) && /\+7 % de parade/.test(r.texte)
-           && /provoquer/.test(r.texte) && !/Mur de bouclier/.test(r.texte));
+  verifier("présentation et paliers Niv. 1 / 3 / 5 / 9 (v347)", r.visible && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 3","Niv. 5","Niv. 9"]',
+           JSON.stringify(r.niveaux));
+  verifier("Rempart, Résonance, +8 % de parade, provocation, boucliers lourds y sont dits — plus de Mur",
+           /Rempart/.test(r.texte) && /Résonance du bouclier/.test(r.texte) && /\+8 % de parade/.test(r.texte)
+           && /provoquer/.test(r.texte) && /boucliers lourds/.test(r.texte) && /réserve 15/.test(r.texte) && !/Mur de bouclier/.test(r.texte));
 }
 
 // =========================================================================
-console.log("\n8. 15 % DE PROVOCATION SUR CHACUNE DE SES ATTAQUES");
+console.log("\n8. 10 % DE PROVOCATION SUR CHACUNE DE SES ATTAQUES (20 % AU NIVEAU 5)");
 // =========================================================================
 {
   const r = await p.evaluate(() => {
@@ -515,22 +539,24 @@ console.log("\n8. 15 % DE PROVOCATION SUR CHACUNE DE SES ATTAQUES");
     const enrichir = (state, qui = lanceur) => { window.appliquerEquipementALaCarte(state, qui, ""); return state.alterations || []; };
     const coup = () => ({ attaques: [{ nom: "Coup", valeurBrute: 5, typeRes: "Physique", cibles: ["M1", "A1"] }], alterations: [] });
     const simple = enrichir(coup());
-    const dejaFaible = enrichir({ ...coup(), alterations: [{ nom: "Provocation", chance: 10, cibles: ["M1"] }] });
+    const dejaFaible = enrichir({ ...coup(), alterations: [{ nom: "Provocation", chance: 5, cibles: ["M1"] }] });
     const dejaForte = enrichir({ ...coup(), alterations: [{ nom: "Provocation", chance: 40, cibles: ["M1"] }] });
     const soin = enrichir({ attaques: [{ nom: "Soin", valeurBrute: 5, isHeal: true, cibles: ["A1"] }], alterations: [] });
     const autre = enrichir(coup(), { idPersonnage: "X", camp: "Allié", classe: "Oracle", xp: 0 });
     const ancien = enrichir(coup(), { idPersonnage: "H2", camp: "Allié", classe: "Hoplite", xp: 0 });
-    return { simple, dejaFaible, dejaForte, soin, autre, ancien };
+    const niv5 = enrichir(coup(), { idPersonnage: "H3", camp: "Allié", classe: "Protecteur", xp: 2500 });
+    return { simple, dejaFaible, dejaForte, soin, autre, ancien, niv5 };
   });
   const prov = (l) => l.find(a => a.nom === "Provocation");
-  verifier("une attaque : Provocation 15 %, sur l'ennemi frappé seulement, au nom du Protecteur",
-           prov(r.simple) && prov(r.simple).chance === 15 && JSON.stringify(prov(r.simple).cibles) === '["M1"]'
+  verifier("une attaque : Provocation 10 %, sur l'ennemi frappé seulement, au nom du Protecteur",
+           prov(r.simple) && prov(r.simple).chance === 10 && JSON.stringify(prov(r.simple).cibles) === '["M1"]'
            && prov(r.simple).idProvocateur === "H1" && prov(r.simple).duree === 2, JSON.stringify(r.simple));
-  verifier("une carte qui provoquait à 10 % : montée à 15", prov(r.dejaFaible).chance === 15 && r.dejaFaible.length === 1);
+  verifier("une carte qui provoquait à 5 % : montée à 10", prov(r.dejaFaible).chance === 10 && r.dejaFaible.length === 1);
+  verifier("niveau 5 : 20 % de provocation", prov(r.niv5) && prov(r.niv5).chance === 20, JSON.stringify(r.niv5));
   verifier("une carte qui provoquait à 40 % : garde 40", prov(r.dejaForte).chance === 40);
   verifier("un soin : aucune provocation", !prov(r.soin));
   verifier("une autre classe : rien", !prov(r.autre));
-  verifier("un héros resté « Hoplite » sur sa fiche provoque aussi", prov(r.ancien) && prov(r.ancien).chance === 15);
+  verifier("un héros resté « Hoplite » sur sa fiche provoque aussi", prov(r.ancien) && prov(r.ancien).chance === 10);
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

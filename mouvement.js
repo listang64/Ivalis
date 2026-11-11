@@ -306,7 +306,9 @@ window.ajouterEtapeMouvement = function(q, r) {
     const persoActuel = window.COMBAT_PERSOS_JOUEUR ? window.COMBAT_PERSOS_JOUEUR[window.COMBAT_INDEX_PERSO] : null;
     const fatigueBrute = persoActuel ? persoActuel.fatigueActuelle : (window.COMBAT_FATIGUE_ACTUELLE || 0);
     const coutCompetence = window.COUT_COMPETENCE_SELECTIONNEE || 0;
-    const fatigueDispo = fatigueBrute - coutCompetence;
+    // (v347) La réserve d'une technique maintenue (le Rempart) est bloquée.
+    const reserveBloquee = typeof window.reserveMaintenueBloquee === "function" ? window.reserveMaintenueBloquee(persoActuel) : 0;
+    const fatigueDispo = fatigueBrute - coutCompetence - reserveBloquee;
 
     // Glacé : le coût en fatigue du mouvement (à pied) est doublé tant que l'état est actif,
     // cumulable avec le doublement du terrain difficile.

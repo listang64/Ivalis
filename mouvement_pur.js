@@ -27,7 +27,7 @@
 // =========================================================================
 
 import { clonerEtat, combattant, tomber, franchissablePour, fuyardActif } from './combat_etat.js';
-import { esquiveDe, paradeDe, defPhysiqueDe, bonusDesEtats, aLEtat, traverserZones, protecteurRempart,
+import { esquiveDe, paradeDe, defPhysiqueDe, bonusDesEtats, aLEtat, traverserZones, protecteurRempart, reserveMaintenueDe,
          ligneDeVue, caseLibre, destinationPoussee } from './moteur_pur.js';
 
 const nombre = (v, defaut = 0) => {
@@ -184,7 +184,9 @@ export function planifierTrajet(etat, id, chemin, plateau, options) {
     // un tour par resoudreCarte quand une arme le prévoit et qu'on vient de
     // frapper.
     const offertes = bonusDesEtats(c, "hexApresAttaque");
-    const budget = Math.max(0, c.fatigue - Math.max(0, reserveCarte));
+    // (v347) La réserve d'une technique maintenue (le Rempart) est bloquée : on
+    // ne marche pas avec.
+    const budget = Math.max(0, c.fatigue - Math.max(0, reserveCarte) - reserveMaintenueDe(c));
 
     const pas = [];
     let cout = 0;
@@ -283,6 +285,8 @@ export const degatsOpportuniteContre = (cible, attaquant) => reduireParArmure(ci
 // trois marches (déplacement, Peur, Repli), et le REMPART de l'Hoplite : si la
 // cible en a un actif, les 8 dégâts bruts sont partagés en deux attaques
 // indépendantes, chacun avec sa propre armure (moteur_pur.js, protecteurRempart).
+// v347 : chacun avec son jet d'esquive ou de parade (resoudreOpportunite) — la
+// moitié du Protecteur part même si la cible a évité la sienne.
 export function infligerOpportunite(etat, idCible, ennemi, coup, hex) {
     const etapes = [];
     const cible = combattant(etat, idCible);
@@ -298,10 +302,12 @@ export function infligerOpportunite(etat, idCible, ennemi, coup, hex) {
     if (protecteur) {
         const brut = nombre(coup.brut, DEGATS_OPPORTUNITE);
         const partHoplite = Math.ceil(brut / 2);
-        etapes.push({ type: "opportunite", ...coup, hex });
+        const jetP = (coup.rempart && coup.rempart.id === protecteur.id) ? coup.rempart : null;
+        etapes.push({ type: "opportunite", ...coup, ...(coup.cibleEvitee ? { evitee: true, mot: coup.motCible, montant: 0 } : {}), hex });
         etapes.push({ type: "message", cible: protecteur.id, acteur: ennemi, texte: "🛡️ Rempart", couleur: "#e8c46a" });
-        appliquer(idCible, cible, reduireParArmure(cible, brut - partHoplite));
-        appliquer(protecteur.id, protecteur, reduireParArmure(protecteur, partHoplite));
+        if (!coup.cibleEvitee) appliquer(idCible, cible, reduireParArmure(cible, brut - partHoplite));
+        if (jetP && jetP.evitee) etapes.push({ type: "message", cible: protecteur.id, acteur: ennemi, texte: jetP.mot });
+        else appliquer(protecteur.id, protecteur, reduireParArmure(protecteur, partHoplite));
         return etapes;
     }
     if (cible.bouclier > 0) cible.bouclier = Math.max(0, cible.bouclier - coup.montant);
@@ -323,13 +329,25 @@ export function resoudreOpportunite(etat, idAttaquant, idCible, des) {
     // Un fuyard (v268, les apparitions) : sa dérobade à lui, tant qu'il fuit.
     const derobade = Math.max(nombre(cible.atouts && cible.atouts.esquiveOpportunite),
                               fuyardActif(etat, cible) ? nombre(cible.fuyard.esquiveOpportunite) : 0);
+    let evitee = false, mot = "";
     if (derobade > 0 && des.d100() <= derobade) {
-        return { attaquant: idAttaquant, cible: idCible, evitee: true, mot: "Dérobade 🐾", montant: 0 };
+        evitee = true; mot = "Dérobade 🐾";
+    } else {
+        const esquive = esquiveDe(cible), parade = paradeDe(cible);
+        evitee = des.d100() <= Math.max(esquive, parade);
+        mot = parade > esquive ? "Paré 🛡️" : "Esquivé 💨";
     }
 
-    const esquive = esquiveDe(cible), parade = paradeDe(cible);
-    const evitee = des.d100() <= Math.max(esquive, parade);
-    const mot = parade > esquive ? "Paré 🛡️" : "Esquivé 💨";
+    // LE REMPART (v347) : le Protecteur qui couvre la cible a son propre jet
+    // pour sa moitié (infligerOpportunite).
+    const p = protecteurRempart(etat, cible);
+    if (p) {
+        const esqP = esquiveDe(p), parP = paradeDe(p);
+        const rempart = { id: p.id, evitee: des.d100() <= Math.max(esqP, parP), mot: parP > esqP ? "Paré 🛡️" : "Esquivé 💨" };
+        if (evitee && rempart.evitee) return { attaquant: idAttaquant, cible: idCible, evitee: true, mot, montant: 0, rempart };
+        return { attaquant: idAttaquant, cible: idCible, evitee: false, mot: "", cibleEvitee: evitee, motCible: evitee ? mot : "",
+                 brut: degatsOpportuniteBruts(a), montant: degatsOpportuniteContre(cible, a), rempart };
+    }
     if (evitee) return { attaquant: idAttaquant, cible: idCible, evitee: true, mot, montant: 0 };
 
     return { attaquant: idAttaquant, cible: idCible, evitee: false, mot: "",

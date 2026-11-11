@@ -874,7 +874,9 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
             const fatigueMax = window.fatigueMaxCombattant(persoActuel);
             // (Retour arrière de l'Oracle : le repos à venir compte déjà.)
             const fatiguePerso = (persoActuel.fatigueActuelle !== undefined ? parseInt(persoActuel.fatigueActuelle) : fatigueMax)
-                + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0);
+                + (typeof window.bonusRetourArriere === "function" ? window.bonusRetourArriere(persoActuel) : 0)
+                // (v347) La réserve d'une technique maintenue est bloquée.
+                - (typeof window.reserveMaintenueBloquee === "function" ? window.reserveMaintenueBloquee(persoActuel) : 0);
             // Le trajet déjà tracé mord aussi sur le budget : une carte abordable
             // seule mais pas une fois le déplacement compté doit perdre "Choisir"
             // exactement comme gererClicCarteCombat (combat.js) le décide déjà.
@@ -955,6 +957,9 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         // Retour arrière : la jauge part de l'énergie APRÈS le repos.
         const bonusRA = (energie && typeof window.bonusRetourArriere === "function") ? window.bonusRetourArriere(heros) : 0;
         if (energie && bonusRA > 0) energie.actuelle = Math.min(energie.max, energie.actuelle + bonusRA);
+        // (v347) La réserve d'une technique maintenue est bloquée : la jauge part sans elle.
+        const reserveBloquee = (energie && typeof window.reserveMaintenueBloquee === "function") ? window.reserveMaintenueBloquee(heros) : 0;
+        if (energie && reserveBloquee > 0) energie.actuelle = Math.max(0, energie.actuelle - reserveBloquee);
         if (energie) {
             const cout = (parseInt(fatigue) || 0) + (window.MOUVEMENT_COUT_TOTAL || 0);
             jaugeEnergieHtml = window.htmlJaugeEnergieApercu(energie, -cout);

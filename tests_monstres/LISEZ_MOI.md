@@ -11157,3 +11157,28 @@ corrections_v346.mjs le vérifie :
 - la consigne, le lieu seul, le gros plan au hasard, le portrait comme l'avatar.
 
 Les contrôles des tests v314, v315, v318, v325, v326 et v329 qui visaient le croquis à l'encre sont mis à jour vers la v346. v330 passe par le vrai procédé avatar, avec un faux dépôt Cloudinary.
+
+## v347 — La refonte des classes : le Protecteur, et la réserve maintenue
+
+- Nico (sa fiche du Protecteur) :
+  - niveau 1 : +8 % de parade et 10 % de chance de provoquer sur toutes ses attaques ;
+  - niveau 3 : le Rempart ;
+  - niveau 5 : +10 % de provocation, et les boucliers lourds ne donnent plus de malus ;
+  - niveau 9 : la Résonance du bouclier.
+- app.js (ATOUTS_CLASSES) : les paliers passent à 1, 3, 5 et 9.
+  - Les deux provocations s'additionnent : 20 % au niveau 5.
+  - objets.js (bonusEquipement) : au niveau 5, le Scutum ne coûte plus +1 par case, son seul malus. La parade reste.
+- La Résonance du bouclier : initiative 50 ; 80 % de chance d'Étourdi pendant 2 manches, un dé par ennemi au contact chez le cerveau ; une résistance à l'Étourdi retire 25 points. Les dégâts physiques valent 15 % des PV max du PROTECTEUR, à coup sûr.
+- Le Rempart : 4 manches, initiative 105.
+  - « Chacun la reçoit comme une attaque indépendante » : le Protecteur a ses propres jets d'esquive et de parade (tirerDesCarte, des.rempart). Sa moitié part même si l'allié a esquivé la sienne.
+  - Même chose pour l'attaque d'opportunité (resoudreOpportunite, infligerOpportunite).
+- LA RÉSERVE MAINTENUE, une mécanique commune (Nico : « tant qu'elle est maintenue, la technique bloque et consomme tant de fatigue par tour »). Le Rempart : 15 par manche, sur 4 manches.
+  - moteur_pur.js (RESERVES_TECHNIQUES) : la part de la manche du lancement est payée tout de suite. Un état « Rempart maintenu » se pose chez le Protecteur, lié au Rempart de l'allié.
+  - Aux manches suivantes, la part est bloquée (reserveMaintenueDe) : ni carte, ni pas, ni la jauge de préparation ne la dépensent. Elle est consommée en fin de manche, avant le regain (reservesDeFinDeManche, cerveau_combat.js).
+  - À court d'énergie, ou le Protecteur à terre : la technique tombe, et le Rempart de l'allié avec elle.
+  - Séparés, il se paie quand même. Il dort et se réveille comme avant.
+  - « Relâcher » : un bouton dans le volet, en préparation (combat.js). Il part avec la carte dans la file (`relacher`), et le cerveau l'applique à l'ouverture de la manche (ouvrirManche). La jauge cesse aussitôt de bloquer la part.
+
+corrections_v347.mjs le vérifie : la réserve (lancement, blocage, quatre paiements, à court, à terre, refus à 14), « Relâcher » (moteur, volet, file), les jets indépendants (carte et opportunité, sur 300 graines), le bouclier lourd, les textes.
+
+hoplite.mjs et bonus_race_classe.mjs sont mis à jour avec les nouvelles valeurs.

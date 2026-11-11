@@ -884,9 +884,16 @@ window.raisonObjetInterditParBlessure = function(perso, objet, emplacement) {
 window.bonusEquipement = function(perso) {
     const total = {};
     window.CLES_BONUS.forEach(cle => total[cle] = 0);
+    // (v347) Le Protecteur de niveau 5 : les boucliers lourds ne lui coûtent
+    // plus rien de plus à chaque case (leur seul malus).
+    const sansMalusLourd = typeof window.atoutRace === "function" && !!(window.atoutRace(perso) || {}).bouclierLourdSansMalus;
     window.objetsEquipes(perso).forEach(objet => {
         const bonus = objet.bonus || {};
-        window.CLES_BONUS.forEach(cle => { total[cle] += (parseInt(bonus[cle]) || 0); });
+        window.CLES_BONUS.forEach(cle => {
+            const v = parseInt(bonus[cle]) || 0;
+            if (sansMalusLourd && objet.modele === "Bouclier lourd" && cle === "coutDeplacement" && v > 0) return;
+            total[cle] += v;
+        });
     });
     return total;
 };
