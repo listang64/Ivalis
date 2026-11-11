@@ -346,7 +346,7 @@ console.log("\n9. LA CRÉATION : SON NOM, SON ALLURE");
   verifier("fiche de classe : Niv. 1 / 3 / 5 / 9, compagnon 25 PV, Lancer de bolas, Lien de sang",
            JSON.stringify(fiche.niveaux) === '["Niv. 1","Niv. 3","Niv. 5","Niv. 9"]' && /25 PV/.test(fiche.texte) && /17 % d'esquive/.test(fiche.texte)
            && /Lancer de bolas/.test(fiche.texte) && /Lien de sang/.test(fiche.texte) && /cheval/.test(fiche.texte), JSON.stringify(fiche.niveaux));
-  verifier("pour une héroïne : « Pisteuse »", fiche.titre === "Pisteuse", fiche.titre);
+  verifier("pour une héroïne : « Pisteur » (v365, plus de féminin)", fiche.titre === "Pisteur", fiche.titre);
   const r = await p.evaluate(() => {
     window.validerClasse();
     const f = document.getElementById("fenetre-compagnon");

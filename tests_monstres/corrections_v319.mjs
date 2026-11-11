@@ -212,7 +212,7 @@ await section(async () => {
   });
   verifier("la création s'ouvre dans le livre, juste après les clans, sur le premier peuple", r.actif && await sur("race-0"), JSON.stringify({ ici: await ici(), race: await idx("race-0") }));
   verifier("sept peuples, une double page chacun ; les seize classes ensuite (v343)", r.races.length === 7 && r.classes === 16 && r.nbPages === 7 * 2 + 16 * 2 + 4 + 2, JSON.stringify(r.races) + " " + r.nbPages);
-  verifier("à gauche tout ce qu'on sait du peuple (lore, en jeu, atout) et le choix du genre", /Les Humains/.test(r.texte) && /Peuple le plus répandu/.test(r.texte) && /En jeu/.test(r.texte) && /Atout/.test(r.texte) && r.genres === 3, r.texte.slice(0, 120));
+  verifier("à gauche tout ce qu'on sait du peuple (lore, en jeu, atout) et le choix du genre", /Les Humains/.test(r.texte) && /Peuple le plus répandu/.test(r.texte) && /En jeu/.test(r.texte) && /Atout/.test(r.texte) && r.genres === 2 /* v365 : sans « Se cherche » */, r.texte.slice(0, 120));
   verifier("à droite, rien pour l'instant (les images viendront)", r.droite === 0);
   verifier("les marque-pages des peuples sortent sur le bord droit ; ceux des classes restent rangés", JSON.stringify(r.groupes) === JSON.stringify([{ g: "races", sorti: true, n: 7 }, { g: "classes", sorti: false, n: 16 }]), JSON.stringify(r.groupes));
   verifier("… pas tous alignés, chacun de sa couleur, dépassant du livre", r.xs >= 5 && r.as >= 5 && r.couleurs === 7 && r.depasse > 20, JSON.stringify({ xs: r.xs, as: r.as, couleurs: r.couleurs, depasse: r.depasse }));
@@ -239,7 +239,7 @@ await section(async () => {
              memeImage: imgG && imgD && imgG.querySelector("img").src === imgD.querySelector("img").src, paliers: g.querySelectorAll(".palier-classe").length, groupes };
   });
   verifier("choisir un peuple (Vargen, Femelle) mène aux classes", r.race === "Vargen" && r.genre === "Femelle" && await sur("classe-0"), JSON.stringify(r).slice(0, 120));
-  verifier("à gauche le descriptif de la classe (ses paliers), au féminin", /Pisteuse/.test(r.titre0) && r.paliers > 0, r.titre0 + " / " + r.paliers);
+  verifier("à gauche le descriptif de la classe (ses paliers), au masculin (v365)", /Pisteur/.test(r.titre0) && r.paliers > 0, r.titre0 + " / " + r.paliers);
   verifier("l'image de fond sur la double page, voilée en dégradé à gauche", r.droite && r.memeImage && /linear-gradient/.test(r.masque), r.masque.slice(0, 70));
   verifier("une classe interdite à ce peuple : grisée, avec la raison", /Vargens ne peuvent pas être Vampire/.test(r.vampire), r.vampire);
   verifier("les marque-pages des classes sortent, ceux des peuples rentrent", JSON.stringify(r.groupes) === "[false,true]", JSON.stringify(r.groupes));

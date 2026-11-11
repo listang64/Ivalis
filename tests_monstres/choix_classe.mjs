@@ -128,11 +128,12 @@ console.log("\n2. LA GRILLE : 13 CARTES DE TAROT 7:12, BORDURE DORÉE, RANGÉES 
   // c'est une héroïne qu'on crée ici : les noms sont au féminin quand ils en
   // ont un — classes_feminin.mjs.)
   // (v343 : sans l'Élémentariste ni le Mage du chaos ; cinq nouvelles, la dernière la Prêtresse de la lumière.)
-  verifier("16 classes, dans l'ordre donné", g.noms.length === 16 && g.noms[0] === "Pisteuse" && g.noms[15] === "Prêtresse de la lumière"
+  verifier("16 classes, dans l'ordre donné", g.noms.length === 16 && g.noms[0] === "Pisteur" && g.noms[15] === "Prêtre de la lumière"
            && !g.noms.includes("Ensorceleur") && !g.noms.includes("Nécromancien"),
            g.noms.join(", "));
-  verifier("orthographe : Géomancienne, Sorcière, Médicus, Inquisitrice",
-           ["Géomancienne", "Sorcière", "Médicus", "Inquisitrice", "Chasseuse de mages", "Prêtresse de la lumière"].every(n => g.noms.includes(n)));
+  // (v365 : plus de noms au féminin.)
+  verifier("orthographe : Géomancien, Sorcier, Médicus, Inquisiteur (au masculin, même pour une héroïne)",
+           ["Géomancien", "Sorcier", "Médicus", "Inquisiteur", "Chasseur de mages", "Prêtre de la lumière"].every(n => g.noms.includes(n)));
   verifier("cartes au format tarot 7:12", Math.abs(g.ratio - 12 / 7) < 0.02, g.ratio.toFixed(3));
   verifier("rangées de 4", g.parRangee === 4, String(g.parRangee));
   verifier("image en object-fit: cover (jamais fill)", g.fit === "cover", g.fit);
@@ -169,7 +170,7 @@ console.log("\n3. LA FICHE DE CLASSE ET LA FLÈCHE COUDÉE");
   verifier("un clic ouvre la fiche de la classe", e.fiche && !e.grille);
   verifier("sur son image de fond", /G%C3%A9omancien_fond/.test(f.src), f.src);
   verifier("en object-fit: cover", f.fit === "cover", f.fit);
-  verifier("avec son grand titre (au féminin pour une héroïne)", f.titre === "Géomancienne", f.titre);
+  verifier("avec son grand titre (au masculin, v365)", f.titre === "Géomancien", f.titre);
   verifier("titre au milieu de la moitié gauche de l'image",
            Math.abs(f.centreTitre.x - 0.25) < 0.03 && Math.abs(f.centreTitre.y - 0.5) < 0.05 && f.centreTitre.droite <= 0.5,
            JSON.stringify(f.centreTitre));

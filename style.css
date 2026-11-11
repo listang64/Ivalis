@@ -5926,8 +5926,8 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 @keyframes annonce-jour { 0% { opacity: 0; transform: scale(1.18); } 18% { opacity: 1; transform: scale(1); }
   78% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0.96); } }
 
-/* La nuit tombe sur la carte, le temps du campement. */
-.voile-nuit-voyage { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 2.2s ease;
+/* La nuit tombe sur toute la fenêtre, le temps du campement (v365) — sous la boîte du campement. */
+.voile-nuit-voyage { position: fixed; inset: 0; z-index: 10002; pointer-events: none; opacity: 0; transition: opacity 2.2s ease;
   background: radial-gradient(ellipse at center, rgba(12, 16, 42, 0.35) 0%, rgba(6, 8, 24, 0.68) 100%); }
 .voile-nuit-voyage.visible { opacity: 1; }
 

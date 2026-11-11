@@ -1464,28 +1464,13 @@ const cleClasse = (nom) => {
 // Le nom d'aujourd'hui d'une classe (« Nécromancien » → « Sorcier »).
 window.nomActuelClasse = (nom) => window.CLASSES_RENOMMEES[cleClasseBrute(nom)] || nom || "";
 
-// LE NOM DE LA CLASSE AU FÉMININ, pour une héroïne (genre « Femelle »). C'est
-// de l'AFFICHAGE seulement : la fiche garde le nom de la classe tel quel
-// (« Sorcier »), et toutes les règles le lisent ainsi. Les classes sans
-// féminin d'usage (Sentinelle, Oracle, Vampire, Médicus) ne changent pas — ni
-// l'Assassin, le Chaman, le Berzerker et le Maudit (Nico : le même pour les deux).
-window.CLASSES_AU_FEMININ = {
-    "Pisteur": "Pisteuse",
-    "Chasseur de mages": "Chasseuse de mages",
-    "Profanateur": "Profanatrice",
-    "Géomancien": "Géomancienne",
-    "Protecteur": "Protectrice",
-    "Sorcier": "Sorcière",
-    "Inquisiteur": "Inquisitrice",                       // (v343)
-    "Prêtre de la lumière": "Prêtresse de la lumière"
-};
+// LE NOM DE LA CLASSE À L'AFFICHAGE. (v365, Nico : « pour les classes, enlève
+// le fait de mettre les noms des classes au féminin, on garde que le
+// masculin ».) Le nom d'aujourd'hui (« Nécromancien » → « Sorcier »), quel
+// que soit le genre du héros. (Le genre reste reçu, pour les appelants.)
 window.estGenreFeminin = (genre) => /^(f|femelle|femme|féminin|feminin)$/i.test(String(genre || "").trim());
-window.nomClasseGenre = function(nom, genre) {
-    const actuel = window.nomActuelClasse(nom);
-    if (!actuel || !window.estGenreFeminin(genre)) return actuel;
-    const cle = cleClasse(actuel);
-    const masculin = Object.keys(window.CLASSES_AU_FEMININ).find(n => cleClasse(n) === cle);
-    return masculin ? window.CLASSES_AU_FEMININ[masculin] : actuel;
+window.nomClasseGenre = function(nom) {
+    return window.nomActuelClasse(nom);
 };
 
 window.paliersDeClasse = function(nomClasse) {

@@ -460,7 +460,7 @@ console.log("\n8. LA FICHE DE CLASSE");
            && /Pointes de glace/.test(r.texte) && /75 %/.test(r.texte)
            && /glace font des dégâts physiques/.test(r.texte) && /15 PV/.test(r.texte)
            && /7 dégâts/.test(r.texte) && /2 cases/.test(r.texte) && /2 tours/.test(r.texte), JSON.stringify(r.niveaux));
-  verifier("pour une héroïne : « Profanatrice »", r.titre === "Profanatrice", r.titre);
+  verifier("pour une héroïne : « Profanateur » (v365, plus de féminin)", r.titre === "Profanateur", r.titre);
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

@@ -222,8 +222,8 @@ await section(async () => {
   verifier("…les classes de la base restent les siennes (Hoplite lu en Protecteur, pas de doublon)", noms.filter(n => n === "Protecteur").length === 1 && noms[noms.length - 1] === "Prêtre de la lumière", noms.join(", "));
   verifier("sans base, la liste du jeu", JSON.stringify(r.seules) === JSON.stringify(r.parDefaut));
   const g = await p.evaluate(() => ["Inquisiteur", "Prêtre de la lumière", "Chaman", "Berserker", "Maudit"].map(n => [window.nomClasseGenre(n, "Femelle"), window.nomClasseGenre(n, "Male")]));
-  verifier("au féminin : Inquisitrice, Prêtresse de la lumière ; Chaman, Berserker, Maudit pour les deux",
-           JSON.stringify(g) === JSON.stringify([["Inquisitrice", "Inquisiteur"], ["Prêtresse de la lumière", "Prêtre de la lumière"], ["Chaman", "Chaman"], ["Berserker", "Berserker"], ["Maudit", "Maudit"]]), JSON.stringify(g));
+  verifier("au masculin pour les deux (v365) : Inquisiteur, Prêtre de la lumière, Chaman, Berserker, Maudit",
+           JSON.stringify(g) === JSON.stringify([["Inquisiteur", "Inquisiteur"], ["Prêtre de la lumière", "Prêtre de la lumière"], ["Chaman", "Chaman"], ["Berserker", "Berserker"], ["Maudit", "Maudit"]]), JSON.stringify(g));
 });
 
 titre("2. DANS LE LIVRE");
@@ -238,13 +238,13 @@ await section(async () => {
   const titres = r.map(x => x.titre);
   verifier("les deux classes en attente ont quitté le livre", !titres.some(t => /l[ée]mentariste|chaos/i.test(t)), titres.join(", "));
   const neuves = r.slice(-5);
-  verifier("les cinq nouvelles, au féminin pour une héroïne", JSON.stringify(neuves.map(x => x.titre)) === JSON.stringify(["Inquisitrice", "Chaman", "Berserker", "Maudit", "Prêtresse de la lumière"]), neuves.map(x => x.titre).join(", "));
+  verifier("les cinq nouvelles, au masculin même pour une héroïne (v365)", JSON.stringify(neuves.map(x => x.titre)) === JSON.stringify(["Inquisiteur", "Chaman", "Berserker", "Maudit", "Prêtre de la lumière"]), neuves.map(x => x.titre).join(", "));
   verifier("…chacune avec son image en fond de double page", neuves.every((x, i) => x.fond.includes(Object.values(IMAGES)[i])), neuves.map(x => x.fond.split("/").pop()).join(", "));
   verifier("…« arrive bientôt », sans bouton pour la choisir — sauf l'Inquisitrice (v358) et la Prêtresse (v359), qui se choisissent",
            [neuves[1]].every(x => !x.bouton && /bientôt/.test(x.bientot)) && [neuves[0], neuves[2], neuves[3], neuves[4]].every(x => x.bouton && !/bientôt/.test(x.bientot)));
   verifier("les autres classes se choisissent toujours", r.slice(0, -5).filter(x => !x.bouton).length === 0 || r.slice(0, -5).every(x => x.bouton || /ne peuvent pas/.test(x.bientot)));
   const onglets = await p.evaluate(() => [...document.querySelectorAll('#onglets-creation [data-groupe="classes"] .onglet-creation')].map(o => o.textContent.trim()));
-  verifier("un marque-page par classe, nouvelles comprises", onglets.length === r.length && onglets.includes("Inquisitrice"), onglets.join(", "));
+  verifier("un marque-page par classe, nouvelles comprises", onglets.length === r.length && onglets.includes("Inquisiteur"), onglets.join(", "));
   verifier("la dernière (Prêtresse de la lumière) reste bloquée vers la droite",
            await p.evaluate(() => { const s = window.GRIMOIRE_CREATION.sections().classes; const pg = window.GRIMOIRE_CREATION.page("classe-" + (s.length - 1)); return window.GRIMOIRE_CREATION.bloqueEnAvant(window.GRIMOIRE.indexDe(pg)); }));
 });

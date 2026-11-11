@@ -11505,3 +11505,13 @@ corrections_v363.mjs le vérifie : le code (plus d'appel à atoutRace), et dans 
 
 possession.mjs le vérifie : la technique et sa réserve, la validation (niveau, boss, leader, portée, allié, énergie), le changement de camp et de poste, le rejeu, l'attente du cerveau, les ordres de son poste (et pas d'un autre), un coup sur son ancien allié, le Maudit inerte et sans tour, la fiche, la fin après 3 manches, à la chute du Maudit ou du monstre (et par un vrai pas), et dans la vraie page : la liste du joueur, l'attente de la préparation, le deck du monstre, le commandement.
 corrections_v364.mjs : les points d'accroche et la version. maudit.mjs : le niveau 9.
+
+## v365 — Cinq retouches : bulle au survol, livre, noms de classes, nuit, genre
+
+- **La bulle au survol (PC)** : sur la feuille perso, la souris posée 300 ms sur un élément (talent, blessure, objet, classe…) ouvre la même bulle de descriptif que l'appui long ; elle se ferme quand la souris sort. Seulement pour la souris (`pointerType === "mouse"`) : le tactile garde l'appui long.
+- **Le livre de création** : tant qu'aucun peuple n'est choisi, la dernière double page des races bloque la page suivante (`bloqueEnAvant`), comme la dernière classe.
+- **Les classes au masculin seulement** : plus de « Pisteuse », « Sorcière », « Prêtresse de la lumière »… (`nomClasseGenre` rend le nom tel quel).
+- **La nuit** : le voile gris couvre toute la fenêtre (posé sur `document.body`, `position: fixed`), plus seulement la carte.
+- **Le genre** : « Se cherche » disparaît ; il reste Mâle et Femelle.
+
+corrections_v365.mjs le vérifie. Les anciens tests qui attendaient le féminin (choix_classe, classes_feminin, corrections_v313, v319, v343, pisteur, géomancien, profanateur) attendent désormais le masculin.

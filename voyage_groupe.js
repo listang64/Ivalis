@@ -962,17 +962,26 @@ function pionMonde() {
     }
     return img;
 }
+// (v365) La nuit grise TOUTE la fenêtre : seulement quand la carte de la
+// région du campement est ouverte, à l'écran du jeu. Une veille l'éteint dès
+// qu'on la quitte (le voile ne vit plus dans la carte, il ne part plus avec elle).
+const nuitVisible = () => !!(voyage && voyage.Etat === "nuit" && voyage.Arrivee
+    && carteOuverte() === Number(voyage.Arrivee.Region) && ecranJeuVisible());
+setInterval(() => {
+    try { const n = $("voile-nuit-voyage"); if (n) n.classList.toggle("visible", nuitVisible()); } catch (e) {}
+}, 500);
 function calquesRegion() {
     const carte = $("carte-region");
     if (!carte) return {};
-    // La nuit tombe sur la carte (l'image, les nuages, les villages), pas sur
-    // le groupe ni sur sa route : le voile passe dessous.
+    // (v365, Nico : « l'animation de la nuit, la carte se grise : il faudrait
+    // que toute la fenêtre se grise ») : le voile de la nuit couvre toute la
+    // fenêtre, sous la seule boîte du campement (qui reste lisible).
     let nuit = $("voile-nuit-voyage");
     if (!nuit) {
         nuit = document.createElement("div");
         nuit.id = "voile-nuit-voyage";
         nuit.className = "voile-nuit-voyage";
-        carte.insertBefore(nuit, $("carte-region-pastilles") || null);
+        document.body.appendChild(nuit);
     }
     let svg = $("carte-region-voyage");
     if (!svg) {
@@ -1093,7 +1102,7 @@ function placerPions() {
         pion.classList.toggle("campement", campe);
         pion.classList.toggle("en-marche", !!(voyage && voyage.Type === "region" && ["marche", "detour", "retour"].includes(voyage.Etat)));
     }
-    if (nuit) nuit.classList.toggle("visible", !!(voyage && voyage.Etat === "nuit" && carteOuverte() === Number(voyage.Arrivee.Region)));
+    if (nuit) nuit.classList.toggle("visible", nuitVisible());
     placerPoi();
 }
 

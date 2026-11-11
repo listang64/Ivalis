@@ -649,7 +649,7 @@ console.log("\n10. À L'ÉCRAN : TERRAIN, CALQUE, POSE, CIBLAGE");
   await p.screenshot({ path: "/tmp/claude-0/geomancien_classe.png" });
   verifier("fiche de classe : la 5e case offerte, +10 init, Mur de terre, passifs",
            /5e case/.test(f.texte) && /\+10 d'initiative/.test(f.texte) && /Mur de terre/.test(f.texte) && /10 PV/.test(f.texte) && /traverse/.test(f.texte));
-  verifier("pour une héroïne : « Géomancienne »", f.titre === "Géomancienne", f.titre);
+  verifier("pour une héroïne : « Géomancien » (v365, plus de féminin)", f.titre === "Géomancien", f.titre);
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

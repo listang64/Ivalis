@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=133">
+  <link rel="stylesheet" href="style.css?v=134">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
   <link rel="stylesheet" href="grimoire.css?v=14">
@@ -2420,7 +2420,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=254"></script>
+<script src="trace_combat.js?v=255"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2486,7 +2486,7 @@
 <script type="module" src="regime_cerveau.js?v=54"></script>
 <script type="module" src="ia_master.js?v=25"></script>
 <script type="module" src="illustrations_recit.js?v=9"></script>
-<script type="module" src="app.js?v=163"></script>
+<script type="module" src="app.js?v=164"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=4"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
@@ -2495,8 +2495,8 @@
 <script type="module" src="grimoire_carte.js?v=6"></script>
 <script src="grimoire_regions.js?v=12"></script>
 <script src="loupe_cartes.js?v=5"></script>
-<script type="module" src="grimoire_fiches.js?v=7"></script>
-<script type="module" src="grimoire_creation.js?v=7"></script>
+<script type="module" src="grimoire_fiches.js?v=8"></script>
+<script type="module" src="grimoire_creation.js?v=8"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=4"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région et son titre (plus de nuages dessus, v286). -->
@@ -2511,7 +2511,7 @@
 <!-- Le déplacement des PJ (v275) : les terrains praticables des cartes régionales,
      puis le groupe, son bouton voyage, les tracés, les votes, la marche et les nuits. -->
 <script type="module" src="terrains_regionaux.js?v=2"></script>
-<script type="module" src="voyage_groupe.js?v=14"></script>
+<script type="module" src="voyage_groupe.js?v=15"></script>
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
 <script type="module" src="environnement_mj.js?v=5"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->
@@ -2766,7 +2766,6 @@
               <option value="">-- Choisir --</option>
               <option value="Male">Mâle</option>
               <option value="Femelle">Femelle</option>
-              <option value="Se cherche">Se cherche</option>
             </select>
           </div>
         </div>

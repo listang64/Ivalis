@@ -139,7 +139,8 @@ function toutRemettre() {
 //  LES PEUPLES
 // ---------------------------------------------------------------------
 const FLEURON = `<svg class="fleuron fleuron-creation" viewBox="0 0 200 24" aria-hidden="true"><path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>`;
-const GENRES = [["Male", "Mâle"], ["Femelle", "Femelle"], ["Se cherche", "Se cherche"]];
+// (v365, Nico : « virer le se cherche dans le sexe des races ».)
+const GENRES = [["Male", "Mâle"], ["Femelle", "Femelle"]];
 const renoncer = `<button type="button" class="lien-fiche renoncer-creation" data-action="creation" data-ca="renoncer">Renoncer à ce héros</button>`;
 
 function htmlRace(r, i, n) {
@@ -600,12 +601,17 @@ setInterval(() => {
 
 // (v339) La dernière double page des classes ne se tourne pas vers la droite :
 // les champs ne s'ouvrent qu'en choisissant une classe (sinon le héros part sans elle).
+// (v365, Nico : « quand on est sur la dernière page de race, fais en sorte
+// qu'on ne puisse plus tourner les pages d'après ») : la dernière double page
+// des peuples ne se tourne pas non plus vers la droite tant qu'aucun peuple
+// n'est choisi — choisir un peuple ouvre les classes.
 function bloqueEnAvant(index) {
     if (!actif) return false;
-    const derniere = sections.classes[sections.classes.length - 1], g = G();
-    if (!derniere || !g || typeof g.indexDe !== "function") return false;
-    const i = g.indexDe(derniere.page);
-    return i >= 0 && (index === i || index === i + 1);
+    const g = G();
+    if (!g || typeof g.indexDe !== "function") return false;
+    const surLaDouble = (section) => { if (!section) return false; const i = g.indexDe(section.page); return i >= 0 && (index === i || index === i + 1); };
+    if (!etat.raceChoisie && surLaDouble(sections.races[sections.races.length - 1])) return true;
+    return surLaDouble(sections.classes[sections.classes.length - 1]);
 }
 
 window.GRIMOIRE_CREATION = {

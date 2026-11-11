@@ -1305,7 +1305,7 @@ async function basculerMemoire(id) {
 
 // L'APPUI LONG : une note à l'encre, posée près du doigt, le temps de la lire.
 let bulle = null, minuteurAppui = null, minuteurBulle = null;
-function montrerAide(el) {
+function montrerAide(el, survol) {
     let d = null;
     try { d = JSON.parse(el.dataset.aide); } catch (e) { return; }
     if (!d) return;
@@ -1321,7 +1321,8 @@ function montrerAide(el) {
     if (y < 8) y = r.bottom + 10 - re.top;
     x = Math.max(8, Math.min(re.width - bw - 8, x));
     bulle.style.left = x + "px"; bulle.style.top = Math.max(8, y) + "px";
-    dernierAppuiLong = Date.now();
+    // (Un survol de la souris n'est pas un appui long : le clic qui suit compte.)
+    if (!survol) dernierAppuiLong = Date.now();
     clearTimeout(minuteurBulle);
 }
 function cacherAide(delai) {
@@ -1343,6 +1344,26 @@ function brancherGestes() {
         const fin = () => { ecran.removeEventListener("pointermove", bouge); };
         ecran.addEventListener("pointermove", bouge);
     }, true);
+    // (v365, Nico : « sur PC, au passage de la souris sur les éléments de la
+    // feuille perso, on n'a pas de bulle qui s'ouvre avec le descriptif ») : la
+    // souris qui s'attarde sur un élément ouvre sa note ; elle part avec la souris.
+    let minuteurSurvol = null, survole = null;
+    ecran.addEventListener("pointerover", (ev) => {
+        if (ev.pointerType !== "mouse") return;
+        const el = ev.target && ev.target.closest && ev.target.closest("[data-aide]");
+        if (!el || el === survole || !ecran.contains(el)) return;
+        survole = el;
+        clearTimeout(minuteurSurvol);
+        minuteurSurvol = setTimeout(() => { if (survole === el) montrerAide(el, true); }, 300);
+    });
+    ecran.addEventListener("pointerout", (ev) => {
+        if (ev.pointerType !== "mouse" || !survole) return;
+        const vers = ev.relatedTarget && ev.relatedTarget.closest ? ev.relatedTarget.closest("[data-aide]") : null;
+        if (vers === survole) return;
+        survole = null;
+        clearTimeout(minuteurSurvol);
+        cacherAide(0);
+    });
     const lacher = () => { clearTimeout(minuteurAppui); if (bulle && bulle.classList.contains("visible")) cacherAide(2600); };
     ecran.addEventListener("pointerup", lacher, true);
     ecran.addEventListener("pointercancel", lacher, true);

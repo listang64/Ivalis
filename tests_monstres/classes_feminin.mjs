@@ -22,22 +22,22 @@ new Function('window', SRC_STATS_COMMUNES)(w);
 console.log("\n1. LA RÈGLE");
 {
     const f = (n) => w.nomClasseGenre(n, "Femelle");
-    verifier("Pisteuse, Sorcière, Protectrice, Chasseuse de mages, Profanatrice, Géomancienne",
-             f("Pisteur") === "Pisteuse" && f("Sorcier") === "Sorcière" && f("Protecteur") === "Protectrice"
-             && f("Chasseur de mages") === "Chasseuse de mages"
-             && f("Profanateur") === "Profanatrice" && f("Géomancien") === "Géomancienne");
+    // (v365, Nico : « enlève le fait de mettre les noms des classes en féminin, on garde
+    // que le masculin ».) Une héroïne garde le nom masculin.
+    verifier("une héroïne : Pisteur, Sorcier, Protecteur, Chasseur de mages, Profanateur, Géomancien (v365 : plus de féminin)",
+             f("Pisteur") === "Pisteur" && f("Sorcier") === "Sorcier" && f("Protecteur") === "Protecteur"
+             && f("Chasseur de mages") === "Chasseur de mages"
+             && f("Profanateur") === "Profanateur" && f("Géomancien") === "Géomancien");
     verifier("inchangées : Assassin, Sentinelle, Oracle, Vampire, Médicus, Chaman, Berserker, Maudit (v343 ; Berserker depuis la v360)",
              ["Assassin", "Sentinelle", "Oracle", "Vampire", "Médicus", "Chaman", "Berserker", "Maudit"].every(n => f(n) === n));
     verifier("un héros (Male) garde le masculin", w.nomClasseGenre("Sorcier", "Male") === "Sorcier" && w.nomClasseGenre("Pisteur", "") === "Pisteur");
-    verifier("les anciens noms suivent : Nécromancienne → Sorcière, Hoplite → Protectrice",
-             f("Nécromancien") === "Sorcière" && f("Hoplite") === "Protectrice" && w.nomClasseGenre("Hoplite", "Male") === "Protecteur");
-    verifier("sans accents ni majuscules : « sorcier », « CHASSEUR DE MAGES »",
-             f("sorcier") === "Sorcière" && f("CHASSEUR DE MAGES") === "Chasseuse de mages");
+    verifier("les anciens noms suivent : Nécromancien → Sorcier, Hoplite → Protecteur",
+             f("Nécromancien") === "Sorcier" && f("Hoplite") === "Protecteur" && w.nomClasseGenre("Hoplite", "Male") === "Protecteur");
     verifier("les règles ne bougent pas : une Sorcière est de la classe Sorcier",
              w.estDeLaClasse({ classe: "Sorcier", genre: "Femelle" }, "Sorcier")
              && w.atoutRace({ classe: "Sorcier", genre: "Femelle", race: "Humain", xp: 0 }).porteeSorts === 1);
     const d = w.detailBonusRaceClasse({ race: "Humain", classe: "Pisteur", genre: "Femelle", xp: 0 });
-    verifier("l'encart des statistiques dit « Pisteuse »", d.classe.nom === "Pisteuse", d.classe.nom);
+    verifier("l'encart des statistiques dit « Pisteur »", d.classe.nom === "Pisteur", d.classe.nom);
 }
 
 // =========================================================================
@@ -126,10 +126,10 @@ console.log("\n2. LE CHOIX DE CLASSE D'UNE HÉROÏNE");
   });
   await p.evaluate(async () => { await window.ouvrirChoixClasse(); document.getElementById("vue-grille-classes").scrollTop = 9999; });
   await p.screenshot({ path: "/tmp/claude-0/classes_feminin.png" });
-  verifier("la grille : Pisteuse, Assassin, Chasseuse de mages, Profanatrice, Géomancienne, Protectrice, Sorcière",
-           ["Pisteuse", "Assassin", "Chasseuse de mages", "Profanatrice", "Géomancienne", "Protectrice", "Sorcière"].every(n => r.noms.includes(n))
-           && !r.noms.includes("Sorcier") && r.noms.includes("Sentinelle") && r.noms.length === 16, r.noms.join(", "));
-  verifier("la fiche de classe s'intitule « Sorcière »", r.titre === "Sorcière", r.titre);
+  verifier("la grille d'une héroïne : au masculin (Pisteur, Sorcier…)",
+           ["Pisteur", "Assassin", "Chasseur de mages", "Profanateur", "Géomancien", "Protecteur", "Sorcier"].every(n => r.noms.includes(n))
+           && !r.noms.includes("Sorcière") && r.noms.includes("Sentinelle") && r.noms.length === 16, r.noms.join(", "));
+  verifier("la fiche de classe s'intitule « Sorcier »", r.titre === "Sorcier", r.titre);
   verifier("mais la fiche du personnage retient « Sorcier »", r.retenue === "Sorcier", r.retenue);
   // (v358 : l'Inquisiteur a ses règles et se choisit ; v359 : le Prêtre de la lumière ; v360 : le Berserker.)
   // (v362 : le Maudit aussi.)
@@ -153,10 +153,10 @@ console.log("\n3. LA FICHE D'UNE HÉROÏNE");
     a.ancienne = document.getElementById("stat-classe").innerText;
     return a;
   });
-  verifier("en tête des statistiques : « Sorcière »", r.classe === "Sorcière", r.classe);
-  verifier("l'encart : « 📜 Classe : Sorcière »", /Classe : Sorcière/.test(r.encart), r.encart);
+  verifier("en tête des statistiques : « Sorcier »", r.classe === "Sorcier", r.classe);
+  verifier("l'encart : « 📜 Classe : Sorcier »", /Classe : Sorcier/.test(r.encart), r.encart);
   verifier("un héros : « Sorcier »", r.classeH === "Sorcier", r.classeH);
-  verifier("une fiche ancienne (« Nécromancien », champ Genre) : « Sorcière »", r.ancienne === "Sorcière", r.ancienne);
+  verifier("une fiche ancienne (« Nécromancien », champ Genre) : « Sorcier »", r.ancienne === "Sorcier", r.ancienne);
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

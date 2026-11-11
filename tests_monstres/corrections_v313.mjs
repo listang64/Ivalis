@@ -182,7 +182,7 @@ await section(async () => {
     titre: pg.querySelector(".titre-clan").textContent, heros: [...pg.querySelectorAll(".ligne-aventurier")].map(b => b.textContent.replace(/\s+/g, " ").trim()) })));
   verifier("« Aventuriers » ouvre la page des clans", (await ici()) === "clans", await ici());
   verifier("un clan par joueur, une page chacun, le sien d'abord : « Clan de Benjamin », « Clan de Nico »", clans.length === 2 && clans[0].titre === "Clan de Benjamin" && clans[1].titre === "Clan de Nico", JSON.stringify(clans.map(c => c.titre)));
-  verifier("ses héros dans l'ordre de leur création, « Nom - Classe » (au féminin pour Kaya)", JSON.stringify(clans[0].heros) === JSON.stringify(["Thorin Ironfoot - Protecteur", "Kaya - Pisteuse"]), JSON.stringify(clans[0].heros));
+  verifier("ses héros dans l'ordre de leur création, « Nom - Classe » (au masculin, v365)", JSON.stringify(clans[0].heros) === JSON.stringify(["Thorin Ironfoot - Protecteur", "Kaya - Pisteur"]), JSON.stringify(clans[0].heros));
   verifier("les autres clans avec leurs héros", JSON.stringify(clans[1].heros) === JSON.stringify(["Lyra Sombreval - Oracle"]), JSON.stringify(clans[1].heros));
   await cap("v313_clans");
 });
@@ -215,7 +215,7 @@ await section(async () => {
   verifier("à droite, de haut en bas : niveau, race/classe, caracs, vitalité, talents, réflexes/résistances, blessures",
            JSON.stringify(r.ordre) === JSON.stringify(["encart-niveau", "encart-identite", "encart-caracs", "rangee-vitale", "encart-talents", "rangee-defenses", "encart-blessures-fiche"]), JSON.stringify(r.ordre));
   verifier("le niveau, sa jauge remplie au crayon (hachures), sans le nombre d'XP", r.niveau === "Niveau 2" && Number(r.pct) > 0 && Number(r.pct) < 100 && r.hachures > 10 && !r.xp, `${r.niveau} ${r.pct} % ${r.hachures} traits`);
-  verifier("la race et la classe", /Race Humain/.test(r.race) && /Classe Pisteuse/.test(r.race), r.race);
+  verifier("la race et la classe", /Race Humain/.test(r.race) && /Classe Pisteur/.test(r.race), r.race);
   verifier("les six caractéristiques (bonus compris)", JSON.stringify(r.caracs) === JSON.stringify(["FOR10", "DEX15", "CON12", "INT13", "SAG10", "CHA8"]), JSON.stringify(r.caracs));
   verifier("points de vie, fatigue max, régénération — sans le titre « Vitalité »", r.vital.length === 3 && /62\s*Points de vie/.test(r.vital[0]) && /Fatigue max/.test(r.vital[1]) && /35 %/.test(r.vital[2]) && !r.titreVitalite, JSON.stringify(r.vital));
   verifier("les talents acquis", /Préparer/.test(r.talents), r.talents);
@@ -244,7 +244,7 @@ await section(async () => {
   const blessure = await appuiLong('#grimoire-fiches-fiche-d .blessure-fiche');
   verifier("une blessure : son effet", /Lèvre fendue/.test(blessure.texte) && /Charisme/.test(blessure.texte), blessure.texte.slice(0, 120));
   const classe = await appuiLong('#grimoire-fiches-fiche-d .morceau-identite:nth-of-type(2)');
-  verifier("la classe : sa description", /Pisteuse/.test(classe.texte) && classe.texte.length > 15, classe.texte.slice(0, 120));
+  verifier("la classe : sa description", /Pisteur/.test(classe.texte) && classe.texte.length > 15, classe.texte.slice(0, 120));
   verifier("l'appui long ne tourne pas la page", (await page()) === avant);
 });
 
