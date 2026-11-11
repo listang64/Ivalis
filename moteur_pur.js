@@ -1512,6 +1512,17 @@ export function zonesDeFinDeManche(etat, des) {
 export function vieillirZones(etat) {
     const etapes = [];
     Object.values(etat.zones || {}).forEach(z => {
+        // (v350) Une zone permanente (la Coulée de lave) reste toute la rencontre :
+        // seule une manche neuve s'y ouvre (chacun pourra la subir de nouveau).
+        if (z.permanente) {
+            if (z.subies) {
+                const { subies, ...sansSubies } = z;
+                void subies;
+                etat.zones[z.id] = sansSubies;
+                etapes.push({ type: "zone", id: z.id, zone: etat.zones[z.id] });
+            }
+            return;
+        }
         const reste = nombre(z.dureeRestante) - 1;
         if (reste > 0) {
             // Une manche neuve : tout le monde pourra la subir de nouveau.
@@ -1596,6 +1607,65 @@ export function pointesDeGlace(etat, idLanceur, cases, des, plateau) {
         etat: { nom: "Glacé", icone: ICONE_GLACE, desc: DESC_GLACE, chance: POINTES_GLACE.chance,
                 duree: POINTES_GLACE.duree, estPoison: false, tickFait: false },
         dureeRestante: POINTES_GLACE.manches + Math.max(0, enPlus),
+        idLanceur
+    };
+    const etapes = poserZone(etat, zone);
+    Object.keys(etat.combattants || {}).sort().forEach(id => {
+        const c = etat.combattants[id];
+        if (!c || c.aTerre || c.q === null || c.q === undefined) return;
+        const hex = emprise.find(h => h.q === nombre(c.q) && h.r === nombre(c.r));
+        if (hex) etapes.push(...traverserZones(etat, id, hex, des, { seulement: z => z.id === zone.id }));
+    });
+    return etapes;
+}
+
+// =========================================================================
+//  LA COULÉE DE LAVE (Géomancien, niveau 9 — v350)
+// =========================================================================
+//  Nico : « Coulée de lave : 0 fatigue, initiative 10 ; crée une zone
+//  persistante de lave sur 3 hexagones consécutifs ; elle reste active pendant
+//  toute la partie ; 5 dégâts magiques ; 50 % de chance d'appliquer BRÛLURE. »
+//  Ses réponses : une ligne droite de 3 cases qui part de la case voisine du
+//  Géomancien, dans l'une de ses six directions ; une fois par combat ; elle
+//  frappe tout le monde comme toute zone (lui excepté dès le niveau 5 :
+//  zonesInoffensives). La zone est de feu, PERMANENTE (vieillirZones ne la
+//  retire jamais) : qui y entre, ou s'y tient en fin de manche, la subit
+//  (esquive possible, comme toute zone).
+export const COULEE_LAVE = { longueur: 3, valeurBrute: 5, typeRes: "Magique", chance: 50, duree: 2 };
+const ICONE_BRULE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181101/IMG_2087_q6chof.png";
+const DESC_BRULE = "-50% de soins reçus, et 8% des PV max en dégâts magiques à chaque fin de manche (défense magique appliquée).";
+export function ligneCouleeLave(origine, pas) {
+    const cases = [];
+    for (let k = 1; k <= COULEE_LAVE.longueur; k++) {
+        const h = tournerHex({ q: k, r: 0 }, pas);
+        cases.push({ q: nombre(origine && origine.q) + h.q, r: nombre(origine && origine.r) + h.r });
+    }
+    return cases;
+}
+// Ces cases sont-elles une ligne de lave de ce lanceur ? Rend la direction (0 à 5), ou -1.
+export function orientationLigne(origine, cases) {
+    if (!origine || !Array.isArray(cases) || cases.length !== COULEE_LAVE.longueur) return -1;
+    const cle = (h) => nombre(h && h.q) + "," + nombre(h && h.r);
+    const voulues = new Set(cases.map(cle));
+    if (voulues.size !== COULEE_LAVE.longueur) return -1;
+    for (let pas = 0; pas < 6; pas++) {
+        if (ligneCouleeLave(origine, pas).every(h => voulues.has(cle(h)))) return pas;
+    }
+    return -1;
+}
+export function couleeDeLave(etat, idLanceur, cases, des, plateau) {
+    const lanceur = combattant(etat, idLanceur);
+    if (!lanceur) return [];
+    const carte = plateau || PLAINE;
+    const emprise = (cases || []).map(h => ({ q: nombre(h && h.q), r: nombre(h && h.r) }))
+        .filter(h => !((carte.etatCase && carte.etatCase(h.q, h.r)) || {}).supprimee);
+    if (emprise.length === 0) return [];
+    const zone = {
+        id: `zp_${nombre(etat.version)}_${idLanceur}_lave`, hexes: emprise, type: "feu", lave: true, permanente: true,
+        degats: { valeurBrute: COULEE_LAVE.valeurBrute, typeRes: COULEE_LAVE.typeRes }, soin: null,
+        etat: { nom: "Brûlé", icone: ICONE_BRULE, desc: DESC_BRULE, chance: COULEE_LAVE.chance,
+                duree: COULEE_LAVE.duree, estPoison: false, tickFait: false },
+        dureeRestante: 999,
         idLanceur
     };
     const etapes = poserZone(etat, zone);

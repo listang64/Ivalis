@@ -147,7 +147,7 @@ window.DESCRIPTIFS_CLASSES = {
             { niveau: 1, titre: "Maître des étendues",
               points: ["Dans la Forge, la 5e case de zone payante d'une compétence ne coûte rien",
                        "+10 d'initiative sur ses compétences à zone"] },
-            { niveau: 5, titre: "Technique : Mur de terre",
+            { niveau: 3, titre: "Technique : Mur de terre",
               points: ["Initiative 80 · 20 de fatigue par mur · autant de murs que sa fatigue le permet",
                        "Sur les cases choisies, à 5 cases et en vue : un pilier de roche de 10 PV, "
                            + "infranchissable, qui coupe la ligne de vue",
@@ -157,7 +157,11 @@ window.DESCRIPTIFS_CLASSES = {
               points: ["Ses zones ne lui infligent aucun dégât",
                        "Le terrain difficile ne le ralentit pas",
                        "Il traverse ses propres murs"] },
-            { niveau: 10, titre: "Terre tenace",
+            { niveau: 9, titre: "Technique : Coulée de lave",
+              points: ["Initiative 10 · aucune fatigue · une fois par combat",
+                       "Une ligne de lave de 3 cases devant lui, qui reste toute la rencontre",
+                       "Qui s'y tient ou y entre : 5 dégâts magiques, 50 % de chance d'être Brûlé"] },
+            { niveau: 9, titre: "Terre tenace",
               points: ["Ses zones persistantes durent un tour de plus (4 au lieu de 3)"] }
         ]
     },

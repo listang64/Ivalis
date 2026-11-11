@@ -47,7 +47,7 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
          partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE, ETAT_SAIGNEMENT, SAIGNEMENT,
          resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, appliquerCharme,
-         pointesDeGlace, orientationCone,
+         pointesDeGlace, orientationCone, couleeDeLave, orientationLigne,
          actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle, ligneDeVue, caseLibre, aLEtat,
          carteToutEtalee, resisteA, prisMalgreResistance,
          reserveMaintenueDe, reserveDeTechnique, relacherMaintien, chanceFaceA, CHANCE_ETOURDI_RESONANCE,
@@ -367,6 +367,10 @@ export function validerIntention(etat, intention, plateau) {
         }
         // Les Pointes de glace (Profanateur) : le cône part de lui, dans l'une
         // de ses six directions — exactement ses cases.
+        // La Coulée de lave (Géomancien, v350) : une ligne de 3 cases qui part de lui.
+        if (idCarte === "CLASSE_COULEE_LAVE" && orientationLigne(acteur, intention.cases) < 0) {
+            return refus("Coulée de lave : une ligne de 3 cases qui part du Géomancien");
+        }
         if (idCarte === "CLASSE_POINTES_GLACE" && orientationCone(acteur, intention.cases) < 0) {
             return refus("Pointes de glace : le cône part du Profanateur, devant lui");
         }
@@ -1134,6 +1138,10 @@ export function appliquerIntention(etat, intention, plateau) {
         // subissent aussitôt (dés du cerveau).
         if (intention.idCarte === "CLASSE_POINTES_GLACE") {
             etapes.push(...pointesDeGlace(suivant, intention.acteur, intention.cases || [], des, plateau));
+        }
+        // LA COULÉE DE LAVE : la ligne de lave, et ceux qui s'y tiennent la subissent.
+        if (intention.idCarte === "CLASSE_COULEE_LAVE") {
+            etapes.push(...couleeDeLave(suivant, intention.acteur, intention.cases || [], des, plateau));
         }
         // LA FUREUR DE LA SENTINELLE : une attaque d'opportunité sur chaque
         // ennemi au contact (dés du cerveau), puis la poussée.

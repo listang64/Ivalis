@@ -1031,12 +1031,14 @@ window.ATOUTS_CLASSES = {
     // jouerCarteCombat) ; au niveau 5, le Mur de terre — et ses nappes ne le
     // blessent plus, il marche sur le terrain difficile comme sur un sol nu et
     // traverse ses murs (combat_etat.js, mouvement_pur.js).
+    // v350, la refonte des classes (Nico) : le Mur de terre au niveau 3 ; les
+    // passifs de zone au niveau 5 ; au niveau 9, la Coulée de lave et ses zones
+    // persistantes qui durent un tour de plus (4 au lieu de 3).
     "Géomancien": [
         { niveau: 1,  zoneGratuite: true, initiativeZone: 10 },
-        { niveau: 5,  techniques: ["CLASSE_MUR_DE_TERRE"], zonesInoffensives: true, terrainFacile: true,
-                      traverseSesMurs: true },
-        // Niveau 10 : ses zones persistantes durent un tour de plus (4 au lieu de 3).
-        { niveau: 10, zonesProlongees: 1 }
+        { niveau: 3,  techniques: ["CLASSE_MUR_DE_TERRE"] },
+        { niveau: 5,  zonesInoffensives: true, terrainFacile: true, traverseSesMurs: true },
+        { niveau: 9,  techniques: ["CLASSE_COULEE_LAVE"], zonesProlongees: 1 }
     ],
     // LA SENTINELLE : +6 à ses attaques d'opportunité et +20 % de soins reçus
     // (mouvement_pur.js, moteur_pur.js) ; au niveau 5, le Défenseur — 30 % de
@@ -1097,6 +1099,7 @@ window.classeInterditeA = function(race, nomClasse) {
 //    cible    "soi" (Mur de bouclier), "allieAdjacent" (Rempart) ou
 //             "zoneDeux" (Assaut mortel : une zone de deux cases au contact),
 //             "cone" (Pointes de glace : un cône de trois rangs devant soi),
+//             "ligne" (Coulée de lave : une ligne de trois cases devant soi),
 //             "allies" (Soin d'urgence) ou "allieKO" (Prise en charge)
 window.TECHNIQUES_CLASSE = {
     // (Le Mur de bouclier n'est plus donné par aucune classe : le moteur le
@@ -1201,8 +1204,16 @@ window.TECHNIQUES_CLASSE = {
     // LE MUR DE TERRE : pas une fois par combat — autant de murs que sa
     // fatigue en paie (20 chacun), sur les cases qu'il désigne (cerveau :
     // leverMursDeTerre).
+    // (v350) La Coulée de lave : une ligne de 3 cases devant lui, qui reste
+    // toute la rencontre (couleeDeLave, moteur_pur.js).
+    CLASSE_COULEE_LAVE: {
+        Nom: "Coulée de lave", classe: "Géomancien", niveau: 9, Initiative: 10, Fatigue: 0, cible: "ligne",
+        desc: "Une ligne de lave de 3 cases part de la case voisine du Géomancien, dans la direction choisie, et "
+            + "reste toute la rencontre. Qui s'y tient ou y entre : 5 dégâts magiques et 50 % de chance d'être "
+            + "Brûlé (esquive possible, alliés compris ; pas le Géomancien). Une fois par combat."
+    },
     CLASSE_MUR_DE_TERRE: {
-        Nom: "Mur de terre", classe: "Géomancien", niveau: 5, Initiative: 80, Fatigue: 0, cible: "murs", portee: 5,
+        Nom: "Mur de terre", classe: "Géomancien", niveau: 3, Initiative: 80, Fatigue: 0, cible: "murs", portee: 5,
         coutParMur: 20, sansLimite: true,
         desc: "Lève un mur de roche sur chaque case choisie à 5 cases (en vue) : 20 de fatigue par mur. "
             + "10 PV, infranchissable, coupe la ligne de vue. Qui s'y tient est repoussé à côté et prend "

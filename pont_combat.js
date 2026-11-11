@@ -584,7 +584,7 @@ const SCENES = {
     // Une technique de classe jouée : son nom sur le pion.
     techniqueClasse(e) {
         const noms = { CLASSE_MUR_BOUCLIER: "🛡️ Mur de bouclier", CLASSE_REMPART: "🛡️ Rempart",
-                       CLASSE_ASSAUT_MORTEL: "🗡️ Assaut mortel", CLASSE_POINTES_GLACE: "❄️ Pointes de glace",
+                       CLASSE_ASSAUT_MORTEL: "🗡️ Assaut mortel", CLASSE_POINTES_GLACE: "❄️ Pointes de glace", CLASSE_COULEE_LAVE: "🌋 Coulée de lave",
                        CLASSE_SOIN_URGENCE: "✚ Soin d'urgence", CLASSE_PRISE_EN_CHARGE: "✚ Prise en charge",
                        CLASSE_NUEE_CHAUVES_SOURIS: "🦇 Nuée de chauve-souris",
                        CLASSE_BAISER_VAMPIRE: "🩸 Baiser du vampire",

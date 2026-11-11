@@ -11220,3 +11220,23 @@ corrections_v349.mjs vérifie :
 - le +3 contre les Vargens : compétences, armure, soins, Baiser, opportunité, autres héros.
 
 vampire.mjs est mis à jour (paliers et brûlure). Les contrôles de version de v348 et v349 acceptent désormais les versions suivantes.
+
+## v350 — La refonte des classes : le Géomancien
+
+- Nico (sa fiche du Géomancien) :
+  - niveau 1 : la 5e case de zone payante gratuite, +10 d'initiative aux sorts de zone (déjà en place) ;
+  - niveau 3 : le Mur de terre, inchangé ;
+  - niveau 5 : ses zones ne le blessent pas, terrain difficile normal, il traverse ses murs (déjà en place) ;
+  - niveau 9 : Coulée de lave ;
+  - passif : les zones persistantes durent 1 tour de plus — au niveau 9, selon sa réponse.
+- app.js : les paliers passent à 1, 3, 5 et 9. Le Mur de terre descend du niveau 5 au niveau 3. zonesProlongees passe du niveau 10 au niveau 9.
+- LA COULÉE DE LAVE (CLASSE_COULEE_LAVE ; couleeDeLave, ligneCouleeLave, orientationLigne dans moteur_pur.js) :
+  - init 10, aucune fatigue, une fois par combat ;
+  - une ligne droite de 3 cases qui part de la case voisine du Géomancien, dans l'une de ses 6 directions ; il la tourne autour de lui au ciblage, comme les Pointes de glace ;
+  - une zone de feu PERMANENTE : vieillirZones ne la retire jamais, et rouvre seulement la manche ;
+  - 5 dégâts magiques et 50 % de chance d'être Brûlé, pour qui s'y tient au moment où elle coule, y entre ensuite, ou s'y tient en fin de manche ;
+  - esquive possible, alliés compris ; le Géomancien est épargné grâce à ses zones inoffensives.
+
+corrections_v350.mjs vérifie : les paliers ; les 6 lignes et les refus (ligne qui ne part pas de lui, brisée, de 2 ou 4 cases, niveau 8) ; la zone ; les dégâts immédiats sur un ennemi et un allié ; la seconde fois refusée ; le rejeu ; 20 manches sans s'effacer ; la fin de manche ; le Brûlé à environ 50 % sur 200 graines ; l'entrée dans la zone ; le Géomancien épargné ; la défense magique ; le ciblage et les textes.
+
+geomancien.mjs est mis à jour (Mur au niveau 3, zones prolongées au niveau 9).

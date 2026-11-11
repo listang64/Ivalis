@@ -6000,7 +6000,8 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
     // « enlève les noms et fais un ciblage visuel comme n'importe quel autre
     // sort »).
     // Les Pointes de glace (Profanateur) aussi : leur cône tourne autour de lui.
-    if (t.cible === "zoneDeux" || t.cible === "cone" || idCarte === "CLASSE_TIR_PRECIS" || (window.TECHNIQUES_VISEES || {})[idCarte]) {
+    // La Coulée de lave (Géomancien, v350) aussi : sa ligne tourne autour de lui.
+    if (t.cible === "zoneDeux" || t.cible === "cone" || t.cible === "ligne" || idCarte === "CLASSE_TIR_PRECIS" || (window.TECHNIQUES_VISEES || {})[idCarte]) {
         if (typeof window.demarrerCiblage === "function") window.demarrerCiblage(idCarte, { idLanceur });
         return;
     }

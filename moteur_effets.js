@@ -1403,6 +1403,19 @@ window.demarrerCiblage = async function(idCarte, options) {
                                     enZone: true, cibles: [] });
     }
 
+    // LA COULÉE DE LAVE (Géomancien, v350) : une ligne de trois cases devant
+    // lui, qu'il tourne autour de lui comme les Pointes de glace. L'aperçu
+    // montre la lave ; les cases partent au cerveau (couleeDeLave, moteur_pur.js).
+    if (dataCarte.techniqueClasse === "CLASSE_COULEE_LAVE") {
+        isZone = true;
+        zoneHexesBase = [{ q: 1, r: 0 }, { q: 2, r: 0 }, { q: 3, r: 0 }];
+        attaquesExtraites.push({ nom: "Coulée de lave", typeRes: "Magique", valeurBrute: 5, pourcentPV: 0,
+                                 isRanged: false, rangeMax: 1, isHeal: false, isShield: false,
+                                 enZone: true, cibles: [] });
+        alterationsExtraites.push({ nom: "Brûlé", chance: 50, duree: 2, isRanged: false, rangeMax: 1,
+                                    enZone: true, cibles: [] });
+    }
+
     // LE TIR PRÉCIS (Pisteur) se vise comme une compétence ordinaire, sur le
     // plateau (Nico : « plutôt qu'une fenêtre avec les noms de la cible »).
     // Un ennemi à `portee` cases, en vue : l'Immobilisation n'est là que pour
@@ -2920,7 +2933,7 @@ window.validerZoneAoE = function() {
 
     // LES POINTES DE GLACE : leur cône part au cerveau tel quel (des cases,
     // pas des cibles) — la zone se pose même vide.
-    if (state.techniqueClasse === "CLASSE_POINTES_GLACE") {
+    if (state.techniqueClasse === "CLASSE_POINTES_GLACE" || state.techniqueClasse === "CLASSE_COULEE_LAVE") {
         const idCarte = state.idCarte;
         window.nettoyerCiblage();
         if (window.regimeDemande && typeof window.regimeDemande.techniqueClasse === "function") {

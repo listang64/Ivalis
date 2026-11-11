@@ -45,7 +45,7 @@ const REGLES = {
     defPhysique: w.defPhysiqueCombattant, defMagique: w.defMagiqueCombattant,
     critique: w.critiqueCombattant, atouts: w.atoutRace, bonusEquip: w.bonusEquip
 };
-const XP = { 1: 0, 4: 1800, 5: 2500, 10: 7900 };
+const XP = { 1: 0, 2: 700, 3: 1200, 4: 1800, 5: 2500, 8: 5200, 9: 6400, 10: 7900 };
 const fiche = (id, extra = {}) => ({
     idPersonnage: id, prenom: id, race: "Ankylar", classe: "", camp: id.startsWith("M") ? "Ennemi" : "Allié",
     estMonstre: id.startsWith("M"), joueur: "", xp: 0,
@@ -74,9 +74,12 @@ console.log("=========================================================");
 
 console.log("\n1. LES PALIERS");
 {
-    const a1 = w.atoutRace(geomancien(1)), a5 = w.atoutRace(geomancien(5));
+    // (v350, la refonte des classes : le Mur au niveau 3, les passifs au 5, la Coulée de lave au 9.)
+    const a1 = w.atoutRace(geomancien(1)), a3 = w.atoutRace(geomancien(3)), a4 = w.atoutRace(geomancien(4)), a5 = w.atoutRace(geomancien(5));
     verifier("niveau 1 : la 5e case de zone offerte, +10 init sur les zones", a1.zoneGratuite === true && a1.initiativeZone === 10
              && !(a1.techniques || []).length, JSON.stringify(a1));
+    verifier("niveau 3 : Mur de terre (pas encore les passifs)", JSON.stringify(a3.techniques) === '["CLASSE_MUR_DE_TERRE"]'
+             && !a4.zonesInoffensives && !a4.terrainFacile && !a4.traverseSesMurs);
     verifier("niveau 5 : Mur de terre, zones inoffensives, terrain facile, traverse ses murs",
              JSON.stringify(a5.techniques) === '["CLASSE_MUR_DE_TERRE"]' && a5.zonesInoffensives && a5.terrainFacile && a5.traverseSesMurs);
     const t = w.TECHNIQUES_CLASSE.CLASSE_MUR_DE_TERRE;
@@ -92,11 +95,11 @@ console.log("\n1. LES PALIERS");
     verifier("un nouveau combat : ni mur ni gravats", JSON.stringify(e.murs) === "{}" && JSON.stringify(e.gravats) === "{}");
 }
 
-console.log("\n1 bis. NIVEAU 10 : SES ZONES PERSISTANTES DURENT UN TOUR DE PLUS");
+console.log("\n1 bis. NIVEAU 9 (v350) : SES ZONES PERSISTANTES DURENT UN TOUR DE PLUS");
 {
     // Nico : « Géomancien, lvl 10 : les zones persistantes durent un tour de plus. »
-    const a5 = w.atoutRace(geomancien(5)), a10 = w.atoutRace(geomancien(10));
-    verifier("niveau 10 : +1 tour aux zones (pas avant)", a10.zonesProlongees === 1 && !a5.zonesProlongees,
+    const a5 = w.atoutRace(geomancien(8)), a10 = w.atoutRace(geomancien(9));
+    verifier("niveau 9 : +1 tour aux zones (pas au 8)", a10.zonesProlongees === 1 && !a5.zonesProlongees,
              `${a5.zonesProlongees} / ${a10.zonesProlongees}`);
     verifier("écrit en clair", /un tour de plus/.test(w.texteAtout("zonesProlongees", 1)), w.texteAtout("zonesProlongees", 1));
     const nappe = (niveau, lanceur = "G") => {
@@ -157,7 +160,7 @@ console.log("\n3. NIVEAU 5 : LEVER DES MURS");
     verifier("6 murs avec 100 d'énergie (120) : refusé", refus([1, 2, 3, 4, 5, 6].map(i => ({ q: i <= 5 ? i : 1, r: i <= 5 ? 0 : 1 }))).refus === true);
     const carte = { etatCase: (q, r) => ({ bloquee: q === 1 && r === 0 }) };
     verifier("derrière un mur de la carte : refusé (pas de ligne de vue)", refus([{ q: 3, r: 0 }], undefined, { plateau: carte }).refus === true);
-    verifier("niveau 4 : il ne l'a pas", (() => { const x = monde(4); return murs(x, [{ q: 2, r: 0 }]).refus === true; })());
+    verifier("niveau 2 : il ne l'a pas", (() => { const x = monde(2); return murs(x, [{ q: 2, r: 0 }]).refus === true; })());
 }
 
 console.log("\n4. QUELQU'UN SUR LA CASE");
