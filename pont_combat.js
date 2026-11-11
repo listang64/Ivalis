@@ -592,7 +592,7 @@ const SCENES = {
                        CLASSE_TRANSFERT: "🔄 Transfert",
                        CLASSE_RESONANCE_BOUCLIER: "🛡️ Résonance du bouclier",
                        CLASSE_BOUCLIER_ANTIMAGIE: "🔮 Bouclier anti-magie",
-                       CLASSE_APPEL_LUMIERE: "☀️ Appel de la lumière",
+                       CLASSE_BRISEUR_ARCANE: "💥 Briseur d'arcane",
                        CLASSE_RETOUR_PASSE: "⌛ Retour dans le passé",
                        CLASSE_RETOUR_ARRIERE: "⏪ Retour arrière",
                        CLASSE_FUREUR_SENTINELLE: "⚔️ Assaut de la sentinelle",

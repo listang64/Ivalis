@@ -296,21 +296,22 @@ window.DESCRIPTIFS_CLASSES = {
     },
     CLASSE_CHASSEUR_DE_MAGES: {
         presentation: "Il a appris à marcher dans les tempêtes de sorts sans y laisser sa peau. Le "
-            + "Chasseur de mages traque ceux qui plient la magie : ses éclairs les aveuglent "
-            + "de lumière, et leurs propres sorts se retournent contre eux.",
+            + "Chasseur de mages traque ceux qui plient la magie : leurs sorts glissent sur lui ou se "
+            + "retournent contre eux, et il brise leurs défenses arcaniques.",
         paliers: [
-            { niveau: 1, titre: "Passif : Maîtrise de la lumière",
+            { niveau: 1, titre: "Traqueur de sorciers",
               points: ["+10 % de résistance magique",
-                       "Ses sorts de foudre ont 33 % de chance d'aveugler leur cible (2 manches)",
-                       "Une chance fixe : elle ne s'additionne pas à l'effet Aveuglement de la carte"] },
+                       "+2 dégâts sur chacune de ses attaques contre les monstres Mage et Soutien"] },
+            { niveau: 3, titre: "Peau d'airain",
+              points: ["+10 % de résistance magique",
+                       "+1 compétence"] },
             { niveau: 5, titre: "Technique : Bouclier anti-magie",
-              points: ["Initiative 200 · aucune fatigue · la manche en cours et la suivante",
-                       "Tout coup magique qui le frappe repart en entier sur son lanceur",
-                       "Une fois par combat"] },
-            { niveau: 10, titre: "Technique : Appel de la lumière",
-              points: ["Initiative 100 · aucune fatigue",
-                       "Aveugle tout le monde sur le champ de bataille (alliés et lui-même compris), 2 manches",
-                       "Une fois par combat"] }
+              points: ["Initiative 200 · aucune fatigue · une fois par combat",
+                       "Tant qu'il est maintenu (2 manches), tout coup magique qui le frappe repart en entier sur son lanceur",
+                       "Réserve : 20 d'énergie par manche (la première au lancement) ; il se relâche en préparation"] },
+            { niveau: 9, titre: "Technique : Briseur d'arcane",
+              points: ["Initiative 100 · aucune fatigue · une fois par combat",
+                       "Un ennemi à 5 cases, en vue, prend 1,5 fois sa résistance magique en dégâts bruts"] }
         ]
     }
 };

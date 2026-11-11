@@ -156,8 +156,14 @@ export function regleDesEtats(c, cle) {
 // malus s'annule (l'atout repasse à false).
 export const BRULURE_AGGRAVEE = { soinsRecus: -10, pvMaxParTour: 2, typeParTour: "Physique" };
 // (v349) Le Vampire de niveau 5 : +3 à chaque coup qui frappe un Vargen.
-export const bonusContreRace = (lanceur, cible) =>
-    (cible && cible.race === "Vargen") ? nombre(lanceur && lanceur.atouts && lanceur.atouts.degatsContreVargen) : 0;
+// (v356) Le Chasseur de mages : +2 à chaque coup qui frappe un monstre Mage
+// ou Soutien (son archétype).
+export const ARCHETYPES_MAGES_SOUTIENS = ["DPS MAGE CAC", "DPS MAGE DISTANCE", "SOUTIEN"];
+export const bonusContreRace = (lanceur, cible) => {
+    const atouts = (lanceur && lanceur.atouts) || {};
+    return ((cible && cible.race === "Vargen") ? nombre(atouts.degatsContreVargen) : 0)
+         + ((cible && ARCHETYPES_MAGES_SOUTIENS.includes(cible.archetype)) ? nombre(atouts.degatsContreMages) : 0);
+};
 
 export const esquiveDe     = (c) => Math.max(nombre(c && c.def && c.def.esquive)  + bonusDesEtats(c, "esquive")
                                   + regleDesEtats(c, "esquive"), planchersEsquive(c));
@@ -569,19 +575,6 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
         });
     });
 
-    // MAÎTRISE DE LA LUMIÈRE (Chasseur de mages, niveau 1 — v237, à la place
-    // de l'effet Lumière) : un sort de FOUDRE a 33 % de chance FIXE
-    // d'aveugler chaque cible qu'il vise. Elle ne s'additionne pas à
-    // l'Aveuglement que porterait la carte : sur une cible que la carte veut
-    // aveugler, c'est la plus forte des deux chances, en un seul jet (plus
-    // bas, chanceEtatDe) ; sur les autres, un jet à elle, après les états.
-    const maitrise = nombre(lanceur && lanceur.atouts && lanceur.atouts.maitriseLumiere);
-    const estFoudre = (a) => !!a && !a.isHeal && !a.isShield && a.typeRes === "Magique"
-                             && (a.element === "Foudre" || (a.elements || []).includes("Foudre"));
-    if (maitrise > 0) (plan.attaques || []).filter(estFoudre).forEach(a => (a.cibles || []).forEach(id => {
-        pourCible(id).maitriseLumiere = maitrise;
-    }));
-
     (plan.alterations || []).forEach(alt => {
         (alt.cibles || []).forEach(id => {
             const c = pourCible(id);
@@ -595,7 +588,7 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
             if (c.etats[alt.nom] === undefined) {
                 const cibleEtat = combattant(etat, id);
                 c.etats[alt.nom] = (critique && !resisteA(cibleEtat, alt.nom))
-                    || des.d100() <= (critique ? chanceFaceA(cibleEtat, alt.nom, 100) : chanceEtatDe(lanceur, alt, cibleEtat, c));
+                    || des.d100() <= (critique ? chanceFaceA(cibleEtat, alt.nom, 100) : chanceEtatDe(lanceur, alt, cibleEtat));
             }
             // L'AVEUGLEMENT tire ICI les 3 cases de noir autour de sa cible —
             // avec les autres dés, pour que tous les postes voient le même noir.
@@ -613,16 +606,6 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
                 c.bouscule = des.d100() <= CHANCE_BOUSCULADE_POUSSEE;
             }
         });
-    });
-
-    // Le jet de la Maîtrise de la lumière sur les cibles que la carte ne
-    // cherchait pas à aveugler : le noir se tire avec (lumiereAveugle, comme
-    // l'ancienne Lumière — resoudreCarte le pose sur la cible touchée).
-    if (maitrise > 0) Object.keys(jets.parCible).forEach(id => {
-        const c = jets.parCible[id];
-        if (!(c.maitriseLumiere > 0) || c.etats[ETAT_AVEUGLE] !== undefined || c.lumiereAveugle !== undefined) return;
-        c.lumiereAveugle = des.d100() <= chanceFaceA(combattant(etat, id), ETAT_AVEUGLE, c.maitriseLumiere);
-        if (c.lumiereAveugle) c.noirLumiere = { [id]: tirerDirectionsAveugle(des) };
     });
 
     // --- LES JETS DE L'ÉQUIPEMENT -----------------------------------------
@@ -753,8 +736,8 @@ export const DIRECTIONS_HEX = [
     { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }
 ];
 export const CASES_AVEUGLEES = 4;
-// L'aveuglement de la Lumière et de l'Appel de la lumière (Chasseur de
-// mages) : celui de l'effet Aveuglement, 2 manches.
+// L'aveuglement de la Lumière (Chasseur de mages, effet des cartes forgées
+// avant la v237) : celui de l'effet Aveuglement, 2 manches.
 export const DUREE_AVEUGLE_LUMIERE = 2;
 export const DESC_AVEUGLE = "4 cases autour de lui sont dans le noir : il ne peut y cibler personne (les zones y frappent quand même).";
 
@@ -841,21 +824,17 @@ export function prisMalgreResistance(c, nom, des) {
 
 // `cible` (facultative) : ce que la cible ajoute elle-même à la chance — le
 // Vampire, +20 % d'être Brûlé par un sort (brulureFacile, v237) — et ce
-// qu'elle en retire : sa résistance à cet état (−25 %, v260). `jetsCible`
-// (facultatif) : ses jets de la carte — un sort de foudre d'un Chasseur de
-// mages y a noté sa Maîtrise de la lumière (l'Aveuglement prend alors la plus
-// forte des deux chances, sans les additionner).
+// qu'elle en retire : sa résistance à cet état (−25 %, v260).
 //
 // Un LEADER (v262) ajoute ses points de chance (+15, à l'origine) à tout état
 // que sa carte peut poser — jamais à un état que la carte ne pose pas (0 %).
-export function chanceEtatDe(lanceur, alt, cible, jetsCible) {
+export function chanceEtatDe(lanceur, alt, cible) {
     const base = nombre(alt && alt.chance);
     const bonus = (lanceur && lanceur.estMonstre) ? (BONUS_CHANCE_ETAT_MONSTRE[alt && alt.nom] || 0) : 0;
     const subie = (alt && alt.nom === "Brûlé" && cible && cible.atouts) ? nombre(cible.atouts.brulureFacile) : 0;
     // (Le leader n'ajoute plus de chance d'état depuis la v267 — Nico : « la
     // dernière colonne, 15 pts, on ne sait pas dans quoi : enlève-la ».)
     let chance = base + bonus + (base > 0 ? subie : 0);
-    if (alt && alt.nom === ETAT_AVEUGLE && jetsCible && jetsCible.maitriseLumiere > 0) chance = Math.max(chance, jetsCible.maitriseLumiere);
     return chanceFaceA(cible, alt && alt.nom, chance);
 }
 
@@ -1744,7 +1723,9 @@ export const RESERVES_TECHNIQUES = {
     CLASSE_NUEE_CHAUVES_SOURIS: { parTour: 33, tours: 2, coutLancement: 40, nom: "Nuée maintenue" },
     // (v351) La Prise en charge : 20 par manche sur 2 manches, pour le Médicus ET
     // pour le réanimé ; un prix, qui ne tient rien — elle ne se relâche pas.
-    CLASSE_PRISE_EN_CHARGE: { parTour: 20, tours: 2, nom: "Prise en charge (réserve)", sansRelache: true }
+    CLASSE_PRISE_EN_CHARGE: { parTour: 20, tours: 2, nom: "Prise en charge (réserve)", sansRelache: true },
+    // (v356) Le Bouclier anti-magie : 20 par manche sur ses 2 manches.
+    CLASSE_BOUCLIER_ANTIMAGIE: { parTour: 20, tours: 2, nom: "Anti-magie maintenu" }
 };
 // Ce qu'une technique maintenue coûte au lancement : son prix, et la part de
 // la manche du lancement.
@@ -1847,14 +1828,29 @@ export function actionBaiserVampire(idLanceur, cible) {
 // recule d'une case, comme une Poussée (un mur ou un pion l'arrête).
 export const SOIN_URGENCE = 12;
 
-// LE CHASSEUR DE MAGES. Bouclier anti-magie (niveau 5) : pour la manche en
-// cours et la suivante, tout coup MAGIQUE qui le frappe repart en entier sur
-// celui qui l'a lancé (avec les défenses de ce dernier) — lui n'en prend rien.
-// Appel de la lumière (niveau 10) : tout le monde sur le champ de bataille,
-// alliés et Chasseur compris, est Aveuglé (2 manches, un noir chacun).
+// LE CHASSEUR DE MAGES. Bouclier anti-magie (niveau 5) : tant qu'il est
+// maintenu (2 manches, réserve de 20 par manche depuis la v356), tout coup
+// MAGIQUE qui le frappe repart en entier sur celui qui l'a lancé (avec les
+// défenses de ce dernier) — lui n'en prend rien.
+// (v356) Briseur d'arcane (niveau 9, à la place de l'Appel de la lumière) :
+// un ennemi à 5 cases, en vue, prend 1,5 fois sa résistance magique (celle du
+// moment) en dégâts bruts — à coup sûr, comme le Baiser du vampire.
 export const ETAT_ANTIMAGIE = "Bouclier anti-magie";
 export const MANCHES_ANTIMAGIE = 2;
 export const DESC_ANTIMAGIE = "Tout coup magique qui le frappe repart en entier sur son lanceur.";
+export const FACTEUR_BRISEUR = 1.5;
+export const PORTEE_BRISEUR = 5;
+export function actionBriseurArcane(idLanceur, cible) {
+    return {
+        type: "carte", idLanceur, idCarte: "CLASSE_BRISEUR_ARCANE", coutFatigue: 0, critique: false,
+        jets: { parCible: {} },
+        attaques: [{ nom: "Briseur d'arcane", typeRes: "Magique", brut: true,
+                     valeurBrute: Math.max(0, Math.floor(FACTEUR_BRISEUR * defMagiqueDe(cible))),
+                     isRanged: true, rangeMax: PORTEE_BRISEUR, isHeal: false, isShield: false,
+                     cibles: cible ? [cible.id] : [] }],
+        alterations: []
+    };
+}
 
 // LE PROTECTEUR (ex-Hoplite). Résonance du bouclier (niveau 9 depuis la v347) :
 // chaque ennemi au contact a 80 % de chance d'être Étourdi (2 manches ; sa
@@ -2028,29 +2024,7 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
         c.etats = [...(c.etats || []).filter(e => e && e.nom !== ETAT_ANTIMAGIE),
                    { nom: ETAT_ANTIMAGIE, duree: MANCHES_ANTIMAGIE, desc: DESC_ANTIMAGIE }];
         etapes.push({ type: "etats", cible: id, liste: c.etats, pose: ETAT_ANTIMAGIE });
-    } else if (action.idCarte === "CLASSE_APPEL_LUMIERE") {
-        // Les noirs ont été tirés par le cerveau (action.noirs), un par
-        // combattant : on ne fait que les poser. Qui résiste à l'Aveuglement
-        // (v260) a eu son dé chez le cerveau (action.prisMalgreResistance).
-        const noirs = action.noirs || {};
-        const pris = action.prisMalgreResistance || {};
-        Object.keys(noirs).sort().forEach(v => {
-            const x = combattant(suivant, v);
-            if (!x || x.aTerre) return;
-            if (resisteA(x, ETAT_AVEUGLE) && pris[v] !== true) {
-                etapes.push({ type: "etatRate", cible: v, nom: ETAT_AVEUGLE, resiste: true });
-                return;
-            }
-            const cases = casesDuNoir(x, noirs[v]);
-            const deja = (x.etats || []).find(e => e && e.nom === ETAT_AVEUGLE);
-            if (deja) {
-                deja.duree = Math.max(nombre(deja.duree), DUREE_AVEUGLE_LUMIERE);
-                deja.cases = cases;
-            } else {
-                x.etats = [...(x.etats || []), { nom: ETAT_AVEUGLE, duree: DUREE_AVEUGLE_LUMIERE, desc: DESC_AVEUGLE, cases }];
-            }
-            etapes.push({ type: "etats", cible: v, pose: ETAT_AVEUGLE, liste: x.etats });
-        });
+        etapes.push(...poserMaintien(c, action.idCarte, [{ cible: id, nom: ETAT_ANTIMAGIE }]));
     } else if (action.idCarte === "CLASSE_CHARME_FRATRICIDE") {
         const ennemi = combattant(suivant, action.cible);
         if (ennemi && !ennemi.aTerre) {
@@ -2755,7 +2729,7 @@ export function resoudreCarte(etat, action, plateau) {
                 });
                 if (etapesNoir.length) {
                     etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
-                                  texte: des.maitriseLumiere > 0 ? "⚡ Ébloui par l'éclair !" : "☀️ Éblouis !", couleur: "#ffe082" });
+                                  texte: "☀️ Éblouis !", couleur: "#ffe082" });
                     etapes.push(...etapesNoir);
                 }
             }

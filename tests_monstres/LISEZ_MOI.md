@@ -11348,3 +11348,22 @@ corrections_v355.mjs le vérifie : les paliers, la disparition de l'Arrêt du te
 oracle.mjs est réécrit : paliers ; l'arcane (seuils, recul dans la file, état Ralenti, rejeu, coût 29, feu, esquive, sans atout, manche suivante) ; le Retour arrière (niveau 9) ; le Retour dans le passé (passé noté et rejoué, 4 manches gardées, retour, une fois par combat, début du combat, case prise, échange, KO) ; la page (+8, lancement direct, Forge −40 %) ; la fiche (Niv. 1 / 3 / 5 / 9).
 
 geomancien.mjs : l'Oracle a +8 (au lieu de +10). corrections_v344 et v346 : leurs contrôles de version passent en « ou plus ».
+
+## v356 — La refonte des classes : le Chasseur de mages
+
+- Nico (sa fiche du Chasseur de mages) :
+  - niveau 1 : +10 % de résistance magique, +2 dégâts physiques contre les monstres Mage et Soutien ;
+  - niveau 3 : +10 % de résistance magique, +1 compétence ;
+  - niveau 5 : Bouclier anti-magie (renvoie à l'expéditeur tous les dégâts magiques, INIT 200, réserve 20 pour 2 tours) ;
+  - niveau 9 : Briseur d'arcane (une fois par combat, 1,5× la résistance magique de la cible en dégâts bruts, INIT 100).
+- Ses réponses : la Maîtrise de la lumière est retirée ; le +2 vaut sur toutes ses attaques ; le Bouclier tient 2 manches tant qu'il est maintenu, et lui ne prend rien ; le Briseur vise un ennemi à 5 cases, en vue (il remplace l'Appel de la lumière).
+- app.js : paliers 1 (defMagique 10, degatsContreMages 2), 3 (defMagique 10, competences 1), 5 (CLASSE_BOUCLIER_ANTIMAGIE, avec sa réserve), 9 (CLASSE_BRISEUR_ARCANE, visé sur le plateau comme le Charme : TECHNIQUES_VISEES).
+- LE +2 : combat_etat.js donne aux créatures leur archétype (fiche.Archetype) ; moteur_pur.js, bonusContreRace ajoute degatsContreMages contre ARCHETYPES_MAGES_SOUTIENS (DPS MAGE CAC, DPS MAGE DISTANCE, SOUTIEN). Il passe par le même chemin que le +3 du Vampire contre les Vargens : cartes et attaques d'opportunité, ajouté au brut de l'attaque (sur un sort, il subit donc la résistance magique).
+- LE BOUCLIER ANTI-MAGIE : RESERVES_TECHNIQUES (20 par manche, 2 manches, « Anti-magie maintenu ») ; poserMaintien relie l'état du bouclier, qui tombe avec la réserve (à court d'énergie, ou relâché en préparation). Le renvoi lui-même ne change pas.
+- LE BRISEUR D'ARCANE : actionBriseurArcane (moteur_pur.js) frappe comme le Baiser du vampire, à coup sûr, en brut : plancher(1,5 × defMagiqueDe(cible)). Validation (cerveau_combat.js) : un ennemi debout, à 5 cases, en vue.
+- Retirés (orphelins) : la Maîtrise de la lumière (tirerDesCarte, chanceEtatDe, combat_etat.js, texteAtout) et l'Appel de la lumière (sa technique, sa branche du moteur, ses noirs tirés par le cerveau, son nom dans pont_combat.js). L'ancienne Lumière des cartes déjà forgées reste. L'animation « appel-lumiere » du catalogue d'animations (animations_catalogue.js) n'est pas touchée.
+- combat.js : icône 💠 et bleu pâle pour « Anti-magie maintenu ».
+
+corrections_v356.mjs le vérifie : la réserve, les archétypes, le Briseur (31 % → 46), la disparition de la Maîtrise et de l'Appel, la fiche de classe et l'onglet Statistiques dans la vraie page, la version.
+
+chasseur_de_mages.mjs est mis à jour (parties sans navigateur) : paliers ; le +2 (archétype en combat, cartes physiques et sorts, opportunité, autres héros) ; le Bouclier (20 payés, 19 refusé, réserve bloquée, chute à court d'énergie) ; le Briseur (portée, allié, KO, mur, 75 bruts, une fois, rejeu, arrondi, esquive, +2 contre un Soutien). Sa partie navigateur demande toujours effets_reels.json, absent du conteneur.

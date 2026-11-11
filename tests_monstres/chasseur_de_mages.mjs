@@ -25,13 +25,25 @@
 // 33 % de chances d'aveugler avec un sort de foudre (fixe, ne s'additionne pas
 // avec l'effet aveugler). » Les cartes déjà forgées avec Lumière gardent leur
 // effet (passer outre la défense magique) : la section 2 le vérifie encore.
+//
+// Puis (v356, la refonte des classes), Nico : « NIVEAU 1 : +10 % Résistance
+// magique, +2 dégâts physiques contre les monstres de type Mage et Soutien.
+// NIVEAU 3 : +10 % Résistance magique, +1 compétence. NIVEAU 5 : Bouclier
+// anti-magie (renvoie à l'expéditeur tous les dégâts magiques, INIT 200,
+// réserve 20 pour 2 tours). NIVEAU 9 : Briseur d'arcane (une fois par combat,
+// inflige à la cible 1,5× sa résistance magique en dégâts bruts, INIT 100). »
+// Ses réponses : la Maîtrise de la lumière est retirée ; le +2 sur toutes ses
+// attaques ; le Bouclier tient 2 manches tant qu'il est maintenu, et lui ne
+// prend rien ; le Briseur vise un ennemi à 5 cases, en vue (il remplace
+// l'Appel de la lumière).
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 import { construireEtatCombat, clonerEtat, appliquerEntree } from '../combat_etat.js';
-import { resoudreCarte, tirerDesCarte, defMagiqueDe, DUREE_AVEUGLE_LUMIERE, ETAT_ANTIMAGIE } from '../moteur_pur.js';
-import { validerIntention, appliquerIntention, vieillirLesEtats } from '../cerveau_combat.js';
+import { resoudreCarte, tirerDesCarte, defMagiqueDe, ETAT_ANTIMAGIE, reserveMaintenueDe, bonusContreRace } from '../moteur_pur.js';
+import { degatsOpportuniteBruts } from '../mouvement_pur.js';
+import { validerIntention, appliquerIntention, vieillirLesEtats, cloturerTour } from '../cerveau_combat.js';
 import { misEnScene } from '../pont_combat.js';
 
 let echecs = 0;
@@ -46,7 +58,7 @@ const REGLES = {
     defPhysique: w.defPhysiqueCombattant, defMagique: w.defMagiqueCombattant,
     critique: w.critiqueCombattant, atouts: w.atoutRace, bonusEquip: w.bonusEquip
 };
-const XP = { 1: 0, 4: 1800, 5: 2500, 9: 6400, 10: 7900 };
+const XP = { 1: 0, 3: 1200, 4: 1800, 5: 2500, 8: 5200, 9: 6400, 10: 7900 };
 const fiche = (id, extra = {}) => ({
     idPersonnage: id, prenom: id, race: "Humain", classe: "", camp: id.startsWith("M") ? "Ennemi" : "Allié",
     estMonstre: id.startsWith("M"), joueur: "", xp: 0,
@@ -80,25 +92,30 @@ const aveugle = (c) => (c.etats || []).find(x => x.nom === "Aveuglé");
 console.log("\n=========================================================");
 console.log("  LE CHASSEUR DE MAGES");
 // =========================================================================
-console.log("\n1. LES PALIERS : +10 RÉSISTANCE MAGIQUE ET MAÎTRISE DE LA LUMIÈRE, BOUCLIER ANTI-MAGIE, APPEL DE LA LUMIÈRE");
+console.log("\n1. LES PALIERS (v356) : +10 % RÉS. MAGIQUE ET +2 CONTRE MAGES/SOUTIENS, +10 % ET +1 COMPÉTENCE, BOUCLIER, BRISEUR");
 // =========================================================================
 {
-    const a1 = w.atoutClasse(chasseur(1)), a5 = w.atoutClasse(chasseur(5)), a10 = w.atoutClasse(chasseur(10));
-    verifier("niveau 1 : +10 de défense magique, Maîtrise de la lumière (33 %), plus d'effet Lumière",
-             a1.defMagique === 10 && a1.maitriseLumiere === 33 && !(a1.effets || []).length && !a1.lumiereAveugle
-             && !(a1.techniques || []).length, JSON.stringify(a1));
-    verifier("niveau 5 : le Bouclier anti-magie", JSON.stringify(a5.techniques) === '["CLASSE_BOUCLIER_ANTIMAGIE"]');
-    verifier("niveau 10 : + l'Appel de la lumière (plus de 30 %)",
-             JSON.stringify(a10.techniques) === '["CLASSE_BOUCLIER_ANTIMAGIE","CLASSE_APPEL_LUMIERE"]' && a10.maitriseLumiere === 33);
-    const ba = w.TECHNIQUES_CLASSE.CLASSE_BOUCLIER_ANTIMAGIE, al = w.TECHNIQUES_CLASSE.CLASSE_APPEL_LUMIERE;
-    verifier("Bouclier anti-magie : init 200, aucune fatigue, sur soi",
-             ba.Initiative === 200 && ba.Fatigue === 0 && ba.cible === "soi" && ba.niveau === 5);
-    verifier("Appel de la lumière : aucune fatigue, niveau 10", al.Fatigue === 0 && al.niveau === 10 && al.cible === "soi");
-    verifier("la fiche annonce +10 de résistance magique",
-             w.defMagiqueCombattant(chasseur(1)) === w.defMagiqueCombattant(fiche("X")) + 10);
+    const a = (n) => w.atoutClasse(chasseur(n));
+    verifier("niveau 1 : +10 de défense magique, +2 contre Mages/Soutiens, plus de Maîtrise de la lumière",
+             a(1).defMagique === 10 && a(1).degatsContreMages === 2 && !a(1).maitriseLumiere && !(a(1).techniques || []).length, JSON.stringify(a(1)));
+    verifier("niveau 3 : +20 de défense magique en tout, +1 compétence", a(3).defMagique === 20 && a(3).competences === 1, JSON.stringify(a(3)));
+    verifier("niveau 5 : le Bouclier anti-magie", JSON.stringify(a(5).techniques) === '["CLASSE_BOUCLIER_ANTIMAGIE"]');
+    verifier("niveau 9 : + le Briseur d'arcane (pas au 8) ; plus d'Appel de la lumière",
+             JSON.stringify(a(9).techniques) === '["CLASSE_BOUCLIER_ANTIMAGIE","CLASSE_BRISEUR_ARCANE"]'
+             && !(a(8).techniques || []).includes("CLASSE_BRISEUR_ARCANE") && !w.TECHNIQUES_CLASSE.CLASSE_APPEL_LUMIERE);
+    const ba = w.TECHNIQUES_CLASSE.CLASSE_BOUCLIER_ANTIMAGIE, br = w.TECHNIQUES_CLASSE.CLASSE_BRISEUR_ARCANE;
+    verifier("Bouclier anti-magie : init 200, aucune fatigue, sur soi, réserve 20 × 2",
+             ba.Initiative === 200 && ba.Fatigue === 0 && ba.cible === "soi" && ba.niveau === 5
+             && ba.reserve && ba.reserve.parTour === 20 && ba.reserve.tours === 2);
+    verifier("Briseur d'arcane : init 100, aucune fatigue, un ennemi à 5 cases, visé sur le plateau",
+             br.Initiative === 100 && br.Fatigue === 0 && br.cible === "ennemi" && br.portee === 5 && br.niveau === 9
+             && !!w.TECHNIQUES_VISEES.CLASSE_BRISEUR_ARCANE);
+    verifier("la fiche annonce +10 puis +20 de résistance magique",
+             w.defMagiqueCombattant(chasseur(1)) === w.defMagiqueCombattant(fiche("X")) + 10
+             && w.defMagiqueCombattant(chasseur(3)) === w.defMagiqueCombattant(fiche("X")) + 20);
+    verifier("le texte du +2", /\+2 dégâts contre les monstres Mage et Soutien/.test(w.texteAtout("degatsContreMages", 2)));
     const e = monde(1);
-    verifier("en combat : défense magique 10, Maîtrise de la lumière 33",
-             defMagiqueDe(e.combattants.C) === 10 && e.combattants.C.atouts.maitriseLumiere === 33);
+    verifier("en combat : défense magique 10, +2 contre Mages", defMagiqueDe(e.combattants.C) === 10 && e.combattants.C.atouts.degatsContreMages === 2);
 }
 
 // =========================================================================
@@ -128,52 +145,33 @@ console.log("\n2. UNE CARTE DÉJÀ FORGÉE AVEC LUMIÈRE : LE SORT PASSE OUTRE L
 }
 
 // =========================================================================
-console.log("\n3. LA MAÎTRISE DE LA LUMIÈRE : UN SORT DE FOUDRE AVEUGLE SA CIBLE (33 %), DÈS LE NIVEAU 1");
+console.log("\n3. +2 CONTRE LES MONSTRES MAGE ET SOUTIEN (v356)");
 // =========================================================================
 {
-    const foudre = (extra = {}) => ({ type: "carte", idLanceur: "C", idCarte: "S", critique: false,
-        attaques: [{ nom: "Attaque Magique", valeurBrute: 10, typeRes: "Magique", rangeMax: 3, element: extra.element || "Foudre",
-                     cibles: ["M1"] }], alterations: [] });
+    const archetypes = (e, m1, m2) => { e.combattants.M1.archetype = m1; e.combattants.M2.archetype = m2; return e; };
+    const fiches = construireEtatCombat({ idPartie: "P", cerveau: "P", graine: 1, regles: REGLES, partie: { Tour_Combat: 1 },
+        combattants: [chasseur(1), fiche("M1", { Archetype: "SOUTIEN" })], positions: { C: { q: 0, r: 0 }, M1: { q: 1, r: 0 } } });
+    verifier("l'archétype d'une créature entre dans le combat", fiches.combattants.M1.archetype === "SOUTIEN");
     const e = monde(1);
-    const r = jouer(e, foudre(), desA(1));
-    const c = r.etat.combattants;
-    verifier("la cible M1 est aveuglée, 2 manches, 4 cases autour d'elle",
-             !!aveugle(c.M1) && aveugle(c.M1).duree === DUREE_AVEUGLE_LUMIERE && aveugle(c.M1).cases.length === 4
-             && aveugle(c.M1).cases.every(h => Math.abs(h.q - 2) <= 1 && Math.abs(h.r) <= 1), JSON.stringify(aveugle(c.M1)));
-    verifier("ses voisins (M2, M3), l'allié, le Chasseur : non",
-             !aveugle(c.M2) && !aveugle(c.M3) && !aveugle(c.A) && !aveugle(c.M4) && !aveugle(c.C));
-    verifier("l'écran le dit : « ⚡ Ébloui par l'éclair ! »", r.etapes.some(x => x.type === "message" && /bloui par l'éclair/.test(x.texte)));
-    const rejoue = appliquerEntree(e, { etapes: r.etapes }).combattants;
-    verifier("rejoué depuis le journal : aveuglé", !!aveugle(rejoue.M1));
-
-    // Le jet de 33 % raté : personne. (Dés dans l'ordre : esquive, puis la
-    // Maîtrise — le 2e tombe sur 34.)
-    let n = 0;
-    const jets = tirerDesCarte(monde(1), foudre(), "C", false, { ...desA(1), d100: () => { n++; return n === 2 ? 34 : 1; } });
-    verifier("le jet raté (34 > 33) : rien", jets.parCible.M1.lumiereAveugle === false && !jets.parCible.M1.noirLumiere,
-             JSON.stringify(jets.parCible.M1));
-    n = 0;
-    const jets33 = tirerDesCarte(monde(1), foudre(), "C", false, { ...desA(1), d100: () => { n++; return n === 2 ? 33 : 1; } });
-    verifier("33 : réussi", jets33.parCible.M1.lumiereAveugle === true);
-
-    const esq = monde(1);
-    esq.combattants.M1.def.esquive = 100;
-    verifier("la cible esquive : pas d'aveuglement", !aveugle(jouer(esq, foudre(), desA(1)).etat.combattants.M1));
-    // v260 : plus d'immunité — une cible qui RÉSISTE à l'Aveuglement retire
-    // 25 points à la Maîtrise : 33 % → 8 %.
-    const imm = monde(1);
-    imm.combattants.M1.atouts.resistances = ["Aveuglé"];
-    let nr = 0;
-    const jR9 = tirerDesCarte(imm, foudre(), "C", false, { ...desA(1), d100: () => { nr++; return nr === 2 ? 9 : 1; } });
-    nr = 0;
-    const jR8 = tirerDesCarte(imm, foudre(), "C", false, { ...desA(1), d100: () => { nr++; return nr === 2 ? 8 : 1; } });
-    verifier("une cible qui résiste : 33 % → 8 % (9 au dé : rien ; 8 : aveuglée)",
-             jR9.parCible.M1.lumiereAveugle === false && jR8.parCible.M1.lumiereAveugle === true);
-    verifier("un sort de feu : pas d'aveuglement", !aveugle(jouer(monde(10), foudre({ element: "Feu" }), desA(1)).etat.combattants.M1));
-    // Une carte de feu ne tire pas un dé de plus.
-    let tires = 0;
-    tirerDesCarte(monde(10), foudre({ element: "Feu" }), "C", false, { ...desA(100), d100: () => { tires++; return 100; } });
-    verifier("…et ne consomme aucun dé de plus", tires === 1, `${tires} dé(s)`);
+    verifier("contre DPS MAGE CAC, DPS MAGE DISTANCE, SOUTIEN : +2 ; contre TANK CAC, DPS DISTANCE ou sans type : rien",
+             ["DPS MAGE CAC", "DPS MAGE DISTANCE", "SOUTIEN"].every(t => bonusContreRace(e.combattants.C, { archetype: t }) === 2)
+             && ["TANK CAC", "DPS DISTANCE", "DPS CAC", ""].every(t => bonusContreRace(e.combattants.C, { archetype: t }) === 0));
+    verifier("un autre héros : rien", bonusContreRace(monde(1).combattants.A, { archetype: "SOUTIEN" }) === 0);
+    // Un coup physique de 10 (défenses à 0) sur un Soutien : 12 ; sur un Tank : 10.
+    const coup = (typeRes) => ({ type: "carte", idLanceur: "C", idCarte: "S", critique: false,
+        attaques: [{ nom: "Coup", valeurBrute: 10, typeRes, rangeMax: 3, cibles: ["M1", "M2"] }], alterations: [],
+        jets: { attaqueRatee: false, parCible: { M1: { esquive: false, etats: {} }, M2: { esquive: false, etats: {} } } } });
+    const r = resoudreCarte(archetypes(monde(1), "SOUTIEN", "TANK CAC"), coup("Physique"));
+    verifier("un coup de 10 : le Soutien prend 12, le Tank 10", r.etat.combattants.M1.pv === 88 && r.etat.combattants.M2.pv === 90,
+             `${r.etat.combattants.M1.pv} / ${r.etat.combattants.M2.pv}`);
+    const m = archetypes(monde(1), "DPS MAGE DISTANCE", "DPS CAC");
+    m.combattants.M1.def.magique = 0; m.combattants.M2.def.magique = 0;
+    const rm = resoudreCarte(m, coup("Magique"));
+    verifier("un sort aussi (toutes ses attaques) : le Mage prend 12", rm.etat.combattants.M1.pv === 88 && rm.etat.combattants.M2.pv === 90);
+    const base = degatsOpportuniteBruts(monde(1).combattants.A, { archetype: "SOUTIEN" });
+    verifier("l'attaque d'opportunité : +2 contre un Soutien",
+             degatsOpportuniteBruts(e.combattants.C, { archetype: "SOUTIEN" }) === base + 2
+             && degatsOpportuniteBruts(e.combattants.C, { archetype: "TANK CAC" }) === base);
 }
 
 // =========================================================================
@@ -187,7 +185,12 @@ console.log("\n3 bis. LE BOUCLIER ANTI-MAGIE : LES SORTS REPARTENT SUR LEUR LANC
     verifier("niveau 4 : il ne l'a pas", !validerIntention(enTete(monde(4), "C", "CLASSE_BOUCLIER_ANTIMAGIE"), bouclier).ok);
     const pas = appliquerIntention(e, bouclier);
     const etat = (pas.etat.combattants.C.etats || []).find(x => x.nom === ETAT_ANTIMAGIE);
-    verifier("l'état sur lui, 2 manches, aucune fatigue", etat && etat.duree === 2 && pas.etat.combattants.C.fatigue === 100);
+    const tenu = (pas.etat.combattants.C.etats || []).find(x => x.maintien === "CLASSE_BOUCLIER_ANTIMAGIE");
+    verifier("l'état sur lui, 2 manches ; 20 d'énergie payés au lancement (100 → 80)", etat && etat.duree === 2
+             && pas.etat.combattants.C.fatigue === 80 && tenu && tenu.reserve === 20 && tenu.duree === 2 && !tenu.sansRelache,
+             `${pas.etat.combattants.C.fatigue} ${JSON.stringify(tenu)}`);
+    const pauvre = enTete(monde(5), "C", "CLASSE_BOUCLIER_ANTIMAGIE"); pauvre.combattants.C.fatigue = 19;
+    verifier("19 d'énergie : refusé (il en faut 20)", !validerIntention(pauvre, bouclier).ok);
     verifier("une fois par combat", !validerIntention(enTete(clonerEtat(pas.etat), "C", "CLASSE_BOUCLIER_ANTIMAGIE"), bouclier).ok);
     const titre = misEnScene(pas.entree.etapes.find(x => x.type === "techniqueClasse"), pas.etat);
     verifier("à l'écran : « 🔮 Bouclier anti-magie »", titre && /Bouclier anti-magie/.test(titre.texte));
@@ -216,35 +219,57 @@ console.log("\n3 bis. LE BOUCLIER ANTI-MAGIE : LES SORTS REPARTENT SUR LEUR LANC
     const encore = (vieux.combattants.C.etats || []).some(x => x.nom === ETAT_ANTIMAGIE);
     vieillirLesEtats(vieux);
     verifier("il tient la manche en cours et la suivante", encore && !(vieux.combattants.C.etats || []).some(x => x.nom === ETAT_ANTIMAGIE));
+
+    // La manche suivante : 20 bloqués puis consommés en fin de manche.
+    const suite = clonerEtat(pas.etat);
+    suite.combattants.C.atouts.regenFatigue = -1000;     // pas de régénération : on lit la réserve seule
+    suite.file = [{ id: "M1", carte: "X", initiative: 10, pas: 0 }];
+    const fin1 = cloturerTour(suite, { d100: () => 100, parmi: (l) => l[0], fraction: () => 0, graine: () => 1 });
+    const apres1 = (fin1 && fin1.etat) || suite;
+    const tenu2 = (apres1.combattants.C.etats || []).find(x => x.maintien === "CLASSE_BOUCLIER_ANTIMAGIE");
+    verifier("la manche suivante : la réserve de 20 est bloquée", tenu2 && reserveMaintenueDe(apres1.combattants.C) === 20,
+             JSON.stringify(apres1.combattants.C.etats));
+    // À court d'énergie : il tombe, et le bouclier avec.
+    const court = clonerEtat(apres1);
+    court.combattants.C.fatigue = 5; court.combattants.C.atouts.regenFatigue = -1000;
+    court.file = [{ id: "M1", carte: "X", initiative: 10, pas: 0 }];
+    const fin2 = cloturerTour(court, { d100: () => 100, parmi: (l) => l[0], fraction: () => 0, graine: () => 1 });
+    const apres2 = (fin2 && fin2.etat) || court;
+    verifier("à court d'énergie (5 < 20) : le bouclier tombe",
+             !(apres2.combattants.C.etats || []).some(x => x.nom === ETAT_ANTIMAGIE || x.maintien === "CLASSE_BOUCLIER_ANTIMAGIE"),
+             JSON.stringify(apres2.combattants.C.etats));
 }
 
 // =========================================================================
-console.log("\n3 ter. L'APPEL DE LA LUMIÈRE : TOUT LE PLATEAU AVEUGLÉ");
+console.log("\n3 ter. LE BRISEUR D'ARCANE (v356) : 1,5 × LA RÉSISTANCE MAGIQUE EN DÉGÂTS BRUTS");
 // =========================================================================
 {
-    const enTete = (e) => { e.file = [{ id: "C", carte: "CLASSE_APPEL_LUMIERE", initiative: 100, pas: 0 }, { id: "M1", carte: "X", initiative: 10, pas: 0 }]; return e; };
-    const appel = { id: "L1", type: "classe", acteur: "C", idCarte: "CLASSE_APPEL_LUMIERE" };
-    const e = enTete(monde(10));
-    e.combattants.M4.aTerre = true;
-    e.combattants.M3.atouts.immunites = ["Aveuglé"];
-    verifier("niveau 10 : accepté", validerIntention(e, appel).ok, validerIntention(e, appel).raison || "");
-    verifier("niveau 9 : il ne l'a pas", !validerIntention(enTete(monde(9)), appel).ok);
-    const pas = appliquerIntention(e, appel);
-    const c = pas.etat.combattants;
-    verifier("ennemis, alliés ET le Chasseur aveuglés, 2 manches, chacun son noir",
-             [c.M1, c.M2, c.A, c.C].every(x => aveugle(x) && aveugle(x).duree === DUREE_AVEUGLE_LUMIERE && aveugle(x).cases.length === 4));
-    verifier("le noir de M2 est autour de M2", aveugle(c.M2).cases.every(h => Math.abs(h.q - 2) <= 1 && Math.abs(h.r + 1) <= 1));
-    verifier("le noir du Chasseur est autour de lui", aveugle(c.C).cases.every(h => Math.abs(h.q) <= 1 && Math.abs(h.r) <= 1));
-    // v260 : M3 RÉSISTE (ses « immunites » d'avant valent résistance) — un dé
-    // du cerveau, à 75 % : aveuglé, ou le refus dit par une étape.
-    verifier("pas un KO ; qui résiste : un dé à 75 % (aveuglé, ou « résisté » dit)", !aveugle(c.M4)
-             && (aveugle(c.M3) ? !pas.entree.etapes.some(x => x.type === "etatRate" && x.cible === "M3")
-                               : pas.entree.etapes.some(x => x.type === "etatRate" && x.cible === "M3" && x.resiste)));
-    verifier("aucune fatigue, une fois par combat", c.C.fatigue === 100 && !validerIntention(enTete(clonerEtat(pas.etat)), appel).ok);
-    const rejoue = appliquerEntree(e, pas.entree).combattants;
-    verifier("rejoué depuis le journal : mêmes noirs", JSON.stringify(aveugle(rejoue.M2)) === JSON.stringify(aveugle(c.M2)));
+    const enTete = (e) => { e.file = [{ id: "C", carte: "CLASSE_BRISEUR_ARCANE", initiative: 100, pas: 0 }, { id: "M1", carte: "X", initiative: 10, pas: 0 }]; return e; };
+    const briseur = (cible) => ({ id: "BR", type: "classe", acteur: "C", idCarte: "CLASSE_BRISEUR_ARCANE", cible });
+    const e = enTete(monde(9));                 // M1 : 50 % de résistance magique, à 2 cases
+    verifier("niveau 9 : accepté sur M1", validerIntention(e, briseur("M1")).ok, validerIntention(e, briseur("M1")).raison || "");
+    verifier("niveau 8 : il ne l'a pas", !validerIntention(enTete(monde(8)), briseur("M1")).ok);
+    verifier("M4 à 6 cases : refusé ; un allié : refusé ; sans cible : refusé",
+             !validerIntention(e, briseur("M4")).ok && !validerIntention(e, briseur("A")).ok && !validerIntention(e, briseur()).ok);
+    const ko = enTete(monde(9)); ko.combattants.M1.aTerre = true;
+    verifier("un KO : refusé", !validerIntention(ko, briseur("M1")).ok);
+    const mur = { etatCase: (q, r) => ({ bloquee: q === 1 && r === 0, supprimee: false, difficile: false }) };
+    verifier("derrière un mur (pas de ligne de vue) : refusé", !validerIntention(e, briseur("M1"), mur).ok);
+    const pas = appliquerIntention(e, briseur("M1"));
+    verifier("M1 (50 % de résistance magique) prend 75 bruts", pas.etat.combattants.M1.pv === 25, String(pas.etat.combattants.M1.pv));
+    verifier("aucune fatigue, une fois par combat", pas.etat.combattants.C.fatigue === 100
+             && !validerIntention(enTete(clonerEtat(pas.etat)), briseur("M2")).ok);
+    verifier("rejoué depuis le journal : mêmes PV", appliquerEntree(e, pas.entree).combattants.M1.pv === 25);
     const titre = misEnScene(pas.entree.etapes.find(x => x.type === "techniqueClasse"), pas.etat);
-    verifier("à l'écran : « ☀️ Appel de la lumière »", titre && /Appel de la lumière/.test(titre.texte));
+    verifier("à l'écran : « 💥 Briseur d'arcane »", titre && /Briseur d'arcane/.test(titre.texte));
+    const impair = enTete(monde(9)); impair.combattants.M1.def.magique = 15;
+    verifier("15 % de résistance : 22 (arrondi en dessous)", appliquerIntention(impair, briseur("M1")).etat.combattants.M1.pv === 78);
+    const rien = enTete(monde(9)); rien.combattants.M1.def.magique = 0;
+    verifier("aucune résistance : aucun dégât", appliquerIntention(rien, briseur("M1")).etat.combattants.M1.pv === 100);
+    const esq = enTete(monde(9)); esq.combattants.M1.def.esquive = 100;
+    verifier("ni esquive ni parade : il touche quand même", appliquerIntention(esq, briseur("M1")).etat.combattants.M1.pv === 25);
+    const mage = enTete(monde(9)); mage.combattants.M1.archetype = "SOUTIEN";
+    verifier("contre un Soutien : +2 (77)", appliquerIntention(mage, briseur("M1")).etat.combattants.M1.pv === 23);
 }
 
 // =========================================================================
@@ -382,10 +407,10 @@ console.log("\n5. LA FICHE DE CLASSE");
              niveaux: [...d.querySelectorAll(".palier-classe-niveau")].map(x => x.textContent.trim()), texte: d.textContent };
   });
   await p.screenshot({ path: "/tmp/claude-0/chasseur_classe.png" });
-  verifier("présentation et paliers Niv. 1 / 5 / 10", r.visible && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]');
-  verifier("résistance magique, Maîtrise de la lumière, Bouclier anti-magie, Appel de la lumière y sont dits",
-           /\+10 % de résistance magique/.test(r.texte) && /Maîtrise de la lumière/.test(r.texte) && /33 % de chance d'aveugler/.test(r.texte)
-           && /foudre/.test(r.texte) && /Bouclier anti-magie/.test(r.texte) && /Appel de la lumière/.test(r.texte));
+  verifier("présentation et paliers Niv. 1 / 3 / 5 / 9", r.visible && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 3","Niv. 5","Niv. 9"]', JSON.stringify(r.niveaux));
+  verifier("résistance magique, +2 contre Mages/Soutiens, Bouclier anti-magie (réserve), Briseur d'arcane y sont dits",
+           /\+10 % de résistance magique/.test(r.texte) && /Mage et Soutien/.test(r.texte) && /Bouclier anti-magie/.test(r.texte)
+           && /Réserve : 20/.test(r.texte) && /Briseur d'arcane/.test(r.texte) && !/Appel de la lumière/.test(r.texte) && !/Maîtrise de la lumière/.test(r.texte));
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

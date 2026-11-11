@@ -988,16 +988,18 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  techniques: ["CLASSE_SOIN_URGENCE"], bonusSoin: 1 },
         { niveau: 9,  techniques: ["CLASSE_PRISE_EN_CHARGE"] }
     ],
-    // LE CHASSEUR DE MAGES : +10 de défense magique et, dès le niveau 1, la
-    // Maîtrise de la lumière (v237, à la place de l'effet Lumière, retiré de
-    // la Forge) : ses sorts de foudre ont 33 % de chance d'aveugler leur cible
-    // — une chance fixe, qui ne s'additionne pas à l'Aveuglement d'une carte
-    // (maitriseLumiere, tirerDesCarte et resoudreCarte) ; le Bouclier
-    // anti-magie au niveau 5, l'Appel de la lumière au niveau 10.
+    // LE CHASSEUR DE MAGES. v356, la refonte des classes (Nico) : au niveau 1,
+    // +10 % de résistance magique et +2 dégâts contre les monstres Mage et
+    // Soutien (degatsContreMages, bonusContreRace dans moteur_pur.js — sur
+    // toutes ses attaques ; la Maîtrise de la lumière n'est plus) ; au niveau
+    // 3, +10 % de résistance magique et +1 compétence ; le Bouclier anti-magie
+    // au niveau 5 (désormais une réserve de 20 par manche sur 2 manches) ; le
+    // Briseur d'arcane au niveau 9 (il remplace l'Appel de la lumière).
     "Chasseur de mages": [
-        { niveau: 1,  defMagique: 10, maitriseLumiere: 33 },
+        { niveau: 1,  defMagique: 10, degatsContreMages: 2 },
+        { niveau: 3,  defMagique: 10, competences: 1 },
         { niveau: 5,  techniques: ["CLASSE_BOUCLIER_ANTIMAGIE"] },
-        { niveau: 10, techniques: ["CLASSE_APPEL_LUMIERE"] }
+        { niveau: 9,  techniques: ["CLASSE_BRISEUR_ARCANE"] }
     ],
     // LE PROFANATEUR (v237, Nico : « passif Relève des morts passe au lvl1 et
     // on vire tout le reste du lvl1 ; au lvl1, ses attaques magiques de glace
@@ -1156,12 +1158,18 @@ window.TECHNIQUES_CLASSE = {
     },
     CLASSE_BOUCLIER_ANTIMAGIE: {
         Nom: "Bouclier anti-magie", classe: "Chasseur de mages", niveau: 5, Initiative: 200, Fatigue: 0, cible: "soi",
-        desc: "Pour la manche en cours et la suivante, tout coup magique qui le frappe repart en entier "
-            + "sur son lanceur ; lui n'en prend rien. Une fois par combat."
+        reserve: { parTour: 20, tours: 2 },
+        desc: "Tant qu'il est maintenu (2 manches), tout coup magique qui le frappe repart en entier sur son "
+            + "lanceur ; lui n'en prend rien. Réserve : 20 d'énergie par manche (la première au lancement, la "
+            + "suivante bloquée puis consommée ; à court d'énergie, il tombe ; on peut le relâcher en préparation). "
+            + "Une fois par combat."
     },
-    CLASSE_APPEL_LUMIERE: {
-        Nom: "Appel de la lumière", classe: "Chasseur de mages", niveau: 10, Initiative: 100, Fatigue: 0, cible: "soi",
-        desc: "Aveugle tout le monde sur le champ de bataille (alliés et lui-même compris) pour 2 manches. Une fois par combat."
+    // (v356) LE BRISEUR D'ARCANE : un ennemi à 5 cases, en vue, prend 1,5 fois
+    // sa résistance magique en dégâts bruts (actionBriseurArcane, moteur_pur.js).
+    CLASSE_BRISEUR_ARCANE: {
+        Nom: "Briseur d'arcane", classe: "Chasseur de mages", niveau: 9, Initiative: 100, Fatigue: 0, cible: "ennemi", portee: 5,
+        desc: "Un ennemi à 5 cases, en vue : il prend 1,5 fois sa résistance magique en dégâts bruts "
+            + "(ni esquive, ni parade, ni défense). Une fois par combat."
     },
     CLASSE_ASSAUT_MORTEL: {
         Nom: "Assaut mortel", classe: "Assassin", niveau: 5, Initiative: 100, Fatigue: 0, cible: "zoneDeux",
@@ -1300,6 +1308,7 @@ window.estTechniqueClasse = (idCarte) => !!(idCarte && window.TECHNIQUES_CLASSE[
 // `toutCamp` : allié ou ennemi ; `sansVue` : même derrière un mur.
 window.TECHNIQUES_VISEES = {
     CLASSE_CHARME_FRATRICIDE: { nom: "Charmé" },
+    CLASSE_BRISEUR_ARCANE: { nom: "Briseur d'arcane" },
     CLASSE_BAISER_VAMPIRE: { nom: "Baiser du vampire" },
     CLASSE_TRANSFERT: { nom: "Transfert", toutCamp: true, sansVue: true }
 };
@@ -1636,7 +1645,6 @@ window.texteAtout = function(cle, valeur) {
         case "maitrePoisons":  return "Maître des poisons : ses poisons mordent à chaque manche (15 % de fatigue, 9 % des PV max), 2 manches";
         case "critiqueSurKOCumulable": return `Instinct du tueur : ${plus(n)} % de critique pendant 2 manches à chaque KO, cumulable`;
         case "lumiereAveugle": return `Sorts de lumière : ${n} % de chance d'aveugler la cible`;
-        case "maitriseLumiere": return `Maîtrise de la lumière : ${n} % de chance d'aveugler avec un sort de foudre (sans s'ajouter à l'Aveuglement)`;
         case "provocationAttaques": return `${n} % de chance de provoquer la cible de chacune de ses attaques`;
         case "bouclierLourdSansMalus": return "Les boucliers lourds ne lui donnent plus aucun malus";
         case "bonusSoin":      return `${plus(n)} à chacun de ses soins`;
@@ -1680,6 +1688,7 @@ window.texteAtout = function(cle, valeur) {
         case "brulureAggravee": return valeur ? "Craint le feu : brûlé, -60 % de soins reçus et 10 % des PV max en dégâts physiques par manche (au lieu de -50 % et 8 % magiques)"
                                               : "Le malus de brûlure s'annule : il brûle comme tout le monde";
         case "degatsContreVargen": return `${plus(n)} dégâts contre les Vargens`;
+        case "degatsContreMages": return `${plus(n)} dégâts contre les monstres Mage et Soutien`;
         case "brulureFacile":  return `Craint le feu : +${n} % de chance d'être Brûlé par les sorts qui brûlent`;
         case "premierPasGratuit": return "La première case de chaque tour ne coûte aucune fatigue";
         case "caracs":         return Object.keys(valeur || {}).map(k => `${plus(Number(valeur[k]) || 0)} ${NOMS_CARACS_ATOUT[k] || k}`).join(" · ");

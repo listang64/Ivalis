@@ -202,9 +202,6 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         // Le Chasseur de mages, niveau 10 : la chance qu'un sort de lumière
         // aveugle sa cible et les ennemis qui la touchent (tirerDesCarte).
         lumiereAveugle: nombre(race.lumiereAveugle),
-        // …et depuis la v237, sa Maîtrise de la lumière (niveau 1) : 33 % de
-        // chance qu'un sort de FOUDRE aveugle sa cible (tirerDesCarte).
-        maitriseLumiere: nombre(race.maitriseLumiere),
         // Le Vampire : le feu le rongeait plus fort (regleDesEtats, moteur_pur.js —
         // plus aucune classe ne l'a depuis la v237),
         // et la première case de chacun de ses tours est gratuite (coutDuPas).
@@ -212,6 +209,8 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         // (v349) Le Vampire : brûlure aggravée de nouveau (niveaux 1 à 4), et
         // +3 dégâts contre les Vargens au niveau 5 (bonusContreRace, moteur_pur.js).
         degatsContreVargen: nombre(race.degatsContreVargen),
+        // (v356) Le Chasseur de mages : +2 contre les monstres Mage et Soutien.
+        degatsContreMages: nombre(race.degatsContreMages),
         // …et désormais, à la place, le feu le PREND plus facilement : +20 %
         // de chance d'être Brûlé par un sort qui brûle (tirerDesCarte).
         brulureFacile: nombre(race.brulureFacile),
@@ -359,6 +358,9 @@ function combattantBrut(fiche, position, bornes) {
         // cerveau qui la joue, et lui seul.
         joueur: fiche.estMonstre ? "" : (fiche.idJoueur || ""),
         race: fiche.race || "",
+        // (v356) L'archétype d'une créature (DPS MAGE CAC, SOUTIEN…) : le
+        // Chasseur de mages frappe plus fort les Mages et les Soutiens.
+        archetype: fiche.Archetype || fiche.archetype || "",
         couleur: fiche.couleur || "",
         // Le caractère d'une créature : c'est lui qui décide si elle fonce, si
         // elle contourne, ou si elle refuse d'entrer dans les flammes.

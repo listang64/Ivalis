@@ -47,9 +47,9 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          traverserZones, creerZonePure, poserZone, vieillirZones, zonesDeFinDeManche,
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
          partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE, ETAT_SAIGNEMENT, SAIGNEMENT,
-         resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, appliquerCharme,
+         resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, actionBriseurArcane, PORTEE_BRISEUR, appliquerCharme,
          pointesDeGlace, orientationCone, couleeDeLave, orientationLigne,
-         actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle, ligneDeVue, caseLibre, aLEtat,
+         actionResonanceBouclier, ennemisAuContact, ligneDeVue, caseLibre, aLEtat,
          carteToutEtalee, resisteA, prisMalgreResistance,
          reserveMaintenueDe, reserveDeTechnique, relacherMaintien, chanceFaceA, CHANCE_ETOURDI_RESONANCE,
          coutLancementReserve, BRULURE_AGGRAVEE, ETAT_RALENTI } from './moteur_pur.js';
@@ -301,6 +301,15 @@ export function validerIntention(etat, intention, plateau) {
             if (!ennemi) return refus("Baiser du vampire sans cible");
             if (ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) return refus("Baiser du vampire : ennemi invalide");
             if (distance(acteur, ennemi) !== 1) return refus("Baiser du vampire : l'ennemi doit être au contact");
+        }
+        // (v356) Le Briseur d'arcane (Chasseur de mages) : un ennemi debout, à
+        // 5 cases au plus, en vue (le plateau tranche quand on l'a).
+        if (idCarte === "CLASSE_BRISEUR_ARCANE") {
+            const ennemi = combattant(etat, intention.cible);
+            if (!ennemi) return refus("Briseur d'arcane sans cible");
+            if (ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) return refus("Briseur d'arcane : ennemi invalide");
+            if (distance(acteur, ennemi) > PORTEE_BRISEUR) return refus("Briseur d'arcane : l'ennemi doit être à 5 cases au plus");
+            if (plateau && !ligneDeVue(plateau, acteur, ennemi)) return refus("Briseur d'arcane : pas de ligne de vue");
         }
         // Le Charme fratricide (Sorcier) : un ennemi debout, à 3 cases au plus.
         if (idCarte === "CLASSE_CHARME_FRATRICIDE") {
@@ -1111,29 +1120,20 @@ export function appliquerIntention(etat, intention, plateau) {
     if (intention.type === "classe") {
         const cibles = intention.idCarte === "CLASSE_ASSAUT_MORTEL" ? ciblesDeLAssaut(etat, intention)
             : Array.isArray(intention.cibles) ? [...new Set(intention.cibles)] : undefined;
-        // L'APPEL DE LA LUMIÈRE : tout le monde, le Chasseur compris. Le noir
-        // de chacun se tire ici, chez le cerveau, dans l'ordre des ids.
-        const noirs = intention.idCarte === "CLASSE_APPEL_LUMIERE"
-            ? Object.fromEntries(Object.keys(etat.combattants || {}).sort()
-                .filter(id => etat.combattants[id] && !etat.combattants[id].aTerre)
-                .map(id => [id, tirerDirectionsAveugle(des)]))
-            : undefined;
         const cibleTechnique = intention.idCarte === "CLASSE_LIEN_DE_SANG"
             ? (compagnonDe(etat, intention.acteur) || {}).id : intention.cible;
-        // LES ÉTATS « À COUP SÛR » ET LES RÉSISTANCES (v260) : l'Aveuglement
-        // de l'Appel de la lumière, le Charme fratricide, l'Immobilisation du
-        // Tir précis prennent à 75 % sur qui y résiste — un dé chez le
-        // cerveau, dans l'ordre des ids, pour ceux-là seulement.
-        const etatSur = { CLASSE_APPEL_LUMIERE: "Aveuglé", CLASSE_CHARME_FRATRICIDE: "Charmé",
+        // LES ÉTATS « À COUP SÛR » ET LES RÉSISTANCES (v260) : le Charme
+        // fratricide, l'Immobilisation du Tir précis prennent à 75 % sur qui y
+        // résiste — un dé chez le cerveau, pour ceux-là seulement.
+        const etatSur = { CLASSE_CHARME_FRATRICIDE: "Charmé",
                           CLASSE_TIR_PRECIS: "Immobilisation" }[intention.idCarte];
-        const visesSurs = !etatSur ? [] : noirs ? Object.keys(noirs).sort() : [cibleTechnique].filter(Boolean);
+        const visesSurs = !etatSur ? [] : [cibleTechnique].filter(Boolean);
         const jetsSurs = Object.fromEntries(visesSurs
             .filter(v => resisteA(combattant(etat, v), etatSur))
             .map(v => [v, prisMalgreResistance(combattant(etat, v), etatSur, des)]));
         const r = resoudreTechniqueClasse(etat, { idLanceur: intention.acteur, idCarte: intention.idCarte,
                                                   cible: cibleTechnique, cibles,
                                                   ...(Array.isArray(intention.cases) ? { cases: intention.cases } : {}),
-                                                  ...(noirs ? { noirs } : {}),
                                                   ...(Object.keys(jetsSurs).length ? { prisMalgreResistance: jetsSurs } : {}),
                                                   ...(intention.initiative !== undefined ? { initiative: intention.initiative } : {}) }, plateau);
         let suivant = clonerEtat(r.etat);
@@ -1156,6 +1156,14 @@ export function appliquerIntention(etat, intention, plateau) {
         // dés (ni esquive, ni critique), des dégâts bruts, le soin du vampirisme.
         if (intention.idCarte === "CLASSE_BAISER_VAMPIRE") {
             const action = actionBaiserVampire(intention.acteur, combattant(suivant, intention.cible));
+            const rc = resoudreCarte(suivant, action, plateau);
+            suivant = clonerEtat(rc.etat);
+            etapes.push(...rc.etapes);
+        }
+        // (v356) LE BRISEUR D'ARCANE frappe de même, à coup sûr : 1,5 fois la
+        // résistance magique de la cible, en dégâts bruts.
+        if (intention.idCarte === "CLASSE_BRISEUR_ARCANE") {
+            const action = actionBriseurArcane(intention.acteur, combattant(suivant, intention.cible));
             const rc = resoudreCarte(suivant, action, plateau);
             suivant = clonerEtat(rc.etat);
             etapes.push(...rc.etapes);
