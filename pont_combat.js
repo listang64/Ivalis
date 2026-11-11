@@ -620,6 +620,14 @@ const SCENES = {
         return { geste: "message", pion: e.cible, texte,
                  couleur: COULEURS.tenebres, duree: RYTHME.message,
                  ...((e.debut || e.acteur) ? { reaction: { sorte: "sursis", pion: e.cible, texte, couleur: COULEURS.tenebres, remplace: true } } : {}) };
+    },
+
+    // (v360) La Rage du Berserker : son « 😡 Rage ! » est un message à part ;
+    // quand elle se pose, l'état se montre comme tout état posé ; le
+    // réarmement, lui, ne se voit pas.
+    rage(e, etat) {
+        if (!Array.isArray(e.liste)) return { geste: "rien" };
+        return SCENES.etats({ ...e, type: "etats" }, etat);
     }
 };
 

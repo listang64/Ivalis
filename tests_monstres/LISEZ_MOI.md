@@ -11449,3 +11449,5 @@ classes_feminin, corrections_v343, corrections_v358 : il reste trois classes « 
 berserker.mjs le vérifie : paliers, nom et textes, PV max, la Rage (seuil, durée, esquive/parade 0, +15, ×1,2 sur cartes et opportunité, pas de double Rage, pas de retour sous le seuil, réarmement, retour, niveau 2, KO direct, rejeu), la Régénération (soin 26, provocations, une fois, rejeu, 80 % et 55 % sur 200 graines), la prise et le rangement des deux armes (le code du livre), et la vraie page (grille, document renommé, fiche, bonus d'équipement).
 corrections_v360.mjs : le nom, le choix, les PV plafonnés, la Rage dans fabriquerPas, la version.
 classes_feminin, corrections_v343, corrections_v358, corrections_v359 : Berserker, et deux classes « bientôt ».
+
+pont_combat.js : la mise en scène de l'étape « rage » (l'état posé se montre comme tout état ; le réarmement ne se voit pas) — pont_combat et geomancien vérifient qu'aucun type d'étape n'en manque.
