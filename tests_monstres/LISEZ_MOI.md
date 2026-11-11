@@ -11492,3 +11492,16 @@ classes_feminin, corrections_v343, v358, v359, v360 : une seule classe « bient�
 - objets.js : bonusEquipement lit la classe seule (atoutClasse) — c'est elle qui porte ces deux règles. Les talents faisaient déjà de même (ils évitent atoutRace).
 
 corrections_v363.mjs le vérifie : le code (plus d'appel à atoutRace), et dans la vraie page un héros avec « Maître des éléments » (Sorcier, Berserker à deux armes à deux mains, Protecteur, sans classe) : plus d'erreur, le talent et le −10 % du Berserker comptent. Sur l'objets.js d'avant, le test retrouve « Maximum call stack size exceeded ».
+
+## v364 — La Possession du Maudit (niveau 9)
+
+- Nico : « Possession — 1 fois par combat, initiative 100, coût 80, réserve 80 pendant toute la durée, portée 6. Prend le contrôle d'un monstre pendant 3 tours. Ni boss ni leader. Pendant la possession, le joueur devient inerte et ne peut plus se déplacer ; il contrôle directement le monstre. »
+- Ses réponses : les 80 sont la réserve (bloqués, pas dépensés : 80 libres pour la lancer) ; le monstre change de camp et se joue comme un héros du joueur ; elle s'arrête si le Maudit ou le monstre tombe ; pas de « Relâcher ».
+- app.js : palier 9 et CLASSE_POSSESSION (visée sur le plateau). classes.js : sa fiche.
+- moteur_pur.js : RESERVES_TECHNIQUES (80, 3 manches, sans relâche) ; resoudreTechniqueClasse pose la possession (le monstre : possedePar, son camp et son poste d'avant, le camp et le poste du Maudit, l'état « Possédé » 3 manches ; le Maudit : possede, sa réserve) ; finirPossessions (appelée par fabriquerPas sur chaque pas) rend au monstre son camp et au Maudit sa liberté et sa réserve quand les 3 manches sont passées, ou que l'un des deux tombe. Une étape « possession » (nouvel applicateur, combat_etat.js) porte ces changements.
+- cerveau_combat.js : la validation (monstre debout, ni boss ni leader ni zombie ni compagnon ni leurre, 6 cases, en vue) ; le monstre possédé reçoit les ordres du poste du Maudit, et le cerveau l'attend comme un héros (pas d'IA) ; le Maudit inerte voit ses intentions refusées et n'a plus de tour (ouvrirManche).
+- pont_combat.js / combat_etat.js : la fiche porte possedePar, campAvant, joueurPossession (le monstre), possede (le Maudit), et se relit.
+- L'écran : herosDuJoueur met le monstre possédé dans la liste du joueur, à la place du Maudit ; combattantsAttendus n'attend plus la carte du Maudit ; le volet du monstre montre ses propres compétences ; commandeParMoi autorise le tracé de son chemin ; l'IA des créatures (monstres_ia.js) ne lui choisit plus de carte et attend celle du joueur.
+
+possession.mjs le vérifie : la technique et sa réserve, la validation (niveau, boss, leader, portée, allié, énergie), le changement de camp et de poste, le rejeu, l'attente du cerveau, les ordres de son poste (et pas d'un autre), un coup sur son ancien allié, le Maudit inerte et sans tour, la fiche, la fin après 3 manches, à la chute du Maudit ou du monstre (et par un vrai pas), et dans la vraie page : la liste du joueur, l'attente de la préparation, le deck du monstre, le commandement.
+corrections_v364.mjs : les points d'accroche et la version. maudit.mjs : le niveau 9.

@@ -54,7 +54,8 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          reserveMaintenueDe, reserveDeTechnique, relacherMaintien, chanceFaceA, CHANCE_ETOURDI_RESONANCE,
          coutLancementReserve, BRULURE_AGGRAVEE, ETAT_RALENTI, coutDeTechnique, PORTEE_CHARME,
          ennemisSurLaCarte, combustionInstantanee, CHANCE_COMBUSTION, PORTEE_DESINTEGRATION, SEUIL_DESINTEGRATION,
-         surveillerRage, regenerationInsolente, CHANCE_REGENERATION_INSOLENTE, refleterVaudou, PORTEE_VAUDOU } from './moteur_pur.js';
+         surveillerRage, regenerationInsolente, CHANCE_REGENERATION_INSOLENTE, refleterVaudou, PORTEE_VAUDOU,
+         finirPossessions, PORTEE_POSSESSION } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles,
@@ -184,9 +185,12 @@ export function validerIntention(etat, intention, plateau) {
     if (intention.poste && acteur.joueur && intention.poste !== acteur.joueur) {
         return refus(`${intention.poste} ne commande pas ${intention.acteur}`);
     }
-    if (acteur.estMonstre && intention.poste) {
+    // (v364) Sauf le monstre possédé par un Maudit : son poste le commande.
+    if (acteur.estMonstre && intention.poste && !acteur.possedePar) {
         return refus("une créature ne reçoit pas d'ordre");
     }
+    // (v364) Le Maudit qui possède un monstre est inerte : ni pas, ni carte.
+    if (acteur.possede) return refus(`${intention.acteur} possède un monstre : il est inerte`);
 
     if (intention.type === "mouvement") {
         const chemin = intention.chemin || [];
@@ -308,6 +312,16 @@ export function validerIntention(etat, intention, plateau) {
             if (!ennemi) return refus("Baiser du vampire sans cible");
             if (ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) return refus("Baiser du vampire : ennemi invalide");
             if (distance(acteur, ennemi) !== 1) return refus("Baiser du vampire : l'ennemi doit être au contact");
+        }
+        // (v364) La Possession (Maudit) : un monstre debout, à 6 cases, en vue —
+        // ni boss, ni leader, ni zombie, ni compagnon, ni leurre.
+        if (idCarte === "CLASSE_POSSESSION") {
+            const m = combattant(etat, intention.cible);
+            if (!m) return refus("Possession sans cible");
+            if (m.aTerre || m.estIllusion || !m.estMonstre || m.zombie || m.compagnon || m.camp === acteur.camp || m.possedePar) return refus("Possession : cible invalide");
+            if (m.leader || String(m.palier || "") === "Boss") return refus("Possession : ni boss ni leader");
+            if (distance(acteur, m) > PORTEE_POSSESSION) return refus("Possession : le monstre doit être à 6 cases au plus");
+            if (plateau && !ligneDeVue(plateau, acteur, m)) return refus("Possession : pas de ligne de vue");
         }
         // (v362) Le Vaudou (Maudit) : un ennemi debout, à 5 cases, en vue.
         if (idCarte === "CLASSE_VAUDOU") {
@@ -451,6 +465,9 @@ function fabriquerPas(etatAvant, etatApres, etapes, cause, acteur, des) {
     // (v362) LE VAUDOU DU MAUDIT : ce qu'il a perdu ou repris pendant ce pas,
     // son ennemi lié le perd ou le reprend aussi.
     if (Array.isArray(etapes)) etapes.push(...refleterVaudou(etatAvant, suivant, etapes));
+    // (v364) LA POSSESSION : finie, ou son Maudit ou son monstre tombé — chacun
+    // retrouve sa place.
+    if (Array.isArray(etapes)) etapes.push(...finirPossessions(suivant));
     if (Array.isArray(etapes)) etapes.push(...surveillerRage(suivant));
     suivant.version = nombre(etatAvant.version) + 1;
 
@@ -977,7 +994,8 @@ export function ouvrirManche(etat, file, des) {
         .map(f => ({ ...entreeDeFile(f), pas: 0 }))
         .filter(f => {
             const c = combattant(suivant, f.id);
-            return c && !c.aTerre;
+            // (v364) Le Maudit qui possède un monstre est inerte : pas de tour.
+            return c && !c.aTerre && !c.possede;
         });
     if (propre.length === 0) return null;
     // (v355) RALENTI par l'arcane de l'Oracle la manche d'avant : son entrée
@@ -1932,6 +1950,8 @@ export function prochainPas(etat, intentions, contexte) {
         const pas = jouerCompagnon(etat, tete.id, plateau);
         if (pas) return { ...pas, creature: tete.id };
     }
+    // (v364) Le monstre possédé : son poste le joue — on l'attend, comme un héros.
+    if (acteur && acteur.estMonstre && !acteur.aTerre && acteur.possedePar) return null;
     if (acteur && acteur.estMonstre && !acteur.aTerre) {
         const carte = carteDe ? carteDe(tete.id, tete.carte) : null;
         // La seconde compétence d'un boss (jouerCreature).

@@ -168,6 +168,39 @@ export const MULTIPLICATEUR_RAGE = 1.2;
 // en PV pendant ce pas (ses étapes, dans l'ordre), l'ennemi lié le perd ou le
 // reprend aussi — ce qu'il a VRAIMENT perdu, sans les défenses de l'ennemi.
 export const PART_PRIX_SANG = 10;
+// (v364) LA POSSESSION (niveau 9) : un monstre à 6 cases, en vue (ni boss, ni
+// leader), pendant 3 manches. finirPossessions, appelée par fabriquerPas sur
+// chaque pas : la possession finie (ses 3 manches écoulées), le Maudit ou le
+// monstre tombé — le monstre retrouve son camp, le Maudit sa liberté (et sa
+// réserve).
+export const ETAT_POSSEDE = "Possédé";
+export const MANCHES_POSSESSION = 3;
+export const PORTEE_POSSESSION = 6;
+export function finirPossessions(suivant) {
+    const etapes = [];
+    Object.keys((suivant && suivant.combattants) || {}).sort().forEach(id => {
+        const m = suivant.combattants[id];
+        if (!m || !m.possedePar) return;
+        const maudit = combattant(suivant, m.possedePar);
+        const tenue = maudit && (maudit.etats || []).some(e => e && e.maintien === "CLASSE_POSSESSION");
+        const marque = (m.etats || []).some(e => e && e.nom === ETAT_POSSEDE);
+        if (maudit && !maudit.aTerre && tenue && marque && !m.aTerre) return;
+        const champs = { possedePar: null, campAvant: null, joueurAvant: null, camp: m.campAvant || "Ennemi", joueur: m.joueurAvant || "" };
+        Object.assign(m, champs);
+        etapes.push({ type: "possession", cible: id, champs });
+        if (marque) {
+            m.etats = (m.etats || []).filter(e => !(e && e.nom === ETAT_POSSEDE));
+            etapes.push({ type: "etats", cible: id, liste: m.etats });
+        }
+        if (maudit) {
+            maudit.possede = null;
+            etapes.push({ type: "possession", cible: maudit.id, champs: { possede: null } });
+            if (tenue) etapes.push(...relacherMaintien(suivant, maudit.id, "CLASSE_POSSESSION"));
+        }
+        if (!m.aTerre) etapes.push({ type: "message", cible: id, acteur: id, texte: "Fin de la possession", couleur: "#7b1fa2" });
+    });
+    return etapes;
+}
 export const ETAT_VAUDOU = "Vaudou";
 export const ETAT_LIE_VAUDOU = "Lié (Vaudou)";
 export const MANCHES_VAUDOU = 2;
@@ -1890,7 +1923,10 @@ export const RESERVES_TECHNIQUES = {
     CLASSE_BOUCLIER_ANTIMAGIE: { parTour: 20, tours: 2, nom: "Anti-magie maintenu" },
     // (v359) La Désintégration : 75 au lancement, puis 60 bloqués la manche
     // suivante (« réserve au prochain tour ») ; elle ne se relâche pas.
-    CLASSE_DESINTEGRATION: { parTour: 60, tours: 2, coutLancement: 75, auProchainTour: true, nom: "Désintégration (réserve)", sansRelache: true }
+    CLASSE_DESINTEGRATION: { parTour: 60, tours: 2, coutLancement: 75, auProchainTour: true, nom: "Désintégration (réserve)", sansRelache: true },
+    // (v364) La Possession du Maudit : 80 bloqués pendant ses 3 manches, rien de
+    // dépensé (Nico : « les 80 sont la réserve ») ; elle ne se relâche pas.
+    CLASSE_POSSESSION: { parTour: 80, tours: 3, nom: "Possession (réserve)", sansRelache: true }
 };
 // L'énergie libre qu'il faut au lancement : le prix, et la réserve qu'on bloque
 // tout de suite (pas celle « au prochain tour »).
@@ -2275,6 +2311,23 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
             etapes.push(...recompenserLeTueur(suivant, ennemi, id, false));
         }
         etapes.push(...poserMaintien(c, action.idCarte, []));
+    } else if (action.idCarte === "CLASSE_POSSESSION") {
+        // (v364) LA POSSESSION : le monstre passe dans son camp, commandé par son
+        // poste, 3 manches ; lui devient inerte (finirPossessions, la fin).
+        const m = combattant(suivant, action.cible);
+        if (m && !m.aTerre) {
+            const champs = { possedePar: id, campAvant: m.camp || "Ennemi", joueurAvant: m.joueur || "",
+                             camp: c.camp || "Allié", joueur: c.joueur || "" };
+            Object.assign(m, champs);
+            m.etats = [...(m.etats || []).filter(e => e && e.nom !== ETAT_POSSEDE),
+                       { nom: ETAT_POSSEDE, duree: MANCHES_POSSESSION, idMaudit: id, desc: "Possédé par le Maudit : il se bat pour son camp." }];
+            c.possede = m.id;
+            etapes.push({ type: "possession", cible: m.id, acteur: id, champs });
+            etapes.push({ type: "possession", cible: id, acteur: id, champs: { possede: m.id } });
+            etapes.push({ type: "etats", cible: m.id, pose: ETAT_POSSEDE, liste: m.etats });
+            etapes.push(...poserMaintien(c, action.idCarte, [{ cible: m.id, nom: ETAT_POSSEDE }]));
+            etapes.push({ type: "message", cible: m.id, acteur: id, texte: "👁️ Possédé !", couleur: "#7b1fa2" });
+        }
     } else if (action.idCarte === "CLASSE_VAUDOU") {
         // (v362) LE VAUDOU : le Maudit et l'ennemi liés, 2 manches.
         const ennemi = combattant(suivant, action.cible);

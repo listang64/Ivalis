@@ -597,6 +597,7 @@ const SCENES = {
                        CLASSE_APPEL_LUMIERE: "☀️ Appel de la lumière",
                        CLASSE_REGENERATION_INSOLENTE: "😤 Régénération insolente",
                        CLASSE_VAUDOU: "🪆 Vaudou",
+                       CLASSE_POSSESSION: "👁️ Possession",
                        CLASSE_DESINTEGRATION: "⚡ Désintégration par la foudre",
                        CLASSE_TERREUR_ARDENTE: "😱 Terreur ardente",
                        CLASSE_RETOUR_PASSE: "⌛ Retour dans le passé",
@@ -626,6 +627,9 @@ const SCENES = {
     // (v360) La Rage du Berserker : son « 😡 Rage ! » est un message à part ;
     // quand elle se pose, l'état se montre comme tout état posé ; le
     // réarmement, lui, ne se voit pas.
+    // (v364) La Possession : son « Possédé ! » est un message à part.
+    possession() { return { geste: "rien" }; },
+
     rage(e, etat) {
         if (!Array.isArray(e.liste)) return { geste: "rien" };
         return SCENES.etats({ ...e, type: "etats" }, etat);
@@ -965,7 +969,12 @@ export function fichesDepuisEtat(etat, fichesActuelles) {
             // la piste. Relevé en leader, sa jauge est la nouvelle (+15 PV).
             ...(c.leader ? { leader: true, PV_Max: nombre(c.pvMax) } : {}),
             // (v359) Désintégré par le Prêtre de la lumière : pas de butin.
-            ...(c.sansButin ? { sansButin: true } : {})
+            ...(c.sansButin ? { sansButin: true } : {}),
+            // (v364) LA POSSESSION DU MAUDIT : le monstre possédé change de camp et
+            // se joue depuis le poste du Maudit ; le Maudit, lui, est inerte.
+            ...(c.possedePar ? { possedePar: c.possedePar, campAvant: c.campAvant || "Ennemi", joueurPossession: c.joueur || "", camp: c.camp }
+                : (fiche.possedePar ? { possedePar: null, joueurPossession: null, camp: c.camp } : {})),
+            ...(c.possede ? { possede: c.possede } : (fiche.possede ? { possede: null } : {}))
         };
     });
 }

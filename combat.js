@@ -133,6 +133,8 @@ window.combattantsAttendus = function(data) {
     const horsJeu = new Set((data && data.Combattants_Hors_Jeu) || []);
     // Avec sa garde : plusieurs bancs extraient cette fonction seule, par son nom.
     if (typeof window.tombesSelonLeCerveau === "function") window.tombesSelonLeCerveau(data).forEach(id => horsJeu.add(id));
+    // (v364) Le Maudit qui possède un monstre est inerte : on n'attend pas sa carte.
+    (window.PERSOS_PARTIE || []).forEach(p => { if (p && p.possede) horsJeu.add(p.idPersonnage); });
     return ((data && data.Ordre_Initiative) || []).filter(id => !horsJeu.has(id));
 };
 
@@ -575,8 +577,23 @@ window.fermerCombat = function() {
 // héros ? », et tout ce qui se pose la question passe par elle.
 window.herosDuJoueur = function(idJoueur) {
     if (!idJoueur) return [];
-    return (window.PERSOS_PARTIE || [])
-        .filter(p => p && p.idJoueur === idJoueur && !p.estMonstre && !p.estIllusion);
+    const persos = window.PERSOS_PARTIE || [];
+    const miens = persos.filter(p => p && p.idJoueur === idJoueur && !p.estMonstre && !p.estIllusion);
+    // (v364) LA POSSESSION DU MAUDIT : le monstre qu'un de mes héros possède se
+    // joue d'ici, à sa place — le Maudit, inerte, sort de la liste.
+    const idsMiens = new Set(miens.map(p => p.idPersonnage));
+    const possedes = persos.filter(p => p && p.estMonstre && p.possedePar && idsMiens.has(p.possedePar));
+    return [...miens.filter(p => !p.possede), ...possedes];
+};
+
+// (v364) Ce combattant est-il commandé depuis ce poste ? Le sien, ou le
+// monstre que l'un de ses héros possède (la Possession du Maudit).
+window.commandeParMoi = function(perso, monId) {
+    if (!perso || !monId) return false;
+    if (perso.idJoueur === monId) return true;
+    if (!perso.possedePar) return false;
+    const maudit = (window.PERSOS_PARTIE || []).find(p => p && p.idPersonnage === perso.possedePar);
+    return !!maudit && maudit.idJoueur === monId;
 };
 
 window.initialiserPersosCombat = function() {
@@ -899,7 +916,9 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         window.mettreAJourJaugeFatigue(0);
         window.mettreAJourJaugePV();
 
-        const deck = persoActuel.deckEquipe || [];
+        // (v364) Un monstre possédé : ses propres compétences forment son deck.
+        const deck = persoActuel.deckEquipe
+            || (persoActuel.possedePar ? Object.keys((window.CACHE_COMPETENCES_GLOBAL || {})[idPersonnage] || {}) : []);
         // Les techniques de classe (Hoplite) s'ajoutent au deck, hors limite.
         const techniquesClasse = typeof window.techniquesDeClasse === "function"
             ? window.techniquesDeClasse(persoActuel) : [];
@@ -933,7 +952,7 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             const nom = String(e.nom || "").replace(/[<>&"]/g, "");
             const idC = String(e.maintien).replace(/[^A-Z0-9_]/gi, "");
             htmlDeck += `<div class="encart-maintien${relache ? " relache" : ""}" data-maintien="${idC}" title="${String(e.desc || "").replace(/"/g, "&quot;")}">
-                <span class="maintien-nom">${/Nuée/.test(nom) ? "🦇" : /Prise en charge/.test(nom) ? "✚" : /sursis/i.test(nom) ? "💀" : /Anti-magie/.test(nom) ? "💠" : /Désintégration/.test(nom) ? "⚡" : "🏰"} ${nom}</span>
+                <span class="maintien-nom">${/Nuée/.test(nom) ? "🦇" : /Prise en charge/.test(nom) ? "✚" : /sursis/i.test(nom) ? "💀" : /Anti-magie/.test(nom) ? "💠" : /Désintégration/.test(nom) ? "⚡" : /Possession/.test(nom) ? "👁️" : "🏰"} ${nom}</span>
                 <span class="maintien-reserve">${relache ? "relâché à la prochaine manche" : bloque ? `⚡ ${parseInt(e.reserve) || 0} bloqués (pas dépensés)` : `⚡ ${parseInt(e.reserve) || 0} bloqués à la prochaine manche`} · ${parseInt(e.duree) || 0} manche${(parseInt(e.duree) || 0) > 1 ? "s" : ""}</span>
                 ${enPreparation() && !e.sansRelache ? `<button type="button" class="maintien-relacher" onclick="event.stopPropagation(); window.basculerRelacher('${persoActuel.idPersonnage}', '${idC}')">${relache ? "Le garder" : "Relâcher"}</button>` : ""}
             </div>`;
@@ -2546,7 +2565,7 @@ document.addEventListener("click", async function(event) {
             phase === "Resolution" &&
             queue.length > 0 &&
             queue[0].idPersonnage === window.TOKEN_SELECTIONNE &&
-            persoSelectionne && persoSelectionne.idJoueur === monId
+            persoSelectionne && window.commandeParMoi(persoSelectionne, monId)
         );
         // Le déplacement ne se referme plus après une première validation : tant
         // que la carte n'est pas lancée (et son lancement met fin au tour), le
@@ -3241,7 +3260,7 @@ function construireHaloVTT(options) {
 // l'image d'un bandeau de carte. Ceux-là prennent un médaillon de LA COULEUR
 // DE LEUR BULLE (COULEUR_ETAT), avec un symbole, et leur nom au survol.
 window.SYMBOLES_ETATS = {
-    "Charmé": "💘", "Ténèbres étalées": "🌑", "Mur de bouclier": "🛡️", "Rempart": "🏰", "Rempart maintenu": "🏰", "Nuée maintenue": "🦇", "Prise en charge (réserve)": "✚", "Dernier sursis (réserve)": "💀", "Anti-magie maintenu": "💠", "Désintégration (réserve)": "⚡", "Lumière protectrice": "🕯️", "Rage": "😡", "Vaudou": "🪆", "Lié (Vaudou)": "🪡",
+    "Charmé": "💘", "Ténèbres étalées": "🌑", "Mur de bouclier": "🛡️", "Rempart": "🏰", "Rempart maintenu": "🏰", "Nuée maintenue": "🦇", "Prise en charge (réserve)": "✚", "Dernier sursis (réserve)": "💀", "Anti-magie maintenu": "💠", "Désintégration (réserve)": "⚡", "Lumière protectrice": "🕯️", "Rage": "😡", "Vaudou": "🪆", "Lié (Vaudou)": "🪡", "Possédé": "👁️", "Possession (réserve)": "👁️",
     "Nuée de chauve-souris": "🦇", "Bouclier anti-magie": "💠", "Plaie rouverte": "🩸",
     "Instinct du tueur": "🗡️", "Bouclier des Sages": "📜", "Étalement": "💢", "Soin étalé": "💚",
     "Élan": "💨", "Ralenti": "⏳", "Repli": "↩️", "Provocation": "😤", "Peur": "😱", "Béni": "✨",
@@ -3410,6 +3429,8 @@ window.COULEUR_ETAT = {
     "Rage":            "#e53935",  // rouge sang — la Rage du Berserker (v360)
     "Vaudou":          "#6a1b9a",  // violet sombre — le lien du Maudit (v362)
     "Lié (Vaudou)":    "#6a1b9a",
+    "Possédé":         "#7b1fa2",  // violet — possédé par le Maudit (v364)
+    "Possession (réserve)": "#7b1fa2",
     "Nuée de chauve-souris": "#6a1b9a",  // pourpre — le Vampire dispersé en nuée
     "Charmé":         "#ec407a",   // rose — retourné contre les siens par le Sorcier
     "Engagé":         "#e53935",   // rouge — pris dans la mêlée (v260)

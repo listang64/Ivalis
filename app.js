@@ -1028,7 +1028,9 @@ window.ATOUTS_CLASSES = {
     "Maudit": [
         { niveau: 1,  dotCumulables: true, sansSurpuissanceOffensive: true, pvMax: 5, competences: 1 },
         { niveau: 3,  magieDuSang: true, effets: ["EFF_MAGIE_DU_SANG"] },
-        { niveau: 5,  techniques: ["CLASSE_VAUDOU"] }
+        { niveau: 5,  techniques: ["CLASSE_VAUDOU"] },
+        // (v364) La Possession.
+        { niveau: 9,  techniques: ["CLASSE_POSSESSION"] }
     ],
     "Berserker": [
         { niveau: 1,  pvMaxPct: -20, soinsRecus: 30 },
@@ -1220,6 +1222,17 @@ window.TECHNIQUES_CLASSE = {
     // (v362) LE MAUDIT. Le Vaudou : un ennemi à 5 cases, en vue, lié à lui 2
     // manches ; tout ce que le Maudit perd ou reprend en PV, l'ennemi le perd ou
     // le reprend aussi (refleterVaudou, moteur_pur.js).
+    // (v364) LA POSSESSION : un monstre à 6 cases, en vue (ni boss, ni leader),
+    // passe 3 manches dans son camp, joué depuis son poste ; lui reste inerte.
+    // Réserve : 80 bloqués (pas dépensés) pendant la possession.
+    CLASSE_POSSESSION: {
+        Nom: "Possession", classe: "Maudit", niveau: 9, Initiative: 100, Fatigue: 80, cible: "ennemi", portee: 6,
+        reserve: { parTour: 80, tours: 3, sansRelache: true },
+        desc: "Prend le contrôle d'un monstre à 6 cases, en vue (ni boss, ni leader), pendant 3 manches : il se bat "
+            + "pour son camp et se joue comme l'un de ses héros, tandis que le Maudit reste inerte (ni pas, ni carte). "
+            + "Réserve : 80 d'énergie bloqués (pas dépensés) pendant la possession ; elle s'arrête si l'un des deux "
+            + "tombe. Une fois par combat."
+    },
     CLASSE_VAUDOU: {
         Nom: "Vaudou", classe: "Maudit", niveau: 5, Initiative: 100, Fatigue: 0, cible: "ennemi", portee: 5,
         desc: "Lie un ennemi à 5 cases, en vue, pendant 2 manches : tout ce que le Maudit perd en PV, l'ennemi le "
@@ -1408,6 +1421,7 @@ window.TECHNIQUES_VISEES = {
     CLASSE_CHARME_FRATRICIDE: { nom: "Charmé" },
     CLASSE_BRISEUR_ARCANE: { nom: "Briseur d'arcane" },
     CLASSE_VAUDOU: { nom: "Vaudou" },
+    CLASSE_POSSESSION: { nom: "Possession" },
     CLASSE_DESINTEGRATION: { nom: "Désintégration" },
     CLASSE_BAISER_VAMPIRE: { nom: "Baiser du vampire" },
     CLASSE_TRANSFERT: { nom: "Transfert", toutCamp: true, sansVue: true }

@@ -376,7 +376,10 @@ function combattantBrut(fiche, position, bornes) {
         estIllusion: !!fiche.estIllusion,
         // Quel POSTE commande ce combattant. Vide pour une créature : c'est le
         // cerveau qui la joue, et lui seul.
-        joueur: fiche.estMonstre ? "" : (fiche.idJoueur || ""),
+        joueur: fiche.estMonstre ? (fiche.possedePar ? (fiche.joueurPossession || "") : "") : (fiche.idJoueur || ""),
+        // (v364) La Possession du Maudit, telle que la fiche la porte.
+        ...(fiche.possedePar ? { possedePar: fiche.possedePar, campAvant: fiche.campAvant || "Ennemi", joueurAvant: "" } : {}),
+        ...(fiche.possede ? { possede: fiche.possede } : {}),
         race: fiche.race || "",
         // (v359) Désintégré : il ne donne aucun butin (loot.js, creaturesDuButin).
         ...(fiche.sansButin ? { sansButin: true } : {}),
@@ -1206,6 +1209,14 @@ export const APPLICATEURS = {
         c.sursis = null;
         // (v359) Désintégré par le Prêtre de la lumière : aucun butin.
         if (e.sansButin) c.sansButin = true;
+    },
+
+    // (v364) La Possession du Maudit : ce qui change de main (camp, poste qui
+    // commande, qui possède qui) — le RÉSULTAT, posé tel quel.
+    possession(etat, e) {
+        const c = combattant(etat, e.cible);
+        if (!c || !e.champs) return;
+        Object.keys(e.champs).forEach(k => { c[k] = e.champs[k]; });
     },
 
     // (v360) La Rage du Berserker : usée (elle ne revient qu'après être

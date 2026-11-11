@@ -517,7 +517,9 @@ window.preparerCartesMonstres = async function() {
         // résolution.
         const p = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === id);
         if (!p) return false;
-        if (p.estMonstre || p.estIllusion) return false;
+        // (v364) Un monstre possédé par un Maudit : c'est un joueur qui le joue.
+        if ((p.estMonstre && !p.possedePar) || p.estIllusion) return false;
+        if (p.possede) return false;      // le Maudit qui possède : inerte, pas de carte
         return !(typeof window.estCombattantMort === "function" && window.estCombattantMort(id));
     });
     if (humainsEnAttente.length > 0) {
@@ -535,7 +537,7 @@ window.preparerCartesMonstres = async function() {
     }
 
     const aJouer = (window.MONSTRES_PARTIE || []).filter(m =>
-        ordre.includes(m.idPersonnage) &&
+        ordre.includes(m.idPersonnage) && !m.possedePar &&
         !dejaChoisi.has(m.idPersonnage) &&
         !(typeof window.estCombattantMort === "function" && window.estCombattantMort(m.idPersonnage))
     );

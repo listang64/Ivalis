@@ -57,8 +57,8 @@ console.log("\n1. LES PALIERS");
     verifier("niveau 1 : DOT cumulables, sans surpuissance offensive, +5 PV, +1 compétence",
              a(1).dotCumulables === true && a(1).sansSurpuissanceOffensive === true && a(1).pvMax === 5 && a(1).competences === 1, JSON.stringify(a(1)));
     verifier("niveau 3 : la Magie du sang (dans la Forge) ; pas au 2", a(3).magieDuSang === true && JSON.stringify(a(3).effets) === '["EFF_MAGIE_DU_SANG"]' && !a(2).magieDuSang);
-    verifier("niveau 5 : Vaudou ; rien au niveau 9 pour l'instant (v363)", JSON.stringify(a(5).techniques) === '["CLASSE_VAUDOU"]'
-             && JSON.stringify(a(9).techniques) === '["CLASSE_VAUDOU"]');
+    verifier("niveau 5 : Vaudou ; niveau 9 : + la Possession (v364, possession.mjs)", JSON.stringify(a(5).techniques) === '["CLASSE_VAUDOU"]'
+             && JSON.stringify(a(9).techniques) === '["CLASSE_VAUDOU","CLASSE_POSSESSION"]');
     verifier("PV max : 95 + 5 = 100", w.pvMaxCombattant(maudit(1)) === 100);
     const t = w.TECHNIQUES_CLASSE.CLASSE_VAUDOU;
     verifier("Vaudou : init 100, 0 fatigue, un ennemi à 5 cases, visé sur le plateau", t.Initiative === 100 && t.Fatigue === 0 && t.cible === "ennemi"

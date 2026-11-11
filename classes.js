@@ -310,8 +310,10 @@ window.DESCRIPTIFS_CLASSES = {
             { niveau: 5, titre: "Technique : Vaudou",
               points: ["Initiative 100 · aucune fatigue · un ennemi à 5 cases · une fois par combat",
                        "2 manches : tout ce qu'il perd ou reprend en PV, l'ennemi le perd ou le reprend aussi"] },
-            { niveau: 9, titre: "Technique : Possession (bientôt)",
-              points: ["Prendre le contrôle d'un monstre pendant 3 manches — elle arrive dans la prochaine version"] }
+            { niveau: 9, titre: "Technique : Possession",
+              points: ["Initiative 100 · réserve de 80 bloqués (pas dépensés) · un monstre à 6 cases · une fois par combat",
+                       "Ni boss ni leader : 3 manches, il se bat pour son camp et se joue comme l'un de ses héros",
+                       "Lui reste inerte (ni pas, ni carte) ; elle s'arrête si l'un des deux tombe"] }
         ]
     },
     CLASSE_BERSERKER: {
