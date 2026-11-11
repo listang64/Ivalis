@@ -127,11 +127,12 @@ console.log("\n2. LA GRILLE : 13 CARTES DE TAROT 7:12, BORDURE DORÉE, RANGÉES 
   // (L'Ensorceleur a été retiré, le Nécromancien est devenu le Sorcier. Et
   // c'est une héroïne qu'on crée ici : les noms sont au féminin quand ils en
   // ont un — classes_feminin.mjs.)
-  verifier("13 classes, dans l'ordre donné", g.noms.length === 13 && g.noms[0] === "Pisteuse" && g.noms[12] === "Élémentariste"
+  // (v343 : sans l'Élémentariste ni le Mage du chaos ; cinq nouvelles, la dernière la Prêtresse de la lumière.)
+  verifier("16 classes, dans l'ordre donné", g.noms.length === 16 && g.noms[0] === "Pisteuse" && g.noms[15] === "Prêtresse de la lumière"
            && !g.noms.includes("Ensorceleur") && !g.noms.includes("Nécromancien"),
            g.noms.join(", "));
-  verifier("orthographe : Géomancienne, Sorcière, Médicus, Élémentariste",
-           ["Géomancienne", "Sorcière", "Médicus", "Élémentariste", "Chasseuse de mages", "Mage du chaos"].every(n => g.noms.includes(n)));
+  verifier("orthographe : Géomancienne, Sorcière, Médicus, Inquisitrice",
+           ["Géomancienne", "Sorcière", "Médicus", "Inquisitrice", "Chasseuse de mages", "Prêtresse de la lumière"].every(n => g.noms.includes(n)));
   verifier("cartes au format tarot 7:12", Math.abs(g.ratio - 12 / 7) < 0.02, g.ratio.toFixed(3));
   verifier("rangées de 4", g.parRangee === 4, String(g.parRangee));
   verifier("image en object-fit: cover (jamais fill)", g.fit === "cover", g.fit);

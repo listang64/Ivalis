@@ -26,8 +26,8 @@ console.log("\n1. LA RÈGLE");
              f("Pisteur") === "Pisteuse" && f("Sorcier") === "Sorcière" && f("Protecteur") === "Protectrice"
              && f("Chasseur de mages") === "Chasseuse de mages"
              && f("Profanateur") === "Profanatrice" && f("Géomancien") === "Géomancienne");
-    verifier("inchangées : Assassin, Sentinelle, Oracle, Vampire, Mage du chaos, Médicus, Élémentariste",
-             ["Assassin", "Sentinelle", "Oracle", "Vampire", "Mage du chaos", "Médicus", "Élémentariste"].every(n => f(n) === n));
+    verifier("inchangées : Assassin, Sentinelle, Oracle, Vampire, Médicus, Chaman, Berzerker, Maudit (v343)",
+             ["Assassin", "Sentinelle", "Oracle", "Vampire", "Médicus", "Chaman", "Berzerker", "Maudit"].every(n => f(n) === n));
     verifier("un héros (Male) garde le masculin", w.nomClasseGenre("Sorcier", "Male") === "Sorcier" && w.nomClasseGenre("Pisteur", "") === "Pisteur");
     verifier("les anciens noms suivent : Nécromancienne → Sorcière, Hoplite → Protectrice",
              f("Nécromancien") === "Sorcière" && f("Hoplite") === "Protectrice" && w.nomClasseGenre("Hoplite", "Male") === "Protecteur");
@@ -113,13 +113,13 @@ console.log("\n2. LE CHOIX DE CLASSE D'UNE HÉROÏNE");
     await window.ouvrirChoixClasse();
     // Les classes qui arrivent bientôt.
     const carte = (id) => document.querySelector(`.carte-classe[data-classe="${id}"]`);
-    const bientot = ["CLASSE_MAGE_DU_CHAOS", "CLASSE_ELEMENTARISTE"].map(id => ({
+    const bientot = window.CLASSES_BIENTOT.map(id => ({
       texte: (carte(id).querySelector(".carte-classe-bientot-texte") || {}).textContent || "",
       opacite: parseFloat(getComputedStyle(carte(id).querySelector(".carte-classe-image")).opacity) }));
     const autre = { texte: !!carte("CLASSE_SORCIER").querySelector(".carte-classe-bientot-texte"),
                     opacite: parseFloat(getComputedStyle(carte("CLASSE_SORCIER").querySelector(".carte-classe-image")).opacity) };
     window.afficherGrilleClasses();
-    window.ouvrirFicheClasse("CLASSE_ELEMENTARISTE");
+    window.ouvrirFicheClasse("CLASSE_MAUDIT");
     const fermee = getComputedStyle(document.getElementById("vue-fiche-classe")).display === "none";
     const message = (document.getElementById("message-classe-interdite") || {}).textContent || "";
     return { noms, titre, retenue, nomsH, bientot, autre, fermee, message };
@@ -128,11 +128,11 @@ console.log("\n2. LE CHOIX DE CLASSE D'UNE HÉROÏNE");
   await p.screenshot({ path: "/tmp/claude-0/classes_feminin.png" });
   verifier("la grille : Pisteuse, Assassin, Chasseuse de mages, Profanatrice, Géomancienne, Protectrice, Sorcière",
            ["Pisteuse", "Assassin", "Chasseuse de mages", "Profanatrice", "Géomancienne", "Protectrice", "Sorcière"].every(n => r.noms.includes(n))
-           && !r.noms.includes("Sorcier") && r.noms.includes("Sentinelle") && r.noms.length === 13, r.noms.join(", "));
+           && !r.noms.includes("Sorcier") && r.noms.includes("Sentinelle") && r.noms.length === 16, r.noms.join(", "));
   verifier("la fiche de classe s'intitule « Sorcière »", r.titre === "Sorcière", r.titre);
   verifier("mais la fiche du personnage retient « Sorcier »", r.retenue === "Sorcier", r.retenue);
-  verifier("Mage du chaos et Élémentariste : « Arrive bientôt », image à 35 %",
-           r.bientot.every(b => b.texte === "Arrive bientôt" && Math.abs(b.opacite - 0.35) < 0.01), JSON.stringify(r.bientot));
+  verifier("les cinq nouvelles (v343) : « Arrive bientôt », image à 35 %",
+           r.bientot.length === 5 && r.bientot.every(b => b.texte === "Arrive bientôt" && Math.abs(b.opacite - 0.35) < 0.01), JSON.stringify(r.bientot));
   verifier("les autres : ni texte ni voile", !r.autre.texte && r.autre.opacite === 1);
   verifier("elles ne s'ouvrent pas : un message le dit", r.fermee && /arrive bientôt/.test(r.message), r.message);
   verifier("un héros : la grille au masculin", r.nomsH.includes("Sorcier") && r.nomsH.includes("Pisteur") && !r.nomsH.includes("Sorcière"));

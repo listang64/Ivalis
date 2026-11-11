@@ -211,10 +211,10 @@ await section(async () => {
              groupes, xs: xs.size, as: as.size, depasse: rect ? Math.round(rect.right - page.right) : 0, couleurs: new Set(ong.map(o => o.querySelector(".lavis path").getAttribute("fill"))).size };
   });
   verifier("la création s'ouvre dans le livre, juste après les clans, sur le premier peuple", r.actif && await sur("race-0"), JSON.stringify({ ici: await ici(), race: await idx("race-0") }));
-  verifier("sept peuples, une double page chacun ; les treize classes ensuite", r.races.length === 7 && r.classes === 13 && r.nbPages === 7 * 2 + 13 * 2 + 4 + 2, JSON.stringify(r.races) + " " + r.nbPages);
+  verifier("sept peuples, une double page chacun ; les seize classes ensuite (v343)", r.races.length === 7 && r.classes === 16 && r.nbPages === 7 * 2 + 16 * 2 + 4 + 2, JSON.stringify(r.races) + " " + r.nbPages);
   verifier("à gauche tout ce qu'on sait du peuple (lore, en jeu, atout) et le choix du genre", /Les Humains/.test(r.texte) && /Peuple le plus répandu/.test(r.texte) && /En jeu/.test(r.texte) && /Atout/.test(r.texte) && r.genres === 3, r.texte.slice(0, 120));
   verifier("à droite, rien pour l'instant (les images viendront)", r.droite === 0);
-  verifier("les marque-pages des peuples sortent sur le bord droit ; ceux des classes restent rangés", JSON.stringify(r.groupes) === JSON.stringify([{ g: "races", sorti: true, n: 7 }, { g: "classes", sorti: false, n: 13 }]), JSON.stringify(r.groupes));
+  verifier("les marque-pages des peuples sortent sur le bord droit ; ceux des classes restent rangés", JSON.stringify(r.groupes) === JSON.stringify([{ g: "races", sorti: true, n: 7 }, { g: "classes", sorti: false, n: 16 }]), JSON.stringify(r.groupes));
   verifier("… pas tous alignés, chacun de sa couleur, dépassant du livre", r.xs >= 5 && r.as >= 5 && r.couleurs === 7 && r.depasse > 20, JSON.stringify({ xs: r.xs, as: r.as, couleurs: r.couleurs, depasse: r.depasse }));
   await cap("v319_peuple");
   // Le marque-page des Ankylars mène à leur page.
