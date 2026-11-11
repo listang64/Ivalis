@@ -295,6 +295,27 @@ window.DESCRIPTIFS_CLASSES = {
                        "Renvoie 33 % des dégâts qu'il subit à qui les lui inflige · une fois par combat"] }
         ]
     },
+    CLASSE_PRETRE_DE_LA_LUMIERE: {
+        presentation: "La lumière le guide et le protège. Le Prêtre aveugle ses ennemis d'éclairs, garde "
+            + "ses alliés des maux qui les guettent, voit clair dans les ténèbres, et sa foudre réduit "
+            + "en cendres l'ennemi affaibli.",
+        paliers: [
+            { niveau: 1, titre: "Maîtrise de la lumière",
+              points: ["Ses sorts de foudre ont 33 % de chance d'aveugler leur cible (2 manches)",
+                       "Une chance fixe : elle ne s'additionne pas à l'effet Aveuglement de la carte",
+                       "Purification par la lumière : l'allié qu'il purifie annule le prochain état néfaste qu'il devrait subir",
+                       "+1 compétence"] },
+            { niveau: 3, titre: "Vision dans les ténèbres",
+              points: ["Insensible à l'Aveuglement"] },
+            { niveau: 5, titre: "Technique : Appel de la lumière",
+              points: ["Initiative 100 · aucune fatigue · une fois par combat",
+                       "Aveugle tous les combattants sur la carte, alliés compris, sauf lui (2 manches)"] },
+            { niveau: 9, titre: "Technique : Désintégration par la foudre",
+              points: ["Les alliés à son contact reprennent 3 PV à chaque fin de manche",
+                       "Initiative 75 · 75 de fatigue, puis 60 en réserve la manche suivante · une fois par combat",
+                       "Un ennemi à 2 cases, à 50 % de ses PV ou moins, tombe sur le coup : son XP, aucun butin"] }
+        ]
+    },
     CLASSE_INQUISITEUR: {
         presentation: "Le feu purificateur répond à sa foi. L'Inquisiteur embrase ses ennemis, ne craint "
             + "pas les flammes, et fait fuir de terreur ceux qui brûlent.",
@@ -456,7 +477,8 @@ const nomAffiche = (c) => (typeof window.nomClasseGenre === "function")
 // « Arrive bientôt » par-dessus ; elles ne s'ouvrent pas encore.
 // (v343) Les cinq nouvelles, sans règles encore : visibles, pas encore choisissables.
 // (v358) L'Inquisiteur a ses règles : il se choisit.
-window.CLASSES_BIENTOT = ["CLASSE_CHAMAN", "CLASSE_BERZERKER", "CLASSE_MAUDIT", "CLASSE_PRETRE_DE_LA_LUMIERE"];
+// (v359) Le Prêtre de la lumière aussi.
+window.CLASSES_BIENTOT = ["CLASSE_CHAMAN", "CLASSE_BERZERKER", "CLASSE_MAUDIT"];
 window.classeBientot = (c) => !!c && window.CLASSES_BIENTOT.includes(c.id);
 
 window.rendreGrilleClasses = function(classes) {

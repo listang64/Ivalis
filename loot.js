@@ -636,7 +636,9 @@ window.creaturesDuButin = function(toutes) {
     const tombee = (m) => m.statut === "Mort" || m.zombie
         || (typeof window.estCombattantMort === "function" && window.estCombattantMort(m.idPersonnage));
     return (window.MONSTRES_PARTIE || [])
-        .filter(m => m && m.idPersonnage && !m.estIllusion && !m.compagnonDe && (toutes || tombee(m)))
+        // (v359) Une créature désintégrée par le Prêtre de la lumière : son XP,
+        // aucun butin.
+        .filter(m => m && m.idPersonnage && !m.estIllusion && !m.compagnonDe && (toutes || (tombee(m) && !m.sansButin)))
         .map(m => ({ id: m.idPersonnage, stature: window.statureDuButin(m.Palier || m.palier),
                      leader: !!(m.leader || m.Leader) }));
 };

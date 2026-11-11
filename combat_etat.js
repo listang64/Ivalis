@@ -214,7 +214,15 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         // (v358) L'Inquisiteur : +1 à ses attaques magiques de feu ; et, Ondari
         // de niveau 3, jamais Brûlé (chanceFaceA, moteur_pur.js).
         degatsFeu: nombre(race.degatsFeu),
-        immunisesA: (race.immuniteBrulureOndari && String(fiche.race || fiche.Race || "") === "Ondari") ? ["Brûlé"] : [],
+        // (v359) Le Prêtre de la lumière, niveau 3 : insensible à l'Aveuglement.
+        immunisesA: [...new Set([...(Array.isArray(race.insensibleA) ? race.insensibleA : []),
+                                 ...((race.immuniteBrulureOndari && String(fiche.race || fiche.Race || "") === "Ondari") ? ["Brûlé"] : [])])],
+        // (v359) Le Prêtre de la lumière : la Maîtrise de la lumière (33 % fixes
+        // d'aveugler avec un sort de foudre, tirerDesCarte), la garde de sa
+        // Purification, son aura de soin (cerveau_combat.js).
+        maitriseLumiere: nombre(race.maitriseLumiere),
+        gardePurification: !!race.gardePurification,
+        auraSoin: nombre(race.auraSoin),
         // …et désormais, à la place, le feu le PREND plus facilement : +20 %
         // de chance d'être Brûlé par un sort qui brûle (tirerDesCarte).
         brulureFacile: nombre(race.brulureFacile),
@@ -362,6 +370,8 @@ function combattantBrut(fiche, position, bornes) {
         // cerveau qui la joue, et lui seul.
         joueur: fiche.estMonstre ? "" : (fiche.idJoueur || ""),
         race: fiche.race || "",
+        // (v359) Désintégré : il ne donne aucun butin (loot.js, creaturesDuButin).
+        ...(fiche.sansButin ? { sansButin: true } : {}),
         // (v356) L'archétype d'une créature (DPS MAGE CAC, SOUTIEN…) : le
         // Chasseur de mages frappe plus fort les Mages et les Soutiens.
         archetype: fiche.Archetype || fiche.archetype || "",
@@ -788,7 +798,7 @@ export const combattant = (etat, id) => (etat && etat.combattants) ? etat.combat
 export const ETAT_INSTINCT_TUEUR = "Instinct du tueur";
 export const MANCHES_INSTINCT_TUEUR = 2;
 
-function recompenserLeTueur(etat, victime, idAuteur, finDeManche) {
+export function recompenserLeTueur(etat, victime, idAuteur, finDeManche) {
     const auteur = combattant(etat, idAuteur);
     const cumulable = nombre(auteur && auteur.atouts && auteur.atouts.critiqueSurKOCumulable);
     const bonus = cumulable > 0 ? cumulable : nombre(auteur && auteur.atouts && auteur.atouts.critiqueSurKO);
@@ -1184,6 +1194,8 @@ export const APPLICATEURS = {
         c.aTerre = true;
         c.pv = 0;
         c.sursis = null;
+        // (v359) Désintégré par le Prêtre de la lumière : aucun butin.
+        if (e.sansButin) c.sansButin = true;
     },
 
     // Une créature se relève en zombie, dans le camp du Profanateur (voir

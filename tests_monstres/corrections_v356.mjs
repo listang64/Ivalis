@@ -31,8 +31,10 @@ console.log("\n1. LES RÈGLES");
              JSON.stringify(ARCHETYPES_MAGES_SOUTIENS) === '["DPS MAGE CAC","DPS MAGE DISTANCE","SOUTIEN"]');
     const a = actionBriseurArcane("C", { id: "M", def: { magique: 31 } }).attaques[0];
     verifier("le Briseur : brut, 31 % → 46, à 5 cases", a.brut === true && a.valeurBrute === 46 && a.rangeMax === 5 && a.cibles[0] === "M");
-    verifier("la Maîtrise et l'Appel de la lumière ont disparu du code", !/maitriseLumiere|APPEL_LUMIERE/.test(
-        ["app.js", "combat.js", "cerveau_combat.js", "moteur_pur.js", "combat_etat.js", "pont_combat.js", "classes.js"].map(lireFichier).join("\n")));
+    // (v359 : la Maîtrise et l'Appel de la lumière reviennent — au Prêtre de la lumière.)
+    const chasseur = (xp) => w.atoutClasse({ classe: "Chasseur de mages", race: "Humain", xp });
+    verifier("le Chasseur n'a plus ni Maîtrise ni Appel de la lumière (ils sont au Prêtre depuis la v359)",
+             !chasseur(7900).maitriseLumiere && !(chasseur(7900).techniques || []).includes("CLASSE_APPEL_LUMIERE"));
 }
 
 // La fiche de classe dans la vraie page.

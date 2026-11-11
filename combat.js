@@ -933,7 +933,7 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             const nom = String(e.nom || "").replace(/[<>&"]/g, "");
             const idC = String(e.maintien).replace(/[^A-Z0-9_]/gi, "");
             htmlDeck += `<div class="encart-maintien${relache ? " relache" : ""}" data-maintien="${idC}" title="${String(e.desc || "").replace(/"/g, "&quot;")}">
-                <span class="maintien-nom">${/Nuée/.test(nom) ? "🦇" : /Prise en charge/.test(nom) ? "✚" : /sursis/i.test(nom) ? "💀" : /Anti-magie/.test(nom) ? "💠" : "🏰"} ${nom}</span>
+                <span class="maintien-nom">${/Nuée/.test(nom) ? "🦇" : /Prise en charge/.test(nom) ? "✚" : /sursis/i.test(nom) ? "💀" : /Anti-magie/.test(nom) ? "💠" : /Désintégration/.test(nom) ? "⚡" : "🏰"} ${nom}</span>
                 <span class="maintien-reserve">${relache ? "relâché à la prochaine manche" : bloque ? `⚡ ${parseInt(e.reserve) || 0} bloqués cette manche` : "manche déjà payée"} · ${parseInt(e.duree) || 0} manche${(parseInt(e.duree) || 0) > 1 ? "s" : ""}</span>
                 ${enPreparation() && !e.sansRelache ? `<button type="button" class="maintien-relacher" onclick="event.stopPropagation(); window.basculerRelacher('${persoActuel.idPersonnage}', '${idC}')">${relache ? "Le garder" : "Relâcher"}</button>` : ""}
             </div>`;
@@ -3241,7 +3241,7 @@ function construireHaloVTT(options) {
 // l'image d'un bandeau de carte. Ceux-là prennent un médaillon de LA COULEUR
 // DE LEUR BULLE (COULEUR_ETAT), avec un symbole, et leur nom au survol.
 window.SYMBOLES_ETATS = {
-    "Charmé": "💘", "Ténèbres étalées": "🌑", "Mur de bouclier": "🛡️", "Rempart": "🏰", "Rempart maintenu": "🏰", "Nuée maintenue": "🦇", "Prise en charge (réserve)": "✚", "Dernier sursis (réserve)": "💀", "Anti-magie maintenu": "💠",
+    "Charmé": "💘", "Ténèbres étalées": "🌑", "Mur de bouclier": "🛡️", "Rempart": "🏰", "Rempart maintenu": "🏰", "Nuée maintenue": "🦇", "Prise en charge (réserve)": "✚", "Dernier sursis (réserve)": "💀", "Anti-magie maintenu": "💠", "Désintégration (réserve)": "⚡", "Lumière protectrice": "🕯️",
     "Nuée de chauve-souris": "🦇", "Bouclier anti-magie": "💠", "Plaie rouverte": "🩸",
     "Instinct du tueur": "🗡️", "Bouclier des Sages": "📜", "Étalement": "💢", "Soin étalé": "💚",
     "Élan": "💨", "Ralenti": "⏳", "Repli": "↩️", "Provocation": "😤", "Peur": "😱", "Béni": "✨",
@@ -3393,6 +3393,8 @@ window.COULEUR_ETAT = {
     "Rempart maintenu": "#e8c46a", // or — le Protecteur qui le tient (v347)
     "Nuée maintenue": "#7e57c2",   // violet — la Nuée du Vampire (v349)
     "Anti-magie maintenu": "#90caf9", // bleu pâle — le Bouclier anti-magie (v356)
+    "Désintégration (réserve)": "#ffe082", // jaune éclair — le Prêtre de la lumière (v359)
+    "Lumière protectrice": "#fff3c4",  // blanc doré — la garde de sa Purification (v359)
     "Nuée de chauve-souris": "#6a1b9a",  // pourpre — le Vampire dispersé en nuée
     "Charmé":         "#ec407a",   // rose — retourné contre les siens par le Sorcier
     "Engagé":         "#e53935",   // rouge — pris dans la mêlée (v260)

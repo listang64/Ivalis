@@ -49,11 +49,11 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE, ETAT_SAIGNEMENT, SAIGNEMENT,
          resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, actionBriseurArcane, PORTEE_BRISEUR, appliquerCharme,
          pointesDeGlace, orientationCone, couleeDeLave, orientationLigne,
-         actionResonanceBouclier, ennemisAuContact, ligneDeVue, caseLibre, aLEtat,
+         actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle, ligneDeVue, caseLibre, aLEtat,
          carteToutEtalee, resisteA, prisMalgreResistance,
          reserveMaintenueDe, reserveDeTechnique, relacherMaintien, chanceFaceA, CHANCE_ETOURDI_RESONANCE,
          coutLancementReserve, BRULURE_AGGRAVEE, ETAT_RALENTI, coutDeTechnique, PORTEE_CHARME,
-         ennemisSurLaCarte, combustionInstantanee, CHANCE_COMBUSTION } from './moteur_pur.js';
+         ennemisSurLaCarte, combustionInstantanee, CHANCE_COMBUSTION, PORTEE_DESINTEGRATION, SEUIL_DESINTEGRATION } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles,
@@ -308,6 +308,19 @@ export function validerIntention(etat, intention, plateau) {
             if (ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) return refus("Baiser du vampire : ennemi invalide");
             if (distance(acteur, ennemi) !== 1) return refus("Baiser du vampire : l'ennemi doit être au contact");
         }
+        // (v359) La Désintégration par la foudre (Prêtre de la lumière) : un
+        // ennemi debout, à 2 cases, en vue, à 50 % de ses PV ou moins — sinon
+        // refusée (pas gâchée).
+        if (idCarte === "CLASSE_DESINTEGRATION") {
+            const ennemi = combattant(etat, intention.cible);
+            if (!ennemi) return refus("Désintégration sans cible");
+            if (ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) return refus("Désintégration : ennemi invalide");
+            if (distance(acteur, ennemi) > PORTEE_DESINTEGRATION) return refus("Désintégration : l'ennemi doit être à 2 cases au plus");
+            if (plateau && !ligneDeVue(plateau, acteur, ennemi)) return refus("Désintégration : pas de ligne de vue");
+            if (nombre(ennemi.pv) * 100 > nombre(ennemi.pvMax) * SEUIL_DESINTEGRATION) {
+                return refus("Désintégration : l'ennemi doit être à 50 % de ses PV ou moins");
+            }
+        }
         // (v356) Le Briseur d'arcane (Chasseur de mages) : un ennemi debout, à
         // 5 cases au plus, en vue (le plateau tranche quand on l'a).
         if (idCarte === "CLASSE_BRISEUR_ARCANE") {
@@ -555,6 +568,7 @@ export function cloturerTour(etat, des) {
         etapes.push(...reservesDeFinDeManche(etat));
         etapes.push(...regenererFinDeManche(etat));
         etapes.push(...regenererPvFinDeManche(etat));
+        etapes.push(...auraDeSoinFinDeManche(etat));
         etapes.push(...ticsDeFinDeManche(etat));
         etapes.push(...vieillirLesEtats(etat));
         // QUI SE TIENT DANS UNE ZONE LA SUBIT (v253), une fois par manche —
@@ -892,6 +906,31 @@ export function regenererPvFinDeManche(etat) {
     return etapes;
 }
 
+// (v359) L'AURA DU PRÊTRE DE LA LUMIÈRE (niveau 9) : chaque allié à son
+// contact — pas lui — reprend 3 PV en fin de manche, selon les règles de tout
+// soin (soins reçus, brûlure ; rien en sursis). Deux prêtres : deux auras.
+export function auraDeSoinFinDeManche(etat) {
+    const etapes = [];
+    (etat.ordre || Object.keys(etat.combattants || {})).forEach(idPretre => {
+        const p = combattant(etat, idPretre);
+        const soin = nombre(p && p.atouts && p.atouts.auraSoin);
+        if (!p || p.aTerre || soin <= 0) return;
+        (etat.ordre || Object.keys(etat.combattants || {})).forEach(id => {
+            const a = combattant(etat, id);
+            if (!a || id === idPretre || a.aTerre || a.estIllusion || enSursis(a)) return;
+            if ((a.camp || "Allié") !== (p.camp || "Allié") || distance(p, a) !== 1) return;
+            const part = 100 + nombre(a.atouts && a.atouts.soinsRecus) + regleDesEtats(a, "soinsRecus");
+            const gain = Math.max(0, Math.round(soin * part / 100));
+            const avant = nombre(a.pv);
+            const apres = Math.min(nombre(a.pvMax), avant + gain);
+            if (apres === avant) return;
+            a.pv = apres;
+            etapes.push({ type: "soin", cible: id, acteur: idPretre, montant: apres - avant, pvApres: apres, aura: true });
+        });
+    });
+    return etapes;
+}
+
 // =========================================================================
 //  OUVRIR UNE MANCHE
 // =========================================================================
@@ -1126,20 +1165,29 @@ export function appliquerIntention(etat, intention, plateau) {
     if (intention.type === "classe") {
         const cibles = intention.idCarte === "CLASSE_ASSAUT_MORTEL" ? ciblesDeLAssaut(etat, intention)
             : Array.isArray(intention.cibles) ? [...new Set(intention.cibles)] : undefined;
+        // (v359) L'APPEL DE LA LUMIÈRE (Prêtre de la lumière) : tout le monde
+        // sauf lui. Le noir de chacun se tire ici, dans l'ordre des ids.
+        const noirs = intention.idCarte === "CLASSE_APPEL_LUMIERE"
+            ? Object.fromEntries(Object.keys(etat.combattants || {}).sort()
+                .filter(id => id !== intention.acteur && etat.combattants[id] && !etat.combattants[id].aTerre)
+                .map(id => [id, tirerDirectionsAveugle(des)]))
+            : undefined;
         const cibleTechnique = intention.idCarte === "CLASSE_LIEN_DE_SANG"
             ? (compagnonDe(etat, intention.acteur) || {}).id : intention.cible;
-        // LES ÉTATS « À COUP SÛR » ET LES RÉSISTANCES (v260) : le Charme
-        // fratricide, l'Immobilisation du Tir précis prennent à 75 % sur qui y
-        // résiste — un dé chez le cerveau, pour ceux-là seulement.
-        const etatSur = { CLASSE_CHARME_FRATRICIDE: "Charmé",
+        // LES ÉTATS « À COUP SÛR » ET LES RÉSISTANCES (v260) : l'Aveuglement de
+        // l'Appel de la lumière, le Charme fratricide, l'Immobilisation du Tir
+        // précis prennent à 75 % sur qui y résiste — un dé chez le cerveau,
+        // dans l'ordre des ids, pour ceux-là seulement.
+        const etatSur = { CLASSE_APPEL_LUMIERE: "Aveuglé", CLASSE_CHARME_FRATRICIDE: "Charmé",
                           CLASSE_TIR_PRECIS: "Immobilisation" }[intention.idCarte];
-        const visesSurs = !etatSur ? [] : [cibleTechnique].filter(Boolean);
+        const visesSurs = !etatSur ? [] : noirs ? Object.keys(noirs).sort() : [cibleTechnique].filter(Boolean);
         const jetsSurs = Object.fromEntries(visesSurs
             .filter(v => resisteA(combattant(etat, v), etatSur))
             .map(v => [v, prisMalgreResistance(combattant(etat, v), etatSur, des)]));
         const r = resoudreTechniqueClasse(etat, { idLanceur: intention.acteur, idCarte: intention.idCarte,
                                                   cible: cibleTechnique, cibles,
                                                   ...(Array.isArray(intention.cases) ? { cases: intention.cases } : {}),
+                                                  ...(noirs ? { noirs } : {}),
                                                   ...(Object.keys(jetsSurs).length ? { prisMalgreResistance: jetsSurs } : {}),
                                                   ...(intention.initiative !== undefined ? { initiative: intention.initiative } : {}) }, plateau);
         let suivant = clonerEtat(r.etat);

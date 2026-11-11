@@ -42,7 +42,7 @@
 // =========================================================================
 
 import { clonerEtat, combattant, creerDes, tomber, enSursis, reductionInertie, MANCHES_RETOUR_PASSE,
-         leaderActuel, reglerLeader, LEADER_DEFAUT } from './combat_etat.js';
+         leaderActuel, reglerLeader, LEADER_DEFAUT, recompenserLeTueur } from './combat_etat.js';
 
 const nombre = (v, defaut = 0) => {
     const n = parseInt(v);
@@ -578,6 +578,19 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
         });
     });
 
+    // MAÎTRISE DE LA LUMIÈRE (Prêtre de la lumière, niveau 1 depuis la v359 ;
+    // Chasseur de mages de la v237 à la v355) : un sort de FOUDRE a 33 % de
+    // chance FIXE d'aveugler chaque cible qu'il vise. Elle ne s'additionne pas
+    // à l'Aveuglement que porterait la carte : sur une cible que la carte veut
+    // aveugler, c'est la plus forte des deux chances, en un seul jet (plus
+    // bas, chanceEtatDe) ; sur les autres, un jet à elle, après les états.
+    const maitrise = nombre(lanceur && lanceur.atouts && lanceur.atouts.maitriseLumiere);
+    const estFoudre = (a) => !!a && !a.isHeal && !a.isShield && a.typeRes === "Magique"
+                             && (a.element === "Foudre" || (a.elements || []).includes("Foudre"));
+    if (maitrise > 0) (plan.attaques || []).filter(estFoudre).forEach(a => (a.cibles || []).forEach(id => {
+        pourCible(id).maitriseLumiere = maitrise;
+    }));
+
     (plan.alterations || []).forEach(alt => {
         (alt.cibles || []).forEach(id => {
             const c = pourCible(id);
@@ -590,8 +603,8 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
             // à une cible qui y résiste (v260) : un dé, à 75 %.
             if (c.etats[alt.nom] === undefined) {
                 const cibleEtat = combattant(etat, id);
-                c.etats[alt.nom] = (critique && !resisteA(cibleEtat, alt.nom))
-                    || des.d100() <= (critique ? chanceFaceA(cibleEtat, alt.nom, 100) : chanceEtatDe(lanceur, alt, cibleEtat));
+                c.etats[alt.nom] = (critique && !resisteA(cibleEtat, alt.nom) && !immuniseA(cibleEtat, alt.nom))
+                    || des.d100() <= (critique ? chanceFaceA(cibleEtat, alt.nom, 100) : chanceEtatDe(lanceur, alt, cibleEtat, c));
             }
             // L'AVEUGLEMENT tire ICI les 3 cases de noir autour de sa cible —
             // avec les autres dés, pour que tous les postes voient le même noir.
@@ -609,6 +622,16 @@ export function tirerDesCarte(etat, plan, idLanceur, critique, des) {
                 c.bouscule = des.d100() <= CHANCE_BOUSCULADE_POUSSEE;
             }
         });
+    });
+
+    // Le jet de la Maîtrise de la lumière sur les cibles que la carte ne
+    // cherchait pas à aveugler : le noir se tire avec (lumiereAveugle, comme
+    // l'ancienne Lumière — resoudreCarte le pose sur la cible touchée).
+    if (maitrise > 0) Object.keys(jets.parCible).forEach(id => {
+        const c = jets.parCible[id];
+        if (!(c.maitriseLumiere > 0) || c.etats[ETAT_AVEUGLE] !== undefined || c.lumiereAveugle !== undefined) return;
+        c.lumiereAveugle = des.d100() <= chanceFaceA(combattant(etat, id), ETAT_AVEUGLE, c.maitriseLumiere);
+        if (c.lumiereAveugle) c.noirLumiere = { [id]: tirerDirectionsAveugle(des) };
     });
 
     // --- LES JETS DE L'ÉQUIPEMENT -----------------------------------------
@@ -780,10 +803,32 @@ export function estDansLeNoir(c, hex) {
 // offerts, l'Élan et les bénédictions de l'équipement, un soin étalé qui n'a
 // pas fini de tomber.
 export const ETATS_BIENFAISANTS = new Set(["Absorption", "Contre", "Élan", "Soin étalé", "Nuée de chauve-souris",
-                                           "Bouclier anti-magie"]);
+                                           "Bouclier anti-magie", "Lumière protectrice"]);
 export function estEtatNefaste(e) {
     // L'engagement (v260) n'est pas une altération : la mêlée, rien à purifier.
     return !!e && !ETATS_BIENFAISANTS.has(e.nom) && !e.bonusEquip && e.nom !== "Engagé";
+}
+
+// (v359) LA LUMIÈRE PROTECTRICE (Prêtre de la lumière, Purification par la
+// lumière) : l'allié purifié la garde jusqu'au prochain état néfaste qu'il
+// devrait subir — cet état-là ne prend pas, et la garde s'en va. Pas de durée
+// (Nico : « jusqu'à usage ») : 999 manches. Appelée là où un état néfaste se
+// pose (cartes, zones, techniques). Mute la cible, ajoute les étapes, rend
+// vrai si l'état est annulé.
+export const ETAT_GARDE_LUMIERE = "Lumière protectrice";
+// (v359) La Désintégration par la foudre : à 2 cases, sur un ennemi à 50 %
+// de ses PV ou moins.
+export const PORTEE_DESINTEGRATION = 2;
+export const SEUIL_DESINTEGRATION = 50;
+export const DESC_GARDE_LUMIERE = "Le prochain état néfaste qu'il devrait subir est annulé.";
+export function gardeAnnule(cible, nom, etapes) {
+    if (!cible || !nom || !estEtatNefaste({ nom })) return false;
+    const garde = (cible.etats || []).find(e => e && e.nom === ETAT_GARDE_LUMIERE);
+    if (!garde) return false;
+    cible.etats = cible.etats.filter(e => e !== garde);
+    etapes.push({ type: "etatRate", cible: cible.id, nom, garde: true, raison: ETAT_GARDE_LUMIERE });
+    etapes.push({ type: "etats", cible: cible.id, liste: cible.etats, retires: [ETAT_GARDE_LUMIERE] });
+    return true;
 }
 
 // L'AUTRE TRICHE : deux états seulement, la Peur et l'Étourdi, prennent huit
@@ -829,17 +874,21 @@ export function prisMalgreResistance(c, nom, des) {
 
 // `cible` (facultative) : ce que la cible ajoute elle-même à la chance — le
 // Vampire, +20 % d'être Brûlé par un sort (brulureFacile, v237) — et ce
-// qu'elle en retire : sa résistance à cet état (−25 %, v260).
+// qu'elle en retire : sa résistance à cet état (−25 %, v260). `jetsCible`
+// (facultatif) : ses jets de la carte — un sort de foudre d'un Prêtre de la
+// lumière y a noté sa Maîtrise de la lumière (l'Aveuglement prend alors la
+// plus forte des deux chances, sans les additionner).
 //
 // Un LEADER (v262) ajoute ses points de chance (+15, à l'origine) à tout état
 // que sa carte peut poser — jamais à un état que la carte ne pose pas (0 %).
-export function chanceEtatDe(lanceur, alt, cible) {
+export function chanceEtatDe(lanceur, alt, cible, jetsCible) {
     const base = nombre(alt && alt.chance);
     const bonus = (lanceur && lanceur.estMonstre) ? (BONUS_CHANCE_ETAT_MONSTRE[alt && alt.nom] || 0) : 0;
     const subie = (alt && alt.nom === "Brûlé" && cible && cible.atouts) ? nombre(cible.atouts.brulureFacile) : 0;
     // (Le leader n'ajoute plus de chance d'état depuis la v267 — Nico : « la
     // dernière colonne, 15 pts, on ne sait pas dans quoi : enlève-la ».)
     let chance = base + bonus + (base > 0 ? subie : 0);
+    if (alt && alt.nom === ETAT_AVEUGLE && jetsCible && jetsCible.maitriseLumiere > 0) chance = Math.max(chance, jetsCible.maitriseLumiere);
     return chanceFaceA(cible, alt && alt.nom, chance);
 }
 
@@ -1352,7 +1401,7 @@ export function traverserZones(etat, id, hex, des, options = {}) {
             // Sauvée par sa résistance seule (le jet aurait pris sans elle) : on le dit.
             if (!pris && resisteA(cible, zone.etat.nom) && jet <= nombre(zone.etat.chance)) {
                 etapes.push({ type: "etatRate", cible: id, nom: zone.etat.nom, resiste: true });
-            } else if (pris) {
+            } else if (pris && !gardeAnnule(cible, zone.etat.nom, etapes)) {
                 const existant = (cible.etats || []).find(e => e && e.nom === zone.etat.nom);
                 if (existant) {
                     existant.duree = Math.max(nombre(existant.duree), nombre(zone.etat.duree));
@@ -1730,7 +1779,10 @@ export const RESERVES_TECHNIQUES = {
     // pour le réanimé ; un prix, qui ne tient rien — elle ne se relâche pas.
     CLASSE_PRISE_EN_CHARGE: { parTour: 20, tours: 2, nom: "Prise en charge (réserve)", sansRelache: true },
     // (v356) Le Bouclier anti-magie : 20 par manche sur ses 2 manches.
-    CLASSE_BOUCLIER_ANTIMAGIE: { parTour: 20, tours: 2, nom: "Anti-magie maintenu" }
+    CLASSE_BOUCLIER_ANTIMAGIE: { parTour: 20, tours: 2, nom: "Anti-magie maintenu" },
+    // (v359) La Désintégration : 75 au lancement (15 + la part de la manche,
+    // 60), puis 60 la manche suivante ; un prix, qui ne se relâche pas.
+    CLASSE_DESINTEGRATION: { parTour: 60, tours: 2, coutLancement: 15, nom: "Désintégration (réserve)", sansRelache: true }
 };
 // Ce qu'une technique maintenue coûte au lancement : son prix, et la part de
 // la manche du lancement.
@@ -1999,6 +2051,7 @@ export function combustionInstantanee(suivant, idLanceur, pris) {
             etapes.push({ type: "etatRate", cible: x.id, nom: "Brûlé", ...(resisteA(x, "Brûlé") ? { resiste: true } : {}) });
             return;
         }
+        if (gardeAnnule(x, "Brûlé", etapes)) return;
         const deja = (x.etats || []).find(e => e && e.nom === "Brûlé");
         if (deja) deja.duree = Math.max(nombre(deja.duree), MANCHES_COMBUSTION);
         else x.etats = [...(x.etats || []), { nom: "Brûlé", duree: MANCHES_COMBUSTION, icone: ICONE_BRULE, desc: DESC_BRULE }];
@@ -2069,13 +2122,53 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
                    { nom: ETAT_ANTIMAGIE, duree: MANCHES_ANTIMAGIE, desc: DESC_ANTIMAGIE }];
         etapes.push({ type: "etats", cible: id, liste: c.etats, pose: ETAT_ANTIMAGIE });
         etapes.push(...poserMaintien(c, action.idCarte, [{ cible: id, nom: ETAT_ANTIMAGIE }]));
+    } else if (action.idCarte === "CLASSE_APPEL_LUMIERE") {
+        // (v359, Prêtre de la lumière ; repris du Chasseur de mages d'avant la
+        // v356) Les noirs ont été tirés par le cerveau (action.noirs), un par
+        // combattant, lui excepté : on ne fait que les poser. Qui résiste à
+        // l'Aveuglement a eu son dé chez le cerveau (action.prisMalgreResistance).
+        const noirs = action.noirs || {};
+        const pris = action.prisMalgreResistance || {};
+        Object.keys(noirs).sort().forEach(v => {
+            const x = combattant(suivant, v);
+            if (!x || x.aTerre || v === id) return;
+            if ((resisteA(x, ETAT_AVEUGLE) || immuniseA(x, ETAT_AVEUGLE)) && pris[v] !== true) {
+                etapes.push({ type: "etatRate", cible: v, nom: ETAT_AVEUGLE, resiste: true });
+                return;
+            }
+            if (gardeAnnule(x, ETAT_AVEUGLE, etapes)) return;
+            const cases = casesDuNoir(x, noirs[v]);
+            const deja = (x.etats || []).find(e => e && e.nom === ETAT_AVEUGLE);
+            if (deja) {
+                deja.duree = Math.max(nombre(deja.duree), DUREE_AVEUGLE_LUMIERE);
+                deja.cases = cases;
+            } else {
+                x.etats = [...(x.etats || []), { nom: ETAT_AVEUGLE, duree: DUREE_AVEUGLE_LUMIERE, desc: DESC_AVEUGLE, cases }];
+            }
+            etapes.push({ type: "etats", cible: v, pose: ETAT_AVEUGLE, liste: x.etats });
+        });
+    } else if (action.idCarte === "CLASSE_DESINTEGRATION") {
+        // (v359) LA DÉSINTÉGRATION PAR LA FOUDRE : l'ennemi (à 50 % de ses PV
+        // ou moins — le cerveau l'a vérifié) tombe sur le coup, sans sursis ni
+        // zombie ; il rapporte son XP, aucun butin (sansButin, loot.js).
+        const ennemi = combattant(suivant, action.cible);
+        if (ennemi && !ennemi.aTerre) {
+            const avant = nombre(ennemi.pv);
+            ennemi.pv = 0; ennemi.aTerre = true; ennemi.sursis = null; ennemi.sansButin = true;
+            etapes.push({ type: "message", cible: ennemi.id, acteur: id, texte: "⚡ Désintégré !", couleur: "#ffe082" });
+            etapes.push({ type: "degats", cible: ennemi.id, acteur: id, montant: avant, surBouclier: 0,
+                          bouclierApres: nombre(ennemi.bouclier), pvApres: 0, nature: "brut" });
+            etapes.push({ type: "chute", cible: ennemi.id, acteur: id, sansButin: true });
+            etapes.push(...recompenserLeTueur(suivant, ennemi, id, false));
+        }
+        etapes.push(...poserMaintien(c, action.idCarte, []));
     } else if (action.idCarte === "CLASSE_CHARME_FRATRICIDE") {
         const ennemi = combattant(suivant, action.cible);
         if (ennemi && !ennemi.aTerre) {
             // À coup sûr, sauf à qui y résiste (v260 : un dé du cerveau, à 75 %).
             if (resisteA(ennemi, ETAT_CHARME) && (action.prisMalgreResistance || {})[ennemi.id] !== true) {
                 etapes.push({ type: "etatRate", cible: ennemi.id, acteur: id, nom: ETAT_CHARME, etat: ETAT_CHARME, resiste: true });
-            } else {
+            } else if (!gardeAnnule(ennemi, ETAT_CHARME, etapes)) {
                 ennemi.etats = [...(ennemi.etats || []).filter(e => e && e.nom !== ETAT_CHARME),
                                 { nom: ETAT_CHARME, duree: MANCHES_CHARME, idSource: id,
                                   desc: "Sa prochaine compétence frappe l'un de ses propres alliés." }];
@@ -2145,7 +2238,7 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
             etapes.push({ type: "message", cible: ennemi.id, acteur: id, texte: "🪢 Lancer de bolas !", couleur: "#e8c46a" });
             if (resisteA(ennemi, ETAT_IMMOBILISATION) && (action.prisMalgreResistance || {})[ennemi.id] !== true) {
                 etapes.push({ type: "etatRate", cible: ennemi.id, acteur: id, nom: ETAT_IMMOBILISATION, etat: ETAT_IMMOBILISATION, resiste: true });
-            } else {
+            } else if (!gardeAnnule(ennemi, ETAT_IMMOBILISATION, etapes)) {
                 ennemi.etats = [...(ennemi.etats || []).filter(e => e && e.nom !== ETAT_IMMOBILISATION),
                                 { nom: ETAT_IMMOBILISATION, duree: MANCHES_TIR_PRECIS, desc: DESC_IMMOBILISATION }];
                 etapes.push({ type: "etats", cible: ennemi.id, liste: ennemi.etats, pose: ETAT_IMMOBILISATION });
@@ -2774,7 +2867,7 @@ export function resoudreCarte(etat, action, plateau) {
                 });
                 if (etapesNoir.length) {
                     etapes.push({ type: "message", cible: idCible, acteur: idLanceur,
-                                  texte: "☀️ Éblouis !", couleur: "#ffe082" });
+                                  texte: des.maitriseLumiere > 0 ? "⚡ Ébloui par l'éclair !" : "☀️ Éblouis !", couleur: "#ffe082" });
                     etapes.push(...etapesNoir);
                 }
             }
@@ -2940,6 +3033,8 @@ export function resoudreCarte(etat, action, plateau) {
             //
             // Un seul vocabulaire, celui du jeu, et l'état emporte de quoi être
             // montré.
+            // (v359) La Lumière protectrice du Prêtre annule le premier état néfaste.
+            if (gardeAnnule(cible, alt.nom, etapes)) return;
             const existant = cible.etats.find(e => e && e.nom === alt.nom);
             let duree = nombre(alt.duree !== undefined ? alt.duree : alt.tours, 1);
             // QUI A POSÉ un état qui ronge en fin de manche (poison, brûlure) :
@@ -3016,6 +3111,14 @@ export function resoudreCarte(etat, action, plateau) {
             const cible = combattant(suivant, idCible);
             const jet = desDe(idCible);
             if (!cible || !jet.purifie) return;
+            // (v359) PURIFICATION PAR LA LUMIÈRE (Prêtre de la lumière) : l'allié
+            // purifié — pas lui-même — garde une Lumière protectrice.
+            if (lanceur.atouts && lanceur.atouts.gardePurification && idCible !== idLanceur && !cible.aTerre
+                && (cible.camp || "Allié") === (lanceur.camp || "Allié")
+                && !(cible.etats || []).some(e => e && e.nom === ETAT_GARDE_LUMIERE)) {
+                cible.etats = [...(cible.etats || []), { nom: ETAT_GARDE_LUMIERE, duree: 999, desc: DESC_GARDE_LUMIERE }];
+                etapes.push({ type: "etats", cible: idCible, pose: ETAT_GARDE_LUMIERE, liste: cible.etats });
+            }
             const retires = [];
             let restant = Math.max(1, Math.round(nombre(attaque.purifNombre, 1)));
             let tirage = nombre(jet.purifJet, 1);

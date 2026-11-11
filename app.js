@@ -1005,6 +1005,20 @@ window.ATOUTS_CLASSES = {
     // Brûlé, et un Ondari Inquisiteur y devient IMMUNISÉ (immuniteBrulureOndari :
     // jamais Brûlé, combat_etat.js → atouts.immunisesA) ; la Combustion
     // instantanée au niveau 5, la Terreur ardente au niveau 9.
+    // (v359) LE PRÊTRE DE LA LUMIÈRE, nouvelle classe (Nico) : au niveau 1, la
+    // Maîtrise de la lumière (33 % fixes d'aveugler avec un sort de foudre,
+    // maitriseLumiere), la Purification par la lumière (un allié purifié garde
+    // une Lumière protectrice qui annule le prochain état néfaste,
+    // gardePurification) et +1 compétence ; au niveau 3, insensible à
+    // l'Aveuglement (insensibleA → atouts.immunisesA) ; l'Appel de la lumière au
+    // niveau 5 ; au niveau 9, +3 PV par fin de manche aux alliés à son contact
+    // (auraSoin) et la Désintégration par la foudre.
+    "Prêtre de la lumière": [
+        { niveau: 1,  maitriseLumiere: 33, gardePurification: true, competences: 1 },
+        { niveau: 3,  insensibleA: ["Aveuglé"] },
+        { niveau: 5,  techniques: ["CLASSE_APPEL_LUMIERE"] },
+        { niveau: 9,  auraSoin: 3, techniques: ["CLASSE_DESINTEGRATION"] }
+    ],
     "Inquisiteur": [
         { niveau: 1,  brulureOfferte: 10, degatsFeu: 1 },
         { niveau: 3,  competences: 1, resistances: ["Brûlé"], immuniteBrulureOndari: true },
@@ -1180,6 +1194,21 @@ window.TECHNIQUES_CLASSE = {
             + "suivante bloquée puis consommée ; à court d'énergie, il tombe ; on peut le relâcher en préparation). "
             + "Une fois par combat."
     },
+    // (v359) LE PRÊTRE DE LA LUMIÈRE. L'Appel de la lumière (repris du Chasseur
+    // de mages d'avant la v356) : tout le monde est Aveuglé, sauf lui. La
+    // Désintégration par la foudre : un ennemi à 50 % de ses PV ou moins tombe
+    // sur le coup — de l'XP, aucun butin (actionDesintegration, moteur_pur.js).
+    CLASSE_APPEL_LUMIERE: {
+        Nom: "Appel de la lumière", classe: "Prêtre de la lumière", niveau: 5, Initiative: 100, Fatigue: 0, cible: "soi",
+        desc: "Aveugle tous les combattants sur la carte (alliés compris), sauf lui, pour 2 manches. Une fois par combat."
+    },
+    CLASSE_DESINTEGRATION: {
+        Nom: "Désintégration par la foudre", classe: "Prêtre de la lumière", niveau: 9, Initiative: 75, Fatigue: 75, cible: "ennemi", portee: 2,
+        reserve: { parTour: 60, tours: 2, coutLancement: 15, sansRelache: true },
+        desc: "Un ennemi à 2 cases, en vue, à 50 % de ses PV ou moins : il tombe sur le coup (il rapporte son XP, "
+            + "aucun butin). 75 de fatigue, puis une réserve de 60 la manche suivante (bloquée puis consommée ; "
+            + "elle ne se relâche pas). Une fois par combat."
+    },
     // (v358) L'INQUISITEUR. La Combustion instantanée : chaque ennemi debout sur
     // la carte, 75 % de chance d'être Brûlé (2 manches). La Terreur ardente :
     // chaque ennemi Brûlé est pris de Peur — il fuit (combustionInstantanee,
@@ -1339,6 +1368,7 @@ window.estTechniqueClasse = (idCarte) => !!(idCarte && window.TECHNIQUES_CLASSE[
 window.TECHNIQUES_VISEES = {
     CLASSE_CHARME_FRATRICIDE: { nom: "Charmé" },
     CLASSE_BRISEUR_ARCANE: { nom: "Briseur d'arcane" },
+    CLASSE_DESINTEGRATION: { nom: "Désintégration" },
     CLASSE_BAISER_VAMPIRE: { nom: "Baiser du vampire" },
     CLASSE_TRANSFERT: { nom: "Transfert", toutCamp: true, sansVue: true }
 };
@@ -1726,6 +1756,10 @@ window.texteAtout = function(cle, valeur) {
                                               : "Le malus de brûlure s'annule : il brûle comme tout le monde";
         case "degatsContreVargen": return `${plus(n)} dégâts contre les Vargens`;
         case "degatsContreMages": return `${plus(n)} dégâts contre les monstres Mage et Soutien`;
+        case "maitriseLumiere": return `Maîtrise de la lumière : ${n} % de chance d'aveugler avec un sort de foudre (sans s'ajouter à l'Aveuglement)`;
+        case "gardePurification": return "Purification par la lumière : l'allié qu'il purifie annule le prochain état néfaste qu'il devrait subir";
+        case "insensibleA":    return `Insensible à : ${(valeur || []).join(", ")}`;
+        case "auraSoin":       return `Les alliés à son contact reprennent ${n} PV à chaque fin de manche`;
         case "brulureOfferte": return `Ses Attaques Magiques de feu ont ${n} % de chance de brûler (au lieu de 5 %)`;
         case "degatsFeu":      return `${plus(n)} dégât magique à ses attaques de feu`;
         case "immuniteBrulureOndari": return "Un Ondari devient totalement immunisé au Brûlé";

@@ -216,8 +216,8 @@ await section(async () => {
   verifier("…les nouvelles, absentes de la base, s'y ajoutent", NOUVELLES.every(n => noms.includes(n)), noms.join(", "));
   verifier("…chacune avec son image", r.lues.filter(x => NOUVELLES.includes(x.nom)).every(x => x.fond.includes(IMAGES[x.nom])));
   // (v358 : l'Inquisiteur a ses règles et se choisit.)
-  verifier("…toutes « arrive bientôt » sauf l'Inquisiteur (v358), et seulement elles",
-           r.lues.every(x => x.bientot === (NOUVELLES.includes(x.nom) && x.nom !== "Inquisiteur")));
+  verifier("…toutes « arrive bientôt » sauf l'Inquisiteur (v358) et le Prêtre de la lumière (v359), et seulement elles",
+           r.lues.every(x => x.bientot === (NOUVELLES.includes(x.nom) && !["Inquisiteur", "Prêtre de la lumière"].includes(x.nom))));
   verifier("…les classes de la base restent les siennes (Hoplite lu en Protecteur, pas de doublon)", noms.filter(n => n === "Protecteur").length === 1 && noms[noms.length - 1] === "Prêtre de la lumière", noms.join(", "));
   verifier("sans base, la liste du jeu", JSON.stringify(r.seules) === JSON.stringify(r.parDefaut));
   const g = await p.evaluate(() => ["Inquisiteur", "Prêtre de la lumière", "Chaman", "Berzerker", "Maudit"].map(n => [window.nomClasseGenre(n, "Femelle"), window.nomClasseGenre(n, "Male")]));
@@ -239,8 +239,8 @@ await section(async () => {
   const neuves = r.slice(-5);
   verifier("les cinq nouvelles, au féminin pour une héroïne", JSON.stringify(neuves.map(x => x.titre)) === JSON.stringify(["Inquisitrice", "Chaman", "Berzerker", "Maudit", "Prêtresse de la lumière"]), neuves.map(x => x.titre).join(", "));
   verifier("…chacune avec son image en fond de double page", neuves.every((x, i) => x.fond.includes(Object.values(IMAGES)[i])), neuves.map(x => x.fond.split("/").pop()).join(", "));
-  verifier("…« arrive bientôt », sans bouton pour la choisir — sauf l'Inquisitrice (v358), qui se choisit",
-           neuves.slice(1).every(x => !x.bouton && /bientôt/.test(x.bientot)) && neuves[0].bouton && !/bientôt/.test(neuves[0].bientot));
+  verifier("…« arrive bientôt », sans bouton pour la choisir — sauf l'Inquisitrice (v358) et la Prêtresse (v359), qui se choisissent",
+           neuves.slice(1, 4).every(x => !x.bouton && /bientôt/.test(x.bientot)) && [neuves[0], neuves[4]].every(x => x.bouton && !/bientôt/.test(x.bientot)));
   verifier("les autres classes se choisissent toujours", r.slice(0, -5).filter(x => !x.bouton).length === 0 || r.slice(0, -5).every(x => x.bouton || /ne peuvent pas/.test(x.bientot)));
   const onglets = await p.evaluate(() => [...document.querySelectorAll('#onglets-creation [data-groupe="classes"] .onglet-creation')].map(o => o.textContent.trim()));
   verifier("un marque-page par classe, nouvelles comprises", onglets.length === r.length && onglets.includes("Inquisitrice"), onglets.join(", "));

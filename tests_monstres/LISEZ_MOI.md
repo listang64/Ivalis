@@ -11406,3 +11406,26 @@ bonus_race_classe.mjs et necromancien.mjs : les paliers du Sorcier passent à 1 
 inquisiteur.mjs le vérifie : paliers et textes, la brûlure offerte, le +1 au feu, la résistance et l'immunité (critique compris), la Combustion (moteur, une fois, rejeu, 75 % et 50 % sur 200 graines), la Terreur ardente (70, fuites, non-brûlés immobiles, rejeu, 75 % contre la résistance à la Peur), et la vraie page (grille, fiche, Forge à 10 %).
 corrections_v358.mjs : choisissable, ses fichiers, la version.
 classes_feminin.mjs et corrections_v343.mjs : il reste quatre classes « bientôt ».
+
+## v359 — La refonte des classes : le Prêtre de la lumière (nouvelle classe jouable)
+
+- Nico (sa fiche du Prêtre de la lumière) :
+  - niveau 1 : Maîtrise de la lumière (33 % fixes d'aveugler avec un sort de foudre, sans cumul avec l'Aveuglement) ; Purification par la lumière (un allié purifié annule le prochain état néfaste qu'il devrait subir) ; +1 compétence ;
+  - niveau 3 : Vision dans les ténèbres (insensible à l'Aveuglement) ;
+  - niveau 5 : Appel de la lumière (aveugle tous les combattants de la carte) ;
+  - niveau 9 : +3 PV par fin de tour aux alliés proches ; Désintégration par la foudre (portée 2, fatigue 75, réserve 60 au tour suivant, init 75 ; tue un ennemi à 50 % de ses PV ou moins ; XP, aucun butin).
+- Ses réponses : la garde dure jusqu'à usage, sur un allié (pas lui) ; l'aura vaut pour les alliés au contact, pas lui ; la Désintégration est refusée au-dessus de 50 %, une fois par combat ; l'Appel aveugle tout le monde sauf le prêtre.
+- classes.js : sorti de CLASSES_BIENTOT (il reste Chaman, Berzerker, Maudit) ; sa fiche (Niv. 1 / 3 / 5 / 9).
+- app.js : paliers (maitriseLumiere 33, gardePurification, competences 1 ; insensibleA Aveuglé ; CLASSE_APPEL_LUMIERE ; auraSoin 3, CLASSE_DESINTEGRATION) ; CLASSE_DESINTEGRATION visée sur le plateau (TECHNIQUES_VISEES).
+- REPRIS DE LA v355 (retirés en v356 avec le Chasseur de mages) : la Maîtrise de la lumière dans tirerDesCarte et chanceEtatDe, l'Appel de la lumière dans resoudreTechniqueClasse et ses noirs tirés par le cerveau — sauf le prêtre.
+- combat_etat.js : immunisesA reçoit aussi insensibleA (le Prêtre, l'Aveuglement) ; maitriseLumiere, gardePurification, auraSoin ; une fiche « sansButin » le reste ; l'applicateur « chute » pose sansButin ; recompenserLeTueur est exporté.
+- moteur_pur.js :
+  - un critique n'impose plus un état à un immunisé (avant, seule la résistance l'arrêtait) ;
+  - LA LUMIÈRE PROTECTRICE (gardeAnnule) : posée par sa Purification sur un allié (999 manches, bienfaisante) ; elle annule le premier état néfaste qui allait se poser — cartes, zones, Charme, Lancer de bolas, Combustion, Appel ;
+  - LA DÉSINTÉGRATION : KO direct (ni sursis, ni zombie), message, dégâts, chute « sansButin », récompense du tueur ; sa réserve (RESERVES_TECHNIQUES : 15 + 60 au lancement, 60 la manche suivante, sans relâche).
+- cerveau_combat.js : validation de la Désintégration (ennemi debout, 2 cases, en vue, PV ≤ 50 %) ; l'aura (auraDeSoinFinDeManche, après la régénération des PV, selon les règles de tout soin).
+- pont_combat.js : la fiche projetée porte sansButin ; les titres « ☀️ Appel de la lumière », « ⚡ Désintégration par la foudre ». loot.js : creaturesDuButin écarte les désintégrés (leur XP reste due). combat.js : icônes de la garde et de la réserve.
+
+pretre_lumiere.mjs le vérifie : paliers, Maîtrise (33 %, foudre seulement, plus forte des deux chances), la garde (posée, pas sur lui ni un ennemi, durable, consommée, état bienfaisant épargné, rejeu), l'insensibilité (critique compris), l'Appel (sauf lui, KO épargné, garde, une fois, rejeu, 75 % contre la résistance), l'aura (contact seulement, ni lui ni un ennemi, niveau 9, plafond), la Désintégration (seuil, portée, mur, 75, KO sans butin, rejeu, fiche, une fois, réserve), et la vraie page (grille, fiche, nom accentué, butin).
+corrections_v359.mjs : choisissable, ce qui revient, le butin, la version.
+classes_feminin, corrections_v343, corrections_v358 : il reste trois classes « bientôt ». corrections_v356, chasseur_de_mages : la Maîtrise et l'Appel ne sont plus au Chasseur (ils existent de nouveau, au Prêtre).

@@ -594,6 +594,8 @@ const SCENES = {
                        CLASSE_BOUCLIER_ANTIMAGIE: "🔮 Bouclier anti-magie",
                        CLASSE_BRISEUR_ARCANE: "💥 Briseur d'arcane",
                        CLASSE_COMBUSTION: "🔥 Combustion instantanée",
+                       CLASSE_APPEL_LUMIERE: "☀️ Appel de la lumière",
+                       CLASSE_DESINTEGRATION: "⚡ Désintégration par la foudre",
                        CLASSE_TERREUR_ARDENTE: "😱 Terreur ardente",
                        CLASSE_RETOUR_PASSE: "⌛ Retour dans le passé",
                        CLASSE_RETOUR_ARRIERE: "⏪ Retour arrière",
@@ -951,7 +953,9 @@ export function fichesDepuisEtat(etat, fichesActuelles) {
             ...(c.zombie ? { zombie: true, camp: c.camp, PV_Max: nombre(c.pvMax), statut: "Vivant" } : {}),
             // UN LEADER (v262) : son aura sur le plateau, son liseré rouge sur
             // la piste. Relevé en leader, sa jauge est la nouvelle (+15 PV).
-            ...(c.leader ? { leader: true, PV_Max: nombre(c.pvMax) } : {})
+            ...(c.leader ? { leader: true, PV_Max: nombre(c.pvMax) } : {}),
+            // (v359) Désintégré par le Prêtre de la lumière : pas de butin.
+            ...(c.sansButin ? { sansButin: true } : {})
         };
     });
 }

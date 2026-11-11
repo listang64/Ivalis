@@ -102,7 +102,7 @@ console.log("\n1. LES PALIERS (v356) : +10 % RÉS. MAGIQUE ET +2 CONTRE MAGES/SO
     verifier("niveau 5 : le Bouclier anti-magie", JSON.stringify(a(5).techniques) === '["CLASSE_BOUCLIER_ANTIMAGIE"]');
     verifier("niveau 9 : + le Briseur d'arcane (pas au 8) ; plus d'Appel de la lumière",
              JSON.stringify(a(9).techniques) === '["CLASSE_BOUCLIER_ANTIMAGIE","CLASSE_BRISEUR_ARCANE"]'
-             && !(a(8).techniques || []).includes("CLASSE_BRISEUR_ARCANE") && !w.TECHNIQUES_CLASSE.CLASSE_APPEL_LUMIERE);
+             && !(a(8).techniques || []).includes("CLASSE_BRISEUR_ARCANE"));
     const ba = w.TECHNIQUES_CLASSE.CLASSE_BOUCLIER_ANTIMAGIE, br = w.TECHNIQUES_CLASSE.CLASSE_BRISEUR_ARCANE;
     verifier("Bouclier anti-magie : init 200, aucune fatigue, sur soi, réserve 20 × 2",
              ba.Initiative === 200 && ba.Fatigue === 0 && ba.cible === "soi" && ba.niveau === 5
