@@ -68,11 +68,19 @@ await p.route('**res.cloudinary.com**', r => {
 const erreurs = []; p.on('pageerror', e => erreurs.push(e.message));
 await p.goto(base + '/index.html'); await p.waitForTimeout(1500);
 // --- LES FAUX SERVEURS D'IA ---------------------------------------------------
-const appels = { gemini: [], openai: [], cloudinary: [] };
+const appels = { gemini: [], openai: [], cloudinary: [], terrain: [] };
 let geminiEnPanne = 0, delaiDessin = 0, numeroVillage = 0, dessinB64 = null;
 const NOMS = ["Tharsys", "Ophyra", "Kalmène", "Drysos", "Phénarée", "Ilvane"];
 await p.route('**generativelanguage.googleapis.com/**', async r => {
-  appels.gemini.push(JSON.parse(r.request().postData() || "{}"));
+  const corpsGemini = JSON.parse(r.request().postData() || "{}");
+  // (v339) Avant d'inventer un village, MIA_TERRAIN lit la carte sous la pastille (une image
+  // jointe, pas d'instruction système) : on lui répond un terrain, sans compter un village.
+  if (!corpsGemini.systemInstruction) {
+    appels.terrain.push(corpsGemini);
+    return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ terrain: "forêt dense", sous_le_groupe: "Des fougères sous de grands chênes.", resume_mj: "Une forêt dense." }) }] } }] }) });
+  }
+  appels.gemini.push(corpsGemini);
   if (geminiEnPanne > 0) { geminiEnPanne--; return r.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"panne"}' }); }
   const nom = NOMS[numeroVillage++ % NOMS.length];
   const v = { nom, description: `Un village de Gobs, ${nom}, caché sous les frondaisons.`, securite: "Moyenne", peuple: "Gobs",

@@ -11118,3 +11118,4 @@ corrections_v344.mjs le vérifie :
 corrections_v339 accepte maintenant des versions plus récentes des fichiers.
 
 Test v337 remis d’aplomb (v344) : au chargement, le livre s’ouvre de lui-même sur la région du groupe, et emmenait parfois ailleurs la demande d’aller sur la première carte (2 échecs déjà sur la v343). Il redemande maintenant tant que la carte n’est pas ouverte, comme corrections_v331.
+Test v273 mis à jour (v344) : depuis v339, MIA_TERRAIN lit la carte avant chaque village (un appel Gemini sans instruction système, image jointe). Le faux Gemini lui répond un terrain, sans compter un village.
