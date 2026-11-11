@@ -1205,6 +1205,9 @@ window.poserMonstreSurTerrain = async function(monstre, tokensData, options) {
 window.ID_COMPAGNON = (idMaitre) => "COMPAGNON_" + idMaitre;
 window.donneesCompagnon = function(heros) {
     const c = (heros && heros.compagnon) || {};
+    // (v352) 25 PV, +5 aux niveaux 5 et 9 du Pisteur (compagnonPv) ; 17 % d'esquive.
+    const atout = typeof window.atoutRace === "function" ? (window.atoutRace(heros) || {}) : {};
+    const pv = 25 + (Number(atout.compagnonPv) || 0);
     return {
         ID_Partie: window.ID_PARTIE_COURANTE || heros.idPartie || "",
         ID_Joueur: "MJ",
@@ -1215,9 +1218,9 @@ window.donneesCompagnon = function(heros) {
         Nom_Personnage: "",
         Archetype: "Compagnon",
         Palier: "",
-        PV_Max: 25, PV_Actuels: 25,
+        PV_Max: pv, PV_Actuels: pv,
         Fatigue_Max: 100, Fatigue_Actuelle: 100,
-        Esquive: 15, Parade: 0, Critique: 0,
+        Esquive: 17, Parade: 0, Critique: 0,
         Def_Physique: 0, Def_Magique: 0,
         Regeneration: 0, Repos_Long: 0,
         Nombre_Actions: 1, XP_Groupe: 0,

@@ -596,7 +596,7 @@ const SCENES = {
                        CLASSE_ARRET_TEMPS: "⏳ Arrêt du temps",
                        CLASSE_RETOUR_ARRIERE: "⏪ Retour arrière",
                        CLASSE_FUREUR_SENTINELLE: "⚔️ Fureur de la sentinelle",
-                       CLASSE_TIR_PRECIS: "🎯 Tir précis",
+                       CLASSE_TIR_PRECIS: "🪢 Lancer de bolas",
                        CLASSE_MUR_DE_TERRE: "🪨 Mur de terre",
                        CLASSE_LIEN_DE_SANG: "🩸 Lien de sang" };
         return { geste: "message", pion: e.acteur, texte: noms[e.idCarte] || "Technique de classe",

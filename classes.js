@@ -126,17 +126,19 @@ window.DESCRIPTIFS_CLASSES = {
         paliers: [
             { niveau: 1, titre: "Compagnon animal",
               points: ["Une bête de votre choix (décrite à la création, pas plus grande qu'un cheval) combat à ses côtés",
-                       "25 PV · 15 % d'esquive · 6 dégâts bruts au contact · 3 cases par tour, sans fatigue",
-                       "Jouée par l'IA, juste après le Pisteur ; KO, elle revient au combat suivant",
-                       "+1 dégât à chaque attaque de ses compétences à arme à distance"] },
-            { niveau: 5, titre: "Technique : Tir précis",
-              points: ["Initiative 100 · aucune fatigue · un ennemi à 5 cases, en vue",
-                       "Immobilisé à coup sûr (aucune esquive) pendant 2 manches",
-                       "Une fois par combat"] },
-            { niveau: 10, titre: "Technique : Lien de sang",
+                       "25 PV · 17 % d'esquive · 7 dégâts physiques au contact · 3 cases par tour, sans fatigue",
+                       "Jouée par l'IA, juste après le Pisteur ; KO, elle revient au combat suivant"] },
+            { niveau: 3, titre: "Technique : Lancer de bolas",
+              points: ["Initiative 100 · aucune fatigue · un ennemi à 5 cases, en vue — sans arme à distance",
+                       "Immobilisé à coup sûr (aucune esquive) pendant 2 manches · une fois par combat",
+                       "Compagnon : +1 dégât"] },
+            { niveau: 5, titre: "Compagnon aguerri",
+              points: ["Compagnon : +5 PV et +1 dégât",
+                       "+2 PV à chaque soin que le Pisteur donne à son compagnon"] },
+            { niveau: 9, titre: "Technique : Lien de sang",
               points: ["Initiative 100 · aucune fatigue · son compagnon, au contact",
-                       "Le soigne entièrement — et le relève avec tous ses PV s'il est KO",
-                       "Une fois par combat"] }
+                       "Le soigne entièrement — et le relève avec tous ses PV s'il est KO · une fois par combat",
+                       "Compagnon : +5 PV et +1 dégât (35 PV, 10 dégâts en tout)"] }
         ]
     },
     CLASSE_GEOMANCIEN: {

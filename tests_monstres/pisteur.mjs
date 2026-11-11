@@ -39,7 +39,7 @@ const REGLES = {
     defPhysique: w.defPhysiqueCombattant, defMagique: w.defMagiqueCombattant,
     critique: w.critiqueCombattant, atouts: w.atoutRace, bonusEquip: w.bonusEquip
 };
-const XP = { 1: 0, 4: 1800, 5: 2500, 9: 6400, 10: 7900 };
+const XP = { 1: 0, 2: 700, 3: 1200, 4: 1800, 5: 2500, 8: 5200, 9: 6400, 10: 7900 };
 const fiche = (id, extra = {}) => ({
     idPersonnage: id, prenom: id, race: "Humain", classe: "", camp: id.startsWith("M") ? "Ennemi" : "Allié",
     estMonstre: id.startsWith("M"), joueur: "", xp: 0,
@@ -69,19 +69,25 @@ console.log("=========================================================");
 
 console.log("\n1. LES PALIERS");
 {
-    const a1 = w.atoutRace(pisteur(1)), a5 = w.atoutRace(pisteur(5)), a10 = w.atoutRace(pisteur(10));
-    verifier("niveau 1 : le compagnon, +1 aux tirs", a1.compagnon === true && a1.bonusDistance === 1 && !(a1.techniques || []).length,
+    // (v352, la refonte des classes : le Lancer de bolas au 3, le compagnon qui grandit, le Lien de sang au 9.)
+    const a1 = w.atoutRace(pisteur(1)), a2 = w.atoutRace(pisteur(2)), a3 = w.atoutRace(pisteur(3)), a5 = w.atoutRace(pisteur(5));
+    const a8 = w.atoutRace(pisteur(8)), a9 = w.atoutRace(pisteur(9)), a10 = w.atoutRace(pisteur(10));
+    verifier("niveau 1 : le compagnon (plus de +1 aux tirs)", a1.compagnon === true && !a1.bonusDistance && !(a1.techniques || []).length && !a1.compagnonDegats,
              JSON.stringify(a1));
-    verifier("niveau 5 : Tir précis", JSON.stringify(a5.techniques) === '["CLASSE_TIR_PRECIS"]');
-    verifier("niveau 10 : Lien de sang (et toujours +1, pas +3)", JSON.stringify(a10.techniques) === '["CLASSE_TIR_PRECIS","CLASSE_LIEN_DE_SANG"]'
-             && a10.bonusDistance === 1);
+    verifier("niveau 3 : le Lancer de bolas, compagnon +1 dégât (pas au 2)", JSON.stringify(a3.techniques) === '["CLASSE_TIR_PRECIS"]' && a3.compagnonDegats === 1
+             && !(a2.techniques || []).length);
+    verifier("niveau 5 : compagnon +5 PV, +2 dégâts en tout, +2 soins sur lui", a5.compagnonPv === 5 && a5.compagnonDegats === 2 && a5.soinCompagnon === 2);
+    verifier("niveau 9 : Lien de sang, compagnon +10 PV et +3 dégâts (pas au 8)", JSON.stringify(a9.techniques) === '["CLASSE_TIR_PRECIS","CLASSE_LIEN_DE_SANG"]'
+             && a9.compagnonPv === 10 && a9.compagnonDegats === 3 && JSON.stringify(a8.techniques) === '["CLASSE_TIR_PRECIS"]');
+    verifier("niveau 10 : les mêmes (la classe s'arrête au 9)", JSON.stringify(a10) === JSON.stringify(a9) && !a10.bonusDistance);
     const tir = w.TECHNIQUES_CLASSE.CLASSE_TIR_PRECIS, lien = w.TECHNIQUES_CLASSE.CLASSE_LIEN_DE_SANG;
-    verifier("Tir précis : init 100, 0 fatigue, un ennemi à 5 cases, en vue", tir.Initiative === 100 && tir.Fatigue === 0
-             && tir.cible === "ennemi" && tir.portee === 5 && tir.ligneDeVue === true);
+    verifier("Lancer de bolas (ex-Tir précis) : niveau 3, init 100, 0 fatigue, un ennemi à 5 cases, en vue", tir.Nom === "Lancer de bolas" && tir.niveau === 3
+             && tir.Initiative === 100 && tir.Fatigue === 0 && tir.cible === "ennemi" && tir.portee === 5 && tir.ligneDeVue === true);
     verifier("Lien de sang : init 100, 0 fatigue, son compagnon", lien.Initiative === 100 && lien.Fatigue === 0 && lien.cible === "compagnon");
-    verifier("écrit en clair", /compagnon/.test(w.texteAtout("compagnon", true)) && /\+1 dégât/.test(w.texteAtout("bonusDistance", 1)));
-    verifier("le compagnon : 25 PV, 15 % d'esquive, 6 dégâts, 3 cases", COMPAGNON.pv === 25 && COMPAGNON.esquive === 15
-             && COMPAGNON.degats === 6 && COMPAGNON.pas === 3);
+    verifier("écrit en clair", /17 % d'esquive, 7 dégâts physiques/.test(w.texteAtout("compagnon", true)) && /\+1 dégât/.test(w.texteAtout("compagnonDegats", 1))
+             && /\+5 PV/.test(w.texteAtout("compagnonPv", 5)) && /\+2 PV à chaque soin/.test(w.texteAtout("soinCompagnon", 2)));
+    verifier("le compagnon : 25 PV, 17 % d'esquive, 7 dégâts, 3 cases", COMPAGNON.pv === 25 && COMPAGNON.esquive === 17
+             && COMPAGNON.degats === 7 && COMPAGNON.pas === 3);
 }
 
 console.log("\n2. LE COMPAGNON EN COMBAT");
@@ -134,12 +140,13 @@ console.log("\n4. SON TOUR : 3 CASES SANS FATIGUE, PUIS 6 DÉGÂTS BRUTS");
              && p1.etat.file[0].id === "M1");
     const proche = tourDe({ q: 4, r: 0 }, { physique: 60 });
     const p2 = jouerCompagnon(proche, "C");
-    verifier("ennemi à 4 cases : 3 pas, puis 6 dégâts — bruts, l'armure (60 %) n'y fait rien",
-             p2.etat.combattants.C.q === 3 && p2.etat.combattants.M1.pv === 94, `${p2.etat.combattants.C.q} ${p2.etat.combattants.M1.pv}`);
+    // (v352) 7 dégâts PHYSIQUES : l'armure (60 %) les réduit (7 → 3).
+    verifier("ennemi à 4 cases : 3 pas, puis 7 dégâts physiques — l'armure (60 %) les réduit à 3",
+             p2.etat.combattants.C.q === 3 && p2.etat.combattants.M1.pv === 97, `${p2.etat.combattants.C.q} ${p2.etat.combattants.M1.pv}`);
     const rejoue = appliquerEntree(proche, p2.entree).combattants;
-    verifier("rejoué depuis le journal", rejoue.M1.pv === 94 && rejoue.C.q === 3);
+    verifier("rejoué depuis le journal", rejoue.M1.pv === 97 && rejoue.C.q === 3);
     const auto = prochainPas(tourDe({ q: 1, r: 0 }), [], {});
-    verifier("le cerveau le joue tout seul, sans carte", auto && auto.creature === "C" && auto.etat.combattants.M1.pv === 94);
+    verifier("le cerveau le joue tout seul, sans carte (7, son maître niveau 1)", auto && auto.creature === "C" && auto.etat.combattants.M1.pv === 93);
     const esquive = tourDe({ q: 1, r: 0 }, { esquive: 100 });
     verifier("la cible peut l'esquiver", jouerCompagnon(esquive, "C").etat.combattants.M1.pv === 100);
     // Les ennemis le visent comme n'importe qui.
@@ -182,13 +189,13 @@ console.log("\n6. NIVEAU 5 : TIR PRÉCIS");
              && pas.etat.file[0].id === "M1");
     verifier("rejoué depuis le journal", aLEtat(appliquerEntree(e, pas.entree).combattants.M1, "Immobilisation"));
     const scene = misEnScene(pas.entree.etapes.find(x => x.type === "techniqueClasse"), pas.etat);
-    verifier("à l'écran : « 🎯 Tir précis »", scene && /Tir précis/.test(scene.texte));
+    verifier("à l'écran : « 🪢 Lancer de bolas »", scene && /Lancer de bolas/.test(scene.texte));
     verifier("à 6 cases : refusé", tir(5, "M1", null, { M1: { q: 6, r: 0 } }).pas.refus === true);
     verifier("un allié : refusé", tir(5, "H").pas.refus === true);
     const mur = { etatCase: (q, r) => ({ bloquee: q === 2 && r === 0, supprimee: false, difficile: false }) };
     const cache = tir(5, "M1", mur);
     verifier("derrière un mur : refusé (pas de ligne de vue)", cache.pas.refus === true && /ligne de vue/.test(cache.pas.raison), cache.pas.raison);
-    verifier("niveau 4 : il ne l'a pas", tir(4, "M1").pas.refus === true);
+    verifier("niveau 3 : il l'a ; niveau 2 : il ne l'a pas", tir(3, "M1").pas.refus !== true && tir(2, "M1").pas.refus === true);
     // v260 : plus d'immunité — qui RÉSISTE à l'Immobilisation a un dé du cerveau, à 75 %.
     const immunise = monde(5); immunise.combattants.M1.atouts.resistances = ["Immobilisation"];
     immunise.file = [{ id: "P", carte: "CLASSE_TIR_PRECIS", initiative: 100, pas: 0 }];
@@ -225,13 +232,13 @@ console.log("\n7. NIVEAU 10 : LIEN DE SANG");
     verifier("indemne : refusé (pas gâché)", lien(10, () => {}).pas.refus === true);
     const loin = lien(10, e => { e.combattants.C.pv = 4; }, { C: { q: 0, r: 3 } });
     verifier("pas au contact : refusé", loin.pas.refus === true && /contact/.test(loin.pas.raison), loin.pas.raison);
-    verifier("niveau 9 : il ne l'a pas", lien(9, e => { e.combattants.C.pv = 4; }).pas.refus === true);
+    verifier("niveau 8 : il ne l'a pas", lien(8, e => { e.combattants.C.pv = 4; }).pas.refus === true);
     verifier("à l'écran : « 🩸 Lien de sang »", /Lien de sang/.test(misEnScene(blesse.pas.entree.etapes.find(x => x.type === "techniqueClasse"), blesse.pas.etat).texte));
     // Le Pisteur à terre : son compagnon se bat toujours.
     const seul = monde(1, { M1: { q: 0, r: 2 } }); seul.combattants.P.aTerre = true; seul.combattants.P.pv = 0;
     seul.file = [{ id: "C", carte: "COMPAGNON_ATTAQUE", initiative: 0, pas: 0 }];
     const ps = prochainPas(seul, [], {});
-    verifier("le Pisteur tombé, son compagnon se bat encore", ps && ps.creature === "C" && ps.etat.combattants.M1.pv === 94);
+    verifier("le Pisteur tombé, son compagnon se bat encore", ps && ps.creature === "C" && ps.etat.combattants.M1.pv === 93);
 }
 
 // =========================================================================
@@ -312,7 +319,8 @@ console.log("\n8. +1 DÉGÂT À CHAQUE ATTAQUE D'UNE COMPÉTENCE À ARME À DIST
     return { distance: essai("Pisteur", "Arme légère Distance"), cac: essai("Pisteur", "Arme légère CAC"),
              autre: essai("Sentinelle", "Arme légère Distance") };
   });
-  verifier("Pisteur, arme à distance : 5 → 6, 3 → 4 (le soin ne bouge pas)", JSON.stringify(r.distance) === "[6,4,4]", JSON.stringify(r.distance));
+  // (v352 : le +1 aux compétences à distance n'est plus.)
+  verifier("Pisteur, arme à distance : plus de +1 (v352)", JSON.stringify(r.distance) === "[5,3,4]", JSON.stringify(r.distance));
   verifier("Pisteur, arme de corps à corps : rien", JSON.stringify(r.cac) === "[5,3,4]", JSON.stringify(r.cac));
   verifier("une autre classe, arme à distance : rien", JSON.stringify(r.autre) === "[5,3,4]", JSON.stringify(r.autre));
 }
@@ -335,9 +343,9 @@ console.log("\n9. LA CRÉATION : SON NOM, SON ALLURE");
              niveaux: [...d.querySelectorAll(".palier-classe-niveau")].map(x => x.textContent.trim()) };
   });
   await p.screenshot({ path: "/tmp/claude-0/pisteur_classe.png" });
-  verifier("fiche de classe : Niv. 1 / 5 / 10, compagnon 25 PV, Tir précis, Lien de sang",
-           JSON.stringify(fiche.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]' && /25 PV/.test(fiche.texte) && /15 % d'esquive/.test(fiche.texte)
-           && /Tir précis/.test(fiche.texte) && /Lien de sang/.test(fiche.texte) && /cheval/.test(fiche.texte));
+  verifier("fiche de classe : Niv. 1 / 3 / 5 / 9, compagnon 25 PV, Lancer de bolas, Lien de sang",
+           JSON.stringify(fiche.niveaux) === '["Niv. 1","Niv. 3","Niv. 5","Niv. 9"]' && /25 PV/.test(fiche.texte) && /17 % d'esquive/.test(fiche.texte)
+           && /Lancer de bolas/.test(fiche.texte) && /Lien de sang/.test(fiche.texte) && /cheval/.test(fiche.texte), JSON.stringify(fiche.niveaux));
   verifier("pour une héroïne : « Pisteuse »", fiche.titre === "Pisteuse", fiche.titre);
   const r = await p.evaluate(() => {
     window.validerClasse();
@@ -457,9 +465,9 @@ console.log("\n12. AU COMBAT : IL APPARAÎT AVEC LES HÉROS, AVEC SON PION");
              src: img && img.getAttribute("src"), classe: document.getElementById("token-COMPAGNON_H1")?.classList.contains("token-compagnon"),
              seulGagne, gagne, xp };
   });
-  verifier("un document Monstres COMPAGNON_<héros> : son camp, 25 PV, 15 % d'esquive, parade 0",
+  verifier("un document Monstres COMPAGNON_<héros> : son camp, 25 PV, 17 % d'esquive, parade 0",
            r.doc && r.doc.Camp === "Allié" && r.doc.Compagnon_De === "H1" && r.doc.PV_Max === 25 && r.doc.PV_Actuels === 25
-           && r.doc.Esquive === 15 && r.doc.Parade === 0 && r.doc.Def_Physique === 0 && r.doc.Prenom_Personnage === "Croc-Gris",
+           && r.doc.Esquive === 17 && r.doc.Parade === 0 && r.doc.Def_Physique === 0 && r.doc.Prenom_Personnage === "Croc-Gris",
            JSON.stringify(r.doc || {}).slice(0, 140));
   verifier("posé au contact de son maître, enregistré avec les héros", r.adjacent === 1 && r.enregistres.includes("COMPAGNON_H1")
            && r.enregistres.includes("H1"), `${r.adjacent} ${JSON.stringify(r.enregistres)}`);
@@ -526,7 +534,7 @@ console.log("\n13. LE TIR PRÉCIS SE VISE SUR LE PLATEAU, COMME UN TIR ORDINAIRE
   verifier("validé : la cible part au cerveau comme technique de classe, le ciblage se ferme",
            r.ferme && r.demandes.length === 1 && JSON.stringify(r.demandes[0]) === '["P","CLASSE_TIR_PRECIS","M1",null]',
            JSON.stringify(r.demandes));
-  verifier("validé sans cible : on le dit, rien ne part", r.demandes.length === 1 && /Tir précis/.test(r.alertes[0] || "") && r.resteOuvert,
+  verifier("validé sans cible : on le dit, rien ne part", r.demandes.length === 1 && /Lancer de bolas/.test(r.alertes[0] || "") && r.resteOuvert,
            JSON.stringify(r.alertes));
 }
 

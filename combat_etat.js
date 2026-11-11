@@ -196,6 +196,9 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         // Le Médicus : des points de régénération de fatigue en plus, à chaque
         // fin de manche (regenererFinDeManche, cerveau_combat.js).
         regenFatigue: nombre(race.regenFatigue),
+        // (v352) Le Pisteur : les dégâts de son compagnon, et ses soins sur lui.
+        compagnonDegats: nombre(race.compagnonDegats),
+        soinCompagnon: nombre(race.soinCompagnon),
         // Le Chasseur de mages, niveau 10 : la chance qu'un sort de lumière
         // aveugle sa cible et les ennemis qui la touchent (tirerDesCarte).
         lumiereAveugle: nombre(race.lumiereAveugle),
@@ -621,7 +624,9 @@ export function frapperMurs(etat, coups, idActeur, critique) {
 // armure ; l'esquive et la parade comptent). Mêmes chiffres à tous les
 // niveaux. KO, il reste à terre jusqu'à la fin du combat (sauf Lien de sang)
 // et revient plein au combat suivant (un nouveau document, monstres.js).
-export const COMPAGNON = { pv: 25, esquive: 15, degats: 6, pas: 3 };
+// (v352) 25 PV, 17 % d'esquive, 7 dégâts PHYSIQUES (bruts jusqu'à la v351) ;
+// le Pisteur lui ajoute des dégâts (compagnonDegats) et des PV (compagnonPv).
+export const COMPAGNON = { pv: 25, esquive: 17, degats: 7, pas: 3 };
 
 // Le compagnon de ce maître, s'il en a un dans ce combat.
 export function compagnonDe(etat, idMaitre) {

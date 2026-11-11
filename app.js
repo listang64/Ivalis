@@ -1024,10 +1024,18 @@ window.ATOUTS_CLASSES = {
     // cerveau_combat.js), et +1 dégât à chaque attaque de ses compétences à
     // arme à distance (bonusDistance, appliquerEquipementALaCarte) ; le Tir
     // précis au niveau 5, le Lien de sang au niveau 10.
+    // v352, la refonte des classes (Nico) : le compagnon a 25 PV, 17 %
+    // d'esquive et frappe 7 dégâts PHYSIQUES (COMPAGNON, combat_etat.js) ; le
+    // Tir précis devient le Lancer de bolas, au niveau 3 ; le compagnon gagne
+    // +1 dégât aux niveaux 3, 5 et 9 (compagnonDegats) et +5 PV aux niveaux 5
+    // et 9 (compagnonPv, donneesCompagnon) ; au niveau 5, +2 à chaque soin que
+    // le Pisteur donne à son compagnon (soinCompagnon) ; le Lien de sang au
+    // niveau 9. Le +1 aux compétences à distance n'est plus.
     "Pisteur": [
-        { niveau: 1,  compagnon: true, bonusDistance: 1 },
-        { niveau: 5,  techniques: ["CLASSE_TIR_PRECIS"] },
-        { niveau: 10, techniques: ["CLASSE_LIEN_DE_SANG"] }
+        { niveau: 1,  compagnon: true },
+        { niveau: 3,  techniques: ["CLASSE_TIR_PRECIS"], compagnonDegats: 1 },
+        { niveau: 5,  compagnonPv: 5, soinCompagnon: 2, compagnonDegats: 1 },
+        { niveau: 9,  techniques: ["CLASSE_LIEN_DE_SANG"], compagnonPv: 5, compagnonDegats: 1 }
     ],
     // LE GÉOMANCIEN : dans la Forge, la 5e case de zone payante d'une
     // compétence ne coûte rien (zoneGratuite, casesZonePayantes), et ses
@@ -1223,14 +1231,15 @@ window.TECHNIQUES_CLASSE = {
             + "10 PV, infranchissable, coupe la ligne de vue. Qui s'y tient est repoussé à côté et prend "
             + "3 dégâts physiques (6, et pas de mur, s'il n'a nulle part où aller). Cassé, il laisse des gravats."
     },
+    // (v352) Le Tir précis devient le Lancer de bolas (même effet ; l'id reste).
     CLASSE_TIR_PRECIS: {
-        Nom: "Tir précis", classe: "Pisteur", niveau: 5, Initiative: 100, Fatigue: 0, cible: "ennemi", portee: 5,
+        Nom: "Lancer de bolas", classe: "Pisteur", niveau: 3, Initiative: 100, Fatigue: 0, cible: "ennemi", portee: 5,
         ligneDeVue: true,
         desc: "Un ennemi à 5 cases, en vue, est immobilisé à coup sûr (aucune esquive) pour 2 manches. "
-            + "Une fois par combat."
+            + "Aucune arme à distance n'est nécessaire. Une fois par combat."
     },
     CLASSE_LIEN_DE_SANG: {
-        Nom: "Lien de sang", classe: "Pisteur", niveau: 10, Initiative: 100, Fatigue: 0, cible: "compagnon",
+        Nom: "Lien de sang", classe: "Pisteur", niveau: 9, Initiative: 100, Fatigue: 0, cible: "compagnon",
         desc: "Soigne entièrement son compagnon au contact — et le relève avec tous ses PV s'il est KO. "
             + "Une fois par combat."
     },
@@ -1630,8 +1639,11 @@ window.texteAtout = function(cle, valeur) {
         case "etatsRaccourcis": return `États néfastes subis : −${n} tour`;
         case "initiative":     return `${plus(n)} d'initiative sur ses compétences`;
         case "diviseurEtalement": return `Forge : la fatigue des dégâts et soins étalés est divisée par ${String(n).replace(".", ",")} (au lieu de 1,3)`;
-        case "compagnon":      return "Un compagnon animal combat à ses côtés : 25 PV, 15 % d'esquive, 6 dégâts bruts, 3 cases, joue juste après lui";
+        case "compagnon":      return "Un compagnon animal combat à ses côtés : 25 PV, 17 % d'esquive, 7 dégâts physiques, 3 cases, joue juste après lui";
         case "bonusDistance":  return `${plus(n)} dégât à chaque attaque de ses compétences à arme à distance`;
+        case "compagnonDegats": return `Compagnon : ${plus(n)} dégât${Math.abs(n) > 1 ? "s" : ""}`;
+        case "compagnonPv":    return `Compagnon : ${plus(n)} PV`;
+        case "soinCompagnon":  return `${plus(n)} PV à chaque soin qu'il donne à son compagnon`;
         case "zoneGratuite":   return "Forge : la 5e case de zone payante d'une compétence ne coûte rien";
         case "initiativeZone": return `${plus(n)} d'initiative sur ses compétences à zone`;
         case "zonesInoffensives": return "Ses zones ne lui infligent aucun dégât";

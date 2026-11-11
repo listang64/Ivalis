@@ -330,14 +330,14 @@ export function validerIntention(etat, intention, plateau) {
                 return refus("Arrêt du temps : l'initiative va de 0 à 199");
             }
         }
-        // Le Tir précis (Pisteur) : un ennemi debout, à 5 cases au plus, en
+        // Le Tir précis — le Lancer de bolas depuis la v352 (Pisteur) : un ennemi debout, à 5 cases au plus, en
         // vue (le plateau tranche quand on l'a).
         if (idCarte === "CLASSE_TIR_PRECIS") {
             const ennemi = combattant(etat, intention.cible);
-            if (!ennemi) return refus("Tir précis sans cible");
-            if (ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) return refus("Tir précis : ennemi invalide");
-            if (distance(acteur, ennemi) > 5) return refus("Tir précis : l'ennemi doit être à 5 cases au plus");
-            if (plateau && !ligneDeVue(plateau, acteur, ennemi)) return refus("Tir précis : pas de ligne de vue");
+            if (!ennemi) return refus("Lancer de bolas sans cible");
+            if (ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) return refus("Lancer de bolas : ennemi invalide");
+            if (distance(acteur, ennemi) > 5) return refus("Lancer de bolas : l'ennemi doit être à 5 cases au plus");
+            if (plateau && !ligneDeVue(plateau, acteur, ennemi)) return refus("Lancer de bolas : pas de ligne de vue");
         }
         // Le Lien de sang (Pisteur) : son compagnon, au contact, blessé ou KO —
         // indemne, la technique est refusée (pas gâchée).
@@ -1683,7 +1683,9 @@ function murAFrapper(etat, id, carte, plateau) {
 // contact sinon.
 const MORSURE_ZOMBIE = { pas: ZOMBIE.pas, degats: ZOMBIE.degats, brut: false, idCarte: "ZOMBIE_MORSURE",
                          nom: "Morsure", quoi: "zombie" };
-const ATTAQUE_COMPAGNON = { pas: COMPAGNON.pas, degats: COMPAGNON.degats, brut: true, idCarte: "COMPAGNON_ATTAQUE",
+// (v352) Des dégâts PHYSIQUES (l'armure réduit), plus ceux que son maître lui
+// donne (compagnonDegats : +1 aux niveaux 3, 5 et 9).
+const ATTAQUE_COMPAGNON = { pas: COMPAGNON.pas, degats: COMPAGNON.degats, idCarte: "COMPAGNON_ATTAQUE",
                             nom: "Attaque du compagnon", quoi: "compagnon" };
 function jouerServiteur(etat, id, plateau, regle) {
     const des = creerDes(etat.graine);
@@ -1740,7 +1742,12 @@ function jouerServiteur(etat, id, plateau, regle) {
 }
 export function jouerZombie(etat, id, plateau) { return jouerServiteur(etat, id, plateau, MORSURE_ZOMBIE); }
 // LE COMPAGNON DU PISTEUR : 3 cases, 6 dégâts bruts au contact.
-export function jouerCompagnon(etat, id, plateau) { return jouerServiteur(etat, id, plateau, ATTAQUE_COMPAGNON); }
+export function jouerCompagnon(etat, id, plateau) {
+    const bete = combattant(etat, id);
+    const maitre = bete && bete.compagnon ? combattant(etat, bete.compagnon.idMaitre) : null;
+    const enPlus = nombre(maitre && maitre.atouts && maitre.atouts.compagnonDegats);
+    return jouerServiteur(etat, id, plateau, { ...ATTAQUE_COMPAGNON, degats: ATTAQUE_COMPAGNON.degats + enPlus });
+}
 
 // =========================================================================
 //  7. QUE FAIRE MAINTENANT ?

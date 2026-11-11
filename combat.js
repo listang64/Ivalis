@@ -6061,7 +6061,7 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
     const echapper = (v) => String(v || "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
     // Personne à relever : la Prise en charge ne part pas, elle n'est pas
     // consommée — elle resservira une autre manche.
-    const titre = tirer ? "🎯 Tir précis" : charmer ? "🌀 Charme fratricide" : echanger ? "🔄 Transfert"
+    const titre = tirer ? "🪢 Lancer de bolas" : charmer ? "🌀 Charme fratricide" : echanger ? "🔄 Transfert"
         : mordre ? "🩸 Baiser du vampire" : relever ? "✚ Prise en charge" : "🛡️ Rempart";
     const question = tirer ? "Quel ennemi immobiliser pendant 2 manches ?"
         : charmer ? "Quel ennemi charmer ? Sa prochaine technique frappera un de ses alliés."

@@ -11260,3 +11260,23 @@ geomancien.mjs est mis à jour (Mur au niveau 3, zones prolongées au niveau 9).
 corrections_v351.mjs le vérifie : les paliers, les deux réserves (lancement, blocage, consommation, réanimé presque vide, à court), le refus à 19, « Relâcher » ignoré, le Soin d'urgence à 12, le volet sans bouton.
 
 medicus.mjs est mis à jour (paliers, 40 %, la réserve du réanimé).
+
+## v352 — La refonte des classes : le Pisteur
+
+- Nico (sa fiche du Pisteur) :
+  - niveau 1 : un compagnon indépendant de 25 PV, 17 % d'esquive, qui fait 7 dégâts physiques ;
+  - niveau 3 : Lancer de bolas, +1 dégât pour le compagnon ;
+  - niveau 5 : +5 PV et +1 dégât pour le compagnon, +2 soins quand le joueur soigne son compagnon ;
+  - niveau 9 : Lien de sang, +5 PV et +1 dégât pour le compagnon.
+  - Lancer de bolas : un ennemi à portée 5 est immobilisé, init 100, sans arme à distance.
+- Ses réponses : les bolas remplacent le Tir précis (même effet ; l'id CLASSE_TIR_PRECIS reste) ; les dégâts deviennent physiques ; le +1 aux compétences à distance disparaît ; les +2 ne valent que pour les soins du Pisteur sur SON compagnon.
+- combat_etat.js : COMPAGNON passe à 25 PV, 17 % d'esquive et 7 dégâts.
+- cerveau_combat.js (jouerCompagnon) :
+  - l'attaque n'est plus brute ;
+  - elle ajoute compagnonDegats, l'atout du maître : +1 aux niveaux 3, 5 et 9, soit 7, 8, 9, puis 10.
+- monstres.js (donneesCompagnon) : les PV du compagnon suivent compagnonPv (+5 aux niveaux 5 et 9 : 25, 30, puis 35) ; esquive 17 %.
+- moteur_pur.js (resoudreCarte) : un soin du Pisteur sur son compagnon prend soinCompagnon (+2 au niveau 5).
+
+corrections_v352.mjs le vérifie : les dégâts par niveau, l'armure qui les réduit, les +2 soins (et pas ailleurs), le document du compagnon (PV et esquive par niveau), les textes.
+
+pisteur.mjs est mis à jour.

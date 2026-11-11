@@ -2089,7 +2089,7 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
         // un dé du cerveau, à 75 %).
         const ennemi = combattant(suivant, action.cible);
         if (ennemi && !ennemi.aTerre) {
-            etapes.push({ type: "message", cible: ennemi.id, acteur: id, texte: "🎯 Tir précis !", couleur: "#e8c46a" });
+            etapes.push({ type: "message", cible: ennemi.id, acteur: id, texte: "🪢 Lancer de bolas !", couleur: "#e8c46a" });
             if (resisteA(ennemi, ETAT_IMMOBILISATION) && (action.prisMalgreResistance || {})[ennemi.id] !== true) {
                 etapes.push({ type: "etatRate", cible: ennemi.id, acteur: id, nom: ETAT_IMMOBILISATION, etat: ETAT_IMMOBILISATION, resiste: true });
             } else {
@@ -2126,7 +2126,7 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
     return { etat: suivant, etapes };
 }
 
-// LE PISTEUR. Tir précis (niveau 5) : Immobilisation sûre, 2 manches.
+// LE PISTEUR. Tir précis — le Lancer de bolas (niveau 3, v352) : Immobilisation sûre, 2 manches.
 export const ETAT_IMMOBILISATION = "Immobilisation";
 export const MANCHES_TIR_PRECIS = 2;
 export const DESC_IMMOBILISATION = "Ne peut plus se déplacer volontairement, gagne 20 fatigue par tour immobilisé.";
@@ -2447,6 +2447,10 @@ export function resoudreCarte(etat, action, plateau) {
                 const avant = cible.pv;
                 // (Un soin étalé ne critique pas, v260.)
                 let soin = Math.max(0, appliquerBonusMonstre(attaque.valeurBrute, bonusMonstre)) * (critique && !attaque.estEtalement ? 2 : 1);
+                // (v352) Le Pisteur de niveau 5 qui soigne SON compagnon : +2.
+                if (cible.compagnon && cible.compagnon.idMaitre === idLanceur && soin > 0) {
+                    soin += nombre(lanceur && lanceur.atouts && lanceur.atouts.soinCompagnon);
+                }
                 // CE QUE LA CIBLE FAIT DU SOIN QU'ELLE REÇOIT. L'Éthéré en tire
                 // trente pour cent de plus ; une plaie qui brûle en perd la
                 // moitié. Ces deux règles ne vivaient que dans l'ancien moteur :
