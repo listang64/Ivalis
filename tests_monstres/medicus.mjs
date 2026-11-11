@@ -35,7 +35,7 @@ const REGLES = {
     defPhysique: w.defPhysiqueCombattant, defMagique: w.defMagiqueCombattant,
     critique: w.critiqueCombattant, atouts: w.atoutRace, bonusEquip: w.bonusEquip
 };
-const XP = { 1: 0, 4: 1800, 5: 2500, 9: 6400, 10: 7900 };
+const XP = { 1: 0, 2: 700, 3: 1200, 4: 1800, 5: 2500, 8: 5200, 9: 6400, 10: 7900 };
 
 const fiche = (id, extra = {}) => ({
     idPersonnage: id, prenom: id, race: "Humain", classe: "", camp: id.startsWith("M") ? "Ennemi" : "Allié",
@@ -76,6 +76,13 @@ console.log("\n1. NIVEAU 1 : +5 DE RÉGÉNÉRATION DE FATIGUE, +1 COMPÉTENCE");
     verifier("niveau 5 : Soin d'urgence", JSON.stringify(a5.techniques) === '["CLASSE_SOIN_URGENCE"]');
     verifier("niveau 10 : et la Prise en charge",
              JSON.stringify(a10.techniques) === '["CLASSE_SOIN_URGENCE","CLASSE_PRISE_EN_CHARGE"]' && a10.regenFatigue === 5);
+    // (v351, la refonte des classes : niveau 3 +1 soin et +5 % d'esquive ; niveau 5 +1 soin ; Prise en charge au 9.)
+    const a2 = w.atoutRace(medicus(2)), a3 = w.atoutRace(medicus(3)), a4 = w.atoutRace(medicus(4)), a9 = w.atoutRace(medicus(9)), a8 = w.atoutRace(medicus(8));
+    verifier("niveau 3 : +2 aux soins et +5 % d'esquive (pas au 2)", a3.bonusSoin === 2 && a3.esquive === 5 && a2.bonusSoin === 1 && !a2.esquive);
+    verifier("niveau 5 : +3 aux soins ; niveau 4 : +2", a5.bonusSoin === 3 && a4.bonusSoin === 2);
+    verifier("niveau 9 : la Prise en charge (pas au 8)", JSON.stringify(a9.techniques) === '["CLASSE_SOIN_URGENCE","CLASSE_PRISE_EN_CHARGE"]'
+             && JSON.stringify(a8.techniques) === '["CLASSE_SOIN_URGENCE"]');
+    verifier("l'esquive de la fiche monte de 5 au niveau 3", w.esquiveCombattant(medicus(3)) === w.esquiveCombattant(fiche("X")) + 5);
     verifier("la fiche annonce 40 % de régénération (35 + 5)", w.regenerationCombattant(medicus(1)) === 40
              && w.regenerationCombattant(fiche("X")) === 35, String(w.regenerationCombattant(medicus(1))));
     // (Des Ondaris : l'Humain a sa propre compétence en plus depuis la v237.)
@@ -87,9 +94,9 @@ console.log("\n1. NIVEAU 1 : +5 DE RÉGÉNÉRATION DE FATIGUE, +1 COMPÉTENCE");
     // (Un Humain a 110 d'énergie : 40 % → 44, 35 % → 38.)
     verifier("en fin de manche : 40 % pour lui, 35 % pour un autre", e.combattants.D.fatigue === 94 && e.combattants.B.fatigue === 88,
              `${e.combattants.D.fatigue} / ${e.combattants.B.fatigue}`);
-    verifier("les cartes : Soin d'urgence init 70, Prise en charge init 0, fatigue 0",
+    verifier("les cartes : Soin d'urgence init 70 (fatigue 0), Prise en charge init 0 (réserve 20 au lancement)",
              w.carteTechniqueClasse("CLASSE_SOIN_URGENCE").Initiative === 70 && w.carteTechniqueClasse("CLASSE_PRISE_EN_CHARGE").Initiative === 0
-             && w.carteTechniqueClasse("CLASSE_SOIN_URGENCE").Fatigue === 0 && w.carteTechniqueClasse("CLASSE_PRISE_EN_CHARGE").Fatigue === 0);
+             && w.carteTechniqueClasse("CLASSE_SOIN_URGENCE").Fatigue === 0 && w.carteTechniqueClasse("CLASSE_PRISE_EN_CHARGE").Fatigue === 20);
     verifier("estDeLaClasse lit « Medicus » sans accent", w.estDeLaClasse({ classe: "Medicus" }, "Médicus") && !w.estDeLaClasse({ classe: "Hoplite" }, "Médicus"));
 }
 
@@ -133,25 +140,26 @@ console.log("\n3. PRISE EN CHARGE : RELEVER UN ALLIÉ KO ADJACENT, REPOUSSER LES
     verifier("sans cible : refusé", !ok(undefined).ok);
     const loin = enTete(monde(10, { A: { q: 3, r: -2 } }), "CLASSE_PRISE_EN_CHARGE");
     verifier("un allié KO trop loin : refusé", !validerIntention(loin, intention("CLASSE_PRISE_EN_CHARGE", "A")).ok);
-    verifier("niveau 9 : il ne l'a pas", !validerIntention(enTete(monde(9), "CLASSE_PRISE_EN_CHARGE"), intention("CLASSE_PRISE_EN_CHARGE", "A")).ok);
+    verifier("niveau 8 : il ne l'a pas", !validerIntention(enTete(monde(8), "CLASSE_PRISE_EN_CHARGE"), intention("CLASSE_PRISE_EN_CHARGE", "A")).ok);
 
     e.combattants.A.etats = [{ nom: "Empoisonnement", duree: 2 }];
     const pas = appliquerIntention(e, intention("CLASSE_PRISE_EN_CHARGE", "A"));
     const c = pas.etat.combattants;
-    verifier("A se relève avec 30 PV (30 % de 100), sur sa case", !c.A.aTerre && c.A.pv === 30 && c.A.q === 1 && c.A.r === 0,
+    verifier("A se relève avec 40 PV (40 % de 100, v351), sur sa case", !c.A.aTerre && c.A.pv === 40 && c.A.q === 1 && c.A.r === 0,
              JSON.stringify({ pv: c.A.pv, q: c.A.q, r: c.A.r }));
-    verifier("ses états sont effacés", c.A.etats.length === 0);
+    verifier("ses états sont effacés (il ne garde que la réserve de la Prise en charge, v351)",
+             c.A.etats.length === 1 && c.A.etats[0].maintien === "CLASSE_PRISE_EN_CHARGE", JSON.stringify(c.A.etats));
     verifier("M1 recule d'une case, à l'opposé de A (2,0 → 3,0)", c.M1.q === 3 && c.M1.r === 0, `${c.M1.q},${c.M1.r}`);
     verifier("M2 recule aussi (1,1 → 1,2)", c.M2.q === 1 && c.M2.r === 2, `${c.M2.q},${c.M2.r}`);
     verifier("M3, loin, ne bouge pas", c.M3.q === 6 && c.M3.r === -3);
     verifier("technique utilisée, tour clos", c.D.techniquesUtilisees.includes("CLASSE_PRISE_EN_CHARGE") && pas.etat.file[0].id === "M3");
     verifier("l'état reste cohérent", verifierEtatCombat(pas.etat).length === 0, verifierEtatCombat(pas.etat).join(" | "));
     const rejoue = appliquerEntree(e, pas.entree).combattants;
-    verifier("rejoué depuis le journal : debout, 30 PV, ennemis repoussés",
-             !rejoue.A.aTerre && rejoue.A.pv === 30 && rejoue.A.etats.length === 0 && rejoue.M1.q === 3 && rejoue.M2.r === 2);
+    verifier("rejoué depuis le journal : debout, 40 PV, ennemis repoussés",
+             !rejoue.A.aTerre && rejoue.A.pv === 40 && rejoue.A.etats.length === 1 && rejoue.M1.q === 3 && rejoue.M2.r === 2);
 
     const impair = enTete(monde(10, {}, { A: { PV_Max: 45 } }), "CLASSE_PRISE_EN_CHARGE");
-    verifier("30 % arrondi au-dessus (45 → 14)", appliquerIntention(impair, intention("CLASSE_PRISE_EN_CHARGE", "A")).etat.combattants.A.pv === 14);
+    verifier("40 % arrondi au-dessus (45 → 18)", appliquerIntention(impair, intention("CLASSE_PRISE_EN_CHARGE", "A")).etat.combattants.A.pv === 18);
 
     // Quelqu'un se tient sur le corps (un KO libère sa case).
     const occupe = enTete(monde(10, { M1: { q: 1, r: 0 } }), "CLASSE_PRISE_EN_CHARGE");
@@ -365,10 +373,10 @@ console.log("\n7. LA FICHE PERSO ET LA FICHE DE CLASSE");
              niveaux: [...d.querySelectorAll(".palier-classe-niveau")].map(x => x.textContent.trim()), texte: d.textContent };
   });
   await p.screenshot({ path: "/tmp/claude-0/medicus_classe.png" });
-  verifier("fiche perso niveau 5 : Soin d'urgence acquis, Prise en charge au niveau 10",
-           JSON.stringify(r.techniques) === '[["CLASSE_SOIN_URGENCE","Une fois par combat"],["CLASSE_PRISE_EN_CHARGE","Niveau 10 requis"]]',
+  verifier("fiche perso niveau 5 : Soin d'urgence acquis, Prise en charge au niveau 9",
+           JSON.stringify(r.techniques) === '[["CLASSE_SOIN_URGENCE","Une fois par combat"],["CLASSE_PRISE_EN_CHARGE","Niveau 9 requis"]]',
            JSON.stringify(r.techniques));
-  verifier("fiche de classe : paliers Niv. 1 / 5 / 10", r.visible && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]');
+  verifier("fiche de classe : paliers Niv. 1 / 3 / 5 / 9 (v351)", r.visible && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 3","Niv. 5","Niv. 9"]');
   verifier("Soin d'urgence et Prise en charge y sont dits", /Soin d'urgence/.test(r.texte) && /Prise en charge/.test(r.texte) && /12 PV/.test(r.texte));
 }
 

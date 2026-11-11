@@ -11240,3 +11240,23 @@ vampire.mjs est mis à jour (paliers et brûlure). Les contrôles de version de 
 corrections_v350.mjs vérifie : les paliers ; les 6 lignes et les refus (ligne qui ne part pas de lui, brisée, de 2 ou 4 cases, niveau 8) ; la zone ; les dégâts immédiats sur un ennemi et un allié ; la seconde fois refusée ; le rejeu ; 20 manches sans s'effacer ; la fin de manche ; le Brûlé à environ 50 % sur 200 graines ; l'entrée dans la zone ; le Géomancien épargné ; la défense magique ; le ciblage et les textes.
 
 geomancien.mjs est mis à jour (Mur au niveau 3, zones prolongées au niveau 9).
+
+## v351 — La refonte des classes : le Médicus
+
+- Nico (sa fiche du Médicus) :
+  - niveau 1 : +5 % de régénération, +1 compétence, +1 aux sorts de soin (déjà en place) ;
+  - niveau 3 : +1 aux sorts de soin, +5 % d'esquive ;
+  - niveau 5 : Soin d'urgence, +1 aux soins ;
+  - niveau 9 : Prise en charge par Médicus (40 % des PV, repousse les ennemis adjacents à l'allié, init 0, réserve 20 pendant 2 tours pour le Médicus et le réanimé).
+- app.js : les paliers passent à 1, 3, 5 et 9.
+  - bonusSoin vaut 1 au niveau 1, 2 au 3, 3 au 5 : « +1 aux soins » est le même bonus, selon sa réponse.
+  - Le Soin d'urgence reste à 12 PV fixes (sa réponse).
+- La Prise en charge :
+  - PART_REANIMATION passe de 30 à 40 ;
+  - la réserve maintenue de la v347 (RESERVES_TECHNIQUES) : 20 par manche sur 2 manches, chez le Médicus ET chez le réanimé. La première part est payée au lancement — le réanimé paie ce qu'il a —, la seconde est bloquée puis consommée ;
+  - à court d'énergie, la réserve tombe, sans rien défaire : la réanimation est acquise ;
+  - elle ne se relâche pas (sansRelache, sa réponse) : pas de bouton dans le volet, et un « relacher » dans la file est ignoré à l'ouverture de la manche.
+
+corrections_v351.mjs le vérifie : les paliers, les deux réserves (lancement, blocage, consommation, réanimé presque vide, à court), le refus à 19, « Relâcher » ignoré, le Soin d'urgence à 12, le volet sans bouton.
+
+medicus.mjs est mis à jour (paliers, 40 %, la réserve du réanimé).

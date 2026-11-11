@@ -833,6 +833,7 @@ window.techniquesMaintenues = function(perso) {
 };
 window.relacheEnAttente = function(perso, idCarte) {
     if (!perso || !enPreparation()) return false;
+    if (window.techniquesMaintenues(perso).some(e => e.maintien === idCarte && e.sansRelache)) return false;
     return (window.RELACHES_EN_ATTENTE[perso.idPersonnage] || []).includes(idCarte);
 };
 // La part bloquée dans sa jauge pour cette manche.
@@ -865,7 +866,7 @@ window.basculerRelacher = function(idPersonnage, idCarte) {
 // Ce que l'entrée de file emporte : les techniques à relâcher.
 const relachesDe = (perso) => {
     const liste = (window.RELACHES_EN_ATTENTE[perso && perso.idPersonnage] || [])
-        .filter(id => window.techniquesMaintenues(perso).some(e => e.maintien === id));
+        .filter(id => window.techniquesMaintenues(perso).some(e => e.maintien === id && !e.sansRelache));
     return liste.length ? { relacher: liste } : {};
 };
 
@@ -932,9 +933,9 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             const nom = String(e.nom || "").replace(/[<>&"]/g, "");
             const idC = String(e.maintien).replace(/[^A-Z0-9_]/gi, "");
             htmlDeck += `<div class="encart-maintien${relache ? " relache" : ""}" data-maintien="${idC}" title="${String(e.desc || "").replace(/"/g, "&quot;")}">
-                <span class="maintien-nom">${/Nuée/.test(nom) ? "🦇" : "🏰"} ${nom}</span>
+                <span class="maintien-nom">${/Nuée/.test(nom) ? "🦇" : /Prise en charge/.test(nom) ? "✚" : "🏰"} ${nom}</span>
                 <span class="maintien-reserve">${relache ? "relâché à la prochaine manche" : bloque ? `⚡ ${parseInt(e.reserve) || 0} bloqués cette manche` : "manche déjà payée"} · ${parseInt(e.duree) || 0} manche${(parseInt(e.duree) || 0) > 1 ? "s" : ""}</span>
-                ${enPreparation() ? `<button type="button" class="maintien-relacher" onclick="event.stopPropagation(); window.basculerRelacher('${persoActuel.idPersonnage}', '${idC}')">${relache ? "Le garder" : "Relâcher"}</button>` : ""}
+                ${enPreparation() && !e.sansRelache ? `<button type="button" class="maintien-relacher" onclick="event.stopPropagation(); window.basculerRelacher('${persoActuel.idPersonnage}', '${idC}')">${relache ? "Le garder" : "Relâcher"}</button>` : ""}
             </div>`;
         });
         const IMAGE_CADRE_NORMAL = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png";
@@ -3240,7 +3241,7 @@ function construireHaloVTT(options) {
 // l'image d'un bandeau de carte. Ceux-là prennent un médaillon de LA COULEUR
 // DE LEUR BULLE (COULEUR_ETAT), avec un symbole, et leur nom au survol.
 window.SYMBOLES_ETATS = {
-    "Charmé": "💘", "Ténèbres étalées": "🌑", "Mur de bouclier": "🛡️", "Rempart": "🏰", "Rempart maintenu": "🏰", "Nuée maintenue": "🦇",
+    "Charmé": "💘", "Ténèbres étalées": "🌑", "Mur de bouclier": "🛡️", "Rempart": "🏰", "Rempart maintenu": "🏰", "Nuée maintenue": "🦇", "Prise en charge (réserve)": "✚",
     "Nuée de chauve-souris": "🦇", "Bouclier anti-magie": "💠", "Plaie rouverte": "🩸",
     "Instinct du tueur": "🗡️", "Bouclier des Sages": "📜", "Étalement": "💢", "Soin étalé": "💚",
     "Élan": "💨", "Repli": "↩️", "Provocation": "😤", "Peur": "😱", "Béni": "✨",

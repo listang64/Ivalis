@@ -979,10 +979,14 @@ window.ATOUTS_CLASSES = {
     // dans la Forge, et +1 à chacun de ses soins (bonusSoin,
     // appliquerEquipementALaCarte) ; Soin d'urgence au niveau 5, Prise en
     // charge au niveau 10.
+    // v351, la refonte des classes (Nico) : au niveau 3, +1 soin encore et +5 %
+    // d'esquive ; au niveau 5, le Soin d'urgence et +1 soin (+3 en tout) ; la
+    // Prise en charge au niveau 9.
     "Médicus": [
         { niveau: 1,  regenFatigue: 5, competences: 1, bonusSoin: 1 },
-        { niveau: 5,  techniques: ["CLASSE_SOIN_URGENCE"] },
-        { niveau: 10, techniques: ["CLASSE_PRISE_EN_CHARGE"] }
+        { niveau: 3,  bonusSoin: 1, esquive: 5 },
+        { niveau: 5,  techniques: ["CLASSE_SOIN_URGENCE"], bonusSoin: 1 },
+        { niveau: 9,  techniques: ["CLASSE_PRISE_EN_CHARGE"] }
     ],
     // LE CHASSEUR DE MAGES : +10 de défense magique et, dès le niveau 1, la
     // Maîtrise de la lumière (v237, à la place de l'effet Lumière, retiré de
@@ -1230,10 +1234,16 @@ window.TECHNIQUES_CLASSE = {
         desc: "Soigne entièrement son compagnon au contact — et le relève avec tous ses PV s'il est KO. "
             + "Une fois par combat."
     },
+    // (v351) 40 % des PV, et une réserve de 20 par manche sur 2 manches, pour le
+    // Médicus ET pour le réanimé (la première payée au lancement) — un prix :
+    // elle ne se relâche pas (RESERVES_TECHNIQUES, moteur_pur.js).
     CLASSE_PRISE_EN_CHARGE: {
-        Nom: "Prise en charge par Médicus", classe: "Médicus", niveau: 10, Initiative: 0, Fatigue: 0, cible: "allieKO",
-        desc: "Réanime un allié KO adjacent avec 30 % de ses PV, et repousse d'une case tous les ennemis "
-            + "qui l'entourent. Une fois par combat."
+        Nom: "Prise en charge par Médicus", classe: "Médicus", niveau: 9, Initiative: 0, Fatigue: 20, cible: "allieKO",
+        reserve: { parTour: 20, tours: 2, sansRelache: true },
+        desc: "Réanime un allié KO adjacent avec 40 % de ses PV, et repousse d'une case tous les ennemis "
+            + "qui l'entourent. Réserve : 20 d'énergie par manche pendant 2 manches, pour le Médicus et pour "
+            + "le réanimé (la première au lancement, la suivante bloquée puis consommée ; elle ne se relâche pas). "
+            + "Une fois par combat."
     }
 };
 // LE GÉOMANCIEN (niveau 1) : combien de cases de zone se PAIENT dans la Forge.

@@ -1741,7 +1741,10 @@ export const MANCHES_REMPART = 4;
 export const RESERVES_TECHNIQUES = {
     CLASSE_REMPART: { parTour: 15, tours: MANCHES_REMPART, nom: "Rempart maintenu" },
     // (v349) La Nuée : 40 au lancement, et 33 par manche sur ses 2 manches.
-    CLASSE_NUEE_CHAUVES_SOURIS: { parTour: 33, tours: 2, coutLancement: 40, nom: "Nuée maintenue" }
+    CLASSE_NUEE_CHAUVES_SOURIS: { parTour: 33, tours: 2, coutLancement: 40, nom: "Nuée maintenue" },
+    // (v351) La Prise en charge : 20 par manche sur 2 manches, pour le Médicus ET
+    // pour le réanimé ; un prix, qui ne tient rien — elle ne se relâche pas.
+    CLASSE_PRISE_EN_CHARGE: { parTour: 20, tours: 2, nom: "Prise en charge (réserve)", sansRelache: true }
 };
 // Ce qu'une technique maintenue coûte au lancement : son prix, et la part de
 // la manche du lancement.
@@ -1885,7 +1888,8 @@ export function actionResonanceBouclier(lanceur, ennemis, etourdis) {
 }
 // Le Transfert du Sorcier (niveau 10) : ce qu'il se soigne en changeant de place.
 export const SOIN_TRANSFERT = 10;
-export const PART_REANIMATION = 30;
+// (v351) La Prise en charge réanime avec 40 % des PV (30 jusqu'à la v350).
+export const PART_REANIMATION = 40;
 
 function casePlusProcheLibre(etat, plateau, depart, idIgnore) {
     const vues = new Set([`${depart.q},${depart.r}`]);
@@ -1918,7 +1922,10 @@ function poserMaintien(c, idCarte, liens) {
     etapes.push({ type: "fatigue", cible: c.id, fatigueApres: c.fatigue, tic: r.nom });
     c.etats = [...(c.etats || []).filter(e => !(e && e.maintien === idCarte)),
                { nom: r.nom, maintien: idCarte, reserve: r.parTour, duree: r.tours, dejaPaye: true, liens,
-                 desc: `${r.parTour} d'énergie bloqués puis consommés à chaque manche tant qu'il est maintenu `
+                 ...(r.sansRelache ? { sansRelache: true } : {}),
+                 desc: r.sansRelache
+                     ? `${r.parTour} d'énergie bloqués puis consommés à chaque manche (le prix de la technique ; elle ne se relâche pas).`
+                     : `${r.parTour} d'énergie bloqués puis consommés à chaque manche tant qu'il est maintenu `
                      + "(à court d'énergie, il tombe ; il se relâche en préparation)." }];
     etapes.push({ type: "etats", cible: c.id, liste: c.etats, pose: r.nom });
     return etapes;
@@ -2056,6 +2063,9 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
             allie.q = place.q;
             allie.r = place.r;
             etapes.push({ type: "reanimation", cible: allie.id, acteur: id, pvApres: allie.pv, q: place.q, r: place.r });
+            // (v351) La réserve de la Prise en charge : le Médicus et le réanimé.
+            etapes.push(...poserMaintien(c, action.idCarte, []));
+            etapes.push(...poserMaintien(allie, action.idCarte, []));
 
             (suivant.ordre || Object.keys(suivant.combattants || {})).forEach(idEnnemi => {
                 const ennemi = combattant(suivant, idEnnemi);

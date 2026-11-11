@@ -915,6 +915,9 @@ export function ouvrirManche(etat, file, des) {
     file.forEach(f => {
         const id = f && (f.id || f.idPersonnage);
         (Array.isArray(f && f.relacher) ? f.relacher : []).forEach(idCarte => {
+            // (v351) Une réserve qui est un prix (la Prise en charge) ne se relâche pas.
+            const tenue = ((combattant(suivant, id) || {}).etats || []).find(e => e && e.maintien === idCarte);
+            if (tenue && tenue.sansRelache) return;
             etapesRelache.push(...relacherMaintien(suivant, id, idCarte, "Relâché"));
         });
     });
