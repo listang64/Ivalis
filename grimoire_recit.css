@@ -349,6 +349,14 @@
 .portrait-pleine-page figcaption { margin-top: calc(var(--u) * 1.2); font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important;
   font-weight: var(--poids-titres, 400); font-size: calc(var(--u) * 6 * var(--echelle-titres, 1)); color: #24150a; text-align: center; line-height: 1.1; }
 .croquis-recit.neuf img, .portrait-pleine-page.neuf img { animation: croquis-monte 2.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+/* v346 — LES ILLUSTRATIONS EN DOUBLE PAGE : le fond de la double page, voilé comme celui
+   des classes (grimoire_creation.css, .fond-classe) ; le texte s'écrit par-dessus à
+   gauche. L'image arrive en fondu une fois chargée (grimoire_recit.js, chargerImagesRecit). */
+.page-recit > .fond-recit.gauche ~ :not(.fleche-suite) { position: relative; z-index: 1; }
+.fond-recit img, .portrait-avatar img { opacity: 0; transition: opacity 1.2s ease; }
+.fond-recit img.pret, .portrait-avatar img.pret { opacity: 1; }
+/* Le portrait d'un PNJ nouveau, fait comme l'avatar des héros : en couleur, détouré. */
+.portrait-avatar img { mix-blend-mode: normal; filter: none; object-fit: contain; }
 @keyframes croquis-monte {
   0% { opacity: 0; filter: blur(6px) sepia(1) contrast(0.4); clip-path: inset(0 100% 0 0); }
   40% { opacity: 0.8; }

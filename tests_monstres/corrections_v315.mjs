@@ -355,17 +355,19 @@ await section(async () => {
     "Le scorpion géant fond sur Kaya et Thorin.",
     `window.__sauve = window.PERSOS_JOUEURS_PARTIE; window.PERSOS_JOUEURS_PARTIE = []; window.PERSOS_PARTIE[0].urlPortraitReference = "portrait-kaya.png";`);
   await p.evaluate(() => { window.PERSOS_JOUEURS_PARTIE = window.__sauve; });
-  const cr = imagesIA.slice(n).find(x => /pen-and-ink/.test(x.corps));
+  const cr = imagesIA.slice(n).find(x => /concept art/.test(x.corps));
   verifier("la liste des joueurs vide : Kaya, nommée, part quand même en référence", !!cr && /edits/.test(cr.url) && (cr.corps.match(/name="image\[\]"/g) || []).length === 1 && /image 1 is Kaya \(a woman, Humain, Pisteur\)/.test(cr.corps), cr ? cr.url : "aucun croquis");
   verifier("… comme l'avatar rhabillé : son portrait de référence, en PNG sur le magenta", a.blobs.includes("portrait-kaya.png"), JSON.stringify(a.blobs));
   verifier("… Thorin, qui n'a pas encore de portrait, décrit en mots", !!cr && /Thorin is a man|Thorin is Nain|Thorin is [^.]*Nain/.test(cr.corps), "");
   verifier("le dessinateur doit les rendre reconnaissables, sans personne d'autre", !!cr && /clearly recognisable/.test(cr.corps) && /Do not add any other person/.test(cr.corps));
-  verifier("qualité « medium » (plus de trait pixelisé), dépôt en q_auto:best", !!cr && /name="quality"\r\n\r\nmedium/.test(cr.corps) && !!a.msg && /q_auto:best/.test(a.msg.Illustration.Url), a.msg ? a.msg.Illustration.Url : "");
-  verifier("seulement l'essentiel : le décor seulement ce que le moment demande (v325)", !!cr && /only as much setting as the moment needs/.test(cr.corps) && /strictement important/.test(lire("illustrations_recit.js")));
+  // (v346) Une image en couleur, déposée telle quelle : plus de q_auto:best réservé au trait d'encre.
+  verifier("qualité « medium » (plus de trait pixelisé)", !!cr && /name="quality"\r\n\r\nmedium/.test(cr.corps) && !!a.msg && /Recit\/Illustrations/.test(a.msg.Illustration.Url), a.msg ? a.msg.Illustration.Url : "");
+  // (v346) Nico : « il faut le personnage, et on fait le décor derrière » : le décor du moment, discret à gauche.
+  verifier("le décor du moment derrière les personnages, discret à gauche (v346)", !!cr && /Le d.+cor du moment se tient derri.+re eux/.test(cr.corps) && /doit rester discret .{1,2} gauche/.test(cr.corps));
   // L'agent parle du groupe sans le nommer : les héros que cite le Narrateur.
   n = imagesIA.length;
   await illustrer({ illustrer: true, moment: "drôle", sujet: "scene", description: "The adventurers flee from an angry goat.", heros: [], pnj_nommes: [] }, "La chèvre poursuit Kaya à travers le marché.");
-  const cr2 = imagesIA.slice(n).find(x => /pen-and-ink/.test(x.corps));
+  const cr2 = imagesIA.slice(n).find(x => /concept art/.test(x.corps));
   verifier("« the adventurers » : ceux que le Narrateur cite (Kaya) partent en référence", !!cr2 && /image 1 is Kaya/.test(cr2.corps) && /With Kaya/.test(cr2.corps), cr2 ? "" : "aucun");
   // Le portrait illisible : pas de croquis plutôt que des inconnus.
   n = imagesIA.length;

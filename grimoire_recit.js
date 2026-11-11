@@ -434,10 +434,44 @@ function htmlCroquis(para) {
 }
 function htmlPortraitPleinePage(para) {
     const im = para.image;
+    // (v346) Le portrait fait comme l'avatar des héros : il arrive en fondu, préchargé.
+    if (im.Format === "avatar") return `<figure class="portrait-pleine-page portrait-avatar" data-e="${echapper(para.e)}">`
+        + `${imgDuFond(im.Url, im.Nom || "")}<figcaption>${echapper(im.Nom || "")}</figcaption></figure>`;
     const neuf = !etat.croquisVus.has(para.e);
     if (neuf) setTimeout(() => etat.croquisVus.add(para.e), 4000);
     return `<figure class="portrait-pleine-page${neuf ? " neuf" : ""}" data-e="${echapper(para.e)}">`
         + `<img src="${echapper(im.Url)}" alt="${echapper(im.Nom || "")}" draggable="false"><figcaption>${echapper(im.Nom || "")}</figcaption></figure>`;
+}
+// LES ILLUSTRATIONS EN DOUBLE PAGE (v346). Nico : « les images vont se mettre en pleine
+// double page avec la transition en dégradé, comme les fonds des classes et des races ;
+// l'image se pose sur la première page de droite suivante vierge, et le texte suivant ne
+// peut pas s'écrire dessus ; la page de gauche, là où il y a le dégradé, on peut écrire
+// dessus » ; « elles apparaissent en fondu si le joueur est sur la page, et se préchargent
+// comme les images des classes et des races ». Le fond de la double page : les mêmes
+// voiles que les classes (grimoire_creation.css, .fond-classe).
+etat.fondsPrets = etat.fondsPrets || new Set();     // les images déjà chargées : plus de fondu
+function imgDuFond(url, alt) {
+    const u = echapper(url), a = echapper(alt || "");
+    return etat.fondsPrets.has(url) ? `<img class="pret" src="${u}" alt="${a}" draggable="false">`
+        : `<img data-src="${u}" alt="${a}" draggable="false" decoding="async">`;
+}
+const htmlFondRecit = (para, cote) => `<div class="fond-classe fond-recit ${cote}" data-e="${echapper(para.e)}" aria-hidden="true">${imgDuFond(para.image.Url)}</div>`;
+// Les images de la double page ouverte, de la suivante et de la précédente.
+function chargerImagesRecit(el) {
+    if (!el) return;
+    el.querySelectorAll("img[data-src]").forEach(img => {
+        if (img.getAttribute("src")) return;
+        const url = img.dataset.src;
+        const pret = () => { etat.fondsPrets.add(url); img.classList.add("pret"); };
+        img.src = url;
+        if (typeof img.decode === "function") img.decode().then(pret, pret); else img.onload = pret;
+    });
+}
+function prechargerImagesRecit() {
+    const g = G(), pf = g && g.pageFlip();
+    if (!etat.actif || !pf || !etat.elements.length) return;
+    const ici = pf.getCurrentPageIndex(), gauche = ici % 2 === 1 ? ici : ici - 1;
+    [0, 1, 2, 3, -2, -1].forEach(d => chargerImagesRecit(etat.elements[gauche + d - premiereSuite()]));
 }
 // Rend les pages du chapitre (HTML) : une page par élément.
 function paginer(entrees) {
@@ -448,17 +482,37 @@ function paginer(entrees) {
     boite.innerHTML = enteteChapitre();
     const deborde = () => boite.scrollHeight > boite.clientHeight + 1;
     const vide = () => !boite.querySelector(".para-recit");
-    const fermer = () => { pages.push(boite.innerHTML); j++; boite = boiteDeMesure(j % 2 === 0); boite.innerHTML = ""; };
+    // (v346) Une page de droite promise à une image : elle se pose dès que sa page de
+    // gauche est pleine ; les images qui attendent leur double page, dans l'ordre.
+    let reservee = null;
+    const enAttente = [];
+    const ouvrirGauche = () => { const im = enAttente.shift(); if (!im) return; if (im.gauche) boite.innerHTML = im.gauche; reservee = im.droite; };
+    const fermer = () => {
+        pages.push(boite.innerHTML); j++;
+        if (j % 2 === 1 && reservee !== null) { pages.push(reservee); reservee = null; j++; }
+        boite = boiteDeMesure(j % 2 === 0); boite.innerHTML = "";
+        if (j % 2 === 0) ouvrirGauche();
+    };
+    // L'image prend la première page de droite vierge : celle d'en face si on écrit à
+    // gauche ; celle-ci si on est sur une page de droite encore blanche (sa gauche reçoit
+    // le dégradé) ; sinon la double page suivante.
+    const placer = (im) => {
+        if (j % 2 === 0 && reservee === null) {
+            if (im.gauche) boite.insertAdjacentHTML("afterbegin", im.gauche);
+            reservee = im.droite;
+        } else if (j % 2 === 1 && !boite.innerHTML.trim()) {
+            if (im.gauche) pages[pages.length - 1] = im.gauche + pages[pages.length - 1];
+            boite.innerHTML = im.droite;
+            fermer();
+        } else enAttente.push(im);
+    };
     for (const para of paragraphesDuChapitre(entrees)) {
         // (v314) LES IMAGES : le croquis suit le texte (v328 : toujours une demi-page ;
         // sur la page suivante s'il n'y tient pas) ; le portrait d'un PNJ prend une page entière.
+        // (v346) Le portrait, en pleine page de droite ; l'illustration, en double page.
         if (para.image) {
-            if (para.type === "portrait") {
-                if (boite.innerHTML.trim()) fermer();          // toujours une page à lui
-                boite.innerHTML += htmlPortraitPleinePage(para);
-                fermer();
-                continue;
-            }
+            if (para.type === "portrait") { placer({ gauche: "", droite: htmlPortraitPleinePage(para) }); continue; }
+            if (para.image.Format === "double-page") { placer({ gauche: htmlFondRecit(para, "gauche"), droite: htmlFondRecit(para, "droite") }); continue; }
             const tmp = document.createElement("div");
             tmp.innerHTML = htmlCroquis(para);
             const fig = tmp.firstElementChild;
@@ -502,7 +556,12 @@ function paginer(entrees) {
             fermer();
         }
     }
-    if (boite.innerHTML.trim() || !pages.length) pages.push(boite.innerHTML || `<p class="page-blanche"></p>`);
+    if (boite.innerHTML.trim() || !pages.length) {
+        pages.push(boite.innerHTML || `<p class="page-blanche"></p>`);
+        if (reservee !== null && pages.length % 2) pages.push(reservee);
+    }
+    // (v346) Les images qui attendaient : chacune sa double page, à la suite.
+    while (enAttente.length) { const im = enAttente.shift(); if (pages.length % 2) pages.push(""); pages.push(im.gauche, im.droite); }
     boite.innerHTML = "";                  // le mesureur ne garde rien (ses mots ne sont pas ceux du livre)
     if (pages.length % 2) pages.push("");
     // LA PETITE FLÈCHE (v304) : « une toute petite flèche noire dans le coin
@@ -568,6 +627,7 @@ function rendre() {
     const avant = etat.pagesRecit;
     etat.pagesRecit = recit.length;
     if (change) g.definirSuite(etat.elements);
+    prechargerImagesRecit();
     appliquerEcriture();
     // (v304 : le livre ne tourne plus tout seul quand le récit passe à la page
     // suivante — la plume finit la double page ouverte, le lecteur tourne.)
@@ -942,6 +1002,7 @@ function surLeRecit() {
 }
 function majInterface() {
     if (!elts) return;
+    prechargerImagesRecit();
     noterLecture();
     const g = G(), pf = g && g.pageFlip();
     const attente = jetsEnAttente(etat.messages);

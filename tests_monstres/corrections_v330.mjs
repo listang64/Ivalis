@@ -176,6 +176,10 @@ const CROQUIS = await (async () => { const pg = await b.newPage(); const u = awa
   x.beginPath(); x.arc(300, 140, 50, 0, 7); x.stroke(); x.beginPath(); x.moveTo(300, 190); x.lineTo(300, 320); x.moveTo(300, 230); x.lineTo(240, 280); x.moveTo(300, 230); x.lineTo(370, 260); x.stroke();
   return c.toDataURL("image/png"); }); await pg.close(); return Buffer.from(u.split(",")[1], "base64"); })();
 await p.route(/res\.cloudinary\.com\/x\/image\/upload\/v1\/(Recit|PNJ)\//, r => r.fulfill({ status: 200, contentType: 'image/png', body: CROQUIS }));
+// (v346) Le portrait d'un PNJ nouveau passe par le procédé de l'avatar (ia_master.js), qui dépose
+// lui-même sur Cloudinary : un faux dépôt.
+await p.route('**/api.cloudinary.com/**', r => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' },
+  body: JSON.stringify({ secure_url: "https://res.cloudinary.com/x/image/upload/v1/PNJ/portrait.png", public_id: "PNJ/portrait" }) }));
 
 
 // Les héros de la partie : « A- Fargus » (un requin), puis Kaya.
@@ -196,11 +200,12 @@ const illustrer = (avis, texteMJ) => p.evaluate(async ([avis, texteMJ]) => {
   return { doc: (window.__docs || {})["Messages_Chat/" + id] || null, blobs: window.__blobs.slice(), fonds: window.__fonds.slice(), depots: window.__depots.slice(), agent: window.__agent };
 }, [avis, texteMJ]);
 const TEXTE_MJ = "Fargus pivote d'un bloc vers nous, la voix sourde et précipitée : « Qu'est-ce qu'on fait ? Cachons-nous ! »";
-const croquisDepuis = (n) => imagesIA.slice(n).find(x => /pen-and-ink/.test(x.corps));
+const croquisDepuis = (n) => imagesIA.slice(n).find(x => /concept art/.test(x.corps));
 const nbImages = (c) => (c.corps.match(/name="image\[\]"/g) || []).length;
 
 const sets = () => p.evaluate(() => (window.__sets || []).filter(x => /^Monde_PNJ\//.test(x.chemin)).map(x => x.data.Nom_PNJ));
-const portraitsDemandes = (n) => imagesIA.slice(n).filter(x => /full-length portrait/.test(x.corps)).length;
+// (v346) Le portrait d'un PNJ nouveau : le procédé de l'avatar (son fond magenta).
+const portraitsDemandes = (n) => imagesIA.slice(n).filter(x => /FOND TOTALEMENT MAGENTA/.test(x.corps)).length;
 
 // =========================================================================
 titre("1. LE CŒUR DU NOM : LES TITRES NE COMPTENT PAS");

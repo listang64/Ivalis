@@ -47,6 +47,19 @@
 //    · qualité « medium » (au lieu de « low ») et dépôt en q_auto:best ;
 //    · le croquis ne montre que l'essentiel : les personnages, et un décor
 //      seulement s'il sert ce qu'on raconte.
+//
+//  v346 (Nico : « les images vont se mettre en pleine double page, en dégradé
+//  comme les fonds des classes et des races ; il faut le personnage, et on fait
+//  le décor derrière ; on garde le côté cinématographique » ; « reprends le style
+//  graphique de la base, celui de la création des avatars » ; « un lieu seul sans
+//  personnage si besoin » ; « pour les nouveaux PNJ, le même procédé que l'avatar
+//  des personnages joueurs, en pleine page de droite ») :
+//    · plus de croquis à l'encre : une illustration de concept art en 16:9, les
+//      personnages sur la moitié droite, la moitié gauche calme (le texte du
+//      carnet s'y écrit) ; le style est celui de Cerveau_IA/INST_76839 ;
+//    · déposée telle quelle (pas de détourage) ; le livre la pose sur une double
+//      page (grimoire_recit.js) ;
+//    · le portrait d'un PNJ nouveau : ia_master.js (portraitPnjFaconAvatar).
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, updateDoc, setDoc, getDocs, collection, query, where } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
@@ -55,7 +68,6 @@ const R = window.REGLAGES_ILLUSTRATIONS = window.REGLAGES_ILLUSTRATIONS || {
     actif: true,
     ecart: 2,                 // au plus une illustration toutes les N réponses du Narrateur
     qualite: "medium",        // v315 : « low » donnait un trait pixelisé (l'avatar rhabillé : medium)
-    tailleMin: 0.42, tailleMax: 0.82,   // largeur de l'illustration, en part de la page
     portraitsMax: 2,          // portraits pleine page par réponse, au plus
     forcerApres: 3            // (v326) 3 réponses du Narrateur sans croquis : un gros plan d'un héros, d'office
 };
@@ -154,10 +166,11 @@ function grosPlanForce(texteMJ) {
     const extrait = (siennes.length ? siennes.slice(-2) : phrases.slice(-1)).join(" ").slice(0, 500);
     return {
         illustrer: true, moment: "gros plan", sujet: "personnage", force: true,
-        description: `A dramatic close-up of ${h.prenom} at this very moment of the story: head and shoulders filling the frame, a strong, expressive face reacting to what is happening.`,
-        acteurs: [{ id: "H" + (tous.indexOf(h) + 1), nom: h.prenom, type: "heros", place: "center",
-                    action: "close-up, head and shoulders, caught in the moment", expression: "the emotion of this moment of the story" }],
-        mise_en_scene: "close-up portrait, the head and shoulders filling the frame, three-quarter view, slightly low angle; deep solid black shadows on one side of the face, bold cross-hatching; a solid black disc behind the head",
+        // (v346) Un plan moyen, le héros sur la moitié droite, le décor du moment derrière lui.
+        description: `${h.prenom} at this very moment of the story, in the place where it happens: a strong, expressive face and body language reacting to what is happening.`,
+        acteurs: [{ id: "H" + (tous.indexOf(h) + 1), nom: h.prenom, type: "heros", place: "right",
+                    action: "medium shot, caught in the moment", expression: "the emotion of this moment of the story" }],
+        mise_en_scene: "cinematic medium shot, the hero on the right half of the frame, three-quarter view, slightly low angle, strong rim light; the setting of the scene behind, calm and quiet on the left half",
         extrait, pnj_nommes: []
     };
 }
@@ -186,13 +199,13 @@ const ecrireEcart = (n) => { try { localStorage.setItem(cleCadence(), String(n))
 // ---------------------------------------------------------------------
 //  1. LE REGARD : Y A-T-IL UN MOMENT À DESSINER ?
 // ---------------------------------------------------------------------
-const PROMPT_AGENT = `Tu es MIA_ILLUSTRATEUR, l'illustrateur du carnet de voyage d'un groupe d'aventuriers (jeu de rôle, Antiquité fantastique). Après chaque réponse du Narrateur, tu lis les dernières actions des joueurs et cette réponse, et tu décides s'il y a UN moment qui mérite un petit croquis à la plume dans le carnet.
+const PROMPT_AGENT = `Tu es MIA_ILLUSTRATEUR, l'illustrateur du carnet de voyage d'un groupe d'aventuriers (jeu de rôle, Antiquité fantastique). Après chaque réponse du Narrateur, tu lis les dernières actions des joueurs et cette réponse, et tu décides s'il y a UN moment qui mérite une illustration cinématographique en double page dans le carnet.
 
 QUAND DESSINER : seulement un moment qui marque — drôle (une maladresse, une réplique, une situation absurde), dramatique (un danger, une perte, un affrontement, une révélation), ou attachant (un geste tendre, une rencontre, un instant de camaraderie), ou un lieu saisissant. Une réponse banale (on marche, on parle de la route, on achète du pain) : NE DESSINE PAS. Dans le doute, ne dessine pas.
 
 LE MOMENT PRÉCIS (v325) : pas un résumé de la réponse — UN instant, le plus fort, figé comme une photo : celui où tout bascule (le pied qui heurte la jambière du héros camouflé, la lame qui sort du fourreau, le regard qui croise un autre). Reste FIDÈLE au texte : qui fait quoi à qui, avec quoi ; qui est caché, camouflé, couché, debout ; qui voit qui. Un héros caché ou déguisé se dessine caché ou déguisé. Recopie dans "extrait" la ou les phrases exactes du texte qui racontent cet instant (en français, 1 à 3 phrases).
 
-QUOI DESSINER : soit une SCÈNE (les personnages en action), soit UN PERSONNAGE en particulier (un héros, un PNJ), soit un LIEU saisissant. Ne dessine QUE ce qui est strictement important pour raconter le moment : les personnages concernés et, seulement s'il est indispensable, l'objet ou l'élément avec lequel ils agissent. PAS de décor ni d'arrière-plan, sauf si le lieu est lui-même le sujet ou qu'il est nécessaire pour comprendre le moment. Décris concrètement ce que montre le croquis, en anglais, en une ou deux phrases (qui, quoi, l'attitude) — pas d'abstraction, pas de texte dans l'image.
+QUOI DESSINER : soit une SCÈNE (les personnages en action), soit UN PERSONNAGE en particulier (un héros, un PNJ) — toujours DANS LE DÉCOR du moment, derrière eux (le lieu où la scène se passe, tel que le texte le décrit) ; soit, seulement si le moment n'a personne à montrer, UN LIEU saisissant seul, sans aucun personnage ("sujet": "lieu"). L'illustration est une image de cinéma, en paysage 16:9 : les personnages TOUJOURS sur la MOITIÉ DROITE de l'image ; la moitié gauche reste un décor sobre, calme et peu détaillé (le texte du carnet s'y écrira). Décris concrètement ce que montre l'image, en anglais, en une ou deux phrases (qui, quoi, l'attitude, le décor) — pas d'abstraction, pas de texte dans l'image.
 
 LE NARRATEUR N'APPARAÎT JAMAIS : la réponse est écrite à la première personne par le chroniqueur du groupe (le « je », le « nous »). Ce chroniqueur ne se dessine JAMAIS : ne le décris pas, ne le compte pas, n'écris jamais « the narrator », « I », « me », « we » ni « us » dans la description. « Nous » ne désigne que les héros présents.
 
@@ -200,11 +213,11 @@ PERSONNE D'AUTRE : le croquis ne montre QUE les héros que tu cites, les PNJ que
 
 LES HÉROS : cite TOUS ceux qui apparaissent DANS le croquis (leur prénom exact, dans la liste fournie), et dans la description, désigne chacun par son prénom exact (jamais « a warrior », « the adventurers » : « Kaya », « Thorin »). N'ajoute AUCUN personnage anonyme qui ne serait pas dans la réponse du Narrateur.
 
-LA MISE EN SCÈNE : chaque héros de la liste a un identifiant (H1, H2…). Dans "acteurs", liste CHAQUE figure du croquis, une par une, dans l'ordre de gauche à droite : un héros par son identifiant ("id": "H1") et son prénom, un PNJ par son nom ("type": "pnj"), un être sans nom par ce qu'il est ("type": "autre", "nom": "a wolf"). Pour chacune, en anglais : "place" (left, center, right, foreground, background), "action" (ce qu'elle fait, sa posture), "expression" (son visage, son émotion). Puis "mise_en_scene", en anglais, comme un directeur artistique : le cadrage et l'angle (plan large, plan moyen, gros plan, contre-plongée, par-dessus l'épaule…), le point focal (où l'œil va d'abord), qui est au premier plan et qui au fond, comment les figures se tiennent l'une par rapport à l'autre, l'objet clé, et ce qui donne de la force à l'image (une grande masse noire, une silhouette à contre-jour, un disque noir derrière le sujet…). Une image lisible d'un coup d'œil. Le dessinateur reçoit le portrait de chaque héros et de chaque PNJ connu : il dessine la scène telle que tu la mets en scène.
+LA MISE EN SCÈNE : chaque héros de la liste a un identifiant (H1, H2…). Dans "acteurs", liste CHAQUE figure du croquis, une par une, dans l'ordre de gauche à droite : un héros par son identifiant ("id": "H1") et son prénom, un PNJ par son nom ("type": "pnj"), un être sans nom par ce qu'il est ("type": "autre", "nom": "a wolf"). Pour chacune, en anglais : "place" (toujours dans la moitié droite : center-right, right, far right, foreground right, background right), "action" (ce qu'elle fait, sa posture : debout, accroupie, en mouvement, assise…), "expression" (son visage, son émotion). Puis "mise_en_scene", en anglais, comme un directeur artistique de cinéma : le cadrage et l'angle (plan large, plan moyen, contre-plongée, par-dessus l'épaule…), le point focal (où l'œil va d'abord), qui est au premier plan et qui au fond, comment les figures se tiennent l'une par rapport à l'autre, l'objet clé, le décor derrière elles, et la lumière qui donne de la force à l'image (contre-jour, lumière qui accroche les contours…). Une image lisible d'un coup d'œil. Le dessinateur reçoit le portrait de chaque héros et de chaque PNJ connu : il dessine la scène telle que tu la mets en scène.
 LES PNJ NOMMÉS : liste les personnages non-joueurs PRÉSENTS dans la scène (v330 : physiquement là, que les héros voient ou à qui ils parlent ; mets "present": true) et désignés par un VRAI nom propre dans la réponse du Narrateur — jamais un nom lu sur un parchemin, une lettre, un sceau ou une inscription, ni entendu dans une rumeur ou un souvenir (alors "present": false) ; un personnage déjà connu sous un autre titre (« Maître Valerius » pour « Valerius ») garde son nom connu (pas les héros, pas « l'aubergiste », pas un nom inventé par un héros pour bluffer), avec leur race (parmi celles du monde, Humain par défaut) et une description physique précise tirée du texte (ou plausible). Indique aussi ceux qui apparaissent dans le croquis.
 
 Réponds UNIQUEMENT en JSON :
-{"illustrer": true, "moment": "drôle|dramatique|attachant|lieu", "sujet": "scene|personnage", "description": "...", "acteurs": [{"id": "H1", "nom": "Kaya", "type": "heros", "place": "left", "action": "crouching behind a fallen trunk, one hand raised to stop the others", "expression": "tense, eyes wide"}, {"nom": "Varos", "type": "pnj", "place": "right", "action": "...", "expression": "..."}], "mise_en_scene": "medium shot, slightly low angle; Kaya in the foreground turned toward Varos…", "extrait": "Varos éclate de rire quand Kaya glisse sur l'amphore.", "heros": ["Kaya"], "pnj_dans_le_croquis": ["Varos"], "autres": [], "nombre": 2, "pnj_nommes": [{"nom": "Varos", "present": true, "race": "Humain", "description_physique": "..."}]}
+{"illustrer": true, "moment": "drôle|dramatique|attachant|lieu", "sujet": "scene|personnage|lieu", "description": "...", "acteurs": [{"id": "H1", "nom": "Kaya", "type": "heros", "place": "center-right", "action": "crouching behind a fallen trunk, one hand raised to stop the others", "expression": "tense, eyes wide"}, {"nom": "Varos", "type": "pnj", "place": "right", "action": "...", "expression": "..."}], "mise_en_scene": "medium shot, slightly low angle; Kaya in the foreground right turned toward Varos, the tavern behind them…", "extrait": "Varos éclate de rire quand Kaya glisse sur l'amphore.", "heros": ["Kaya"], "pnj_dans_le_croquis": ["Varos"], "autres": [], "nombre": 2, "pnj_nommes": [{"nom": "Varos", "present": true, "race": "Humain", "description_physique": "..."}]}
 ou {"illustrer": false, "pnj_nommes": [...]}`;
 
 async function demanderAgent(texteJoueurs, texteMJ) {
@@ -223,70 +236,82 @@ async function demanderAgent(texteJoueurs, texteMJ) {
 }
 
 // ---------------------------------------------------------------------
-//  2. LE CROQUIS : gpt-image, l'encre sur le blanc (v325), le blanc retiré
+//  2. L'ILLUSTRATION : gpt-image, un concept art en 16:9 (v346)
 // ---------------------------------------------------------------------
-// v325 — Nico : « le dessin est très mal fait et peu lisible ; je veux des traits
-// plus gros et une meilleure mise en scène artistique » (trois exemples : un
-// croquis de rue à la plume, une illustration gravée aux hachures avec un
-// disque noir derrière, un portrait au trait libre avec des taches d'encre) ;
-// « dis-lui de dessiner en noir sur fond blanc, et fais un algo qui retire
-// tout le blanc ». Le dessin vient en noir sur blanc ; le dépôt retire le blanc
-// (app.js, detourerFondBlanc) : sur la page, il ne reste que l'encre.
-const STYLE_CROQUIS = "A bold, expressive black ink illustration drawn with a dip pen and a brush pen in an adventurer's travel journal. "
-    + "THICK, CONFIDENT LINES: heavy black outlines with strong line-weight variation (thick contours, thinner inner details), "
-    + "readable at a glance even when printed small — never faint, never scratchy, never thin grey pencil lines. "
-    + "Volumes and shadows built with dense parallel hatching and cross-hatching, and some SOLID BLACK masses for the deepest shadows, "
-    + "for a strong black-and-white contrast, like a classic pen-and-ink book illustration or an engraving; "
-    + "a few loose gestural strokes and small ink splatters for life; the edges of the drawing may stay unfinished and fade out. "
-    + "ARTISTIC STAGING: a cinematic composition built around the action of the moment — a clear focal point, readable silhouettes, "
-    + "the figures large in the frame, a meaningful camera angle (low angle, over-the-shoulder, close-up…), depth with a foreground and a background "
-    + "only when it serves the story; when it helps, a simple graphic shape behind the subject (a solid black disc, a hatched moon, a burst of strokes). "
-    + "Draw ONLY what tells the moment: the characters and what they act with, and only as much setting as the moment needs (a few strokes suggest it). "
-    + "A VIGNETTE, NOT A RECTANGLE: the drawing is an irregular, organic island of ink floating in the middle of a wide white margin; "
-    + "it fades out toward its edges in loose, broken, unfinished strokes, and NOTHING touches the edges of the image — no full-bleed scene, "
-    + "no hatching or background filling the whole picture, no straight cut-off edge, no rectangular or square shape, no frame, no panel border. "
-    + "At least a sixth of the image on every side stays pure white. "
-    + "PURE BLACK INK ON A PURE WHITE BACKGROUND (#FFFFFF): no colour at all, no grey wash, no paper texture, no stains, no frame, no border, "
-    + "no text, no letters, no signature, no monogram. Every empty area is plain flat white. "
-    + "Universe: Mythic Ancient Fantasy (Greco-Roman antiquity with magic — bronze, leather and linen, crested helmets, chitons and cloaks; "
-    + "never medieval plate armour, never a crossbow or any firearm).";
+// v346 — Nico : « les images vont se mettre en pleine double page ; il faut le
+// personnage, et on fait le décor derrière ; on garde le côté cinématographique » ;
+// la composition, la zone de texte, la qualité et les contraintes sont les siennes ;
+// le style, celui de la base (Cerveau_IA/INST_76839, la création des avatars) — le
+// sien en secours si la base ne répond pas.
+const STYLE_SECOURS = "Bande dessinée européenne moderne et esthétique d'animation 2D haut de gamme (type Fortiche ou Studio Mir), concept art stylisé dans un univers d'Antiquité fantastique. "
+    + "TRAIT : lignes nettes, tranchantes et assurées avec des épaisseurs variées ; contours encrés sombres et marqués pour les sujets au premier plan. "
+    + "RENDU ET OMBRAGE : cel-shading sophistiqué combiné à de douces transitions en dégradé ; ombres nettes, géométriques et stylisées ; aplats de couleurs denses et lisses sans bruit visuel. "
+    + "ÉCLAIRAGE : éclairage cinématographique très contrasté, fort rim lighting, lumière ambiante diffuse ; séparation très distincte et lisible des plans de profondeur grâce aux valeurs lumineuses. "
+    + "FORMES ET DESIGN : réalisme stylisé, proportions anatomiques crédibles et traits du visage très expressifs ; géométrie anguleuse et tranchante dans la découpe des vêtements, des armures, des accessoires et des plis de tissu.";
+function consigneIllustration(style, lieu) {
+    const compo = lieu
+        ? "COMPOSITION ET CADRAGE :\nImage horizontale, format paysage 16:9.\nAucun personnage : le lieu lui-même. Son élément principal est placé sur la moitié droite de l'image, en laissant une large zone libre sur la moitié gauche.\n"
+        : "COMPOSITION ET CADRAGE :\nImage horizontale, format paysage 16:9.\n"
+          + "Le ou les personnages principaux doivent être positionnés exclusivement sur la moitié droite de l'image, en laissant une large zone libre sur la moitié gauche.\n"
+          + "Les personnages peuvent être représentés dans différentes postures naturelles et dynamiques : debout, accroupis, en mouvement, assis ou dans une mise en scène particulière.\n"
+          + "Si plusieurs personnages sont présents, les disposer harmonieusement sur la partie droite, sans qu'ils se chevauchent excessivement.\n"
+          + "Les personnages doivent être suffisamment grands et détaillés pour être clairement identifiables.\n"
+          + "Le décor du moment se tient derrière eux.\n";
+    return "Créer une illustration de concept art dans un univers d'Antiquité fantastique (Mythic Ancient Fantasy : Antiquité gréco-romaine et magie — bronze, cuir et lin, casques à cimier, chitons et capes ; jamais d'armure de plates médiévale, jamais d'arbalète ni d'arme à feu).\n\n"
+        + compo
+        + "Conserver une marge de sécurité sur les quatre côtés de l'image. Aucun élément important ne doit être coupé par les bords.\n\n"
+        + "ZONE DE TEXTE :\nLa moitié gauche de l'image doit rester largement dégagée, avec un arrière-plan sobre, peu détaillé et visuellement calme.\n"
+        + "Cette zone est destinée à accueillir ultérieurement du texte descriptif.\n"
+        + "Éviter les éléments visuels trop contrastés ou complexes dans cette partie. Le décor peut légèrement se prolonger derrière " + (lieu ? "l'élément principal" : "les personnages") + ", mais doit rester discret à gauche.\n\n"
+        + "STYLE ARTISTIQUE (directives obligatoires) :\n" + (String(style || "").trim() || STYLE_SECOURS) + "\n\n"
+        + "QUALITÉ :\nIllustration de concept art professionnelle, finition soignée, silhouettes lisibles, détails maîtrisés et cohérence visuelle entre " + (lieu ? "les éléments du lieu" : "les personnages et leur environnement") + ".\n\n"
+        + "CONTRAINTES :\n"
+        + (lieu ? "- Respecter la composition avec l'élément principal à droite.\n" : "- Respecter la composition avec les personnages à droite.\n")
+        + "- Conserver une grande zone libre à gauche.\n- Aucun texte, titre, logo ou inscription.\n- Aucun élément important coupé par les bords.\n"
+        + "- Conserver une marge périphérique.\n- Format paysage 16:9.\n- Ne pas utiliser de rendu photoréaliste ou de photographie.\n- Conserver une esthétique d'animation 2D haut de gamme.\n\n";
+}
+window.consigneIllustrationRecit = consigneIllustration;   // (pour les bancs)
 
-const CADRAGES = { scene: "1536x1024", personnage: "1024x1024", portrait: "1024x1536" };
+// 16:9 pour gpt-image-2 (la taille des bâtiments, ia_master.js) ; les modèles de
+// secours n'ont que le 3:2. Le livre cadre l'image sur la double page.
+const TAILLES = { "gpt-image-2": "1792x1024" };
 const ratioDe = (taille) => { const [w, h] = taille.split("x").map(Number); return +(w / h).toFixed(4); };
 
-async function dessiner(prompt, references, cadrage, options) {
+async function dessiner(prompt, references, sujet, options) {
     const o = options || {};
     const cles = lireCles();
-    const taille = CADRAGES[cadrage] || "1024x1024";
     // LES RÉFÉRENCES, comme l'avatar rhabillé : le portrait mis en PNG carré sur
     // le blanc (v325 ; imageVersBlobPng), joint dans l'ordre que le texte annonce.
     const blobs = [];
     for (const r of references || []) {
         if (!r.url || typeof window.imageVersBlobPng !== "function") continue;
-        const b = await window.imageVersBlobPng(r.url, "#FFFFFF").catch(() => null);   // (v325 : sur du blanc, comme le dessin)
+        const b = await window.imageVersBlobPng(r.url, "#FFFFFF").catch(() => null);
         if (b) blobs.push({ ...r, blob: b });
         else console.warn(`[MIA_ILLUSTRATEUR] Le portrait de ${r.nom} est illisible (${r.url}).`);
         if (blobs.length >= 4) break;
     }
     // Des héros sans leur image : on ne dessine pas des inconnus à leur place.
     if (o.herosAttendus && blobs.filter(b => b.heros).length < o.herosAttendus) {
-        throw new Error(`MIA_ILLUSTRATEUR : ${o.herosAttendus} héros attendus, ${blobs.filter(b => b.heros).length} référence(s) lisible(s) — pas de croquis`);
+        throw new Error(`MIA_ILLUSTRATEUR : ${o.herosAttendus} héros attendus, ${blobs.filter(b => b.heros).length} référence(s) lisible(s) — pas d'illustration`);
     }
     console.log(`🖋️ [MIA_ILLUSTRATEUR] ${blobs.length} référence(s) jointe(s)${blobs.length ? " : " + blobs.map(b => b.nom).join(", ") : ""}.`);
     const refsTexte = blobs.length ? ` The ${blobs.length} attached reference image${blobs.length > 1 ? "s show" : " shows"} the EXACT character${blobs.length > 1 ? "s" : ""} to draw, in this order: `
         + blobs.map((b, i) => `image ${i + 1} is ${b.nom}${b.qui ? " (" + b.qui + ")" : ""}${b.scene ? " — in the scene: " + b.scene : ""}`).join("; ")
         + ". Each of them must be clearly recognisable as the person in their reference image: same face, hairstyle, hair colour, beard or not, build, "
-        + "age, clothing and equipment — only translated into the black ink style. Do not copy the references' backgrounds, colours or poses: "
+        + "age, clothing, colours and equipment — in the illustration's style. Do not copy the references' backgrounds or poses: "
         + "pose them as the staging says. "
         + "Do not add any other person than those named here and in the description." : "";
     const mise = (o.miseEnScene ? ` STAGING: ${o.miseEnScene}.` : "")
         + (o.extrait ? ` The moment, exactly as the journal tells it (French; its writer, the "je"/"nous", is never drawn): « ${o.extrait} ». Stay faithful to it: who does what to whom, who hides, who sees whom.` : "");
-    const texte = `${STYLE_CROQUIS}${refsTexte}${mise} The sketch shows: ${prompt}`;
-    console.log(`🖋️ [MIA_ILLUSTRATEUR] La consigne du dessinateur : ${texte.slice(STYLE_CROQUIS.length).trim()}`);
+    const style = typeof window.instructionStyleIvalis === "function" ? await window.instructionStyleIvalis().catch(() => "") : "";
+    const entete = consigneIllustration(style, sujet === "lieu");
+    const texte = `${entete}THE ILLUSTRATION SHOWS: ${prompt}${refsTexte}${mise}`;
+    console.log(`🖋️ [MIA_ILLUSTRATEUR] La consigne du dessinateur : ${texte.slice(entete.length).trim()}`);
     const modeles = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1"];
     const delais = [5000, 15000, 30000];
-    let json = null;
+    let json = null, taille = "";
     for (const model of modeles) {
+        taille = TAILLES[model] || "1536x1024";
         for (let essai = 0; essai < 3 && !json; essai++) {
             let statut = 0, rep = "";
             try {
@@ -296,13 +321,13 @@ async function dessiner(prompt, references, cadrage, options) {
                     form.append("model", model);
                     form.append("prompt", texte);
                     blobs.forEach((b, i) => form.append("image[]", b.blob, `ref${i + 1}.png`));
-                    form.append("n", "1"); form.append("size", taille); form.append("quality", R.qualite); form.append("output_format", "png");
+                    form.append("n", "1"); form.append("size", TAILLES[model] || "1536x1024"); form.append("quality", R.qualite); form.append("output_format", "png");
                     if (model !== "gpt-image-2") form.append("input_fidelity", "high");
                     r = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { "Authorization": "Bearer " + cles.openai }, body: form });
                 } else {
                     r = await fetch("https://api.openai.com/v1/images/generations", {
                         method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + cles.openai },
-                        body: JSON.stringify({ model, prompt: texte, n: 1, size: taille, quality: R.qualite, output_format: "png", moderation: "low" })
+                        body: JSON.stringify({ model, prompt: texte, n: 1, size: TAILLES[model] || "1536x1024", quality: R.qualite, output_format: "png", moderation: "low" })
                     });
                 }
                 statut = r.status; rep = await r.text();
@@ -316,12 +341,11 @@ async function dessiner(prompt, references, cadrage, options) {
     }
     if (!json) throw new Error("MIA_ILLUSTRATEUR : aucune image");
     const source = json.data[0].url || ("data:image/png;base64," + json.data[0].b64_json);
-    const depot = typeof window.televerserImageDetoureeIvalis === "function"
-        ? await window.televerserImageDetoureeIvalis(source, cadrage === "portrait" ? "PNJ" : "Recit/Illustrations", cles, { fond: "blanc" }) : "";
-    if (!depot) throw new Error("MIA_ILLUSTRATEUR : dépôt impossible");
-    // (Un trait d'encre : la compression automatique la plus fine, pas d'escalier.)
-    const url = String(depot).replace("/upload/q_auto,f_auto/", "/upload/q_auto:best,f_auto/");
-    return { url, ratio: ratioDe(taille), references: blobs.map(b => b.nom), consigne: texte.slice(STYLE_CROQUIS.length).trim() };
+    // (v346) Une image pleine, avec son décor : déposée telle quelle.
+    const url = typeof window.televerserImageDetoureeIvalis === "function"
+        ? await window.televerserImageDetoureeIvalis(source, "Recit/Illustrations", cles, { fond: "aucun" }) : "";
+    if (!url) throw new Error("MIA_ILLUSTRATEUR : dépôt impossible");
+    return { url, ratio: ratioDe(taille), references: blobs.map(b => b.nom), consigne: texte.slice(entete.length).trim() };
 }
 
 // ---------------------------------------------------------------------
@@ -347,11 +371,16 @@ async function fichesPnj(noms, connus) {
     }
     return trouves;
 }
-// Un PNJ nommé sans portrait : son croquis en pied, rangé dans sa fiche (créée s'il le faut).
+// Un PNJ nommé sans portrait : son portrait, rangé dans sa fiche (créée s'il le faut).
+// (v346) Le procédé de l'avatar des héros (ia_master.js : le style de la base, le
+// fond magenta détouré, 1024 × 1792) ; le livre le pose en pleine page de droite.
 async function portraitDuPnj(p, fiche) {
     const description = (fiche && fiche.Description_Physique) || p.description_physique || "";
     const race = (fiche && fiche.Race) || p.race || "Humain";
-    const img = await dessiner(`a full-length portrait of ${p.nom}, a ${race}: ${description}. Standing, three-quarter view, the whole figure from head to feet.`, [], "portrait");
+    const url = typeof window.portraitPnjFaconAvatar === "function" ? await window.portraitPnjFaconAvatar(description, race) : "";
+    // (Un dépôt manqué rend l'image brute, en data: : elle ne va pas dans la fiche.)
+    if (!url || String(url).startsWith("data:")) throw new Error("MIA_ILLUSTRATEUR : pas de portrait");
+    const img = { url, ratio: ratioDe("1024x1792") };
     let id = fiche && fiche.__id;
     try {
         if (id) await updateDoc(doc(db, "Monde_PNJ", id), { URL_Cloudinary: img.url });
@@ -364,7 +393,7 @@ async function portraitDuPnj(p, fiche) {
             });
         }
     } catch (e) { console.error("[MIA_ILLUSTRATEUR] La fiche du PNJ :", e); }
-    return { Nom: p.nom, Url: img.url, Ratio: img.ratio };
+    return { Nom: p.nom, Url: img.url, Ratio: img.ratio, Format: "avatar" };
 }
 
 // ---------------------------------------------------------------------
@@ -404,7 +433,10 @@ window.illustrerLeRecit = async function (options) {
         // description qui parlent de lui (ou d'un « I/me/we ») sont retirées.
         a.description = sansLeNarrateur(a.description);
         const refs = [];
-        const acteurs = acteursDuCroquis(a, o.texteMJ);
+        // (v346) Un lieu seul : personne dans l'image.
+        const lieu = a.sujet === "lieu";
+        const sujet = lieu ? "lieu" : a.sujet === "personnage" ? "personnage" : "scene";
+        const acteurs = lieu ? { heros: [], pnj: [], autres: [], perdus: [], scene: {} } : acteursDuCroquis(a, o.texteMJ);
         // (v326) Un héros qu'on ne retrouve pas n'est pas dessiné — ni personne à sa
         // place ; les autres le sont (avant, tout le croquis tombait).
         if (acteurs.perdus.length) console.warn(`[MIA_ILLUSTRATEUR] Héros introuvable(s) dans la partie, laissé(s) hors du croquis : ${acteurs.perdus.join(", ")}.`);
@@ -433,9 +465,9 @@ window.illustrerLeRecit = async function (options) {
                 : " No person at all in the drawing: no narrator, no onlooker, no figure in the distance.";
             const miseEnScene = String(a.mise_en_scene || "").trim();
             const extrait = String(a.extrait || "").replace(/\s+/g, " ").trim().slice(0, 600);
-            const img = await dessiner(a.description + qui, refs, a.sujet === "personnage" ? "personnage" : "scene", { herosAttendus: heros.length - sansImage.length, miseEnScene, extrait });
-            const taille = +(R.tailleMin + Math.random() * (R.tailleMax - R.tailleMin)).toFixed(3);
-            const illustration = { Url: img.url, Ratio: img.ratio, Taille: taille, Moment: String(a.moment || ""), Sujet: a.sujet === "personnage" ? "personnage" : "scene", Le: Date.now(),
+            const img = await dessiner(a.description + qui, refs, sujet, { herosAttendus: heros.length - sansImage.length, miseEnScene, extrait });
+            // (v346) Format « double-page » : le livre la pose en fond d'une double page.
+            const illustration = { Url: img.url, Ratio: img.ratio, Format: "double-page", Moment: String(a.moment || ""), Sujet: sujet, Le: Date.now(),
                 // (v323) Pour vérifier après coup : les portraits joints, la consigne envoyée.
                 References: img.references || [], Consigne: String(img.consigne || "").slice(0, 1800), ...(force ? { Force: true } : {}) };
             await updateDoc(ref, { Illustration: illustration });

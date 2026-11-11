@@ -257,7 +257,8 @@ await section(async () => {
 
 {
   const html = lire("index.html");
-  verifier("version 345 ; grimoire_regions.js v11", /VERSION_IVALIS = 345;/.test(lire("trace_combat.js")) && JSON.parse(lire("version.json")).version === 345 && html.includes('grimoire_regions.js?v=11"'));
+  verifier("version 345 ou plus ; grimoire_regions.js v11 ou plus", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 345 && JSON.parse(lire("version.json")).version >= 345
+    && Number((/grimoire_regions\.js\?v=(\d+)"/.exec(html) || [])[1]) >= 11);
 }
 console.log(erreurs.length ? "\nErreurs de page : " + erreurs.slice(0, 5).join(" | ") : "");
 console.log(`\n${echecs ? echecs + " ÉCHEC(S)" : "TOUS LES CONTRÔLES PASSENT"}`);

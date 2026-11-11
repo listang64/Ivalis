@@ -195,7 +195,7 @@ const illustrer = (avis, texteMJ) => p.evaluate(async ([avis, texteMJ]) => {
   return { doc: (window.__docs || {})["Messages_Chat/" + id] || null, blobs: window.__blobs.slice(), fonds: window.__fonds.slice(), depots: window.__depots.slice(), agent: window.__agent };
 }, [avis, texteMJ]);
 const TEXTE_MJ = "Fargus pivote d'un bloc vers nous, la voix sourde et précipitée : « Qu'est-ce qu'on fait ? Cachons-nous ! »";
-const croquisDepuis = (n) => imagesIA.slice(n).find(x => /pen-and-ink/.test(x.corps));
+const croquisDepuis = (n) => imagesIA.slice(n).find(x => /concept art/.test(x.corps));
 const nbImages = (c) => (c.corps.match(/name="image\[\]"/g) || []).length;
 
 const ill = (k, taille, ratio) => ({ Url: `https://res.cloudinary.com/x/image/upload/v1/Recit/Illustrations/croquis_${k}.png`, Ratio: ratio, Taille: taille });

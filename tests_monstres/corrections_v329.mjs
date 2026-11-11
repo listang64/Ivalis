@@ -195,7 +195,7 @@ const illustrer = (avis, texteMJ) => p.evaluate(async ([avis, texteMJ]) => {
   return { doc: (window.__docs || {})["Messages_Chat/" + id] || null, blobs: window.__blobs.slice(), fonds: window.__fonds.slice(), depots: window.__depots.slice(), agent: window.__agent };
 }, [avis, texteMJ]);
 const TEXTE_MJ = "Fargus pivote d'un bloc vers nous, la voix sourde et précipitée : « Qu'est-ce qu'on fait ? Cachons-nous ! »";
-const croquisDepuis = (n) => imagesIA.slice(n).find(x => /pen-and-ink/.test(x.corps));
+const croquisDepuis = (n) => imagesIA.slice(n).find(x => /concept art/.test(x.corps));
 const nbImages = (c) => (c.corps.match(/name="image\[\]"/g) || []).length;
 
 
@@ -232,8 +232,8 @@ await section(async () => {
   await illustrer({ illustrer: true, moment: "dramatique", sujet: "scene", description: "Fargus tears the scroll from the slaver's belt.",
     acteurs: [{ id: "H1", nom: "Fargus", type: "heros", place: "center", action: "tearing a scroll from a belt", expression: "grim" }], mise_en_scene: "medium shot", pnj_nommes: [] }, "Fargus arrache le rouleau.");
   const cr = croquisDepuis(n);
-  verifier("le dessinateur doit faire une vignette qui s'efface vers ses bords", !!cr && /A VIGNETTE, NOT A RECTANGLE/.test(cr.corps) && /NOTHING touches the edges of the image/.test(cr.corps) && /no rectangular or square shape/.test(cr.corps), cr ? "" : "aucun croquis");
-  verifier("… avec une marge blanche sur chaque côté", !!cr && /At least a sixth of the image on every side stays pure white/.test(cr.corps));
+  // (v346) Plus de vignette d'encre : l'image prend la double page ; la marge reste (rien de coupé aux bords).
+  verifier("une marge de sécurité : rien d'important coupé par les bords (v346)", !!cr && /Conserver une marge de s.{1,2}curit.{1,2} sur les quatre c/.test(cr.corps), cr ? "" : "aucun croquis");
 });
 
 console.log(erreurs.length ? "\nErreurs de page : " + erreurs.slice(0, 5).join(" | ") : "");

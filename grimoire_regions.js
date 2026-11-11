@@ -309,6 +309,16 @@
         if (!el) { el = document.createElement("div"); el.id = "region-pliure"; el.className = "region-pliure"; el.innerHTML = `<i class="gauche"></i><i class="droite"></i>`; }
         if (el.parentNode !== G().livre()) G().livre().appendChild(el);
         el.classList.toggle("paysage", paysage(r));
+        // (v346) Nico : « une ombre vient se mettre en plus au milieu, et disparaît dès
+        // que je sélectionne pour tourner ». Hors de la carte vivante (le papier entre le
+        // dos et le cadre), la page a déjà sa propre ombre : la pliure ne couvre que la carte.
+        const vue = $("vue-carte-region"), image = $("carte-region-image"), e = el.getBoundingClientRect();
+        const a = vue && vue.getBoundingClientRect(), b = image ? image.getBoundingClientRect() : a;
+        if (!a || !e.width || !el.offsetWidth) return;
+        const v = { top: Math.max(a.top, b.top), right: Math.min(a.right, b.right), bottom: Math.min(a.bottom, b.bottom), left: Math.max(a.left, b.left) };
+        const k = el.offsetWidth / e.width, px = (n) => Math.max(0, Math.round(n * k)) + "px";
+        const clip = `inset(${px(v.top - e.top)} ${px(e.right - v.right)} ${px(e.bottom - v.bottom)} ${px(v.left - e.left)})`;
+        if (el.style.clipPath !== clip) el.style.clipPath = clip;
     }
     // LE GROUPE SUR LA CARTE DU MONDE DU LIVRE (v312). Nico : « rebranche sur la map
     // globale le token de là où se trouve le groupe, et les traces de déplacement

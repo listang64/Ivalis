@@ -11130,3 +11130,30 @@ Test v273 mis à jour (v344) : depuis v339, MIA_TERRAIN lit la carte avant chaqu
 - grimoire_regions.js : la carte vivante reste cachée tant qu'elle n'est pas celle de la double page ouverte, sur la même condition que l'ombre de la pliure. Dessous, la page garde son image, ses lieux (v344) et sa propre ombre (grimoire.css). L'ombre est donc là à chaque image, sans fondu nécessaire.
 
 corrections_v345.mjs le vérifie, image par image (requestAnimationFrame), sur trois tournes : une page en avant, une en arrière, des pages qui défilent. La carte vivante n'y est jamais celle d'une autre page, ni montrée sans l'ombre. Il mesure aussi, à l'écran, l'ombre sur la carte après la tourne. Sur la v344 : 2 échecs (4 puis 11 images sans ombre).
+
+## v346 — Plus d'ombre en trop sur les cartes ; les images du récit en double page
+
+- Nico : « sur les pages des maps, une ombre vient se mettre en plus au milieu, et elle disparaît dès que je sélectionne pour tourner une page ».
+  - La cause : l'ombre de pliure de la carte vivante (v310) couvre 40 % du livre. Sur le papier entre le dos et le cadre de la carte, elle s'ajoutait à l'ombre de la page. Au premier geste de tourne, elle s'en allait.
+  - grimoire_regions.js (poserPliure) : la pliure de la carte est découpée (clip-path) à l'image de la carte, dans la carte vivante. Hors de la carte, seule reste l'ombre de la page.
+- Nico : « les images qui spawn vont se mettre en pleine double page avec la transition en dégradé, comme les fonds des classes et des races ».
+  - grimoire_recit.js (paginer) : l'image prend la première page de droite vierge (aucun texte n'y va) ; sa page de gauche reçoit la moitié gauche, voilée comme les fonds des classes (.fond-classe), et le texte s'y écrit par-dessus.
+    - On écrit à gauche : l'image se pose en face. Sur une page de droite encore blanche : elle la prend. Sinon : la double page suivante.
+    - Le texte d'après reprend sur la page de gauche suivante, une fois la gauche pleine.
+  - Le portrait d'un PNJ nouveau : seul, en pleine page de droite.
+  - Les anciens croquis à l'encre (sans Format) gardent leur demi-page.
+  - « Elles apparaissent en fondu si le joueur est sur la page, et se préchargent comme les classes et les races » : l'adresse attend dans data-src. La double page ouverte, la précédente et la suivante se chargent. Une image chargée apparaît en fondu (1,2 s), une seule fois.
+- Nico : « il faut le personnage, et on fait le décors derrière, on garde le côté cinématographique », avec sa consigne (composition 16:9, personnages à droite, zone libre à gauche, contraintes) ; « reprends le style graphique de la base, celui des avatars » ; « un lieu seul sans personnage si besoin » ; le gros plan forcé « au hasard sur un des héros présents ».
+  - illustrations_recit.js : sa consigne mot pour mot, le style lu dans Cerveau_IA/INST_76839 (le sien en secours). Le format est 1792 × 1024 en gpt-image-2. L'image est déposée telle quelle (app.js : fond « aucun ») et rangée en Format « double-page ».
+  - L'agent peut choisir « lieu » : aucun personnage, l'élément principal à droite.
+  - Le gros plan forcé devient un plan moyen, le héros à droite, le décor derrière.
+- Nico : « pour les nouveaux PNJ, le même procédé que pour l'avatar des personnages joueurs, et affiche-les pleine page de droite ».
+  - ia_master.js : window.portraitPnjFaconAvatar passe outre la pause des portraits (v300) pour les PNJ présents dans la scène. On garde le style de la base, le fond magenta détouré, le format 1024 × 1792 et le Format « avatar ».
+
+corrections_v346.mjs le vérifie :
+- l'ombre : la bande du milieu au repos contre doigt posé ; sur la v345, 52 et 30 colonnes plus sombres ;
+- la mise en page : à gauche, à droite, le portrait, l'ancien croquis ;
+- le fondu et le préchargement ;
+- la consigne, le lieu seul, le gros plan au hasard, le portrait comme l'avatar.
+
+Les contrôles des tests v314, v315, v318, v325, v326 et v329 qui visaient le croquis à l'encre sont mis à jour vers la v346. v330 passe par le vrai procédé avatar, avec un faux dépôt Cloudinary.

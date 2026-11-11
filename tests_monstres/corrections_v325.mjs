@@ -196,7 +196,7 @@ const illustrer = (avis, texteMJ) => p.evaluate(async ([avis, texteMJ]) => {
   return { doc: (window.__docs || {})["Messages_Chat/" + id] || null, blobs: window.__blobs.slice(), fonds: window.__fonds.slice(), depots: window.__depots.slice(), agent: window.__agent };
 }, [avis, texteMJ]);
 const TEXTE_MJ = "Fargus pivote d'un bloc vers nous, la voix sourde et précipitée : « Qu'est-ce qu'on fait ? Cachons-nous ! »";
-const croquisDepuis = (n) => imagesIA.slice(n).find(x => /pen-and-ink/.test(x.corps));
+const croquisDepuis = (n) => imagesIA.slice(n).find(x => /concept art/.test(x.corps));
 const nbImages = (c) => (c.corps.match(/name="image\[\]"/g) || []).length;
 
 
@@ -235,12 +235,13 @@ await section(async () => {
               { id: "H1", nom: "Fargus", type: "heros", place: "right", action: "motionless, covered in moss and ivy, camouflaged as an old stump", expression: "frozen, holding his breath" }],
     mise_en_scene: "low angle close on the kick, the sandal hitting the greave as the focal point; Fargus a huge dark mass of moss and hatching", extrait, pnj_nommes: [] }, extrait);
   const cr = croquisDepuis(n);
-  verifier("le dessin est demandé en noir sur un fond BLANC, sans plus aucun magenta", !!cr && /PURE BLACK INK ON A PURE WHITE BACKGROUND/.test(cr.corps) && !/magenta|FF00FF/i.test(cr.corps), cr ? "" : "aucun croquis");
-  verifier("des traits épais et lisibles, des hachures, des masses noires", !!cr && /THICK, CONFIDENT LINES/.test(cr.corps) && /cross-hatching/.test(cr.corps) && /SOLID BLACK masses/.test(cr.corps) && /never thin grey pencil lines/.test(cr.corps));
-  verifier("une mise en scène artistique (cadrage, point focal, silhouettes)", !!cr && /ARTISTIC STAGING/.test(cr.corps) && /clear focal point/.test(cr.corps) && /STAGING: low angle close on the kick/.test(cr.corps));
+  // (v346) L'encre noire sur blanc est remplacée par le concept art en couleur (corrections_v346.mjs) ;
+  // reste : pas de magenta, et la mise en scène de l'agent part au dessinateur.
+  verifier("l'illustration, sans magenta (v346 : un concept art)", !!cr && /concept art/.test(cr.corps) && !/magenta|FF00FF/i.test(cr.corps), cr ? "" : "aucun croquis");
+  verifier("la mise en scène de l'agent part au dessinateur", !!cr && /STAGING: low angle close on the kick/.test(cr.corps));
   verifier("le moment tel que le texte le raconte part au dessinateur (fidèle : qui cache qui)", !!cr && cr.corps.includes("petit coup du bout de sa sandale") && /Stay faithful to it/.test(cr.corps));
   verifier("le portrait de Fargus est mis sur du BLANC pour partir", JSON.stringify(res.fonds) === '["#FFFFFF"]', JSON.stringify(res.fonds));
-  verifier("au dépôt, c'est le blanc qu'on retire (pas le magenta)", JSON.stringify(res.depots) === '[{"fond":"blanc"}]', JSON.stringify(res.depots));
+  verifier("au dépôt, rien n'est retiré (v346 : une image pleine, avec son décor)", JSON.stringify(res.depots) === '[{"fond":"aucun"}]', JSON.stringify(res.depots));
   verifier("l'agent cherche LE moment précis, fidèle, et le recopie (« extrait »)", /LE MOMENT PRÉCIS/.test(res.agent) && /dans \\"extrait\\"/.test(res.agent) && /directeur artistique/.test(res.agent));
 });
 

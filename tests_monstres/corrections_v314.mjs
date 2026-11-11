@@ -177,6 +177,9 @@ const CROQUIS = await (async () => { const pg = await b.newPage(); const u = awa
   x.beginPath(); x.arc(300, 140, 50, 0, 7); x.stroke(); x.beginPath(); x.moveTo(300, 190); x.lineTo(300, 320); x.moveTo(300, 230); x.lineTo(240, 280); x.moveTo(300, 230); x.lineTo(370, 260); x.stroke();
   return c.toDataURL("image/png"); }); await pg.close(); return Buffer.from(u.split(",")[1], "base64"); })();
 await p.route(/res\.cloudinary\.com\/x\/image\/upload\/v1\/(Recit|PNJ)\//, r => r.fulfill({ status: 200, contentType: 'image/png', body: CROQUIS }));
+// (v346) Le portrait d'un PNJ nouveau passe par le procédé de l'avatar (ia_master.js), qui dépose lui-même : un faux dépôt.
+await p.route('**/api.cloudinary.com/**', r => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' },
+  body: JSON.stringify({ secure_url: "https://res.cloudinary.com/x/image/upload/v1/PNJ/portrait.png", public_id: "PNJ/portrait" }) }));
 
 // =========================================================================
 titre("1. LE LIVRE : LA COUVERTURE, LE MARQUE-PAGE DU NARRATEUR, LES PAPIERS VIEILLIS, LES TACHES DE CAFÉ");
@@ -225,16 +228,18 @@ await section(async () => {
   const res = await p.evaluate(() => window.illustrerLeRecit({ idMessage: "m1", texteMJ: "Varos éclate de rire quand Kaya glisse sur une amphore.", texteJoueurs: "Kaya : je cours vers le comptoir", pnjConnus: {} }));
   const a = await p.evaluate(() => window.__agent[0]);
   verifier("après le Narrateur, l'agent lit les messages des joueurs et la réponse du Narrateur", !!a && /je cours vers le comptoir/.test(a.corps.contents[0].parts[0].text) && /Varos éclate de rire/.test(a.corps.contents[0].parts[0].text) && /drôle|dramatique/.test(a.corps.systemInstruction.parts[0].text));
-  const croquis = imagesIA.find(x => /edits/.test(x.url) && /pen-and-ink/.test(x.corps));
-  verifier("le croquis : à l'encre, sur fond blanc (v325 : le blanc retiré), qualité « medium » (v315)", !!croquis && /PURE WHITE BACKGROUND \(#FFFFFF\)/.test(croquis.corps) && /name="quality"\r\n\r\nmedium/.test(croquis.corps), croquis ? croquis.url : imagesIA.map(x => x.url).join(","));
+  const croquis = imagesIA.find(x => /edits/.test(x.url) && /concept art/.test(x.corps));
+  // (v346) Le croquis à l'encre est devenu une illustration de concept art en double page.
+  verifier("l'illustration : un concept art (v346), qualité « medium » (v315)", !!croquis && /concept art/.test(croquis.corps) && /name="quality"\r\n\r\nmedium/.test(croquis.corps), croquis ? croquis.url : imagesIA.map(x => x.url).join(","));
   verifier("les héros du croquis en référence, avec leur nom (comme pour les avatars)", !!croquis && (croquis.corps.match(/name="image\[\]"/g) || []).length === 1 && /image 1 is Kaya/.test(croquis.corps), "");
-  verifier("une scène : en paysage (1536 × 1024)", !!croquis && /name="size"\r\n\r\n1536x1024/.test(croquis.corps));
+  verifier("une scène : en paysage 16:9 (1792 × 1024, v346)", !!croquis && /name="size"\r\n\r\n1792x1024/.test(croquis.corps));
   const m = await p.evaluate(() => window.__docs["Messages_Chat/m1"]);
-  verifier("le croquis est rangé sur le message du Narrateur (taille au hasard)", !!m && !!m.Illustration && /Recit\/Illustrations/.test(m.Illustration.Url) && m.Illustration.Ratio === 1.5 && m.Illustration.Taille >= 0.42 && m.Illustration.Taille <= 0.82, JSON.stringify(m && m.Illustration));
-  const portrait = imagesIA.find(x => /generations/.test(x.url) && /Varos/.test(x.corps));
+  verifier("l'illustration est rangée sur le message du Narrateur (v346 : en double page)", !!m && !!m.Illustration && /Recit\/Illustrations/.test(m.Illustration.Url) && m.Illustration.Ratio === 1.75 && m.Illustration.Format === "double-page", JSON.stringify(m && m.Illustration));
+  const portrait = imagesIA.find(x => /generations/.test(x.url) && /FOND TOTALEMENT MAGENTA/.test(x.corps));
   const pnj = await p.evaluate(() => Object.entries(window.__docs).filter(([k]) => /^Monde_PNJ\//.test(k)).map(([k, v]) => v));
-  verifier("Varos, PNJ nommé absent de la base : son portrait en pied, dans le même style", !!portrait && /pen-and-ink/.test(portrait.corps) && /1024x1536/.test(portrait.corps) && !imagesIA.some(x => /full-length portrait of Kaya/.test(x.corps)), portrait ? "" : "aucun");
-  verifier("… rangé dans la base (Monde_PNJ, son image avec)", pnj.length === 1 && pnj[0].Nom_PNJ === "Varos" && /PNJ\/croquis/.test(pnj[0].URL_Cloudinary), JSON.stringify(pnj));
+  // (v346) Le portrait d'un PNJ nouveau : le procédé de l'avatar (ia_master.js : fond magenta, 1024 × 1792).
+  verifier("Varos, PNJ nommé absent de la base : son portrait, comme l'avatar des héros (v346)", !!portrait && /FOND TOTALEMENT MAGENTA/.test(portrait.corps) && /1024x1792/.test(portrait.corps) && /aubergiste/.test(portrait.corps), portrait ? "" : "aucun");
+  verifier("… rangé dans la base (Monde_PNJ, son image avec)", pnj.length === 1 && pnj[0].Nom_PNJ === "Varos" && /PNJ\/portrait/.test(pnj[0].URL_Cloudinary), JSON.stringify(pnj));
   verifier("… et posé en pleine page (Portraits_PNJ du message)", !!m && Array.isArray(m.Portraits_PNJ) && m.Portraits_PNJ[0].Nom === "Varos", JSON.stringify(m && m.Portraits_PNJ));
   // Juste après : pas de second croquis (au plus un toutes les deux réponses).
   const avant = imagesIA.length;
@@ -247,15 +252,16 @@ await section(async () => {
   await relayer([{ idDoc: "m1", ID_Partie: "P1", Auteur_ID: "MJ", Auteur_Nom: "MJ", Est_Narration_IA: true, Texte: texte, Timestamp: 1000, Illustration: msg.Illustration, Portraits_PNJ: msg.Portraits_PNJ }], true);
   await p.waitForTimeout(900);
   const livre = await p.evaluate(() => {
-    const fig = document.querySelector(".page-recit .croquis-recit"), por = document.querySelector(".page-recit .portrait-pleine-page");
+    // (v346) L'illustration : le fond d'une double page (dégradé à gauche, l'image à droite).
+    const fig = document.querySelector(".page-recit .fond-recit.gauche"), por = document.querySelector(".page-recit .portrait-pleine-page");
     const pageFig = fig && fig.closest(".page-recit"), pagePor = por && por.closest(".page-recit");
-    const apres = fig ? !!(fig.previousElementSibling && fig.previousElementSibling.classList.contains("para-recit")) : false;
+    const droite = !!document.querySelector(".page-recit .fond-recit.droite"), apres = fig ? !!fig.parentElement.querySelector(".para-recit") : false;
     return { fig: !!fig, apres, largeur: fig ? fig.style.width : "", por: !!por, seul: pagePor ? pagePor.querySelectorAll(".para-recit").length === 0 : false, nom: por ? por.querySelector("figcaption").textContent : "",
-             anim: fig ? getComputedStyle(fig.querySelector("img")).animationName : "" };
+             droite, fondu: fig ? getComputedStyle(fig.querySelector("img")).transitionDuration : "" };
   });
-  verifier("le croquis se dessine dans le livre, à la suite du paragraphe", livre.fig && livre.apres && livre.anim === "croquis-monte", JSON.stringify(livre));
+  verifier("l'illustration se pose dans le livre, en double page, le texte par-dessus à gauche (v346)", livre.fig && livre.droite && livre.apres && livre.fondu === "1.2s", JSON.stringify(livre));
   verifier("le portrait du PNJ nouveau : une pleine page à lui, son nom dessous", livre.por && livre.seul && livre.nom === "Varos", JSON.stringify(livre));
-  await p.evaluate(() => { const pg = document.querySelector(".croquis-recit").closest(".page-grimoire"); window.GRIMOIRE.allerALaPage(window.GRIMOIRE.indexDe(pg)); });
+  await p.evaluate(() => { const pg = document.querySelector(".fond-recit").closest(".page-grimoire"); window.GRIMOIRE.allerALaPage(window.GRIMOIRE.indexDe(pg)); });
   await p.waitForTimeout(2600); await pose(); await p.waitForTimeout(2600);
   await cap("v314_croquis");
   await p.evaluate(() => { const pg = document.querySelector(".portrait-pleine-page").closest(".page-grimoire"); window.GRIMOIRE.allerALaPage(window.GRIMOIRE.indexDe(pg)); });

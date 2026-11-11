@@ -3138,7 +3138,8 @@ async function detourerFondBlanc(imageSource) {
 }
 window.detourerFondBlancIvalis = detourerFondBlanc;
 // `options.fond` : "blanc" pour un dessin noir sur blanc (le blanc s'en va) ;
-// sinon le fond magenta des avatars et des pions.
+// "aucun" pour une image pleine, déposée telle quelle ; sinon le fond magenta des
+// avatars et des pions.
 async function televerserImageDetouree(imageSource, dossier, cles, options) {
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const form1 = new FormData();
@@ -3151,6 +3152,8 @@ async function televerserImageDetouree(imageSource, dossier, cles, options) {
         const json1 = await (await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/upload`, { method: "POST", body: form1 })).json();
         if (json1.secure_url) { urlSecurisee = json1.secure_url; publicId = json1.public_id; }
     } catch (e) { console.error("Compagnon : pont Cloudinary impossible :", e); }
+    // (v346) Une image pleine (les illustrations du récit, avec leur décor) : pas de détourage.
+    if (options && options.fond === "aucun") return publicId ? urlSecurisee.replace("/upload/", "/upload/q_auto,f_auto/") : "";
     const detouree = options && options.fond === "blanc" ? await detourerFondBlanc(urlSecurisee) : await detourerFondMagenta(urlSecurisee);
     const form2 = new FormData();
     form2.append("file", detouree); form2.append("api_key", cles.cloudKey);

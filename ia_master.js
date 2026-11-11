@@ -443,8 +443,12 @@ async function detourerFondMagentaPNJ(imageSource) {
 // créations d'images de PNJ pour le moment, ça va revenir après ». Les fiches
 // des PNJ se créent toujours ; seul le portrait attend (false le rallume).
 window.PORTRAITS_PNJ_EN_PAUSE = true;
-async function genererEtStockerImagePNJ(descriptionPhysique, racePNJ = "Humain") {
-    if (window.PORTRAITS_PNJ_EN_PAUSE !== false) return "";
+// (v346) Nico : « pour les nouveaux PNJ, utilise le même procédé que pour créer l'avatar
+// des personnages joueurs, et affiche-les en pleine page de droite ». MIA_ILLUSTRATEUR
+// (illustrations_recit.js) passe outre la pause pour les PNJ présents dans la scène.
+window.portraitPnjFaconAvatar = (description, race) => genererEtStockerImagePNJ(description, race, true);
+async function genererEtStockerImagePNJ(descriptionPhysique, racePNJ = "Humain", malgreLaPause = false) {
+    if (!malgreLaPause && window.PORTRAITS_PNJ_EN_PAUSE !== false) return "";
     const cles = {
         openai: localStorage.getItem("ivalis_OPENAI_API_KEY")?.trim(),
         cloudName: localStorage.getItem("ivalis_CLOUDINARY_CLOUD_NAME")?.trim(),

@@ -209,14 +209,15 @@ await section(async () => {
   const n = imagesIA.length;
   await illustrer({ illustrer: true, moment: "drôle", sujet: "scene", description: "Kaya slips on a wet amphora while Varos laughs, a stray wolf sniffing the spilled wine. I watch from the doorway, laughing.",
                     heros: ["Kaya"], pnj_dans_le_croquis: ["Varos"], autres: ["a stray wolf"], nombre: 3, pnj_nommes: [] }, "Varos éclate de rire quand Kaya glisse sur une amphore ; je ris aussi depuis le seuil.");
-  const cr = imagesIA.slice(n).find(x => /pen-and-ink/.test(x.corps));
+  const cr = imagesIA.slice(n).find(x => /concept art/.test(x.corps));
   verifier("le dessinateur reçoit le compte exact et les noms (Kaya, Varos, le loup), personne d'autre", !!cr && /EXACTLY 3 figures in the whole drawing: Kaya, Varos, a stray wolf/.test(cr.corps) && /no narrator, no chronicler, no onlooker, no crowd/.test(cr.corps), cr ? "" : "aucun croquis");
   verifier("la phrase du chroniqueur (« I watch from the doorway ») ne part pas au dessinateur", !!cr && !/I watch|doorway/.test(cr.corps));
-  verifier("que de l'encre NOIRE (v325 : sur un fond blanc, retiré au dépôt), pas de couleur", !!cr && /PURE BLACK INK ON A PURE WHITE BACKGROUND/.test(cr.corps) && /no colour at all/.test(cr.corps) && !/brown-black/.test(cr.corps));
+  // (v346) Plus d'encre noire : l'illustration est en couleur (concept art) — voir corrections_v346.mjs.
+  verifier("plus d'encre noire sur blanc : un concept art (v346)", !!cr && /concept art/.test(cr.corps) && !/PURE BLACK INK/.test(cr.corps));
   // Un lieu sans personne.
   const n2 = imagesIA.length;
   await illustrer({ illustrer: true, moment: "lieu", sujet: "scene", description: "A ruined temple of Hera half swallowed by the dunes at dusk.", heros: [], pnj_dans_le_croquis: [], autres: [], nombre: 0, pnj_nommes: [] }, "Le temple d'Héra se dresse, à moitié englouti par les dunes.");
-  const lieu = imagesIA.slice(n2).find(x => /pen-and-ink/.test(x.corps));
+  const lieu = imagesIA.slice(n2).find(x => /concept art/.test(x.corps));
   verifier("un lieu : « personne du tout » dans le dessin (pas même un passant)", !!lieu && /No person at all in the drawing/.test(lieu.corps), lieu ? "" : "aucun croquis");
 });
 

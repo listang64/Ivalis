@@ -196,7 +196,7 @@ const illustrer = (avis, texteMJ, extra) => p.evaluate(async ([avis, texteMJ, ex
   return { doc: (window.__docs || {})["Messages_Chat/" + id] || null, blobs: window.__blobs.slice(), fonds: window.__fonds.slice(), depots: window.__depots.slice(), agent: window.__agent };
 }, [avis, texteMJ, extra || null]);
 const TEXTE_MJ = "Fargus pivote d'un bloc vers nous, la voix sourde et précipitée : « Qu'est-ce qu'on fait ? Cachons-nous ! »";
-const croquisDepuis = (n) => imagesIA.slice(n).find(x => /pen-and-ink/.test(x.corps));
+const croquisDepuis = (n) => imagesIA.slice(n).find(x => /concept art/.test(x.corps));
 const nbImages = (c) => (c.corps.match(/name="image\[\]"/g) || []).length;
 
 const RIEN = { illustrer: false, pnj_nommes: [] };
@@ -213,9 +213,10 @@ await section(async () => {
   const res = await illustrer(RIEN, TEXTE, { narrationsSansCroquis: 2 });
   const cr = croquisDepuis(n), il = res.doc && res.doc.Illustration;
   verifier("à la 3e : un croquis quand même, marqué « forcé »", !!cr && !!il && il.Force === true, il ? JSON.stringify({ Force: il.Force, Moment: il.Moment, Sujet: il.Sujet }) : "aucun");
-  verifier("un gros plan (cadrage carré, « personnage »)", !!il && il.Sujet === "personnage" && il.Moment === "gros plan" && !!cr && /name="size"\r\n\r\n1024x1024/.test(cr.corps));
+  // (v346) Le « gros plan » forcé devient un plan moyen en 16:9, le héros à droite, le décor derrière.
+  verifier("un plan sur un héros (« personnage »), en 16:9 (v346)", !!il && il.Sujet === "personnage" && il.Moment === "gros plan" && !!cr && /name="size"\r\n\r\n1792x1024/.test(cr.corps));
   verifier("d'un héros que le Narrateur vient de citer, avec son portrait", !!il && il.References.length === 1 && ["A- Fargus", "Kaya"].includes(il.References[0]), il ? JSON.stringify(il.References) : "");
-  verifier("tête et épaules, une expression forte, un disque noir derrière", !!cr && /A dramatic close-up of/.test(cr.corps) && /head and shoulders filling the frame/.test(cr.corps) && /solid black disc behind the head/.test(cr.corps));
+  verifier("un plan moyen, le héros sur la moitié droite, le décor derrière (v346)", !!cr && /cinematic medium shot, the hero on the right half of the frame/.test(cr.corps) && /the setting of the scene behind/.test(cr.corps));
   verifier("la phrase du récit qui parle de lui part avec (le moment)", !!cr && (/coup de sandale contre la jambi/.test(cr.corps) || /retient son souffle/.test(cr.corps)));
   verifier("toujours une seule figure", !!cr && /EXACTLY 1 figure in the whole drawing/.test(cr.corps));
 });
@@ -231,7 +232,7 @@ await section(async () => {
   const vrai = await illustrer({ illustrer: true, moment: "dramatique", sujet: "scene", description: "Fargus freezes as a sandal hits his greave.",
     acteurs: [{ id: "H1", nom: "Fargus", type: "heros", place: "center", action: "motionless", expression: "holding his breath" }], mise_en_scene: "low angle", pnj_nommes: [] }, TEXTE, { narrationsSansCroquis: 5 });
   const il = vrai.doc && vrai.doc.Illustration;
-  verifier("l'agent a vu un moment : c'est SON croquis (un seul, pas forcé)", !!il && !il.Force && imagesIA.slice(n2).filter(x => /pen-and-ink/.test(x.corps)).length === 1, il ? JSON.stringify({ Force: il.Force }) : "aucun");
+  verifier("l'agent a vu un moment : c'est SON croquis (un seul, pas forcé)", !!il && !il.Force && imagesIA.slice(n2).filter(x => /concept art/.test(x.corps)).length === 1, il ? JSON.stringify({ Force: il.Force }) : "aucun");
 });
 
 // =========================================================================
