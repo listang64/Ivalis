@@ -961,13 +961,18 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  provocationAttaques: 10, bouclierLourdSansMalus: true },
         { niveau: 9,  techniques: ["CLASSE_RESONANCE_BOUCLIER"] }
     ],
-    // L'ASSASSIN : un KO lui donne +15 de critique pour 2 manches (Instinct du
-    // tueur, combat_etat.js) ; l'Assaut mortel au niveau 5 ; au niveau 10, son
-    // poison mord à chaque manche, plus fort (POISON_MAITRE, moteur_pur.js).
+    // L'ASSASSIN. v348, la refonte des classes (Nico) : un KO lui donne +15 de
+    // critique pour 2 manches, sans cumul (Instinct du tueur, combat_etat.js) ;
+    // au niveau 3, le Maître des poisons — son poison mord à chaque fin de
+    // manche, 2 manches durant (POISON_MAITRE, moteur_pur.js) ; l'Assaut mortel
+    // au niveau 5 ; au niveau 9, l'Instinct passe à +25 et devient cumulable :
+    // chaque KO ajoute son bonus, avec ses propres 2 manches, sans plafond
+    // (critiqueSurKOCumulable).
     "Assassin": [
         { niveau: 1,  critiqueSurKO: 15 },
+        { niveau: 3,  maitrePoisons: true },
         { niveau: 5,  techniques: ["CLASSE_ASSAUT_MORTEL"] },
-        { niveau: 10, maitrePoisons: true }
+        { niveau: 9,  critiqueSurKOCumulable: 25 }
     ],
     // LE MÉDICUS : +5 de régénération de fatigue en fin de manche (lue par
     // regenerationCombattant ici, et par le cerveau), une création de plus
@@ -1571,7 +1576,8 @@ window.texteAtout = function(cle, valeur) {
         case "effets":         return (valeur || []).map(id => `Effet de combat : ${nomEffet(id)}`).join(" · ");
         case "techniques":     return (valeur || []).map(id => `Technique : ${((window.TECHNIQUES_CLASSE || {})[id] || {}).Nom || id}`).join(" · ");
         case "critiqueSurKO":  return `Instinct du tueur : ${plus(n)} % de critique pendant 2 manches après un KO`;
-        case "maitrePoisons":  return "Maître des poisons : ses poisons mordent à chaque manche (18 % de fatigue, 9 % des PV max), 2 manches";
+        case "maitrePoisons":  return "Maître des poisons : ses poisons mordent à chaque manche (15 % de fatigue, 9 % des PV max), 2 manches";
+        case "critiqueSurKOCumulable": return `Instinct du tueur : ${plus(n)} % de critique pendant 2 manches à chaque KO, cumulable`;
         case "lumiereAveugle": return `Sorts de lumière : ${n} % de chance d'aveugler la cible`;
         case "maitriseLumiere": return `Maîtrise de la lumière : ${n} % de chance d'aveugler avec un sort de foudre (sans s'ajouter à l'Aveuglement)`;
         case "provocationAttaques": return `${n} % de chance de provoquer la cible de chacune de ses attaques`;

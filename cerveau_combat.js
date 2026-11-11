@@ -634,9 +634,9 @@ export function ticsDeFinDeManche(etat) {
         //  absorption ; seul le bouclier encaisse d'abord (POISON.brut).
         //  `tickFait` reste sur l'état : il voyage avec lui dans l'étape de
         //  vieillissement qui suit, donc le poison ne mord pas deux fois.
-        //  LE POISON DU MAÎTRE (Assassin, niveau 10) mord, lui, à CHAQUE fin
-        //  de manche tant qu'il dure (2 manches) : 18 % de l'énergie max et
-        //  10 % des PV max (POISON_MAITRE). Le KO qu'il fait revient à
+        //  LE POISON DU MAÎTRE (Assassin, niveau 3) mord, lui, à CHAQUE fin
+        //  de manche tant qu'il dure (2 manches) : 15 % de l'énergie max et
+        //  9 % des PV max (POISON_MAITRE). Le KO qu'il fait revient à
         //  l'Assassin (`idSource`, l'Instinct du tueur).
         const poison = c.etats.find(e => e && e.nom === "Empoisonnement" && (e.maitre ? nombre(e.duree) > 0 : !e.tickFait));
         if (poison) {

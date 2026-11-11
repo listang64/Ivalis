@@ -3,7 +3,7 @@
 // Nico : « vérifier que pour l'empoisonnement, la baisse de fatigue se fasse
 // bien sur la fatigue max de la cible et non actuelle. »
 // Règle (tableau des effets) : 10 % de l'énergie MAXIMUM, et 8 % des PV max
-// en dégâts bruts ; le poison du maître (Assassin 10) : 18 % et 9 %. Une
+// en dégâts bruts ; le poison du maître (Assassin 3, v348) : 15 % et 9 %. Une
 // cible de 150 d'énergie max qui n'en a plus que 30 perd donc 15 (pas 3).
 import fs from 'fs';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
@@ -44,7 +44,7 @@ console.log("\n=========================================================");
 console.log("  L'EMPOISONNEMENT : 10 % DE L'ÉNERGIE MAXIMUM");
 console.log("=========================================================\n");
 
-verifier("la règle : 10 % de l'énergie max (poison), 18 % (maître)", POISON.energiePct === 10 && POISON_MAITRE.energiePct === 18);
+verifier("la règle : 10 % de l'énergie max (poison), 15 % (maître, v348)", POISON.energiePct === 10 && POISON_MAITRE.energiePct === 15);
 const a = empoisonner(150, 30);
 verifier("150 max, 30 restants : perd 15 (10 % du max), pas 3 (10 % du reste)", a.max === 150 && a.perte === 15 && a.apres === 15,
          JSON.stringify(a));
@@ -53,7 +53,7 @@ verifier("150 max, plein : perd 15 aussi — la même morsure quel que soit le r
 const c = empoisonner(80, 5);
 verifier("80 max, 5 restants : tombe à 0 (8 dus, jamais en dessous de zéro)", c.apres === 0, JSON.stringify(c));
 const d = empoisonner(150, 40, true);
-verifier("poison du maître, 150 max, 40 restants : perd 27 (18 % du max)", d.perte === 27, JSON.stringify(d));
+verifier("poison du maître, 150 max, 40 restants : perd 23 (15 % du max, arrondi au-dessus)", d.perte === 23, JSON.stringify(d));
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

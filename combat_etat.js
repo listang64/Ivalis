@@ -190,6 +190,8 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         // met un ennemi KO (tomber, plus bas), et son poison de maître
         // (niveau 10, ticsDeFinDeManche dans cerveau_combat.js).
         critiqueSurKO: nombre(race.critiqueSurKO),
+        // (v348) Au niveau 9 : +25 par KO, cumulable (recompenserLeTueur).
+        critiqueSurKOCumulable: nombre(race.critiqueSurKOCumulable),
         maitrePoisons: !!race.maitrePoisons,
         // Le Médicus : des points de régénération de fatigue en plus, à chaque
         // fin de manche (regenererFinDeManche, cerveau_combat.js).
@@ -737,16 +739,25 @@ export const combattant = (etat, id) => (etat && etat.combattants) ? etat.combat
 // les tics de fin de manche, juste avant que les états ne vieillissent, en
 // porte une de plus, pour valoir encore les 2 manches qui viennent. Pas de
 // cumul : un nouveau KO relance la durée, jamais le bonus.
+// v348 (Nico : « au niveau 9, le bonus passe à 25 % et devient cumulable ») :
+// chaque KO pose SON Instinct (+25), avec ses propres 2 manches — deux KO coup
+// sur coup, +50 ; chacun tombe à la fin de ses manches. Pas de plafond.
 export const ETAT_INSTINCT_TUEUR = "Instinct du tueur";
 export const MANCHES_INSTINCT_TUEUR = 2;
 
 function recompenserLeTueur(etat, victime, idAuteur, finDeManche) {
     const auteur = combattant(etat, idAuteur);
-    const bonus = nombre(auteur && auteur.atouts && auteur.atouts.critiqueSurKO);
+    const cumulable = nombre(auteur && auteur.atouts && auteur.atouts.critiqueSurKOCumulable);
+    const bonus = cumulable > 0 ? cumulable : nombre(auteur && auteur.atouts && auteur.atouts.critiqueSurKO);
     if (!auteur || bonus <= 0 || auteur.aTerre) return [];
     if (victime.estIllusion || (auteur.camp || "Allié") === (victime.camp || "Allié")) return [];
     const duree = MANCHES_INSTINCT_TUEUR + (finDeManche ? 1 : 0);
     const etats = Array.isArray(auteur.etats) ? auteur.etats : [];
+    if (cumulable > 0) {
+        auteur.etats = [...etats, { nom: ETAT_INSTINCT_TUEUR, duree, bonusEquip: { critique: bonus }, cumulable: true,
+                                    desc: `+${bonus} % de chance de critique (cumulable).` }];
+        return [{ type: "etats", cible: auteur.id, pose: ETAT_INSTINCT_TUEUR, liste: auteur.etats }];
+    }
     const existant = etats.find(e => e && e.nom === ETAT_INSTINCT_TUEUR);
     auteur.etats = existant
         ? etats.map(e => e === existant ? { ...e, duree: Math.max(nombre(e.duree), duree) } : e)

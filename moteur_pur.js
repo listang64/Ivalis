@@ -114,11 +114,11 @@ export const REGLES_ETATS = {
 // magiques). Le bouclier, lui, encaisse toujours en premier. Un seul tic
 // (cerveau_combat.js, ticsDeFinDeManche).
 export const POISON = { energiePct: 10, pvMaxPct: 8, typeRes: "Magique", brut: true };
-// LE POISON DU MAÎTRE (Assassin, niveau 10) : 18 % de l'énergie maximum et
-// 9 % des PV max en dégâts bruts — à CHAQUE fin de manche, pendant 2
-// manches, là où le poison ordinaire ne mord qu'une fois.
-export const POISON_MAITRE = { energiePct: 18, pvMaxPct: 9, typeRes: "Magique", brut: true, manches: 2 };
-export const DESC_POISON_MAITRE = "Poison de maître : 18 % de l'énergie max et 9 % des PV max en dégâts bruts à chaque fin de manche, 2 manches.";
+// LE POISON DU MAÎTRE (Assassin, niveau 3 depuis la v348) : 15 % de l'énergie
+// maximum (18 jusqu'à la v347) et 9 % des PV max en dégâts bruts — à CHAQUE
+// fin de manche, pendant 2 manches, là où le poison ordinaire ne mord qu'une fois.
+export const POISON_MAITRE = { energiePct: 15, pvMaxPct: 9, typeRes: "Magique", brut: true, manches: 2 };
+export const DESC_POISON_MAITRE = "Poison de maître : 15 % de l'énergie max et 9 % des PV max en dégâts bruts à chaque fin de manche, 2 manches.";
 
 // LE SAIGNEMENT (tableau de Nico) : 8 % des PV max en dégâts PHYSIQUES à
 // chaque fin de manche tant qu'il dure (l'armure réduit, le bouclier encaisse
@@ -2721,7 +2721,7 @@ export function resoudreCarte(etat, action, plateau) {
             // (Le Saignement aussi : son auteur compte pour le Profanateur, dont
             // les dégâts sur la durée sont plus forts, et pour ses zombies.)
             const ronge = alt.nom === "Empoisonnement" || alt.nom === "Brûlé" || alt.nom === ETAT_SAIGNEMENT;
-            // LE MAÎTRE DES POISONS (Assassin, niveau 10) : son poison mord à
+            // LE MAÎTRE DES POISONS (Assassin, niveau 3) : son poison mord à
             // chaque fin de manche, 2 manches durant (POISON_MAITRE).
             const maitre = alt.nom === "Empoisonnement" && !!(lanceur && lanceur.atouts && lanceur.atouts.maitrePoisons);
             if (maitre) duree = Math.max(duree, POISON_MAITRE.manches);

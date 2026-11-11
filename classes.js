@@ -224,13 +224,16 @@ window.DESCRIPTIFS_CLASSES = {
             { niveau: 1, titre: "Instinct du tueur",
               points: ["Quand il met un ennemi KO : +15 % de chance de critique pendant 2 manches",
                        "Un nouveau KO relance la durée, sans cumul"] },
+            { niveau: 3, titre: "Maître des poisons",
+              points: ["Ses empoisonnements mordent à chaque fin de manche, 2 manches durant",
+                       "-15 % de fatigue (énergie max) et -9 % des PV max en dégâts bruts à chaque fois"] },
             { niveau: 5, titre: "Technique : Assaut mortel",
               points: ["Initiative 100 · aucune fatigue",
-                       "Une zone de deux cases au contact : 10 dégâts physiques à chaque ennemi",
+                       "Deux cibles adjacentes, au contact : 10 dégâts physiques à chaque ennemi",
                        "100 % d'empoisonnement, même s'il esquive · une fois par combat"] },
-            { niveau: 10, titre: "Maître des poisons",
-              points: ["Ses empoisonnements mordent à chaque fin de manche, 2 manches durant",
-                       "-18 % de fatigue (énergie max) et -9 % des PV max en dégâts bruts à chaque fois"] }
+            { niveau: 9, titre: "Instinct du tueur aiguisé",
+              points: ["Le bonus passe à +25 % de chance de critique, pendant 2 manches",
+                       "Cumulable : chaque KO ajoute le sien, avec ses propres 2 manches"] }
         ]
     },
     CLASSE_MEDICUS: {

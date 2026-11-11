@@ -12,6 +12,12 @@
 // chaque fin de manche, 2 manches), dégâts magiques avec réductions ; il vaut
 // pour tous ses poisons ; l'Assaut mortel se vise comme une zone de deux
 // cases au contact, et empoisonne même si le coup est esquivé.
+//
+// v348, la refonte des classes (Nico) : niveau 1 l'Instinct (+15, sans cumul) ;
+// niveau 3 le Maître des poisons (15 % de fatigue et 9 % des PV max à chaque
+// fin de manche, 2 manches) ; niveau 5 l'Assaut mortel ; niveau 9 l'Instinct à
+// +25, cumulable (chaque KO le sien, ses 2 manches, sans plafond) —
+// corrections_v348.mjs.
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -35,7 +41,7 @@ const REGLES = {
     defPhysique: w.defPhysiqueCombattant, defMagique: w.defMagiqueCombattant,
     critique: w.critiqueCombattant, atouts: w.atoutRace, bonusEquip: w.bonusEquip
 };
-const XP = { 1: 0, 4: 1800, 5: 2500, 9: 6400, 10: 7900 };
+const XP = { 1: 0, 2: 700, 3: 1200, 4: 1800, 5: 2500, 8: 5200, 9: 6400, 10: 7900 };
 
 const fiche = (id, extra = {}) => ({
     idPersonnage: id, prenom: id, race: "Humain", classe: "", camp: id.startsWith("M") ? "Ennemi" : "Allié",
@@ -75,15 +81,18 @@ console.log("  L'ASSASSIN");
 console.log("=========================================================");
 
 // =========================================================================
-console.log("\n1. LES PALIERS : 1, 5 ET 10");
+console.log("\n1. LES PALIERS (v348) : 1, 3, 5 ET 9");
 // =========================================================================
 {
-    const a1 = w.atoutClasse(assassin(1)), a5 = w.atoutClasse(assassin(5)), a9 = w.atoutClasse(assassin(9)), a10 = w.atoutClasse(assassin(10));
+    const a1 = w.atoutClasse(assassin(1)), a2 = w.atoutClasse(assassin(2)), a3 = w.atoutClasse(assassin(3)), a5 = w.atoutClasse(assassin(5));
+    const a8 = w.atoutClasse(assassin(8)), a9 = w.atoutClasse(assassin(9)), a10 = w.atoutClasse(assassin(10));
     verifier("niveau 1 : +15 de critique sur KO, ni technique ni maître",
-             a1.critiqueSurKO === 15 && !(a1.techniques || []).length && !a1.maitrePoisons, JSON.stringify(a1));
+             a1.critiqueSurKO === 15 && !(a1.techniques || []).length && !a1.maitrePoisons && !a1.critiqueSurKOCumulable, JSON.stringify(a1));
+    verifier("niveau 2 : pas encore maître ; niveau 3 : maître des poisons", !a2.maitrePoisons && a3.maitrePoisons === true && !(a3.techniques || []).length);
     verifier("niveau 5 : Assaut mortel", JSON.stringify(a5.techniques) === '["CLASSE_ASSAUT_MORTEL"]', JSON.stringify(a5.techniques));
-    verifier("niveau 9 : pas encore maître des poisons", !a9.maitrePoisons);
-    verifier("niveau 10 : maître des poisons (le bonus ne double pas)", a10.maitrePoisons === true && a10.critiqueSurKO === 15);
+    verifier("niveau 8 : l'Instinct reste à +15 sans cumul", a8.critiqueSurKO === 15 && !a8.critiqueSurKOCumulable);
+    verifier("niveau 9 : l'Instinct cumulable à +25 (le +15 ne s'y ajoute pas)", a9.critiqueSurKOCumulable === 25 && a9.critiqueSurKO === 15 && a9.maitrePoisons === true);
+    verifier("niveau 10 : les mêmes (la classe s'arrête au 9)", JSON.stringify(a10) === JSON.stringify(a9));
     const e = monde(10);
     verifier("en combat : l'atout est sur le combattant",
              e.combattants.S.atouts.critiqueSurKO === 15 && e.combattants.S.atouts.maitrePoisons === true
@@ -160,7 +169,7 @@ console.log("\n2. INSTINCT DU TUEUR : +15 DE CRITIQUE, 2 MANCHES, SUR TOUT KO");
 }
 
 // =========================================================================
-console.log("\n3. MAÎTRE DES POISONS (NIVEAU 10) : 18 % D'ÉNERGIE ET 9 % DES PV, À CHAQUE MANCHE, 2 MANCHES");
+console.log("\n3. MAÎTRE DES POISONS (NIVEAU 3, v348) : 15 % D'ÉNERGIE ET 9 % DES PV, À CHAQUE MANCHE, 2 MANCHES");
 // =========================================================================
 {
     const e = lancer(monde(10), "S", "M1", 0, { alterations: [POISON] }).etat;
@@ -170,15 +179,15 @@ console.log("\n3. MAÎTRE DES POISONS (NIVEAU 10) : 18 % D'ÉNERGIE ET 9 % DES P
     e.file = [];
     ticsDeFinDeManche(e);
     const m1 = e.combattants.M1;
-    verifier("1re fin de manche : -18 d'énergie, -9 PV", m1.fatigue === 82 && m1.pv === 91, `${m1.fatigue} / ${m1.pv}`);
+    verifier("1re fin de manche : -15 d'énergie, -9 PV", m1.fatigue === 85 && m1.pv === 91, `${m1.fatigue} / ${m1.pv}`);
     vieillirLesEtats(e);
     ticsDeFinDeManche(e);
-    verifier("2e fin de manche : encore -18 et -9", m1.fatigue === 64 && m1.pv === 82, `${m1.fatigue} / ${m1.pv}`);
+    verifier("2e fin de manche : encore -15 et -9", m1.fatigue === 70 && m1.pv === 82, `${m1.fatigue} / ${m1.pv}`);
     vieillirLesEtats(e);
     ticsDeFinDeManche(e);
-    verifier("puis il s'arrête", m1.fatigue === 64 && m1.pv === 82 && !m1.etats.some(x => x.nom === "Empoisonnement"),
+    verifier("puis il s'arrête", m1.fatigue === 70 && m1.pv === 82 && !m1.etats.some(x => x.nom === "Empoisonnement"),
              `${m1.fatigue} / ${m1.pv}`);
-    verifier("les chiffres de la règle", POISON_MAITRE.energiePct === 18 && POISON_MAITRE.pvMaxPct === 9 && POISON_MAITRE.manches === 2);
+    verifier("les chiffres de la règle", POISON_MAITRE.energiePct === 15 && POISON_MAITRE.pvMaxPct === 9 && POISON_MAITRE.manches === 2);
 
     const mag = lancer(monde(10), "S", "M1", 0, { alterations: [POISON] }).etat;
     mag.combattants.M1.def.magique = 50;
@@ -188,10 +197,10 @@ console.log("\n3. MAÎTRE DES POISONS (NIVEAU 10) : 18 % D'ÉNERGIE ET 9 % DES P
     // défense magique ne le réduit plus.
     verifier("la part des PV est brute : défense magique 50 %, toujours -9", mag.combattants.M1.pv === 91, String(mag.combattants.M1.pv));
 
-    const n9 = lancer(monde(9), "S", "M1", 0, { alterations: [POISON] }).etat;
+    const n9 = lancer(monde(2), "S", "M1", 0, { alterations: [POISON] }).etat;
     n9.file = [];
     ticsDeFinDeManche(n9); vieillirLesEtats(n9); ticsDeFinDeManche(n9);
-    verifier("niveau 9 : le poison ordinaire (10 et 8, une seule fois)",
+    verifier("niveau 2 : le poison ordinaire (10 et 8, une seule fois)",
              n9.combattants.M1.fatigue === 90 && n9.combattants.M1.pv === 92, `${n9.combattants.M1.fatigue} / ${n9.combattants.M1.pv}`);
 
     const autre = lancer(monde(10), "A", "M1", 0, { alterations: [POISON] }).etat;
@@ -220,7 +229,7 @@ console.log("\n4. ASSAUT MORTEL : UNE ZONE DE DEUX CASES AU CONTACT, 10 PHYSIQUE
     const c = pas.etat.combattants;
     verifier("10 dégâts physiques à chacun", c.M1.pv === 90 && c.M2.pv === 90, `${c.M1.pv} / ${c.M2.pv}`);
     verifier("et l'empoisonnement à chacun", ["M1", "M2"].every(id => c[id].etats.some(x => x.nom === "Empoisonnement")));
-    verifier("niveau 5 : poison ordinaire", !c.M1.etats.find(x => x.nom === "Empoisonnement").maitre);
+    verifier("niveau 5 : le poison du maître (maître depuis le niveau 3)", c.M1.etats.find(x => x.nom === "Empoisonnement").maitre === true);
     verifier("technique marquée « utilisée », tour clos, aucune énergie",
              c.S.techniquesUtilisees.includes("CLASSE_ASSAUT_MORTEL") && pas.etat.file[0].id === "M3" && c.S.fatigue === 100);
     verifier("l'état reste cohérent", verifierEtatCombat(pas.etat).length === 0, verifierEtatCombat(pas.etat).join(" | "));

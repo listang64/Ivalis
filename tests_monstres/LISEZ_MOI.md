@@ -11182,3 +11182,18 @@ Les contrôles des tests v314, v315, v318, v325, v326 et v329 qui visaient le cr
 corrections_v347.mjs le vérifie : la réserve (lancement, blocage, quatre paiements, à court, à terre, refus à 14), « Relâcher » (moteur, volet, file), les jets indépendants (carte et opportunité, sur 300 graines), le bouclier lourd, les textes.
 
 hoplite.mjs et bonus_race_classe.mjs sont mis à jour avec les nouvelles valeurs.
+
+## v348 — La refonte des classes : l'Assassin
+
+- Nico (sa fiche de l'Assassin) :
+  - niveau 1 : +15 % de critique pendant 2 tours après un KO, sans cumul — déjà en place ;
+  - niveau 3 : Maître des poisons ;
+  - niveau 5 : Assaut mortel — déjà en place : init 100, deux cibles adjacentes au contact, +10 physiques, 100 % d'empoisonnement ;
+  - niveau 9 : le bonus de critique passe à 25 % et devient cumulable.
+- app.js (ATOUTS_CLASSES) : les paliers passent à 1, 3, 5 et 9. Le Maître des poisons descend du niveau 10 au niveau 3.
+- moteur_pur.js (POISON_MAITRE) : 15 % de l'énergie max (au lieu de 18) et 9 % des PV max, à chaque fin de manche pendant 2 manches (réponse de Nico : « chaque tour, 2 tours »).
+- combat_etat.js (recompenserLeTueur) : au niveau 9 (critiqueSurKOCumulable : 25), chaque KO pose SON Instinct (+25), avec ses propres 2 manches. Pas de plafond (réponses de Nico). Avant le niveau 9, rien ne change : +15, un nouveau KO relance la durée.
+
+corrections_v348.mjs le vérifie : les paliers, le non-cumul jusqu'au niveau 8, le cumul au 9 (deux KO = +50, chacun tombe à la fin de ses manches, quatre KO = +100, le poison qui achève compte), le poison du maître dès le niveau 3, l'Assaut mortel qui pose ce poison, les textes.
+
+assassin.mjs et poison_fatigue_max.mjs sont mis à jour avec les nouvelles valeurs. Le contrôle de version de corrections_v347.mjs accepte désormais les versions suivantes.

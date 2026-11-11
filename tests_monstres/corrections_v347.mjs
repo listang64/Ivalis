@@ -342,11 +342,15 @@ console.log("\n7. LA FICHE DE CLASSE ET LES CARTES");
   verifier("la Résonance dit 80 % et 15 % des PV max du Protecteur", /80 %/.test(r.resonance.desc) && /15 % des PV max du Protecteur/.test(r.resonance.desc));
 }
 
-verifier("version 347 ; moteur_pur v70, cerveau v63, mouvement_pur v24 (carte des imports comprise), combat v161, app v147",
-  /VERSION_IVALIS = 347;/.test(fs.readFileSync(RACINE + "/trace_combat.js", "utf-8")) && JSON.parse(fs.readFileSync(RACINE + "/version.json", "utf-8")).version === 347
-  && (() => { const h = fs.readFileSync(RACINE + "/index.html", "utf-8");
-              return ['moteur_pur.js?v=70"', 'cerveau_combat.js?v=63"', 'mouvement_pur.js?v=24"', 'combat.js?v=161"', 'app.js?v=147"', 'objets.js?v=21"', 'classes.js?v=30"']
-                .every(x => h.split(x).length - 1 >= 1) && h.split('moteur_pur.js?v=70"').length - 1 === 2; })());
+verifier("version 347 ou plus ; les fichiers touchés ont monté (carte des imports comprise)",
+  (() => { const v = (re, txt) => Number((re.exec(txt) || [])[1]);
+           const h = fs.readFileSync(RACINE + "/index.html", "utf-8");
+           return v(/VERSION_IVALIS = (\d+);/, fs.readFileSync(RACINE + "/trace_combat.js", "utf-8")) >= 347
+             && JSON.parse(fs.readFileSync(RACINE + "/version.json", "utf-8")).version >= 347
+             && v(/"\.\/moteur_pur\.js\?v=(\d+)"/, h) >= 70 && v(/src="moteur_pur\.js\?v=(\d+)"/, h) === v(/"\.\/moteur_pur\.js\?v=(\d+)"/, h)
+             && v(/src="cerveau_combat\.js\?v=(\d+)"/, h) >= 63 && v(/src="mouvement_pur\.js\?v=(\d+)"/, h) >= 24
+             && v(/src="combat\.js\?v=(\d+)"/, h) >= 161 && v(/src="app\.js\?v=(\d+)"/, h) >= 147
+             && v(/src="objets\.js\?v=(\d+)"/, h) >= 21 && v(/src="classes\.js\?v=(\d+)"/, h) >= 30; })());
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
 await b.close(); serveur.close();
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
