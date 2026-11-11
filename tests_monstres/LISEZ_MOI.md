@@ -11116,3 +11116,5 @@ corrections_v344.mjs le vérifie :
 - la loupe : au repos, pendant la glisse (à la place exacte), ouverte, et en refermant ;
 - un lieu nouveau sur sa page ; aucun identifiant en double.
 corrections_v339 accepte maintenant des versions plus récentes des fichiers.
+
+Test v337 remis d’aplomb (v344) : au chargement, le livre s’ouvre de lui-même sur la région du groupe, et emmenait parfois ailleurs la demande d’aller sur la première carte (2 échecs déjà sur la v343). Il redemande maintenant tant que la carte n’est pas ouverte, comme corrections_v331.

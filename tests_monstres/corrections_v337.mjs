@@ -190,8 +190,14 @@ titre("1. D'UNE CARTE À L'AUTRE, LA LOUPE RESTE");
 await section(async () => {
   await attendreQue(() => p.evaluate(() => window.GRIMOIRE_REGIONS.regions().length === 4), 6000); await pose();
   const regions = await p.evaluate(() => window.GRIMOIRE_REGIONS.regions());
-  await p.evaluate((pg) => window.GRIMOIRE.allerALaPage(pg), regions[0].page);
-  await p.waitForTimeout(2500); await pose(); await p.waitForTimeout(900);
+  // (v344) Au chargement, le livre s'ouvre de lui-même sur la région du groupe : on
+  // redemande la première carte tant qu'elle n'est pas ouverte (comme corrections_v331).
+  for (let k = 0; k < 5; k++) {
+    await p.evaluate((pg) => window.GRIMOIRE.allerALaPage(pg), regions[0].page);
+    await p.waitForTimeout(2500); await pose();
+    if (await monteeSur(regions[0].numero)) break;
+  }
+  await p.waitForTimeout(900);
   const a = await etatLoupe();
   verifier("sur la première carte régionale, la loupe est là", !a.cachee && a.etat === "repos", JSON.stringify(a));
   // la région suivante : une page qui tourne
