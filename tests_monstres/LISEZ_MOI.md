@@ -11039,3 +11039,11 @@ Sur la v337 : 8 échecs.
 - LE PROTECTEUR (classes.js). Il a un nouveau fond (IMG_2257). Une base qui garde l'ancien (Hoplite_fond) prend le nouveau.
 
 corrections_v339.mjs vérifie tout cela, sur la vraie page.
+
+Tests mis à jour par la v339 :
+- aide_caracs.mjs : le Charisme ne liste plus l'Illusion.
+- choix_classe.mjs : le fond du Protecteur est IMG_2257.
+- talents.mjs : 26 talents, sans Dégâts illusoires.
+- corrections_v270.mjs : tolérance sur la proportion du texte (la taille minimale des jauges).
+- illusions_multiples.mjs est retiré : l'effet Illusion n'existe plus.
+- illusion_cerveau.mjs reste : le noyau sait toujours lire un leurre.

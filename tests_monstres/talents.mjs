@@ -66,8 +66,8 @@ console.log("=========================================================");
 console.log("\n1. LA LISTE, LES POINTS, LES PRÉREQUIS");
 {
     const par = Object.fromEntries(w.LIGNES_TALENTS.map(l => [l.nom, w.TALENTS.filter(t => t.carac === l.cle).length]));
-    verifier("27 talents : Général 5, Force 4, Dex 2, Con 4, Int 3, Sag 5, Cha 4", w.TALENTS.length === 27
-             && JSON.stringify(par) === '{"Général":5,"Force":4,"Dextérité":2,"Constitution":4,"Intelligence":3,"Sagesse":5,"Charisme":4}',
+    verifier("26 talents : Général 5, Force 4, Dex 2, Con 4, Int 3, Sag 5, Cha 3 (v339 : plus de Dégâts illusoires)", w.TALENTS.length === 26
+             && JSON.stringify(par) === '{"Général":5,"Force":4,"Dextérité":2,"Constitution":4,"Intelligence":3,"Sagesse":5,"Charisme":3}',
              JSON.stringify(par));
     // Chanceux est branché depuis les blessures (blessures.js) : prenable.
     verifier("Chanceux : prenable désormais (CON 10), « −5 au jet de blessure »", !w.talentParId("TAL_CHANCEUX").aVenir
@@ -93,7 +93,7 @@ console.log("\n2. CE QU'ILS DONNENT (atoutRace, les stats du jeu)");
     const tous = heros({ talents: { TAL_PREPARER: 2, TAL_FORME: 2, TAL_GUERRIER_IMPLACABLE: 1, TAL_PRECIS: 1, TAL_ART_ESQUIVE: 1,
         TAL_MASTODONTE: 1, TAL_RESERVE_ARCANIQUE: 1, TAL_DEFENSEUR_ARCANIQUE: 1, TAL_BENEDICTION_DIVINE: 1, TAL_DIVERSION: 1,
         TAL_MAITRE_ELEMENTS: 1, TAL_MAITRE_ILLUSIONNISTE: 1, TAL_FORMATION_MEDICUS: 1, TAL_ARCHIMAGE: 1, TAL_TAILLE_GUERRE: 1,
-        TAL_LANGAGE_ARCANIQUE: 1, TAL_DEGATS_ILLUSOIRES: 1, TAL_IMMUNISE: 1 } });
+        TAL_LANGAGE_ARCANIQUE: 1, TAL_IMMUNISE: 1 } });
     const a = w.atoutRace(tous);
     // (L'Humain a sa propre compétence en plus depuis la v237 : 2 + 1.)
     verifier("Préparer ×2 : +10 d'initiative ; Formé ×2 : +2 compétences", a.initiative === 10 && a.competences === 3
@@ -106,8 +106,9 @@ console.log("\n2. CE QU'ILS DONNENT (atoutRace, les stats du jeu)");
              w.defMagiqueCombattant(tous) === 3 && Math.abs(w.multiplicateurSoinsRecus(tous) - 1.09) < 1e-9);
     verifier("Diversion +30 % d'éviter une attaque d'opportunité", a.esquiveOpportunite === 30);
     verifier("Maître des éléments +8, Illusionniste +6, Medicus +1 soin", a.chanceElementaire === 8 && a.chanceEtatsCharisme === 6 && a.bonusSoin === 1);
-    verifier("Archimage, Taillé, Langage : +1 chacun ; Dégâts illusoires ⌈2,5 × 2⌉ = 5 ; Immunisé 1",
-             a.degatsMagiques === 1 && a.degatsPhysiques === 1 && a.degatsMotsPouvoir === 1 && a.degatsIllusoires === 5 && a.etatsRaccourcis === 1);
+    verifier("Archimage, Taillé, Langage : +1 chacun ; Immunisé 1 ; plus de Dégâts illusoires (v339)",
+             a.degatsMagiques === 1 && a.degatsPhysiques === 1 && a.degatsMotsPouvoir === 1 && !a.degatsIllusoires && a.etatsRaccourcis === 1
+             && w.talentParId("TAL_DEGATS_ILLUSOIRES") === null);
     const vargen = heros({ race: "Vargen", talents: { TAL_DIVERSION: 1 } });
     verifier("Diversion s'ajoute à l'esquive d'opportunité du Vargen (50 + 30, v237)", w.atoutRace(vargen).esquiveOpportunite === 80);
     const nul = heros({ caracs: { ...CARACS, dex: 8 }, talents: { TAL_PRECIS: 1 } });
@@ -147,12 +148,7 @@ console.log("\n3. DANS LE COMBAT");
     const e1b = monde([heros(), monstre("M1", { PV_Actuels: 5 })], { H: { q: 0, r: 0 }, M1: { q: 1, r: 0 } });
     verifier("…sans le talent, rien", coup(e1b, "H", "M1", 10).etat.combattants.H.fatigue === 50);
 
-    // Dégâts illusoires.
-    const e2 = monde([heros({ talents: { TAL_DEGATS_ILLUSOIRES: 1 } }), monstre("M1")], { H: { q: 0, r: 0 }, M1: { q: 3, r: 0 } });
-    e2.combattants.ILL = combattantIllusion(e2.combattants.H, "ILL", 2, 0);
-    const r2 = coup(e2, "M1", "ILL", 4);
-    verifier("Dégâts illusoires : qui brise l'illusion encaisse 5 dégâts bruts", r2.etat.combattants.ILL.aTerre
-             && r2.etat.combattants.M1.pv === 95 && r2.etapes.some(x => x.texte === "✨ Dégâts illusoires"), String(r2.etat.combattants.M1.pv));
+    // (v339) Dégâts illusoires : retiré avec l'effet Illusion.
 
     // Inertie martiale.
     const e3 = monde([heros({ talents: { TAL_INERTIE_MARTIALE: 1 } }), monstre("M1")], { H: { q: 0, r: 0 }, M1: { q: 5, r: 0 } });
