@@ -3241,7 +3241,7 @@ function construireHaloVTT(options) {
 // l'image d'un bandeau de carte. Ceux-là prennent un médaillon de LA COULEUR
 // DE LEUR BULLE (COULEUR_ETAT), avec un symbole, et leur nom au survol.
 window.SYMBOLES_ETATS = {
-    "Charmé": "💘", "Ténèbres étalées": "🌑", "Mur de bouclier": "🛡️", "Rempart": "🏰", "Rempart maintenu": "🏰", "Nuée maintenue": "🦇", "Prise en charge (réserve)": "✚", "Dernier sursis (réserve)": "💀", "Anti-magie maintenu": "💠", "Désintégration (réserve)": "⚡", "Lumière protectrice": "🕯️",
+    "Charmé": "💘", "Ténèbres étalées": "🌑", "Mur de bouclier": "🛡️", "Rempart": "🏰", "Rempart maintenu": "🏰", "Nuée maintenue": "🦇", "Prise en charge (réserve)": "✚", "Dernier sursis (réserve)": "💀", "Anti-magie maintenu": "💠", "Désintégration (réserve)": "⚡", "Lumière protectrice": "🕯️", "Rage": "😡",
     "Nuée de chauve-souris": "🦇", "Bouclier anti-magie": "💠", "Plaie rouverte": "🩸",
     "Instinct du tueur": "🗡️", "Bouclier des Sages": "📜", "Étalement": "💢", "Soin étalé": "💚",
     "Élan": "💨", "Ralenti": "⏳", "Repli": "↩️", "Provocation": "😤", "Peur": "😱", "Béni": "✨",
@@ -3395,6 +3395,7 @@ window.COULEUR_ETAT = {
     "Anti-magie maintenu": "#90caf9", // bleu pâle — le Bouclier anti-magie (v356)
     "Désintégration (réserve)": "#ffe082", // jaune éclair — le Prêtre de la lumière (v359)
     "Lumière protectrice": "#fff3c4",  // blanc doré — la garde de sa Purification (v359)
+    "Rage":            "#e53935",  // rouge sang — la Rage du Berserker (v360)
     "Nuée de chauve-souris": "#6a1b9a",  // pourpre — le Vampire dispersé en nuée
     "Charmé":         "#ec407a",   // rose — retourné contre les siens par le Sorcier
     "Engagé":         "#e53935",   // rouge — pris dans la mêlée (v260)

@@ -1012,7 +1012,15 @@ async function rangerArme(champ) {
     if (!objet) return;
     son();
     const maj = { Equip_Stock: objet, [champ]: null };
-    if (objet.deuxMains) { maj.Equip_Main_Droite = null; maj.Equip_Main_Gauche = null; }
+    if (objet.deuxMains) {
+        maj.Equip_Main_Droite = null; maj.Equip_Main_Gauche = null;
+        // (v360) Le Berserker range l'une de ses DEUX armes à deux mains :
+        // l'autre reprend ses deux mains.
+        const autre = champ === "Equip_Main_Droite" ? h.equipMainGauche : h.equipMainDroite;
+        if (autre && autre !== objet && autre.deuxMains && !(autre.uid && autre.uid === objet.uid)) {
+            maj.Equip_Main_Droite = autre; maj.Equip_Main_Gauche = autre;
+        }
+    }
     await ecrire(h, maj);
 }
 async function prendreArme() {
@@ -1021,7 +1029,13 @@ async function prendreArme() {
     if (!objet) return;
     son();
     let maj = null;
-    if (objet.deuxMains) {
+    // (v360) Le Berserker de niveau 9 : une seconde arme à deux mains, dans la
+    // main gauche, quand il en tient déjà une (et rien d'autre).
+    const d = h.equipMainDroite, g = h.equipMainGauche;
+    const berserker = typeof window.atoutRace === "function" && !!(window.atoutRace(h) || {}).deuxArmesDeuxMains;
+    if (objet.deuxMains && berserker && d && d.deuxMains && (d === g || (d.uid && g && d.uid === g.uid))) {
+        maj = { Equip_Main_Droite: d, Equip_Main_Gauche: objet };
+    } else if (objet.deuxMains) {
         if (h.equipMainDroite || h.equipMainGauche) { noter(pagesFiche["inv-d"], "Il faut les deux mains libres pour cette arme."); return; }
         maj = { Equip_Main_Droite: objet, Equip_Main_Gauche: objet };
     } else if (!h.equipMainDroite) maj = { Equip_Main_Droite: objet };

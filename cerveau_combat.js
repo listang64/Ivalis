@@ -53,7 +53,8 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          carteToutEtalee, resisteA, prisMalgreResistance,
          reserveMaintenueDe, reserveDeTechnique, relacherMaintien, chanceFaceA, CHANCE_ETOURDI_RESONANCE,
          coutLancementReserve, BRULURE_AGGRAVEE, ETAT_RALENTI, coutDeTechnique, PORTEE_CHARME,
-         ennemisSurLaCarte, combustionInstantanee, CHANCE_COMBUSTION, PORTEE_DESINTEGRATION, SEUIL_DESINTEGRATION } from './moteur_pur.js';
+         ennemisSurLaCarte, combustionInstantanee, CHANCE_COMBUSTION, PORTEE_DESINTEGRATION, SEUIL_DESINTEGRATION,
+         surveillerRage, regenerationInsolente, CHANCE_REGENERATION_INSOLENTE } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles,
@@ -436,6 +437,10 @@ export function validerIntention(etat, intention, plateau) {
 
 function fabriquerPas(etatAvant, etatApres, etapes, cause, acteur, des) {
     const suivant = etatApres;
+    // (v360) LA RAGE DU BERSERKER : chaque pas, quel qu'il soit (coup, tic,
+    // zone, soin), peut le faire passer sous 25 % de ses PV — ou l'y faire
+    // remonter. On regarde ici, par où tout passe.
+    if (Array.isArray(etapes)) etapes.push(...surveillerRage(suivant));
     suivant.version = nombre(etatAvant.version) + 1;
 
     // LE COMPTEUR DE CASES MARCHÉES SUIT LES ÉTAPES, ICI ET POUR TOUS LES PAS.
@@ -1213,6 +1218,13 @@ export function appliquerIntention(etat, intention, plateau) {
             const rc = resoudreCarte(suivant, action, plateau);
             suivant = clonerEtat(rc.etat);
             etapes.push(...rc.etapes);
+        }
+        // (v360) LA RÉGÉNÉRATION INSOLENTE : un dé par ennemi debout (ordre des
+        // ids), 80 % moins sa résistance à la Provocation.
+        if (intention.idCarte === "CLASSE_REGENERATION_INSOLENTE") {
+            const pris = Object.fromEntries(ennemisSurLaCarte(suivant, intention.acteur).map(x =>
+                [x.id, des.d100() <= chanceFaceA(x, "Provocation", CHANCE_REGENERATION_INSOLENTE)]));
+            etapes.push(...regenerationInsolente(suivant, intention.acteur, pris));
         }
         // (v358) LA COMBUSTION INSTANTANÉE : un dé par ennemi debout (ordre des
         // ids), 75 % moins sa résistance au feu ; un immunisé ne brûle jamais.

@@ -65,7 +65,8 @@ window.CLASSES_PAR_DEFAUT = [
     // le fond de sa double page (elle sert aussi de carte dans l'ancienne grille).
     C(14, "Inquisiteur",          "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/inquisiteur_mtcrjp.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/inquisiteur_mtcrjp.png"),
     C(15, "Chaman",               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/chaman_dbjpiw.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/chaman_dbjpiw.png"),
-    C(16, "Berzerker",            "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/beserker_h9l0fy.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/beserker_h9l0fy.png"),
+    // (v360) « Berzerker » devient « Berserker » (Nico) : CLASSES_DOC_RENOMMEES.
+    C(16, "Berserker",            "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/beserker_h9l0fy.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/beserker_h9l0fy.png"),
     C(17, "Maudit",               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/maudit_b6xsnz.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/maudit_b6xsnz.png"),
     C(18, "Prêtre de la lumière", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/prete_lumi%C3%A8re_yfuwp3.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/prete_lumi%C3%A8re_yfuwp3.png")
 ];
@@ -295,6 +296,27 @@ window.DESCRIPTIFS_CLASSES = {
                        "Renvoie 33 % des dégâts qu'il subit à qui les lui inflige · une fois par combat"] }
         ]
     },
+    CLASSE_BERSERKER: {
+        presentation: "Plus il saigne, plus il frappe. Le Berserker se soigne mieux que quiconque, "
+            + "entre en rage quand la mort le frôle, nargue l'ennemi tout entier, et finit par manier "
+            + "deux armes à deux mains.",
+        paliers: [
+            { niveau: 1, titre: "Chair de guerre",
+              points: ["−20 % de PV max",
+                       "+30 % de soins reçus"] },
+            { niveau: 3, titre: "Passif : Rage",
+              points: ["Sous 25 % de ses PV : la Rage, 2 manches",
+                       "Parade et esquive à 0 · +15 % de résistances physique et magique · +20 % de dégâts",
+                       "Elle revient une fois finie, s'il est d'abord remonté à 25 % de ses PV ou plus"] },
+            { niveau: 5, titre: "Technique : Régénération insolente",
+              points: ["Initiative 100 · aucune fatigue · une fois par combat",
+                       "Chaque ennemi sur la carte : 80 % de chance d'être Provoqué (2 manches)",
+                       "Il reprend 20 PV"] },
+            { niveau: 9, titre: "Deux armes à deux mains",
+              points: ["Il peut tenir une arme à deux mains dans chaque main : −10 % de résistances physique et magique",
+                       "Sans ces deux armes : +2 dégâts à chacune de ses attaques"] }
+        ]
+    },
     CLASSE_PRETRE_DE_LA_LUMIERE: {
         presentation: "La lumière le guide et le protège. Le Prêtre aveugle ses ennemis d'éclairs, garde "
             + "ses alliés des maux qui les guettent, voit clair dans les ténèbres, et sa foudre réduit "
@@ -388,7 +410,8 @@ window.optimiserImageClasse = (url) => {
 // documents tels qu'ils sont ; le jeu, lui, montre le Sorcier à la place du
 // Nécromancien (mêmes images), et ne propose plus l'Ensorceleur.
 window.CLASSES_DOC_RENOMMEES = { CLASSE_NECROMANCIEN: { id: "CLASSE_SORCIER", nom: "Sorcier" },
-                                 CLASSE_HOPLITE: { id: "CLASSE_PROTECTEUR", nom: "Protecteur" } };
+                                 CLASSE_HOPLITE: { id: "CLASSE_PROTECTEUR", nom: "Protecteur" },
+                                 CLASSE_BERZERKER: { id: "CLASSE_BERSERKER", nom: "Berserker" } };
 window.CLASSES_RETIREES = ["CLASSE_ENSORCELEUR", "CLASSE_MAGE_DU_CHAOS", "CLASSE_ELEMENTARISTE"];   // (v343) les deux classes en attente
 
 // LES FONDS REMPLACÉS (v339, Nico : « remplace l'image de la classe Protecteur ») :
@@ -477,8 +500,8 @@ const nomAffiche = (c) => (typeof window.nomClasseGenre === "function")
 // « Arrive bientôt » par-dessus ; elles ne s'ouvrent pas encore.
 // (v343) Les cinq nouvelles, sans règles encore : visibles, pas encore choisissables.
 // (v358) L'Inquisiteur a ses règles : il se choisit.
-// (v359) Le Prêtre de la lumière aussi.
-window.CLASSES_BIENTOT = ["CLASSE_CHAMAN", "CLASSE_BERZERKER", "CLASSE_MAUDIT"];
+// (v359) Le Prêtre de la lumière aussi ; (v360) le Berserker aussi.
+window.CLASSES_BIENTOT = ["CLASSE_CHAMAN", "CLASSE_MAUDIT"];
 window.classeBientot = (c) => !!c && window.CLASSES_BIENTOT.includes(c.id);
 
 window.rendreGrilleClasses = function(classes) {

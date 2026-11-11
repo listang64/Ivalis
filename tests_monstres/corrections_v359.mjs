@@ -9,7 +9,7 @@ const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd
 const lire = (f) => fs.readFileSync('/home/user/Ivalis/' + f, 'utf-8');
 console.log("\n1. CHOISISSABLE, ET CE QUI REVIENT");
 verifier("il sort des classes « bientôt » : il reste Chaman, Berzerker, Maudit",
-         /CLASSES_BIENTOT = \["CLASSE_CHAMAN", "CLASSE_BERZERKER", "CLASSE_MAUDIT"\];/.test(lire("classes.js")));
+         /CLASSES_BIENTOT = \["CLASSE_CHAMAN", ("CLASSE_BERZERKER", )?"CLASSE_MAUDIT"\];/.test(lire("classes.js")));
 verifier("ses paliers, ses deux techniques, sa fiche", /"Prêtre de la lumière": \[/.test(lire("app.js"))
          && /CLASSE_APPEL_LUMIERE: \{\s*Nom: "Appel de la lumière", classe: "Prêtre de la lumière"/.test(lire("app.js"))
          && /CLASSE_DESINTEGRATION: \{/.test(lire("app.js")) && /CLASSE_PRETRE_DE_LA_LUMIERE: \{/.test(lire("classes.js")));

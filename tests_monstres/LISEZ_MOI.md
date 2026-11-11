@@ -11429,3 +11429,23 @@ classes_feminin.mjs et corrections_v343.mjs : il reste quatre classes « bientô
 pretre_lumiere.mjs le vérifie : paliers, Maîtrise (33 %, foudre seulement, plus forte des deux chances), la garde (posée, pas sur lui ni un ennemi, durable, consommée, état bienfaisant épargné, rejeu), l'insensibilité (critique compris), l'Appel (sauf lui, KO épargné, garde, une fois, rejeu, 75 % contre la résistance), l'aura (contact seulement, ni lui ni un ennemi, niveau 9, plafond), la Désintégration (seuil, portée, mur, 75, KO sans butin, rejeu, fiche, une fois, réserve), et la vraie page (grille, fiche, nom accentué, butin).
 corrections_v359.mjs : choisissable, ce qui revient, le butin, la version.
 classes_feminin, corrections_v343, corrections_v358 : il reste trois classes « bientôt ». corrections_v356, chasseur_de_mages : la Maîtrise et l'Appel ne sont plus au Chasseur (ils existent de nouveau, au Prêtre).
+
+## v360 — La refonte des classes : le Berserker (nouvelle classe jouable, ex-« Berzerker »)
+
+- Nico (sa fiche du Berserker) :
+  - niveau 1 : −20 % de PV max ; +30 % de soins reçus ;
+  - niveau 3 : la Rage (sous 25 % de ses PV, 2 tours : parade et esquive à 0, +15 % de résistances, +20 % de dégâts ; elle revient une fois finie, s'il est d'abord remonté à 25 % ou plus) ;
+  - niveau 5 : Régénération insolente (80 % de provoquer tous les ennemis, où qu'ils soient ; +20 PV ; init 100) ;
+  - niveau 9 : deux armes à deux mains (−10 % de résistances physique et magique) ; sans elles, +2 dégâts.
+- Ses réponses : le nom « Berserker » ; Rage : +15 de résistance physique et magique, ×1,2 sur tous ses dégâts (opportunité comprise) ; Régénération : 0 fatigue, une fois par combat, Provoqué 2 manches, soin selon les règles de tout soin ; le +2 sur toutes ses attaques.
+- LE NOM : classes.js (C(16, "Berserker"), CLASSES_DOC_RENOMMEES pour un document « Berzerker » en base) ; app.js (CLASSES_RENOMMEES : une fiche « Berzerker » se lit Berserker). Il sort de CLASSES_BIENTOT (il reste Chaman, Maudit).
+- app.js : paliers (pvMaxPct −20, soinsRecus 30 ; rage ; CLASSE_REGENERATION_INSOLENTE ; deuxArmesDeuxMains) et leurs textes.
+- LA RAGE (moteur_pur.js, surveillerRage) : appelée par fabriquerPas (cerveau_combat.js), par où passe chaque pas — coup, tic, zone, soin. Sous 25 % : l'état « Rage » (2 manches ; bonusEquip resPhys/resMag +15) et le drapeau rageUsee ; remonté à 25 % ou plus une fois la Rage finie : réarmée. Une étape « rage » (nouvel applicateur, combat_etat.js) porte le drapeau et la liste des états. esquiveDe et paradeDe rendent 0 en Rage ; ses coups ×1,2 (resoudreCarte, après les bonus plats) ; l'attaque d'opportunité aussi (degatsOpportuniteBruts, mouvement_pur.js).
+- LA RÉGÉNÉRATION INSOLENTE (moteur_pur.js, regenerationInsolente ; les dés dans cerveau_combat.js) : un dé par ennemi debout (80 %, résistance déduite), Provocation 2 manches vers lui (la Lumière protectrice l'annule) ; +20 PV selon les règles de tout soin (26 avec ses +30 %).
+- LE NIVEAU 9 (objets.js) : deuxArmesDeuxMains(perso) ; bonusEquipement : deux armes à deux mains → resPhys et resMag −10 (leurs bonus s'additionnent, objetsEquipes les compte toutes deux) ; sinon degats +2 et degatsOpportunite +2 (nouvelle clé, lue par combat_etat.js). grimoire_fiches.js : prendreArme met une seconde arme à deux mains dans la main gauche ; rangerArme en range une, l'autre reprend ses deux mains.
+- combat_etat.js : LES PV NE DÉPASSENT JAMAIS LE MAXIMUM à l'entrée en combat (avant : PV_Actuels tel quel). Un Berserker créé à 100 PV entre à 80 ; une blessure qui rabote le maximum aussi.
+- pont_combat.js : « 😤 Régénération insolente ». combat.js : l'icône 😡 de la Rage.
+
+berserker.mjs le vérifie : paliers, nom et textes, PV max, la Rage (seuil, durée, esquive/parade 0, +15, ×1,2 sur cartes et opportunité, pas de double Rage, pas de retour sous le seuil, réarmement, retour, niveau 2, KO direct, rejeu), la Régénération (soin 26, provocations, une fois, rejeu, 80 % et 55 % sur 200 graines), la prise et le rangement des deux armes (le code du livre), et la vraie page (grille, document renommé, fiche, bonus d'équipement).
+corrections_v360.mjs : le nom, le choix, les PV plafonnés, la Rage dans fabriquerPas, la version.
+classes_feminin, corrections_v343, corrections_v358, corrections_v359 : Berserker, et deux classes « bientôt ».

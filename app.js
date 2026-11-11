@@ -1013,6 +1013,17 @@ window.ATOUTS_CLASSES = {
     // l'Aveuglement (insensibleA → atouts.immunisesA) ; l'Appel de la lumière au
     // niveau 5 ; au niveau 9, +3 PV par fin de manche aux alliés à son contact
     // (auraSoin) et la Désintégration par la foudre.
+    // (v360) LE BERSERKER, nouvelle classe (Nico ; ex-« Berzerker ») : au niveau 1,
+    // −20 % de PV max (pvMaxPct) et +30 % de soins reçus ; la Rage au niveau 3
+    // (surveillerRage, cerveau_combat.js) ; la Régénération insolente au niveau 5 ;
+    // au niveau 9, deux armes à deux mains (−10 % de résistances), ou +2 dégâts
+    // sans elles (deuxArmesDeuxMains, bonusEquipement dans objets.js).
+    "Berserker": [
+        { niveau: 1,  pvMaxPct: -20, soinsRecus: 30 },
+        { niveau: 3,  rage: true },
+        { niveau: 5,  techniques: ["CLASSE_REGENERATION_INSOLENTE"] },
+        { niveau: 9,  deuxArmesDeuxMains: true }
+    ],
     "Prêtre de la lumière": [
         { niveau: 1,  maitriseLumiere: 33, gardePurification: true, competences: 1 },
         { niveau: 3,  insensibleA: ["Aveuglé"] },
@@ -1193,6 +1204,14 @@ window.TECHNIQUES_CLASSE = {
             + "lanceur ; lui n'en prend rien. Réserve : 20 d'énergie par manche (la première au lancement, la "
             + "suivante bloquée puis consommée ; à court d'énergie, il tombe ; on peut le relâcher en préparation). "
             + "Une fois par combat."
+    },
+    // (v360) LE BERSERKER. La Régénération insolente : chaque ennemi sur la
+    // carte, 80 % de chance d'être Provoqué (2 manches) ; il reprend 20 PV
+    // (regenerationInsolente, moteur_pur.js).
+    CLASSE_REGENERATION_INSOLENTE: {
+        Nom: "Régénération insolente", classe: "Berserker", niveau: 5, Initiative: 100, Fatigue: 0, cible: "soi",
+        desc: "Chaque ennemi sur la carte a 80 % de chance d'être Provoqué (2 manches ; 55 % s'il y résiste), "
+            + "et il reprend 20 PV (selon les règles de tout soin). Une fois par combat."
     },
     // (v359) LE PRÊTRE DE LA LUMIÈRE. L'Appel de la lumière (repris du Chasseur
     // de mages d'avant la v356) : tout le monde est Aveuglé, sauf lui. La
@@ -1400,7 +1419,7 @@ window.toutesTechniquesDeClasse = function(perso) {
 //
 // UNE CLASSE RENOMMÉE garde ses héros : le Nécromancien est devenu le Sorcier,
 // et une fiche qui porte encore « Nécromancien » se lit « Sorcier ».
-window.CLASSES_RENOMMEES = { "necromancien": "Sorcier", "hoplite": "Protecteur" };
+window.CLASSES_RENOMMEES = { "necromancien": "Sorcier", "hoplite": "Protecteur", "berzerker": "Berserker" };
 const cleClasseBrute = (nom) => String(nom || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .toLowerCase().trim();
 const cleClasse = (nom) => {
@@ -1691,6 +1710,7 @@ window.texteAtout = function(cle, valeur) {
         case "regenFatigue":   return `${plus(n)} % de régénération de fatigue en fin de manche`;
         case "regenPv":        return `${plus(n)} PV repris à chaque fin de manche`;
         case "soinsRecus":     return `${plus(n)} % de soins reçus`;
+        case "pvMaxPct":       return `${plus(n)} % de PV max`;
         case "porteeMagique":  return `${plus(n)} case de portée pour les sorts magiques à distance`;
         case "porteeSorts":    return `${plus(n)} case de portée de base sur tous ses sorts`;
         case "sortsSansMalusContact": return "Aucune réduction au contact pour ses attaques à distance";
@@ -1756,6 +1776,8 @@ window.texteAtout = function(cle, valeur) {
                                               : "Le malus de brûlure s'annule : il brûle comme tout le monde";
         case "degatsContreVargen": return `${plus(n)} dégâts contre les Vargens`;
         case "degatsContreMages": return `${plus(n)} dégâts contre les monstres Mage et Soutien`;
+        case "rage":           return "Rage : sous 25 % de ses PV, 2 manches — parade et esquive à 0, +15 % de résistances, +20 % de dégâts";
+        case "deuxArmesDeuxMains": return "Deux armes à deux mains (−10 % de résistances) ; sans elles, +2 dégâts à chacune de ses attaques";
         case "maitriseLumiere": return `Maîtrise de la lumière : ${n} % de chance d'aveugler avec un sort de foudre (sans s'ajouter à l'Aveuglement)`;
         case "gardePurification": return "Purification par la lumière : l'allié qu'il purifie annule le prochain état néfaste qu'il devrait subir";
         case "insensibleA":    return `Insensible à : ${(valeur || []).join(", ")}`;

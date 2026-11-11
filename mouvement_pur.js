@@ -27,7 +27,7 @@
 // =========================================================================
 
 import { clonerEtat, combattant, tomber, franchissablePour, fuyardActif } from './combat_etat.js';
-import { esquiveDe, paradeDe, defPhysiqueDe, bonusDesEtats, aLEtat, traverserZones, protecteurRempart, reserveMaintenueDe, bonusContreRace,
+import { esquiveDe, paradeDe, defPhysiqueDe, bonusDesEtats, aLEtat, traverserZones, protecteurRempart, reserveMaintenueDe, bonusContreRace, multiplicateurRage,
          ligneDeVue, caseLibre, destinationPoussee } from './moteur_pur.js';
 
 const nombre = (v, defaut = 0) => {
@@ -277,8 +277,9 @@ const reduireParArmure = (cible, brut) => {
 };
 // La Sentinelle frappe plus fort (+6, `degatsOpportunite`), avant l'armure.
 // (v349) Le Vampire de niveau 5 : +3 contre un Vargen (bonusContreRace).
-export const degatsOpportuniteBruts = (attaquant, cible) =>
-    DEGATS_OPPORTUNITE + nombre(attaquant && attaquant.atouts && attaquant.atouts.degatsOpportunite) + bonusContreRace(attaquant, cible);
+// (v360) La Rage du Berserker : ×1,2.
+export const degatsOpportuniteBruts = (attaquant, cible) => Math.round((DEGATS_OPPORTUNITE
+    + nombre(attaquant && attaquant.atouts && attaquant.atouts.degatsOpportunite) + bonusContreRace(attaquant, cible)) * multiplicateurRage(attaquant));
 export const degatsOpportuniteContre = (cible, attaquant) => reduireParArmure(cible, degatsOpportuniteBruts(attaquant, cible));
 
 // LE COUP D'OPPORTUNITÉ QUI PORTE : le bouclier d'abord (le surplus part dans

@@ -217,7 +217,8 @@ window.CLES_BONUS = [
     "coutDeplacement",   // modificateur du coût en énergie de chaque case
     "ignoreArmure",      // % de chance d'ignorer la résistance PHYSIQUE de la cible
     "ignoreResistances", // % de chance d'ignorer TOUTE résistance de la cible
-    "hexApresAttaque"    // cases de déplacement offertes après une attaque
+    "hexApresAttaque",   // cases de déplacement offertes après une attaque
+    "degatsOpportunite"  // (v360) dégâts en plus des attaques d'opportunité
 ];
 
 // =========================================================================
@@ -802,7 +803,8 @@ const LIBELLES_BONUS = {
     coutDeplacement:   v => v < 0 ? `${v} au coût de déplacement` : `+${v} au coût de déplacement`,
     ignoreArmure:      v => `${v}% d'ignorer l'armure`,
     ignoreResistances: v => `${v}% d'ignorer les résistances`,
-    hexApresAttaque:   v => `+${v} case${v > 1 ? "s" : ""} de mouvement après l'attaque`
+    hexApresAttaque:   v => `+${v} case${v > 1 ? "s" : ""} de mouvement après l'attaque`,
+    degatsOpportunite: v => `+${v} dégât${v > 1 ? "s" : ""} aux attaques d'opportunité`
 };
 
 const LIBELLES_ETATS = {
@@ -881,9 +883,21 @@ window.raisonObjetInterditParBlessure = function(perso, objet, emplacement) {
     return null;
 };
 
+// (v360) LE BERSERKER de niveau 9 tient-il DEUX armes à deux mains (une par main) ?
+window.deuxArmesDeuxMains = function(perso) {
+    const d = perso && perso.equipMainDroite, g = perso && perso.equipMainGauche;
+    return !!(d && g && d.deuxMains && g.deuxMains && d !== g && !(d.uid && d.uid === g.uid));
+};
 window.bonusEquipement = function(perso) {
     const total = {};
     window.CLES_BONUS.forEach(cle => total[cle] = 0);
+    // (v360) Le Berserker de niveau 9 : deux armes à deux mains, −10 % de
+    // résistances ; sans elles, +2 à chacune de ses attaques (cartes et
+    // attaques d'opportunité).
+    if (typeof window.atoutRace === "function" && (window.atoutRace(perso) || {}).deuxArmesDeuxMains) {
+        if (window.deuxArmesDeuxMains(perso)) { total.resPhys -= 10; total.resMag -= 10; }
+        else { total.degats += 2; total.degatsOpportunite += 2; }
+    }
     // (v347) Le Protecteur de niveau 5 : les boucliers lourds ne lui coûtent
     // plus rien de plus à chaque case (leur seul malus).
     const sansMalusLourd = typeof window.atoutRace === "function" && !!(window.atoutRace(perso) || {}).bouclierLourdSansMalus;

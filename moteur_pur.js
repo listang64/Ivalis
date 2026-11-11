@@ -159,6 +159,61 @@ export const BRULURE_AGGRAVEE = { soinsRecus: -10, pvMaxParTour: 2, typeParTour:
 // (v356) Le Chasseur de mages : +2 à chaque coup qui frappe un monstre Mage
 // ou Soutien (son archétype).
 export const ARCHETYPES_MAGES_SOUTIENS = ["DPS MAGE CAC", "DPS MAGE DISTANCE", "SOUTIEN"];
+// (v360) La Rage du Berserker : ×1,2 sur ses dégâts ; +15 % de résistances ;
+// elle se déclenche sous 25 % de ses PV, pour 2 manches.
+export const MULTIPLICATEUR_RAGE = 1.2;
+export const SEUIL_RAGE = 25;
+export const MANCHES_RAGE = 2;
+export const multiplicateurRage = (c) => enRage(c) ? MULTIPLICATEUR_RAGE : 1;
+export function surveillerRage(etat) {
+    const etapes = [];
+    Object.keys((etat && etat.combattants) || {}).sort().forEach(id => {
+        const c = etat.combattants[id];
+        if (!c || c.aTerre || !(c.atouts && c.atouts.rage) || !(nombre(c.pvMax) > 0)) return;
+        const sousLeSeuil = nombre(c.pv) * 100 < nombre(c.pvMax) * SEUIL_RAGE;
+        if (enRage(c)) return;
+        if (c.rageUsee && !sousLeSeuil) {
+            c.rageUsee = false;
+            etapes.push({ type: "rage", cible: id, usee: false });
+            return;
+        }
+        if (c.rageUsee || !sousLeSeuil || nombre(c.pv) <= 0) return;
+        c.rageUsee = true;
+        c.etats = [...(c.etats || []), { nom: ETAT_RAGE, duree: MANCHES_RAGE, bonusEquip: { resPhys: 15, resMag: 15 },
+                                         desc: "Parade et esquive à 0, +15 % de résistances, +20 % de dégâts." }];
+        etapes.push({ type: "message", cible: id, acteur: id, texte: "😡 Rage !", couleur: "#e53935" });
+        etapes.push({ type: "rage", cible: id, usee: true, liste: c.etats, pose: ETAT_RAGE });
+    });
+    return etapes;
+}
+
+// (v360) LA RÉGÉNÉRATION INSOLENTE (Berserker, niveau 5) : chaque ennemi que
+// le dé du cerveau a pris (`pris`) est Provoqué 2 manches ; lui reprend 20 PV.
+export const CHANCE_REGENERATION_INSOLENTE = 80;
+export const SOIN_REGENERATION_INSOLENTE = 20;
+export function regenerationInsolente(suivant, idLanceur, pris) {
+    const etapes = [];
+    const c = combattant(suivant, idLanceur);
+    if (!c) return etapes;
+    ennemisSurLaCarte(suivant, idLanceur).forEach(x => {
+        if (pris[x.id] !== true) {
+            etapes.push({ type: "etatRate", cible: x.id, nom: "Provocation", ...(resisteA(x, "Provocation") ? { resiste: true } : {}) });
+            return;
+        }
+        if (gardeAnnule(x, "Provocation", etapes)) return;
+        x.etats = [...(x.etats || []).filter(e => e && e.nom !== "Provocation"),
+                   { nom: "Provocation", duree: 2, idProvocateur: idLanceur, desc: "Ne voit plus que celui qui l'a provoqué." }];
+        etapes.push({ type: "etats", cible: x.id, pose: "Provocation", liste: x.etats });
+    });
+    if (!enSursis(c)) {
+        const part = 100 + nombre(c.atouts && c.atouts.soinsRecus) + regleDesEtats(c, "soinsRecus");
+        const soin = Math.max(0, Math.round(SOIN_REGENERATION_INSOLENTE * part / 100));
+        const avant = nombre(c.pv);
+        c.pv = Math.min(nombre(c.pvMax), avant + soin);
+        if (c.pv > avant) etapes.push({ type: "soin", cible: idLanceur, acteur: idLanceur, montant: c.pv - avant, pvApres: c.pv });
+    }
+    return etapes;
+}
 // (v358) L'Inquisiteur : +1 dégât à chaque attaque magique de feu.
 export const bonusFeu = (lanceur, attaque) => (attaque && attaque.element === "Feu" && attaque.typeRes === "Magique"
     && !attaque.isHeal && !attaque.isShield) ? nombre(lanceur && lanceur.atouts && lanceur.atouts.degatsFeu) : 0;
@@ -168,7 +223,10 @@ export const bonusContreRace = (lanceur, cible) => {
          + ((cible && ARCHETYPES_MAGES_SOUTIENS.includes(cible.archetype)) ? nombre(atouts.degatsContreMages) : 0);
 };
 
-export const esquiveDe     = (c) => Math.max(nombre(c && c.def && c.def.esquive)  + bonusDesEtats(c, "esquive")
+// (v360) LA RAGE du Berserker : esquive et parade à 0, tant qu'elle dure.
+export const ETAT_RAGE = "Rage";
+const enRage = (c) => !!(c && Array.isArray(c.etats) && c.etats.some(e => e && e.nom === ETAT_RAGE));
+export const esquiveDe     = (c) => enRage(c) ? 0 : Math.max(nombre(c && c.def && c.def.esquive)  + bonusDesEtats(c, "esquive")
                                   + regleDesEtats(c, "esquive"), planchersEsquive(c));
 // Un plancher d'esquive posé par un état (Nuée de chauve-souris : au moins
 // 40 %). L'esquive déjà plus haute reste plus haute ; sinon elle monte au
@@ -179,7 +237,7 @@ function planchersEsquive(c) {
     // descendre sous zéro.
     return planchers.length ? Math.max(...planchers) : -Infinity;
 }
-export const paradeDe      = (c) => nombre(c && c.def && c.def.parade)   + bonusDesEtats(c, "parade")
+export const paradeDe      = (c) => enRage(c) ? 0 : nombre(c && c.def && c.def.parade)   + bonusDesEtats(c, "parade")
                                   + regleDesEtats(c, "parade");
 export const defPhysiqueDe = (c) => nombre(c && c.def && c.def.physique) + bonusDesEtats(c, "resPhys");
 export const defMagiqueDe  = (c) => nombre(c && c.def && c.def.magique)  + bonusDesEtats(c, "resMag");
@@ -2700,9 +2758,13 @@ export function resoudreCarte(etat, action, plateau) {
             // (v349) Le Vampire de niveau 5 : +3 contre un Vargen, avant les défenses.
             // (v358) L'Inquisiteur : +1 à ses attaques magiques de feu.
             const contreRace = bonusContreRace(lanceur, cible) + bonusFeu(lanceur, attaque);
-            const attaqueAvecBonus = contreRace > 0
+            const avecContre = contreRace > 0
                 ? { ...attaqueMonstre, valeurBrute: decimal(attaqueMonstre.valeurBrute) + contreRace }
                 : attaqueMonstre;
+            // (v360) La Rage du Berserker : +20 % sur tous ses dégâts.
+            const attaqueAvecBonus = (enRage(lanceur) && !attaque.isHeal && !attaque.isShield)
+                ? { ...avecContre, valeurBrute: Math.round(decimal(avecContre.valeurBrute) * MULTIPLICATEUR_RAGE) }
+                : avecContre;
 
             // UNE CIBLE FRAPPÉE : la chaîne de dégâts, puis tout ce qu'elle
             // déclenche (drain, énergie bue, bouclier, renvoi, étalement,

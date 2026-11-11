@@ -9,7 +9,7 @@ const lire = (f) => fs.readFileSync('/home/user/Ivalis/' + f, 'utf-8');
 console.log("\n1. CHOISISSABLE");
 verifier("il n'est plus dans les classes « bientôt » ; Chaman, Berzerker et Maudit y restent (v359 : le Prêtre en sort aussi)",
          !/CLASSES_BIENTOT = \[[^\]]*CLASSE_INQUISITEUR/.test(lire("classes.js"))
-         && /CLASSES_BIENTOT = \["CLASSE_CHAMAN", "CLASSE_BERZERKER", "CLASSE_MAUDIT"/.test(lire("classes.js")));
+         && /CLASSES_BIENTOT = \["CLASSE_CHAMAN", "(CLASSE_BERZERKER", ")?CLASSE_MAUDIT"/.test(lire("classes.js")));
 verifier("ses paliers (app.js), ses techniques, sa fiche (classes.js)", /"Inquisiteur": \[/.test(lire("app.js"))
          && /CLASSE_COMBUSTION: \{/.test(lire("app.js")) && /CLASSE_TERREUR_ARDENTE: \{/.test(lire("app.js")) && /CLASSE_INQUISITEUR: \{/.test(lire("classes.js")));
 verifier("son immunité passe par le combat (combat_etat.js) et par toutes les chances d'état (chanceFaceA)",

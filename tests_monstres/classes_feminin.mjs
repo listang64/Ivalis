@@ -26,8 +26,8 @@ console.log("\n1. LA RÈGLE");
              f("Pisteur") === "Pisteuse" && f("Sorcier") === "Sorcière" && f("Protecteur") === "Protectrice"
              && f("Chasseur de mages") === "Chasseuse de mages"
              && f("Profanateur") === "Profanatrice" && f("Géomancien") === "Géomancienne");
-    verifier("inchangées : Assassin, Sentinelle, Oracle, Vampire, Médicus, Chaman, Berzerker, Maudit (v343)",
-             ["Assassin", "Sentinelle", "Oracle", "Vampire", "Médicus", "Chaman", "Berzerker", "Maudit"].every(n => f(n) === n));
+    verifier("inchangées : Assassin, Sentinelle, Oracle, Vampire, Médicus, Chaman, Berserker, Maudit (v343 ; Berserker depuis la v360)",
+             ["Assassin", "Sentinelle", "Oracle", "Vampire", "Médicus", "Chaman", "Berserker", "Maudit"].every(n => f(n) === n));
     verifier("un héros (Male) garde le masculin", w.nomClasseGenre("Sorcier", "Male") === "Sorcier" && w.nomClasseGenre("Pisteur", "") === "Pisteur");
     verifier("les anciens noms suivent : Nécromancienne → Sorcière, Hoplite → Protectrice",
              f("Nécromancien") === "Sorcière" && f("Hoplite") === "Protectrice" && w.nomClasseGenre("Hoplite", "Male") === "Protecteur");
@@ -131,9 +131,9 @@ console.log("\n2. LE CHOIX DE CLASSE D'UNE HÉROÏNE");
            && !r.noms.includes("Sorcier") && r.noms.includes("Sentinelle") && r.noms.length === 16, r.noms.join(", "));
   verifier("la fiche de classe s'intitule « Sorcière »", r.titre === "Sorcière", r.titre);
   verifier("mais la fiche du personnage retient « Sorcier »", r.retenue === "Sorcier", r.retenue);
-  // (v358 : l'Inquisiteur a ses règles et se choisit ; v359 : le Prêtre de la lumière aussi.)
-  verifier("les trois qui attendent encore (v343, sans l'Inquisiteur ni le Prêtre de la lumière) : « Arrive bientôt », image à 35 %",
-           r.bientot.length === 3 && !r.bientotIds.includes("CLASSE_INQUISITEUR") && !r.bientotIds.includes("CLASSE_PRETRE_DE_LA_LUMIERE") && r.bientot.every(b => b.texte === "Arrive bientôt" && Math.abs(b.opacite - 0.35) < 0.01), JSON.stringify(r.bientot));
+  // (v358 : l'Inquisiteur a ses règles et se choisit ; v359 : le Prêtre de la lumière ; v360 : le Berserker.)
+  verifier("les deux qui attendent encore (Chaman, Maudit) : « Arrive bientôt », image à 35 %",
+           r.bientot.length === 2 && !r.bientotIds.includes("CLASSE_INQUISITEUR") && !r.bientotIds.includes("CLASSE_PRETRE_DE_LA_LUMIERE") && r.bientot.every(b => b.texte === "Arrive bientôt" && Math.abs(b.opacite - 0.35) < 0.01), JSON.stringify(r.bientot));
   verifier("les autres : ni texte ni voile", !r.autre.texte && r.autre.opacite === 1);
   verifier("elles ne s'ouvrent pas : un message le dit", r.fermee && /arrive bientôt/.test(r.message), r.message);
   verifier("un héros : la grille au masculin", r.nomsH.includes("Sorcier") && r.nomsH.includes("Pisteur") && !r.nomsH.includes("Sorcière"));

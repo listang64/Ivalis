@@ -222,6 +222,8 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         // Purification, son aura de soin (cerveau_combat.js).
         maitriseLumiere: nombre(race.maitriseLumiere),
         gardePurification: !!race.gardePurification,
+        // (v360) Le Berserker : la Rage (surveillerRage, cerveau_combat.js).
+        rage: !!race.rage,
         auraSoin: nombre(race.auraSoin),
         // …et désormais, à la place, le feu le PREND plus facilement : +20 %
         // de chance d'être Brûlé par un sort qui brûle (tirerDesCarte).
@@ -244,7 +246,9 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         arcaneRalentit: !!race.arcaneRalentit,
         // Le rayon où un ennemi qui tombe se relève (2 cases dès le niveau 1, v260).
         rayonZombies: nombre(race.rayonZombies, race.zombies ? 1 : 0),
-        degatsOpportunite: nombre(race.degatsOpportunite),
+        // (v360) + ce que l'équipement y ajoute (le Berserker sans ses deux
+        // armes à deux mains : +2, bonusEquipement dans objets.js).
+        degatsOpportunite: nombre(race.degatsOpportunite) + nombre(calcul.bonusEquip(sansEtats, "degatsOpportunite")),
         defenseur: nombre(race.defenseur),
         // (v353) Le Défenseur de la Sentinelle à 50 % au niveau 9.
         defenseurRenforce: nombre(race.defenseurRenforce),
@@ -384,7 +388,10 @@ function combattantBrut(fiche, position, bornes) {
         // pour un héros — il n'a pas de palier, et n'y a donc jamais droit.
         palier: fiche.Palier || fiche.palier || "",
 
-        pv: nombre(fiche.PV_Actuels, pvMax),
+        // (v360) Jamais au-dessus du maximum : un Berserker (−20 % de PV max),
+        // ou une blessure qui rabote le maximum, n'entre pas en combat avec
+        // les PV pleins de sa fiche d'avant.
+        pv: pvMax > 0 ? Math.min(nombre(fiche.PV_Actuels, pvMax), pvMax) : nombre(fiche.PV_Actuels, pvMax),
         pvMax,
         bouclier: nombre(fiche.Bouclier_Actuel),
         fatigue: nombre(fiche.fatigueActuelle !== undefined ? fiche.fatigueActuelle
@@ -1196,6 +1203,15 @@ export const APPLICATEURS = {
         c.sursis = null;
         // (v359) Désintégré par le Prêtre de la lumière : aucun butin.
         if (e.sansButin) c.sansButin = true;
+    },
+
+    // (v360) La Rage du Berserker : usée (elle ne revient qu'après être
+    // remonté à 25 % de ses PV), ou réarmée ; l'état lui-même voyage par `liste`.
+    rage(etat, e) {
+        const c = combattant(etat, e.cible);
+        if (!c) return;
+        c.rageUsee = !!e.usee;
+        if (Array.isArray(e.liste)) c.etats = JSON.parse(JSON.stringify(e.liste));
     },
 
     // Une créature se relève en zombie, dans le camp du Profanateur (voir
