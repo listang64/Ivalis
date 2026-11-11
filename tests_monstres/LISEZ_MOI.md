@@ -11382,3 +11382,5 @@ chasseur_de_mages.mjs est mis à jour (parties sans navigateur) : paliers ; le +
 corrections_v357.mjs le vérifie : les paliers, le coût et la portée dans le moteur, la fiche, la version, et le ciblage du plateau dans la vraie page (Charme : seul l'ennemi debout à 5 cases et en vue ; Transfert : tout le monde debout, à toute distance, derrière un mur compris).
 
 sorcier.mjs est mis à jour : paliers ; le malus au contact gardé jusqu'au niveau 8 ; le Charme (niveau 3, 5 cases pile / 6 refusé, 29 d'énergie refusé, 30 → 0, 100 → 70, dépense dite, rejeu) ; le Transfert (niveau 5, 8 puis 40 cases). Sa partie navigateur demande toujours effets_reels.json.
+
+bonus_race_classe.mjs et necromancien.mjs : les paliers du Sorcier passent à 1 / 3 / 5 / 9, le « sans malus au contact » au niveau 9.

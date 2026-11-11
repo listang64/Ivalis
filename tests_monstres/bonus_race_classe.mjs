@@ -134,8 +134,9 @@ console.log("\n3. L'ENCART DANS LA FICHE");
              /Sorcier/.test(r.classe) && !/Nécromancien/.test(r.classe) && /Ténèbres/.test(r.classe)
              && /\+1 case de portée/.test(r.classe) && /Aucune réduction au contact/.test(r.classe) && !/\+8 PV/.test(r.classe),
              r.classe.replace(/\s+/g, " ").trim().slice(0, 160));
-    verifier("niveau 5 : le Transfert du niveau 10 est grisé, « à venir »",
-             JSON.stringify(r.paliers) === '[["1",false],["5",false],["10",true]]' && /à venir/.test(r.classe), JSON.stringify(r.paliers));
+    // (v357 : Charme au 3, Transfert au 5, « sans malus au contact » au 9.)
+    verifier("niveau 5 : Charme (3) et Transfert (5) acquis, le niveau 9 grisé, « à venir »",
+             JSON.stringify(r.paliers) === '[["1",false],["3",false],["5",false],["9",true]]' && /à venir/.test(r.classe), JSON.stringify(r.paliers));
     verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
     await b.close();
 }
