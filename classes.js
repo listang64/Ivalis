@@ -295,6 +295,25 @@ window.DESCRIPTIFS_CLASSES = {
                        "Renvoie 33 % des dégâts qu'il subit à qui les lui inflige · une fois par combat"] }
         ]
     },
+    CLASSE_INQUISITEUR: {
+        presentation: "Le feu purificateur répond à sa foi. L'Inquisiteur embrase ses ennemis, ne craint "
+            + "pas les flammes, et fait fuir de terreur ceux qui brûlent.",
+        paliers: [
+            { niveau: 1, titre: "Flamme sacrée",
+              points: ["Ses Attaques Magiques de feu ont 10 % de chance de brûler (au lieu de 5 %)",
+                       "+1 dégât magique à ses attaques de feu"] },
+            { niveau: 3, titre: "Cœur de braise",
+              points: ["+1 compétence",
+                       "Résiste au feu (−25 % de chance d'être Brûlé, −15 % des sorts de feu)",
+                       "Un Ondari devient totalement immunisé au Brûlé"] },
+            { niveau: 5, titre: "Technique : Combustion instantanée",
+              points: ["Initiative 0 · aucune fatigue · une fois par combat",
+                       "Chaque ennemi sur la carte a 75 % de chance d'être Brûlé (2 manches)"] },
+            { niveau: 9, titre: "Technique : Terreur ardente",
+              points: ["Initiative 50 · 70 de fatigue · une fois par combat",
+                       "Chaque ennemi Brûlé sur la carte est pris de Peur et fuit"] }
+        ]
+    },
     CLASSE_CHASSEUR_DE_MAGES: {
         presentation: "Il a appris à marcher dans les tempêtes de sorts sans y laisser sa peau. Le "
             + "Chasseur de mages traque ceux qui plient la magie : leurs sorts glissent sur lui ou se "
@@ -436,7 +455,8 @@ const nomAffiche = (c) => (typeof window.nomClasseGenre === "function")
 // LES CLASSES QUI ARRIVENT BIENTÔT : visibles dans la grille, l'image voilée et
 // « Arrive bientôt » par-dessus ; elles ne s'ouvrent pas encore.
 // (v343) Les cinq nouvelles, sans règles encore : visibles, pas encore choisissables.
-window.CLASSES_BIENTOT = ["CLASSE_INQUISITEUR", "CLASSE_CHAMAN", "CLASSE_BERZERKER", "CLASSE_MAUDIT", "CLASSE_PRETRE_DE_LA_LUMIERE"];
+// (v358) L'Inquisiteur a ses règles : il se choisit.
+window.CLASSES_BIENTOT = ["CLASSE_CHAMAN", "CLASSE_BERZERKER", "CLASSE_MAUDIT", "CLASSE_PRETRE_DE_LA_LUMIERE"];
 window.classeBientot = (c) => !!c && window.CLASSES_BIENTOT.includes(c.id);
 
 window.rendreGrilleClasses = function(classes) {

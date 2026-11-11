@@ -998,6 +998,19 @@ window.ATOUTS_CLASSES = {
     // 3, +10 % de résistance magique et +1 compétence ; le Bouclier anti-magie
     // au niveau 5 (désormais une réserve de 20 par manche sur 2 manches) ; le
     // Briseur d'arcane au niveau 9 (il remplace l'Appel de la lumière).
+    // (v358) L'INQUISITEUR, nouvelle classe (Nico) : au niveau 1, l'élément Feu
+    // de ses Attaques Magiques offre 10 % de Brûlé au lieu de 5 % (brulureOfferte,
+    // chanceElementOfferte) et +1 dégât magique à ses attaques de feu
+    // (degatsFeu, moteur_pur.js) ; au niveau 3, +1 compétence, il résiste au
+    // Brûlé, et un Ondari Inquisiteur y devient IMMUNISÉ (immuniteBrulureOndari :
+    // jamais Brûlé, combat_etat.js → atouts.immunisesA) ; la Combustion
+    // instantanée au niveau 5, la Terreur ardente au niveau 9.
+    "Inquisiteur": [
+        { niveau: 1,  brulureOfferte: 10, degatsFeu: 1 },
+        { niveau: 3,  competences: 1, resistances: ["Brûlé"], immuniteBrulureOndari: true },
+        { niveau: 5,  techniques: ["CLASSE_COMBUSTION"] },
+        { niveau: 9,  techniques: ["CLASSE_TERREUR_ARDENTE"] }
+    ],
     "Chasseur de mages": [
         { niveau: 1,  defMagique: 10, degatsContreMages: 2 },
         { niveau: 3,  defMagique: 10, competences: 1 },
@@ -1166,6 +1179,20 @@ window.TECHNIQUES_CLASSE = {
             + "lanceur ; lui n'en prend rien. Réserve : 20 d'énergie par manche (la première au lancement, la "
             + "suivante bloquée puis consommée ; à court d'énergie, il tombe ; on peut le relâcher en préparation). "
             + "Une fois par combat."
+    },
+    // (v358) L'INQUISITEUR. La Combustion instantanée : chaque ennemi debout sur
+    // la carte, 75 % de chance d'être Brûlé (2 manches). La Terreur ardente :
+    // chaque ennemi Brûlé est pris de Peur — il fuit (combustionInstantanee,
+    // cerveau_combat.js ; resoudrePeur, mouvement_pur.js).
+    CLASSE_COMBUSTION: {
+        Nom: "Combustion instantanée", classe: "Inquisiteur", niveau: 5, Initiative: 0, Fatigue: 0, cible: "soi",
+        desc: "Chaque ennemi sur la carte a 75 % de chance d'être Brûlé (2 manches ; 50 % s'il résiste au feu). "
+            + "Une fois par combat."
+    },
+    CLASSE_TERREUR_ARDENTE: {
+        Nom: "Terreur ardente", classe: "Inquisiteur", niveau: 9, Initiative: 50, Fatigue: 70, cible: "soi",
+        desc: "Chaque ennemi Brûlé sur la carte est pris de Peur et fuit loin de l'Inquisiteur (à coup sûr ; "
+            + "75 % s'il résiste à la Peur). 70 de fatigue. Une fois par combat."
     },
     // (v356) LE BRISEUR D'ARCANE : un ennemi à 5 cases, en vue, prend 1,5 fois
     // sa résistance magique en dégâts bruts (actionBriseurArcane, moteur_pur.js).
@@ -1462,6 +1489,13 @@ window.ELEMENTS_MAGIQUES = [
       couleur: "#b98cff", fond: "#3a1a66" }
 ];
 window.CHANCE_ELEMENT_OFFERTE = 5;
+// (v358) La chance qu'offre l'élément sur SON état, pour ce personnage :
+// 5 %, ou 10 % de Brûlé pour l'Inquisiteur (brulureOfferte).
+window.chanceElementOfferte = function(perso, etat) {
+    const base = window.CHANCE_ELEMENT_OFFERTE || 5;
+    if (etat !== "Brûlé" || !perso || typeof window.atoutRace !== "function") return base;
+    return Math.max(base, Number((window.atoutRace(perso) || {}).brulureOfferte) || 0);
+};
 window.REDUCTION_SORT_RESISTE = 15;
 window.elementMagique = function(id) {
     return window.ELEMENTS_MAGIQUES.find(e => e.id === id) || null;
@@ -1692,6 +1726,9 @@ window.texteAtout = function(cle, valeur) {
                                               : "Le malus de brûlure s'annule : il brûle comme tout le monde";
         case "degatsContreVargen": return `${plus(n)} dégâts contre les Vargens`;
         case "degatsContreMages": return `${plus(n)} dégâts contre les monstres Mage et Soutien`;
+        case "brulureOfferte": return `Ses Attaques Magiques de feu ont ${n} % de chance de brûler (au lieu de 5 %)`;
+        case "degatsFeu":      return `${plus(n)} dégât magique à ses attaques de feu`;
+        case "immuniteBrulureOndari": return "Un Ondari devient totalement immunisé au Brûlé";
         case "brulureFacile":  return `Craint le feu : +${n} % de chance d'être Brûlé par les sorts qui brûlent`;
         case "premierPasGratuit": return "La première case de chaque tour ne coûte aucune fatigue";
         case "caracs":         return Object.keys(valeur || {}).map(k => `${plus(Number(valeur[k]) || 0)} ${NOMS_CARACS_ATOUT[k] || k}`).join(" · ");

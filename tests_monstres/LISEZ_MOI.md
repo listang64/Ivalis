@@ -11384,3 +11384,25 @@ corrections_v357.mjs le vérifie : les paliers, le coût et la portée dans le m
 sorcier.mjs est mis à jour : paliers ; le malus au contact gardé jusqu'au niveau 8 ; le Charme (niveau 3, 5 cases pile / 6 refusé, 29 d'énergie refusé, 30 → 0, 100 → 70, dépense dite, rejeu) ; le Transfert (niveau 5, 8 puis 40 cases). Sa partie navigateur demande toujours effets_reels.json.
 
 bonus_race_classe.mjs et necromancien.mjs : les paliers du Sorcier passent à 1 / 3 / 5 / 9, le « sans malus au contact » au niveau 9.
+
+## v358 — La refonte des classes : l'Inquisiteur (nouvelle classe jouable)
+
+- Nico (sa fiche de l'Inquisiteur) :
+  - niveau 1 : les attaques magiques de base de feu ont 10 % de chance de brûler (au lieu de 5 %) ; +1 dégât magique avec les techniques de feu ;
+  - niveau 3 : +1 compétence ; résistance au feu ; un Ondari devient totalement immunisé au Brûlé ;
+  - niveau 5 : Combustion instantanée (tous les ennemis de la carte : 75 % d'être Brûlé ; init 0, fatigue 0) ;
+  - niveau 9 : tous les ennemis Brûlés subissent la Peur (fatigue 70, init 50).
+- Ses réponses : le +1 sur ses attaques magiques de feu ; le niveau 9 s'appelle « Terreur ardente », Peur sûre (75 % sur qui y résiste) ; Combustion une fois par combat, Brûlé 2 manches, résistance comprise, alliés épargnés ; résistance habituelle au feu ; l'Ondari immunisé de toute source.
+- classes.js : sorti de CLASSES_BIENTOT (il se choisit, dans la grille et dans le livre) ; sa fiche (Niv. 1 / 3 / 5 / 9).
+- app.js : paliers (brulureOfferte 10, degatsFeu 1 ; competences 1, resistances Brûlé, immuniteBrulureOndari ; CLASSE_COMBUSTION ; CLASSE_TERREUR_ARDENTE) ; window.chanceElementOfferte(perso, état), lue par l'extraction des cartes (moteur_effets.js) et par la Forge (competences.js : chanceOfferteForge et la fenêtre du choix d'élément).
+- moteur_pur.js :
+  - bonusFeu, ajouté au brut comme bonusContreRace ;
+  - immuniseA / atouts.immunisesA (posé par combat_etat.js pour un Ondari de niveau 3) : chanceFaceA rend 0, prisMalgreResistance rend faux (le dé est tiré quand même : la suite des dés ne change pas) ; un critique ne l'impose pas (la résistance passe par chanceFaceA) ;
+  - COUTS_TECHNIQUES : la Terreur ardente coûte 70 ;
+  - ennemisSurLaCarte, combustionInstantanee (pose Brûlé 2 manches, ou dit l'état raté).
+- cerveau_combat.js : la Combustion tire un dé par ennemi (ordre des ids, chanceFaceA à 75) ; la Terreur ardente fait fuir chaque ennemi Brûlé (prisMalgreResistance « Peur », puis resoudrePeur). La Peur du jeu est une fuite immédiate, pas un état qui dure.
+- pont_combat.js : « 🔥 Combustion instantanée », « 😱 Terreur ardente ».
+
+inquisiteur.mjs le vérifie : paliers et textes, la brûlure offerte, le +1 au feu, la résistance et l'immunité (critique compris), la Combustion (moteur, une fois, rejeu, 75 % et 50 % sur 200 graines), la Terreur ardente (70, fuites, non-brûlés immobiles, rejeu, 75 % contre la résistance à la Peur), et la vraie page (grille, fiche, Forge à 10 %).
+corrections_v358.mjs : choisissable, ses fichiers, la version.
+classes_feminin.mjs et corrections_v343.mjs : il reste quatre classes « bientôt ».

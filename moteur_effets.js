@@ -1472,8 +1472,10 @@ window.demarrerCiblage = async function(idCarte, options) {
             // (La Distorsion mentale n'a plus d'état du charisme lié depuis la
             // v260 : un `etatMental` resté sur une carte d'avant est ignoré.)
             const lienAct = elementAct;
+            // (v358) 10 % de Brûlé pour l'Inquisiteur (chanceElementOfferte, app.js).
             const chanceOfferte = (etat) => (lienAct && lienAct.etat === etat)
-                ? (window.CHANCE_ELEMENT_OFFERTE || 5) : 0;
+                ? (typeof window.chanceElementOfferte === "function" ? window.chanceElementOfferte(lanceurCarte, etat)
+                                                                     : (window.CHANCE_ELEMENT_OFFERTE || 5)) : 0;
             const dureeOfferte = () => {
                 const e = lienAct && window.EFFETS_BDD_CACHE[lienAct.effetId];
                 return (e && parseFrFloat(e.Tours)) || 2;

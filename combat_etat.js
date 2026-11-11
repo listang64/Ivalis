@@ -211,6 +211,10 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         degatsContreVargen: nombre(race.degatsContreVargen),
         // (v356) Le Chasseur de mages : +2 contre les monstres Mage et Soutien.
         degatsContreMages: nombre(race.degatsContreMages),
+        // (v358) L'Inquisiteur : +1 à ses attaques magiques de feu ; et, Ondari
+        // de niveau 3, jamais Brûlé (chanceFaceA, moteur_pur.js).
+        degatsFeu: nombre(race.degatsFeu),
+        immunisesA: (race.immuniteBrulureOndari && String(fiche.race || fiche.Race || "") === "Ondari") ? ["Brûlé"] : [],
         // …et désormais, à la place, le feu le PREND plus facilement : +20 %
         // de chance d'être Brûlé par un sort qui brûle (tirerDesCarte).
         brulureFacile: nombre(race.brulureFacile),

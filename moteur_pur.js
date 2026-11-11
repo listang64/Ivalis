@@ -159,6 +159,9 @@ export const BRULURE_AGGRAVEE = { soinsRecus: -10, pvMaxParTour: 2, typeParTour:
 // (v356) Le Chasseur de mages : +2 à chaque coup qui frappe un monstre Mage
 // ou Soutien (son archétype).
 export const ARCHETYPES_MAGES_SOUTIENS = ["DPS MAGE CAC", "DPS MAGE DISTANCE", "SOUTIEN"];
+// (v358) L'Inquisiteur : +1 dégât à chaque attaque magique de feu.
+export const bonusFeu = (lanceur, attaque) => (attaque && attaque.element === "Feu" && attaque.typeRes === "Magique"
+    && !attaque.isHeal && !attaque.isShield) ? nombre(lanceur && lanceur.atouts && lanceur.atouts.degatsFeu) : 0;
 export const bonusContreRace = (lanceur, cible) => {
     const atouts = (lanceur && lanceur.atouts) || {};
     return ((cible && cible.race === "Vargen") ? nombre(atouts.degatsContreVargen) : 0)
@@ -813,13 +816,15 @@ export function resistancesDe(c) {
 }
 export const resisteA = (c, nom) => !!nom && resistancesDe(c).includes(nom);
 // Ce qu'il reste d'une chance face à la résistance de la cible (jamais sous 0).
-export const chanceFaceA = (c, nom, chance) =>
-    Math.max(0, Math.min(100, nombre(chance)) - (resisteA(c, nom) ? RESISTANCE_ETAT_PCT : 0));
+// (v358) Un IMMUNISÉ (l'Ondari Inquisiteur au Brûlé) : jamais, quelle que soit la chance.
+export const immuniseA = (c, nom) => !!nom && Array.isArray(c && c.atouts && c.atouts.immunisesA) && c.atouts.immunisesA.includes(nom);
+export const chanceFaceA = (c, nom, chance) => immuniseA(c, nom) ? 0
+    : Math.max(0, Math.min(100, nombre(chance)) - (resisteA(c, nom) ? RESISTANCE_ETAT_PCT : 0));
 // Un état « à coup sûr » (100 %) sur cette cible : pris d'office si elle n'y
 // résiste pas — sans dé ; sinon un dé, à 75 %.
 export function prisMalgreResistance(c, nom, des) {
-    if (!resisteA(c, nom)) return true;
-    return des.d100() <= 100 - RESISTANCE_ETAT_PCT;
+    if (!resisteA(c, nom) && !immuniseA(c, nom)) return true;
+    return des.d100() <= 100 - RESISTANCE_ETAT_PCT && !immuniseA(c, nom);
 }
 
 // `cible` (facultative) : ce que la cible ajoute elle-même à la chance — le
@@ -1974,7 +1979,33 @@ function poserMaintien(c, idCarte, liens) {
 
 // (v357) LES TECHNIQUES QUI COÛTENT DE LA FATIGUE, payée au lancement (sans
 // réserve) : le Charme fratricide du Sorcier, 30.
-export const COUTS_TECHNIQUES = { CLASSE_CHARME_FRATRICIDE: 30 };
+export const COUTS_TECHNIQUES = { CLASSE_CHARME_FRATRICIDE: 30, CLASSE_TERREUR_ARDENTE: 70 };
+
+// (v358) L'INQUISITEUR. Combustion instantanée (niveau 5) : chaque ennemi
+// debout a 75 % de chance d'être Brûlé, 2 manches (les dés : le cerveau,
+// `pris`). Terreur ardente (niveau 9) : chaque ennemi Brûlé fuit (le cerveau,
+// resoudrePeur).
+export const CHANCE_COMBUSTION = 75;
+export const MANCHES_COMBUSTION = 2;
+export const ennemisSurLaCarte = (etat, idLanceur) => {
+    const l = combattant(etat, idLanceur);
+    return Object.keys((etat && etat.combattants) || {}).sort().map(v => etat.combattants[v])
+        .filter(x => x && l && !x.aTerre && !x.estIllusion && (x.camp || "Allié") !== (l.camp || "Allié"));
+};
+export function combustionInstantanee(suivant, idLanceur, pris) {
+    const etapes = [];
+    ennemisSurLaCarte(suivant, idLanceur).forEach(x => {
+        if (pris[x.id] !== true) {
+            etapes.push({ type: "etatRate", cible: x.id, nom: "Brûlé", ...(resisteA(x, "Brûlé") ? { resiste: true } : {}) });
+            return;
+        }
+        const deja = (x.etats || []).find(e => e && e.nom === "Brûlé");
+        if (deja) deja.duree = Math.max(nombre(deja.duree), MANCHES_COMBUSTION);
+        else x.etats = [...(x.etats || []), { nom: "Brûlé", duree: MANCHES_COMBUSTION, icone: ICONE_BRULE, desc: DESC_BRULE }];
+        etapes.push({ type: "etats", cible: x.id, pose: "Brûlé", liste: x.etats });
+    });
+    return etapes;
+}
 export const coutDeTechnique = (idCarte) => nombre(COUTS_TECHNIQUES[idCarte]);
 // (v357) Le Charme fratricide vise à 5 cases.
 export const PORTEE_CHARME = 5;
@@ -2574,7 +2605,8 @@ export function resoudreCarte(etat, action, plateau) {
                 ? { ...attaque, valeurBrute: appliquerBonusMonstre(attaque.valeurBrute, bonusMonstre) }
                 : attaque;
             // (v349) Le Vampire de niveau 5 : +3 contre un Vargen, avant les défenses.
-            const contreRace = bonusContreRace(lanceur, cible);
+            // (v358) L'Inquisiteur : +1 à ses attaques magiques de feu.
+            const contreRace = bonusContreRace(lanceur, cible) + bonusFeu(lanceur, attaque);
             const attaqueAvecBonus = contreRace > 0
                 ? { ...attaqueMonstre, valeurBrute: decimal(attaqueMonstre.valeurBrute) + contreRace }
                 : attaqueMonstre;

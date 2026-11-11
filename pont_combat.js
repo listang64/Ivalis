@@ -593,6 +593,8 @@ const SCENES = {
                        CLASSE_RESONANCE_BOUCLIER: "🛡️ Résonance du bouclier",
                        CLASSE_BOUCLIER_ANTIMAGIE: "🔮 Bouclier anti-magie",
                        CLASSE_BRISEUR_ARCANE: "💥 Briseur d'arcane",
+                       CLASSE_COMBUSTION: "🔥 Combustion instantanée",
+                       CLASSE_TERREUR_ARDENTE: "😱 Terreur ardente",
                        CLASSE_RETOUR_PASSE: "⌛ Retour dans le passé",
                        CLASSE_RETOUR_ARRIERE: "⏪ Retour arrière",
                        CLASSE_FUREUR_SENTINELLE: "⚔️ Assaut de la sentinelle",

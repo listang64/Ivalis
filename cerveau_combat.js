@@ -52,7 +52,8 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          actionResonanceBouclier, ennemisAuContact, ligneDeVue, caseLibre, aLEtat,
          carteToutEtalee, resisteA, prisMalgreResistance,
          reserveMaintenueDe, reserveDeTechnique, relacherMaintien, chanceFaceA, CHANCE_ETOURDI_RESONANCE,
-         coutLancementReserve, BRULURE_AGGRAVEE, ETAT_RALENTI, coutDeTechnique, PORTEE_CHARME } from './moteur_pur.js';
+         coutLancementReserve, BRULURE_AGGRAVEE, ETAT_RALENTI, coutDeTechnique, PORTEE_CHARME,
+         ennemisSurLaCarte, combustionInstantanee, CHANCE_COMBUSTION } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles,
@@ -1164,6 +1165,25 @@ export function appliquerIntention(etat, intention, plateau) {
             const rc = resoudreCarte(suivant, action, plateau);
             suivant = clonerEtat(rc.etat);
             etapes.push(...rc.etapes);
+        }
+        // (v358) LA COMBUSTION INSTANTANÉE : un dé par ennemi debout (ordre des
+        // ids), 75 % moins sa résistance au feu ; un immunisé ne brûle jamais.
+        if (intention.idCarte === "CLASSE_COMBUSTION") {
+            const pris = Object.fromEntries(ennemisSurLaCarte(suivant, intention.acteur).map(x =>
+                [x.id, des.d100() <= chanceFaceA(x, "Brûlé", CHANCE_COMBUSTION)]));
+            etapes.push(...combustionInstantanee(suivant, intention.acteur, pris));
+        }
+        // (v358) LA TERREUR ARDENTE : chaque ennemi Brûlé fuit l'Inquisiteur — à
+        // coup sûr, un dé à 75 % pour qui résiste à la Peur (ordre des ids).
+        if (intention.idCarte === "CLASSE_TERREUR_ARDENTE") {
+            ennemisSurLaCarte(suivant, intention.acteur)
+                .filter(x => (x.etats || []).some(e => e && e.nom === "Brûlé"))
+                .filter(x => {
+                    const pris = prisMalgreResistance(x, "Peur", des);
+                    if (!pris) etapes.push({ type: "etatRate", cible: x.id, nom: "Peur", resiste: true });
+                    return pris;
+                })
+                .forEach(x => etapes.push(...resoudrePeur(suivant, intention.acteur, x.id, des, plateau)));
         }
         // (v356) LE BRISEUR D'ARCANE frappe de même, à coup sûr : 1,5 fois la
         // résistance magique de la cible, en dégâts bruts.

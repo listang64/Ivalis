@@ -122,7 +122,7 @@ console.log("\n2. LE CHOIX DE CLASSE D'UNE HÉROÏNE");
     window.ouvrirFicheClasse("CLASSE_MAUDIT");
     const fermee = getComputedStyle(document.getElementById("vue-fiche-classe")).display === "none";
     const message = (document.getElementById("message-classe-interdite") || {}).textContent || "";
-    return { noms, titre, retenue, nomsH, bientot, autre, fermee, message };
+    return { noms, titre, retenue, nomsH, bientot, autre, fermee, message, bientotIds: [...window.CLASSES_BIENTOT] };
   });
   await p.evaluate(async () => { await window.ouvrirChoixClasse(); document.getElementById("vue-grille-classes").scrollTop = 9999; });
   await p.screenshot({ path: "/tmp/claude-0/classes_feminin.png" });
@@ -131,8 +131,9 @@ console.log("\n2. LE CHOIX DE CLASSE D'UNE HÉROÏNE");
            && !r.noms.includes("Sorcier") && r.noms.includes("Sentinelle") && r.noms.length === 16, r.noms.join(", "));
   verifier("la fiche de classe s'intitule « Sorcière »", r.titre === "Sorcière", r.titre);
   verifier("mais la fiche du personnage retient « Sorcier »", r.retenue === "Sorcier", r.retenue);
-  verifier("les cinq nouvelles (v343) : « Arrive bientôt », image à 35 %",
-           r.bientot.length === 5 && r.bientot.every(b => b.texte === "Arrive bientôt" && Math.abs(b.opacite - 0.35) < 0.01), JSON.stringify(r.bientot));
+  // (v358 : l'Inquisiteur a ses règles et se choisit ; il en reste quatre.)
+  verifier("les quatre qui attendent encore (v343, sans l'Inquisiteur depuis la v358) : « Arrive bientôt », image à 35 %",
+           r.bientot.length === 4 && !r.bientotIds.includes("CLASSE_INQUISITEUR") && r.bientot.every(b => b.texte === "Arrive bientôt" && Math.abs(b.opacite - 0.35) < 0.01), JSON.stringify(r.bientot));
   verifier("les autres : ni texte ni voile", !r.autre.texte && r.autre.opacite === 1);
   verifier("elles ne s'ouvrent pas : un message le dit", r.fermee && /arrive bientôt/.test(r.message), r.message);
   verifier("un héros : la grille au masculin", r.nomsH.includes("Sorcier") && r.nomsH.includes("Pisteur") && !r.nomsH.includes("Sorcière"));

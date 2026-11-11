@@ -32,7 +32,7 @@ console.log("\n1. LES PALIERS ET LES RÈGLES");
              && JSON.stringify(a(5).techniques) === '["CLASSE_CHARME_FRATRICIDE","CLASSE_TRANSFERT"]' && !(a(4).techniques || []).includes("CLASSE_TRANSFERT")
              && a(9).sortsSansMalusContact === true && !a(8).sortsSansMalusContact);
     verifier("le Charme coûte 30 dans le moteur, et vise à 5 cases", coutDeTechnique("CLASSE_CHARME_FRATRICIDE") === 30 && PORTEE_CHARME === 5
-             && coutDeTechnique("CLASSE_TRANSFERT") === 0 && JSON.stringify(COUTS_TECHNIQUES) === '{"CLASSE_CHARME_FRATRICIDE":30}');
+             && coutDeTechnique("CLASSE_TRANSFERT") === 0 && COUTS_TECHNIQUES.CLASSE_CHARME_FRATRICIDE === 30);
     const c = lireFichier("classes.js");
     verifier("la fiche : Charme au 3 (30 de fatigue, 5 cases), Transfert au 5 (où qu'il soit), sorts à bout portant au 9",
              /niveau: 3, titre: "Technique : Charme fratricide"/.test(c) && /30 de fatigue · un ennemi à 5 cases/.test(c)

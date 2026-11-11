@@ -1845,7 +1845,8 @@ window.ouvrirChoixElement = function(surChoix, actuel, pris, options) {
     if (titre) titre.textContent = textes.titre;
     const texte = modale.querySelector(".forge-choix-element-texte");
     if (texte) texte.innerHTML = textes.texte;
-    const offert = window.CHANCE_ELEMENT_OFFERTE || 5;
+    const offertDe = (el) => typeof window.chanceElementOfferte === "function"
+        ? window.chanceElementOfferte(window.forgeState && window.forgeState.statsPerso, el.etat) : (window.CHANCE_ELEMENT_OFFERTE || 5);
     boutons.innerHTML = liste.map(el => {
         const prisAilleurs = interdits.has(el.id);
         return `
@@ -1854,7 +1855,7 @@ window.ouvrirChoixElement = function(surChoix, actuel, pris, options) {
                 onclick="if (typeof jouerSonClic === 'function') jouerSonClic(); window.choisirElementForge('${el.id}')">
             <span class="forge-element-disque"><span class="forge-element-icone${el.dessin ? " dessin" : ""}">${iconeDuLien(el)}</span></span>
             <span class="forge-element-nom">${el.nom}</span>
-            <span class="forge-element-etat">${prisAilleurs ? "déjà sur la carte" : el.etat ? `${el.etat} · ${offert} %` : "aucune résistance"}</span>
+            <span class="forge-element-etat">${prisAilleurs ? "déjà sur la carte" : el.etat ? `${el.etat} · ${offertDe(el)} %` : "aucune résistance"}</span>
         </button>`;
     }).join("");
     modale.style.display = "block";
@@ -1927,7 +1928,10 @@ function elementsDeLaCarte() {
 // son élément (ou de sa Distorsion), rien ailleurs.
 function chanceOfferteSur(effet, action) {
     const el = lienDeLAction(action);
-    return (el && effet && (effet.id === el.effetId || effet.Nom === el.etat)) ? (window.CHANCE_ELEMENT_OFFERTE || 5) : 0;
+    if (!(el && effet && (effet.id === el.effetId || effet.Nom === el.etat))) return 0;
+    // (v358) 10 % de Brûlé pour l'Inquisiteur.
+    return typeof window.chanceElementOfferte === "function"
+        ? window.chanceElementOfferte(window.forgeState && window.forgeState.statsPerso, el.etat) : (window.CHANCE_ELEMENT_OFFERTE || 5);
 }
 window.chanceOfferteForge = chanceOfferteSur;
 
