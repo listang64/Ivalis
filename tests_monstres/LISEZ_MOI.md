@@ -11053,3 +11053,15 @@ Tests mis à jour par la v339 :
 - Nico : « mets la police pour les titres : Shadows Into Light, par défaut » (police_titres.js).
 - Un poste resté sur l'ancienne écriture par défaut (Homemade Apple) passe une fois à la nouvelle. Une écriture choisie ensuite dans Paramètres reste.
 - corrections_v299 et corrections_v312 attendent maintenant Shadows Into Light.
+
+## v341 — Les images des peuples et des classes arrivent avant la page
+
+- Nico : « les images dans les races et classes mettent du temps à arriver ; la page est ouverte quand on voit l'image pop ».
+- Elles n'étaient pas lourdes (≈ 200 Ko, en AVIF ou WebP). Le problème était loading="lazy" : le navigateur ne les demandait qu'une fois la page visible.
+- grimoire_creation.js :
+  - L'adresse attend dans data-src.
+  - prechargerAutour() la pose, et décode l'image, pour la double page ouverte, la précédente et la suivante. Elle tourne avec la veille des marque-pages, toutes les 250 ms.
+  - Un saut (marque-page, choix d'un peuple) charge d'abord la page d'arrivée.
+  - Les pages plus loin attendent : rien de lourd d'un coup sur iPad.
+
+corrections_v341.mjs le vérifie : à l'ouverture, en tournant, au saut par marque-page, sur les classes et sur les pages réécrites. corrections_v339.mjs lit maintenant data-src.

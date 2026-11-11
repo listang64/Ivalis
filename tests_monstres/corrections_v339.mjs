@@ -232,7 +232,7 @@ await section(async () => {
     const ig = g && g.querySelector(".fond-classe.gauche img"), id = d && d.querySelector(".fond-classe.droite img");
     const masque = (el) => el ? (getComputedStyle(el).maskImage || getComputedStyle(el).webkitMaskImage || "") : "";
     const classe = document.querySelector("#grimoire-creation-classe-0 .fond-classe.gauche");
-    return { race: race.nom, g: ig && ig.getAttribute("src"), d: id && id.getAttribute("src"), attendu: window.FONDS_RACES_LIVRE[race.nom],
+    return { race: race.nom, g: ig && (ig.dataset.src || ig.getAttribute("src")), d: id && (id.dataset.src || id.getAttribute("src")), attendu: window.FONDS_RACES_LIVRE[race.nom],
              masque: masque(ig && ig.parentElement), masqueClasse: masque(classe), texteDessus: Number(getComputedStyle(g.querySelector(".contenu-page")).zIndex) };
   }));
   const ids = { Humain: "IMG_2249", Ankylar: "IMG_2250", "Ethéré": "IMG_2251", Gob: "IMG_2252", Ondari: "IMG_2253", Ophior: "IMG_2254", Vargen: "IMG_2255" };
@@ -359,7 +359,7 @@ titre("7. LES VERSIONS");
 {
   const html = lire("index.html"), version = JSON.parse(lire("version.json")).version;
   verifier("version 339 ou plus (trace_combat.js, version.json)", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 339 && version >= 339, String(version));
-  const attendus = { "style.css": 130, "grimoire.js": 22, "grimoire_creation.js": 5, "grimoire_creation.css": 5, "grimoire_regions.js": 9, "grimoire_regions.css": 4,
+  const attendus = { "style.css": 130, "grimoire.js": 22, "grimoire_creation.js": 6, "grimoire_creation.css": 5, "grimoire_regions.js": 9, "grimoire_regions.css": 4,
                      "descriptifs_regions.js": 2, "app.js": 144, "moteur_effets.js": 102, "talents.js": 6, "lia_forge.js": 8, "classes.js": 28, "villages_regionaux.js": 9 };
   const faux = Object.entries(attendus).filter(([f, n]) => !html.includes(`${f}?v=${n}"`));
   verifier("chaque fichier touché a changé de version", faux.length === 0, JSON.stringify(faux));

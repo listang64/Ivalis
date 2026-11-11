@@ -64,7 +64,8 @@ const FONDS_RACES = {
 const fondRace = (r) => (r && (r.imageFond || FONDS_RACES[r.nom] || FONDS_RACES[sansAccent(r.nom).replace(/^\w/, c => c.toUpperCase())])) || "";
 // Le fond sur la double page : à gauche voilé en dégradé sous le texte, à droite entier
 // (les mêmes calques que les classes, grimoire_creation.css).
-const htmlFond = (url, cote) => url ? `<div class="fond-classe ${cote}" aria-hidden="true"><img src="${echapper(url)}" alt="" draggable="false" loading="lazy" decoding="async"></div>` : "";
+// (v341) L'adresse attend dans data-src : prechargerAutour() la pose à l'avance (voir plus bas).
+const htmlFond = (url, cote) => url ? `<div class="fond-classe ${cote}" aria-hidden="true"><img data-src="${echapper(url)}" alt="" draggable="false" decoding="async"></div>` : "";
 window.FONDS_RACES_LIVRE = FONDS_RACES;
 const COULEURS_CLASSES = {
     "Pisteur": "#5f7d3a", "Assassin": "#4f4f5a", "Chasseur de mages": "#4f6d8a", "Sentinelle": "#b0884a",
@@ -97,11 +98,33 @@ function page(cle, cote, classe) {
     pg[cle] = el;
     return el;
 }
-const aller = (el) => { if (el && F() && F().aller) F().aller(el); };
+const aller = (el) => { if (el && F() && F().aller) { chargerFonds(el); F().aller(el); } };
 function ranger(el, dans) {
     if (!el || !dans) return;
     if (!ranges.has(el)) ranges.set(el, { parent: el.parentNode, suivant: el.nextSibling });
     dans.appendChild(el);
+}
+// LES IMAGES DE FOND EN AVANCE (v341). Nico : « les images des races et des classes
+// mettent du temps à arriver : la page est ouverte quand on voit l'image apparaître ;
+// charge l'image de la page d'avant et d'après pour que ce soit fluide ». En lazy, le
+// navigateur ne les demandait qu'une fois la page visible. Elles se chargent (et se
+// décodent) maintenant pour la double page ouverte, la précédente et la suivante ; un
+// saut par marque-page charge d'abord celle d'arrivée.
+function chargerFonds(el) {
+    if (!el) return;
+    const i = pages.indexOf(el), paire = i < 0 ? [el] : [pages[i - (i % 2)], pages[i - (i % 2) + 1]];
+    paire.forEach(pageEl => pageEl && pageEl.querySelectorAll("img[data-src]").forEach(img => {
+        if (img.getAttribute("src") === img.dataset.src) return;
+        img.src = img.dataset.src;
+        if (typeof img.decode === "function") img.decode().catch(() => {});
+    }));
+}
+function prechargerAutour() {
+    const g = G(), pf = g && g.pageFlip && g.pageFlip();
+    if (!actif || !pf || typeof g.indexDe !== "function") return;
+    const ici = pf.getCurrentPageIndex();
+    // La double page ouverte, puis la suivante et la précédente (deux pages de part et d'autre).
+    [0, 2, -2, 3, -1, 1].forEach(d => { const el = pages.find(p => g.indexDe(p) === ici + d); if (el) chargerFonds(el); });
 }
 function toutRemettre() {
     [...ranges.entries()].reverse().forEach(([el, o]) => {
@@ -154,7 +177,7 @@ function htmlClasseGauche(c, i, n) {
     const fond = c.imageFond || c.imageTarot || "";
     const descriptif = typeof window.rendreDescriptifClasse === "function" ? window.rendreDescriptifClasse(c.id) : "";
     const choisie = window.CLASSE_SELECTIONNEE_TEMP === c.nom;
-    return `${fond ? `<div class="fond-classe gauche" aria-hidden="true"><img src="${echapper(fond)}" alt="" draggable="false" loading="lazy" decoding="async"></div>` : ""}
+    return `${htmlFond(fond, "gauche")}
       <div class="contenu-page page-texte-creation page-texte-classe defile-fiche">
         <div class="sur-titre-creation">Les classes <span>· ${i + 1} / ${n}</span></div>
         <h2 class="titre-creation">${echapper(nomAffiche(c))}</h2>
@@ -169,7 +192,7 @@ function htmlClasseGauche(c, i, n) {
 }
 const htmlClasseDroite = (c) => {
     const fond = c.imageFond || c.imageTarot || "";
-    return `${fond ? `<div class="fond-classe droite" aria-hidden="true"><img src="${echapper(fond)}" alt="" draggable="false" loading="lazy" decoding="async"></div>` : ""}<div class="contenu-page"></div>`;
+    return `${htmlFond(fond, "droite")}<div class="contenu-page"></div>`;
 };
 
 // ---------------------------------------------------------------------
@@ -326,6 +349,7 @@ function reecrireClasses() {
     const classes = listeClasses();
     classes.forEach((c, i) => { const g = pg["classe-" + i]; if (g) g.innerHTML = htmlClasseGauche(c, i, classes.length); });
     (window.DONNEES_RACES || []).forEach((r, i) => { const g = pg["race-" + i]; if (g) g.innerHTML = htmlRace(r, i, (window.DONNEES_RACES || []).length); });
+    prechargerAutour();   // (v341) les pages réécrites reprennent leur image, déjà en cache
 }
 
 // ---------------------------------------------------------------------
@@ -543,6 +567,7 @@ function commencer() {
         construire();
         creerOnglets();
         setTimeout(() => aller(sections.races[0] && sections.races[0].page), 60);
+        if (sections.races[1]) chargerFonds(sections.races[1].page);   // (v341) la suivante, déjà prête
     };
     if (typeof window.chargerClasses === "function" && !window.CLASSES_CACHE) Promise.resolve(window.chargerClasses()).catch(() => {}).then(suite);
     else suite();
@@ -567,6 +592,7 @@ setInterval(() => {
         const g = G();
         if (!g || !g.enPartie || !g.enPartie()) { terminer(); return; }
         majOnglets();
+        prechargerAutour();
     } catch (e) { console.warn("Le livre : la création", e); }
 }, 250);
 
@@ -581,7 +607,7 @@ function bloqueEnAvant(index) {
 }
 
 window.GRIMOIRE_CREATION = {
-    commencer, terminer, agir, bloqueEnAvant,
+    commencer, terminer, agir, bloqueEnAvant, prechargerAutour,
     pages: () => (actif ? pages.slice() : []),
     actif: () => actif,
     page: (cle) => pg[cle] || null,
