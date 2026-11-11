@@ -214,7 +214,7 @@ await section(async () => {
            r.gauche.join(" | ") === "I- Aventuriers | II- Carte du monde | III- Le village" && r.droite.join(" | ") === "IV- Les combats | V- Le récit", r.gauche.concat(r.droite).join(" | "));
   verifier("le fond du sommaire : l'image de Nico, à 20 %, étirée sur la double page (une moitié par page)",
            r.fonds.length === 2 && r.fonds.every(f => /IMG_2057_ez0wu9\.png/.test(f.img) && f.op === "0.2" && f.taille === "200% 100%") && r.fonds[0].pos !== r.fonds[1].pos, JSON.stringify(r.fonds.map(f => [f.op, f.taille, f.pos])));
-  verifier("une écriture manuscrite (v313 : celle choisie dans Paramètres, Homemade Apple par défaut)", /Homemade Apple/.test(r.police) && /Homemade Apple/.test(r.policeEntree), `${r.police}`);
+  verifier("une écriture manuscrite (v313 : celle choisie dans Paramètres, Shadows Into Light par défaut depuis v340)", /Shadows Into Light/.test(r.police) && /Shadows Into Light/.test(r.policeEntree), `${r.police}`);
   verifier("le marque-page du sommaire : une étoile ; celui du récit : une plume redessinée", r.etoile && r.plume);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v312_sommaire.png" });
   await p.evaluate(() => document.getElementById("grimoire-marque-menu").click());
@@ -256,7 +256,7 @@ await section(async () => {
   const a = await p.evaluate(() => { const pa = document.getElementById("recit-avatar"), u = pa.querySelector(".papier-usure"), c = pa.querySelector(".cadre-portrait"), n = pa.querySelector(".nom-portrait"), st = getComputedStyle(n);
     return { basImage: c.offsetTop + c.offsetHeight, hPapier: u.offsetHeight, uneLigne: n.scrollWidth <= n.clientWidth + 1 && n.offsetHeight < parseFloat(st.fontSize) * 1.6, police: st.fontFamily, dore: /gradient/.test(st.backgroundImage) && /text/.test(st.webkitBackgroundClip || st.backgroundClip), texte: n.textContent }; });
   verifier("l'image descend jusqu'au bas du papier (et un peu au-delà, sous la déchirure)", a.basImage >= a.hPapier, `${a.basImage} / ${a.hPapier}`);
-  verifier("le nom en titre doré, sur une seule ligne qui s'ajuste à la largeur", a.uneLigne && a.dore && /Homemade Apple/.test(a.police) && a.texte === "Thorin Ironfoot le Grand des Montagnes", JSON.stringify(a));
+  verifier("le nom en titre doré, sur une seule ligne qui s'ajuste à la largeur", a.uneLigne && a.dore && /Shadows Into Light/.test(a.police) && a.texte === "Thorin Ironfoot le Grand des Montagnes", JSON.stringify(a));
   const pa = await centre("#recit-avatar .papier-usure");
   await p.mouse.click(pa.x - pa.w * 0.25, pa.y);
   await p.waitForTimeout(400);

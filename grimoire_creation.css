@@ -43,6 +43,10 @@ body.creation-livre #overlay-jeu-modale { display: none !important; }
 /* LES CLASSES : l'image de fond sur toute la double page ; à gauche, voilée en
    dégradé sous le texte (presque effacée au bord, entière vers la pliure). */
 .page-classe { overflow: hidden; }
+/* (v339) Les peuples ont leur fond aussi, voilé de même. */
+.page-race { overflow: hidden; }
+.page-race .contenu-page { z-index: 1; }
+.page-texte-race { padding-right: calc(var(--u) * 12) !important; }
 .fond-classe { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
 .fond-classe img { position: absolute; top: 0; height: 100%; width: 200%; max-width: none; object-fit: cover; }
 .fond-classe.gauche img { left: 0; }

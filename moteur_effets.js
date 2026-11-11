@@ -1542,20 +1542,10 @@ window.demarrerCiblage = async function(idCarte, options) {
             // si un mod Distance est posé dessus).
             // Une Illusion posée en MOD sur une autre action compte aussi : un
             // leurre de plus, l'action qui la porte se joue normalement.
-            listeMods.forEach(m => {
-                const modEff = window.EFFETS_BDD_CACHE[m.id];
-                if (modEff && (modEff.Nom || "").toLowerCase().includes("illusion")) {
-                    isIllusion = true;
-                    porteeIllusion = Math.max(porteeIllusion, rangeMax);
-                    nbIllusions += Math.max(1, Math.round(m.count || 1));
-                }
-            });
-            if (nomLower.includes("illusion")) {
-                isIllusion = true;
-                porteeIllusion = Math.max(porteeIllusion, rangeMax);
-                nbIllusions += Math.max(1, Math.round(act.count || 1));
-                return;
-            }
+            // (v339) Nico : « enlève l'effet de combat Illusion ». Une ancienne carte
+            // qui la porte se joue sans leurre : l'action Illusion ne fait plus rien,
+            // et posée en mod, elle est ignorée (isIllusion reste faux).
+            if (nomLower.includes("illusion")) return;
 
             // L'arme équipée peut transformer l'action en tir, et allonger sa
             // portée. Posé ICI, avant que isRanged et rangeMax ne servent :

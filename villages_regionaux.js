@@ -459,18 +459,38 @@ const clesManquantes = (cles) => [["gemini", "Gemini"], ["openai", "OpenAI"], ["
     ["cloudKey", "Cloudinary (clé)"], ["cloudSecret", "Cloudinary (secret)"]].filter(([k]) => !cles[k]).map(([, nom]) => nom);
 
 // 1. LE TEXTE : le village, d'après le lore de sa région.
-function promptTexte(numero, nomsExistants) {
+// (v339) Nico : « les lieux sont nickel, mais les villages ne s'intègrent pas bien dans
+// le paysage de la map ». Les lieux (poi_creation.js) lisent le terrain du point
+// (MIA_TERRAIN) et le descriptif de la région avant d'être inventés ; les villages
+// étaient dessinés à l'aveugle (un village « type », le même en forêt qu'au désert,
+// et aussi gros que le carré). Ils lisent maintenant le même terrain, le même
+// descriptif, et se dessinent en hameau posé dans ce qui est déjà peint.
+const SUJET_VILLAGE = "a small village (a modest cluster of a few buildings, at the same scale as the surrounding map features), nestled into the existing landscape";
+const texteTerrain = (t) => t ? [t.terrain, t.sous_le_groupe, t.resume_mj].filter(Boolean).join(" — ") : "";
+async function terrainDuVillage(numero, p) {
+    if (typeof window.lireTerrainA !== "function") return null;
+    try { return await window.lireTerrainA({ Region: Number(numero), x: p.x, y: p.y }); }
+    catch (e) { console.warn("[MIA_VILLAGE] Terrain illisible :", e); return null; }
+}
+function promptTexte(numero, nomsExistants, terrain) {
     const carte = (window.CARTES_REGIONALES || {})[numero] || {};
     const lore = typeof window.loreDeLaRegion === "function" ? window.loreDeLaRegion(numero) : "";
+    const descriptif = typeof window.descriptifRegion === "function" ? (window.descriptifRegion(numero) || {}).texte : (carte.description || "");
+    const t = texteTerrain(terrain);
     return `Tu es MIA_VILLAGE, l'IA qui peuple les cartes régionales du monde d'Ivalis.
 
-LE LORE (à respecter scrupuleusement) :
+${descriptif ? `Descriptif de la région : ${descriptif}
+
+` : ""}LE LORE (à respecter scrupuleusement) :
 ${lore}
 
 La carte : « ${carte.nom || "région inconnue"} ».
+LE TERRAIN à l'endroit du village (lu sur la carte) : ${t || "inconnu"}.
 Les lieux déjà posés sur cette carte : ${JSON.stringify(nomsExistants)}.
 
-Ta mission : invente UN petit village antique de cette région, cohérent avec son lore (les peuples qui y vivent, leurs mœurs, les tensions, les factions).
+Ta mission : invente UN petit village antique de cette région, cohérent avec son lore (les peuples qui y vivent, leurs mœurs, les tensions, les factions)
+ET avec le terrain à cet endroit (pas de port dans le désert, des maisons de bois en forêt, de pierre en montagne, sur pilotis dans un marais…).
+C'est un petit village : un hameau de quelques maisons, jamais une ville.
 Il doit être différent des lieux déjà posés (un autre nom, une autre identité).
 
 Réponds OBLIGATOIREMENT avec un JSON valide, exactement dans ce format :
@@ -479,13 +499,13 @@ Réponds OBLIGATOIREMENT avec un JSON valide, exactement dans ce format :
   "description": "Une description riche : atmosphère, architecture, peuple, métiers, croyances, ce qu'on y trouve, une tension ou une rumeur locale.",
   "securite": "Moyenne",
   "peuple": "Le peuple majoritaire du village",
-  "visuel": "A very short ENGLISH description of what this village looks like seen from above on a map: its buildings, materials, layout and one notable feature. Physical elements only, no style words."
+  "visuel": "A very short ENGLISH description of what this village looks like seen from above on a map, built INTO the terrain at this spot: a modest cluster of a few buildings, materials suited to that terrain, how it sits among what is already there (trees, river, hills, sand, rocks…) and one notable feature. Physical elements only, no style words."
 }
 « securite » est un de : ${SECURITES.join(", ")}.`;
 }
-async function inventerVillage(cles, numero, nomsExistants) {
+async function inventerVillage(cles, numero, nomsExistants, terrain) {
     const corps = {
-        systemInstruction: { parts: [{ text: promptTexte(numero, nomsExistants) }] },
+        systemInstruction: { parts: [{ text: promptTexte(numero, nomsExistants, terrain) }] },
         contents: [{ role: "user", parts: [{ text: "Crée un nouveau village pour cette carte." }] }],
         generationConfig: { temperature: 0.95, responseMimeType: "application/json" }
     };
@@ -704,11 +724,13 @@ window.creerVillagesRegion = async function() {
     for (let i = 0; i < lot.length; i++) {
         const p = lot[i];
         try {
+            attente(true, "Création des villages… Patientez", `Village ${i + 1} sur ${lot.length} — MIA_TERRAIN lit le terrain`);
+            const terrain = await terrainDuVillage(numero, p);
             attente(true, "Création des villages… Patientez", `Village ${i + 1} sur ${lot.length} — MIA_VILLAGE imagine le village`);
             const noms = villagesDeLaCarte(numero).map(v => v.nom).concat(crees.map(v => v.nom));
-            const v = await inventerVillage(cles, numero, noms);
+            const v = await inventerVillage(cles, numero, noms, terrain);
             attente(true, "Création des villages… Patientez", `Village ${i + 1} sur ${lot.length} — MIA_VILLAGE dessine « ${v.nom} »`);
-            const calque = await fabriquerCalque(cles, urlImage, p, v.visuel);
+            const calque = await fabriquerCalque(cles, urlImage, p, v.visuel, SUJET_VILLAGE);
             const id = nouvelId(v.nom);
             const fiche = {
                 Nom_Du_Lieu: v.nom, Description_Global: v.description, Niveau_De_Securite: v.securite,
@@ -716,7 +738,8 @@ window.creerVillagesRegion = async function() {
                 Reputations: {}, Stigmates: "", URL_Cloudinary: "",
                 Carte_Regionale: Number(numero),
                 Position_Region: { x: Math.round(p.x * 1e5) / 1e5, y: Math.round(p.y * 1e5) / 1e5, taille: Math.round(p.taille * 1e5) / 1e5 },
-                URL_Calque_Region: calque, Calque_Plein: true
+                URL_Calque_Region: calque, Calque_Plein: true,
+                ...(terrain && terrain.terrain ? { Terrain_Village: String(terrain.terrain) } : {})
             };
             await setDoc(doc(db, COLLECTION_LIEUX, id), fiche);
             villages[id] = lireVillage(id, fiche);
@@ -749,7 +772,7 @@ window.redessinerVillageRegion = async function(id) {
     try {
         // Un village d'avant v281 se redessine dans son nouveau carré (la moitié).
         const taille = Math.round(coteAffiche(v) * 1e5) / 1e5;
-        const calque = await fabriquerCalque(cles, window.imageCarteRegionaleOuverte(), { ...v, taille }, v.visuel || "a small ancient village");
+        const calque = await fabriquerCalque(cles, window.imageCarteRegionaleOuverte(), { ...v, taille }, v.visuel || "a small ancient village", SUJET_VILLAGE);
         await setDoc(doc(db, COLLECTION_LIEUX, v.id), { URL_Calque_Region: calque, Calque_Plein: true,
                                                         Position_Region: { x: v.x, y: v.y, taille } }, { merge: true });
         Object.assign(v, { calque, plein: true, taille });

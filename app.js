@@ -5509,8 +5509,18 @@ window.completerEffetsDeSecours = function(cache) {
 // passent pour réservés à une classe qui ne les débloque jamais : ni la Forge,
 // ni le générateur de monstres, ni l'IA de la Forge ne les proposent.
 window.EFFETS_RETIRES_FORGE = ["EFF_LUMIERE"];
-window.effetReserveAUneClasse = function(id, effet) {
+// (v339) Nico : « enlève l'effet de combat Illusion, pour les joueurs comme pour les
+// monstres ». Son identifiant vit dans le grimoire (Combat_Effets) : on le reconnaît
+// à son nom. Retiré de la Forge, du générateur de monstres et de LIA ; une ancienne
+// carte qui le porte se joue sans poser de leurre (moteur_effets.js).
+window.NOMS_EFFETS_RETIRES = ["illusion"];
+window.effetRetire = function(id, effet) {
     if ((window.EFFETS_RETIRES_FORGE || []).includes(id)) return true;
+    const nom = String((effet && effet.Nom) || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    return !!nom && (window.NOMS_EFFETS_RETIRES || []).some(n => nom.includes(n));
+};
+window.effetReserveAUneClasse = function(id, effet) {
+    if (window.effetRetire(id, effet)) return true;
     if (effet && effet.Classe) return true;
     return Object.values(window.ATOUTS_CLASSES || {}).some(paliers =>
         paliers.some(p => (p.effets || []).includes(id)));
@@ -5520,7 +5530,7 @@ window.effetReserveAUneClasse = function(id, effet) {
 // public ; pour un effet de classe, seulement si sa classe l'a débloqué à son
 // niveau (Ténèbres : Nécromancien de niveau 5).
 window.effetAccessible = function(id, effet, perso) {
-    if ((window.EFFETS_RETIRES_FORGE || []).includes(id)) return false;
+    if (window.effetRetire(id, effet)) return false;
     if (!window.effetReserveAUneClasse(id, effet)) return true;
     return (window.atoutRace(perso || {}).effets || []).includes(id);
 };
@@ -6581,7 +6591,7 @@ window.AIDE_CARACS = {
            rp: "arcanes, histoire, enquête, nature, religion, déchiffrer" },
   sag:   { combat: ["Soin", "Purification", "Bouclier magique", "Absorption"],
            rp: "perception, intuition, médecine, survie, pister, dressage" },
-  cha:   { combat: ["Distorsion mentale", "Confusion", "Peur", "Immobilisation", "Illusion"],
+  cha:   { combat: ["Distorsion mentale", "Confusion", "Peur", "Immobilisation"],
            rp: "persuasion, intimidation, duperie, marchandage, représentation" }
 };
 

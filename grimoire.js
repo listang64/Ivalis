@@ -662,6 +662,11 @@
             if (aGauche ? xp > pw * ZONE_PRISE : xp < pw * (1 - ZONE_PRISE)) return;
             // (v306) la dernière double page vierge : on ne referme pas le livre par la fin.
             if (!aGauche && pageFlip.getCurrentPageIndex() >= nbPages - 3) return;
+            // (v339) Nico : « sur la dernière page des classes, on ne doit pas pouvoir
+            // tourner la page à droite, ça fait bugger le jeu » : la suite (les champs)
+            // ne s'ouvre qu'en choisissant une classe.
+            if (!aGauche && window.GRIMOIRE_CREATION && typeof window.GRIMOIRE_CREATION.bloqueEnAvant === "function"
+                && window.GRIMOIRE_CREATION.bloqueEnAvant(pageFlip.getCurrentPageIndex())) return;
             // (v312) Nico : « quand on ouvre le livre, bloque le fait qu'on puisse le
             // refermer » : la première double page ne se tourne pas vers la couverture.
             if (aGauche && pageFlip.getCurrentPageIndex() <= 2) return;

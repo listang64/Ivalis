@@ -41,8 +41,17 @@
         ["Dancing Script", "700", 1.05, "cursive dansante"],
         ["Kaushan Script", "400", 0.95, "pinceau épais"]
     ];
-    const PAR_DEFAUT = "Homemade Apple";
+    // (v340) Nico : « mets la police Shadows Into Light par défaut pour les titres ».
+    const PAR_DEFAUT = "Shadows Into Light";
     const CLE = "ivalis_police_titres";
+    // Un poste resté sur l'ancienne écriture par défaut (Homemade Apple) passe une fois
+    // à la nouvelle ; ensuite, ce qu'on choisit dans Paramètres reste.
+    try {
+        if (!localStorage.getItem("ivalis_police_titres_v340")) {
+            if (localStorage.getItem(CLE) === "Homemade Apple") localStorage.removeItem(CLE);
+            localStorage.setItem("ivalis_police_titres_v340", "1");
+        }
+    } catch (e) {}
     window.POLICES_TITRES = POLICES.map(([nom, poids, echelle, genre]) => ({ nom, poids, echelle, genre }));
 
     const url = (liste) => "https://fonts.googleapis.com/css2?" + liste.map(([nom, poids]) => "family=" + nom.replace(/ /g, "+") + ":wght@" + poids).join("&") + "&display=swap";

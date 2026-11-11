@@ -4299,6 +4299,11 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 .jauges-selection-token {
     position: absolute; top: 104%; left: 50%; transform: translateX(-50%);
     width: 84%; height: 30%;
+    /* (v339) Nico : « je ne peux plus afficher le nombre de PV quand je clique sur
+       un token » : au cadrage d'entrée du combat (la carte entière à l'écran), un
+       pion ne fait qu'une vingtaine de pixels et ses chiffres tombaient à 1 px.
+       Les jauges ne descendent plus sous une taille où ils se lisent. */
+    min-width: 56px; min-height: 31px;
     display: flex; flex-direction: column; justify-content: space-between;
     pointer-events: none; z-index: 5;
     opacity: 1; transition: opacity 0.45s ease;
@@ -4307,7 +4312,7 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 .jauges-selection-token.repliee { opacity: 0; }
 .jauge-selection {
     position: relative;
-    height: 46%; background: #111; border: 1px solid #c2a878; border-radius: 3px;
+    height: 46%; min-height: 14px; background: #111; border: 1px solid #c2a878; border-radius: 3px;
     overflow: hidden; box-sizing: border-box;
     /* La barre est le conteneur de ses chiffres (v270) : cqh / cqw. */
     container-type: size;

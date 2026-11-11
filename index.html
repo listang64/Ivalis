@@ -13,16 +13,16 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=129">
+  <link rel="stylesheet" href="style.css?v=130">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
   <link rel="stylesheet" href="grimoire.css?v=14">
   <link rel="stylesheet" href="grimoire_recit.css?v=16">
   <link rel="stylesheet" href="grimoire_carte.css?v=2">
-  <link rel="stylesheet" href="grimoire_regions.css?v=3">
+  <link rel="stylesheet" href="grimoire_regions.css?v=4">
   <link rel="stylesheet" href="loupe_cartes.css?v=2">
   <link rel="stylesheet" href="grimoire_fiches.css?v=6">
-  <link rel="stylesheet" href="grimoire_creation.css?v=4">
+  <link rel="stylesheet" href="grimoire_creation.css?v=5">
 
  
   <!-- ===================================================================== -->
@@ -2420,7 +2420,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=243"></script>
+<script src="trace_combat.js?v=244"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2429,8 +2429,8 @@
 <script src="cles_gemini.js?v=4"></script>
 <!-- LE GRIMOIRE (v297) : StPageFlip 2.0.7 (MIT, dans vendor/), puis le livre -->
 <script src="vendor/page-flip/page-flip.browser.js?v=2.0.7"></script>
-<script src="police_titres.js?v=1"></script>
-<script src="grimoire.js?v=21"></script>
+<script src="police_titres.js?v=2"></script>
+<script src="grimoire.js?v=22"></script>
 <!-- LES DÉPENSES DU MJ (v293) : tokens et coût en euros de chaque réponse -->
 <script src="depenses_ia.js?v=4"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
@@ -2486,17 +2486,17 @@
 <script type="module" src="regime_cerveau.js?v=54"></script>
 <script type="module" src="ia_master.js?v=24"></script>
 <script type="module" src="illustrations_recit.js?v=8"></script>
-<script type="module" src="app.js?v=143"></script>
+<script type="module" src="app.js?v=144"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=4"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
 <script type="module" src="grimoire_recit.js?v=18"></script>
 <!-- LA CARTE DU MONDE DANS LE GRIMOIRE (v302) : sa double page, ses zones (DEV). -->
 <script type="module" src="grimoire_carte.js?v=6"></script>
-<script src="grimoire_regions.js?v=8"></script>
+<script src="grimoire_regions.js?v=9"></script>
 <script src="loupe_cartes.js?v=4"></script>
 <script type="module" src="grimoire_fiches.js?v=6"></script>
-<script type="module" src="grimoire_creation.js?v=4"></script>
+<script type="module" src="grimoire_creation.js?v=5"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=4"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région et son titre (plus de nuages dessus, v286). -->
@@ -2505,9 +2505,9 @@
 <script type="module" src="cartes_regionales.js?v=20"></script>
 <!-- Le lore du monde, par région (v273), puis les villages des cartes régionales et MIA_VILLAGE. -->
 <script src="lore_ivalis.js?v=4"></script>
-<script type="module" src="villages_regionaux.js?v=8"></script>
+<script type="module" src="villages_regionaux.js?v=9"></script>
 <!-- Les descriptifs RP des régions (v274) : le mode DEV et sa fenêtre pleine page. -->
-<script type="module" src="descriptifs_regions.js?v=1"></script>
+<script type="module" src="descriptifs_regions.js?v=2"></script>
 <!-- Le déplacement des PJ (v275) : les terrains praticables des cartes régionales,
      puis le groupe, son bouton voyage, les tracés, les votes, la marche et les nuits. -->
 <script type="module" src="terrains_regionaux.js?v=2"></script>
@@ -2528,11 +2528,11 @@
 <!-- La montée de niveau (v256) : la popup du héros qui prend un niveau. -->
 <script src="montee_niveau.js?v=1"></script>
 <!-- Les talents : les règles (script simple), puis leur fenêtre. -->
-<script src="talents.js?v=5"></script>
+<script src="talents.js?v=6"></script>
 <!-- Les blessures : la table et ses règles (script simple), puis l'écran. -->
 <script src="blessures.js?v=2"></script>
 <script type="module" src="creation_personnage.js?v=27"></script>
-<script type="module" src="classes.js?v=27"></script>
+<script type="module" src="classes.js?v=28"></script>
 <script type="module" src="recit_dynamique.js?v=7"></script>
 <script type="module" src="competences.js?v=69"></script>
 <script type="module" src="talents_ui.js?v=2"></script>
@@ -2541,7 +2541,7 @@
 <script src="zones_procedurales.js?v=6"></script>
 <script type="module" src="studio_animation.js?v=13"></script>
 <!-- LIA, l'aide à la création de la Forge -->
-<script type="module" src="lia_forge.js?v=7"></script>
+<script type="module" src="lia_forge.js?v=8"></script>
 <!-- L'illustration des compétences (prompt IA + image IA, en file) -->
 <script type="module" src="illustration_competence.js?v=10"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
@@ -2554,7 +2554,7 @@
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=40"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=101"></script>
+<script type="module" src="moteur_effets.js?v=102"></script>
 <!-- LES APPARITIONS (v268) : le tableau de Nico, son tirage, sa fenêtre de
      réglage. Avant monstres.js, qui le lit dès son chargement. -->
 <script src="apparitions.js?v=3"></script>

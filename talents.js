@@ -196,10 +196,9 @@
           texte: "+3 × le modificateur de Charisme aux chances des états de Charisme (Confusion, Peur, Immobilisation).",
           effet: (m) => ({ chanceEtatsCharisme: 3 * m("cha") }),
           resume: (m) => `${plus(3 * m("cha"))} % sur Confusion, Peur et Immobilisation` },
-        { id: "TAL_DEGATS_ILLUSOIRES", nom: "Dégâts illusoires", carac: "cha", min: 12, max: 1,
-          texte: "Un ennemi qui détruit une de ses illusions subit 2,5 × le modificateur de Charisme en dégâts bruts (arrondi supérieur).",
-          effet: (m) => ({ degatsIllusoires: Math.ceil(2.5 * m("cha")) }),
-          resume: (m) => `${Math.ceil(2.5 * m("cha"))} dégâts bruts à qui brise une illusion` },
+        // (v339) « Dégâts illusoires » est parti avec l'effet Illusion : sans illusion à
+        // briser, il ne servait plus. Un héros qui l'avait retrouve son point
+        // (talentsDuPerso ne compte que les talents qui existent).
         { id: "TAL_LANGAGE_ARCANIQUE", nom: "Langage arcanique", carac: "cha", min: 14, max: 1,
           texte: "+1 dégât pour la Distorsion mentale.",
           effet: () => ({ degatsMotsPouvoir: 1 }),

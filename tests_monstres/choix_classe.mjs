@@ -212,13 +212,13 @@ console.log("\n5. LA BASE : LIRE LES CLASSES (le bouton d'installation est retir
   const r = await p.evaluate(() => ({ installer: typeof window.installerClasses, bouton: !!document.getElementById("btn-installer-classes"),
                                       doc: window.documentDepuisClasse(window.CLASSES_PAR_DEFAUT.find(c => c.id === "CLASSE_PROTECTEUR")) }));
   verifier("plus de bouton ni de fonction d'installation", r.installer === "undefined" && !r.bouton);
-  verifier("le format d'un document de classe reste connu (nom, images, ordre)", r.doc.Nom === "Protecteur" && /Hoplite_fond/.test(r.doc.Image_Fond)
+  verifier("le format d'un document de classe reste connu (nom, images, ordre)", r.doc.Nom === "Protecteur" && /IMG_2257_ucdhvf/.test(r.doc.Image_Fond)
            && /IMG_2159/.test(r.doc.Image_Tarot) && r.doc.Ordre === 8, JSON.stringify(r.doc));
   const lu = await p.evaluate(() => window.classeDepuisDocument("CLASSE_PROTECTEUR", { Nom: "Protecteur d'élite" }));
-  verifier("un document incomplet est complété par la liste du jeu", lu.nom === "Protecteur d'élite" && /Hoplite_fond/.test(lu.imageFond));
+  verifier("un document incomplet est complété par la liste du jeu", lu.nom === "Protecteur d'élite" && /IMG_2257_ucdhvf/.test(lu.imageFond));
   const vieux = await p.evaluate(() => window.classeDepuisDocument("CLASSE_HOPLITE", { Nom: "Hoplite" }));
   verifier("le document Hoplite de la base se lit « Protecteur » (CLASSE_PROTECTEUR)",
-           vieux.id === "CLASSE_PROTECTEUR" && vieux.nom === "Protecteur" && /Hoplite_fond/.test(vieux.imageFond), JSON.stringify(vieux).slice(0, 80));
+           vieux.id === "CLASSE_PROTECTEUR" && vieux.nom === "Protecteur" && /IMG_2257_ucdhvf/.test(vieux.imageFond), JSON.stringify(vieux).slice(0, 80));
   verifier("la liste du jeu porte déjà les liens optimisés", /q_auto,f_auto/.test(r.doc.Image_Tarot) && /q_auto,f_auto/.test(r.doc.Image_Fond));
   const ancien = await p.evaluate(() => window.classeDepuisDocument("CLASSE_HOPLITE", {
     Image_Tarot: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1790440202/IMG_2159_iligqv.jpg" }));
