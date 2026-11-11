@@ -366,7 +366,8 @@ export function declencherDefenseurs(etat, idMobile, contactAvant, contactApres,
     for (const ennemi of contactApres) {
         if (contactAvant.has(ennemi) || tentes.has(ennemi) || ennemi === exempte) continue;
         const a = combattant(etat, ennemi);
-        const chance = nombre(a && a.atouts && a.atouts.defenseur);
+        // (v353) Au niveau 9, le Défenseur passe à 50 % (defenseurRenforce).
+        const chance = Math.max(nombre(a && a.atouts && a.atouts.defenseur), nombre(a && a.atouts && a.atouts.defenseurRenforce));
         if (!a || chance <= 0 || a.aTerre || a.estIllusion) continue;
         const mobile = combattant(etat, idMobile);
         if (!mobile || mobile.aTerre) break;
@@ -381,29 +382,25 @@ export function declencherDefenseurs(etat, idMobile, contactAvant, contactApres,
     return etapes;
 }
 
-// LA FUREUR DE LA SENTINELLE (niveau 10) : chaque ENNEMI qui lui est adjacent
-// reçoit une attaque d'opportunité (esquive ou parade possible, +6 compris),
-// puis ceux qui tiennent encore debout sont repoussés d'une case — un mur ou
-// un pion arrête la poussée, le coup a déjà porté. Mute l'état, rend les
-// étapes (poussées comprises, et le feu où l'on atterrit).
+// L'ASSAUT DE LA SENTINELLE (niveau 5 — v353 ; l'ancienne Fureur, niveau 10).
+// Nico : « repousse d'une case tous les belligérants qui lui sont adjacents, et
+// 70 % de chances de faire une attaque d'opportunité sur chaque ennemi ainsi
+// repoussé ». Ses réponses : alliés compris (seuls les ennemis peuvent être
+// frappés) ; d'abord la poussée, puis les attaques — un ennemi que rien n'a pu
+// repousser (un mur, un pion) n'est pas frappé ; les 70 % passés, c'est une
+// attaque d'opportunité ordinaire (esquive ou parade possible, +6 compris).
+// Mute l'état, rend les étapes (poussées comprises, et le feu où l'on atterrit).
+export const CHANCE_ASSAUT_SENTINELLE = 70;
 export function fureurDeLaSentinelle(etat, idLanceur, des, plateau) {
     const etapes = [];
     const moi = combattant(etat, idLanceur);
     if (!moi || moi.aTerre) return etapes;
-    const cibles = Object.keys(etat.combattants || {}).sort().filter(id => {
+    const voisins = Object.keys(etat.combattants || {}).sort().filter(id => {
         const x = etat.combattants[id];
-        return id !== idLanceur && x && !x.aTerre && !x.estIllusion
-            && (x.camp || "Allié") !== (moi.camp || "Allié") && distance(moi, x) === 1;
+        return id !== idLanceur && x && !x.aTerre && !x.estIllusion && distance(moi, x) === 1;
     });
-    cibles.forEach(id => {
-        const x = combattant(etat, id);
-        const coup = resoudreOpportunite(etat, idLanceur, id, des);
-        if (!coup) return;
-        const hex = { q: x.q, r: x.r };
-        if (coup.evitee) etapes.push({ type: "opportunite", ...coup, hex });
-        else etapes.push(...infligerOpportunite(etat, id, idLanceur, coup, hex));
-    });
-    cibles.forEach(id => {
+    const repousses = [];
+    voisins.forEach(id => {
         const x = combattant(etat, id);
         if (!x || x.aTerre) return;
         const de = { q: nombre(x.q), r: nombre(x.r) };
@@ -416,6 +413,20 @@ export function fureurDeLaSentinelle(etat, idLanceur, des, plateau) {
         x.r = vers.r;
         etapes.push({ type: "poussee", cible: id, acteur: idLanceur, de, vers });
         etapes.push(...traverserZones(etat, id, vers, des));
+        repousses.push(id);
+    });
+    repousses.forEach(id => {
+        const x = combattant(etat, id);
+        if (!x || x.aTerre || (x.camp || "Allié") === (moi.camp || "Allié")) return;
+        if (des.d100() > CHANCE_ASSAUT_SENTINELLE) {
+            etapes.push({ type: "message", cible: id, acteur: idLanceur, texte: "Pas d'ouverture" });
+            return;
+        }
+        const coup = resoudreOpportunite(etat, idLanceur, id, des);
+        if (!coup) return;
+        const hex = { q: x.q, r: x.r };
+        if (coup.evitee) etapes.push({ type: "opportunite", ...coup, hex });
+        else etapes.push(...infligerOpportunite(etat, id, idLanceur, coup, hex));
     });
     return etapes;
 }

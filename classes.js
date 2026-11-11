@@ -194,14 +194,16 @@ window.DESCRIPTIFS_CLASSES = {
             + "repousse d'un seul élan.",
         paliers: [
             { niveau: 1, titre: "Vigilance",
-              points: ["+6 aux dégâts de ses attaques d'opportunité", "+20 % de soins reçus"] },
-            { niveau: 5, titre: "Passif : Défenseur",
+              points: ["+6 aux dégâts de ses attaques d'opportunité"] },
+            { niveau: 3, titre: "Passif : Défenseur",
               points: ["Un ennemi qui entre dans sa zone (case adjacente) : 30 % de chance d'une attaque d'opportunité",
                        "Avec une arme à allonge (lance lourde), sa zone passe à 2 cases"] },
-            { niveau: 10, titre: "Technique : Fureur de la sentinelle",
-              points: ["Initiative 20 · aucune fatigue",
-                       "Une attaque d'opportunité sur chaque ennemi adjacent, puis repoussé d'une case",
-                       "Une fois par combat"] }
+            { niveau: 5, titre: "Technique : Assaut de la sentinelle",
+              points: ["Initiative 0 · aucune fatigue · une fois par combat",
+                       "Repousse d'une case tous les combattants qui lui sont adjacents, alliés compris",
+                       "Puis 70 % de chance d'une attaque d'opportunité sur chaque ennemi ainsi repoussé"] },
+            { niveau: 9, titre: "Défenseur aguerri",
+              points: ["Le Défenseur passe à 50 % de chance d'une attaque d'opportunité"] }
         ]
     },
     CLASSE_ORACLE: {

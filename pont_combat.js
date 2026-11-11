@@ -595,7 +595,7 @@ const SCENES = {
                        CLASSE_APPEL_LUMIERE: "☀️ Appel de la lumière",
                        CLASSE_ARRET_TEMPS: "⏳ Arrêt du temps",
                        CLASSE_RETOUR_ARRIERE: "⏪ Retour arrière",
-                       CLASSE_FUREUR_SENTINELLE: "⚔️ Fureur de la sentinelle",
+                       CLASSE_FUREUR_SENTINELLE: "⚔️ Assaut de la sentinelle",
                        CLASSE_TIR_PRECIS: "🪢 Lancer de bolas",
                        CLASSE_MUR_DE_TERRE: "🪨 Mur de terre",
                        CLASSE_LIEN_DE_SANG: "🩸 Lien de sang" };

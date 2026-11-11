@@ -349,7 +349,10 @@ export function validerIntention(etat, intention, plateau) {
         }
         // La Fureur de la sentinelle : au moins un ennemi au contact, sinon
         // refusée (pas gâchée).
-        if (idCarte === "CLASSE_FUREUR_SENTINELLE" && ennemisAuContact(etat, acteur.id).length === 0) {
+        // (v353) L'Assaut de la sentinelle repousse tout le monde : il suffit
+        // d'un combattant à côté d'elle (allié ou ennemi).
+        if (idCarte === "CLASSE_FUREUR_SENTINELLE" && !Object.values(etat.combattants || {}).some(x =>
+                x && x.id !== acteur.id && !x.aTerre && !x.estIllusion && distance(acteur, x) === 1)) {
             return refus("Fureur de la sentinelle : aucun ennemi au contact");
         }
         // La Résonance du bouclier (Protecteur) : il lui faut au moins un

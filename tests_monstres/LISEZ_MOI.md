@@ -11280,3 +11280,26 @@ medicus.mjs est mis à jour (paliers, 40 %, la réserve du réanimé).
 corrections_v352.mjs le vérifie : les dégâts par niveau, l'armure qui les réduit, les +2 soins (et pas ailleurs), le document du compagnon (PV et esquive par niveau), les textes.
 
 pisteur.mjs est mis à jour.
+
+## v353 — La refonte des classes : la Sentinelle
+
+- Nico (sa fiche de la Sentinelle) :
+  - niveau 1 : +6 aux attaques d'opportunité ;
+  - niveau 3 : le passif Défenseur (30 %, 2 cases avec une lance lourde) ;
+  - niveau 5 : Assaut de la sentinelle ;
+  - niveau 9 : le Défenseur passe à 50 %.
+- app.js : les paliers passent à 1, 3, 5 et 9.
+  - Le +20 % de soins reçus disparaît (sa réponse).
+  - defenseurRenforce : 50 au niveau 9 (mouvement_pur.js prend la plus forte des deux chances).
+- L'ASSAUT DE LA SENTINELLE remplace la Fureur (l'id CLASSE_FUREUR_SENTINELLE reste ; init 0 ; une fois par combat ; mouvement_pur.js) :
+  - d'abord, tous les combattants adjacents, alliés compris, reculent d'une case ;
+  - puis chaque ENNEMI réellement repoussé a 70 % de chance de prendre une attaque d'opportunité ordinaire (esquive ou parade possible, +6 compris) ;
+  - un ennemi qui n'a pas pu être repoussé (mur, pion) n'est pas frappé ;
+  - il suffit d'un combattant au contact pour la lancer.
+
+corrections_v353.mjs le vérifie : le Défenseur à 30 % puis 50 %, les alliés repoussés jamais frappés (50 graines), les textes.
+
+sentinelle.mjs est mis à jour :
+- paliers ;
+- l'Assaut : poussées puis attaques, 70 % sur 300 graines, poussée bloquée jamais frappée, parade ;
+- la fin des soins reçus.

@@ -232,6 +232,8 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         rayonZombies: nombre(race.rayonZombies, race.zombies ? 1 : 0),
         degatsOpportunite: nombre(race.degatsOpportunite),
         defenseur: nombre(race.defenseur),
+        // (v353) Le Défenseur de la Sentinelle à 50 % au niveau 9.
+        defenseurRenforce: nombre(race.defenseurRenforce),
         allongeOpportunite: !!race.allongeOpportunite,
         // Le Géomancien, niveau 5 : il traverse ses murs de terre, marche sur
         // le terrain difficile comme sur un sol nu, et ses nappes ne le

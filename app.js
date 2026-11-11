@@ -1057,10 +1057,15 @@ window.ATOUTS_CLASSES = {
     // chance de frapper l'ennemi qui ENTRE dans sa zone — et cette zone portée
     // à 2 cases avec une arme à allonge ; la Fureur de la sentinelle au
     // niveau 10.
+    // v353, la refonte des classes (Nico) : +6 aux attaques d'opportunité au
+    // niveau 1 (le +20 % de soins reçus n'est plus) ; le Défenseur au niveau 3 ;
+    // l'Assaut de la sentinelle (ex-Fureur) au niveau 5 ; au niveau 9, le
+    // Défenseur passe à 50 % (defenseurRenforce).
     "Sentinelle": [
-        { niveau: 1,  degatsOpportunite: 6, soinsRecus: 20 },
-        { niveau: 5,  defenseur: 30, allongeOpportunite: true },
-        { niveau: 10, techniques: ["CLASSE_FUREUR_SENTINELLE"] }
+        { niveau: 1,  degatsOpportunite: 6 },
+        { niveau: 3,  defenseur: 30, allongeOpportunite: true },
+        { niveau: 5,  techniques: ["CLASSE_FUREUR_SENTINELLE"] },
+        { niveau: 9,  defenseurRenforce: 50 }
     ],
     // L'ORACLE : +10 d'initiative sur ses compétences forgées (jouerCarteCombat,
     // combat.js) ; l'Arrêt du temps au niveau 5 (voir la file, rejouer une
@@ -1208,10 +1213,12 @@ window.TECHNIQUES_CLASSE = {
         desc: "Se choisit avec une autre compétence : au début de son tour, l'Oracle prend un repos long, "
             + "puis joue cette compétence avec sa fatigue remise à jour. Une fois par combat."
     },
+    // (v353) La Fureur devient l'Assaut de la sentinelle (l'id reste).
     CLASSE_FUREUR_SENTINELLE: {
-        Nom: "Fureur de la sentinelle", classe: "Sentinelle", niveau: 10, Initiative: 20, Fatigue: 0, cible: "soi",
-        desc: "Chaque ennemi adjacent reçoit une attaque d'opportunité, puis est repoussé d'une case. "
-            + "Une fois par combat."
+        Nom: "Assaut de la sentinelle", classe: "Sentinelle", niveau: 5, Initiative: 0, Fatigue: 0, cible: "soi",
+        desc: "Repousse d'une case tous les combattants qui lui sont adjacents (alliés compris), puis 70 % de "
+            + "chance de faire une attaque d'opportunité sur chaque ennemi ainsi repoussé (esquive ou parade "
+            + "possible). Une fois par combat."
     },
     // LE MUR DE TERRE : pas une fois par combat — autant de murs que sa
     // fatigue en paie (20 chacun), sur les cases qu'il désigne (cerveau :
@@ -1655,6 +1662,7 @@ window.texteAtout = function(cle, valeur) {
         case "glacePhysique":  return "Ses attaques magiques de glace font des dégâts physiques au lieu de magiques";
         case "degatsOpportunite": return `${plus(n)} aux dégâts de ses attaques d'opportunité`;
         case "defenseur":      return `Défenseur : ${n} % de chance de frapper l'ennemi qui entre dans sa zone`;
+        case "defenseurRenforce": return `Défenseur : passe à ${n} % de chance`;
         case "allongeOpportunite": return "Sa zone passe à 2 cases avec une arme à allonge (lance lourde)";
         case "brulureAggravee": return valeur ? "Craint le feu : brûlé, -60 % de soins reçus et 10 % des PV max en dégâts physiques par manche (au lieu de -50 % et 8 % magiques)"
                                               : "Le malus de brûlure s'annule : il brûle comme tout le monde";

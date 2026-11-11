@@ -36,7 +36,7 @@ const REGLES = {
     defPhysique: w.defPhysiqueCombattant, defMagique: w.defMagiqueCombattant,
     critique: w.critiqueCombattant, atouts: w.atoutRace, bonusEquip: w.bonusEquip
 };
-const XP = { 1: 0, 4: 1800, 5: 2500, 9: 6400, 10: 7900 };
+const XP = { 1: 0, 2: 700, 3: 1200, 4: 1800, 5: 2500, 8: 5200, 9: 6400, 10: 7900 };
 const fiche = (id, extra = {}) => ({
     idPersonnage: id, prenom: id, race: "Humain", classe: "", camp: id.startsWith("M") ? "Ennemi" : "Allié",
     estMonstre: id.startsWith("M"), joueur: "", xp: 0,
@@ -67,22 +67,26 @@ console.log("=========================================================");
 
 console.log("\n1. LES PALIERS");
 {
-    const a1 = w.atoutRace(sentinelle(1)), a5 = w.atoutRace(sentinelle(5)), a10 = w.atoutRace(sentinelle(10));
-    verifier("niveau 1 : +6 d'opportunité, +20 % de soins reçus", a1.degatsOpportunite === 6 && a1.soinsRecus === 20
+    // (v353, la refonte des classes : Défenseur au 3, Assaut au 5, Défenseur à 50 % au 9, plus de soins reçus.)
+    const a1 = w.atoutRace(sentinelle(1)), a2 = w.atoutRace(sentinelle(2)), a3 = w.atoutRace(sentinelle(3)), a5 = w.atoutRace(sentinelle(5));
+    const a8 = w.atoutRace(sentinelle(8)), a9 = w.atoutRace(sentinelle(9)), a10 = w.atoutRace(sentinelle(10));
+    verifier("niveau 1 : +6 d'opportunité (plus de +20 % de soins reçus)", a1.degatsOpportunite === 6 && !a1.soinsRecus
              && !a1.defenseur && !(a1.techniques || []).length, JSON.stringify(a1));
-    verifier("niveau 5 : Défenseur 30 %, zone à 2 cases avec allonge", a5.defenseur === 30 && a5.allongeOpportunite === true);
-    verifier("niveau 10 : la Fureur de la sentinelle", JSON.stringify(a10.techniques) === '["CLASSE_FUREUR_SENTINELLE"]');
+    verifier("niveau 3 : Défenseur 30 %, zone à 2 cases avec allonge (pas au 2)", a3.defenseur === 30 && a3.allongeOpportunite === true && !a2.defenseur);
+    verifier("niveau 5 : l'Assaut de la sentinelle", JSON.stringify(a5.techniques) === '["CLASSE_FUREUR_SENTINELLE"]');
+    verifier("niveau 9 : le Défenseur passe à 50 % (pas au 8)", a9.defenseurRenforce === 50 && !a8.defenseurRenforce && JSON.stringify(a10) === JSON.stringify(a9));
     const f = w.TECHNIQUES_CLASSE.CLASSE_FUREUR_SENTINELLE;
-    verifier("Fureur : init 20, aucune fatigue, niveau 10", f.Initiative === 20 && f.Fatigue === 0 && f.niveau === 10 && f.classe === "Sentinelle");
+    verifier("Assaut de la sentinelle : init 0, aucune fatigue, niveau 5", f.Nom === "Assaut de la sentinelle" && f.Initiative === 0 && f.Fatigue === 0
+             && f.niveau === 5 && f.classe === "Sentinelle");
     const e = monde(10);
     verifier("en combat : les atouts voyagent", e.combattants.S.atouts.degatsOpportunite === 6 && e.combattants.S.atouts.defenseur === 30
-             && e.combattants.S.atouts.allongeOpportunite === true && e.combattants.S.atouts.soinsRecus === 20);
+             && e.combattants.S.atouts.defenseurRenforce === 50 && e.combattants.S.atouts.allongeOpportunite === true && !e.combattants.S.atouts.soinsRecus);
     const lance = combattantDepuisFiche(sentinelle(5), { q: 0, r: 0 }, { ...REGLES, bonusEquip: (f, cle) => cle === "allonge" ? 1 : 0 });
     verifier("l'allonge de l'arme est retenue dans l'état", lance.mod.allonge === 1 && porteeDeMenace(lance) === 2
              && porteeDeMenace(e.combattants.S) === 1);
 }
 
-console.log("\n2. NIVEAU 1 : +6 AUX ATTAQUES D'OPPORTUNITÉ, +20 % DE SOINS");
+console.log("\n2. NIVEAU 1 : +6 AUX ATTAQUES D'OPPORTUNITÉ (v353 : PLUS DE +20 % DE SOINS)");
 {
     const e = monde(1);
     const r = marcher(e, "M1", [{ q: 2, r: 0 }], desA());
@@ -99,7 +103,7 @@ console.log("\n2. NIVEAU 1 : +6 AUX ATTAQUES D'OPPORTUNITÉ, +20 % DE SOINS");
         attaques: [{ nom: "Soin", valeurBrute: 10, isHeal: true, cibles: ["S"] }], alterations: [],
         jets: { attaqueRatee: false, parCible: { S: { esquive: false, etats: {} } } } });
     void soin;
-    verifier("un soin de 10 lui rend 12 (+20 %)", soinBlesse.etat.combattants.S.pv === 62, String(soinBlesse.etat.combattants.S.pv));
+    verifier("un soin de 10 lui rend 10 (plus de +20 %)", soinBlesse.etat.combattants.S.pv === 60, String(soinBlesse.etat.combattants.S.pv));
 }
 
 console.log("\n3. NIVEAU 5 : LE DÉFENSEUR");
@@ -119,7 +123,9 @@ console.log("\n3. NIVEAU 5 : LE DÉFENSEUR");
     verifier("le coup part, mais la parade le stoppe", pv(rp, "M2") === 100 && rp.etapes.some(x => x.type === "opportunite" && x.evitee && x.defenseur));
     const n4 = monde(4, { M1: { q: 9, r: 9 } });
     const d4 = desA(1);
-    verifier("niveau 4 : pas de Défenseur (aucun dé)", pv(marcher(n4, "M2", chemin, d4), "M2") === 100 && d4.tires.length === 0);
+    verifier("niveau 2 : pas de Défenseur (aucun dé)", (() => { const n2 = monde(2, { M1: { q: 9, r: 9 } }); const d2 = desA(1);
+             return pv(marcher(n2, "M2", chemin, d2), "M2") === 100 && d2.tires.length === 0; })());
+    void n4; void d4;
     // Entrer, sortir, rentrer dans le même déplacement : un seul jet.
     const va = desA(100, 100, 100);
     const r3 = marcher(base(), "M2", [{ q: 3, r: 0 }, { q: 2, r: 0 }, { q: 1, r: 0 }, { q: 2, r: -1 }, { q: 1, r: -1 }], va);
@@ -175,40 +181,61 @@ console.log("\n4. LE DÉFENSEUR ET LES AUTRES DÉPLACEMENTS");
              && !rp.etapes.some(x => x.type === "opportunite"), `${rp.etat.combattants.M2.q}`);
 }
 
-console.log("\n5. LA FUREUR DE LA SENTINELLE");
+console.log("\n5. L'ASSAUT DE LA SENTINELLE (v353) : TOUT LE MONDE RECULE, PUIS 70 % D'ATTAQUE SUR CHAQUE ENNEMI REPOUSSÉ");
 {
     // S (0,0) ; M1 (1,0) et M2 (-1,0) au contact ; A, un allié, au contact (0,1) ; M3 loin.
     const e = monde(10, { M2: { q: -1, r: 0 }, M3: { q: 6, r: 0 }, A: { q: 0, r: 1 } }, ["M1", "M2", "A", "M3"]);
     e.combattants.M2.def.physique = 50;
-    e.file = [{ id: "S", carte: "CLASSE_FUREUR_SENTINELLE", initiative: 20, pas: 0 }, { id: "M1", carte: "X", initiative: 10, pas: 0 }];
+    e.file = [{ id: "S", carte: "CLASSE_FUREUR_SENTINELLE", initiative: 0, pas: 0 }, { id: "M1", carte: "X", initiative: 10, pas: 0 }];
     const i = { id: "F1", type: "classe", acteur: "S", idCarte: "CLASSE_FUREUR_SENTINELLE" };
-    verifier("niveau 10, des ennemis au contact : acceptée", validerIntention(e, i).ok, validerIntention(e, i).raison || "");
-    const n9 = monde(9); n9.file = [{ id: "S", carte: "CLASSE_FUREUR_SENTINELLE", initiative: 20, pas: 0 }];
-    verifier("niveau 9 : il ne l'a pas", !validerIntention(n9, i).ok);
-    const seul = monde(10, { M1: { q: 5, r: 0 } }); seul.file = [{ id: "S", carte: "CLASSE_FUREUR_SENTINELLE", initiative: 20, pas: 0 }];
+    verifier("niveau 10, des combattants au contact : acceptée", validerIntention(e, i).ok, validerIntention(e, i).raison || "");
+    const n4 = monde(4); n4.file = [{ id: "S", carte: "CLASSE_FUREUR_SENTINELLE", initiative: 0, pas: 0 }];
+    verifier("niveau 5 : acceptée ; niveau 4 : il ne l'a pas", !validerIntention(n4, i).ok
+             && validerIntention(Object.assign(monde(5), { file: [{ id: "S", carte: "CLASSE_FUREUR_SENTINELLE", initiative: 0, pas: 0 }] }), i).ok);
+    const seul = monde(10, { M1: { q: 5, r: 0 } }); seul.file = [{ id: "S", carte: "CLASSE_FUREUR_SENTINELLE", initiative: 0, pas: 0 }];
     verifier("personne au contact : refusée (pas gâchée)", !validerIntention(seul, i).ok, validerIntention(seul, i).raison);
+    const allie = monde(10, { M1: { q: 5, r: 0 }, A: { q: 0, r: 1 } }, ["M1", "A"]); allie.file = [{ id: "S", carte: "CLASSE_FUREUR_SENTINELLE", initiative: 0, pas: 0 }];
+    verifier("seulement un allié au contact : acceptée (elle le repousse)", validerIntention(allie, i).ok);
     const pas = appliquerIntention(e, i);
     const c = pas.etat.combattants;
-    verifier("M1 : 14 dégâts, repoussé en (2,0)", c.M1.pv === 86 && c.M1.q === 2 && c.M1.r === 0, `${c.M1.pv} (${c.M1.q},${c.M1.r})`);
-    verifier("M2 (50 % d'armure) : 7, repoussé en (-2,0)", c.M2.pv === 93 && c.M2.q === -2, `${c.M2.pv} (${c.M2.q},${c.M2.r})`);
-    verifier("l'allié et l'ennemi loin : rien", c.A.pv === 100 && c.A.q === 0 && c.A.r === 1 && c.M3.pv === 100 && c.M3.q === 6);
+    verifier("tout le monde recule d'une case : M1 (2,0), M2 (-2,0), l'allié A (0,2)", c.M1.q === 2 && c.M2.q === -2 && c.A.q === 0 && c.A.r === 2,
+             `(${c.M1.q},${c.M1.r}) (${c.M2.q},${c.M2.r}) (${c.A.q},${c.A.r})`);
+    verifier("l'allié n'est jamais frappé ; l'ennemi loin ne bouge pas", c.A.pv === 100 && c.M3.pv === 100 && c.M3.q === 6);
+    verifier("les poussées d'abord, puis les attaques", (() => { const et = pas.entree.etapes;
+             const dernierePoussee = et.map(x => x.type).lastIndexOf("poussee"), premiereAttaque = et.findIndex(x => x.type === "opportunite" || x.type === "degats" || (x.type === "message" && /ouverture/.test(x.texte)));
+             return dernierePoussee >= 0 && premiereAttaque > dernierePoussee; })());
+    verifier("M1 : 14 si l'attaque part, rien sinon ; M2 (50 %) : 7 ou rien", [86, 100].includes(c.M1.pv) && [93, 100].includes(c.M2.pv), `${c.M1.pv} / ${c.M2.pv}`);
     verifier("aucune fatigue, une fois par combat", c.S.fatigue === 100
-             && !validerIntention(Object.assign(clonerEtat(pas.etat), { file: [{ id: "S", carte: "CLASSE_FUREUR_SENTINELLE", initiative: 20, pas: 0 }] }), i).ok);
+             && !validerIntention(Object.assign(clonerEtat(pas.etat), { file: [{ id: "S", carte: "CLASSE_FUREUR_SENTINELLE", initiative: 0, pas: 0 }] }), i).ok);
     const rejoue = appliquerEntree(e, pas.entree).combattants;
-    verifier("rejoué depuis le journal : mêmes PV, mêmes cases", rejoue.M1.pv === 86 && rejoue.M1.q === 2 && rejoue.M2.q === -2);
+    verifier("rejoué depuis le journal : mêmes PV, mêmes cases", rejoue.M1.pv === c.M1.pv && rejoue.M1.q === 2 && rejoue.M2.q === -2 && rejoue.A.r === 2);
     const titre = misEnScene(pas.entree.etapes.find(x => x.type === "techniqueClasse"), pas.etat);
-    verifier("à l'écran : « ⚔️ Fureur de la sentinelle »", titre && /Fureur de la sentinelle/.test(titre.texte));
-    // Poussée bloquée : le coup porte quand même.
-    const bloque = monde(10, { M2: { q: 2, r: 0 } }, ["M1", "M2", "A"]);
-    bloque.file = [{ id: "S", carte: "CLASSE_FUREUR_SENTINELLE", initiative: 20, pas: 0 }];
-    const rb = appliquerIntention(bloque, i);
-    verifier("poussée bloquée (un pion derrière) : le coup porte, il reste", rb.etat.combattants.M1.pv === 86 && rb.etat.combattants.M1.q === 1
-             && rb.entree.etapes.some(x => x.type === "message" && /Poussée bloquée/.test(x.texte)));
-    // Qui esquive est repoussé quand même.
-    const esq = monde(10); esq.combattants.M1.def.esquive = 100;
-    esq.file = [{ id: "S", carte: "CLASSE_FUREUR_SENTINELLE", initiative: 20, pas: 0 }];
-    const re = appliquerIntention(esq, i).etat.combattants.M1;
-    verifier("il esquive le coup : repoussé quand même", re.pv === 100 && re.q === 2);
+    verifier("à l'écran : « ⚔️ Assaut de la sentinelle »", titre && /Assaut de la sentinelle/.test(titre.texte));
+    // 70 % : sur 300 graines, l'attaque part environ 7 fois sur 10 (esquive et parade à 0 : elle touche).
+    let frappes = 0;
+    for (let g = 1; g <= 300; g++) {
+        const s1 = monde(10); s1.graine = g; s1.file = [{ id: "S", carte: "CLASSE_FUREUR_SENTINELLE", initiative: 0, pas: 0 }];
+        if (appliquerIntention(s1, i).etat.combattants.M1.pv < 100) frappes++;
+    }
+    verifier("l'attaque part environ 7 fois sur 10 (sur 300 graines)", Math.abs(frappes / 300 - 0.7) < 0.07, `${frappes}/300`);
+    // Poussée bloquée : pas repoussé, donc pas frappé.
+    let frappeBloque = 0;
+    for (let g = 1; g <= 40; g++) {
+        const bloque = monde(10, { M2: { q: 2, r: 0 } }, ["M1", "M2", "A"]); bloque.graine = g;
+        bloque.file = [{ id: "S", carte: "CLASSE_FUREUR_SENTINELLE", initiative: 0, pas: 0 }];
+        const rb = appliquerIntention(bloque, i);
+        if (rb.etat.combattants.M1.pv < 100 || rb.etat.combattants.M1.q !== 1) frappeBloque++;
+    }
+    verifier("poussée bloquée (un pion derrière) : il reste, et n'est jamais frappé", frappeBloque === 0, String(frappeBloque));
+    // Les 70 % passés, la parade peut encore l'arrêter.
+    let pare = 0, essais = 0;
+    for (let g = 1; g <= 100; g++) {
+        const p2 = monde(10); p2.graine = g; p2.combattants.M1.def.parade = 100;
+        p2.file = [{ id: "S", carte: "CLASSE_FUREUR_SENTINELLE", initiative: 0, pas: 0 }];
+        const r2 = appliquerIntention(p2, i);
+        if (r2.entree.etapes.some(x => x.type === "opportunite" && x.cible === "M1")) { essais++; if (r2.etat.combattants.M1.pv === 100) pare++; }
+    }
+    verifier("une parade à 100 % arrête chaque attaque qui part", essais > 0 && pare === essais, `${pare}/${essais}`);
 }
 
 // =========================================================================
@@ -277,14 +304,14 @@ console.log("\n6. LA FICHE DE CLASSE ET LES BONUS EN CLAIR");
              lignes: detail.paliers.map(p => p.lignes.join(" · ")) };
   });
   await p.screenshot({ path: "/tmp/claude-0/sentinelle_classe.png" });
-  verifier("présentation et paliers Niv. 1 / 5 / 10", r.visible && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]');
-  verifier("le descriptif dit +6, +20 %, Défenseur 30 %, allonge, Fureur",
-           /\+6/.test(r.texte) && /\+20 %/.test(r.texte) && /Défenseur/.test(r.texte) && /30 %/.test(r.texte)
-           && /allonge/.test(r.texte) && /Fureur de la sentinelle/.test(r.texte));
+  verifier("présentation et paliers Niv. 1 / 3 / 5 / 9 (v353)", r.visible && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 3","Niv. 5","Niv. 9"]');
+  verifier("le descriptif dit +6, Défenseur 30 % puis 50 %, allonge, Assaut — plus de +20 %",
+           /\+6/.test(r.texte) && !/\+20 %/.test(r.texte) && /Défenseur/.test(r.texte) && /30 %/.test(r.texte) && /50 %/.test(r.texte)
+           && /allonge/.test(r.texte) && /Assaut de la sentinelle/.test(r.texte));
   verifier("l'onglet Statistiques écrit chaque atout en clair",
-           /\+6 aux dégâts de ses attaques d'opportunité/.test(r.lignes[0]) && /\+20 % de soins reçus/.test(r.lignes[0])
+           /\+6 aux dégâts de ses attaques d'opportunité/.test(r.lignes[0]) && !/soins reçus/.test(r.lignes[0])
            && /Défenseur : 30 %/.test(r.lignes[1]) && /2 cases avec une arme à allonge/.test(r.lignes[1])
-           && /Fureur de la sentinelle/.test(r.lignes[2]), JSON.stringify(r.lignes));
+           && /Assaut de la sentinelle/.test(r.lignes[2]) && /50 %/.test(r.lignes[3]), JSON.stringify(r.lignes));
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
