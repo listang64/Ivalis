@@ -11077,3 +11077,18 @@ corrections_v342.mjs le vérifie :
 - revenir en arrière à la souris et au doigt, sur les peuples et sur les classes, jusqu'au dernier peuple depuis la première classe ;
 - un geste vertical ne tourne rien ;
 - les images des classes, la précédente, l'ouverte et la suivante, sont chargées à l'avance.
+
+## v343 — Les classes mises à jour
+
+- Nico : « vire les deux classes en attente du livre (Élémentariste, Mage du chaos) ; ajoute Inquisiteur / Inquisitrice, Chaman, Berzerker, Maudit, Prêtre / Prêtresse de la lumière ».
+- classes.js :
+  - Les deux classes quittent la liste du jeu.
+  - Leurs documents de la base sont ignorés (CLASSES_RETIREES).
+  - Les cinq nouvelles y entrent (ordres 14 à 18), avec l'image donnée par Nico : fond de double page, et carte de l'ancienne grille.
+  - Sans règles encore, elles « arrivent bientôt » (CLASSES_BIENTOT) : visibles, pas encore choisissables. C'était le choix de Nico.
+  - Une classe de la liste du jeu que la base n'a pas encore s'ajoute à celles de la base (chargerClasses).
+- app.js : Inquisitrice, Prêtresse de la lumière. Chaman, Berzerker et Maudit restent les mêmes pour les deux sexes (choix de Nico).
+- grimoire_creation.js : la couleur des marque-pages des nouvelles.
+- La dernière classe du livre est maintenant la Prêtresse de la lumière. Elle reste bloquée vers la droite (v339).
+
+corrections_v343.mjs le vérifie : avec une base qui garde les deux classes en attente et ignore les nouvelles, et dans le livre au féminin.

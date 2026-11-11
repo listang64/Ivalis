@@ -239,7 +239,7 @@ await section(async () => {
 
 {
   const html = lire("index.html");
-  verifier("version 341 ou plus ; grimoire_creation.js en v6", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 341 && JSON.parse(lire("version.json")).version >= 341 && html.includes('grimoire_creation.js?v=6"'));
+  verifier("version 341 ou plus ; grimoire_creation.js en v7", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 341 && JSON.parse(lire("version.json")).version >= 341 && html.includes('grimoire_creation.js?v=7"'));
 }
 console.log(erreurs.length ? "\nErreurs de page : " + erreurs.slice(0, 5).join(" | ") : "");
 console.log(`\n${echecs ? echecs + " ÉCHEC(S)" : "TOUS LES CONTRÔLES PASSENT"}`);

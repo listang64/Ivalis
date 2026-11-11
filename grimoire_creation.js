@@ -70,7 +70,9 @@ window.FONDS_RACES_LIVRE = FONDS_RACES;
 const COULEURS_CLASSES = {
     "Pisteur": "#5f7d3a", "Assassin": "#4f4f5a", "Chasseur de mages": "#4f6d8a", "Sentinelle": "#b0884a",
     "Profanateur": "#6b2e4a", "Géomancien": "#8a6a3e", "Protecteur": "#a87a3a", "Oracle": "#c4ac52",
-    "Vampire": "#8a1f2a", "Sorcier": "#5a3f7a", "Mage du chaos": "#a03c78", "Médicus": "#4f9a84", "Élémentariste": "#4a86bc"
+    "Vampire": "#8a1f2a", "Sorcier": "#5a3f7a", "Médicus": "#4f9a84",
+    // (v343) les nouvelles classes
+    "Inquisiteur": "#7a5a2a", "Chaman": "#4f7a4a", "Berzerker": "#9a3a24", "Maudit": "#3f3a5a", "Prêtre de la lumière": "#c8a640"
 };
 const nuance = (hex, f) => {
     const n = parseInt(String(hex).slice(1), 16), c = [(n >> 16) & 255, (n >> 8) & 255, n & 255];

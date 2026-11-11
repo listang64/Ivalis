@@ -58,12 +58,16 @@ window.CLASSES_PAR_DEFAUT = [
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438696/Vampire_fond_wapbww.png"),
     C(11, "Sorcier",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2171_u2hda6.jpg",
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438696/Necromancien_fond_duglq6.png"),
-    C(12, "Mage du chaos",     "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2174_myjwel.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438697/Mage_Chaos_fond_mtfs6i.png"),
     C(13, "Médicus",           "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440201/IMG_2166_xcmkfp.jpg",
                                "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438697/Medicus_fond_nc0sv3.png"),
-    C(14, "Élémentariste",     "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790440202/IMG_2167_efk77h.jpg",
-                               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1790438696/Elementariste_fond_xhhnlj.png")
+    // (v343) Nico : « vire l'Élémentariste et le Mage du chaos ; ajoute Inquisiteur,
+    // Chaman, Berzerker, Maudit et Prêtre de la lumière ». Une seule image chacune :
+    // le fond de sa double page (elle sert aussi de carte dans l'ancienne grille).
+    C(14, "Inquisiteur",          "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/inquisiteur_mtcrjp.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/inquisiteur_mtcrjp.png"),
+    C(15, "Chaman",               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/chaman_dbjpiw.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/chaman_dbjpiw.png"),
+    C(16, "Berzerker",            "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/beserker_h9l0fy.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/beserker_h9l0fy.png"),
+    C(17, "Maudit",               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/maudit_b6xsnz.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/maudit_b6xsnz.png"),
+    C(18, "Prêtre de la lumière", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/prete_lumi%C3%A8re_yfuwp3.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/prete_lumi%C3%A8re_yfuwp3.png")
 ];
 
 // =========================================================================
@@ -317,7 +321,7 @@ window.optimiserImageClasse = (url) => {
 // Nécromancien (mêmes images), et ne propose plus l'Ensorceleur.
 window.CLASSES_DOC_RENOMMEES = { CLASSE_NECROMANCIEN: { id: "CLASSE_SORCIER", nom: "Sorcier" },
                                  CLASSE_HOPLITE: { id: "CLASSE_PROTECTEUR", nom: "Protecteur" } };
-window.CLASSES_RETIREES = ["CLASSE_ENSORCELEUR"];
+window.CLASSES_RETIREES = ["CLASSE_ENSORCELEUR", "CLASSE_MAGE_DU_CHAOS", "CLASSE_ELEMENTARISTE"];   // (v343) les deux classes en attente
 
 // LES FONDS REMPLACÉS (v339, Nico : « remplace l'image de la classe Protecteur ») :
 // la base qui garde encore l'ancienne image prend celle d'ici. Un fond changé depuis
@@ -354,6 +358,8 @@ window.chargerClasses = async function() {
         console.error("Lecture des classes (on garde la liste du jeu) :", e);
     }
     if (classes.length === 0) classes = window.CLASSES_PAR_DEFAUT.map(c => ({ ...c }));
+    // (v343) Une classe de la liste du jeu que la base n'a pas encore (les nouvelles) s'y ajoute.
+    else window.CLASSES_PAR_DEFAUT.forEach(c => { if (!classes.some(x => x.id === c.id)) classes.push({ ...c }); });
     // Une seule carte par classe : le Nécromancien relu en Sorcier ne double
     // pas un vrai document Sorcier qui aurait été installé depuis.
     const vus = new Set();
@@ -401,7 +407,8 @@ const nomAffiche = (c) => (typeof window.nomClasseGenre === "function")
 
 // LES CLASSES QUI ARRIVENT BIENTÔT : visibles dans la grille, l'image voilée et
 // « Arrive bientôt » par-dessus ; elles ne s'ouvrent pas encore.
-window.CLASSES_BIENTOT = ["CLASSE_MAGE_DU_CHAOS", "CLASSE_ELEMENTARISTE"];
+// (v343) Les cinq nouvelles, sans règles encore : visibles, pas encore choisissables.
+window.CLASSES_BIENTOT = ["CLASSE_INQUISITEUR", "CLASSE_CHAMAN", "CLASSE_BERZERKER", "CLASSE_MAUDIT", "CLASSE_PRETRE_DE_LA_LUMIERE"];
 window.classeBientot = (c) => !!c && window.CLASSES_BIENTOT.includes(c.id);
 
 window.rendreGrilleClasses = function(classes) {

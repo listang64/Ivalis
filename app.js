@@ -1271,15 +1271,17 @@ window.nomActuelClasse = (nom) => window.CLASSES_RENOMMEES[cleClasseBrute(nom)] 
 // LE NOM DE LA CLASSE AU FÉMININ, pour une héroïne (genre « Femelle »). C'est
 // de l'AFFICHAGE seulement : la fiche garde le nom de la classe tel quel
 // (« Sorcier »), et toutes les règles le lisent ainsi. Les classes sans
-// féminin d'usage (Sentinelle, Oracle, Vampire, Mage du chaos, Médicus,
-// Élémentariste) ne changent pas — ni l'Assassin (Nico : le même pour les deux).
+// féminin d'usage (Sentinelle, Oracle, Vampire, Médicus) ne changent pas — ni
+// l'Assassin, le Chaman, le Berzerker et le Maudit (Nico : le même pour les deux).
 window.CLASSES_AU_FEMININ = {
     "Pisteur": "Pisteuse",
     "Chasseur de mages": "Chasseuse de mages",
     "Profanateur": "Profanatrice",
     "Géomancien": "Géomancienne",
     "Protecteur": "Protectrice",
-    "Sorcier": "Sorcière"
+    "Sorcier": "Sorcière",
+    "Inquisiteur": "Inquisitrice",                       // (v343)
+    "Prêtre de la lumière": "Prêtresse de la lumière"
 };
 window.estGenreFeminin = (genre) => /^(f|femelle|femme|féminin|feminin)$/i.test(String(genre || "").trim());
 window.nomClasseGenre = function(nom, genre) {

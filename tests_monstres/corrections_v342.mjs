@@ -253,7 +253,7 @@ titre("3. AILLEURS DANS LE LIVRE, RIEN NE CHANGE");
   verifier("hors création, un texte qui défile garde le doigt (les fiches)", /if \(defile && !defile\.closest\("\.page-creation"\)\) return;/.test(src));
   verifier("la dernière classe reste bloquée vers la droite (v339)", /bloqueEnAvant\(pageFlip\.getCurrentPageIndex\(\)\)\) return;/.test(src));
   const html = lire("index.html");
-  verifier("version 342 ; grimoire.js v23, grimoire_creation.css v6", /VERSION_IVALIS = 342;/.test(lire("trace_combat.js")) && JSON.parse(lire("version.json")).version === 342
+  verifier("version 342 ou plus ; grimoire.js v23, grimoire_creation.css v6", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 342 && JSON.parse(lire("version.json")).version >= 342
            && html.includes('grimoire.js?v=23"') && html.includes('grimoire_creation.css?v=6"'));
 }
 console.log(erreurs.length ? "\nErreurs de page : " + erreurs.slice(0, 5).join(" | ") : "");

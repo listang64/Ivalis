@@ -359,8 +359,8 @@ titre("7. LES VERSIONS");
 {
   const html = lire("index.html"), version = JSON.parse(lire("version.json")).version;
   verifier("version 339 ou plus (trace_combat.js, version.json)", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 339 && version >= 339, String(version));
-  const attendus = { "style.css": 130, "grimoire.js": 23, "grimoire_creation.js": 6, "grimoire_creation.css": 6, "grimoire_regions.js": 9, "grimoire_regions.css": 4,
-                     "descriptifs_regions.js": 2, "app.js": 144, "moteur_effets.js": 102, "talents.js": 6, "lia_forge.js": 8, "classes.js": 28, "villages_regionaux.js": 9 };
+  const attendus = { "style.css": 130, "grimoire.js": 23, "grimoire_creation.js": 7, "grimoire_creation.css": 6, "grimoire_regions.js": 9, "grimoire_regions.css": 4,
+                     "descriptifs_regions.js": 2, "app.js": 145, "moteur_effets.js": 102, "talents.js": 6, "lia_forge.js": 8, "classes.js": 29, "villages_regionaux.js": 9 };
   const faux = Object.entries(attendus).filter(([f, n]) => !html.includes(`${f}?v=${n}"`));
   verifier("chaque fichier touché a changé de version", faux.length === 0, JSON.stringify(faux));
 }
