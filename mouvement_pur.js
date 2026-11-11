@@ -27,7 +27,7 @@
 // =========================================================================
 
 import { clonerEtat, combattant, tomber, franchissablePour, fuyardActif } from './combat_etat.js';
-import { esquiveDe, paradeDe, defPhysiqueDe, bonusDesEtats, aLEtat, traverserZones, protecteurRempart, reserveMaintenueDe,
+import { esquiveDe, paradeDe, defPhysiqueDe, bonusDesEtats, aLEtat, traverserZones, protecteurRempart, reserveMaintenueDe, bonusContreRace,
          ligneDeVue, caseLibre, destinationPoussee } from './moteur_pur.js';
 
 const nombre = (v, defaut = 0) => {
@@ -276,9 +276,10 @@ const reduireParArmure = (cible, brut) => {
     return Math.max(0, Math.round(brut * (1 - reduction)));
 };
 // La Sentinelle frappe plus fort (+6, `degatsOpportunite`), avant l'armure.
-export const degatsOpportuniteBruts = (attaquant) =>
-    DEGATS_OPPORTUNITE + nombre(attaquant && attaquant.atouts && attaquant.atouts.degatsOpportunite);
-export const degatsOpportuniteContre = (cible, attaquant) => reduireParArmure(cible, degatsOpportuniteBruts(attaquant));
+// (v349) Le Vampire de niveau 5 : +3 contre un Vargen (bonusContreRace).
+export const degatsOpportuniteBruts = (attaquant, cible) =>
+    DEGATS_OPPORTUNITE + nombre(attaquant && attaquant.atouts && attaquant.atouts.degatsOpportunite) + bonusContreRace(attaquant, cible);
+export const degatsOpportuniteContre = (cible, attaquant) => reduireParArmure(cible, degatsOpportuniteBruts(attaquant, cible));
 
 // LE COUP D'OPPORTUNITÉ QUI PORTE : le bouclier d'abord (le surplus part dans
 // le vide), la vie ensuite, la chute éventuelle. Une seule écriture pour les
@@ -346,12 +347,12 @@ export function resoudreOpportunite(etat, idAttaquant, idCible, des) {
         const rempart = { id: p.id, evitee: des.d100() <= Math.max(esqP, parP), mot: parP > esqP ? "Paré 🛡️" : "Esquivé 💨" };
         if (evitee && rempart.evitee) return { attaquant: idAttaquant, cible: idCible, evitee: true, mot, montant: 0, rempart };
         return { attaquant: idAttaquant, cible: idCible, evitee: false, mot: "", cibleEvitee: evitee, motCible: evitee ? mot : "",
-                 brut: degatsOpportuniteBruts(a), montant: degatsOpportuniteContre(cible, a), rempart };
+                 brut: degatsOpportuniteBruts(a, cible), montant: degatsOpportuniteContre(cible, a), rempart };
     }
     if (evitee) return { attaquant: idAttaquant, cible: idCible, evitee: true, mot, montant: 0 };
 
     return { attaquant: idAttaquant, cible: idCible, evitee: false, mot: "",
-             brut: degatsOpportuniteBruts(a), montant: degatsOpportuniteContre(cible, a) };
+             brut: degatsOpportuniteBruts(a, cible), montant: degatsOpportuniteContre(cible, a) };
 }
 
 // LE DÉFENSEUR (Sentinelle, niveau 5) : l'ennemi qui ENTRE de lui-même dans sa

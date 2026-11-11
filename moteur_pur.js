@@ -143,7 +143,7 @@ export function regleDesEtats(c, cle) {
         const regle = e && REGLES_ETATS[e.nom];
         if (regle && typeof regle[cle] === "number") total += regle[cle];
         // Le Vampire craint le feu : sa brûlure va plus loin que celle des
-        // autres (-60 % de soins, 18 % des PV max par manche).
+        // autres (-60 % de soins, 10 % des PV max par manche, en physique).
         if (e && e.nom === "Brûlé" && c.atouts && c.atouts.brulureAggravee
             && typeof BRULURE_AGGRAVEE[cle] === "number") total += BRULURE_AGGRAVEE[cle];
     });
@@ -151,8 +151,13 @@ export function regleDesEtats(c, cle) {
 }
 
 // Ce que la brûlure ajoute sur un Vampire (atout brulureAggravee), par-dessus
-// la règle commune de REGLES_ETATS["Brûlé"].
-export const BRULURE_AGGRAVEE = { soinsRecus: -10, pvMaxParTour: 10 };
+// la règle commune de REGLES_ETATS["Brûlé"]. v349 (Nico) : −60 % de soins reçus
+// et 10 % des PV max en dégâts PHYSIQUES (ticsDeFinDeManche) ; au niveau 5, le
+// malus s'annule (l'atout repasse à false).
+export const BRULURE_AGGRAVEE = { soinsRecus: -10, pvMaxParTour: 2, typeParTour: "Physique" };
+// (v349) Le Vampire de niveau 5 : +3 à chaque coup qui frappe un Vargen.
+export const bonusContreRace = (lanceur, cible) =>
+    (cible && cible.race === "Vargen") ? nombre(lanceur && lanceur.atouts && lanceur.atouts.degatsContreVargen) : 0;
 
 export const esquiveDe     = (c) => Math.max(nombre(c && c.def && c.def.esquive)  + bonusDesEtats(c, "esquive")
                                   + regleDesEtats(c, "esquive"), planchersEsquive(c));
@@ -1664,8 +1669,13 @@ export const MANCHES_REMPART = 4;
 //  sur l'allié). Elle vieillit comme tout état : ses manches sont celles de
 //  la technique.
 export const RESERVES_TECHNIQUES = {
-    CLASSE_REMPART: { parTour: 15, tours: MANCHES_REMPART, nom: "Rempart maintenu" }
+    CLASSE_REMPART: { parTour: 15, tours: MANCHES_REMPART, nom: "Rempart maintenu" },
+    // (v349) La Nuée : 40 au lancement, et 33 par manche sur ses 2 manches.
+    CLASSE_NUEE_CHAUVES_SOURIS: { parTour: 33, tours: 2, coutLancement: 40, nom: "Nuée maintenue" }
 };
+// Ce qu'une technique maintenue coûte au lancement : son prix, et la part de
+// la manche du lancement.
+export const coutLancementReserve = (r) => r ? nombre(r.coutLancement) + nombre(r.parTour) : 0;
 export const reserveDeTechnique = (idCarte) => RESERVES_TECHNIQUES[idCarte] || null;
 // Ce que ses techniques maintenues bloquent dans sa jauge pour la manche en
 // cours (la manche du lancement est déjà payée).
@@ -1694,11 +1704,13 @@ export function relacherMaintien(etat, idLanceur, idCarte, raison) {
     if (raison) etapes.push({ type: "message", cible: idLanceur, acteur: idLanceur, texte: raison, couleur: "#e8c46a" });
     return etapes;
 }
-// La Nuée de chauve-souris (Vampire, niveau 10) : l'esquive au moins à 40 %,
-// pour la manche en cours et la suivante.
+// La Nuée de chauve-souris (Vampire, niveau 9 depuis la v349) : l'esquive au
+// moins à 40 %, pour la manche en cours et la suivante ; v349, elle RENVOIE 33 %
+// des dégâts qu'il subit à qui les lui inflige (renvoiPct, resoudreCarte).
 export const ETAT_NUEE = "Nuée de chauve-souris";
 export const ESQUIVE_NUEE = 40;
 export const MANCHES_NUEE = 2;
+export const RENVOI_NUEE = 33;
 
 // Le protecteur qui partage ce coup avec la cible, ou null : un Rempart posé
 // sur elle, un Hoplite debout (ni à terre, ni en sursis), et côte à côte À CET
@@ -1832,7 +1844,7 @@ function poserMaintien(c, idCarte, liens) {
     const r = reserveDeTechnique(idCarte);
     if (!r) return [];
     const etapes = [];
-    c.fatigue = Math.max(0, nombre(c.fatigue) - r.parTour);
+    c.fatigue = Math.max(0, nombre(c.fatigue) - coutLancementReserve(r));
     etapes.push({ type: "fatigue", cible: c.id, fatigueApres: c.fatigue, tic: r.nom });
     c.etats = [...(c.etats || []).filter(e => !(e && e.maintien === idCarte)),
                { nom: r.nom, maintien: idCarte, reserve: r.parTour, duree: r.tours, dejaPaye: true, liens,
@@ -1864,9 +1876,10 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
         etapes.push({ type: "etats", cible: id, liste: c.etats, pose: ETAT_MUR_BOUCLIER });
     } else if (action.idCarte === "CLASSE_NUEE_CHAUVES_SOURIS") {
         c.etats = [...(c.etats || []).filter(e => e && e.nom !== ETAT_NUEE),
-                   { nom: ETAT_NUEE, duree: MANCHES_NUEE, esquiveMin: ESQUIVE_NUEE,
-                     desc: `Esquive d'au moins ${ESQUIVE_NUEE} % (plus si elle l'était déjà).` }];
+                   { nom: ETAT_NUEE, duree: MANCHES_NUEE, esquiveMin: ESQUIVE_NUEE, renvoiPct: RENVOI_NUEE,
+                     desc: `Esquive d'au moins ${ESQUIVE_NUEE} % (plus si elle l'était déjà) ; renvoie ${RENVOI_NUEE} % des dégâts subis.` }];
         etapes.push({ type: "etats", cible: id, liste: c.etats, pose: ETAT_NUEE });
+        etapes.push(...poserMaintien(c, action.idCarte, [{ cible: id, nom: ETAT_NUEE }]));
     } else if (action.idCarte === "CLASSE_REMPART") {
         const allie = combattant(suivant, action.cible);
         if (allie) {
@@ -2390,9 +2403,14 @@ export function resoudreCarte(etat, action, plateau) {
             // la chaîne : elle traverse donc le malus à bout portant et les
             // résistances comme un dégât normal, plutôt que de passer en douce
             // derrière l'armure.
-            const attaqueAvecBonus = bonusMonstre
+            const attaqueMonstre = bonusMonstre
                 ? { ...attaque, valeurBrute: appliquerBonusMonstre(attaque.valeurBrute, bonusMonstre) }
                 : attaque;
+            // (v349) Le Vampire de niveau 5 : +3 contre un Vargen, avant les défenses.
+            const contreRace = bonusContreRace(lanceur, cible);
+            const attaqueAvecBonus = contreRace > 0
+                ? { ...attaqueMonstre, valeurBrute: decimal(attaqueMonstre.valeurBrute) + contreRace }
+                : attaqueMonstre;
 
             // UNE CIBLE FRAPPÉE : la chaîne de dégâts, puis tout ce qu'elle
             // déclenche (drain, énergie bue, bouclier, renvoi, étalement,
@@ -2475,6 +2493,15 @@ export function resoudreCarte(etat, action, plateau) {
                     ...((compte.tics || []).length > 0 ? { etale: compte.tics.reduce((a, b) => a + nombre(b), 0) } : {}),
                     ...(compte.tenebres ? { tenebres: true } : {})
                 });
+
+                // LA NUÉE DE CHAUVES-SOURIS (Vampire, v349) : 33 % des dégâts subis
+                // (PV et bouclier entamés) repartent vers l'attaquant, comme la part
+                // d'un Contre — et avec elle.
+                const pctRenvoi = Math.max(0, ...(cible.etats || []).map(e => nombre(e && e.renvoiPct)));
+                const subis = nombre(compte.versBouclier) + Math.min(pvAvantCoup, nombre(compte.versPv));
+                if (pctRenvoi > 0 && subis > 0 && !attaqueFrappe.renvoyeAntimagie) {
+                    compte.renvoi = nombre(compte.renvoi) + Math.max(1, Math.round(subis * pctRenvoi / 100));
+                }
 
                 // LE CONTRE RENVOIE SA PART À L'ATTAQUANT : bouclier d'abord, vie
                 // ensuite, comme n'importe quel coup — sans résistance, c'est la
@@ -2968,6 +2995,6 @@ if (typeof window !== "undefined") {
         // Le leader (v262), réglé depuis le même tableau.
         reglerLeader, leaderActuel, LEADER_DEFAUT, chanceEtatDe,
         // La réserve maintenue (v347), lue par l'écran de préparation.
-        RESERVES_TECHNIQUES, reserveMaintenueDe
+        RESERVES_TECHNIQUES, reserveMaintenueDe, coutLancementReserve
     };
 }

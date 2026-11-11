@@ -50,7 +50,8 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          pointesDeGlace, orientationCone,
          actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle, ligneDeVue, caseLibre, aLEtat,
          carteToutEtalee, resisteA, prisMalgreResistance,
-         reserveMaintenueDe, reserveDeTechnique, relacherMaintien, chanceFaceA, CHANCE_ETOURDI_RESONANCE } from './moteur_pur.js';
+         reserveMaintenueDe, reserveDeTechnique, relacherMaintien, chanceFaceA, CHANCE_ETOURDI_RESONANCE,
+         coutLancementReserve, BRULURE_AGGRAVEE } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles,
@@ -283,8 +284,8 @@ export function validerIntention(etat, intention, plateau) {
         if (tete.carte && tete.carte !== idCarte) return refus(`la carte de ce tour est ${tete.carte}`);
         // (v347) Une technique maintenue paie sa réserve de la manche au lancement.
         const reserveTech = reserveDeTechnique(idCarte);
-        if (reserveTech && reserveTech.parTour > nombre(acteur.fatigue) - reserveMaintenueDe(acteur)) {
-            return refus(`il faut ${reserveTech.parTour} d'énergie pour la réserve, il en reste ${nombre(acteur.fatigue) - reserveMaintenueDe(acteur)}`);
+        if (reserveTech && coutLancementReserve(reserveTech) > nombre(acteur.fatigue) - reserveMaintenueDe(acteur)) {
+            return refus(`il faut ${coutLancementReserve(reserveTech)} d'énergie (coût et réserve), il en reste ${nombre(acteur.fatigue) - reserveMaintenueDe(acteur)}`);
         }
         if (idCarte === "CLASSE_REMPART") {
             const allie = combattant(etat, intention.cible);
@@ -667,10 +668,11 @@ export function ticsDeFinDeManche(etat) {
         const brulure = c.etats.find(e => e && e.nom === "Brûlé");
         if (brulure) {
             const regle = REGLES_ETATS["Brûlé"] || {};
-            // regleDesEtats plutôt que la règle seule : le Vampire brûle à
-            // 18 % de ses PV max, pas à 8 (brulureAggravee).
+            // regleDesEtats plutôt que la règle seule : le Vampire (niveaux 1 à 4)
+            // brûle à 10 % de ses PV max, en PHYSIQUE (brulureAggravee, v349).
             const brut = Math.ceil(nombre(c.pvMax) * (regleDesEtats(c, "pvMaxParTour") / 100));
-            const compte = chaineDeDegats(c, { valeurBrute: brut, typeRes: regle.typeParTour || "Magique" }, {});
+            const typeBrulure = (c.atouts && c.atouts.brulureAggravee) ? BRULURE_AGGRAVEE.typeParTour : (regle.typeParTour || "Magique");
+            const compte = chaineDeDegats(c, { valeurBrute: brut, typeRes: typeBrulure }, {});
             if (compte.degats > 0) {
                 etapes.push(...infligerTic(c, id, compte.degats, "Brûlure", etat, brulure.idSource));
             }

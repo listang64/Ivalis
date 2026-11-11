@@ -149,7 +149,7 @@ console.log("\n5. LES TEXTES");
     verifier("la fiche de classe : paliers 1, 3, 5, 9 ; 15 % et 9 % ; +25 % cumulable",
              /niveau: 3, titre: "Maître des poisons"/.test(c) && /-15 % de fatigue/.test(c) && /niveau: 9, titre: "Instinct du tueur aiguisé"/.test(c) && /\+25 % de chance de critique/.test(c));
     verifier("la ligne des Statistiques dit le cumul", /cumulable/.test(w.texteAtout ? w.texteAtout("critiqueSurKOCumulable", 25) : lireFichier("app.js")));
-    verifier("version 348", /VERSION_IVALIS = 348;/.test(lireFichier("trace_combat.js")) && JSON.parse(lireFichier("version.json")).version === 348);
+    verifier("version 348 ou plus", Number((/VERSION_IVALIS = (\d+);/.exec(lireFichier("trace_combat.js")) || [])[1]) >= 348 && JSON.parse(lireFichier("version.json")).version >= 348);
 }
 
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

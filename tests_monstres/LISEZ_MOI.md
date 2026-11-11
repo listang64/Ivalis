@@ -11197,3 +11197,26 @@ hoplite.mjs et bonus_race_classe.mjs sont mis à jour avec les nouvelles valeurs
 corrections_v348.mjs le vérifie : les paliers, le non-cumul jusqu'au niveau 8, le cumul au 9 (deux KO = +50, chacun tombe à la fin de ses manches, quatre KO = +100, le poison qui achève compte), le poison du maître dès le niveau 3, l'Assaut mortel qui pose ce poison, les textes.
 
 assassin.mjs et poison_fatigue_max.mjs sont mis à jour avec les nouvelles valeurs. Le contrôle de version de corrections_v347.mjs accepte désormais les versions suivantes.
+
+## v349 — La refonte des classes : le Vampire
+
+- Nico (sa fiche du Vampire) :
+  - niveau 1 : +15 % de résistance physique ; brûlé, −60 % de soins reçus et 10 % de ses PV max en dégâts physiques ; résistance au gel ;
+  - niveau 3 : Baiser du vampire ;
+  - niveau 5 : le malus de brûlure s'annule, et +3 dégâts contre les Vargens ;
+  - niveau 9 : Nuée de chauves-souris (40, une fois par combat ; esquive à 40 %, 2 tours ; renvoie 33 % des dégâts subis ; 33 de réserve ; init 100) ;
+  - les Vargens ne peuvent pas être Vampire (déjà en place).
+- app.js : les paliers passent à 1, 3, 5 et 9. Le « +20 % de chance d'être Brûlé » (v237) n'est plus.
+- La brûlure aggravée revient au niveau 1 (BRULURE_AGGRAVEE, moteur_pur.js) : −60 % de soins, 10 % des PV max en dégâts PHYSIQUES (l'armure réduit ; ticsDeFinDeManche). Au niveau 5, l'atout repasse à false : il brûle comme tout le monde (réponse de Nico).
+- +3 contre les Vargens (bonusContreRace) : toutes ses attaques qui frappent (compétences, Baiser, attaques d'opportunité), avant les défenses. Les soins ne prennent pas ce bonus.
+- La Nuée (niveau 9) : 40 d'énergie au lancement, plus la réserve maintenue de la v347, 33 par manche sur ses 2 manches. La première part est payée au lancement (73 en tout), la seconde est bloquée puis consommée. À court, la nuée se dissipe.
+  - RESERVES_TECHNIQUES prend un `coutLancement`.
+  - Elle renvoie 33 % des dégâts SUBIS (bouclier et PV réellement entamés) à l'attaquant, sans défense, comme la part d'un Contre. Seulement sur les cartes, comme le Contre.
+- Le Baiser reste une fois par combat (réponse de Nico).
+
+corrections_v349.mjs vérifie :
+- la Nuée : refus à 72, 73 au lancement, la part bloquée et consommée, à court ;
+- le renvoi : armure, bouclier, esquive, minimum 1, fin de la Nuée ;
+- le +3 contre les Vargens : compétences, armure, soins, Baiser, opportunité, autres héros.
+
+vampire.mjs est mis à jour (paliers et brûlure). Les contrôles de version de v348 et v349 acceptent désormais les versions suivantes.

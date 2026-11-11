@@ -1057,17 +1057,20 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  techniques: ["CLASSE_ARRET_TEMPS"] },
         { niveau: 10, techniques: ["CLASSE_RETOUR_ARRIERE"] }
     ],
-    // LE VAMPIRE : +10 de résistance physique, résistant au gel (25 % de
-    // chance en moins d'être Glacé, −15 % des sorts de glace ; une immunité
-    // avant la v260), mais le feu le prend plus facilement : +20 % de chance d'être
-    // Brûlé par un sort qui brûle (brulureFacile, tirerDesCarte — v237, à la
-    // place de l'ancienne brûlure aggravée). Le Baiser du vampire au niveau 5 (technique de classe :
-    // il remplace l'effet Vampirisme de la Forge), la Nuée de chauve-souris au
-    // niveau 10. Interdit aux Vargens (CLASSES_INTERDITES).
+    // LE VAMPIRE. v349, la refonte des classes (Nico) : au niveau 1, +15 de
+    // résistance physique, résistant au gel (25 % de chance en moins d'être
+    // Glacé, −15 % des sorts de glace), et sa BRÛLURE est aggravée : −60 % de
+    // soins reçus et 10 % de ses PV max en dégâts PHYSIQUES par manche
+    // (brulureAggravee, BRULURE_AGGRAVEE dans moteur_pur.js — le « +20 % de
+    // chance d'être Brûlé » de la v237 n'est plus) ; le Baiser du vampire au
+    // niveau 3 ; au niveau 5, le malus de brûlure s'annule (il brûle comme tout
+    // le monde) et +3 dégâts contre les Vargens (degatsContreVargen) ; la Nuée
+    // de chauves-souris au niveau 9. Interdit aux Vargens (CLASSES_INTERDITES).
     "Vampire": [
-        { niveau: 1,  defPhysique: 10, brulureFacile: 20, resistances: ["Glacé"] },
-        { niveau: 5,  techniques: ["CLASSE_BAISER_VAMPIRE"] },
-        { niveau: 10, techniques: ["CLASSE_NUEE_CHAUVES_SOURIS"] }
+        { niveau: 1,  defPhysique: 15, brulureAggravee: true, resistances: ["Glacé"] },
+        { niveau: 3,  techniques: ["CLASSE_BAISER_VAMPIRE"] },
+        { niveau: 5,  brulureAggravee: false, degatsContreVargen: 3 },
+        { niveau: 9,  techniques: ["CLASSE_NUEE_CHAUVES_SOURIS"] }
     ]
 };
 
@@ -1149,14 +1152,20 @@ window.TECHNIQUES_CLASSE = {
         desc: "Soigne de 12 PV tous les alliés debout, où qu'ils soient (le Médicus compris). Une fois par combat."
     },
     CLASSE_BAISER_VAMPIRE: {
-        Nom: "Baiser du vampire", classe: "Vampire", niveau: 5, Initiative: 100, Fatigue: 0, cible: "ennemiAdjacent",
+        Nom: "Baiser du vampire", classe: "Vampire", niveau: 3, Initiative: 100, Fatigue: 0, cible: "ennemiAdjacent",
         desc: "Sur un ennemi au contact : 25 % de ses PV max en dégâts bruts (aucune défense, à coup sûr), "
             + "et le Vampire se soigne de 60 % des dégâts infligés. Une fois par combat."
     },
+    // (v349) La Nuée coûte 40 au lancement, plus sa réserve maintenue : 33 par
+    // manche sur ses 2 manches (la première payée au lancement — 73 en tout au
+    // lancement ; RESERVES_TECHNIQUES, moteur_pur.js).
     CLASSE_NUEE_CHAUVES_SOURIS: {
-        Nom: "Nuée de chauve-souris", classe: "Vampire", niveau: 10, Initiative: 100, Fatigue: 0, cible: "soi",
-        desc: "Le Vampire se disperse en nuée : son esquive passe à 40 % (elle reste plus haute si elle "
-            + "l'était déjà) pour la manche en cours et la suivante. Une fois par combat."
+        Nom: "Nuée de chauve-souris", classe: "Vampire", niveau: 9, Initiative: 100, Fatigue: 73, cible: "soi",
+        reserve: { parTour: 33, tours: 2, coutLancement: 40 },
+        desc: "Le Vampire se disperse en nuée pour la manche en cours et la suivante : son esquive passe à 40 % "
+            + "(elle reste plus haute si elle l'était déjà) et il renvoie 33 % des dégâts qu'il subit à qui les "
+            + "lui inflige. Coût : 40 d'énergie au lancement, et une réserve de 33 par manche (la première au "
+            + "lancement, la suivante bloquée puis consommée ; à court d'énergie, la nuée se dissipe). Une fois par combat."
     },
     CLASSE_CHARME_FRATRICIDE: {
         Nom: "Charme fratricide", classe: "Sorcier", niveau: 5, Initiative: 105, Fatigue: 0, cible: "ennemi", portee: 3,
@@ -1614,7 +1623,9 @@ window.texteAtout = function(cle, valeur) {
         case "degatsOpportunite": return `${plus(n)} aux dégâts de ses attaques d'opportunité`;
         case "defenseur":      return `Défenseur : ${n} % de chance de frapper l'ennemi qui entre dans sa zone`;
         case "allongeOpportunite": return "Sa zone passe à 2 cases avec une arme à allonge (lance lourde)";
-        case "brulureAggravee": return "Craint le feu : brûlé, -60 % de soins reçus et 18 % des PV max par manche (au lieu de -50 % et 8 %)";
+        case "brulureAggravee": return valeur ? "Craint le feu : brûlé, -60 % de soins reçus et 10 % des PV max en dégâts physiques par manche (au lieu de -50 % et 8 % magiques)"
+                                              : "Le malus de brûlure s'annule : il brûle comme tout le monde";
+        case "degatsContreVargen": return `${plus(n)} dégâts contre les Vargens`;
         case "brulureFacile":  return `Craint le feu : +${n} % de chance d'être Brûlé par les sorts qui brûlent`;
         case "premierPasGratuit": return "La première case de chaque tour ne coûte aucune fatigue";
         case "caracs":         return Object.keys(valeur || {}).map(k => `${plus(Number(valeur[k]) || 0)} ${NOMS_CARACS_ATOUT[k] || k}`).join(" · ");

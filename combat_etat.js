@@ -206,6 +206,9 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         // plus aucune classe ne l'a depuis la v237),
         // et la première case de chacun de ses tours est gratuite (coutDuPas).
         brulureAggravee: !!race.brulureAggravee,
+        // (v349) Le Vampire : brûlure aggravée de nouveau (niveaux 1 à 4), et
+        // +3 dégâts contre les Vargens au niveau 5 (bonusContreRace, moteur_pur.js).
+        degatsContreVargen: nombre(race.degatsContreVargen),
         // …et désormais, à la place, le feu le PREND plus facilement : +20 %
         // de chance d'être Brûlé par un sort qui brûle (tirerDesCarte).
         brulureFacile: nombre(race.brulureFacile),

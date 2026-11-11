@@ -261,17 +261,20 @@ window.DESCRIPTIFS_CLASSES = {
             + "— mais le feu le ronge plus que tout autre. Les Vargens ne peuvent pas l'être.",
         paliers: [
             { niveau: 1, titre: "Sang froid",
-              points: ["+10 % de résistance physique",
+              points: ["+15 % de résistance physique",
                        "Résiste au gel : −25 % de chance d'être Glacé, −15 % des sorts de glace",
-                       "Craint le feu : +20 % de chance d'être Brûlé par les sorts qui brûlent"] },
-            { niveau: 5, titre: "Technique : Baiser du vampire",
+                       "Craint le feu : brûlé, −60 % de soins reçus et 10 % de ses PV max en dégâts physiques par manche"] },
+            { niveau: 3, titre: "Technique : Baiser du vampire",
               points: ["Initiative 100 · aucune fatigue · sur un ennemi au contact",
                        "25 % de ses PV max en dégâts bruts, à coup sûr",
                        "Se soigne de 60 % des dégâts infligés · une fois par combat"] },
-            { niveau: 10, titre: "Technique : Nuée de chauve-souris",
-              points: ["Initiative 100 · aucune fatigue",
+            { niveau: 5, titre: "Sang ancien",
+              points: ["Le malus de brûlure s'annule : il brûle comme tout le monde",
+                       "+3 dégâts contre les Vargens"] },
+            { niveau: 9, titre: "Technique : Nuée de chauves-souris",
+              points: ["Initiative 100 · 40 d'énergie au lancement · réserve 33 par manche, sur 2 manches",
                        "Son esquive passe à 40 % (plus si elle l'était déjà)",
-                       "Pour la manche en cours et la suivante · une fois par combat"] }
+                       "Renvoie 33 % des dégâts qu'il subit à qui les lui inflige · une fois par combat"] }
         ]
     },
     CLASSE_CHASSEUR_DE_MAGES: {

@@ -932,7 +932,7 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             const nom = String(e.nom || "").replace(/[<>&"]/g, "");
             const idC = String(e.maintien).replace(/[^A-Z0-9_]/gi, "");
             htmlDeck += `<div class="encart-maintien${relache ? " relache" : ""}" data-maintien="${idC}" title="${String(e.desc || "").replace(/"/g, "&quot;")}">
-                <span class="maintien-nom">🏰 ${nom}</span>
+                <span class="maintien-nom">${/Nuée/.test(nom) ? "🦇" : "🏰"} ${nom}</span>
                 <span class="maintien-reserve">${relache ? "relâché à la prochaine manche" : bloque ? `⚡ ${parseInt(e.reserve) || 0} bloqués cette manche` : "manche déjà payée"} · ${parseInt(e.duree) || 0} manche${(parseInt(e.duree) || 0) > 1 ? "s" : ""}</span>
                 ${enPreparation() ? `<button type="button" class="maintien-relacher" onclick="event.stopPropagation(); window.basculerRelacher('${persoActuel.idPersonnage}', '${idC}')">${relache ? "Le garder" : "Relâcher"}</button>` : ""}
             </div>`;
@@ -3240,7 +3240,7 @@ function construireHaloVTT(options) {
 // l'image d'un bandeau de carte. Ceux-là prennent un médaillon de LA COULEUR
 // DE LEUR BULLE (COULEUR_ETAT), avec un symbole, et leur nom au survol.
 window.SYMBOLES_ETATS = {
-    "Charmé": "💘", "Ténèbres étalées": "🌑", "Mur de bouclier": "🛡️", "Rempart": "🏰", "Rempart maintenu": "🏰",
+    "Charmé": "💘", "Ténèbres étalées": "🌑", "Mur de bouclier": "🛡️", "Rempart": "🏰", "Rempart maintenu": "🏰", "Nuée maintenue": "🦇",
     "Nuée de chauve-souris": "🦇", "Bouclier anti-magie": "💠", "Plaie rouverte": "🩸",
     "Instinct du tueur": "🗡️", "Bouclier des Sages": "📜", "Étalement": "💢", "Soin étalé": "💚",
     "Élan": "💨", "Repli": "↩️", "Provocation": "😤", "Peur": "😱", "Béni": "✨",
@@ -3389,6 +3389,7 @@ window.COULEUR_ETAT = {
     "Instinct du tueur": "#c62828",
     "Rempart":        "#e8c46a",   // or — protégé par un Hoplite à ses côtés
     "Rempart maintenu": "#e8c46a", // or — le Protecteur qui le tient (v347)
+    "Nuée maintenue": "#7e57c2",   // violet — la Nuée du Vampire (v349)
     "Nuée de chauve-souris": "#6a1b9a",  // pourpre — le Vampire dispersé en nuée
     "Charmé":         "#ec407a",   // rose — retourné contre les siens par le Sorcier
     "Engagé":         "#e53935",   // rouge — pris dans la mêlée (v260)
