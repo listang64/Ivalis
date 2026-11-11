@@ -242,7 +242,9 @@ titre("3. LES CHIFFRES DES JAUGES : DANS LEUR JAUGE, LE PLUS GRAND POSSIBLE, À 
   const vie = mesures.map(l => l[0] || {});
   verifier("il grandit avec la jauge quand on zoome (même proportion de la place utile)",
            vie.length === 3 && vie[2].texteH > vie[1].texteH && vie[1].texteH >= vie[0].texteH
-           && Math.abs(vie[2].texteH / vie[2].utileH - vie[1].texteH / vie[1].utileH) < 0.12,
+           // (v339) les jauges ont une taille minimale (56 × 14 px) : aux petits zooms, le
+           // texte (« 1234/1250 ») y est tenu par la largeur, un peu moins haut (≈ 0,82).
+           && Math.abs(vie[2].texteH / vie[2].utileH - vie[1].texteH / vie[1].utileH) < 0.16,
            vie.map(m => (m.texteH / m.utileH).toFixed(2)).join(" / "));
   verifier("plus de taille en dur : la feuille de style la tire de la jauge", toutes.every(m => !m.enLigne && Number(m.car) > 0)
            && /container-type:\s*size/.test(lire('style.css')) && /cqh/.test(lire('style.css')));
