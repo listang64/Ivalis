@@ -11322,3 +11322,29 @@ sentinelle.mjs est mis à jour :
 corrections_v354.mjs le vérifie : le départ (100 → 70, 30 pile, refus à 29 et KO), la réserve bloquée (cartes), la consommation, le KO à court d'énergie, le rejeu, la fin du sursis, les paliers, les textes.
 
 profanateur.mjs est mis à jour.
+
+## v355 — La refonte des classes : l'Oracle
+
+- Nico (sa fiche de l'Oracle) :
+  - niveau 1 : +8 d'initiative ; les attaques arcaniques retirent de l'initiative à l'ennemi selon la fatigue (30 : −5, 60 : −10, 90 : −15), au tour actuel et au suivant ;
+  - niveau 3 : −40 % de coût en fatigue pour « Initiative + », +1 compétence ;
+  - niveau 5 : Retour dans le passé (tous reprennent les positions d'il y a 3 tours) ;
+  - niveau 9 : Retour arrière.
+- Ses réponses : la fatigue qui compte est le coût de l'attaque ; le +8 vaut pour ses compétences forgées (comme le +10 d'avant) ; le Retour dans le passé remplace l'Arrêt du temps (une fois par combat, initiative 100, 0 fatigue ; moins de 3 manches jouées : le début du combat) ; seules les positions changent, les KO et les nouveaux venus restent, une case prise renvoie à la case libre la plus proche.
+- app.js : paliers 1 (initiative 8, arcaneRalentit), 3 (reductionInitiativePlus 40, competences 1), 5 (CLASSE_RETOUR_PASSE), 9 (CLASSE_RETOUR_ARRIERE, venu du niveau 10). CLASSE_ARRET_TEMPS n'existe plus.
+- L'ARCANE QUI RALENTIT (moteur_pur.js, ralentirParLArcane, appelé par resoudreCarte) :
+  - chaque ennemi touché (pas esquivé) par une attaque d'élément Arcane perd malusArcanique(coût) ;
+  - cette manche : son entrée encore à jouer recule dans la file (trierSuiteDeFile : à égalité l'ordre d'avant, le compagnon du Pisteur derrière son maître), dite par une étape « tour » ;
+  - la manche suivante : l'état « Ralenti » (2 manches, malusInitiative), lu par ouvrirManche (cerveau_combat.js) qui retire l'initiative et retrie.
+- LA FORGE (competences.js, coutDUneAction) : « Initiative + » coûte 40 % de moins (effet de base ou sous-effet) ; le remboursement d'initiative suit le prix payé, donc toujours +8 par cran.
+- LE RETOUR DANS LE PASSÉ :
+  - combat_etat.js : positionsDeManche / memoriserPositions (les 4 dernières manches dans etat.positionsPassees) ; ouvrirManche les note et les met dans son étape « tour », que l'applicateur note aussi (rejeu identique).
+  - moteur_pur.js : positionsIlYA (la manche − 3, sinon la plus ancienne) et retourDansLePasse : tous les vivants qui ont un passé quittent leur case, puis chacun reprend la sienne (prise : casePlusProcheLibre), en étapes « bond ».
+- Retirés (orphelins de l'Arrêt du temps) : la fenêtre ouvrirArretDuTemps (combat.js) et son CSS (style.css), sa validation (cerveau_combat.js), sa marque arretDuTemps dans la file (combat_etat.js, pont_combat.js).
+- combat.js : icône ⏳ et couleur violette pour « Ralenti ».
+
+corrections_v355.mjs le vérifie : les paliers, la disparition de l'Arrêt du temps, le tri de la file (compagnon, égalités), le choix du passé, les textes, la version.
+
+oracle.mjs est réécrit : paliers ; l'arcane (seuils, recul dans la file, état Ralenti, rejeu, coût 29, feu, esquive, sans atout, manche suivante) ; le Retour arrière (niveau 9) ; le Retour dans le passé (passé noté et rejoué, 4 manches gardées, retour, une fois par combat, début du combat, case prise, échange, KO) ; la page (+8, lancement direct, Forge −40 %) ; la fiche (Niv. 1 / 3 / 5 / 9).
+
+geomancien.mjs : l'Oracle a +8 (au lieu de +10). corrections_v344 et v346 : leurs contrôles de version passent en « ou plus ».

@@ -593,7 +593,7 @@ const SCENES = {
                        CLASSE_RESONANCE_BOUCLIER: "🛡️ Résonance du bouclier",
                        CLASSE_BOUCLIER_ANTIMAGIE: "🔮 Bouclier anti-magie",
                        CLASSE_APPEL_LUMIERE: "☀️ Appel de la lumière",
-                       CLASSE_ARRET_TEMPS: "⏳ Arrêt du temps",
+                       CLASSE_RETOUR_PASSE: "⌛ Retour dans le passé",
                        CLASSE_RETOUR_ARRIERE: "⏪ Retour arrière",
                        CLASSE_FUREUR_SENTINELLE: "⚔️ Assaut de la sentinelle",
                        CLASSE_TIR_PRECIS: "🪢 Lancer de bolas",
@@ -1028,10 +1028,9 @@ export function fileDepuisEtat(etat) {
         // comptes séparés finiraient par ne plus être d'accord, et le joueur
         // verrait un prix qu'on ne lui prend pas.
         pasParcourus: nombre(f.pas),
-        // Les marques de l'Oracle (Retour arrière, Arrêt du temps).
+        // La marque de l'Oracle (Retour arrière).
         ...(f.retourArriere ? { retourArriere: true } : {}),
-        ...(f.reposPris ? { reposPris: true } : {}),
-        ...(f.arretDuTemps ? { arretDuTemps: true } : {})
+        ...(f.reposPris ? { reposPris: true } : {})
     }));
 }
 

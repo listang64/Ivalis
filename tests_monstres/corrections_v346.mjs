@@ -438,7 +438,9 @@ await section(async () => {
 {
   const html = lire("index.html");
   verifier("version 346 ; grimoire_recit v19, illustrations_recit v9, ia_master v25, app v146, grimoire_regions v12, grimoire_recit.css v17",
-    /VERSION_IVALIS = 346;/.test(lire("trace_combat.js")) && JSON.parse(lire("version.json")).version === 346 && ['grimoire_recit.js?v=19"', 'illustrations_recit.js?v=9"', 'ia_master.js?v=25"', 'app.js?v=146"', 'grimoire_regions.js?v=12"', 'grimoire_recit.css?v=17"'].every(s => html.includes(s)));
+    Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 346 && JSON.parse(lire("version.json")).version >= 346
+    && [['grimoire_recit\\.js', 19], ['illustrations_recit\\.js', 9], ['ia_master\\.js', 25], ['app\\.js', 146], ['grimoire_regions\\.js', 12], ['grimoire_recit\\.css', 17]]
+       .every(([f, v]) => Number((new RegExp('"(?:\\./)?' + f + '\\?v=(\\d+)"').exec(html) || [])[1]) >= v));
 }
 console.log(erreurs.length ? "\nErreurs de page : " + erreurs.slice(0, 5).join(" | ") : "");
 console.log(`\n${echecs ? echecs + " ÉCHEC(S)" : "TOUS LES CONTRÔLES PASSENT"}`);

@@ -1,31 +1,32 @@
 // LA CLASSE ORACLE.
 //
-// Nico : « Oracle : Lvl1 : +10 d'initiative. Lvl5 : COMP Arrêt du temps.
-// Lvl10 : COMP Retour arrière. Arrêt du temps (ORACLE), 0 fatigue (une fois
-// par combat) : permet de regarder l'initiative de tout le monde, et relancer
-// une autre de ses compétences de son choix en définissant son initiative
-// soi-même avec une petite popup qui apparaît. INIT 200. Retour arrière
-// (ORACLE), 0 fatigue (une fois par combat) : agit comme un repos long, mais il
-// doit choisir une autre compétence. Donc en gros il fait un repos long et
-// ensuite il fait sa compétence avec sa fatigue mise à jour. »
-// Ses réponses : le +10 sur ses compétences forgées seulement ; la fenêtre
-// montre tout le monde trié par initiative, avec la compétence de chacun ; il
-// joue donc deux fois dans la manche ; initiative libre de 0 à 199 ; la
-// compétence relancée coûte sa fatigue, une compétence de son deck (pas une
-// technique de classe, pas le repos long), grisée si trop chère ; le Retour
-// arrière se choisit avec une compétence en préparation, le repos compte tout
-// de suite pour ce qu'il peut se payer ; la compétence garde son initiative,
-// le repos se prend au début de son tour ; pas d'Arrêt du temps ni de repos
-// long avec un Retour arrière.
+// v355, la refonte des classes (Nico) : « NIVEAU 1 : +8 Initiative. Les
+// attaques arcaniques réduisent l'initiative de l'ennemi en fonction de la
+// fatigue accumulée : à partir de 30 Fatigue −5, de 60 −10, de 90 −15. La
+// réduction s'applique au tour actuel et au tour suivant. NIVEAU 3 : −40 % de
+// coût en fatigue pour les points investis dans « Initiative + ». +1
+// compétence. NIVEAU 5 : COMPÉTENCE Retour dans le passé — tous les
+// personnages reprennent les positions qu'ils occupaient 3 tours auparavant.
+// NIVEAU 9 : COMPÉTENCE Retour arrière. »
+// Ses réponses : la fatigue qui compte est le coût de l'attaque ; le +8 sur
+// ses compétences forgées ; le Retour dans le passé remplace l'Arrêt du temps
+// (une fois par combat, initiative 100, 0 fatigue ; moins de 3 manches : les
+// positions du début) ; seules les positions changent, les KO et les
+// nouveaux venus restent, une case prise renvoie à la case libre la plus
+// proche.
+// Le Retour arrière (inchangé, passé du niveau 10 au 9) : il se choisit avec
+// une compétence en préparation ; au début de son tour, un repos long, puis
+// la compétence avec la fatigue remise à jour.
 //
 // Partie 1 : le VRAI code des règles (app.js, experience.js) et le VRAI noyau
 // (moteur_pur, combat_etat, cerveau_combat), sans navigateur.
-// Partie 2 : la vraie page (préparation, fenêtre de l'Arrêt du temps, fiche).
+// Partie 2 : la vraie page (préparation, Retour dans le passé, fiche).
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
 import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 import { construireEtatCombat, clonerEtat, appliquerEntree, verifierEtatCombat } from '../combat_etat.js';
+import { malusArcanique, resoudreCarte } from '../moteur_pur.js';
 import { validerIntention, appliquerIntention, ouvrirManche, avancerFile } from '../cerveau_combat.js';
 import { misEnScene, fileDepuisEtat } from '../pont_combat.js';
 import { creerDes } from '../combat_etat.js';
@@ -42,7 +43,7 @@ const REGLES = {
     defPhysique: w.defPhysiqueCombattant, defMagique: w.defMagiqueCombattant,
     critique: w.critiqueCombattant, atouts: w.atoutRace, bonusEquip: w.bonusEquip
 };
-const XP = { 1: 0, 4: 1800, 5: 2500, 9: 6400, 10: 7900 };
+const XP = { 1: 0, 3: 1200, 4: 1800, 5: 2500, 8: 5200, 9: 6400, 10: 7900 };
 const fiche = (id, extra = {}) => ({
     idPersonnage: id, prenom: id, race: "Humain", classe: "", camp: id.startsWith("M") ? "Ennemi" : "Allié",
     estMonstre: id.startsWith("M"), joueur: "", xp: 0,
@@ -62,6 +63,7 @@ const monde = (niveau = 10, extraO = {}, partie = {}) => {
     return e;
 };
 const fileDe = (e) => e.file.map(f => `${f.id}:${f.carte}:${f.initiative}`).join(" ");
+const suiteDe = (e) => e.file.filter(f => f.id !== "O").map(f => `${f.id}:${f.carte}:${f.initiative}`).join(" ");
 
 console.log("\n=========================================================");
 console.log("  L'ORACLE");
@@ -69,71 +71,75 @@ console.log("=========================================================");
 
 console.log("\n1. LES PALIERS");
 {
-    const a1 = w.atoutRace(oracle(1)), a5 = w.atoutRace(oracle(5)), a10 = w.atoutRace(oracle(10));
-    verifier("niveau 1 : +10 d'initiative, pas de technique", a1.initiative === 10 && !(a1.techniques || []).length, JSON.stringify(a1));
-    verifier("niveau 5 : l'Arrêt du temps", JSON.stringify(a5.techniques) === '["CLASSE_ARRET_TEMPS"]');
-    verifier("niveau 10 : + le Retour arrière", JSON.stringify(a10.techniques) === '["CLASSE_ARRET_TEMPS","CLASSE_RETOUR_ARRIERE"]');
-    const at = w.TECHNIQUES_CLASSE.CLASSE_ARRET_TEMPS, ra = w.TECHNIQUES_CLASSE.CLASSE_RETOUR_ARRIERE;
-    verifier("Arrêt du temps : init 200, aucune fatigue, niveau 5", at.Initiative === 200 && at.Fatigue === 0 && at.niveau === 5 && at.classe === "Oracle");
-    verifier("Retour arrière : aucune fatigue, niveau 10", ra.Fatigue === 0 && ra.niveau === 10 && ra.classe === "Oracle");
-    verifier("la fiche l'écrit en clair", w.texteAtout("initiative", 10) === "+10 d'initiative sur ses compétences");
+    const a1 = w.atoutRace(oracle(1)), a3 = w.atoutRace(oracle(3)), a5 = w.atoutRace(oracle(5)), a9 = w.atoutRace(oracle(9));
+    const c1 = w.atoutClasse ? w.atoutClasse(oracle(1)) : a1, c3 = w.atoutClasse ? w.atoutClasse(oracle(3)) : a3;
+    verifier("niveau 1 : +8 d'initiative, l'arcane qui ralentit, pas de technique",
+             a1.initiative === 8 && a1.arcaneRalentit === true && !(a1.techniques || []).length, JSON.stringify(a1));
+    verifier("niveau 3 : Initiative + à −40 %, +1 compétence",
+             a3.reductionInitiativePlus === 40 && (c3.competences || 0) - (c1.competences || 0) === 1, JSON.stringify(c3));
+    verifier("niveau 5 : le Retour dans le passé (plus d'Arrêt du temps)", JSON.stringify(a5.techniques) === '["CLASSE_RETOUR_PASSE"]', JSON.stringify(a5.techniques));
+    verifier("niveau 9 : + le Retour arrière", JSON.stringify(a9.techniques) === '["CLASSE_RETOUR_PASSE","CLASSE_RETOUR_ARRIERE"]');
+    verifier("niveau 8 : pas encore le Retour arrière", !(w.atoutRace(oracle(8)).techniques || []).includes("CLASSE_RETOUR_ARRIERE"));
+    const rp = w.TECHNIQUES_CLASSE.CLASSE_RETOUR_PASSE, ra = w.TECHNIQUES_CLASSE.CLASSE_RETOUR_ARRIERE;
+    verifier("Retour dans le passé : init 100, aucune fatigue, niveau 5, sur soi",
+             rp && rp.Initiative === 100 && rp.Fatigue === 0 && rp.niveau === 5 && rp.classe === "Oracle" && rp.cible === "soi");
+    verifier("Retour arrière : aucune fatigue, niveau 9", ra.Fatigue === 0 && ra.niveau === 9 && ra.classe === "Oracle");
+    verifier("l'Arrêt du temps n'existe plus", !w.TECHNIQUES_CLASSE.CLASSE_ARRET_TEMPS);
+    verifier("la fiche l'écrit en clair", w.texteAtout("initiative", 8) === "+8 d'initiative sur ses compétences"
+             && /arcaniques/.test(w.texteAtout("arcaneRalentit", true)) && /40 %/.test(w.texteAtout("reductionInitiativePlus", 40)));
 }
 
-console.log("\n2. L'ARRÊT DU TEMPS : UNE SECONDE ENTRÉE DANS LA FILE, À L'INITIATIVE CHOISIE");
+console.log("\n2. L'ARCANE QUI RALENTIT : CETTE MANCHE ET LA SUIVANTE");
 {
-    const avecFile = (niveau = 5) => {
+    verifier("le malus selon le coût : 29 → 0, 30 → 5, 59 → 5, 60 → 10, 90 → 15, 140 → 15",
+             [29, 30, 59, 60, 90, 140].map(malusArcanique).join(",") === "0,5,5,10,15,15");
+    const avecFile = (niveau = 1) => {
         const e = monde(niveau);
-        e.file = [{ id: "O", carte: "CLASSE_ARRET_TEMPS", initiative: 200, pas: 0 },
-                  { id: "M1", carte: "MC", initiative: 150, pas: 0 },
-                  { id: "A", carte: "AC", initiative: 80, pas: 0 },
+        e.file = [{ id: "O", carte: "C1", initiative: 120, pas: 0 },
+                  { id: "M1", carte: "MC", initiative: 70, pas: 0 },
+                  { id: "A", carte: "AC", initiative: 64, pas: 0 },
                   { id: "M2", carte: "MC", initiative: 40, pas: 0 }];
         return e;
     };
-    const arret = (cible, initiative) => ({ id: "T1", type: "classe", acteur: "O", idCarte: "CLASSE_ARRET_TEMPS",
-                                            ...(cible !== undefined ? { cible } : {}), ...(initiative !== undefined ? { initiative } : {}) });
+    const sort = (cout, extra = {}) => ({ id: "I1", type: "carte", acteur: "O", idCarte: "C1", coutFatigue: cout,
+        attaques: [{ cibles: ["M1"], element: "Arcane", typeRes: "Magique", degats: 4, rangeMax: 5, ...extra }], alterations: [],
+        jets: { parCible: { M1: {} } } });
     const e = avecFile();
-    verifier("niveau 5 : accepté (compétence C2, initiative 100)", validerIntention(e, arret("C2", 100)).ok, validerIntention(e, arret("C2", 100)).raison || "");
-    verifier("niveau 4 : il ne l'a pas", !validerIntention(avecFile(4), arret("C2", 100)).ok);
-    verifier("sans compétence : refusé", !validerIntention(e, arret(undefined, 100)).ok);
-    verifier("pas une technique de classe, pas le repos long",
-             !validerIntention(e, arret("CLASSE_RETOUR_ARRIERE", 100)).ok && !validerIntention(e, arret("REPOS_LONG", 100)).ok);
-    verifier("initiative hors de 0–199, ou pas entière : refusé",
-             !validerIntention(e, arret("C2", 200)).ok && !validerIntention(e, arret("C2", -1)).ok
-             && !validerIntention(e, arret("C2", 12.5)).ok && !validerIntention(e, arret("C2")).ok);
-    verifier("0 et 199 : acceptés", validerIntention(e, arret("C2", 0)).ok && validerIntention(e, arret("C2", 199)).ok);
+    const pas = appliquerIntention(e, sort(60));
+    verifier("validée", validerIntention(e, sort(60)).ok, validerIntention(e, sort(60)).raison || "");
+    verifier("coût 60 : le Gnoll perd 10 cette manche (70 → 60) et passe derrière Bran (64)",
+             suiteDe(pas.etat) === "A:AC:64 M1:MC:60 M2:MC:40", fileDe(pas.etat));
+    const ralenti = pas.etat.combattants.M1.etats.find(x => x.nom === "Ralenti");
+    verifier("…et porte « Ralenti » (−10, 2 manches)", ralenti && ralenti.malusInitiative === 10 && ralenti.duree === 2, JSON.stringify(ralenti));
+    verifier("rejoué depuis le journal : même file, même état", fileDe(appliquerEntree(e, pas.entree)) === fileDe(pas.etat)
+             && appliquerEntree(e, pas.entree).combattants.M1.etats.some(x => x.nom === "Ralenti"));
+    verifier("l'état reste cohérent", verifierEtatCombat(pas.etat).length === 0, verifierEtatCombat(pas.etat).join(" | "));
+    verifier("coût 29 : rien", suiteDe(appliquerIntention(avecFile(), sort(29)).etat) === suiteDe(avecFile()));
+    verifier("un sort de feu : rien", suiteDe(appliquerIntention(avecFile(), sort(90, { element: "Feu" })).etat) === suiteDe(avecFile()));
+    // Esquivé : le jet est tranché d'avance (noyau pur, resoudreCarte).
+    const esquive = { ...sort(90), idLanceur: "O", jets: { parCible: { M1: { esquive: true } } } };
+    const rEsq = resoudreCarte(avecFile(), esquive);
+    verifier("esquivé : rien", !rEsq.etat.combattants.M1.etats.length && suiteDe(rEsq.etat) === suiteDe(avecFile()));
+    const rTouche = resoudreCarte(avecFile(), { ...sort(90), idLanceur: "O" });
+    verifier("touché, coût 90 : −15 (70 → 55)", rTouche.etat.file.find(f => f.id === "M1").initiative === 55);
+    const sans = monde(1); sans.combattants.O.atouts.arcaneRalentit = false;
+    sans.file = avecFile().file;
+    verifier("sans l'atout (un autre mage) : rien", suiteDe(appliquerIntention(sans, sort(90)).etat) === suiteDe(avecFile()));
 
-    const pas = appliquerIntention(e, arret("C2", 100));
-    verifier("la file : M1 150, puis O (C2) à 100, puis A 80, M2 40", fileDe(pas.etat) === "M1:MC:150 O:C2:100 A:AC:80 M2:MC:40", fileDe(pas.etat));
-    verifier("la technique est consommée, sans fatigue", pas.etat.combattants.O.techniquesUtilisees.includes("CLASSE_ARRET_TEMPS")
-             && pas.etat.combattants.O.fatigue === 100);
-    verifier("l'état reste cohérent (O une seule fois dans la file)", verifierEtatCombat(pas.etat).length === 0, verifierEtatCombat(pas.etat).join(" | "));
-    verifier("rejoué depuis le journal : même file", fileDe(appliquerEntree(e, pas.entree)) === fileDe(pas.etat));
-    verifier("une fois par combat", !validerIntention(Object.assign(clonerEtat(pas.etat), {
-        file: [{ id: "O", carte: "CLASSE_ARRET_TEMPS", initiative: 200, pas: 0 }, ...pas.etat.file.filter(f => f.id !== "O")] }), arret("C2", 50)).ok);
-    const titre = misEnScene(pas.entree.etapes.find(x => x.type === "techniqueClasse"), pas.etat);
-    verifier("à l'écran : « ⏳ Arrêt du temps », puis « Rejouera à 100 »", titre && /Arrêt du temps/.test(titre.texte)
-             && pas.entree.etapes.some(x => x.type === "message" && /Rejouera à 100/.test(x.texte)));
-    verifier("la file projetée garde la marque", fileDepuisEtat(pas.etat).some(f => f.idPersonnage === "O" && f.arretDuTemps));
-
-    const egal = appliquerIntention(avecFile(), arret("C2", 80));
-    verifier("à égalité (80), il passe APRÈS celui qui y était", fileDe(egal.etat) === "M1:MC:150 A:AC:80 O:C2:80 M2:MC:40", fileDe(egal.etat));
-    const vite = appliquerIntention(avecFile(), arret("C2", 199));
-    verifier("à 199 : il rejoue tout de suite", vite.etat.file[0].id === "O" && vite.etat.file[0].carte === "C2");
-    const fin = appliquerIntention(avecFile(), arret("C2", 0));
-    verifier("à 0 : il joue en dernier", fin.etat.file[fin.etat.file.length - 1].id === "O");
-
-    // Son second tour venu, il joue C2 et la paie.
-    const second = clonerEtat(vite.etat);
-    const carte = { id: "I2", type: "carte", acteur: "O", idCarte: "C2", coutFatigue: 30, attaques: [], alterations: [] };
-    verifier("son second tour : la compétence choisie est acceptée", validerIntention(second, carte).ok, validerIntention(second, carte).raison || "");
-    const joue = appliquerIntention(second, carte);
-    verifier("…et coûte sa fatigue (100 − 30)", joue.etat.combattants.O.fatigue === 70 && joue.etat.file[0].id === "M1",
-             `${joue.etat.combattants.O.fatigue} ${fileDe(joue.etat)}`);
+    // La manche suivante : son initiative baisse à l'ouverture.
+    const prochaine = clonerEtat(pas.etat);
+    prochaine.phase = "Preparation"; prochaine.file = [];
+    prochaine.combattants.M1.etats = prochaine.combattants.M1.etats.map(x => x.nom === "Ralenti" ? { ...x, duree: 1 } : x);
+    const ouverte = ouvrirManche(prochaine, [{ idPersonnage: "O", idCarte: "C1", initiative: 50 },
+        { idPersonnage: "M1", idCarte: "MC", initiative: 55 }, { idPersonnage: "M2", idCarte: "MC", initiative: 30 }], creerDes(3));
+    verifier("la manche suivante : le Gnoll ouvre à 55 − 10 = 45, derrière l'Oracle (50)",
+             fileDe(ouverte.etat) === "O:C1:50 M1:MC:45 M2:MC:30", fileDe(ouverte.etat));
+    verifier("rejoué depuis le journal", fileDe(appliquerEntree(prochaine, ouverte.entree)) === fileDe(ouverte.etat));
 }
 
 console.log("\n3. LE RETOUR ARRIÈRE : LE REPOS AU DÉBUT DE SON TOUR, PUIS LA COMPÉTENCE");
 {
-    const prepa = (niveau = 10, extraO = { Fatigue_Actuelle: 20 }) => monde(niveau, extraO, { Phase_Combat: "Preparation" });
+    const prepa = (niveau = 9, extraO = { Fatigue_Actuelle: 20 }) => monde(niveau, extraO, { Phase_Combat: "Preparation" });
     const fileRA = (oracleEnTete) => oracleEnTete
         ? [{ idPersonnage: "O", idCarte: "C3", initiative: 60, retourArriere: true }, { idPersonnage: "M1", idCarte: "MC", initiative: 50 }]
         : [{ idPersonnage: "M1", idCarte: "MC", initiative: 90 }, { idPersonnage: "O", idCarte: "C3", initiative: 60, retourArriere: true }];
@@ -167,16 +173,77 @@ console.log("\n3. LE RETOUR ARRIÈRE : LE REPOS AU DÉBUT DE SON TOUR, PUIS LA C
     verifier("la file projetée garde la marque", fileDepuisEtat(apresM1.etat)[0].retourArriere === true);
 
     // Les gardes.
-    const n9 = ouvrirManche(prepa(9), fileRA(true), creerDes(1)).etat.combattants.O;
-    verifier("niveau 9 : il ne l'a pas — aucun repos", n9.fatigue === 20 && !(n9.techniquesUtilisees || []).length);
+    const n8 = ouvrirManche(prepa(8), fileRA(true), creerDes(1)).etat.combattants.O;
+    verifier("niveau 8 : il ne l'a pas — aucun repos", n8.fatigue === 20 && !(n8.techniquesUtilisees || []).length);
     const deja = prepa(); deja.combattants.O.techniquesUtilisees = ["CLASSE_RETOUR_ARRIERE"];
     verifier("déjà jouée dans ce combat : aucun repos", ouvrirManche(deja, fileRA(true), creerDes(1)).etat.combattants.O.fatigue === 20);
-    const plein = ouvrirManche(prepa(10, { Fatigue_Actuelle: 100 }), fileRA(true), creerDes(1)).etat.combattants.O;
+    const plein = ouvrirManche(prepa(9, { Fatigue_Actuelle: 100 }), fileRA(true), creerDes(1)).etat.combattants.O;
     verifier("jamais au-dessus du plein (100 → 110)", plein.fatigue === 110);
-    const direct = construireEtatCombat({ idPartie: "P", cerveau: "P", graine: 1, combattants: [oracle(10, { Fatigue_Actuelle: 20 }), fiche("M1")],
+    const direct = construireEtatCombat({ idPartie: "P", cerveau: "P", graine: 1, combattants: [oracle(9, { Fatigue_Actuelle: 20 }), fiche("M1")],
         positions: POS, regles: REGLES, partie: { Tour_Combat: 1, Phase_Combat: "Resolution", File_Attente_Combat: fileRA(true) } });
     verifier("un combat qui s'ouvre sur lui : repos dès l'état de départ", direct.combattants.O.fatigue === 58
              && direct.file[0].reposPris === true);
+}
+
+console.log("\n3 bis. LE RETOUR DANS LE PASSÉ : LES POSITIONS D'IL Y A 3 MANCHES");
+{
+    // Le passé se note à chaque ouverture de manche.
+    let e = monde(5, {}, { Phase_Combat: "Preparation" });
+    const fileManche = [{ idPersonnage: "O", idCarte: "C1", initiative: 50 }, { idPersonnage: "M1", idCarte: "MC", initiative: 40 }];
+    const trace = [];
+    for (let m = 1; m <= 5; m++) {
+        e.manche = m; e.phase = "Preparation"; e.file = [];
+        const pas = ouvrirManche(e, fileManche, creerDes(m));
+        verifier(`manche ${m} : rejouée depuis le journal, même passé`, JSON.stringify(appliquerEntree(e, pas.entree).positionsPassees)
+                 === JSON.stringify(pas.etat.positionsPassees));
+        e = pas.etat;
+        trace.push(e.positionsPassees.map(p => p.manche).join(""));
+        e.combattants.M1.q = 3 + m;        // le Gnoll avance d'une case par manche
+    }
+    verifier("on ne garde que les 4 dernières manches", trace[4] === "2345", trace.join(" "));
+    verifier("la manche 2 : le Gnoll était en (4,0)", e.positionsPassees.find(p => p.manche === 2).positions.M1.q === 4);
+
+    // Le lancer, manche 5 : retour aux positions de la manche 2.
+    const lancer = { id: "R1", type: "classe", acteur: "O", idCarte: "CLASSE_RETOUR_PASSE" };
+    e.phase = "Resolution";
+    e.file = [{ id: "O", carte: "CLASSE_RETOUR_PASSE", initiative: 100, pas: 0 }, { id: "M1", carte: "MC", initiative: 40, pas: 0 }];
+    e.combattants.O.q = 1; e.combattants.A.q = 2; e.combattants.A.r = 2;
+    verifier("niveau 5 : accepté", validerIntention(e, lancer).ok, validerIntention(e, lancer).raison || "");
+    const n4 = clonerEtat(e); n4.combattants.O.atouts.techniques = [];
+    verifier("sans la technique (niveau 4) : refusé", !validerIntention(n4, lancer).ok);
+    const pas = appliquerIntention(e, lancer);
+    const pos = (id) => `${pas.etat.combattants[id].q},${pas.etat.combattants[id].r}`;
+    verifier("manche 5 (Gnoll en (8,0)) → les positions de la manche 2 : Gnoll (4,0), Oracle (0,0), Bran (0,1)",
+             pos("M1") === "4,0" && pos("O") === "0,0" && pos("A") === "0,1", `${pos("M1")} ${pos("O")} ${pos("A")}`);
+    verifier("seules les positions changent (PV, fatigue)", pas.etat.combattants.M1.pv === e.combattants.M1.pv
+             && pas.etat.combattants.O.fatigue === e.combattants.O.fatigue);
+    verifier("rejoué depuis le journal : mêmes cases", JSON.stringify(appliquerEntree(e, pas.entree).combattants) === JSON.stringify(pas.etat.combattants));
+    verifier("l'état reste cohérent", verifierEtatCombat(pas.etat).length === 0, verifierEtatCombat(pas.etat).join(" | "));
+    verifier("une fois par combat", !validerIntention(Object.assign(clonerEtat(pas.etat), { file: e.file }), lancer).ok);
+    const titre = misEnScene(pas.entree.etapes.find(x => x.type === "techniqueClasse"), pas.etat);
+    verifier("à l'écran : « ⌛ Retour dans le passé »", titre && /Retour dans le passé/.test(titre.texte));
+
+    // Moins de 3 manches : le début du combat.
+    const tot = clonerEtat(e); tot.manche = 3;
+    tot.positionsPassees = [{ manche: 1, positions: { O: { q: 0, r: 0 }, M1: { q: 9, r: 0 }, A: { q: 0, r: 1 } } },
+                            { manche: 2, positions: { O: { q: 0, r: 0 }, M1: { q: 8, r: 0 }, A: { q: 0, r: 1 } } }];
+    verifier("manche 3 (pas encore 3 manches jouées) : le début du combat",
+             appliquerIntention(tot, lancer).etat.combattants.M1.q === 9);
+
+    // Une case prise par quelqu'un qui n'a pas de passé (un nouveau venu) :
+    // la case libre la plus proche. Deux qui échangent : sans se gêner.
+    const pris = clonerEtat(e);
+    pris.combattants.M2.q = 4; pris.combattants.M2.r = 0;     // M2 n'est pas dans le passé
+    pris.positionsPassees = pris.positionsPassees.map(p => ({ ...p, positions: Object.fromEntries(Object.entries(p.positions).filter(([k]) => k !== "M2")) }));
+    const apres = appliquerIntention(pris, lancer).etat.combattants;
+    verifier("sa case est prise (par un nouveau venu) : la libre la plus proche", `${apres.M2.q},${apres.M2.r}` === "4,0"
+             && !(apres.M1.q === 4 && apres.M1.r === 0) && Math.abs(apres.M1.q - 4) + Math.abs(apres.M1.r) <= 2, `${apres.M1.q},${apres.M1.r}`);
+    const echange = clonerEtat(e);
+    echange.combattants.O.q = 0; echange.combattants.O.r = 1; echange.combattants.A.q = 0; echange.combattants.A.r = 0;
+    const ech = appliquerIntention(echange, lancer).etat.combattants;
+    verifier("deux qui ont échangé leurs cases reprennent chacun la sienne", ech.O.r === 0 && ech.A.r === 1 && ech.O.q === 0 && ech.A.q === 0);
+    const ko = clonerEtat(e); ko.combattants.M1.aTerre = true; ko.combattants.M1.pv = 0;
+    verifier("un KO reste où il est", appliquerIntention(ko, lancer).etat.combattants.M1.q === e.combattants.M1.q);
 }
 
 // =========================================================================
@@ -230,7 +297,7 @@ const erreurs = [];
 p.on('pageerror', e => erreurs.push(e.message));
 await p.goto(base + '/index.html');
 await p.waitForTimeout(2000);
-console.log("\n4. EN PRÉPARATION : +10 D'INITIATIVE, LE RETOUR ARRIÈRE QUI ATTEND SA COMPÉTENCE");
+console.log("\n4. EN PRÉPARATION : +8 D'INITIATIVE, LE RETOUR ARRIÈRE QUI ATTEND SA COMPÉTENCE");
 {
   const r = await p.evaluate(async () => {
     document.getElementById("fenetre-combat").style.display = "block";
@@ -260,7 +327,7 @@ console.log("\n4. EN PRÉPARATION : +10 D'INITIATIVE, LE RETOUR ARRIÈRE QUI ATT
 
     await window.jouerCarteCombat("C1");
     const c1 = derniere();
-    await window.jouerCarteCombat("CLASSE_ARRET_TEMPS");
+    await window.jouerCarteCombat("CLASSE_RETOUR_PASSE");
     const arret = derniere();
 
     // Le Retour arrière : rien ne part, il attend sa compétence.
@@ -289,7 +356,7 @@ console.log("\n4. EN PRÉPARATION : +10 D'INITIATIVE, LE RETOUR ARRIÈRE QUI ATT
 
     await window.jouerReposLong();
     const reposRefuse = ecrits.length === nbAvant && alertes.some(a => /Retour arrière/.test(a));
-    await window.jouerCarteCombat("CLASSE_ARRET_TEMPS");
+    await window.jouerCarteCombat("CLASSE_RETOUR_PASSE");
     const arretRefuse = ecrits.length === nbAvant && alertes.some(a => /technique de classe/.test(a));
 
     await window.jouerCarteCombat("C2");
@@ -305,10 +372,10 @@ console.log("\n4. EN PRÉPARATION : +10 D'INITIATIVE, LE RETOUR ARRIÈRE QUI ATT
     return { ordre, c2Avant, c1, arret, rienEcrit, enAttente, c2Apres, cadreRA, fatigueChoix, choisissable, jauge, c2Choisie, apresRafraichi,
              reposRefuse, arretRefuse, c2, vide, annule, sansRA };
   });
-  verifier("le volet : ses compétences, puis Arrêt du temps et Retour arrière, puis le repos",
-           JSON.stringify(r.ordre) === '["C1","C2","CLASSE_ARRET_TEMPS","CLASSE_RETOUR_ARRIERE","REPOS_LONG"]', JSON.stringify(r.ordre));
-  verifier("une compétence forgée part avec +10 (40 → 50)", r.c1 && r.c1.initiative === 50 && !r.c1.retourArriere, JSON.stringify(r.c1));
-  verifier("l'Arrêt du temps garde son 200 (pas de +10)", r.arret && r.arret.idCarte === "CLASSE_ARRET_TEMPS" && r.arret.initiative === 200);
+  verifier("le volet : ses compétences, puis Retour dans le passé et Retour arrière, puis le repos",
+           JSON.stringify(r.ordre) === '["C1","C2","CLASSE_RETOUR_PASSE","CLASSE_RETOUR_ARRIERE","REPOS_LONG"]', JSON.stringify(r.ordre));
+  verifier("une compétence forgée part avec +8 (40 → 48)", r.c1 && r.c1.initiative === 48 && !r.c1.retourArriere, JSON.stringify(r.c1));
+  verifier("le Retour dans le passé garde son 100 (pas de +8)", r.arret && r.arret.idCarte === "CLASSE_RETOUR_PASSE" && r.arret.initiative === 100);
   verifier("Retour arrière : rien n'est inscrit, il attend sa compétence", r.rienEcrit && r.enAttente === "O1");
   verifier("sa bannière est surlignée", /ban_cible/.test(r.cadreRA), r.cadreRA);
   verifier("le repos compte déjà : C2 (70) n'est plus grisée (50 + 38 = 88)",
@@ -320,66 +387,38 @@ console.log("\n4. EN PRÉPARATION : +10 D'INITIATIVE, LE RETOUR ARRIÈRE QUI ATT
            JSON.stringify(r.apresRafraichi));
   verifier("pas de repos long en plus", r.reposRefuse);
   verifier("pas d'autre technique de classe avec lui", r.arretRefuse);
-  verifier("C2 inscrite à 40 (30 + 10), marquée Retour arrière", r.c2 && r.c2.idCarte === "C2" && r.c2.initiative === 40 && r.c2.retourArriere === true,
+  verifier("C2 inscrite à 38 (30 + 8), marquée Retour arrière", r.c2 && r.c2.idCarte === "C2" && r.c2.initiative === 38 && r.c2.retourArriere === true,
            JSON.stringify(r.c2));
   verifier("…et l'attente est levée", r.vide === null);
   verifier("le choisir deux fois l'annule ; la carte suivante part sans lui", r.annule === null && r.sansRA && !r.sansRA.retourArriere);
 }
 
-console.log("\n5. SON TOUR VENU : LA FENÊTRE DE L'ARRÊT DU TEMPS");
+console.log("\n5. SON TOUR VENU : LE RETOUR DANS LE PASSÉ PART SANS FENÊTRE ; LA FORGE");
 {
   const r = await p.evaluate(async () => {
-    window.PARTIE_DATA = { Phase_Combat: "Resolution", File_Attente_Combat: [
-      { idPersonnage: "O1", idCarte: "CLASSE_ARRET_TEMPS", initiative: 200 },
-      { idPersonnage: "M1", idCarte: "MC", initiative: 120 },
-      { idPersonnage: "A1", idCarte: "REPOS_LONG", initiative: 0 }] };
-    window.PERSOS_PARTIE.push({ idPersonnage: "A1", prenom: "Bran", camp: "Allié" });
-    window.CACHE_COMPETENCES_GLOBAL.M1 = { MC: { Nom: "Coup de griffe", Initiative: 120, Fatigue: 0 } };
     const demandes = [];
     window.regimeDemande = { actif: () => true, enVol: () => false,
       etat: () => ({ combattants: { O1: { fatigue: 50 } } }),
       techniqueClasse: (...a) => demandes.push(a) };
-    window.lancerTechniqueClasse("CLASSE_ARRET_TEMPS", "O1");
-    const f = document.getElementById("fenetre-arret-temps");
-    const lignes = [...f.querySelectorAll(".arret-temps-ligne")].map(l => l.textContent.replace(/\s+/g, " ").trim());
-    const boutons = [...f.querySelectorAll(".arret-temps-competence")].map(b => [b.dataset.id, b.disabled]);
-    const validerAvant = document.getElementById("arret-temps-valider").disabled;
-    window.choisirCompetenceArretTemps("C2");                 // trop chère : ignorée
-    const apresC2 = document.getElementById("arret-temps-valider").disabled;
-    f.querySelector('.arret-temps-competence[data-id="C1"]').click();
-    const initProposee = document.getElementById("arret-temps-initiative").value;
-    document.getElementById("arret-temps-initiative").value = "120";
-    await new Promise(r => setTimeout(r, 50));
-    return { visible: getComputedStyle(f).display !== "none", titre: f.querySelector(".choix-rempart-titre").textContent,
-             lignes, boutons, validerAvant, apresC2, initProposee, demandes };
+    window.lancerTechniqueClasse("CLASSE_RETOUR_PASSE", "O1");
+    // La Forge : « Initiative + » (3 PT le cran, +8) pour un Oracle niveau 1, puis niveau 3.
+    const initPlus = { id: "INIT", Nom: "Initiative +", Cout_PT: "3", Valeur: "8" };
+    const act = { baseEffet: { id: "COUP", Nom: "Coup", Cout_PT: "4" }, count: 1, mods: { INIT: 2 }, zoneHexes: [], baseDuree: 0, modsDuree: {} };
+    const n1 = window.coutDUneActionForge(act, [initPlus], { classe: "Oracle", race: "Humain", xp: 0 }, 5);
+    const n3 = window.coutDUneActionForge(act, [initPlus], { classe: "Oracle", race: "Humain", xp: 1200 }, 5);
+    const autre = window.coutDUneActionForge(act, [initPlus], { classe: "Assassin", race: "Humain", xp: 1200 }, 5);
+    const socle = window.coutDUneActionForge({ baseEffet: initPlus, count: 2, mods: {}, zoneHexes: [], baseDuree: 0, modsDuree: {} },
+                                             [initPlus], { classe: "Oracle", race: "Humain", xp: 1200 }, 5);
+    return { demandes, n1, n3, autre, socle };
   });
-  await p.screenshot({ path: "/tmp/claude-0/oracle_arret_temps.png" });
-  verifier("la fenêtre s'ouvre : « ⏳ Arrêt du temps »", r.visible && /Arrêt du temps/.test(r.titre));
-  verifier("la manche, triée : lui (200), le Gnoll (120, Coup de griffe), Bran (repos)",
-           r.lignes.length === 3 && /^200 Pythia Arrêt du temps/.test(r.lignes[0]) && /^120 Gnoll Coup de griffe/.test(r.lignes[1])
-           && /Bran Repos long/.test(r.lignes[2]), JSON.stringify(r.lignes));
-  verifier("ses compétences : C1 libre, C2 (70) grisée avec 50 d'énergie",
-           JSON.stringify(r.boutons) === '[["C1",false],["C2",true]]', JSON.stringify(r.boutons));
-  verifier("rien de choisi : « Arrêter le temps » éteint ; C2 ne se choisit pas", r.validerAvant && r.apresC2);
-  verifier("C1 choisie : son initiative proposée (40 + 10 = 50)", r.initProposee === "50", r.initProposee);
-  const lu = await p.evaluate(async () => {
-    const demandes = [];
-    window.regimeDemande.techniqueClasse = (...a) => demandes.push(a);
-    window.lancerTechniqueClasse("CLASSE_ARRET_TEMPS", "O1");
-    document.querySelector('#fenetre-arret-temps .arret-temps-competence[data-id="C1"]').click();
-    document.getElementById("arret-temps-initiative").value = "120";
-    window.validerArretDuTemps();
-    window.lancerTechniqueClasse("CLASSE_ARRET_TEMPS", "O1");
-    document.querySelector('#fenetre-arret-temps .arret-temps-competence[data-id="C1"]').click();
-    document.getElementById("arret-temps-initiative").value = "250";
-    window.validerArretDuTemps();
-    demandes.cachee = getComputedStyle(document.getElementById("fenetre-arret-temps")).display === "none";
-    return { demandes, cachee: demandes.cachee };
-  }).then(x => Object.assign(x.demandes, { cachee: x.cachee }));
-  verifier("valider : la fenêtre se ferme", lu.cachee);
-  verifier("la demande part : Arrêt du temps, C1, initiative 120",
-           JSON.stringify(lu[0]) === '["O1","CLASSE_ARRET_TEMPS","C1",null,{"initiative":120}]', JSON.stringify(lu[0]));
-  verifier("250 tapé : ramené à 199", lu[1] && lu[1][4].initiative === 199, JSON.stringify(lu[1]));
+  verifier("lancé : la demande part tout de suite (aucune fenêtre)",
+           JSON.stringify(r.demandes[0]) === '["O1","CLASSE_RETOUR_PASSE"]', JSON.stringify(r.demandes));
+  verifier("Forge, niveau 1 : 2 crans d'Initiative + coûtent 6 PT (+ 4 du coup)", Math.abs(r.n1.cout - 10) < 1e-9, JSON.stringify(r.n1));
+  verifier("Forge, niveau 3 : 40 % de moins sur l'Initiative + (3,6 PT), le coup ne change pas", Math.abs(r.n3.cout - 7.6) < 1e-9, JSON.stringify(r.n3));
+  verifier("…et l'initiative gagnée reste la même (+8 par cran, sa fatigue remboursée)",
+           Math.abs(r.n1.initBonus - (16 + 30)) < 1e-9 && Math.abs(r.n3.initBonus - (16 + 18)) < 1e-9, `${r.n1.initBonus} ${r.n3.initBonus}`);
+  verifier("une autre classe : prix plein", Math.abs(r.autre.cout - 10) < 1e-9);
+  verifier("Initiative + en effet de base : la même ristourne (2 × 1,8)", Math.abs(r.socle.cout - 3.6) < 1e-9, JSON.stringify(r.socle));
 }
 
 console.log("\n6. LA FICHE DE CLASSE");
@@ -395,9 +434,10 @@ console.log("\n6. LA FICHE DE CLASSE");
              niveaux: [...d.querySelectorAll(".palier-classe-niveau")].map(x => x.textContent.trim()), texte: d.textContent };
   });
   await p.screenshot({ path: "/tmp/claude-0/oracle_classe.png" });
-  verifier("présentation et paliers Niv. 1 / 5 / 10", r.visible && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 5","Niv. 10"]');
-  verifier("+10 d'initiative, Arrêt du temps et Retour arrière y sont dits",
-           /\+10 d'initiative/.test(r.texte) && /Arrêt du temps/.test(r.texte) && /Retour arrière/.test(r.texte));
+  verifier("présentation et paliers Niv. 1 / 3 / 5 / 9", r.visible && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 3","Niv. 5","Niv. 9"]', JSON.stringify(r.niveaux));
+  verifier("+8 d'initiative, l'arcane, Initiative + à −40 %, Retour dans le passé et Retour arrière y sont dits",
+           /\+8 d'initiative/.test(r.texte) && /arcaniques/.test(r.texte) && /40 %/.test(r.texte)
+           && /Retour dans le passé/.test(r.texte) && /Retour arrière/.test(r.texte) && !/Arrêt du temps/.test(r.texte));
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

@@ -228,6 +228,9 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         // moteur_pur.js).
         zombies: !!race.zombies,
         glacePhysique: !!race.glacePhysique,
+        // (v355) L'Oracle : ses attaques arcaniques ralentissent l'ennemi
+        // touché (ralentirParLArcane, moteur_pur.js).
+        arcaneRalentit: !!race.arcaneRalentit,
         // Le rayon où un ennemi qui tombe se relève (2 cases dès le niveau 1, v260).
         rayonZombies: nombre(race.rayonZombies, race.zombies ? 1 : 0),
         degatsOpportunite: nombre(race.degatsOpportunite),
@@ -538,7 +541,10 @@ export function construireEtatCombat(source) {
         // LES MURS DE TERRE du Géomancien (par identifiant) et les GRAVATS
         // des murs cassés (par case, « q_r ») : un nouveau combat n'en a pas.
         murs: JSON.parse(JSON.stringify((source && source.murs) || {})),
-        gravats: { ...((source && source.gravats) || {}) }
+        gravats: { ...((source && source.gravats) || {}) },
+        // (v355) Les positions de chacun à l'ouverture des dernières manches
+        // (Retour dans le passé de l'Oracle) : un nouveau combat n'en a pas.
+        positionsPassees: JSON.parse(JSON.stringify((source && source.positionsPassees) || []))
     };
     // Un Oracle en tête dès l'ouverture, avec un Retour arrière : son repos se
     // prend tout de suite (l'état de départ n'a pas d'étapes à raconter).
@@ -672,8 +678,7 @@ export function entreeDeFile(f) {
         // La ligne droite du tour (Inertie martiale), si elle a commencé.
         ...(f.ligneMax ? { ligne: nombre(f.ligne), dirLigne: f.dirLigne || null, ligneMax: nombre(f.ligneMax) } : {}),
         ...(f.retourArriere ? { retourArriere: true } : {}),
-        ...(f.reposPris ? { reposPris: true } : {}),
-        ...(f.arretDuTemps ? { arretDuTemps: true } : {})
+        ...(f.reposPris ? { reposPris: true } : {})
     };
 }
 
@@ -720,6 +725,28 @@ export function reposDuRetourArriere(etat) {
 
 // Une copie franche, sans lien avec l'original. Le cerveau travaille sur une
 // copie : si le calcul échoue à mi-chemin, l'état d'avant est intact.
+// (v355) LE RETOUR DANS LE PASSÉ (Oracle) : où chacun se tenait à
+// l'ouverture des dernières manches. ouvrirManche (cerveau_combat.js) les
+// note et les fait voyager dans son étape « tour » ; l'applicateur les note
+// à son tour, pour que les trois écrans gardent le même passé.
+export const MANCHES_RETOUR_PASSE = 3;
+export function positionsDeManche(etat) {
+    const positions = {};
+    Object.keys((etat && etat.combattants) || {}).sort().forEach(id => {
+        const c = etat.combattants[id];
+        if (!c || c.aTerre || c.q === null || c.q === undefined) return;
+        positions[id] = { q: nombre(c.q), r: nombre(c.r) };
+    });
+    return positions;
+}
+export function memoriserPositions(etat, manche, positions) {
+    if (!etat || !positions) return;
+    etat.positionsPassees = [...(etat.positionsPassees || []).filter(p => p && p.manche !== manche),
+                             { manche, positions: JSON.parse(JSON.stringify(positions)) }]
+        .sort((a, b) => a.manche - b.manche)
+        .slice(-(MANCHES_RETOUR_PASSE + 1));
+}
+
 export function clonerEtat(etat) {
     return JSON.parse(JSON.stringify(etat));
 }
@@ -1243,6 +1270,7 @@ export const APPLICATEURS = {
         if (e.phase) etat.phase = e.phase;
         if (e.manche !== undefined) etat.manche = nombre(e.manche, etat.manche);
         if (Array.isArray(e.ontJoue)) etat.ontJoue = [...e.ontJoue];
+        if (e.positions) memoriserPositions(etat, nombre(etat.manche), e.positions);
     },
 
     // Un renfort entre en scène.

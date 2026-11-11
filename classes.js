@@ -211,17 +211,21 @@ window.DESCRIPTIFS_CLASSES = {
     },
     CLASSE_ORACLE: {
         presentation: "Le temps n'a pas de secret pour l'Oracle. Il voit venir chaque geste avant qu'il "
-            + "ne parte, il sait arrêter l'instant pour frapper au moment juste, et revenir sur ses pas "
-            + "quand le souffle lui manque.",
+            + "ne parte, il ralentit ceux que sa magie arcanique touche, et sait ramener le combat "
+            + "quelques instants en arrière.",
         paliers: [
             { niveau: 1, titre: "Prescience",
-              points: ["+10 d'initiative sur ses compétences"] },
-            { niveau: 5, titre: "Technique : Arrêt du temps",
-              points: ["Initiative 200 · aucune fatigue",
-                       "Voit l'initiative et la compétence de tout le monde",
-                       "Rejoue une autre de ses compétences plus tard dans la manche, à l'initiative de son choix (0 à 199)",
-                       "Une fois par combat"] },
-            { niveau: 10, titre: "Technique : Retour arrière",
+              points: ["+8 d'initiative sur ses compétences",
+                       "Ses attaques arcaniques retirent de l'initiative à l'ennemi touché, cette manche et la suivante",
+                       "Compétence de 30 de fatigue ou plus : −5 · 60 ou plus : −10 · 90 ou plus : −15"] },
+            { niveau: 3, titre: "Esprit vif",
+              points: ["Forge : « Initiative + » coûte 40 % de fatigue en moins",
+                       "+1 compétence"] },
+            { niveau: 5, titre: "Technique : Retour dans le passé",
+              points: ["Initiative 100 · aucune fatigue · une fois par combat",
+                       "Tous les personnages reprennent les positions qu'ils occupaient 3 tours auparavant",
+                       "Seules les positions changent ; une case prise renvoie sur la case libre la plus proche"] },
+            { niveau: 9, titre: "Technique : Retour arrière",
               points: ["Aucune fatigue · se choisit avec une autre compétence",
                        "Au début de son tour : un repos long, puis la compétence, avec la fatigue remise à jour",
                        "Une fois par combat"] }

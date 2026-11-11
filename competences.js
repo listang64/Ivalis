@@ -2557,7 +2557,13 @@ window.etatSousEffetForge = etatSousEffet;
 // de rafraichirForge pour servir aussi au combat (fatigueDeSurpuissance).
 function coutDUneAction(act, bdd, statsPerso, coutDureePlus) {
     let initBonus = 0;
-    let baseActionCost = parseFrenchFloat(act.baseEffet.Cout_PT) * act.count;
+    // (v355) L'ORACLE, niveau 3 : « Initiative + » lui coûte 40 % de moins.
+    // L'initiative qu'il rend reste la même (+8 par cran) : le remboursement
+    // suit le prix payé.
+    const atoutForge = (statsPerso && typeof window.atoutRace === "function") ? (window.atoutRace(statsPerso) || {}) : {};
+    const partInitPlus = 1 - Math.min(100, Math.max(0, Number(atoutForge.reductionInitiativePlus) || 0)) / 100;
+    const coutPT = (eff) => parseFrenchFloat(eff.Cout_PT) * (eff.Nom === "Initiative +" ? partInitPlus : 1);
+    let baseActionCost = coutPT(act.baseEffet) * act.count;
     let coutDureeBase = (act.baseDuree || 0) * coutDureePlus;
     
     let coutMods = 0;
@@ -2578,7 +2584,7 @@ function coutDUneAction(act, bdd, statsPerso, coutDureePlus) {
 
     if (act.baseEffet.Nom === "Initiative +") {
         const baseVal = parseFrenchFloat(act.baseEffet.Valeur) || 8;
-        initBonus += act.count * (baseVal + parseFrenchFloat(act.baseEffet.Cout_PT) * 5);
+        initBonus += act.count * (baseVal + coutPT(act.baseEffet) * 5);
     }
     // Le coût d'un effet hors initiative (Absorption, Contre, états…) est
     // rendu à l'initiative : il ne retarde pas la carte.
@@ -2593,7 +2599,7 @@ function coutDUneAction(act, bdd, statsPerso, coutDureePlus) {
         if (modEff) {
             if (modEff.Nom === "Initiative +") {
                 const baseVal = parseFrenchFloat(modEff.Valeur) || 8;
-                initBonus += modCount * (baseVal + parseFrenchFloat(modEff.Cout_PT) * 5);
+                initBonus += modCount * (baseVal + coutPT(modEff) * 5);
             }
             // Même remboursement pour un sous-effet hors initiative.
             if (window.horsInitiative(modEff.Nom)) {
@@ -2612,7 +2618,7 @@ function coutDUneAction(act, bdd, statsPerso, coutDureePlus) {
                 aDOT = true;
                 diviseurDOT = diviseurEtalement(modEff, statsPerso);
             } else {
-                coutCeMod = parseFrenchFloat(modEff.Cout_PT) * modCount;
+                coutCeMod = coutPT(modEff) * modCount;
             }
 
             // Surcoût lié au bouton ⏳ de CE sous-effet

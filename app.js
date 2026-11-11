@@ -1072,14 +1072,19 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  techniques: ["CLASSE_FUREUR_SENTINELLE"] },
         { niveau: 9,  defenseurRenforce: 50 }
     ],
-    // L'ORACLE : +10 d'initiative sur ses compétences forgées (jouerCarteCombat,
-    // combat.js) ; l'Arrêt du temps au niveau 5 (voir la file, rejouer une
-    // compétence à l'initiative de son choix), le Retour arrière au niveau 10
-    // (un repos long, puis une compétence).
+    // L'ORACLE. v355, la refonte des classes (Nico) : au niveau 1, +8
+    // d'initiative sur ses compétences forgées (jouerCarteCombat, combat.js),
+    // et ses attaques ARCANIQUES ralentissent l'ennemi touché selon leur coût
+    // (30+ : −5, 60+ : −10, 90+ : −15 d'initiative, cette manche et la
+    // suivante — ralentirParLArcane, moteur_pur.js) ; au niveau 3, « Initiative
+    // + » coûte 40 % de fatigue en moins dans la Forge (coutDUneAction,
+    // competences.js) et +1 compétence ; le Retour dans le passé au niveau 5
+    // (il remplace l'Arrêt du temps) ; le Retour arrière au niveau 9.
     "Oracle": [
-        { niveau: 1,  initiative: 10 },
-        { niveau: 5,  techniques: ["CLASSE_ARRET_TEMPS"] },
-        { niveau: 10, techniques: ["CLASSE_RETOUR_ARRIERE"] }
+        { niveau: 1,  initiative: 8, arcaneRalentit: true },
+        { niveau: 3,  reductionInitiativePlus: 40, competences: 1 },
+        { niveau: 5,  techniques: ["CLASSE_RETOUR_PASSE"] },
+        { niveau: 9,  techniques: ["CLASSE_RETOUR_ARRIERE"] }
     ],
     // LE VAMPIRE. v349, la refonte des classes (Nico) : au niveau 1, +15 de
     // résistance physique, résistant au gel (25 % de chance en moins d'être
@@ -1202,19 +1207,20 @@ window.TECHNIQUES_CLASSE = {
         desc: "Se téléporte à la place d'un combattant à 5 cases (allié ou ennemi), même hors de vue "
             + "(derrière un mur), qui prend la sienne, et se soigne de 10 PV. Une fois par combat."
     },
-    // L'ARRÊT DU TEMPS : son tour venu (initiative 200), l'Oracle voit la file
-    // de tout le monde, et choisit une autre de ses compétences qu'il jouera
-    // plus tard dans la manche, à l'initiative qu'il fixe (0 à 199).
-    CLASSE_ARRET_TEMPS: {
-        Nom: "Arrêt du temps", classe: "Oracle", niveau: 5, Initiative: 200, Fatigue: 0, cible: "arretTemps",
-        desc: "Voit l'initiative et la compétence de tout le monde, puis rejoue une autre de ses compétences "
-            + "plus tard dans la manche, à l'initiative de son choix (0 à 199). Une fois par combat."
+    // (v355) LE RETOUR DANS LE PASSÉ : tous les combattants debout reprennent
+    // la case qu'ils occupaient 3 manches plus tôt (retourDansLePasse,
+    // moteur_pur.js). Il remplace l'Arrêt du temps.
+    CLASSE_RETOUR_PASSE: {
+        Nom: "Retour dans le passé", classe: "Oracle", niveau: 5, Initiative: 100, Fatigue: 0, cible: "soi",
+        desc: "Tous les personnages reprennent les positions qu'ils occupaient 3 tours auparavant (au début "
+            + "du combat s'il n'y a pas encore eu 3 tours). Seules les positions changent ; une case prise "
+            + "renvoie sur la case libre la plus proche. Une fois par combat."
     },
     // LE RETOUR ARRIÈRE : choisi en préparation AVEC une compétence. Au début
     // de son tour, l'Oracle prend un repos long, puis joue cette compétence
     // avec sa fatigue remise à jour (reposDuRetourArriere, combat_etat.js).
     CLASSE_RETOUR_ARRIERE: {
-        Nom: "Retour arrière", classe: "Oracle", niveau: 10, Initiative: 0, Fatigue: 0, cible: "avecCompetence",
+        Nom: "Retour arrière", classe: "Oracle", niveau: 9, Initiative: 0, Fatigue: 0, cible: "avecCompetence",
         desc: "Se choisit avec une autre compétence : au début de son tour, l'Oracle prend un repos long, "
             + "puis joue cette compétence avec sa fatigue remise à jour. Une fois par combat."
     },
@@ -1650,6 +1656,8 @@ window.texteAtout = function(cle, valeur) {
         case "degatsIllusoires": return `${n} dégâts bruts à qui brise une de ses illusions`;
         case "etatsRaccourcis": return `États néfastes subis : −${n} tour`;
         case "initiative":     return `${plus(n)} d'initiative sur ses compétences`;
+        case "arcaneRalentit": return "Ses attaques arcaniques retirent de l'initiative à l'ennemi touché, cette manche et la suivante : −5 (compétence de 30 de fatigue ou plus), −10 (60+), −15 (90+)";
+        case "reductionInitiativePlus": return `Forge : « Initiative + » coûte ${n} % de fatigue en moins`;
         case "diviseurEtalement": return `Forge : la fatigue des dégâts et soins étalés est divisée par ${String(n).replace(".", ",")} (au lieu de 1,3)`;
         case "compagnon":      return "Un compagnon animal combat à ses côtés : 25 PV, 17 % d'esquive, 7 dégâts physiques, 3 cases, joue juste après lui";
         case "bonusDistance":  return `${plus(n)} dégât à chaque attaque de ses compétences à arme à distance`;

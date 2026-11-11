@@ -129,7 +129,7 @@ console.log("\n2. NIVEAU 1 : LA FORGE ET L'INITIATIVE");
     const simple = { Initiative: 60, Effets_Compiles: [{ nom: "Coup", isMod: false }] };
     verifier("une compétence à zone : +10 ; sans zone : rien", w.bonusInitiativeClasse(g, zone) === 10 && w.bonusInitiativeClasse(g, simple) === 0);
     verifier("une technique de classe : rien", w.bonusInitiativeClasse(g, { ...zone, techniqueClasse: "X" }) === 0);
-    verifier("l'Oracle garde son +10 partout", w.bonusInitiativeClasse(fiche("O", { classe: "Oracle" }), simple) === 10);
+    verifier("l'Oracle garde son bonus partout (+8 depuis la v355)", w.bonusInitiativeClasse(fiche("O", { classe: "Oracle" }), simple) === 8);
 }
 
 console.log("\n3. NIVEAU 5 : LEVER DES MURS");

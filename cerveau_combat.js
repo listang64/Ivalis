@@ -41,7 +41,8 @@ import { clonerEtat, combattant, creerDes, combattantIllusion,
          verifierEtatCombat, compterPasMarche, reductionInertie, FORMAT_ETAT, tomber, enSursis,
          reposDuRetourArriere, entreeDeFile, ZOMBIE, COMPAGNON, compagnonDe,
          placerCompagnons, MUR_TERRE, murEn, plateauDeCombat, franchissablePour, frapperMurs,
-         cleGravats, APPLICATEURS, ETAT_PLAIE_ROUVERTE, gainReposLong, MAINTIEN_SURSIS } from './combat_etat.js';
+         cleGravats, APPLICATEURS, ETAT_PLAIE_ROUVERTE, gainReposLong, MAINTIEN_SURSIS,
+         positionsDeManche, memoriserPositions } from './combat_etat.js';
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones, zonesDeFinDeManche,
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
@@ -51,7 +52,7 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle, ligneDeVue, caseLibre, aLEtat,
          carteToutEtalee, resisteA, prisMalgreResistance,
          reserveMaintenueDe, reserveDeTechnique, relacherMaintien, chanceFaceA, CHANCE_ETOURDI_RESONANCE,
-         coutLancementReserve, BRULURE_AGGRAVEE } from './moteur_pur.js';
+         coutLancementReserve, BRULURE_AGGRAVEE, ETAT_RALENTI } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles,
@@ -316,19 +317,6 @@ export function validerIntention(etat, intention, plateau) {
             if (!autre) return refus("Transfert sans cible");
             if (autre.id === acteur.id || autre.aTerre || autre.estIllusion) return refus("Transfert : cible invalide");
             if (distance(acteur, autre) > 5) return refus("Transfert : la cible doit être à 5 cases au plus");
-        }
-        // L'Arrêt du temps (Oracle) : une compétence FORGÉE à rejouer (ni une
-        // technique de classe, ni le repos long), et une initiative de 0 à 199.
-        if (idCarte === "CLASSE_ARRET_TEMPS") {
-            const choisie = intention.cible;
-            if (!choisie || typeof choisie !== "string") return refus("Arrêt du temps : aucune compétence choisie");
-            if (choisie.startsWith("CLASSE_") || choisie === "REPOS_LONG") {
-                return refus("Arrêt du temps : une compétence forgée seulement");
-            }
-            const init = Number(intention.initiative);
-            if (!Number.isInteger(init) || init < 0 || init > 199) {
-                return refus("Arrêt du temps : l'initiative va de 0 à 199");
-            }
         }
         // Le Tir précis — le Lancer de bolas depuis la v352 (Pisteur) : un ennemi debout, à 5 cases au plus, en
         // vue (le plateau tranche quand on l'a).
@@ -920,6 +908,22 @@ export function ouvrirManche(etat, file, des) {
             return c && !c.aTerre;
         });
     if (propre.length === 0) return null;
+    // (v355) RALENTI par l'arcane de l'Oracle la manche d'avant : son entrée
+    // perd l'initiative dite par l'état, puis la file se retrie (à égalité,
+    // l'ordre d'avant tient).
+    let ralentie = false;
+    propre.forEach(f => {
+        const malus = Math.max(0, ...((combattant(suivant, f.id) || {}).etats || [])
+            .filter(e => e && e.nom === ETAT_RALENTI).map(e => nombre(e.malusInitiative)));
+        if (malus <= 0) return;
+        f.initiative = Math.max(0, nombre(f.initiative) - malus);
+        ralentie = true;
+    });
+    if (ralentie) {
+        const triee = propre.map((f, i) => ({ f, i }))
+            .sort((a, b) => (nombre(b.f.initiative) - nombre(a.f.initiative)) || (a.i - b.i)).map(x => x.f);
+        propre.splice(0, propre.length, ...triee);
+    }
     // Le compagnon du Pisteur joue juste après son maître (combat_etat.js).
     const rangee = placerCompagnons(suivant, propre);
     propre.splice(0, propre.length, ...rangee);
@@ -942,8 +946,12 @@ export function ouvrirManche(etat, file, des) {
     suivant.ontJoue = [];
     const etapesRepos = reposDuRetourArriere(suivant);
 
+    // (v355) OÙ CHACUN SE TIENT À L'OUVERTURE DE LA MANCHE : ce que le Retour
+    // dans le passé de l'Oracle rejouera 3 manches plus tard.
+    const positions = positionsDeManche(suivant);
+    memoriserPositions(suivant, suivant.manche, positions);
     const etapes = [...etapesRelache, { type: "tour", file: propre, phase: "Resolution",
-                      manche: suivant.manche, ontJoue: [] }, ...etapesRepos];
+                      manche: suivant.manche, ontJoue: [], positions }, ...etapesRepos];
     return fabriquerPas(etat, suivant, etapes, `manche|${suivant.manche}`, null, des);
 }
 

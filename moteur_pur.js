@@ -41,7 +41,7 @@
 //  venaient les dégâts comptés deux fois.
 // =========================================================================
 
-import { clonerEtat, combattant, creerDes, tomber, enSursis, reductionInertie,
+import { clonerEtat, combattant, creerDes, tomber, enSursis, reductionInertie, MANCHES_RETOUR_PASSE,
          leaderActuel, reglerLeader, LEADER_DEFAUT } from './combat_etat.js';
 
 const nombre = (v, defaut = 0) => {
@@ -1912,6 +1912,51 @@ function casePlusProcheLibre(etat, plateau, depart, idIgnore) {
     return null;
 }
 
+// (v355) LE RETOUR DANS LE PASSÉ (Oracle, niveau 5). Nico : « Tous les
+// personnages reprennent les positions qu'ils occupaient 3 tours
+// auparavant. » Ses réponses : seules les positions changent (PV, états,
+// zones restent) ; les KO et les créatures apparues depuis restent où ils
+// sont ; une case prise (ou devenue mur) renvoie sur la case libre la plus
+// proche ; moins de 3 manches jouées : les positions du début du combat.
+// Le passé, c'est etat.positionsPassees (memoriserPositions, combat_etat.js).
+export function positionsIlYA(etat, manches) {
+    const passe = [...((etat && etat.positionsPassees) || [])].sort((a, b) => a.manche - b.manche);
+    if (passe.length === 0) return null;
+    const visee = nombre(etat.manche) - manches;
+    const avant = passe.filter(p => p.manche <= visee);
+    return (avant.length ? avant[avant.length - 1] : passe[0]).positions || null;
+}
+export function retourDansLePasse(suivant, plateau, idLanceur) {
+    const passe = positionsIlYA(suivant, MANCHES_RETOUR_PASSE);
+    if (!passe) return [{ type: "message", cible: idLanceur, acteur: idLanceur, texte: "Aucun passé où revenir", couleur: "#b39ddb" }];
+    const ids = (suivant.ordre || Object.keys(suivant.combattants || {})).filter(cid => {
+        const c = combattant(suivant, cid);
+        return c && !c.aTerre && passe[cid];
+    });
+    // Tous quittent leur case d'abord : deux combattants qui échangent leurs
+    // places ne se gênent pas.
+    const departs = {};
+    ids.forEach(cid => {
+        const c = combattant(suivant, cid);
+        departs[cid] = { q: nombre(c.q), r: nombre(c.r) };
+        c.q = null; c.r = null;
+    });
+    const etapes = [];
+    ids.forEach(cid => {
+        const c = combattant(suivant, cid);
+        let vers = { q: nombre(passe[cid].q), r: nombre(passe[cid].r) };
+        if (!caseLibre(suivant, plateau, vers.q, vers.r, cid)) {
+            vers = casePlusProcheLibre(suivant, plateau, vers, cid)
+                || (caseLibre(suivant, plateau, departs[cid].q, departs[cid].r, cid) ? departs[cid] : vers);
+        }
+        c.q = vers.q; c.r = vers.r;
+        if (vers.q === departs[cid].q && vers.r === departs[cid].r) return;
+        etapes.push({ type: "bond", acteur: cid, cible: cid, de: departs[cid], vers, retourPasse: true });
+    });
+    etapes.unshift({ type: "message", cible: idLanceur, acteur: idLanceur, texte: "⌛ Retour dans le passé", couleur: "#b39ddb" });
+    return etapes;
+}
+
 // LA RÉSERVE AU LANCEMENT (v347) : la part de la manche où la technique part
 // est payée tout de suite ; l'état « … maintenu » se pose chez le lanceur.
 function poserMaintien(c, idCarte, liens) {
@@ -1977,18 +2022,8 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
             if (allie.pv === avant) return;
             etapes.push({ type: "soin", cible: idAllie, acteur: id, montant: allie.pv - avant, pvApres: allie.pv });
         });
-    } else if (action.idCarte === "CLASSE_ARRET_TEMPS") {
-        // L'ARRÊT DU TEMPS (Oracle) : une seconde entrée pour lui dans la file,
-        // avec la compétence choisie, à l'initiative qu'il a fixée — derrière
-        // ceux qui ont autant ou plus. La tête (lui, maintenant) s'en va à la
-        // clôture du tour ; la nouvelle entrée attend son tour.
-        const initiative = Math.max(0, Math.min(199, Math.round(nombre(action.initiative))));
-        const file = suivant.file || [];
-        let place = 1;
-        while (place < file.length && nombre(file[place].initiative) >= initiative) place++;
-        file.splice(place, 0, { id, carte: action.cible, initiative, pas: 0, arretDuTemps: true });
-        suivant.file = file;
-        etapes.push({ type: "message", cible: id, acteur: id, texte: `⏳ Rejouera à ${initiative}`, couleur: "#b39ddb" });
+    } else if (action.idCarte === "CLASSE_RETOUR_PASSE") {
+        etapes.push(...retourDansLePasse(suivant, plateau || PLAINE, id));
     } else if (action.idCarte === "CLASSE_BOUCLIER_ANTIMAGIE") {
         c.etats = [...(c.etats || []).filter(e => e && e.nom !== ETAT_ANTIMAGIE),
                    { nom: ETAT_ANTIMAGIE, duree: MANCHES_ANTIMAGIE, desc: DESC_ANTIMAGIE }];
@@ -2142,6 +2177,67 @@ export function glaceEnPhysique(action) {
                             && !((a.elements || []).length > 1);
     if (!(action && (action.attaques || []).some(estGlace))) return action;
     return { ...action, attaques: action.attaques.map(a => estGlace(a) ? { ...a, typeRes: "Physique", glacePhysique: true } : a) };
+}
+
+// (v355) LE RALENTISSEMENT ARCANIQUE (Oracle, niveau 1). Nico : « Les attaques
+// arcaniques réduisent l'initiative de l'ennemi en fonction de la fatigue
+// accumulée : à partir de 30 Fatigue −5, 60 −10, 90 −15. La réduction
+// s'applique au tour actuel et au tour suivant. » La fatigue qui compte est
+// le coût de la compétence (sa réponse). Cette manche : l'entrée de l'ennemi
+// qui n'a pas encore joué recule dans la file. La suivante : l'état
+// « Ralenti » (2 manches) que lit ouvrirManche (cerveau_combat.js).
+export const ETAT_RALENTI = "Ralenti";
+export function malusArcanique(coutFatigue) {
+    const cout = nombre(coutFatigue);
+    return cout >= 90 ? 15 : cout >= 60 ? 10 : cout >= 30 ? 5 : 0;
+}
+export function ralentirParLArcane(suivant, lanceur, action, touchees) {
+    const malus = malusArcanique(action && action.coutFatigue);
+    if (malus <= 0) return [];
+    const arcaniques = (action.attaques || []).filter(a => a && !a.isHeal && !a.isShield && a.element === "Arcane");
+    const visees = new Set(arcaniques.flatMap(a => a.cibles || []));
+    const etapes = [];
+    let fileTouchee = false;
+    [...touchees].forEach(idCible => {
+        const cible = combattant(suivant, idCible);
+        if (!visees.has(idCible) || !cible || cible.aTerre || (cible.camp || "Allié") === (lanceur.camp || "Allié")) return;
+        (suivant.file || []).forEach((f, i) => {
+            if (i === 0 || f.id !== idCible) return;
+            f.initiative = Math.max(0, nombre(f.initiative) - malus);
+            fileTouchee = true;
+        });
+        const existant = (cible.etats || []).find(e => e && e.nom === ETAT_RALENTI);
+        const pire = Math.max(malus, nombre(existant && existant.malusInitiative));
+        cible.etats = [...(cible.etats || []).filter(e => e && e.nom !== ETAT_RALENTI),
+                       { nom: ETAT_RALENTI, duree: 2, malusInitiative: pire,
+                         desc: `−${pire} d'initiative (arcane de l'Oracle).` }];
+        etapes.push({ type: "message", cible: idCible, acteur: lanceur.id, texte: `⏳ −${malus} d'initiative`, couleur: "#b98cff" });
+        etapes.push({ type: "etats", cible: idCible, pose: ETAT_RALENTI, liste: cible.etats });
+    });
+    if (fileTouchee) {
+        suivant.file = trierSuiteDeFile(suivant, suivant.file);
+        etapes.push({ type: "tour", file: suivant.file });
+    }
+    return etapes;
+}
+// La file réordonnée après la tête (qui joue) : par initiative décroissante,
+// à égalité dans l'ordre d'avant ; le compagnon du Pisteur reste juste
+// derrière son maître, à la même initiative.
+export function trierSuiteDeFile(etat, file) {
+    const [tete, ...reste] = file || [];
+    if (!tete) return [];
+    const table = (etat && etat.combattants) || {};
+    const maitreDe = (f) => { const c = table[f.id]; return c && c.compagnon ? c.compagnon.idMaitre : null; };
+    const suiveurs = reste.filter(f => maitreDe(f) && reste.some(x => x.id === maitreDe(f)));
+    const tries = reste.filter(f => !suiveurs.includes(f))
+        .map((f, i) => ({ f, i }))
+        .sort((a, b) => (nombre(b.f.initiative) - nombre(a.f.initiative)) || (a.i - b.i))
+        .map(x => x.f);
+    suiveurs.forEach(f => {
+        const i = tries.findIndex(x => x.id === maitreDe(f));
+        tries.splice(i + 1, 0, { ...f, initiative: nombre(tries[i].initiative) });
+    });
+    return [tete, ...tries];
 }
 
 export function resoudreCarte(etat, action, plateau) {
@@ -2989,6 +3085,9 @@ export function resoudreCarte(etat, action, plateau) {
             etapes.push({ type: "fatigue", cible: id, fatigueApres: apres, tic: "Élan partagé" });
         });
     }
+
+    // (v355) L'ORACLE : ses attaques arcaniques ralentissent l'ennemi touché.
+    if (lanceur.atouts && lanceur.atouts.arcaneRalentit) etapes.push(...ralentirParLArcane(suivant, lanceur, action, touchees));
 
     // --- LA FATIGUE DU LANCEUR -------------------------------------------
     if (action.coutFatigue !== undefined) {
