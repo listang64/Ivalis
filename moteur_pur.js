@@ -1972,6 +1972,13 @@ function poserMaintien(c, idCarte, liens) {
     return etapes;
 }
 
+// (v357) LES TECHNIQUES QUI COÛTENT DE LA FATIGUE, payée au lancement (sans
+// réserve) : le Charme fratricide du Sorcier, 30.
+export const COUTS_TECHNIQUES = { CLASSE_CHARME_FRATRICIDE: 30 };
+export const coutDeTechnique = (idCarte) => nombre(COUTS_TECHNIQUES[idCarte]);
+// (v357) Le Charme fratricide vise à 5 cases.
+export const PORTEE_CHARME = 5;
+
 // Ce qu'une technique de classe fait à l'état. Rend { etat, etapes } comme
 // resoudreCarte ; ne clôt pas le tour (le cerveau s'en charge).
 export function resoudreTechniqueClasse(etat, action, plateau) {
@@ -1987,6 +1994,12 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
                   cible: action.cible || id, utilisees,
                   ...(Array.isArray(action.cibles) ? { cibles: [...action.cibles] } : {}),
                   ...(Array.isArray(action.cases) ? { cases: action.cases.map(h => ({ q: nombre(h.q), r: nombre(h.r) })) } : {}) });
+    const cout = coutDeTechnique(action.idCarte);
+    if (cout > 0) {
+        const avant = nombre(c.fatigue);
+        c.fatigue = Math.max(0, avant - cout);
+        etapes.push({ type: "fatigue", cible: id, fatigueApres: c.fatigue, ...(avant > c.fatigue ? { depense: avant - c.fatigue } : {}) });
+    }
 
     if (action.idCarte === "CLASSE_MUR_BOUCLIER") {
         c.etats = [...(c.etats || []).filter(e => e && e.nom !== ETAT_MUR_BOUCLIER),

@@ -79,23 +79,24 @@ window.CLASSES_PAR_DEFAUT = [
 //  seul, au milieu de la moitié gauche.
 window.DESCRIPTIFS_CLASSES = {
     CLASSE_SORCIER: {
-        presentation: "Les ombres répondent à sa voix. Le Sorcier frappe de loin sans jamais "
-            + "perdre en force quand on le serre de près, vide l'énergie de ses ennemis, retourne "
-            + "leurs propres coups contre leurs alliés et change de place avec qui il veut.",
+        presentation: "Les ombres répondent à sa voix. Le Sorcier frappe de loin, vide l'énergie de ses "
+            + "ennemis, retourne leurs propres coups contre leurs alliés et change de place avec qui il "
+            + "veut ; les plus aguerris ne perdent plus rien de leurs sorts quand on les serre de près.",
         paliers: [
             { niveau: 1, titre: "Sort : Ténèbres",
               points: ["Dans la Forge · 2 pts · Intelligence · 3 dégâts magiques bruts (aucune armure)",
                        "Les dégâts frappent la fatigue de la cible ; plus de fatigue ? Le reste frappe ses PV ×1,5",
-                       "+1 case de portée de base sur tous ses sorts",
-                       "Aucune réduction au contact pour ses sorts à distance"] },
-            { niveau: 5, titre: "Technique : Charme fratricide",
-              points: ["Initiative 105 · aucune fatigue · un ennemi à 3 cases",
+                       "+1 case de portée de base sur tous ses sorts"] },
+            { niveau: 3, titre: "Technique : Charme fratricide",
+              points: ["Initiative 105 · 30 de fatigue · un ennemi à 5 cases",
                        "Sa prochaine compétence frappe l'un de ses propres alliés",
                        "Une fois par combat"] },
-            { niveau: 10, titre: "Technique : Transfert",
-              points: ["Initiative 100 · aucune fatigue · un combattant à 5 cases (allié ou ennemi), même hors de vue",
+            { niveau: 5, titre: "Technique : Transfert",
+              points: ["Initiative 100 · aucune fatigue · n'importe quel combattant (allié ou ennemi), où qu'il soit, même hors de vue",
                        "Se téléporte à sa place (il prend la sienne), et se soigne de 10 PV",
-                       "Une fois par combat"] }
+                       "Une fois par combat"] },
+            { niveau: 9, titre: "Sorts à bout portant",
+              points: ["Ses sorts à distance ne subissent plus de réduction au corps-à-corps"] }
         ]
     },
     CLASSE_PROTECTEUR: {

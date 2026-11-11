@@ -2420,7 +2420,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=246"></script>
+<script src="trace_combat.js?v=247"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2446,10 +2446,10 @@
 <script type="importmap">
 { "imports": {
     "./combat_etat.js": "./combat_etat.js?v=53",
-    "./moteur_pur.js": "./moteur_pur.js?v=77",
+    "./moteur_pur.js": "./moteur_pur.js?v=78",
     "./mouvement_pur.js": "./mouvement_pur.js?v=26",
     "./ia_pure.js": "./ia_pure.js?v=16",
-    "./cerveau_combat.js": "./cerveau_combat.js?v=72",
+    "./cerveau_combat.js": "./cerveau_combat.js?v=73",
     "./spectateur_combat.js": "./spectateur_combat.js?v=9",
     "./depot_firestore.js": "./depot_firestore.js?v=11",
     "./pont_combat.js": "./pont_combat.js?v=51",
@@ -2468,11 +2468,11 @@
 <script type="module" src="combat_etat.js?v=53"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=77"></script>
+<script type="module" src="moteur_pur.js?v=78"></script>
 <script type="module" src="mouvement_pur.js?v=26"></script>
 <script type="module" src="ia_pure.js?v=16"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
-<script type="module" src="cerveau_combat.js?v=72"></script>
+<script type="module" src="cerveau_combat.js?v=73"></script>
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
      la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
 <script type="module" src="spectateur_combat.js?v=9"></script>
@@ -2486,7 +2486,7 @@
 <script type="module" src="regime_cerveau.js?v=54"></script>
 <script type="module" src="ia_master.js?v=25"></script>
 <script type="module" src="illustrations_recit.js?v=9"></script>
-<script type="module" src="app.js?v=156"></script>
+<script type="module" src="app.js?v=157"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=4"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
@@ -2532,7 +2532,7 @@
 <!-- Les blessures : la table et ses règles (script simple), puis l'écran. -->
 <script src="blessures.js?v=2"></script>
 <script type="module" src="creation_personnage.js?v=27"></script>
-<script type="module" src="classes.js?v=39"></script>
+<script type="module" src="classes.js?v=40"></script>
 <script type="module" src="recit_dynamique.js?v=7"></script>
 <script type="module" src="competences.js?v=71"></script>
 <script type="module" src="talents_ui.js?v=2"></script>

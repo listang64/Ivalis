@@ -52,7 +52,7 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          actionResonanceBouclier, ennemisAuContact, ligneDeVue, caseLibre, aLEtat,
          carteToutEtalee, resisteA, prisMalgreResistance,
          reserveMaintenueDe, reserveDeTechnique, relacherMaintien, chanceFaceA, CHANCE_ETOURDI_RESONANCE,
-         coutLancementReserve, BRULURE_AGGRAVEE, ETAT_RALENTI } from './moteur_pur.js';
+         coutLancementReserve, BRULURE_AGGRAVEE, ETAT_RALENTI, coutDeTechnique, PORTEE_CHARME } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles,
@@ -283,6 +283,11 @@ export function validerIntention(etat, intention, plateau) {
             if (cout > nombre(acteur.fatigue)) return refus(`Mur de terre : il faut ${cout} d'énergie, il en reste ${nombre(acteur.fatigue)}`);
         }
         if (tete.carte && tete.carte !== idCarte) return refus(`la carte de ce tour est ${tete.carte}`);
+        // (v357) Une technique qui coûte de la fatigue (le Charme fratricide : 30).
+        const coutTech = coutDeTechnique(idCarte);
+        if (coutTech > nombre(acteur.fatigue) - reserveMaintenueDe(acteur)) {
+            return refus(`il faut ${coutTech} d'énergie, il en reste ${nombre(acteur.fatigue) - reserveMaintenueDe(acteur)}`);
+        }
         // (v347) Une technique maintenue paie sa réserve de la manche au lancement.
         const reserveTech = reserveDeTechnique(idCarte);
         if (reserveTech && coutLancementReserve(reserveTech) > nombre(acteur.fatigue) - reserveMaintenueDe(acteur)) {
@@ -311,21 +316,21 @@ export function validerIntention(etat, intention, plateau) {
             if (distance(acteur, ennemi) > PORTEE_BRISEUR) return refus("Briseur d'arcane : l'ennemi doit être à 5 cases au plus");
             if (plateau && !ligneDeVue(plateau, acteur, ennemi)) return refus("Briseur d'arcane : pas de ligne de vue");
         }
-        // Le Charme fratricide (Sorcier) : un ennemi debout, à 3 cases au plus.
+        // Le Charme fratricide (Sorcier) : un ennemi debout, à 5 cases au plus
+        // (3 jusqu'à la v356).
         if (idCarte === "CLASSE_CHARME_FRATRICIDE") {
             const ennemi = combattant(etat, intention.cible);
             if (!ennemi) return refus("Charme sans cible");
             if (ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) return refus("Charme : ennemi invalide");
-            if (distance(acteur, ennemi) > 3) return refus("Charme : l'ennemi doit être à 3 cases au plus");
+            if (distance(acteur, ennemi) > PORTEE_CHARME) return refus("Charme : l'ennemi doit être à 5 cases au plus");
         }
         // Le Transfert (Sorcier) : un autre combattant debout, allié ou ennemi,
-        // à 5 cases au plus — la ligne de vue ne compte pas (il se téléporte,
-        // même derrière un mur).
+        // où qu'il soit (v357 : portée infinie ; 5 cases jusque-là) — la ligne
+        // de vue ne compte pas (il se téléporte, même derrière un mur).
         if (idCarte === "CLASSE_TRANSFERT") {
             const autre = combattant(etat, intention.cible);
             if (!autre) return refus("Transfert sans cible");
             if (autre.id === acteur.id || autre.aTerre || autre.estIllusion) return refus("Transfert : cible invalide");
-            if (distance(acteur, autre) > 5) return refus("Transfert : la cible doit être à 5 cases au plus");
         }
         // Le Tir précis — le Lancer de bolas depuis la v352 (Pisteur) : un ennemi debout, à 5 cases au plus, en
         // vue (le plateau tranche quand on l'a).

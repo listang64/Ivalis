@@ -11367,3 +11367,18 @@ geomancien.mjs : l'Oracle a +8 (au lieu de +10). corrections_v344 et v346 : leur
 corrections_v356.mjs le vérifie : la réserve, les archétypes, le Briseur (31 % → 46), la disparition de la Maîtrise et de l'Appel, la fiche de classe et l'onglet Statistiques dans la vraie page, la version.
 
 chasseur_de_mages.mjs est mis à jour (parties sans navigateur) : paliers ; le +2 (archétype en combat, cartes physiques et sorts, opportunité, autres héros) ; le Bouclier (20 payés, 19 refusé, réserve bloquée, chute à court d'énergie) ; le Briseur (portée, allié, KO, mur, 75 bruts, une fois, rejeu, arrondi, esquive, +2 contre un Soutien). Sa partie navigateur demande toujours effets_reels.json, absent du conteneur.
+
+## v357 — La refonte des classes : le Sorcier
+
+- Nico (sa fiche du Sorcier) :
+  - niveau 1 : Ténèbres, +1 portée de base sur tous les sorts ;
+  - niveau 3 : Charme fratricide (30 de fatigue, une fois par combat, INIT 105, portée 5) ;
+  - niveau 5 : Transfert (0, une fois par combat, INIT 100, portée infinie même derrière les murs) ;
+  - niveau 9 : les sorts à distance ne subissent plus de réduction au corps-à-corps.
+- app.js : paliers 1 (Ténèbres, porteeSorts 1), 3 (Charme), 5 (Transfert), 9 (sortsSansMalusContact, qui était au niveau 1). Charme : Fatigue 30, portée 5. Transfert : portée 99 (le ciblage du plateau accepte tout le monde, toujours sans ligne de vue).
+- LE COÛT D'UNE TECHNIQUE (moteur_pur.js, COUTS_TECHNIQUES / coutDeTechnique) : jusqu'ici, seules les réserves faisaient payer une technique. Le Charme paie ses 30 au lancement (resoudreTechniqueClasse, étape « fatigue » avec sa dépense) ; le cerveau refuse s'il n'a pas 30 d'énergie libre (réserves maintenues déduites).
+- cerveau_combat.js : le Charme vise à PORTEE_CHARME (5) ; le Transfert n'a plus de limite de distance.
+
+corrections_v357.mjs le vérifie : les paliers, le coût et la portée dans le moteur, la fiche, la version, et le ciblage du plateau dans la vraie page (Charme : seul l'ennemi debout à 5 cases et en vue ; Transfert : tout le monde debout, à toute distance, derrière un mur compris).
+
+sorcier.mjs est mis à jour : paliers ; le malus au contact gardé jusqu'au niveau 8 ; le Charme (niveau 3, 5 cases pile / 6 refusé, 29 d'énergie refusé, 30 → 0, 100 → 70, dépense dite, rejeu) ; le Transfert (niveau 5, 8 puis 40 cases). Sa partie navigateur demande toujours effets_reels.json.

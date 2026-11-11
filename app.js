@@ -938,15 +938,18 @@ window.atoutPeuple = function(perso) {
 //    sursis      tombé à 0 PV, il tient encore ce nombre de tours (une fois
 //                par combat, sans soin possible) avant d'être mis KO
 window.ATOUTS_CLASSES = {
-    // LE SORCIER (ex-Nécromancien, renommé — CLASSES_RENOMMEES) : Ténèbres dans
-    // la Forge dès le niveau 1, +1 case de portée sur TOUS ses sorts (porteeSorts,
-    // bonusPorteeMagique) et aucun malus au contact pour ses attaques à distance
-    // (sortsSansMalusContact, chaineDeDegats) ; le Charme fratricide au niveau
-    // 5, le Transfert au niveau 10.
+    // LE SORCIER (ex-Nécromancien, renommé — CLASSES_RENOMMEES). v357, la
+    // refonte des classes (Nico) : Ténèbres dans la Forge et +1 case de portée
+    // sur TOUS ses sorts (porteeSorts, bonusPorteeMagique) dès le niveau 1 ; le
+    // Charme fratricide au niveau 3 (30 de fatigue, 5 cases) ; le Transfert au
+    // niveau 5 (portée infinie) ; au niveau 9, plus aucun malus au contact
+    // pour ses attaques à distance (sortsSansMalusContact, chaineDeDegats —
+    // c'était au niveau 1).
     "Sorcier": [
-        { niveau: 1,  effets: ["EFF_TENEBRES"], porteeSorts: 1, sortsSansMalusContact: true },
-        { niveau: 5,  techniques: ["CLASSE_CHARME_FRATRICIDE"] },
-        { niveau: 10, techniques: ["CLASSE_TRANSFERT"] }
+        { niveau: 1,  effets: ["EFF_TENEBRES"], porteeSorts: 1 },
+        { niveau: 3,  techniques: ["CLASSE_CHARME_FRATRICIDE"] },
+        { niveau: 5,  techniques: ["CLASSE_TRANSFERT"] },
+        { niveau: 9,  sortsSansMalusContact: true }
     ],
     // LE PROTECTEUR (ex-Hoplite, renommé — CLASSES_RENOMMEES). v347, la refonte
     // des classes (Nico) : +8 % de parade et 10 % de chance de provoquer la
@@ -1206,14 +1209,14 @@ window.TECHNIQUES_CLASSE = {
             + "lancement, la suivante bloquée puis consommée ; à court d'énergie, la nuée se dissipe). Une fois par combat."
     },
     CLASSE_CHARME_FRATRICIDE: {
-        Nom: "Charme fratricide", classe: "Sorcier", niveau: 5, Initiative: 105, Fatigue: 0, cible: "ennemi", portee: 3,
-        desc: "Sur un ennemi à 3 cases : sa prochaine compétence frappe l'un de ses propres alliés "
-            + "(au hasard, à sa portée ; aucun à portée, elle se perd). Une fois par combat."
+        Nom: "Charme fratricide", classe: "Sorcier", niveau: 3, Initiative: 105, Fatigue: 30, cible: "ennemi", portee: 5,
+        desc: "Sur un ennemi à 5 cases : sa prochaine compétence frappe l'un de ses propres alliés "
+            + "(au hasard, à sa portée ; aucun à portée, elle se perd). 30 de fatigue. Une fois par combat."
     },
     CLASSE_TRANSFERT: {
-        Nom: "Transfert", classe: "Sorcier", niveau: 10, Initiative: 100, Fatigue: 0, cible: "combattant", portee: 5,
-        desc: "Se téléporte à la place d'un combattant à 5 cases (allié ou ennemi), même hors de vue "
-            + "(derrière un mur), qui prend la sienne, et se soigne de 10 PV. Une fois par combat."
+        Nom: "Transfert", classe: "Sorcier", niveau: 5, Initiative: 100, Fatigue: 0, cible: "combattant", portee: 99,
+        desc: "Se téléporte à la place d'un combattant (allié ou ennemi), où qu'il soit sur le plateau, même hors "
+            + "de vue (derrière un mur), qui prend la sienne, et se soigne de 10 PV. Une fois par combat."
     },
     // (v355) LE RETOUR DANS LE PASSÉ : tous les combattants debout reprennent
     // la case qu'ils occupaient 3 manches plus tôt (retourDansLePasse,

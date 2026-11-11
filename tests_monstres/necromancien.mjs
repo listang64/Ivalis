@@ -78,8 +78,9 @@ console.log("\n1. SES ATOUTS, PALIER PAR PALIER (niveau tiré de l'XP)");
     // dans sorcier.mjs.)
     const necro = (niveau, extra = {}) => heros("N", { classe: "Nécromancien", xp: XP[niveau], ...extra });
     const a1 = w.atoutClasse(necro(1)), a10 = w.atoutClasse(necro(10));
-    verifier("niveau 1 (ancien nom) : Ténèbres, +1 portée de sort, sans malus",
-             (a1.effets || []).includes("EFF_TENEBRES") && a1.porteeSorts === 1 && a1.sortsSansMalusContact === true
+    // (v357 : le « sans malus au contact » passe au niveau 9.)
+    verifier("niveau 1 (ancien nom) : Ténèbres, +1 portée de sort ; sans malus au contact au niveau 10",
+             (a1.effets || []).includes("EFF_TENEBRES") && a1.porteeSorts === 1 && !a1.sortsSansMalusContact && a10.sortsSansMalusContact === true
              && !a1.competences && !a1.pvMax && !(a1.immunites || []).length, JSON.stringify(a1));
     verifier("niveau 10 : plus de sursis", !a10.sursis, JSON.stringify(a10));
     verifier("le nom se lit sans accents (« necromancien », « NÉCROMANCIEN »)",

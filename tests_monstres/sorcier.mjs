@@ -11,6 +11,12 @@
 // vue, genre derrière un mur. » Et enfin : « Transfert marche idem sur tout
 // le monde » (alliés compris).
 //
+// Puis (v357, la refonte des classes), Nico : « NIVEAU 1 : Ténèbres, +1
+// portée de base sur tous les sorts. NIVEAU 3 : Charme fratricide (30, une
+// fois par combat, INIT 105, portée 5). NIVEAU 5 : Transfert (0, une fois par
+// combat, INIT 100, portée infinie même derrière les murs). NIVEAU 9 : les
+// sorts à distance ne subissent plus de réduction au corps-à-corps. »
+//
 // Partie 1 : le VRAI code des règles (app.js, experience.js) et le VRAI noyau
 // (moteur_pur, combat_etat, cerveau_combat), sans navigateur.
 // Partie 2 : la vraie page (portée affichée et extraite, fenêtre de ciblage
@@ -36,7 +42,7 @@ const REGLES = {
     defPhysique: w.defPhysiqueCombattant, defMagique: w.defMagiqueCombattant,
     critique: w.critiqueCombattant, atouts: w.atoutRace, bonusEquip: w.bonusEquip
 };
-const XP = { 1: 0, 4: 1800, 5: 2500, 9: 6400, 10: 7900 };
+const XP = { 1: 0, 2: 700, 3: 1200, 4: 1800, 5: 2500, 8: 5200, 9: 6400, 10: 7900 };
 const fiche = (id, extra = {}) => ({
     idPersonnage: id, prenom: id, race: "Humain", classe: "", camp: id.startsWith("M") ? "Ennemi" : "Allié",
     estMonstre: id.startsWith("M"), joueur: "", xp: 0,
@@ -70,21 +76,25 @@ console.log("=========================================================");
 
 console.log("\n1. LES PALIERS, ET L'ANCIEN NOM");
 {
-    const a1 = w.atoutRace(sorcier(1)), a5 = w.atoutRace(sorcier(5)), a10 = w.atoutRace(sorcier(10));
-    verifier("niveau 1 : Ténèbres, +1 portée de sort, sans malus au contact",
-             JSON.stringify(a1.effets) === '["EFF_TENEBRES"]' && a1.porteeSorts === 1 && a1.sortsSansMalusContact === true
+    const a1 = w.atoutRace(sorcier(1)), a3 = w.atoutRace(sorcier(3)), a5 = w.atoutRace(sorcier(5)), a10 = w.atoutRace(sorcier(10));
+    verifier("niveau 1 : Ténèbres, +1 portée de sort (le « sans malus au contact » attend le niveau 9, v357)",
+             JSON.stringify(a1.effets) === '["EFF_TENEBRES"]' && a1.porteeSorts === 1 && !a1.sortsSansMalusContact
              && !(a1.techniques || []).length, JSON.stringify(a1));
+    verifier("niveau 9 : plus de malus au contact ; pas au 8",
+             w.atoutRace(sorcier(9)).sortsSansMalusContact === true && !w.atoutRace(sorcier(8)).sortsSansMalusContact);
     // (La classe seule : l'Humain a sa propre compétence en plus depuis la v237.)
     const c10 = w.atoutClasse(sorcier(10));
     verifier("…et plus rien de l'ancien Nécromancien (+8 PV, +1 compétence, sursis)",
              !c10.pvMax && !c10.competences && !c10.sursis, JSON.stringify(c10));
-    verifier("niveau 5 : Charme fratricide", JSON.stringify(a5.techniques) === '["CLASSE_CHARME_FRATRICIDE"]');
-    verifier("niveau 10 : + Transfert", JSON.stringify(a10.techniques) === '["CLASSE_CHARME_FRATRICIDE","CLASSE_TRANSFERT"]');
+    verifier("niveau 3 : Charme fratricide", JSON.stringify(a3.techniques) === '["CLASSE_CHARME_FRATRICIDE"]'
+             && !(w.atoutRace(sorcier(2)).techniques || []).length);
+    verifier("niveau 5 : + Transfert", JSON.stringify(a5.techniques) === '["CLASSE_CHARME_FRATRICIDE","CLASSE_TRANSFERT"]'
+             && JSON.stringify(a10.techniques) === '["CLASSE_CHARME_FRATRICIDE","CLASSE_TRANSFERT"]');
     const ch = w.TECHNIQUES_CLASSE.CLASSE_CHARME_FRATRICIDE, tr = w.TECHNIQUES_CLASSE.CLASSE_TRANSFERT;
-    verifier("Charme : init 105, aucune fatigue, un ennemi à 3 cases",
-             ch.Initiative === 105 && ch.Fatigue === 0 && ch.cible === "ennemi" && ch.portee === 3 && ch.niveau === 5, JSON.stringify(ch).slice(0, 120));
-    verifier("Transfert : init 100, aucune fatigue, un combattant à 5 cases",
-             tr.Initiative === 100 && tr.Fatigue === 0 && tr.cible === "combattant" && tr.portee === 5 && tr.niveau === 10);
+    verifier("Charme : init 105, 30 de fatigue, un ennemi à 5 cases, niveau 3",
+             ch.Initiative === 105 && ch.Fatigue === 30 && ch.cible === "ennemi" && ch.portee === 5 && ch.niveau === 3, JSON.stringify(ch).slice(0, 120));
+    verifier("Transfert : init 100, aucune fatigue, un combattant, portée infinie, niveau 5",
+             tr.Initiative === 100 && tr.Fatigue === 0 && tr.cible === "combattant" && tr.portee >= 99 && tr.niveau === 5);
     verifier("un héros resté « Nécromancien » est un Sorcier",
              w.nomActuelClasse("Nécromancien") === "Sorcier" && w.nomActuelClasse("NECROMANCIEN") === "Sorcier"
              && w.atoutRace(fiche("N", { classe: "Nécromancien", xp: XP[10] })).techniques.length === 2
@@ -107,8 +117,8 @@ console.log("\n2. +1 CASE DE PORTÉE SUR TOUS SES SORTS");
 
 console.log("\n3. AUCUNE RÉDUCTION AU CONTACT POUR SES ATTAQUES À DISTANCE");
 {
-    const sortTire = (lanceur, typeRes = "Magique") => {
-        const e = monde(1); e.combattants.M1.q = 1; e.combattants.M1.r = 0;   // au contact
+    const sortTire = (lanceur, typeRes = "Magique", niveauS = 9) => {
+        const e = monde(niveauS); e.combattants.M1.q = 1; e.combattants.M1.r = 0;   // au contact
         if (lanceur === "H") { e.combattants.H.q = 2; e.combattants.H.r = -1; }
         // v260 : le malus ne joue que sur un tireur engagé — M1 vient de le frapper.
         e.combattants[lanceur].etats = [...(e.combattants[lanceur].etats || []), { nom: "Engagé", duree: 1, par: ["M1"] }];
@@ -117,32 +127,42 @@ console.log("\n3. AUCUNE RÉDUCTION AU CONTACT POUR SES ATTAQUES À DISTANCE");
             alterations: [], jets: { attaqueRatee: false, parCible: { M1: { esquive: false, etats: {} } } } });
         return 100 - r.etat.combattants.M1.pv;
     };
-    verifier("le Sorcier engagé, sort à distance tiré au contact : 10 pleins", sortTire("S") === 10, `${sortTire("S")}`);
+    verifier("le Sorcier (niveau 9) engagé, sort à distance tiré au contact : 10 pleins", sortTire("S") === 10, `${sortTire("S")}`);
+    verifier("le Sorcier de niveau 8 : 7 comme tout le monde (v357)", sortTire("S", "Magique", 8) === 7, `${sortTire("S", "Magique", 8)}`);
     verifier("un autre héros engagé : 7 (×0,7)", sortTire("H") === 7, `${sortTire("H")}`);
     // v233 (Nico : « le Sorcier a eu le malus de -30 % au contact alors qu'il
     // n'est pas censé l'avoir ») : plus rien de ce qu'il tire ne perd au contact.
     verifier("le Sorcier, tir PHYSIQUE au contact : 10 pleins aussi", sortTire("S", "Physique") === 10, `${sortTire("S", "Physique")}`);
-    verifier("l'atout voyage dans le combattant", monde(1).combattants.S.atouts.sortsSansMalusContact === true
-             && !monde(1).combattants.H.atouts.sortsSansMalusContact);
+    verifier("l'atout voyage dans le combattant", monde(9).combattants.S.atouts.sortsSansMalusContact === true
+             && !monde(9).combattants.H.atouts.sortsSansMalusContact && !monde(1).combattants.S.atouts.sortsSansMalusContact);
 }
 
 console.log("\n4. LE CHARME FRATRICIDE");
 {
     const charme = (cible = "M1") => ({ id: "I1", type: "classe", acteur: "S", idCarte: "CLASSE_CHARME_FRATRICIDE", cible });
-    const e = enTete(monde(5), "S", "CLASSE_CHARME_FRATRICIDE");
-    verifier("niveau 5 : accepté sur un ennemi à 2 cases", validerIntention(e, charme()).ok, validerIntention(e, charme()).raison || "");
-    verifier("niveau 4 : il ne l'a pas", !validerIntention(enTete(monde(4), "S", "CLASSE_CHARME_FRATRICIDE"), charme()).ok);
+    const e = enTete(monde(3), "S", "CLASSE_CHARME_FRATRICIDE");
+    verifier("niveau 3 : accepté sur un ennemi à 2 cases", validerIntention(e, charme()).ok, validerIntention(e, charme()).raison || "");
+    verifier("niveau 2 : il ne l'a pas", !validerIntention(enTete(monde(2), "S", "CLASSE_CHARME_FRATRICIDE"), charme()).ok);
     verifier("pas sur un allié", !validerIntention(e, charme("A")).ok);
-    verifier("pas au-delà de 3 cases", !validerIntention(e, charme("M3")).ok, validerIntention(e, charme("M3")).raison || "");
-    const loin3 = enTete(monde(5), "S", "CLASSE_CHARME_FRATRICIDE"); loin3.combattants.M3.q = 3; loin3.combattants.M3.r = -3;
-    verifier("à 3 cases pile : accepté", validerIntention(loin3, charme("M3")).ok);
+    verifier("pas au-delà de 5 cases (M3 à 8)", !validerIntention(e, charme("M3")).ok, validerIntention(e, charme("M3")).raison || "");
+    const loin5 = enTete(monde(3), "S", "CLASSE_CHARME_FRATRICIDE"); loin5.combattants.M3.q = 5; loin5.combattants.M3.r = -5;
+    verifier("à 5 cases pile : accepté", validerIntention(loin5, charme("M3")).ok, validerIntention(loin5, charme("M3")).raison || "");
+    const loin6 = enTete(monde(3), "S", "CLASSE_CHARME_FRATRICIDE"); loin6.combattants.M3.q = 6; loin6.combattants.M3.r = -6;
+    verifier("à 6 cases : refusé", !validerIntention(loin6, charme("M3")).ok);
+    const fatigue29 = enTete(monde(3), "S", "CLASSE_CHARME_FRATRICIDE"); fatigue29.combattants.S.fatigue = 29;
+    verifier("29 d'énergie : refusé (il en coûte 30)", !validerIntention(fatigue29, charme()).ok, validerIntention(fatigue29, charme()).raison || "");
+    const fatigue30 = enTete(monde(3), "S", "CLASSE_CHARME_FRATRICIDE"); fatigue30.combattants.S.fatigue = 30;
+    verifier("30 : accepté, il tombe à 0", validerIntention(fatigue30, charme()).ok
+             && appliquerIntention(fatigue30, charme()).etat.combattants.S.fatigue === 0);
 
     const pas = appliquerIntention(e, charme());
     const M1 = pas.etat.combattants.M1, S = pas.etat.combattants.S;
     const etatCharme = (M1.etats || []).find(x => x.nom === ETAT_CHARME);
-    verifier("M1 est Charmé (2 manches), le Sorcier ne perd aucune fatigue",
-             etatCharme && etatCharme.duree === 2 && S.fatigue === 100 && S.techniquesUtilisees.includes("CLASSE_CHARME_FRATRICIDE"),
-             JSON.stringify(M1.etats));
+    verifier("M1 est Charmé (2 manches), le Sorcier paie 30 (100 → 70)",
+             etatCharme && etatCharme.duree === 2 && S.fatigue === 70 && S.techniquesUtilisees.includes("CLASSE_CHARME_FRATRICIDE"),
+             `${S.fatigue} ${JSON.stringify(M1.etats)}`);
+    verifier("la dépense se dit (une étape de fatigue, −30)", pas.entree.etapes.some(x => x.type === "fatigue" && x.cible === "S" && x.depense === 30));
+    verifier("rejoué depuis le journal : 70 d'énergie", appliquerEntree(e, pas.entree).combattants.S.fatigue === 70);
     verifier("une fois par combat", !validerIntention(enTete(clonerEtat(pas.etat), "S", "CLASSE_CHARME_FRATRICIDE"), charme()).ok);
     verifier("rejoué depuis le journal : même état", JSON.stringify(appliquerEntree(e, pas.entree).combattants.M1.etats)
              === JSON.stringify(M1.etats));
@@ -185,12 +205,15 @@ console.log("\n5. LE TRANSFERT");
     const transfert = (cible = "M1") => ({ id: "T1", type: "classe", acteur: "S", idCarte: "CLASSE_TRANSFERT", cible });
     const e = enTete(monde(10, { PV_Actuels: 40 }), "S", "CLASSE_TRANSFERT");
     verifier("niveau 10 : accepté sur un ennemi à 2 cases", validerIntention(e, transfert()).ok, validerIntention(e, transfert()).raison || "");
+    verifier("niveau 5 : il l'a déjà (v357)", validerIntention(enTete(monde(5), "S", "CLASSE_TRANSFERT"), transfert()).ok);
     // (Nico, ensuite : « Transfert marche idem sur tout le monde. »)
     verifier("et sur un allié à 3 cases", validerIntention(e, transfert("H")).ok, validerIntention(e, transfert("H")).raison || "");
     const avecAllie = appliquerIntention(enTete(monde(10), "S", "CLASSE_TRANSFERT"), transfert("H")).etat.combattants;
     verifier("…places échangées avec l'allié", pos(avecAllie.S) === "-3,0" && pos(avecAllie.H) === "0,0");
-    verifier("niveau 9 : il ne l'a pas", !validerIntention(enTete(monde(9), "S", "CLASSE_TRANSFERT"), transfert()).ok);
-    verifier("pas au-delà de 5 cases", !validerIntention(e, transfert("M3")).ok);
+    verifier("niveau 4 : il ne l'a pas", !validerIntention(enTete(monde(4), "S", "CLASSE_TRANSFERT"), transfert()).ok);
+    const tresLoin = enTete(monde(10), "S", "CLASSE_TRANSFERT"); tresLoin.combattants.M3.q = 40; tresLoin.combattants.M3.r = 0;
+    verifier("portée infinie : M3 à 8 cases, puis à 40, acceptés", validerIntention(e, transfert("M3")).ok && validerIntention(tresLoin, transfert("M3")).ok
+             && pos(appliquerIntention(tresLoin, transfert("M3")).etat.combattants.S) === "40,0");
     verifier("pas sur soi", !validerIntention(e, transfert("S")).ok);
     const ko = enTete(monde(10), "S", "CLASSE_TRANSFERT"); ko.combattants.M1.aTerre = true;
     verifier("pas sur un combattant à terre", !validerIntention(ko, transfert()).ok);
@@ -376,13 +399,13 @@ console.log("\n7. LE CHARME ET LE TRANSFERT SE VISENT SUR LE PLATEAU, COMME UN S
   const ch = await viser("CLASSE_CHARME_FRATRICIDE", essais);
   verifier("Charme : le lancement ouvre le ciblage du plateau (plus de fenêtre de noms)",
            ch.ouvert.actif && ch.ouvert.technique === "CLASSE_CHARME_FRATRICIDE" && !ch.ouvert.fenetre, JSON.stringify(ch.ouvert));
-  verifier("…seul l'ennemi debout, à 3 cases et en vue, se vise (ni allié, ni leurre, ni trop loin, ni derrière un mur)",
+  verifier("…seul l'ennemi debout, à 5 cases et en vue, se vise (ni allié, ni leurre, ni trop loin, ni derrière un mur)",
            JSON.stringify(ch.acceptes) === '["M1"]', JSON.stringify(ch.acceptes));
   verifier("validé : la technique part sur lui, le ciblage se ferme",
            ch.ferme && JSON.stringify(ch.demandes) === '[["S","CLASSE_CHARME_FRATRICIDE","M1"]]', JSON.stringify(ch.demandes));
   const tr = await viser("CLASSE_TRANSFERT", essais);
-  verifier("Transfert : alliés ET ennemis debout à 5 cases, même derrière un mur (ni lui-même, ni un tombé, ni un leurre, ni trop loin)",
-           tr.ouvert.actif && !tr.ouvert.fenetre && JSON.stringify(tr.acceptes) === '["A","M1","M3","M4"]', JSON.stringify(tr));
+  verifier("Transfert : alliés ET ennemis debout, à toute distance (v357), même derrière un mur (ni lui-même, ni un tombé, ni un leurre)",
+           tr.ouvert.actif && !tr.ouvert.fenetre && JSON.stringify(tr.acceptes) === '["A","M1","M3","M4","M6"]', JSON.stringify(tr));
   verifier("…validé : la technique part sur le premier", tr.ferme && JSON.stringify(tr.demandes) === '[["S","CLASSE_TRANSFERT","A"]]', JSON.stringify(tr.demandes));
 }
 
@@ -402,8 +425,8 @@ console.log("\n8. LES CLASSES LUES EN BASE : LE NÉCROMANCIEN DEVENU SORCIER, PL
            r.some(x => x[0] === "CLASSE_SORCIER" && x[1] === "Sorcier" && /necro\.png/.test(x[2])), JSON.stringify(r));
   verifier("l'Ensorceleur n'est plus proposé", !ids.includes("CLASSE_ENSORCELEUR") && ids.length === 2, ids.join(","));
   const fiche = await p.evaluate(() => window.detailBonusRaceClasse({ classe: "Nécromancien", xp: 2500, race: "Humain" }).classe);
-  verifier("la fiche d'un héros « Nécromancien » affiche Sorcier, avec ses 3 paliers",
-           fiche.nom === "Sorcier" && fiche.paliers.length === 3, JSON.stringify(fiche).slice(0, 120));
+  verifier("la fiche d'un héros « Nécromancien » affiche Sorcier, avec ses 4 paliers (v357)",
+           fiche.nom === "Sorcier" && fiche.paliers.length === 4, JSON.stringify(fiche).slice(0, 120));
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
