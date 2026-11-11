@@ -224,6 +224,10 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         gardePurification: !!race.gardePurification,
         // (v360) Le Berserker : la Rage (surveillerRage, cerveau_combat.js).
         rage: !!race.rage,
+        // (v362) Le Maudit : ses DOT d'une même compétence se cumulent
+        // (resoudreCarte), et sa Magie du sang lui coûte des PV.
+        dotCumulables: !!race.dotCumulables,
+        magieDuSang: !!race.magieDuSang,
         auraSoin: nombre(race.auraSoin),
         // …et désormais, à la place, le feu le PREND plus facilement : +20 %
         // de chance d'être Brûlé par un sort qui brûle (tirerDesCarte).

@@ -1018,6 +1018,18 @@ window.ATOUTS_CLASSES = {
     // (surveillerRage, cerveau_combat.js) ; la Régénération insolente au niveau 5 ;
     // au niveau 9, deux armes à deux mains (−10 % de résistances), ou +2 dégâts
     // sans elles (deuxArmesDeuxMains, bonusEquipement dans objets.js).
+    // (v362) LE MAUDIT, nouvelle classe (Nico) : au niveau 1, la Malédiction
+    // avancée (ses DOT d'une même compétence se cumulent, dotCumulables,
+    // empilerEtalement) et ses sorts offensifs sans surpuissance classique
+    // (sansSurpuissanceOffensive, l'extraction dans moteur_effets.js), +5 PV,
+    // +1 compétence ; au niveau 3, la Magie du sang (EFF_MAGIE_DU_SANG dans la
+    // Forge : ×1,2 sur les sorts offensifs, 10 % du coût en PV) ; le Vaudou au
+    // niveau 5. (La Possession, niveau 9 : v363.)
+    "Maudit": [
+        { niveau: 1,  dotCumulables: true, sansSurpuissanceOffensive: true, pvMax: 5, competences: 1 },
+        { niveau: 3,  magieDuSang: true, effets: ["EFF_MAGIE_DU_SANG"] },
+        { niveau: 5,  techniques: ["CLASSE_VAUDOU"] }
+    ],
     "Berserker": [
         { niveau: 1,  pvMaxPct: -20, soinsRecus: 30 },
         { niveau: 3,  rage: true },
@@ -1205,6 +1217,15 @@ window.TECHNIQUES_CLASSE = {
             + "est maintenu (si son énergie tombe plus bas, il tombe ; on peut le relâcher en préparation). "
             + "Une fois par combat."
     },
+    // (v362) LE MAUDIT. Le Vaudou : un ennemi à 5 cases, en vue, lié à lui 2
+    // manches ; tout ce que le Maudit perd ou reprend en PV, l'ennemi le perd ou
+    // le reprend aussi (refleterVaudou, moteur_pur.js).
+    CLASSE_VAUDOU: {
+        Nom: "Vaudou", classe: "Maudit", niveau: 5, Initiative: 100, Fatigue: 0, cible: "ennemi", portee: 5,
+        desc: "Lie un ennemi à 5 cases, en vue, pendant 2 manches : tout ce que le Maudit perd en PV, l'ennemi le "
+            + "perd aussi (sans ses défenses), et tout soin qu'il reçoit, l'ennemi le reçoit aussi — en plus de ses "
+            + "propres dégâts et soins. Une fois par combat."
+    },
     // (v360) LE BERSERKER. La Régénération insolente : chaque ennemi sur la
     // carte, 80 % de chance d'être Provoqué (2 manches) ; il reprend 20 PV
     // (regenerationInsolente, moteur_pur.js).
@@ -1386,6 +1407,7 @@ window.estTechniqueClasse = (idCarte) => !!(idCarte && window.TECHNIQUES_CLASSE[
 window.TECHNIQUES_VISEES = {
     CLASSE_CHARME_FRATRICIDE: { nom: "Charmé" },
     CLASSE_BRISEUR_ARCANE: { nom: "Briseur d'arcane" },
+    CLASSE_VAUDOU: { nom: "Vaudou" },
     CLASSE_DESINTEGRATION: { nom: "Désintégration" },
     CLASSE_BAISER_VAMPIRE: { nom: "Baiser du vampire" },
     CLASSE_TRANSFERT: { nom: "Transfert", toutCamp: true, sansVue: true }
@@ -1775,6 +1797,9 @@ window.texteAtout = function(cle, valeur) {
                                               : "Le malus de brûlure s'annule : il brûle comme tout le monde";
         case "degatsContreVargen": return `${plus(n)} dégâts contre les Vargens`;
         case "degatsContreMages": return `${plus(n)} dégâts contre les monstres Mage et Soutien`;
+        case "dotCumulables":  return "Malédiction avancée : ses dégâts sur la durée se cumulent sur une même cible (un rond dit combien)";
+        case "sansSurpuissanceOffensive": return "Ses sorts offensifs n'ont pas la surpuissance classique";
+        case "magieDuSang":    return "Magie du sang : dans la Forge, ×1,2 sur un sort offensif, contre 10 % de son coût en fatigue, en PV";
         case "rage":           return "Rage : sous 25 % de ses PV, 2 manches — parade et esquive à 0, +15 % de résistances, +20 % de dégâts";
         case "deuxArmesDeuxMains": return "Deux armes à deux mains (−10 % de résistances) ; sans elles, +2 dégâts à chacune de ses attaques";
         case "maitriseLumiere": return `Maîtrise de la lumière : ${n} % de chance d'aveugler avec un sort de foudre (sans s'ajouter à l'Aveuglement)`;
@@ -1932,6 +1957,11 @@ window.PALIERS_SURPUISSANCE = [
     { fatigue: 100, multiplicateur: 1.35 },
     { fatigue: 70,  multiplicateur: 1.25 }
 ];
+// (v362) LA MAGIE DU SANG DU MAUDIT : une carte qui la porte.
+window.MULTIPLICATEUR_MAGIE_DU_SANG = 1.2;
+window.carteAMagieDuSang = (dataCarte) => !!dataCarte && (
+    ((dataCarte.Composants && dataCarte.Composants.actions) || []).some(a => a && a.mods && Object.keys(a.mods).includes("EFF_MAGIE_DU_SANG"))
+    || (dataCarte.Effets_Compiles || []).some(e => e && /magie du sang/i.test(e.nom || "")));
 window.multiplicateurSurpuissance = function(fatigue) {
     const f = Number(fatigue) || 0;
     const palier = window.PALIERS_SURPUISSANCE.find(p => f >= p.fatigue);
@@ -5666,6 +5696,16 @@ window.MIGRATION_EFFETS = [
     // Ténèbres : 1 pt, Intelligence, 1 dégât magique par cran, sans plafond.
     // La carte qui le porte soigne son lanceur de 70 % de ce qu'elle inflige
     // aux ennemis (resoudreCarte, moteur_pur.js).
+    // (v362) LA MAGIE DU SANG, L'EFFET DU MAUDIT (niveau 3). Un sous-effet à 0
+    // point, sur une action à dégâts magiques : ses attaques offensives ×1,2 ;
+    // au lancement, le Maudit perd 10 % du coût en fatigue de la carte en PV.
+    { id: "EFF_MAGIE_DU_SANG", secoursLocal: true,
+      champs: { Nom: "Magie du sang", Cout_PT: "0", Modificateur: "AUCUN",
+                Type_Mecanique: "Magique", Type_Mecanique_2: "Aucun",
+                Valeur: 0, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0, Cible_Etat: "magieDuSang",
+                Classe: "Maudit", Niveau_Requis: 3,
+                Effet_Base: "Surpuissance ×1,2 sur les sorts offensifs de la carte ; coûte 10 % de sa fatigue en PV",
+                Notes: "Réservé au Maudit (niveau 3). Seulement sur une action à dégâts magiques. Ses attaques offensives frappent ×1,2 (sa seule surpuissance : le Maudit n'a pas la surpuissance classique). Au lancement, il perd 10 % du coût en fatigue de la carte en PV, arrondi au-dessus — jamais sous 1 PV." } },
     { id: "EFF_VAMPIRISME", secoursLocal: true,
       champs: { Nom: "Vampirisme", Cout_PT: "1", Modificateur: "INTELLIGENCE",
                 Type_Mecanique: "Action/Global", Type_Mecanique_2: "Aucun",

@@ -596,6 +596,7 @@ const SCENES = {
                        CLASSE_COMBUSTION: "🔥 Combustion instantanée",
                        CLASSE_APPEL_LUMIERE: "☀️ Appel de la lumière",
                        CLASSE_REGENERATION_INSOLENTE: "😤 Régénération insolente",
+                       CLASSE_VAUDOU: "🪆 Vaudou",
                        CLASSE_DESINTEGRATION: "⚡ Désintégration par la foudre",
                        CLASSE_TERREUR_ARDENTE: "😱 Terreur ardente",
                        CLASSE_RETOUR_PASSE: "⌛ Retour dans le passé",

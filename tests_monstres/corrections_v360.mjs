@@ -10,7 +10,7 @@ console.log("\n1. LE NOM, LE CHOIX, LES PV");
 verifier("« Berserker » dans la liste du jeu ; un document « Berzerker » se relit Berserker",
          /C\(16, "Berserker",/.test(lire("classes.js")) && /CLASSE_BERZERKER: \{ id: "CLASSE_BERSERKER", nom: "Berserker" \}/.test(lire("classes.js"))
          && /"berzerker": "Berserker"/.test(lire("app.js")));
-verifier("il sort des classes « bientôt » : il reste Chaman et Maudit", /CLASSES_BIENTOT = \["CLASSE_CHAMAN", "CLASSE_MAUDIT"\];/.test(lire("classes.js")));
+verifier("il sort des classes « bientôt » : il reste Chaman et Maudit", /CLASSES_BIENTOT = \["CLASSE_CHAMAN"(, "CLASSE_MAUDIT")?\];/.test(lire("classes.js")));
 verifier("ses paliers, sa technique, sa fiche", /"Berserker": \[/.test(lire("app.js")) && /CLASSE_REGENERATION_INSOLENTE: \{/.test(lire("app.js"))
          && /CLASSE_BERSERKER: \{/.test(lire("classes.js")));
 verifier("en combat, les PV ne dépassent jamais le maximum", /pv: pvMax > 0 \? Math\.min\(nombre\(fiche\.PV_Actuels, pvMax\), pvMax\)/.test(lire("combat_etat.js")));

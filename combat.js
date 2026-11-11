@@ -3241,7 +3241,7 @@ function construireHaloVTT(options) {
 // l'image d'un bandeau de carte. Ceux-là prennent un médaillon de LA COULEUR
 // DE LEUR BULLE (COULEUR_ETAT), avec un symbole, et leur nom au survol.
 window.SYMBOLES_ETATS = {
-    "Charmé": "💘", "Ténèbres étalées": "🌑", "Mur de bouclier": "🛡️", "Rempart": "🏰", "Rempart maintenu": "🏰", "Nuée maintenue": "🦇", "Prise en charge (réserve)": "✚", "Dernier sursis (réserve)": "💀", "Anti-magie maintenu": "💠", "Désintégration (réserve)": "⚡", "Lumière protectrice": "🕯️", "Rage": "😡",
+    "Charmé": "💘", "Ténèbres étalées": "🌑", "Mur de bouclier": "🛡️", "Rempart": "🏰", "Rempart maintenu": "🏰", "Nuée maintenue": "🦇", "Prise en charge (réserve)": "✚", "Dernier sursis (réserve)": "💀", "Anti-magie maintenu": "💠", "Désintégration (réserve)": "⚡", "Lumière protectrice": "🕯️", "Rage": "😡", "Vaudou": "🪆", "Lié (Vaudou)": "🪡",
     "Nuée de chauve-souris": "🦇", "Bouclier anti-magie": "💠", "Plaie rouverte": "🩸",
     "Instinct du tueur": "🗡️", "Bouclier des Sages": "📜", "Étalement": "💢", "Soin étalé": "💚",
     "Élan": "💨", "Ralenti": "⏳", "Repli": "↩️", "Provocation": "😤", "Peur": "😱", "Béni": "✨",
@@ -3267,7 +3267,17 @@ window.medaillonEtat = function(etat, taille) {
          + ` background: linear-gradient(135deg, #fff1c2 0%, #d9b45a 35%, #8a6424 70%, #4a3212 100%);"></span>`
          + `<span class="medaillon-etat-fond" style="position: absolute; inset: 11%; ${losange}`
          + ` background: radial-gradient(circle at 50% 32%, rgba(255,255,255,0.55) 0%, ${couleur} 42%, ${couleur} 68%, rgba(0,0,0,0.55) 100%);"></span>`
-         + `<span style="position: relative;">${symbole}</span></span>`;
+         + `<span style="position: relative;">${symbole}</span>${window.ronDeCumul(etat, t)}</span>`;
+};
+// (v362) LA MALÉDICTION AVANCÉE DU MAUDIT : un rond, et le nombre de dégâts sur
+// la durée actifs, sur l'état qui les porte (dès 2).
+window.ronDeCumul = function(etat, taille) {
+    const n = Array.isArray(etat && etat.sources) ? etat.sources.length : 0;
+    if (n < 2) return "";
+    const t = Math.max(10, Math.round((taille || 18) * 0.55));
+    return `<span class="rond-cumul-dot" title="${n} dégâts sur la durée actifs" style="position: absolute; right: -${Math.round(t * 0.35)}px; bottom: -${Math.round(t * 0.25)}px;`
+         + ` width: ${t}px; height: ${t}px; border-radius: 50%; background: #4a148c; color: #fff; border: 1px solid #e1bee7;`
+         + ` font: bold ${Math.round(t * 0.7)}px/1 sans-serif; display: inline-flex; align-items: center; justify-content: center;">${n}</span>`;
 };
 window.imageEtat = function(etat, taille) {
     if (!etat || !etat.nom && !etat.icone) return "";
@@ -3276,9 +3286,11 @@ window.imageEtat = function(etat, taille) {
     if (!etat.icone || /bandeau_carte_normal/.test(String(etat.icone))) {
         return typeof window.medaillonEtat === "function" ? window.medaillonEtat(etat, taille) : "";
     }
-    return `<img src="${etat.icone}" style="width: ${taille}px; height: auto; border: none;`
+    const img = `<img src="${etat.icone}" style="width: ${taille}px; height: auto; border: none;`
          + ` background: transparent; box-shadow: none;`
          + ` filter: drop-shadow(0 ${taille > 30 ? 4 : 2}px ${taille > 30 ? 6 : 4}px rgba(0,0,0,0.85));">`;
+    const rond = window.ronDeCumul(etat, taille);
+    return rond ? `<span style="position: relative; display: inline-block;">${img}${rond}</span>` : img;
 };
 
 // L'ESQUIVE SE VOIT : LE PION RECULE.
@@ -3396,6 +3408,8 @@ window.COULEUR_ETAT = {
     "Désintégration (réserve)": "#ffe082", // jaune éclair — le Prêtre de la lumière (v359)
     "Lumière protectrice": "#fff3c4",  // blanc doré — la garde de sa Purification (v359)
     "Rage":            "#e53935",  // rouge sang — la Rage du Berserker (v360)
+    "Vaudou":          "#6a1b9a",  // violet sombre — le lien du Maudit (v362)
+    "Lié (Vaudou)":    "#6a1b9a",
     "Nuée de chauve-souris": "#6a1b9a",  // pourpre — le Vampire dispersé en nuée
     "Charmé":         "#ec407a",   // rose — retourné contre les siens par le Sorcier
     "Engagé":         "#e53935",   // rouge — pris dans la mêlée (v260)

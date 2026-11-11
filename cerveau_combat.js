@@ -54,7 +54,7 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          reserveMaintenueDe, reserveDeTechnique, relacherMaintien, chanceFaceA, CHANCE_ETOURDI_RESONANCE,
          coutLancementReserve, BRULURE_AGGRAVEE, ETAT_RALENTI, coutDeTechnique, PORTEE_CHARME,
          ennemisSurLaCarte, combustionInstantanee, CHANCE_COMBUSTION, PORTEE_DESINTEGRATION, SEUIL_DESINTEGRATION,
-         surveillerRage, regenerationInsolente, CHANCE_REGENERATION_INSOLENTE } from './moteur_pur.js';
+         surveillerRage, regenerationInsolente, CHANCE_REGENERATION_INSOLENTE, refleterVaudou, PORTEE_VAUDOU } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles,
@@ -309,6 +309,14 @@ export function validerIntention(etat, intention, plateau) {
             if (ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) return refus("Baiser du vampire : ennemi invalide");
             if (distance(acteur, ennemi) !== 1) return refus("Baiser du vampire : l'ennemi doit être au contact");
         }
+        // (v362) Le Vaudou (Maudit) : un ennemi debout, à 5 cases, en vue.
+        if (idCarte === "CLASSE_VAUDOU") {
+            const ennemi = combattant(etat, intention.cible);
+            if (!ennemi) return refus("Vaudou sans cible");
+            if (ennemi.aTerre || ennemi.estIllusion || ennemi.camp === acteur.camp) return refus("Vaudou : ennemi invalide");
+            if (distance(acteur, ennemi) > PORTEE_VAUDOU) return refus("Vaudou : l'ennemi doit être à 5 cases au plus");
+            if (plateau && !ligneDeVue(plateau, acteur, ennemi)) return refus("Vaudou : pas de ligne de vue");
+        }
         // (v359) La Désintégration par la foudre (Prêtre de la lumière) : un
         // ennemi debout, à 2 cases, en vue, à 50 % de ses PV ou moins — sinon
         // refusée (pas gâchée).
@@ -440,6 +448,9 @@ function fabriquerPas(etatAvant, etatApres, etapes, cause, acteur, des) {
     // (v360) LA RAGE DU BERSERKER : chaque pas, quel qu'il soit (coup, tic,
     // zone, soin), peut le faire passer sous 25 % de ses PV — ou l'y faire
     // remonter. On regarde ici, par où tout passe.
+    // (v362) LE VAUDOU DU MAUDIT : ce qu'il a perdu ou repris pendant ce pas,
+    // son ennemi lié le perd ou le reprend aussi.
+    if (Array.isArray(etapes)) etapes.push(...refleterVaudou(etatAvant, suivant, etapes));
     if (Array.isArray(etapes)) etapes.push(...surveillerRage(suivant));
     suivant.version = nombre(etatAvant.version) + 1;
 

@@ -296,6 +296,24 @@ window.DESCRIPTIFS_CLASSES = {
                        "Renvoie 33 % des dégâts qu'il subit à qui les lui inflige · une fois par combat"] }
         ]
     },
+    CLASSE_MAUDIT: {
+        presentation: "Il ronge ses ennemis de malédictions qui s'accumulent, paie sa puissance de son "
+            + "propre sang, et lie son destin à celui de sa victime.",
+        paliers: [
+            { niveau: 1, titre: "Malédiction avancée",
+              points: ["Ses dégâts sur la durée se cumulent sur une même cible : un rond dit combien",
+                       "Ses sorts offensifs n'ont pas la surpuissance classique",
+                       "+5 PV · +1 compétence"] },
+            { niveau: 3, titre: "Magie du sang",
+              points: ["Dans la Forge : la Magie du sang, sur un sort offensif (0 point)",
+                       "Le sort frappe ×1,2 ; au lancement, il perd 10 % de son coût en fatigue, en PV"] },
+            { niveau: 5, titre: "Technique : Vaudou",
+              points: ["Initiative 100 · aucune fatigue · un ennemi à 5 cases · une fois par combat",
+                       "2 manches : tout ce qu'il perd ou reprend en PV, l'ennemi le perd ou le reprend aussi"] },
+            { niveau: 9, titre: "Technique : Possession (bientôt)",
+              points: ["Prendre le contrôle d'un monstre pendant 3 manches — elle arrive dans la prochaine version"] }
+        ]
+    },
     CLASSE_BERSERKER: {
         presentation: "Plus il saigne, plus il frappe. Le Berserker se soigne mieux que quiconque, "
             + "entre en rage quand la mort le frôle, nargue l'ennemi tout entier, et finit par manier "
@@ -501,7 +519,8 @@ const nomAffiche = (c) => (typeof window.nomClasseGenre === "function")
 // (v343) Les cinq nouvelles, sans règles encore : visibles, pas encore choisissables.
 // (v358) L'Inquisiteur a ses règles : il se choisit.
 // (v359) Le Prêtre de la lumière aussi ; (v360) le Berserker aussi.
-window.CLASSES_BIENTOT = ["CLASSE_CHAMAN", "CLASSE_MAUDIT"];
+// (v362) Le Maudit aussi.
+window.CLASSES_BIENTOT = ["CLASSE_CHAMAN"];
 window.classeBientot = (c) => !!c && window.CLASSES_BIENTOT.includes(c.id);
 
 window.rendreGrilleClasses = function(classes) {

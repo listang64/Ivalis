@@ -11466,3 +11466,21 @@ pont_combat.js : la mise en scène de l'étape « rage » (l'état posé se mont
 
 corrections_v361.mjs le vérifie : les prix et les réserves, la fin de manche qui ne prend rien, la réserve différée, la chute sous la réserve, les textes, la version.
 Mis à jour pour la nouvelle règle : corrections_v347 (Rempart), v349 (Nuée), v351 (Prise en charge), v354 (Dernier sursis), chasseur_de_mages (Bouclier anti-magie), pretre_lumiere (Désintégration), vampire, hoplite.
+
+## v362 — La refonte des classes : le Maudit, niveaux 1, 3 et 5 (la Possession, niveau 9 : v363)
+
+- Nico (sa fiche du Maudit) : niveau 1, Malédiction avancée (des DOT offensifs sans surpuissance, cumulables sur une même cible ; un rond et un chiffre : le nombre de DOT actifs), +5 PV, +1 compétence, pas de surpuissance classique sur ses sorts offensifs ; niveau 3, la Magie du sang (×1,2 sur les sorts offensifs en l'intégrant au sort ; 10 % du coût en fatigue, en PV) ; niveau 5, le Vaudou (1×/combat, init 100, 0 fatigue, portée 5 : lié 2 tours à un ennemi, qui subit aussi ses dégâts et ses soins — exactement ce qu'il subit).
+- Ses réponses : la Magie du sang est un sous-effet à 0 point de la Forge ; arrondi au-dessus, jamais sous 1 PV ; ses soins gardent la surpuissance ; Vaudou : ce que le Maudit perd vraiment, sans les défenses de l'ennemi, et les soins pareil ; la Possession dans une version à part.
+- classes.js : sorti de CLASSES_BIENTOT (il ne reste que le Chaman) ; sa fiche (Niv. 9 : la Possession, annoncée).
+- app.js : paliers (dotCumulables, sansSurpuissanceOffensive, pvMax 5, competences 1 ; magieDuSang + effets EFF_MAGIE_DU_SANG ; CLASSE_VAUDOU), textes, EFF_MAGIE_DU_SANG (MIGRATION_EFFETS, secours local : 0 point, menu Magique, Maudit niveau 3), carteAMagieDuSang, MULTIPLICATEUR_MAGIE_DU_SANG.
+- competences.js : la Magie du sang une seule fois par action, seulement sur une action à dégâts magiques ; la carte en grand et l'indicateur de la Forge disent « Magie du sang ×1,2 » (ou « pas de surpuissance classique ») pour le Maudit.
+- moteur_effets.js (extraction) : les attaques offensives du Maudit n'ont pas la surpuissance classique ; avec la Magie du sang, ×1,2, et l'attaque porte « magieDuSang ».
+- moteur_pur.js :
+  - DOT cumulables : la source d'étalement du Maudit porte le pas qui la lance (`#version`) — chaque lancer s'ajoute, rien ne se réinitialise ;
+  - le prix du sang (resoudreCarte, avant la fatigue) : ceil(10 % du coût), jamais sous 1 PV, une étape « degats » marquée sang ;
+  - le Vaudou : états « Vaudou » (sur lui, bienfaisant) et « Lié (Vaudou) » (sur l'ennemi), 2 manches ; refleterVaudou, appelée par fabriquerPas sur chaque pas : ce que le Maudit a perdu ou repris en PV pendant le pas (ses étapes, dans l'ordre), l'ennemi le perd (sans défenses, il peut en tomber) ou le reprend.
+- combat_etat.js : dotCumulables, magieDuSang dans les atouts du combattant. cerveau_combat.js : validation du Vaudou (ennemi debout, 5 cases, en vue). combat.js : le rond des DOT cumulés (ronDeCumul) sur l'icône de l'état dès 2 sources ; icônes du Vaudou. pont_combat.js : « 🪆 Vaudou ».
+
+maudit.mjs le vérifie : paliers, textes, PV ; les DOT cumulés (et la réinitialisation pour un autre) ; le prix du sang (8 PV pour 75, jamais sous 1, rien sans l'atout) ; le Vaudou (validation, liens, une fois, dégâts reflétés sans armure, soins reflétés, le prix du sang reflété, le KO par le lien, rejeu) ; la vraie page (grille, fiche, Magie du sang accessible au seul Maudit de niveau 3, cartes extraites : surpuissance classique pour un Sorcier, rien pour le Maudit, ×1,2 avec la Magie du sang, le rond).
+corrections_v362.mjs : choisissable, la Forge, l'extraction, le Vaudou dans fabriquerPas, la version.
+classes_feminin, corrections_v343, v358, v359, v360 : une seule classe « bientôt ».

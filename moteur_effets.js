@@ -1688,12 +1688,20 @@ window.demarrerCiblage = async function(idCarte, options) {
                 // que l'équipement y ajoute.
                 const valeurDeLaCarte = nomLower.includes("purification")
                     ? 0 : (parseFrFloat(effBase.Valeur) || 0) * (act.count || 1);
-                const surpuissance = (!isShield && !isPurification && !(lanceurCarte && lanceurCarte.estMonstre)
+                const surpuissanceClassique = (!isShield && !isPurification && !(lanceurCarte && lanceurCarte.estMonstre)
                                       && typeof window.multiplicateurSurpuissance === "function")
                     // Sa puissance d'avant l'étalement (v241) : un sort mis en
                     // DOT garde la surpuissance de ce qu'il pèse.
                     ? window.multiplicateurSurpuissance(typeof window.fatigueDeSurpuissance === "function"
                         ? window.fatigueDeSurpuissance(dataCarte, lanceurCarte) : dataCarte.Fatigue) : 1;
+                // (v362) LE MAUDIT : ses attaques offensives n'ont pas la
+                // surpuissance classique ; avec la Magie du sang (niveau 3),
+                // ×1,2 — et la carte le marque (le cerveau lui prend ses PV).
+                const atoutsMaudit = (lanceurCarte && typeof window.atoutRace === "function") ? (window.atoutRace(lanceurCarte) || {}) : {};
+                const offensiveMaudit = !isHeal && !isShield && !isPurification && !!atoutsMaudit.sansSurpuissanceOffensive;
+                const sangMaudit = offensiveMaudit && !!atoutsMaudit.magieDuSang && typeof window.carteAMagieDuSang === "function"
+                                   && window.carteAMagieDuSang(dataCarte);
+                const surpuissance = offensiveMaudit ? (sangMaudit ? (window.MULTIPLICATEUR_MAGIE_DU_SANG || 1.2) : 1) : surpuissanceClassique;
 
                 attaquesExtraites.push({
                     nom: effBase.Nom,
@@ -1729,6 +1737,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                     // l'état qui va avec : qui y résiste en prend 15 % (v260)
                     // de moins (chaineDeDegats, moteur_pur.js).
                     ...(elementAct && !isHeal ? { element: elementAct.id, etatElement: elementAct.etat } : {}),
+                    ...(sangMaudit ? { magieDuSang: true } : {}),
                     cibles: []
                 });
             }

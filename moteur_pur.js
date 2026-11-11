@@ -162,6 +162,47 @@ export const ARCHETYPES_MAGES_SOUTIENS = ["DPS MAGE CAC", "DPS MAGE DISTANCE", "
 // (v360) La Rage du Berserker : ×1,2 sur ses dégâts ; +15 % de résistances ;
 // elle se déclenche sous 25 % de ses PV, pour 2 manches.
 export const MULTIPLICATEUR_RAGE = 1.2;
+// (v362) LE MAUDIT. La Magie du sang : 10 % du coût de la carte en PV. Le
+// Vaudou : 2 manches, à 5 cases. refleterVaudou, appelée par fabriquerPas
+// (cerveau_combat.js) sur chaque pas : ce que le Maudit lié a perdu ou repris
+// en PV pendant ce pas (ses étapes, dans l'ordre), l'ennemi lié le perd ou le
+// reprend aussi — ce qu'il a VRAIMENT perdu, sans les défenses de l'ennemi.
+export const PART_PRIX_SANG = 10;
+export const ETAT_VAUDOU = "Vaudou";
+export const ETAT_LIE_VAUDOU = "Lié (Vaudou)";
+export const MANCHES_VAUDOU = 2;
+export const PORTEE_VAUDOU = 5;
+export function refleterVaudou(etatAvant, suivant, etapes) {
+    const ajout = [];
+    Object.keys((suivant && suivant.combattants) || {}).sort().forEach(id => {
+        const m = suivant.combattants[id];
+        const lien = m && (m.etats || []).find(e => e && e.nom === ETAT_VAUDOU);
+        if (!lien) return;
+        const ennemi = combattant(suivant, lien.idLie);
+        const avant = combattant(etatAvant, id);
+        if (!ennemi || ennemi.aTerre || !avant) return;
+        let courant = nombre(avant.pv), perte = 0, gain = 0;
+        (etapes || []).forEach(e => {
+            if (!e || e.cible !== id || e.pvApres === undefined || e.vaudou) return;
+            const delta = nombre(e.pvApres) - courant;
+            if (delta < 0) perte -= delta; else gain += delta;
+            courant = nombre(e.pvApres);
+        });
+        if (perte > 0) {
+            const pvAvant = nombre(ennemi.pv);
+            ennemi.pv = Math.max(0, pvAvant - perte);
+            ajout.push({ type: "degats", cible: ennemi.id, acteur: id, montant: pvAvant - ennemi.pv, surBouclier: 0,
+                         bouclierApres: nombre(ennemi.bouclier), pvApres: ennemi.pv, nature: "brut", vaudou: true });
+            ajout.push(...tomber(suivant, ennemi.id, id));
+        }
+        if (gain > 0 && !ennemi.aTerre && !enSursis(ennemi)) {
+            const pvAvant = nombre(ennemi.pv);
+            ennemi.pv = Math.min(nombre(ennemi.pvMax), pvAvant + gain);
+            if (ennemi.pv > pvAvant) ajout.push({ type: "soin", cible: ennemi.id, acteur: id, montant: ennemi.pv - pvAvant, pvApres: ennemi.pv, vaudou: true });
+        }
+    });
+    return ajout;
+}
 export const SEUIL_RAGE = 25;
 export const MANCHES_RAGE = 2;
 export const multiplicateurRage = (c) => enRage(c) ? MULTIPLICATEUR_RAGE : 1;
@@ -861,7 +902,7 @@ export function estDansLeNoir(c, hex) {
 // offerts, l'Élan et les bénédictions de l'équipement, un soin étalé qui n'a
 // pas fini de tomber.
 export const ETATS_BIENFAISANTS = new Set(["Absorption", "Contre", "Élan", "Soin étalé", "Nuée de chauve-souris",
-                                           "Bouclier anti-magie", "Lumière protectrice"]);
+                                           "Bouclier anti-magie", "Lumière protectrice", "Vaudou"]);
 export function estEtatNefaste(e) {
     // L'engagement (v260) n'est pas une altération : la mêlée, rien à purifier.
     return !!e && !ETATS_BIENFAISANTS.has(e.nom) && !e.bonusEquip && e.nom !== "Engagé";
@@ -2234,6 +2275,17 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
             etapes.push(...recompenserLeTueur(suivant, ennemi, id, false));
         }
         etapes.push(...poserMaintien(c, action.idCarte, []));
+    } else if (action.idCarte === "CLASSE_VAUDOU") {
+        // (v362) LE VAUDOU : le Maudit et l'ennemi liés, 2 manches.
+        const ennemi = combattant(suivant, action.cible);
+        if (ennemi && !ennemi.aTerre) {
+            c.etats = [...(c.etats || []).filter(e => e && e.nom !== ETAT_VAUDOU),
+                       { nom: ETAT_VAUDOU, duree: MANCHES_VAUDOU, idLie: ennemi.id, desc: `Lié à ${ennemi.nom || ennemi.id} : ce qu'il perd ou reprend en PV, l'autre aussi.` }];
+            ennemi.etats = [...(ennemi.etats || []).filter(e => e && e.nom !== ETAT_LIE_VAUDOU),
+                            { nom: ETAT_LIE_VAUDOU, duree: MANCHES_VAUDOU, idMaudit: id, desc: "Ce que le Maudit perd ou reprend en PV, il le perd ou le reprend aussi." }];
+            etapes.push({ type: "etats", cible: id, pose: ETAT_VAUDOU, liste: c.etats });
+            etapes.push({ type: "etats", cible: ennemi.id, pose: ETAT_LIE_VAUDOU, liste: ennemi.etats });
+        }
     } else if (action.idCarte === "CLASSE_CHARME_FRATRICIDE") {
         const ennemi = combattant(suivant, action.cible);
         if (ennemi && !ennemi.aTerre) {
@@ -2433,7 +2485,11 @@ export function resoudreCarte(etat, action, plateau) {
     // Qui a quitté le contact de son agresseur n'est plus engagé par lui (v267).
     desengagerLesEloignes(suivant);
     // L'étalement d'une même compétence ne se cumule pas (empilerEtalement, v267).
-    const sourceEtalement = action.idCarte ? `${idLanceur}|${action.idCarte}` : null;
+    // (v362) LA MALÉDICTION AVANCÉE DU MAUDIT : ses DOT d'une même compétence
+    // se CUMULENT — chaque lancer est sa propre source (le pas qui le joue),
+    // rien ne se réinitialise ; l'écran compte les sources (un rond, un chiffre).
+    const cumulDot = !!(lanceur.atouts && lanceur.atouts.dotCumulables);
+    const sourceEtalement = action.idCarte ? `${idLanceur}|${action.idCarte}${cumulDot ? `#${nombre(etat.version)}` : ""}` : null;
     const lancerEtale = new Set();
 
     // LA CONFUSION DÉCIDE D'ABORD SI LA CARTE PART (voir appliquerConfusion).
@@ -3286,6 +3342,16 @@ export function resoudreCarte(etat, action, plateau) {
 
     // (v355) L'ORACLE : ses attaques arcaniques ralentissent l'ennemi touché.
     if (lanceur.atouts && lanceur.atouts.arcaneRalentit) etapes.push(...ralentirParLArcane(suivant, lanceur, action, touchees));
+
+    // (v362) LA MAGIE DU SANG DU MAUDIT : la carte qui la porte lui coûte 10 %
+    // de sa fatigue en PV, arrondi au-dessus — jamais sous 1 PV.
+    if (lanceur.atouts && lanceur.atouts.magieDuSang && (action.attaques || []).some(a => a && a.magieDuSang) && !enSursis(lanceur)) {
+        const prix = Math.ceil(nombre(action.coutFatigue) * PART_PRIX_SANG / 100);
+        const avant = nombre(lanceur.pv);
+        lanceur.pv = Math.max(1, avant - prix);
+        if (avant > lanceur.pv) etapes.push({ type: "degats", cible: idLanceur, acteur: idLanceur, montant: avant - lanceur.pv, surBouclier: 0,
+                                              bouclierApres: nombre(lanceur.bouclier), pvApres: lanceur.pv, nature: "brut", sang: true });
+    }
 
     // --- LA FATIGUE DU LANCEUR -------------------------------------------
     if (action.coutFatigue !== undefined) {

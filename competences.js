@@ -795,10 +795,20 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
     const fatigueCarte = Number(data.Fatigue) || fatigue;
     const puissance = typeof window.fatigueDeSurpuissance === "function"
         ? window.fatigueDeSurpuissance(data, porteurCout) : fatigueCarte;
+    // (v362) LE MAUDIT : ses sorts offensifs n'ont pas la surpuissance classique ;
+    // la Magie du sang leur donne ×1,2 (contre 10 % du coût en PV).
+    const atoutsPorteur = (porteurCout && typeof window.atoutRace === "function") ? (window.atoutRace(porteurCout) || {}) : {};
+    if (atoutsPorteur.sansSurpuissanceOffensive) {
+        if (atoutsPorteur.magieDuSang && typeof window.carteAMagieDuSang === "function" && window.carteAMagieDuSang(data)) {
+            htmlEffets += `<div class="ligne-surpuissance">${ligneEffetHD("Magie du sang ×1,2",
+                `Ses attaques offensives ×1,2 ; au lancement, ${Math.ceil(fatigueCarte * 0.1)} PV (10 % de ${fatigueCarte})`, false)}</div>`;
+        }
+    } else {
     const surpuissance = typeof window.texteSurpuissance === "function" ? window.texteSurpuissance(puissance) : "";
     if (surpuissance) {
         htmlEffets += `<div class="ligne-surpuissance">${ligneEffetHD("Surpuissance " + surpuissance,
             `Dégâts et soins ${surpuissance} (technique à ${fatigueCarte} de fatigue${puissance > fatigueCarte ? `, ${puissance} avant l'étalement` : ""})`, false)}</div>`;
+    }
     }
 
     // NOUVEAU : Dessin avec Bounding Box Dynamique (Rognage auto)
@@ -1298,7 +1308,7 @@ function getMaxStacks(effet) {
     if (valBase > 0 && pMax > 0) return Math.floor(pMax / valBase);
     if (pMax > 0 && pBase === 0 && valBase === 0) return Math.floor(pMax);
 
-    if (["Persistance terrain", "Durée +", "Durée étalement dégâts", "DOT", "Illusion"].includes(effet.Nom)) return 1;
+    if (["Persistance terrain", "Durée +", "Durée étalement dégâts", "DOT", "Illusion", "Magie du sang"].includes(effet.Nom)) return 1;
     if (effet.Nom === "Initiative +") return 6;
     if (effet.Nom === "Zone") return 15;
     return 25;
@@ -2541,7 +2551,7 @@ function etatSousEffet(mod, actionCourante, activeTags) {
         || (estUnModEtalement(nomModLower) && carteADejaUnePersistance);
     // LUMIÈRE (Chasseur de mages) : elle fait passer un sort outre la
     // défense magique — il lui faut donc une action à dégâts magiques.
-    const estIncompatibleLumiere = nomModLower.startsWith("lumi")
+    const estIncompatibleLumiere = (nomModLower.startsWith("lumi") || nomModLower === "magie du sang")
         && !actionADegatsMagiques(actionCourante);
     // LA DISTANCE : arme polyvalente, à distance, magie — ou un soin.
     const estIncompatibleDistance = mod.Nom === "Distance"
@@ -2765,7 +2775,17 @@ window.rafraichirForge = function() {
     // La surpuissance que la fatigue de la carte lui donne (app.js), et le
     // prochain palier tant qu'il en reste un.
     const surpuissance = document.getElementById("forge-surpuissance");
-    if (surpuissance && typeof window.multiplicateurSurpuissance === "function") {
+    // (v362) LE MAUDIT : pas de surpuissance classique sur ses sorts offensifs ;
+    // la Magie du sang, si la carte la porte (×1,2, 10 % du coût en PV).
+    const atoutsForgeMaudit = (typeof window.atoutRace === "function" && window.forgeState && window.forgeState.statsPerso)
+        ? (window.atoutRace(window.forgeState.statsPerso) || {}) : {};
+    const sangDansLaForge = (window.forgeState.actions || []).some(a => a && a.mods && Object.keys(a.mods).includes("EFF_MAGIE_DU_SANG"));
+    if (surpuissance && atoutsForgeMaudit.sansSurpuissanceOffensive) {
+        surpuissance.classList.toggle("active", sangDansLaForge);
+        surpuissance.textContent = sangDansLaForge
+            ? `🩸 Magie du sang ×1,2 sur les sorts offensifs — ${Math.ceil(fatigueConsommee * 0.1)} PV au lancement`
+            : "Pas de surpuissance classique sur les sorts offensifs (Maudit)";
+    } else if (surpuissance && typeof window.multiplicateurSurpuissance === "function") {
         const texte = window.texteSurpuissance(fatigueSurpuissance);
         const prochain = [...window.PALIERS_SURPUISSANCE].reverse().find(p => fatigueSurpuissance < p.fatigue);
         // Étalée, la carte coûte moins qu'elle ne pèse : on le dit.
