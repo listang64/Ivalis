@@ -327,8 +327,8 @@ await section(async () => {
 
 {
   const html = lire("index.html");
-  verifier("version 344 ; les fichiers touchés ont changé de version", /VERSION_IVALIS = 344;/.test(lire("trace_combat.js")) && JSON.parse(lire("version.json")).version === 344
-           && ['villages_regionaux.js?v=10"', 'cartes_regionales.js?v=21"', 'grimoire_regions.js?v=10"', 'grimoire_regions.css?v=5"', 'loupe_cartes.js?v=5"', 'loupe_cartes.css?v=3"', 'style.css?v=131"'].every(x => html.includes(x)));
+  verifier("version 344 ou plus ; les fichiers touchés ont changé de version", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 344 && JSON.parse(lire("version.json")).version >= 344
+           && ['villages_regionaux.js?v=10"', 'cartes_regionales.js?v=21"', 'grimoire_regions.js?v=11"', 'grimoire_regions.css?v=5"', 'loupe_cartes.js?v=5"', 'loupe_cartes.css?v=3"', 'style.css?v=131"'].every(x => html.includes(x)));
 }
 console.log(erreurs.length ? "\nErreurs de page : " + erreurs.slice(0, 5).join(" | ") : "");
 console.log(`\n${echecs ? echecs + " ÉCHEC(S)" : "TOUS LES CONTRÔLES PASSENT"}`);

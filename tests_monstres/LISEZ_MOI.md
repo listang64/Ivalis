@@ -11119,3 +11119,14 @@ corrections_v339 accepte maintenant des versions plus récentes des fichiers.
 
 Test v337 remis d’aplomb (v344) : au chargement, le livre s’ouvre de lui-même sur la région du groupe, et emmenait parfois ailleurs la demande d’aller sur la première carte (2 échecs déjà sur la v343). Il redemande maintenant tant que la carte n’est pas ouverte, comme corrections_v331.
 Test v273 mis à jour (v344) : depuis v339, MIA_TERRAIN lit la carte avant chaque village (un appel Gemini sans instruction système, image jointe). Le faux Gemini lui répond un terrain, sans compter un village.
+
+## v345 — L'ombre de la pliure reste quand on tourne une page de carte régionale
+
+- Nico : « quand on clique pour tourner la page, l'ombre du milieu de page disparaît ; au moins en fondu, et dans l'idéal, la garder ».
+- La cause : une fois la page posée, la carte vivante réapparaissait aussitôt.
+  - C'était encore celle de la région d'avant (une image : la carte du désert sur la page du mont Pletia), ou la nouvelle avant son ombre.
+  - L'ombre de la pliure, elle, n'était posée qu'une fois la nouvelle carte montée.
+  - Le temps de quelques images, ni ombre ni bonne carte.
+- grimoire_regions.js : la carte vivante reste cachée tant qu'elle n'est pas celle de la double page ouverte, sur la même condition que l'ombre de la pliure. Dessous, la page garde son image, ses lieux (v344) et sa propre ombre (grimoire.css). L'ombre est donc là à chaque image, sans fondu nécessaire.
+
+corrections_v345.mjs le vérifie, image par image (requestAnimationFrame), sur trois tournes : une page en avant, une en arrière, des pages qui défilent. La carte vivante n'y est jamais celle d'une autre page, ni montrée sans l'ombre. Il mesure aussi, à l'écran, l'ombre sur la carte après la tourne. Sur la v344 : 2 échecs (4 puis 11 images sans ombre).

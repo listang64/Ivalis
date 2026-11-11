@@ -410,7 +410,14 @@
         if (pf && !pf.__veilleRegions) { pf.__veilleRegions = true; try { pf.on("changeState", () => setTimeout(veiller, 0)); } catch (e) {} }
         const lu = !!pf && pf.getState() === "read" && !(g.defileEnCours && g.defileEnCours());
         const vue = $("vue-carte-region");
-        if (vue) vue.classList.toggle("en-tourne", !lu && !!montee);
+        // (v345) Nico : « quand on tourne la page, l'ombre du milieu disparaît ». Une fois
+        // la page posée, la carte vivante réapparaissait aussitôt, encore celle de la région
+        // d'avant (la nouvelle n'était pas montée) et sans l'ombre de la pliure, posée
+        // seulement une fois la nouvelle montée : un instant, ni ombre ni bonne carte. Elle
+        // reste cachée tant qu'elle n'est pas celle de la double page ouverte ; dessous,
+        // la page garde son image, ses lieux et sa propre ombre.
+        const rIci = lu ? regionOuverte() : null;
+        if (vue) vue.classList.toggle("en-tourne", !!montee && !(lu && rIci && montee === rIci.numero));
         const aideDev = $("dev-nouveau-region-aide");
         if (aideDev) aideDev.style.display = montee ? "none" : "";
         const titre = $("region-titre-vivant");
