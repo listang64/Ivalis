@@ -65,39 +65,41 @@ const abattre = (niveau, fatigue) => { const e = sansRegain(monde(niveau)); e.co
 console.log("\n1. LE DERNIER SURSIS : 30 D'ÉNERGIE QUAND IL COMMENCE");
 {
     const r = abattre(9, 100), p = r.etat.combattants.P;
-    verifier("à 0 PV, 100 d'énergie : le sursis (2 tours), 30 payés (70)", !p.aTerre && p.sursis && p.sursis.tours === 2 && p.fatigue === 70, `${p.fatigue}`);
-    verifier("la réserve : 30, manche payée, sans « Relâcher »", !!reserve(p) && reserve(p).reserve === 30 && reserve(p).dejaPaye === true
+    // (v361 : la réserve est bloquée, jamais dépensée.)
+    verifier("à 0 PV, 100 d'énergie : le sursis (2 tours), rien de dépensé (100), 30 bloqués", !p.aTerre && p.sursis && p.sursis.tours === 2 && p.fatigue === 100
+             && reserveMaintenueDe(p) === 30, `${p.fatigue}`);
+    verifier("la réserve : 30, sans « Relâcher »", !!reserve(p) && reserve(p).reserve === 30 && !reserve(p).differee
              && reserve(p).sansRelache === true && RESERVE_SURSIS === 30, JSON.stringify(reserve(p)));
     verifier("rejoué depuis le journal : même énergie, même réserve", (() => { const e = sansRegain(monde(9)); e.combattants.P.fatigue = 100;
-             const x = appliquerEntree(e, { etapes: r.etapes }).combattants.P; return x.fatigue === 70 && !!reserve(x) && !!x.sursis; })());
+             const x = appliquerEntree(e, { etapes: r.etapes }).combattants.P; return x.fatigue === 100 && !!reserve(x) && !!x.sursis; })());
     const pile = abattre(9, 30).etat.combattants.P;
-    verifier("30 pile : le sursis, énergie à 0", !pile.aTerre && pile.sursis && pile.fatigue === 0);
+    verifier("30 pile : le sursis, énergie toujours à 30 (bloqués)", !pile.aTerre && pile.sursis && pile.fatigue === 30);
     const pauvre = abattre(9, 29);
     verifier("29 d'énergie : pas de sursis — KO tout de suite", pauvre.etat.combattants.P.aTerre && !pauvre.etat.combattants.P.sursis
              && pauvre.etapes.some(x => x.type === "chute" && x.cible === "P"));
 }
 
-console.log("\n2. PUIS 30 BLOQUÉS ET CONSOMMÉS À CHAQUE MANCHE DU SURSIS");
+console.log("\n2. PUIS 30 BLOQUÉS (PAS DÉPENSÉS) TANT QUE DURE LE SURSIS");
 {
     const r = abattre(9, 100);
     const f1 = finDeManche(r.etat);
-    verifier("fin de la manche où il tombe : rien de pris, 30 bloqués pour la suivante", f1.etat.combattants.P.fatigue === 70
+    verifier("fin de la manche où il tombe : rien de pris, 30 toujours bloqués", f1.etat.combattants.P.fatigue === 100
              && reserveMaintenueDe(f1.etat.combattants.P) === 30 && !f1.etat.combattants.P.aTerre);
     const carte = (e, cout) => { const s = clonerEtat(e); s.file = [{ id: "P", carte: "C", initiative: 50, pas: 0 }];
         return validerIntention(s, { id: "c", type: "carte", acteur: "P", idCarte: "C", coutFatigue: cout, attaques: [] }); };
-    verifier("pendant le sursis : une carte à 40 passe, une à 41 non (70 − 30)", carte(f1.etat, 40).ok && !carte(f1.etat, 41).ok);
+    verifier("pendant le sursis : une carte à 70 passe, une à 71 non (100 − 30)", carte(f1.etat, 70).ok && !carte(f1.etat, 71).ok);
     const f2 = finDeManche(f1.etat);
-    verifier("fin de la manche suivante, toujours en sursis : 30 consommés (40)", f2.etat.combattants.P.fatigue === 40 && !f2.etat.combattants.P.aTerre,
+    verifier("fin de la manche suivante, toujours en sursis : rien de pris (100)", f2.etat.combattants.P.fatigue === 100 && !f2.etat.combattants.P.aTerre,
              String(f2.etat.combattants.P.fatigue));
     const court = clonerEtat(f1.etat); court.combattants.P.fatigue = 20;
     const fc = finDeManche(court);
-    verifier("à court (20 sur 30) : le sursis s'arrête, il tombe KO", fc.etat.combattants.P.aTerre && !fc.etat.combattants.P.sursis && !reserve(fc.etat.combattants.P)
+    verifier("énergie bue à 20 (sous les 30) : le sursis s'arrête, il tombe KO", fc.etat.combattants.P.aTerre && !fc.etat.combattants.P.sursis && !reserve(fc.etat.combattants.P)
              && fc.etapes.some(x => x.type === "chute" && x.cible === "P" && x.finSursis) && fc.etapes.some(x => x.type === "message" && /à court/.test(x.texte)));
     verifier("rejoué depuis le journal : KO aussi", appliquerEntree(court, { etapes: fc.etapes }).combattants.P.aTerre);
     // Le sursis fini (ses 2 tours), la réserve s'en va avec lui.
     const fini = clonerEtat(f1.etat); fini.combattants.P.sursis = null; fini.combattants.P.aTerre = true;
     verifier("le sursis fini (KO) : la réserve s'en va, rien n'est pris", (() => { const x = finDeManche(fini).etat.combattants.P;
-             return !reserve(x) && x.fatigue === 70; })());
+             return !reserve(x) && x.fatigue === 100; })());
     verifier("l'état reste cohérent", [r.etat, f1.etat, f2.etat, fc.etat].every(x => verifierEtatCombat(x).length === 0));
 }
 
@@ -109,7 +111,7 @@ console.log("\n3. LES PALIERS ET LES TEXTES");
     verifier("le zombie ne change pas : 15 PV, 7 dégâts, 2 cases, 3 tours", ZOMBIE.pv === 15 && ZOMBIE.degats === 7 && ZOMBIE.pas === 2 && ZOMBIE.tours === 3);
     const c = lireFichier("classes.js");
     verifier("la fiche : Nécromancie, Glace funèbre au 3, Dernier sursis au 9 avec sa réserve", /titre: "Passif : Nécromancie"/.test(c)
-             && /niveau: 3, titre: "Glace funèbre"/.test(c) && /niveau: 9, titre: "Passif : Dernier sursis"/.test(c) && /Réserve : 30 d'énergie/.test(c));
+             && /niveau: 3, titre: "Glace funèbre"/.test(c) && /niveau: 9, titre: "Passif : Dernier sursis"/.test(c) && /Réserve : 30 d'énergie bloqués/.test(c));
     verifier("version 354 ou plus", Number((/VERSION_IVALIS = (\d+);/.exec(lireFichier("trace_combat.js")) || [])[1]) >= 354
              && JSON.parse(lireFichier("version.json")).version >= 354);
 }

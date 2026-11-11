@@ -525,7 +525,7 @@ console.log("\n7. LA FICHE DE CLASSE : LE DESCRIPTIF DU PROTECTEUR");
            JSON.stringify(r.niveaux));
   verifier("Rempart, Résonance, +8 % de parade, provocation, boucliers lourds y sont dits — plus de Mur",
            /Rempart/.test(r.texte) && /Résonance du bouclier/.test(r.texte) && /\+8 % de parade/.test(r.texte)
-           && /provoquer/.test(r.texte) && /boucliers lourds/.test(r.texte) && /réserve 15/.test(r.texte) && !/Mur de bouclier/.test(r.texte));
+           && /provoquer/.test(r.texte) && /boucliers lourds/.test(r.texte) && /réserve de 15/.test(r.texte) && !/Mur de bouclier/.test(r.texte));
 }
 
 // =========================================================================

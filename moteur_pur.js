@@ -1825,32 +1825,40 @@ export const MANCHES_REMPART = 4;
 //  préparation, l'arrête à l'ouverture de la manche (relacherMaintien).
 //
 //  Elle vit sur le LANCEUR, en un état « … maintenu » (`maintien` : l'id de la
-//  technique, `reserve` : la part, `dejaPaye` : la manche du lancement est
-//  payée, `liens` : les états qu'elle tient chez les autres — le Rempart posé
-//  sur l'allié). Elle vieillit comme tout état : ses manches sont celles de
-//  la technique.
+//  technique, `reserve` : la part, `differee` : pas encore bloquée — la
+//  Désintégration, dont la réserve ne vaut qu'à la manche suivante —, `liens` :
+//  les états qu'elle tient chez les autres — le Rempart posé sur l'allié).
+//  Elle vieillit comme tout état : ses manches sont celles de la technique.
+//
+//  v361, Nico : « les points en réserve ne sont pas vraiment dépensés, ils sont
+//  juste inutilisables tant que la technique est active. Du coup leur jauge de
+//  fatigue est moins haute, ils ne pourront pas faire de grosses techniques. »
+//  Pour toutes les classes. Au lancement, le prix (`coutLancement`) seul est
+//  payé ; la réserve est BLOQUÉE (reserveMaintenueDe) et rien ne la consomme
+//  plus : la technique finie ou relâchée, elle revient. Si l'énergie tombe sous
+//  la réserve (bue par un ennemi), la technique tombe en fin de manche.
 export const RESERVES_TECHNIQUES = {
+    // (Rempart, Prise en charge, Bouclier anti-magie : aucun prix, la réserve seule.)
     CLASSE_REMPART: { parTour: 15, tours: MANCHES_REMPART, nom: "Rempart maintenu" },
-    // (v349) La Nuée : 40 au lancement, et 33 par manche sur ses 2 manches.
+    // (v349) La Nuée : 40 au lancement, et 33 bloqués pendant ses 2 manches.
     CLASSE_NUEE_CHAUVES_SOURIS: { parTour: 33, tours: 2, coutLancement: 40, nom: "Nuée maintenue" },
-    // (v351) La Prise en charge : 20 par manche sur 2 manches, pour le Médicus ET
-    // pour le réanimé ; un prix, qui ne tient rien — elle ne se relâche pas.
+    // (v351) La Prise en charge : 20 bloqués pendant 2 manches, chez le Médicus ET
+    // chez le réanimé ; un prix, qui ne tient rien — elle ne se relâche pas.
     CLASSE_PRISE_EN_CHARGE: { parTour: 20, tours: 2, nom: "Prise en charge (réserve)", sansRelache: true },
-    // (v356) Le Bouclier anti-magie : 20 par manche sur ses 2 manches.
+    // (v356) Le Bouclier anti-magie : 20 bloqués pendant ses 2 manches.
     CLASSE_BOUCLIER_ANTIMAGIE: { parTour: 20, tours: 2, nom: "Anti-magie maintenu" },
-    // (v359) La Désintégration : 75 au lancement (15 + la part de la manche,
-    // 60), puis 60 la manche suivante ; un prix, qui ne se relâche pas.
-    CLASSE_DESINTEGRATION: { parTour: 60, tours: 2, coutLancement: 15, nom: "Désintégration (réserve)", sansRelache: true }
+    // (v359) La Désintégration : 75 au lancement, puis 60 bloqués la manche
+    // suivante (« réserve au prochain tour ») ; elle ne se relâche pas.
+    CLASSE_DESINTEGRATION: { parTour: 60, tours: 2, coutLancement: 75, auProchainTour: true, nom: "Désintégration (réserve)", sansRelache: true }
 };
-// Ce qu'une technique maintenue coûte au lancement : son prix, et la part de
-// la manche du lancement.
-export const coutLancementReserve = (r) => r ? nombre(r.coutLancement) + nombre(r.parTour) : 0;
+// L'énergie libre qu'il faut au lancement : le prix, et la réserve qu'on bloque
+// tout de suite (pas celle « au prochain tour »).
+export const coutLancementReserve = (r) => r ? nombre(r.coutLancement) + (r.auProchainTour ? 0 : nombre(r.parTour)) : 0;
 export const reserveDeTechnique = (idCarte) => RESERVES_TECHNIQUES[idCarte] || null;
-// Ce que ses techniques maintenues bloquent dans sa jauge pour la manche en
-// cours (la manche du lancement est déjà payée).
+// Ce que ses techniques maintenues bloquent dans sa jauge en ce moment.
 export function reserveMaintenueDe(c) {
     return ((c && c.etats) || []).reduce((t, e) =>
-        t + (e && e.maintien && !e.dejaPaye && nombre(e.duree, 1) > 0 ? nombre(e.reserve) : 0), 0);
+        t + (e && e.maintien && !e.differee && nombre(e.duree, 1) > 0 ? nombre(e.reserve) : 0), 0);
 }
 // Arrête une technique maintenue : son état chez le lanceur, et ce qu'elle
 // tenait chez les autres. Mute l'état, rend les étapes.
@@ -2068,21 +2076,27 @@ export function retourDansLePasse(suivant, plateau, idLanceur) {
     return etapes;
 }
 
-// LA RÉSERVE AU LANCEMENT (v347) : la part de la manche où la technique part
-// est payée tout de suite ; l'état « … maintenu » se pose chez le lanceur.
-function poserMaintien(c, idCarte, liens) {
+// LA RÉSERVE AU LANCEMENT (v347 ; v361 : bloquée, jamais dépensée) : le prix
+// est payé, l'état « … maintenu » se pose chez le lanceur et bloque sa réserve.
+// `prix` : faux pour celui qui porte la réserve sans avoir lancé (le réanimé
+// de la Prise en charge).
+function poserMaintien(c, idCarte, liens, prix = true) {
     const r = reserveDeTechnique(idCarte);
     if (!r) return [];
     const etapes = [];
-    c.fatigue = Math.max(0, nombre(c.fatigue) - coutLancementReserve(r));
-    etapes.push({ type: "fatigue", cible: c.id, fatigueApres: c.fatigue, tic: r.nom });
+    if (prix && nombre(r.coutLancement) > 0) {
+        const avant = nombre(c.fatigue);
+        c.fatigue = Math.max(0, avant - nombre(r.coutLancement));
+        etapes.push({ type: "fatigue", cible: c.id, fatigueApres: c.fatigue, tic: r.nom,
+                      ...(avant > c.fatigue ? { depense: avant - c.fatigue } : {}) });
+    }
     c.etats = [...(c.etats || []).filter(e => !(e && e.maintien === idCarte)),
-               { nom: r.nom, maintien: idCarte, reserve: r.parTour, duree: r.tours, dejaPaye: true, liens,
+               { nom: r.nom, maintien: idCarte, reserve: r.parTour, duree: r.tours, liens,
+                 ...(r.auProchainTour ? { differee: true } : {}),
                  ...(r.sansRelache ? { sansRelache: true } : {}),
-                 desc: r.sansRelache
-                     ? `${r.parTour} d'énergie bloqués puis consommés à chaque manche (le prix de la technique ; elle ne se relâche pas).`
-                     : `${r.parTour} d'énergie bloqués puis consommés à chaque manche tant qu'il est maintenu `
-                     + "(à court d'énergie, il tombe ; il se relâche en préparation)." }];
+                 desc: (r.auProchainTour ? `${r.parTour} d'énergie bloqués (pas dépensés) à la manche suivante`
+                                         : `${r.parTour} d'énergie bloqués (pas dépensés) tant que la technique dure`)
+                     + (r.sansRelache ? " ; elle ne se relâche pas." : " ; elle se relâche en préparation (à court d'énergie, elle tombe).") }];
     etapes.push({ type: "etats", cible: c.id, liste: c.etats, pose: r.nom });
     return etapes;
 }
@@ -2269,7 +2283,7 @@ export function resoudreTechniqueClasse(etat, action, plateau) {
             etapes.push({ type: "reanimation", cible: allie.id, acteur: id, pvApres: allie.pv, q: place.q, r: place.r });
             // (v351) La réserve de la Prise en charge : le Médicus et le réanimé.
             etapes.push(...poserMaintien(c, action.idCarte, []));
-            etapes.push(...poserMaintien(allie, action.idCarte, []));
+            etapes.push(...poserMaintien(allie, action.idCarte, [], false));
 
             (suivant.ordre || Object.keys(suivant.combattants || {})).forEach(idEnnemi => {
                 const ennemi = combattant(suivant, idEnnemi);

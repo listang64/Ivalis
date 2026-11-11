@@ -273,8 +273,9 @@ console.log("\n5. NUÉE DE CHAUVE-SOURIS (v349) : L'ESQUIVE À 40 %, DEUX MANCHE
     const pas = appliquerIntention(e, nuee);
     const V = pas.etat.combattants.V;
     verifier("son esquive passe de 10 à 40", esquiveDe(V) === 40, `${esquiveDe(V)}`);
-    verifier("technique utilisée, tour clos, 73 d'énergie au lancement (40 + 33)",
-             V.techniquesUtilisees.includes("CLASSE_NUEE_CHAUVES_SOURIS") && pas.etat.file[0].id === "M1" && V.fatigue === 100 - 73, String(V.fatigue));
+    // (v361 : 40 dépensés, 33 bloqués — pas dépensés.)
+    verifier("technique utilisée, tour clos, 40 d'énergie dépensés au lancement (33 bloqués en plus)",
+             V.techniquesUtilisees.includes("CLASSE_NUEE_CHAUVES_SOURIS") && pas.etat.file[0].id === "M1" && V.fatigue === 100 - 40, String(V.fatigue));
     const haut = clonerEtat(pas.etat); haut.combattants.V.def.esquive = 70;
     verifier("plus haute, elle le reste (70)", esquiveDe(haut.combattants.V) === 70);
     const etourdi = clonerEtat(pas.etat); etourdi.combattants.V.etats.push({ nom: "Étourdi", duree: 1 });

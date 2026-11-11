@@ -604,7 +604,7 @@ export function reservesDeFinDeManche(etat) {
             // (v354) La réserve du Dernier sursis : le sursis fini, elle s'en va ;
             // à court d'énergie, le sursis s'arrête — il tombe KO.
             if (m.maintien === MAINTIEN_SURSIS && !enSursis(c)) { etapes.push(...relacherMaintien(etat, id, m.maintien)); return; }
-            if (m.maintien === MAINTIEN_SURSIS && !m.dejaPaye && nombre(c.fatigue) < nombre(m.reserve)) {
+            if (m.maintien === MAINTIEN_SURSIS && nombre(c.fatigue) < nombre(m.reserve)) {
                 etapes.push(...relacherMaintien(etat, id, m.maintien, "Dernier sursis : à court d'énergie"));
                 c.sursis = null;
                 c.aTerre = true;
@@ -613,18 +613,20 @@ export function reservesDeFinDeManche(etat) {
                             { type: "chute", cible: id, acteur: id, finSursis: true });
                 return;
             }
-            if (m.dejaPaye) {
-                c.etats = c.etats.map(e => (e === m ? { ...e, dejaPaye: false } : e));
+            // (v361) RIEN N'EST CONSOMMÉ : la réserve reste bloquée. Celle « au
+            // prochain tour » (la Désintégration) le devient maintenant — même
+            // si elle dépasse son énergie : la manche suivante, il n'a presque
+            // plus rien de libre, c'est le prix. Une réserve déjà bloquée que
+            // son énergie ne couvre plus (bue par un ennemi) : elle tombe.
+            if (m.differee) {
+                c.etats = c.etats.map(e => (e === m ? (({ differee, ...reste }) => reste)(e) : e));
                 etapes.push({ type: "etats", cible: id, liste: c.etats });
                 return;
             }
-            const part = nombre(m.reserve);
-            if (nombre(c.fatigue) < part) {
+            if (nombre(c.fatigue) < nombre(m.reserve)) {
                 etapes.push(...relacherMaintien(etat, id, m.maintien, `${m.nom} : à court d'énergie`));
                 return;
             }
-            c.fatigue = nombre(c.fatigue) - part;
-            etapes.push({ type: "fatigue", cible: id, fatigueApres: c.fatigue, tic: m.nom });
         });
     });
     return etapes;

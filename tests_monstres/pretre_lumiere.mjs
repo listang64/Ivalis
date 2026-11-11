@@ -70,7 +70,7 @@ console.log("\n1. LES PALIERS");
     verifier("Appel : init 100, 0 fatigue, sur soi, niveau 5, Prêtre", ap.Initiative === 100 && ap.Fatigue === 0 && ap.cible === "soi" && ap.niveau === 5 && ap.classe === "Prêtre de la lumière");
     verifier("Désintégration : init 75, 75 de fatigue, un ennemi à 2 cases, réserve 60 sans relâche",
              de.Initiative === 75 && de.Fatigue === 75 && de.cible === "ennemi" && de.portee === 2 && de.niveau === 9
-             && de.reserve.parTour === 60 && de.reserve.sansRelache === true && de.reserve.coutLancement + de.reserve.parTour === 75
+             && de.reserve.parTour === 60 && de.reserve.sansRelache === true && de.reserve.coutLancement === 75 && de.reserve.auProchainTour === true
              && !!w.TECHNIQUES_VISEES.CLASSE_DESINTEGRATION);
     verifier("les textes", /33 %/.test(w.texteAtout("maitriseLumiere", 33)) && /prochain état néfaste/.test(w.texteAtout("gardePurification", true))
              && /Aveuglé/.test(w.texteAtout("insensibleA", ["Aveuglé"])) && /3 PV/.test(w.texteAtout("auraSoin", 3)));
@@ -212,6 +212,10 @@ console.log("\n7. LA DÉSINTÉGRATION PAR LA FOUDRE");
     verifier("M1 tombe sur le coup, marqué « sans butin »", c.M1.aTerre && c.M1.pv === 0 && c.M1.sansButin === true);
     verifier("il paie 75 (100 → 25), réserve de 60 posée, sans relâche", c.P.fatigue === 25
              && (c.P.etats || []).some(x => x.maintien === "CLASSE_DESINTEGRATION" && x.reserve === 60 && x.sansRelache));
+    const avant = clonerEtat(e); avant.combattants.M1.pv = 40; avant.file.push({ id: "M2", carte: "X", initiative: 5, pas: 0 });
+    const meme = appliquerIntention(avant, desint("M1")).etat;
+    verifier("la manche du lancement : la réserve attend (rien de bloqué encore)", meme.manche === 1
+             && (meme.combattants.P.etats || []).some(x => x.maintien === "CLASSE_DESINTEGRATION" && x.differee) && reserveMaintenueDe(meme.combattants.P) === 0);
     verifier("rejoué depuis le journal : à terre, sans butin", (x => x.aTerre && x.sansButin)(appliquerEntree(e, pas.entree).combattants.M1));
     verifier("la fiche projetée porte « sansButin »", fichesDepuisEtat(pas.etat, [{ idPersonnage: "M1", estMonstre: true }])[0].sansButin === true);
     verifier("une fois par combat", !validerIntention((x => { x.combattants.M2.pv = 10; return enTete(x, "CLASSE_DESINTEGRATION"); })(clonerEtat(pas.etat)), desint("M2")).ok);
@@ -219,18 +223,17 @@ console.log("\n7. LA DÉSINTÉGRATION PAR LA FOUDRE");
     const titre = misEnScene(pas.entree.etapes.find(x => x.type === "techniqueClasse"), pas.etat);
     verifier("à l'écran : « ⚡ Désintégration par la foudre »", titre && /Désintégration/.test(titre.texte));
     // M1 était le dernier de la file : la manche s'est close dans le même pas.
-    verifier("la manche suivante (déjà ouverte) : 60 bloqués", pas.etat.manche === 2 && reserveMaintenueDe(c.P) === 60, `${pas.etat.manche} ${reserveMaintenueDe(c.P)}`);
-    // À la fin de celle-ci : 25 < 60, la réserve tombe, sans autre suite.
+    verifier("la manche suivante : 60 bloqués, même avec 25 d'énergie (rien de libre)", pas.etat.manche === 2 && reserveMaintenueDe(c.P) === 60
+             && !(c.P.etats || []).some(x => x.differee), `${pas.etat.manche} ${reserveMaintenueDe(c.P)}`);
+    const carte5 = (() => { const s = clonerEtat(pas.etat); s.file = [{ id: "P", carte: "C", initiative: 50, pas: 0 }];
+        return validerIntention(s, { id: "c", type: "carte", acteur: "P", idCarte: "C", coutFatigue: 5, attaques: [] }); })();
+    verifier("cette manche-là, même une carte à 5 est refusée", !carte5.ok, carte5.raison || "");
+    // À sa fin : rien n'est pris, la réserve s'en va.
     const suite = clonerEtat(pas.etat); suite.combattants.P.atouts.regenFatigue = -1000;
     suite.file = [{ id: "M2", carte: "X", initiative: 10, pas: 0 }];
     cloturerTour(suite, DES_FIN);
-    verifier("à court d'énergie à la fin de la manche : la réserve tombe, rien de plus",
-             !(suite.combattants.P.etats || []).some(x => x.maintien === "CLASSE_DESINTEGRATION") && !suite.combattants.P.aTerre);
-    const riche = clonerEtat(pas.etat); riche.combattants.P.fatigue = 90; riche.combattants.P.atouts.regenFatigue = -1000;
-    riche.file = [{ id: "M2", carte: "X", initiative: 10, pas: 0 }];
-    cloturerTour(riche, DES_FIN);
-    verifier("avec 90 : 60 consommés (→ 30), puis la réserve est finie", riche.combattants.P.fatigue <= 30
-             && !(riche.combattants.P.etats || []).some(x => x.maintien === "CLASSE_DESINTEGRATION"), String(riche.combattants.P.fatigue));
+    verifier("à la fin de cette manche : rien n'est pris (25), la réserve s'en va",
+             !(suite.combattants.P.etats || []).some(x => x.maintien === "CLASSE_DESINTEGRATION") && suite.combattants.P.fatigue === 25 && !suite.combattants.P.aTerre);
 }
 
 // La vraie page : la grille, la fiche, le butin.

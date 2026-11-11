@@ -968,14 +968,13 @@ export function tomber(etat, id, acteur, options) {
         c.sursis = { tours, entame };
         c.sursisUtilise = true;
         c.aTerre = false;
-        // (v354) La réserve : 30 tout de suite, puis 30 par manche tant qu'il tient.
-        c.fatigue = nombre(c.fatigue) - RESERVE_SURSIS;
+        // (v354) La réserve : 30 d'énergie bloqués tant qu'il tient — pas
+        // dépensés (v361 : une réserve n'est jamais consommée).
         c.etats = [...(c.etats || []).filter(e => !(e && e.maintien === MAINTIEN_SURSIS)),
-                   { nom: "Dernier sursis (réserve)", maintien: MAINTIEN_SURSIS, reserve: RESERVE_SURSIS, duree: 99, dejaPaye: true,
+                   { nom: "Dernier sursis (réserve)", maintien: MAINTIEN_SURSIS, reserve: RESERVE_SURSIS, duree: 99,
                      sansRelache: true, liens: [],
-                     desc: `${RESERVE_SURSIS} d'énergie bloqués puis consommés à chaque manche du sursis ; à court, il tombe KO.` }];
+                     desc: `${RESERVE_SURSIS} d'énergie bloqués (pas dépensés) pendant le sursis ; si son énergie tombe plus bas, il tombe KO.` }];
         return [{ type: "sursis", cible: id, acteur: acteur || id, tours, entame, pvApres: 0, debut: true },
-                { type: "fatigue", cible: id, fatigueApres: c.fatigue, tic: "Dernier sursis" },
                 { type: "etats", cible: id, liste: c.etats }];
     }
     c.aTerre = true;

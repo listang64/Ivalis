@@ -80,25 +80,27 @@ console.log("\n2. PRISE EN CHARGE : 40 % DES PV, ET LA RÉSERVE DE 20 POUR LUI E
     const pas = appliquerIntention(e, intention("CLASSE_PRISE_EN_CHARGE", "A"));
     const D = pas.etat.combattants.D, A = pas.etat.combattants.A;
     verifier("réanimé avec 40 PV (40 %)", !A.aTerre && A.pv === 40 && PART_REANIMATION === 40);
-    verifier("le Médicus paie 20 au lancement (100 → 80), le réanimé aussi (60 → 40)", D.fatigue === 80 && A.fatigue === 40, `${D.fatigue} / ${A.fatigue}`);
+    // (v361 : la réserve est bloquée, jamais dépensée.)
+    verifier("rien n'est dépensé (100 / 60) ; 20 bloqués chez chacun", D.fatigue === 100 && A.fatigue === 60
+             && reserveMaintenueDe(D) === 20 && reserveMaintenueDe(A) === 20, `${D.fatigue} / ${A.fatigue}`);
     verifier("chacun porte la réserve : 20, 2 manches, sans « Relâcher »", [D, A].every(c => { const r = reserve(c);
-             return r && r.reserve === 20 && r.duree === 2 && r.dejaPaye === true && r.sansRelache === true; }), JSON.stringify([reserve(D), reserve(A)]));
+             return r && r.reserve === 20 && r.duree === 2 && !r.differee && r.sansRelache === true; }), JSON.stringify([reserve(D), reserve(A)]));
     const f1 = finDeManche(pas.etat);
-    verifier("fin de la manche de la réanimation : rien de pris, 20 bloqués chez chacun",
-             f1.etat.combattants.D.fatigue === 80 && f1.etat.combattants.A.fatigue === 40
+    verifier("fin de la manche de la réanimation : rien de pris, 20 toujours bloqués chez chacun",
+             f1.etat.combattants.D.fatigue === 100 && f1.etat.combattants.A.fatigue === 60
              && reserveMaintenueDe(f1.etat.combattants.D) === 20 && reserveMaintenueDe(f1.etat.combattants.A) === 20);
     const f2 = finDeManche(f1.etat);
-    verifier("fin de la manche suivante : 20 consommés chez chacun (60, 20), puis plus rien",
-             f2.etat.combattants.D.fatigue === 60 && f2.etat.combattants.A.fatigue === 20 && !reserve(f2.etat.combattants.D) && !reserve(f2.etat.combattants.A),
+    verifier("fin de la manche suivante : rien de pris, les réserves s'en vont",
+             f2.etat.combattants.D.fatigue === 100 && f2.etat.combattants.A.fatigue === 60 && !reserve(f2.etat.combattants.D) && !reserve(f2.etat.combattants.A),
              `${f2.etat.combattants.D.fatigue} / ${f2.etat.combattants.A.fatigue}`);
     verifier("rejoué depuis le journal : mêmes énergies, mêmes réserves", (() => { const r = appliquerEntree(e, pas.entree).combattants;
-             return r.D.fatigue === 80 && r.A.fatigue === 40 && !!reserve(r.A); })());
-    // Le réanimé presque vide : il paie ce qu'il peut au lancement ; à court ensuite, sa réserve tombe — il reste debout.
+             return r.D.fatigue === 100 && r.A.fatigue === 60 && !!reserve(r.A); })());
+    // Le réanimé presque vide : 5 d'énergie, 20 à bloquer — sa réserve tombe en fin de manche, il reste debout.
     const vide = sansRegain(enTete(monde(9), "CLASSE_PRISE_EN_CHARGE")); vide.combattants.A.fatigue = 5;
     const pv = appliquerIntention(vide, intention("CLASSE_PRISE_EN_CHARGE", "A")).etat;
-    verifier("le réanimé à 5 d'énergie : il paie ce qu'il a (0)", pv.combattants.A.fatigue === 0);
-    const court = finDeManche(finDeManche(pv).etat);
-    verifier("à court ensuite : sa réserve tombe, il reste debout avec ses PV", !reserve(court.etat.combattants.A) && !court.etat.combattants.A.aTerre
+    verifier("le réanimé à 5 d'énergie : rien n'est pris (5)", pv.combattants.A.fatigue === 5);
+    const court = finDeManche(pv);
+    verifier("à court : sa réserve tombe, il reste debout avec ses PV", !reserve(court.etat.combattants.A) && !court.etat.combattants.A.aTerre
              && court.etat.combattants.A.pv === 40 && court.etapes.some(x => x.type === "message" && x.cible === "A" && /à court/.test(x.texte)));
     const pauvre = enTete(monde(9), "CLASSE_PRISE_EN_CHARGE"); pauvre.combattants.D.fatigue = 19;
     const ref = validerIntention(pauvre, intention("CLASSE_PRISE_EN_CHARGE", "A"));
@@ -194,7 +196,7 @@ console.log("\n4. EN PRÉPARATION : LA RÉSERVE BLOQUÉE, SANS BOUTON « RELÂCH
 {
   const c = lireFichier("classes.js");
   verifier("la fiche de classe : 3 (+2 soins, +5 % d'esquive), 5 (+3), 9 (40 %, réserve 20)", /niveau: 3, titre: "Mains sûres"/.test(c) && /\+5 % d'esquive/.test(c)
-           && /\+3 en tout/.test(c) && /niveau: 9, titre: "Technique : Prise en charge par Médicus"/.test(c) && /40 % de ses PV/.test(c) && /réserve 20 par manche/.test(c));
+           && /\+3 en tout/.test(c) && /niveau: 9, titre: "Technique : Prise en charge par Médicus"/.test(c) && /40 % de ses PV/.test(c) && /réserve de 20/.test(c));
   verifier("version 351 ou plus", Number((/VERSION_IVALIS = (\d+);/.exec(lireFichier("trace_combat.js")) || [])[1]) >= 351
            && JSON.parse(lireFichier("version.json")).version >= 351);
 }

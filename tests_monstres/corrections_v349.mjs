@@ -80,7 +80,7 @@ const coup = (lanceur, cible, valeur, extra = {}) => ({ type: "carte", idLanceur
     attaques: [{ valeurBrute: valeur, typeRes: extra.typeRes || "Physique", cibles: [cible], ...(extra.attaque || {}) }],
     jets: { attaqueRatee: false, parCible: { [cible]: { esquive: !!extra.esquive, etats: {} } } } });
 
-console.log("\n1. LA NUÉE : 40 AU LANCEMENT, PLUS 33 PAR MANCHE SUR SES 2 MANCHES");
+console.log("\n1. LA NUÉE : 40 AU LANCEMENT, PLUS 33 BLOQUÉS PENDANT SES 2 MANCHES (v361)");
 {
     const e = enTete(monde(9), "V", "CLASSE_NUEE_CHAUVES_SOURIS");
     e.combattants.V.stats = { ...(e.combattants.V.stats || {}), Regeneration: 0 };
@@ -89,18 +89,19 @@ console.log("\n1. LA NUÉE : 40 AU LANCEMENT, PLUS 33 PAR MANCHE SUR SES 2 MANCH
     e.combattants.V.fatigue = 100;
     const pas = appliquerIntention(e, nuee());
     const V = pas.etat.combattants.V, m = maintien(V);
-    verifier("lancée : 100 → 27 (40 de coût, 33 pour sa première manche)", V.fatigue === 27, String(V.fatigue));
-    verifier("« Nuée maintenue » : 33 par manche, 2 manches, la première payée", !!m && m.reserve === 33 && m.duree === 2 && m.dejaPaye === true
+    // (v361 : la réserve est bloquée, jamais dépensée.)
+    verifier("lancée : 100 → 60 (40 de coût) ; 33 bloqués", V.fatigue === 60 && reserveMaintenueDe(V) === 33, `${V.fatigue} ${reserveMaintenueDe(V)}`);
+    verifier("« Nuée maintenue » : 33, 2 manches", !!m && m.reserve === 33 && m.duree === 2 && !m.differee
              && m.liens[0].cible === "V" && m.liens[0].nom === ETAT_NUEE, JSON.stringify(m));
     const f1 = finDeManche(pas.etat);
-    verifier("fin de la 1re manche : rien de pris, 33 bloqués pour la suivante", f1.etat.combattants.V.fatigue === 27
+    verifier("fin de la 1re manche : rien de pris (60), 33 toujours bloqués", f1.etat.combattants.V.fatigue === 60
              && reserveMaintenueDe(f1.etat.combattants.V) === 33 && aNuee(f1.etat.combattants.V));
-    const riche = clonerEtat(f1.etat); riche.combattants.V.fatigue = 60;
-    const f2 = finDeManche(riche);
-    verifier("fin de la 2e manche : 33 consommés (60 → 27), puis la Nuée s'en va", f2.etat.combattants.V.fatigue === 27
-             && !aNuee(f2.etat.combattants.V) && !maintien(f2.etat.combattants.V), String(f2.etat.combattants.V.fatigue));
-    const pauvre = finDeManche(f1.etat);
-    verifier("27 d'énergie, 33 à payer : à court — la Nuée se dissipe, rien n'est pris",
+    const f2 = finDeManche(f1.etat);
+    verifier("fin de la 2e manche : rien de pris (60), la Nuée s'en va, la réserve revient", f2.etat.combattants.V.fatigue === 60
+             && !aNuee(f2.etat.combattants.V) && !maintien(f2.etat.combattants.V) && reserveMaintenueDe(f2.etat.combattants.V) === 0, String(f2.etat.combattants.V.fatigue));
+    const bu = clonerEtat(f1.etat); bu.combattants.V.fatigue = 27;
+    const pauvre = finDeManche(bu);
+    verifier("énergie bue à 27 (sous les 33) : la Nuée se dissipe, rien n'est pris",
              !aNuee(pauvre.etat.combattants.V) && pauvre.etat.combattants.V.fatigue === 27 && pauvre.etapes.some(x => x.type === "message" && /à court/.test(x.texte)));
     verifier("la carte de l'écran annonce 73", w.carteTechniqueClasse("CLASSE_NUEE_CHAUVES_SOURIS").Fatigue === 73);
 }
@@ -157,7 +158,7 @@ console.log("\n4. LES TEXTES ET LA VERSION");
     const c = lireFichier("classes.js");
     verifier("la fiche de classe : 1 (+15, brûlure −60 % et 10 %), 3 Baiser, 5 (brûlure annulée, Vargens), 9 Nuée (40, réserve 33, renvoi 33 %)",
              /\+15 % de résistance physique/.test(c) && /−60 % de soins reçus et 10 %/.test(c) && /niveau: 3, titre: "Technique : Baiser du vampire"/.test(c)
-             && /\+3 dégâts contre les Vargens/.test(c) && /niveau: 9, titre: "Technique : Nuée de chauves-souris"/.test(c) && /réserve 33/.test(c) && /Renvoie 33 %/.test(c));
+             && /\+3 dégâts contre les Vargens/.test(c) && /niveau: 9, titre: "Technique : Nuée de chauves-souris"/.test(c) && /réserve de 33/.test(c) && /Renvoie 33 %/.test(c));
     verifier("version 349 ou plus", Number((/VERSION_IVALIS = (\d+);/.exec(lireFichier("trace_combat.js")) || [])[1]) >= 349 && JSON.parse(lireFichier("version.json")).version >= 349);
 }
 

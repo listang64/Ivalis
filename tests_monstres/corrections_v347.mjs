@@ -65,54 +65,46 @@ const rempartSur = (c) => (c.etats || []).find(x => x && x.nom === "Rempart");
 const finDeManche = (e) => { const s = clonerEtat(e); s.file = [{ id: "M", carte: "X", initiative: 1, pas: 0 }];
     const clot = cloturerTour(s, creerDes(s.graine)); return { etat: s, etapes: clot.etapes }; };
 
-console.log("\n1. LA RÉSERVE MAINTENUE : 15 AU LANCEMENT, PUIS BLOQUÉS ET CONSOMMÉS À CHAQUE MANCHE (4)");
+console.log("\n1. LA RÉSERVE MAINTENUE (v361 : BLOQUÉE TANT QUE LA TECHNIQUE DURE, JAMAIS DÉPENSÉE)");
+// (v361, Nico : « les points en réserve ne sont pas vraiment dépensés, ils sont juste
+// inutilisables tant que la technique est active ».)
 {
-    verifier("le Rempart a sa réserve dans le moteur : 15 par manche, 4 manches",
-             RESERVES_TECHNIQUES.CLASSE_REMPART.parTour === 15 && RESERVES_TECHNIQUES.CLASSE_REMPART.tours === 4);
+    verifier("le Rempart a sa réserve dans le moteur : 15, 4 manches, aucun prix",
+             RESERVES_TECHNIQUES.CLASSE_REMPART.parTour === 15 && RESERVES_TECHNIQUES.CLASSE_REMPART.tours === 4 && !RESERVES_TECHNIQUES.CLASSE_REMPART.coutLancement);
     const e = monde(3);
     e.combattants.H.stats = { ...(e.combattants.H.stats || {}), Regeneration: 0 };   // (sans regain, pour lire la réserve seule)
     const pas = lancerRempart(e);
     const h = pas.etat.combattants.H, m = maintien(h);
-    verifier("niveau 3 : lancé, 15 payés au lancement (100 → 85)", h.fatigue === 85, String(h.fatigue));
-    verifier("le Protecteur tient « Rempart maintenu » : 15, 4 manches, manche payée, lié au Rempart de l'allié",
-             !!m && m.reserve === 15 && m.duree === 4 && m.dejaPaye === true && m.liens[0].cible === "A", JSON.stringify(m));
+    verifier("niveau 3 : lancé, rien n'est dépensé (100)", h.fatigue === 100, String(h.fatigue));
+    verifier("le Protecteur tient « Rempart maintenu » : 15, 4 manches, lié au Rempart de l'allié",
+             !!m && m.reserve === 15 && m.duree === 4 && !m.differee && m.liens[0].cible === "A", JSON.stringify(m));
     verifier("l'allié porte le Rempart, 4 manches", rempartSur(pas.etat.combattants.A).duree === 4);
-    verifier("la manche du lancement : rien de bloqué en plus", reserveMaintenueDe(h) === 0);
+    verifier("dès le lancement : 15 bloqués", reserveMaintenueDe(h) === 15);
     verifier("rejoué depuis le journal : même énergie, mêmes états", (() => { const r = appliquerEntree(enTete(e, "H", "CLASSE_REMPART"), pas.entree).combattants.H;
-             return r.fatigue === 85 && JSON.stringify(r.etats) === JSON.stringify(h.etats); })());
-    // Fin de la manche du lancement : rien n'est pris, la réserve s'arme.
+             return r.fatigue === 100 && JSON.stringify(r.etats) === JSON.stringify(h.etats); })());
     const f1 = finDeManche(pas.etat);
-    verifier("fin de la manche du lancement : rien de pris (85), la réserve s'arme pour la suivante",
-             f1.etat.combattants.H.fatigue === 85 && maintien(f1.etat.combattants.H).dejaPaye === false && maintien(f1.etat.combattants.H).duree === 3,
-             `${f1.etat.combattants.H.fatigue} ${JSON.stringify(maintien(f1.etat.combattants.H))}`);
-    verifier("manche suivante : 15 bloqués (ni carte ni pas)", reserveMaintenueDe(f1.etat.combattants.H) === 15);
-    // Une carte à 75 passe (85 − 15 = 70 ? non) : 70 de disponible.
+    verifier("fin de manche : rien de pris (100), toujours 15 bloqués, 3 manches",
+             f1.etat.combattants.H.fatigue === 100 && reserveMaintenueDe(f1.etat.combattants.H) === 15 && maintien(f1.etat.combattants.H).duree === 3
+             && !f1.etapes.some(x => x.type === "fatigue" && x.cible === "H"), `${f1.etat.combattants.H.fatigue} ${JSON.stringify(maintien(f1.etat.combattants.H))}`);
     const avecCarte = (cout) => { const s = clonerEtat(f1.etat); s.phase = "Resolution"; s.file = [{ id: "H", carte: "C", initiative: 50, pas: 0 }];
         return validerIntention(s, { id: "c", type: "carte", acteur: "H", idCarte: "C", coutFatigue: cout, attaques: [] }); };
-    verifier("une carte à 70 passe, une à 71 est refusée (85 − 15 bloqués)", avecCarte(70).ok && !avecCarte(71).ok, avecCarte(71).raison);
+    verifier("une carte à 85 passe, une à 86 est refusée (100 − 15 bloqués)", avecCarte(85).ok && !avecCarte(86).ok, avecCarte(86).raison);
     const marche = (() => { const s = clonerEtat(f1.etat); s.combattants.H.fatigue = 20;
         return planifierTrajet(s, "H", [{ q: -1, r: 0 }, { q: -2, r: 0 }, { q: -3, r: 0 }, { q: -4, r: 0 }, { q: -5, r: 0 }, { q: -6, r: 0 }], null, {}); })();
     verifier("à 20 d'énergie, 15 bloqués : il ne marche qu'avec 5", marche.cout <= 5 && marche.tronque, JSON.stringify({ cout: marche.cout, pas: marche.pas.length }));
-    const f2 = finDeManche(f1.etat);
-    verifier("fin de la 2e manche : 15 consommés (85 → 70), étape « fatigue » dite",
-             f2.etat.combattants.H.fatigue === 70 && f2.etapes.some(x => x.type === "fatigue" && x.cible === "H" && x.tic === "Rempart maintenu"));
-    const f3 = finDeManche(f2.etat), f4 = finDeManche(f3.etat);
-    verifier("3e et 4e manches : 15 chaque fois (55, puis 40) — 4 paiements en tout",
-             f3.etat.combattants.H.fatigue === 55 && f4.etat.combattants.H.fatigue === 40, `${f3.etat.combattants.H.fatigue} ${f4.etat.combattants.H.fatigue}`);
-    verifier("au bout des 4 manches : plus de maintien, plus de Rempart", !maintien(f4.etat.combattants.H) && !rempartSur(f4.etat.combattants.A)
+    const f2 = finDeManche(f1.etat), f3 = finDeManche(f2.etat), f4 = finDeManche(f3.etat);
+    verifier("les 4 manches passent : 100 tout du long", [f2, f3, f4].every(f => f.etat.combattants.H.fatigue === 100));
+    verifier("au bout des 4 manches : plus de maintien, plus de Rempart, la réserve revient", !maintien(f4.etat.combattants.H) && !rempartSur(f4.etat.combattants.A)
              && reserveMaintenueDe(f4.etat.combattants.H) === 0);
-    const f5 = finDeManche(f4.etat);
-    verifier("et plus rien n'est pris ensuite", f5.etat.combattants.H.fatigue === 40);
     verifier("l'état reste cohérent tout du long", [pas.etat, f1.etat, f2.etat, f4.etat].every(x => verifierEtatCombat(x).length === 0));
-    // La réserve se consomme AVANT le regain de la manche.
-    const regen = clonerEtat(f1.etat); regen.combattants.H.stats.Regeneration = 30; regen.combattants.H.fatigue = 10;
-    const fr = finDeManche(regen);
-    const regain = Math.floor(0.3 * regen.combattants.H.fatigueMax);
-    verifier("à 10 d'énergie, 15 à payer : à court — le Rempart tombe, rien n'est pris, puis le regain (10 + 30 %)",
-             !maintien(fr.etat.combattants.H) && !rempartSur(fr.etat.combattants.A) && fr.etat.combattants.H.fatigue === 10 + regain
+    // Son énergie bue sous la réserve (par un ennemi) : la technique tombe en fin de manche.
+    const bu = clonerEtat(f1.etat); bu.combattants.H.fatigue = 10;
+    const fr = finDeManche(bu);
+    verifier("énergie tombée à 10 (sous les 15 bloqués) : le Rempart tombe, rien n'est pris",
+             !maintien(fr.etat.combattants.H) && !rempartSur(fr.etat.combattants.A) && fr.etat.combattants.H.fatigue === 10
              && fr.etapes.some(x => x.type === "message" && /à court/.test(x.texte)), `${fr.etat.combattants.H.fatigue}`);
     const pile = clonerEtat(f1.etat); pile.combattants.H.fatigue = 15;
-    verifier("à 15 pile : payé (0), il tient", (() => { const r = finDeManche(pile).etat; return r.combattants.H.fatigue === 0 && !!maintien(r.combattants.H); })());
+    verifier("à 15 pile : il tient (rien n'est pris)", (() => { const r = finDeManche(pile).etat; return r.combattants.H.fatigue === 15 && !!maintien(r.combattants.H); })());
     const ko = clonerEtat(f1.etat); ko.combattants.H.aTerre = true; ko.combattants.H.pv = 0;
     verifier("le Protecteur à terre : la technique tombe", (() => { const r = finDeManche(ko).etat; return !maintien(r.combattants.H) && !rempartSur(r.combattants.A); })());
     const pauvre = monde(3); pauvre.combattants.H.fatigue = 14;
@@ -307,8 +299,8 @@ console.log("\n5. EN PRÉPARATION : LA RÉSERVE BLOQUÉE, « RELÂCHER » DANS L
     return { avant, apres, entree, garde, resolution };
   });
   verifier("15 bloqués : 40 d'énergie, 25 pour choisir", r.avant.bloque === 15 && r.avant.dispo === 25, JSON.stringify(r.avant));
-  verifier("le volet dit « Rempart maintenu · ⚡ 15 bloqués cette manche » et propose « Relâcher »",
-           r.avant.encart && /Rempart maintenu/.test(r.avant.texte) && /15 bloqués cette manche/.test(r.avant.texte) && /Relâcher/.test(r.avant.texte), r.avant.texte);
+  verifier("le volet dit « Rempart maintenu · ⚡ 15 bloqués (pas dépensés) » et propose « Relâcher »",
+           r.avant.encart && /Rempart maintenu/.test(r.avant.texte) && /15 bloqués \(pas dépensés\)/.test(r.avant.texte) && /Relâcher/.test(r.avant.texte), r.avant.texte);
   verifier("la carte à 30 est grisée (30 > 25)", r.avant.epuisee === true);
   verifier("« Relâcher » : plus rien de bloqué, la carte redevient abordable", r.apres.bloque === 0 && r.apres.dispo === 40 && r.apres.relache && r.apres.epuisee === false
            && /relâché à la prochaine manche/.test(r.apres.texte) && /Le garder/.test(r.apres.texte), JSON.stringify(r.apres));
@@ -337,7 +329,7 @@ console.log("\n7. LA FICHE DE CLASSE ET LES CARTES");
 {
   const r = await p.evaluate(() => ({ rempart: window.carteTechniqueClasse("CLASSE_REMPART"), resonance: window.TECHNIQUES_CLASSE.CLASSE_RESONANCE_BOUCLIER,
                                       paliers: window.DESCRIPTIFS_CLASSES ? null : null }));
-  verifier("le Rempart dit sa réserve et ses deux attaques indépendantes", /Réserve : 15 d'énergie par manche/.test(r.rempart.Effets_Compiles[0].desc)
+  verifier("le Rempart dit sa réserve et ses deux attaques indépendantes", /Réserve : 15 d'énergie bloqués \(pas dépensés\)/.test(r.rempart.Effets_Compiles[0].desc)
            && /attaques indépendantes/.test(r.rempart.Effets_Compiles[0].desc) && r.rempart.Fatigue === 15);
   verifier("la Résonance dit 80 % et 15 % des PV max du Protecteur", /80 %/.test(r.resonance.desc) && /15 % des PV max du Protecteur/.test(r.resonance.desc));
 }

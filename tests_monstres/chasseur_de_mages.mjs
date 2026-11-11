@@ -104,8 +104,9 @@ console.log("\n1. LES PALIERS (v356) : +10 % RÉS. MAGIQUE ET +2 CONTRE MAGES/SO
              JSON.stringify(a(9).techniques) === '["CLASSE_BOUCLIER_ANTIMAGIE","CLASSE_BRISEUR_ARCANE"]'
              && !(a(8).techniques || []).includes("CLASSE_BRISEUR_ARCANE"));
     const ba = w.TECHNIQUES_CLASSE.CLASSE_BOUCLIER_ANTIMAGIE, br = w.TECHNIQUES_CLASSE.CLASSE_BRISEUR_ARCANE;
-    verifier("Bouclier anti-magie : init 200, aucune fatigue, sur soi, réserve 20 × 2",
-             ba.Initiative === 200 && ba.Fatigue === 0 && ba.cible === "soi" && ba.niveau === 5
+    // (v361 : la carte annonce l'énergie libre qu'il faut — sa réserve, 20.)
+    verifier("Bouclier anti-magie : init 200, sur soi, aucun coût, réserve 20 × 2",
+             ba.Initiative === 200 && ba.Fatigue === 20 && !ba.reserve.coutLancement && ba.cible === "soi" && ba.niveau === 5
              && ba.reserve && ba.reserve.parTour === 20 && ba.reserve.tours === 2);
     verifier("Briseur d'arcane : init 100, aucune fatigue, un ennemi à 5 cases, visé sur le plateau",
              br.Initiative === 100 && br.Fatigue === 0 && br.cible === "ennemi" && br.portee === 5 && br.niveau === 9
@@ -186,8 +187,8 @@ console.log("\n3 bis. LE BOUCLIER ANTI-MAGIE : LES SORTS REPARTENT SUR LEUR LANC
     const pas = appliquerIntention(e, bouclier);
     const etat = (pas.etat.combattants.C.etats || []).find(x => x.nom === ETAT_ANTIMAGIE);
     const tenu = (pas.etat.combattants.C.etats || []).find(x => x.maintien === "CLASSE_BOUCLIER_ANTIMAGIE");
-    verifier("l'état sur lui, 2 manches ; 20 d'énergie payés au lancement (100 → 80)", etat && etat.duree === 2
-             && pas.etat.combattants.C.fatigue === 80 && tenu && tenu.reserve === 20 && tenu.duree === 2 && !tenu.sansRelache,
+    verifier("l'état sur lui, 2 manches ; rien de dépensé (100), 20 bloqués", etat && etat.duree === 2
+             && pas.etat.combattants.C.fatigue === 100 && reserveMaintenueDe(pas.etat.combattants.C) === 20 && tenu && tenu.reserve === 20 && tenu.duree === 2 && !tenu.sansRelache,
              `${pas.etat.combattants.C.fatigue} ${JSON.stringify(tenu)}`);
     const pauvre = enTete(monde(5), "C", "CLASSE_BOUCLIER_ANTIMAGIE"); pauvre.combattants.C.fatigue = 19;
     verifier("19 d'énergie : refusé (il en faut 20)", !validerIntention(pauvre, bouclier).ok);
@@ -220,7 +221,7 @@ console.log("\n3 bis. LE BOUCLIER ANTI-MAGIE : LES SORTS REPARTENT SUR LEUR LANC
     vieillirLesEtats(vieux);
     verifier("il tient la manche en cours et la suivante", encore && !(vieux.combattants.C.etats || []).some(x => x.nom === ETAT_ANTIMAGIE));
 
-    // La manche suivante : 20 bloqués puis consommés en fin de manche.
+    // La manche suivante : 20 toujours bloqués (v361 : jamais consommés).
     const suite = clonerEtat(pas.etat);
     suite.combattants.C.atouts.regenFatigue = -1000;     // pas de régénération : on lit la réserve seule
     suite.file = [{ id: "M1", carte: "X", initiative: 10, pas: 0 }];
@@ -229,7 +230,7 @@ console.log("\n3 bis. LE BOUCLIER ANTI-MAGIE : LES SORTS REPARTENT SUR LEUR LANC
     const tenu2 = (apres1.combattants.C.etats || []).find(x => x.maintien === "CLASSE_BOUCLIER_ANTIMAGIE");
     verifier("la manche suivante : la réserve de 20 est bloquée", tenu2 && reserveMaintenueDe(apres1.combattants.C) === 20,
              JSON.stringify(apres1.combattants.C.etats));
-    // À court d'énergie : il tombe, et le bouclier avec.
+    // Son énergie bue sous la réserve : le bouclier tombe.
     const court = clonerEtat(apres1);
     court.combattants.C.fatigue = 5; court.combattants.C.atouts.regenFatigue = -1000;
     court.file = [{ id: "M1", carte: "X", initiative: 10, pas: 0 }];

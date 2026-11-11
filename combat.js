@@ -839,7 +839,7 @@ window.relacheEnAttente = function(perso, idCarte) {
 // La part bloquée dans sa jauge pour cette manche.
 window.reserveMaintenueBloquee = function(perso) {
     return window.techniquesMaintenues(perso)
-        .filter(e => !e.dejaPaye && !window.relacheEnAttente(perso, e.maintien))
+        .filter(e => !e.differee && !window.relacheEnAttente(perso, e.maintien))
         .reduce((t, e) => t + (parseInt(e.reserve) || 0), 0);
 };
 window.basculerRelacher = function(idPersonnage, idCarte) {
@@ -929,12 +929,12 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         // (v347) LES TECHNIQUES MAINTENUES : leur réserve, et « Relâcher ».
         window.techniquesMaintenues(persoActuel).forEach(e => {
             const relache = window.relacheEnAttente(persoActuel, e.maintien);
-            const bloque = !e.dejaPaye && !relache;
+            const bloque = !e.differee && !relache;
             const nom = String(e.nom || "").replace(/[<>&"]/g, "");
             const idC = String(e.maintien).replace(/[^A-Z0-9_]/gi, "");
             htmlDeck += `<div class="encart-maintien${relache ? " relache" : ""}" data-maintien="${idC}" title="${String(e.desc || "").replace(/"/g, "&quot;")}">
                 <span class="maintien-nom">${/Nuée/.test(nom) ? "🦇" : /Prise en charge/.test(nom) ? "✚" : /sursis/i.test(nom) ? "💀" : /Anti-magie/.test(nom) ? "💠" : /Désintégration/.test(nom) ? "⚡" : "🏰"} ${nom}</span>
-                <span class="maintien-reserve">${relache ? "relâché à la prochaine manche" : bloque ? `⚡ ${parseInt(e.reserve) || 0} bloqués cette manche` : "manche déjà payée"} · ${parseInt(e.duree) || 0} manche${(parseInt(e.duree) || 0) > 1 ? "s" : ""}</span>
+                <span class="maintien-reserve">${relache ? "relâché à la prochaine manche" : bloque ? `⚡ ${parseInt(e.reserve) || 0} bloqués (pas dépensés)` : `⚡ ${parseInt(e.reserve) || 0} bloqués à la prochaine manche`} · ${parseInt(e.duree) || 0} manche${(parseInt(e.duree) || 0) > 1 ? "s" : ""}</span>
                 ${enPreparation() && !e.sansRelache ? `<button type="button" class="maintien-relacher" onclick="event.stopPropagation(); window.basculerRelacher('${persoActuel.idPersonnage}', '${idC}')">${relache ? "Le garder" : "Relâcher"}</button>` : ""}
             </div>`;
         });

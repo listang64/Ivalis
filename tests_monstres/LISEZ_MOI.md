@@ -11451,3 +11451,18 @@ corrections_v360.mjs : le nom, le choix, les PV plafonnés, la Rage dans fabriqu
 classes_feminin, corrections_v343, corrections_v358, corrections_v359 : Berserker, et deux classes « bientôt ».
 
 pont_combat.js : la mise en scène de l'étape « rage » (l'état posé se montre comme tout état ; le réarmement ne se voit pas) — pont_combat et geomancien vérifient qu'aucun type d'étape n'en manque.
+
+## v361 — Les réserves sont bloquées, jamais dépensées (toutes les classes)
+
+- Nico : « les points en réserve ne sont pas vraiment dépensés, ils sont juste inutilisables tant que la technique est active. Du coup leur jauge de fatigue est moins haute, ils ne pourront pas faire de grosses techniques. » Pour toutes les classes qui en ont.
+- moteur_pur.js (RESERVES_TECHNIQUES, poserMaintien, reserveMaintenueDe) :
+  - au lancement, seul le prix (coutLancement) est payé ; la réserve est BLOQUÉE dès cet instant ;
+  - l'énergie libre qu'il faut au lancement : le prix + la réserve (coutLancementReserve) — Rempart 15, Nuée 73 (40 + 33), Prise en charge 20, Bouclier anti-magie 20, Désintégration 75 ;
+  - la Désintégration : 75 de prix, et sa réserve de 60 « au prochain tour » (differee : bloquée à partir de la manche suivante, même au-delà de son énergie — c'est le prix : cette manche-là, il n'a presque rien de libre) ;
+  - le réanimé de la Prise en charge porte sa réserve sans payer de prix.
+- cerveau_combat.js (reservesDeFinDeManche) : plus rien n'est consommé. Une réserve différée devient bloquée ; une réserve déjà bloquée que l'énergie ne couvre plus (bue par un ennemi) fait tomber la technique (le Dernier sursis : KO). La technique finie ou relâchée, la réserve revient.
+- combat_etat.js : le Dernier sursis ne prend plus 30 ; il en bloque 30 tant qu'il dure (il en faut toujours 30 pour qu'il parte).
+- Les textes (app.js, classes.js, la description de l'état, l'encart du volet dans combat.js) disent « bloqués (pas dépensés) ». Le Bouclier anti-magie annonce 20 (l'énergie libre qu'il faut), comme le Rempart annonce 15.
+
+corrections_v361.mjs le vérifie : les prix et les réserves, la fin de manche qui ne prend rien, la réserve différée, la chute sous la réserve, les textes, la version.
+Mis à jour pour la nouvelle règle : corrections_v347 (Rempart), v349 (Nuée), v351 (Prise en charge), v354 (Dernier sursis), chasseur_de_mages (Bouclier anti-magie), pretre_lumiere (Désintégration), vampire, hoplite.

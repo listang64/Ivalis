@@ -109,7 +109,7 @@ window.DESCRIPTIFS_CLASSES = {
               points: ["+8 % de parade",
                        "10 % de chance de provoquer la cible de chacune de ses attaques"] },
             { niveau: 3, titre: "Technique : Rempart",
-              points: ["Initiative 105 · réserve 15 par manche, sur 4 manches · sur un allié adjacent",
+              points: ["Initiative 105 · réserve de 15 bloqués (pas dépensés), 4 manches · sur un allié adjacent",
                        "Chaque attaque qu'il reçoit est divisée en deux attaques indépendantes, à moitié des dégâts : une pour lui, une pour le Protecteur",
                        "Il faut rester côte à côte · une fois par combat"] },
             { niveau: 5, titre: "Bouclier de la phalange",
@@ -190,7 +190,7 @@ window.DESCRIPTIFS_CLASSES = {
             { niveau: 9, titre: "Passif : Dernier sursis",
               points: ["Tombé à 0 PV, il tient encore 2 tours debout avant d'être mis KO",
                        "Les coups sont ignorés, aucun soin possible · une fois par combat",
-                       "Réserve : 30 d'énergie au début, puis 30 par manche tant qu'il dure — sans eux, il tombe KO"] }
+                       "Réserve : 30 d'énergie bloqués (pas dépensés) tant qu'il dure — sans eux, il tombe KO"] }
         ]
     },
     CLASSE_SENTINELLE: {
@@ -268,7 +268,7 @@ window.DESCRIPTIFS_CLASSES = {
                        "Soigne de 12 PV tous les alliés debout, où qu'ils soient",
                        "Une fois par combat · et +1 à chacun de ses soins (+3 en tout)"] },
             { niveau: 9, titre: "Technique : Prise en charge par Médicus",
-              points: ["Initiative 0 · réserve 20 par manche, sur 2 manches, pour lui et pour le réanimé",
+              points: ["Initiative 0 · réserve de 20 bloqués (pas dépensés), 2 manches, pour lui et pour le réanimé",
                        "Réanime un allié KO adjacent avec 40 % de ses PV",
                        "Repousse d'une case tous les ennemis qui l'entourent · une fois par combat",
                        "Lui seul voit, très pâles, ses alliés tombés sur le plateau"] }
@@ -291,7 +291,7 @@ window.DESCRIPTIFS_CLASSES = {
               points: ["Le malus de brûlure s'annule : il brûle comme tout le monde",
                        "+3 dégâts contre les Vargens"] },
             { niveau: 9, titre: "Technique : Nuée de chauves-souris",
-              points: ["Initiative 100 · 40 d'énergie au lancement · réserve 33 par manche, sur 2 manches",
+              points: ["Initiative 100 · 40 d'énergie au lancement · réserve de 33 bloqués (pas dépensés), 2 manches",
                        "Son esquive passe à 40 % (plus si elle l'était déjà)",
                        "Renvoie 33 % des dégâts qu'il subit à qui les lui inflige · une fois par combat"] }
         ]
@@ -334,7 +334,7 @@ window.DESCRIPTIFS_CLASSES = {
                        "Aveugle tous les combattants sur la carte, alliés compris, sauf lui (2 manches)"] },
             { niveau: 9, titre: "Technique : Désintégration par la foudre",
               points: ["Les alliés à son contact reprennent 3 PV à chaque fin de manche",
-                       "Initiative 75 · 75 de fatigue, puis 60 en réserve la manche suivante · une fois par combat",
+                       "Initiative 75 · 75 de fatigue, puis 60 bloqués (pas dépensés) la manche suivante · une fois par combat",
                        "Un ennemi à 2 cases, à 50 % de ses PV ou moins, tombe sur le coup : son XP, aucun butin"] }
         ]
     },
@@ -371,7 +371,7 @@ window.DESCRIPTIFS_CLASSES = {
             { niveau: 5, titre: "Technique : Bouclier anti-magie",
               points: ["Initiative 200 · aucune fatigue · une fois par combat",
                        "Tant qu'il est maintenu (2 manches), tout coup magique qui le frappe repart en entier sur son lanceur",
-                       "Réserve : 20 d'énergie par manche (la première au lancement) ; il se relâche en préparation"] },
+                       "Réserve : 20 d'énergie bloqués (pas dépensés) tant qu'il dure ; il se relâche en préparation"] },
             { niveau: 9, titre: "Technique : Briseur d'arcane",
               points: ["Initiative 100 · aucune fatigue · une fois par combat",
                        "Un ennemi à 5 cases, en vue, prend 1,5 fois sa résistance magique en dégâts bruts"] }

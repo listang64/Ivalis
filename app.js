@@ -1178,8 +1178,8 @@ window.TECHNIQUES_CLASSE = {
         Nom: "Mur de bouclier", classe: "Protecteur", niveau: 5, Initiative: 100, Fatigue: 0, cible: "soi",
         desc: "+60 % de parade sur soi jusqu'à la fin de la manche. Une fois par combat."
     },
-    // (v347) LE REMPART EST MAINTENU : sa réserve (15 d'énergie par manche,
-    // 4 manches) est bloquée dans la jauge puis consommée à chaque fin de
+    // (v347) LE REMPART EST MAINTENU : sa réserve (15 d'énergie, 4 manches) est
+    // bloquée dans la jauge — pas dépensée depuis la v361 — à chaque fin de
     // manche ; à court d'énergie, il tombe ; « Relâcher » l'arrête. La règle
     // vit dans le moteur (RESERVES_TECHNIQUES, moteur_pur.js) ; `reserve` ici
     // ne sert qu'à l'écran.
@@ -1189,8 +1189,8 @@ window.TECHNIQUES_CLASSE = {
         desc: "Sur un allié adjacent, pour 4 manches : chaque attaque qu'il reçoit est divisée en deux attaques "
             + "indépendantes, à moitié des dégâts — une pour lui, une pour le Protecteur, chacun avec ses jets "
             + "d'esquive et de parade et ses défenses. Il faut rester côte à côte. Pas les états altérés. "
-            + "Réserve : 15 d'énergie par manche, bloqués puis consommés, tant qu'il est maintenu (à court "
-            + "d'énergie, il tombe ; on peut le relâcher en préparation). Une fois par combat."
+            + "Réserve : 15 d'énergie bloqués (pas dépensés) tant qu'il est maintenu (si son énergie tombe plus "
+            + "bas, il tombe ; on peut le relâcher en préparation). Une fois par combat."
     },
     CLASSE_RESONANCE_BOUCLIER: {
         Nom: "Résonance du bouclier", classe: "Protecteur", niveau: 9, Initiative: 50, Fatigue: 0, cible: "soi",
@@ -1198,11 +1198,11 @@ window.TECHNIQUES_CLASSE = {
             + "égaux à 15 % des PV max du Protecteur, à coup sûr. Une fois par combat."
     },
     CLASSE_BOUCLIER_ANTIMAGIE: {
-        Nom: "Bouclier anti-magie", classe: "Chasseur de mages", niveau: 5, Initiative: 200, Fatigue: 0, cible: "soi",
+        Nom: "Bouclier anti-magie", classe: "Chasseur de mages", niveau: 5, Initiative: 200, Fatigue: 20, cible: "soi",
         reserve: { parTour: 20, tours: 2 },
         desc: "Tant qu'il est maintenu (2 manches), tout coup magique qui le frappe repart en entier sur son "
-            + "lanceur ; lui n'en prend rien. Réserve : 20 d'énergie par manche (la première au lancement, la "
-            + "suivante bloquée puis consommée ; à court d'énergie, il tombe ; on peut le relâcher en préparation). "
+            + "lanceur ; lui n'en prend rien. Aucun coût ; réserve : 20 d'énergie bloqués (pas dépensés) tant qu'il "
+            + "est maintenu (si son énergie tombe plus bas, il tombe ; on peut le relâcher en préparation). "
             + "Une fois par combat."
     },
     // (v360) LE BERSERKER. La Régénération insolente : chaque ennemi sur la
@@ -1223,10 +1223,10 @@ window.TECHNIQUES_CLASSE = {
     },
     CLASSE_DESINTEGRATION: {
         Nom: "Désintégration par la foudre", classe: "Prêtre de la lumière", niveau: 9, Initiative: 75, Fatigue: 75, cible: "ennemi", portee: 2,
-        reserve: { parTour: 60, tours: 2, coutLancement: 15, sansRelache: true },
+        reserve: { parTour: 60, tours: 2, coutLancement: 75, auProchainTour: true, sansRelache: true },
         desc: "Un ennemi à 2 cases, en vue, à 50 % de ses PV ou moins : il tombe sur le coup (il rapporte son XP, "
-            + "aucun butin). 75 de fatigue, puis une réserve de 60 la manche suivante (bloquée puis consommée ; "
-            + "elle ne se relâche pas). Une fois par combat."
+            + "aucun butin). 75 de fatigue, puis une réserve de 60 bloqués (pas dépensés) la manche suivante "
+            + "(elle ne se relâche pas). Une fois par combat."
     },
     // (v358) L'INQUISITEUR. La Combustion instantanée : chaque ennemi debout sur
     // la carte, 75 % de chance d'être Brûlé (2 manches). La Terreur ardente :
@@ -1280,8 +1280,8 @@ window.TECHNIQUES_CLASSE = {
         reserve: { parTour: 33, tours: 2, coutLancement: 40 },
         desc: "Le Vampire se disperse en nuée pour la manche en cours et la suivante : son esquive passe à 40 % "
             + "(elle reste plus haute si elle l'était déjà) et il renvoie 33 % des dégâts qu'il subit à qui les "
-            + "lui inflige. Coût : 40 d'énergie au lancement, et une réserve de 33 par manche (la première au "
-            + "lancement, la suivante bloquée puis consommée ; à court d'énergie, la nuée se dissipe). Une fois par combat."
+            + "lui inflige. Coût : 40 d'énergie au lancement, et une réserve de 33 bloqués (pas dépensés) tant qu'elle "
+            + "dure (si son énergie tombe plus bas, la nuée se dissipe). Une fois par combat."
     },
     CLASSE_CHARME_FRATRICIDE: {
         Nom: "Charme fratricide", classe: "Sorcier", niveau: 3, Initiative: 105, Fatigue: 30, cible: "ennemi", portee: 5,
@@ -1354,9 +1354,8 @@ window.TECHNIQUES_CLASSE = {
         Nom: "Prise en charge par Médicus", classe: "Médicus", niveau: 9, Initiative: 0, Fatigue: 20, cible: "allieKO",
         reserve: { parTour: 20, tours: 2, sansRelache: true },
         desc: "Réanime un allié KO adjacent avec 40 % de ses PV, et repousse d'une case tous les ennemis "
-            + "qui l'entourent. Réserve : 20 d'énergie par manche pendant 2 manches, pour le Médicus et pour "
-            + "le réanimé (la première au lancement, la suivante bloquée puis consommée ; elle ne se relâche pas). "
-            + "Une fois par combat."
+            + "qui l'entourent. Aucun coût ; réserve : 20 d'énergie bloqués (pas dépensés) pendant 2 manches, pour "
+            + "le Médicus et pour le réanimé (elle ne se relâche pas). Une fois par combat."
     }
 };
 // LE GÉOMANCIEN (niveau 1) : combien de cases de zone se PAIENT dans la Forge.
@@ -1725,7 +1724,7 @@ window.texteAtout = function(cle, valeur) {
             return `Résiste (−${window.RESISTANCE_ETAT_PCT || 25} % de chance) : ${liste.join(", ")}`
                 + (elementaires.length ? ` (−${window.REDUCTION_SORT_RESISTE || 15} % des sorts de ${elementaires.map(e => e.nom).join(", ")})` : "");
         }
-        case "sursis":         return `Dernier sursis : tombé à 0 PV, tient encore ${n} tour${n > 1 ? "s" : ""} avant d'être KO (une fois par combat ; réserve de 30 d'énergie par manche)`;
+        case "sursis":         return `Dernier sursis : tombé à 0 PV, tient encore ${n} tour${n > 1 ? "s" : ""} avant d'être KO (une fois par combat ; 30 d'énergie bloqués pendant le sursis)`;
         case "effets":         return (valeur || []).map(id => `Effet de combat : ${nomEffet(id)}`).join(" · ");
         case "techniques":     return (valeur || []).map(id => `Technique : ${((window.TECHNIQUES_CLASSE || {})[id] || {}).Nom || id}`).join(" · ");
         case "critiqueSurKO":  return `Instinct du tueur : ${plus(n)} % de critique pendant 2 manches après un KO`;
