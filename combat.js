@@ -3267,7 +3267,7 @@ window.medaillonEtat = function(etat, taille) {
          + ` background: linear-gradient(135deg, #fff1c2 0%, #d9b45a 35%, #8a6424 70%, #4a3212 100%);"></span>`
          + `<span class="medaillon-etat-fond" style="position: absolute; inset: 11%; ${losange}`
          + ` background: radial-gradient(circle at 50% 32%, rgba(255,255,255,0.55) 0%, ${couleur} 42%, ${couleur} 68%, rgba(0,0,0,0.55) 100%);"></span>`
-         + `<span style="position: relative;">${symbole}</span>${window.ronDeCumul(etat, t)}</span>`;
+         + `<span style="position: relative;">${symbole}</span>${typeof window.ronDeCumul === "function" ? window.ronDeCumul(etat, t) : ""}</span>`;
 };
 // (v362) LA MALÉDICTION AVANCÉE DU MAUDIT : un rond, et le nombre de dégâts sur
 // la durée actifs, sur l'état qui les porte (dès 2).
@@ -3289,7 +3289,7 @@ window.imageEtat = function(etat, taille) {
     const img = `<img src="${etat.icone}" style="width: ${taille}px; height: auto; border: none;`
          + ` background: transparent; box-shadow: none;`
          + ` filter: drop-shadow(0 ${taille > 30 ? 4 : 2}px ${taille > 30 ? 6 : 4}px rgba(0,0,0,0.85));">`;
-    const rond = window.ronDeCumul(etat, taille);
+    const rond = typeof window.ronDeCumul === "function" ? window.ronDeCumul(etat, taille) : "";
     return rond ? `<span style="position: relative; display: inline-block;">${img}${rond}</span>` : img;
 };
 

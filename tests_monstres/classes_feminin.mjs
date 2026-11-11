@@ -119,7 +119,7 @@ console.log("\n2. LE CHOIX DE CLASSE D'UNE HÉROÏNE");
     const autre = { texte: !!carte("CLASSE_SORCIER").querySelector(".carte-classe-bientot-texte"),
                     opacite: parseFloat(getComputedStyle(carte("CLASSE_SORCIER").querySelector(".carte-classe-image")).opacity) };
     window.afficherGrilleClasses();
-    window.ouvrirFicheClasse("CLASSE_MAUDIT");
+    window.ouvrirFicheClasse("CLASSE_CHAMAN");   // (v362 : le Maudit se choisit ; le Chaman attend encore)
     const fermee = getComputedStyle(document.getElementById("vue-fiche-classe")).display === "none";
     const message = (document.getElementById("message-classe-interdite") || {}).textContent || "";
     return { noms, titre, retenue, nomsH, bientot, autre, fermee, message, bientotIds: [...window.CLASSES_BIENTOT] };
