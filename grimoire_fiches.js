@@ -90,6 +90,8 @@ function nomDuJoueur(id) {
     if (c && c.nom && id === idJoueurCourant()) return c.nom;
     return "";
 }
+// (v369) Le nom d'un joueur, pour « Lecture terminée » (grimoire_recit.js).
+window.nomDuJoueurLivre = (id) => { if (!joueurs && typeof chargerJoueurs === "function") chargerJoueurs(); return nomDuJoueur(id); };
 
 // LES CLANS : un par joueur ; le sien d'abord, puis les autres par nom. Les
 // héros dans l'ordre de leur création (Cree_Le, v313 ; ceux d'avant, faute de

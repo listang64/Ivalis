@@ -11572,3 +11572,13 @@ corrections_v367.mjs le vérifie, dans la vraie page (clans, Forge, onglet DEV, 
 - **Le studio** : Totem, Faisceau entre deux totems, Renforcement chamanique (171 animations).
 
 chaman.mjs vérifie les règles : les paliers, la pose et ses refus, le rejeu, les effets (tout le monde, les alliés pour le soin), les faisceaux, le soin refusé et le bouclier, la chute, la fin après 5 manches, le Renforcement. corrections_v368.mjs vérifie la page : la classe, la fenêtre, les cases, la naissance du totem, l'écran, le studio. Mis à jour : corrections_v343/v358/v359/v360/v362, classes_feminin (plus de « bientôt »), studio_catalogue_1, studio_animation (171).
+
+## v369 — « Lecture terminée » après chaque réponse du Narrateur
+
+- Chaque nouvelle réponse du Narrateur porte `Lecture_Attendue: true` (ia_master.js).
+- Une fois le texte écrit dans le livre, un petit papier « Lecture terminée » sort à la place du papier d'écriture. Il dit qui on attend encore (le nom du joueur, sinon ses héros).
+- Attendus : les joueurs qui ont un héros actif (la case de la v367), un clic par joueur. Le clic s'écrit sur le message du Narrateur (`Lectures.<idJoueur>`), que tous les postes écoutent déjà.
+- Tous ont cliqué : le papier disparaît et le papier d'écriture sort pour tout le monde en même temps.
+- Personne ne reste bloqué par un absent : 3 minutes après la réponse, le papier s'ouvre de lui-même. Les réponses d'avant (sans la marque) n'attendent personne.
+
+corrections_v369.mjs le vérifie dans le livre : l'encart et les noms, le clic (écrit en base), le dernier clic qui ouvre l'écriture, un héros au repos, les 3 minutes, les anciennes réponses.

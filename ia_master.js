@@ -2382,6 +2382,8 @@ window.declencherTourIA = async function(options) {
                         Auteur_ID: "MJ", Auteur_Nom: "MJ", Auteur_Couleur: "#ffffff",
                         Texte,
                         Est_Narration_IA: true, // 🔻 C'EST CETTE LIGNE QUI DÉCLENCHE LE VISUAL NOVEL 🔻
+                        // (v369) Chacun clique « Lecture terminée » avant d'écrire (grimoire_recit.js).
+                        Lecture_Attendue: true,
                         Timestamp: horodatage,
                         ...etatMessage
                     });

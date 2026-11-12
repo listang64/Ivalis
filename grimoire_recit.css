@@ -424,3 +424,16 @@
    « * { Almendra !important } » de style.css l'imposait sinon). */
 .page-recit .para-recit, .page-recit .para-recit * {
   font-family: 'Palatino', 'Palatino Linotype', 'Book Antiqua', 'Palladio', 'URW Palladio L', 'P052', serif !important; }
+
+/* v369 — « LECTURE TERMINÉE » : le même marque-page que le papier d'écriture,
+   plus bas ; un bouton tracé à l'encre et les joueurs qu'on attend encore. */
+.recit-lecture { top: calc(-110px * var(--s, 1)); height: calc(150px * var(--s, 1)); }
+.papier-ecriture.papier-lecture { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--u) * 1.2); text-align: center; }
+.bouton-lecture {
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive; font-size: calc(var(--u) * 4.2); color: #1b1009;
+  background: rgba(255, 244, 214, 0.45); border: 2px solid #3a2210; border-radius: calc(var(--u) * 1.4);
+  padding: calc(var(--u) * 1) calc(var(--u) * 3.2); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.bouton-lecture:not(:disabled):hover { background: rgba(255, 236, 190, 0.8); }
+.bouton-lecture:disabled { cursor: default; opacity: 0.75; border-style: dashed; }
+.attente-lecture { font-family: 'IM Fell English', serif; font-style: italic; font-size: calc(var(--u) * 3); color: #5c3a21; min-height: 1.2em; }

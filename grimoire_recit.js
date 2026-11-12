@@ -795,11 +795,22 @@ function creerElements() {
       </form>`;
     papierDechire(ecriture.querySelector(".papier-ecriture"));
     avantLivre(ecriture);                  // (v301) un marque-page : sous les pages, il sort par le haut
+    // (v369) « LECTURE TERMINÉE » : le même marque-page, plus petit, qui sort à
+    // la place du papier d'écriture tant que tout le monde n'a pas fini de lire.
+    const lecture = document.createElement("div");
+    lecture.className = "recit-ecriture recit-lecture";
+    lecture.id = "recit-lecture";
+    lecture.innerHTML = `<div class="papier-ecriture papier-lecture">
+        <button type="button" class="bouton-lecture" id="recit-lecture-bouton">Lecture terminée</button>
+        <div class="attente-lecture" id="recit-lecture-attente"></div></div>`;
+    papierDechire(lecture.querySelector(".papier-ecriture"));
+    avantLivre(lecture);
     const poussiere = document.createElement("div");
     poussiere.className = "recit-poussiere";
     poussiere.id = "recit-poussiere";
     ecran.appendChild(poussiere);
-    elts = { portrait, avatar, avatars, notes, postit, ecriture, poussiere, saisie: ecriture.querySelector("textarea"), form: ecriture.querySelector("form") };
+    elts = { portrait, avatar, avatars, notes, postit, ecriture, lecture, poussiere, saisie: ecriture.querySelector("textarea"), form: ecriture.querySelector("form") };
+    toucherVite(lecture.querySelector("#recit-lecture-bouton"), () => terminerLecture());
     elts.form.addEventListener("submit", (ev) => { ev.preventDefault(); envoyer(); });
     elts.saisie.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); envoyer(); } });
     elts.micro = ecriture.querySelector("#recit-micro");
@@ -1023,7 +1034,11 @@ function majInterface() {
     // de suite le morceau de papier dans le livre ; on le replie quand le narrateur
     // écrit ». Pendant l'envoi il reste là (sans rien prendre de plus) ; il rentre
     // quand le Narrateur prend la plume (son tour, ou sa page qui s'écrit).
-    const ouvrir = recit && posee && !bloque && !ecrit && !!heros;
+    // (v369) Après chaque réponse du Narrateur : « Lecture terminée », puis le
+    // papier d'écriture s'ouvre pour tout le monde en même temps.
+    const lecture = etatLecture();
+    const ouvrir = recit && posee && !bloque && !ecrit && !!heros && !lecture.enAttente;
+    majLecture(lecture, recit && posee && !ecrit && !combat && lecture.enAttente, fige);
     elts.saisie.readOnly = !!etat.envoi;
     const etaitSorti = elts.ecriture.classList.contains("sortie");
     if (!fige) elts.ecriture.classList.toggle("sortie", ouvrir);
@@ -1056,6 +1071,80 @@ function majInterface() {
     clearTimeout(etat.revoir);
     if (etat.actif && pf && fige) etat.revoir = setTimeout(majInterface, 120);
 }
+// =====================================================================
+//  « LECTURE TERMINÉE » (v369)
+// =====================================================================
+//  Nico : « après chaque texte que le narrateur envoie, à la toute fin, un petit
+//  encart Lecture terminée, avec les noms des joueurs en attente. Une fois que
+//  tous les joueurs ont cliqué, l'encart disparaît et le post-it où l'on écrit
+//  son RP apparaît : chacun peut écrire en même temps, peu importe sa vitesse
+//  de lecture. » Attendus : les joueurs qui ont un héros actif (un clic par
+//  joueur). Personne ne reste bloqué par un absent : 3 minutes après la réponse,
+//  le papier s'ouvre de lui-même. Les clics vivent sur le message du Narrateur
+//  (Lectures.<idJoueur>), que tous les postes écoutent déjà. Seules les réponses
+//  marquées « Lecture_Attendue » (ia_master.js) attendent : les anciennes, non.
+const DELAI_LECTURE_MS = 3 * 60 * 1000;
+const lusIci = {};                       // ce poste a cliqué, avant que la base ne le redise
+function derniereNarration() {
+    let derniere = null;
+    etat.messages.forEach(m => { if (m && m.Est_Narration_IA) derniere = m; });
+    return derniere;
+}
+function joueursAttendusLecture() {
+    const ids = [];
+    herosDeLaPartie().forEach(h => {
+        if (!h.idJoueur || h.actif === false || h.statut === "Mort" || ids.includes(h.idJoueur)) return;
+        ids.push(h.idJoueur);
+    });
+    return ids;
+}
+function nomJoueurLecture(id) {
+    const nom = typeof window.nomDuJoueurLivre === "function" ? window.nomDuJoueurLivre(id) : "";
+    if (nom && nom !== id) return nom;
+    const siens = herosDeLaPartie().filter(h => h.idJoueur === id && h.actif !== false).map(h => h.prenom).filter(Boolean);
+    return siens.join(" / ") || id;
+}
+function etatLecture() {
+    const m = derniereNarration();
+    if (!m || m.Lecture_Attendue !== true) return { enAttente: false };
+    const id = idDe(m);
+    const lus = { ...(m.Lectures || {}), ...(lusIci[id] || {}) };
+    const attendus = joueursAttendusLecture();
+    const manquants = attendus.filter(j => !lus[j]);
+    const echeance = (Number(m.Timestamp) || 0) + DELAI_LECTURE_MS;
+    const expire = Date.now() >= echeance;
+    // (Un rappel juste après l'échéance : le papier s'ouvre de lui-même.)
+    clearTimeout(etat.revoirLecture);
+    if (manquants.length && !expire) etat.revoirLecture = setTimeout(() => majInterface(), Math.min(echeance - Date.now() + 200, 60000));
+    return { enAttente: manquants.length > 0 && !expire, message: m, id, manquants, attenduMoi: attendus.includes(moi()), luMoi: !!lus[moi()] };
+}
+function majLecture(lecture, voulu, fige) {
+    if (!elts || !elts.lecture) return;
+    if (voulu) {
+        const bouton = elts.lecture.querySelector("#recit-lecture-bouton");
+        const fini = !lecture.attenduMoi || lecture.luMoi;
+        bouton.disabled = fini;
+        bouton.textContent = fini ? "✓ Lecture terminée" : "Lecture terminée";
+        const noms = (lecture.manquants || []).map(nomJoueurLecture);
+        elts.lecture.querySelector("#recit-lecture-attente").textContent = noms.length ? `En attente : ${noms.join(", ")}` : "";
+    }
+    if (!fige) elts.lecture.classList.toggle("sortie", !!voulu);
+}
+function terminerLecture() {
+    const lecture = etatLecture();
+    if (!lecture.message || lecture.luMoi) return;
+    const id = lecture.id, qui = moi();
+    if (!qui) return;
+    son("page-prise", 0.5);
+    lusIci[id] = { ...(lusIci[id] || {}), [qui]: Date.now() };
+    majInterface();
+    if (lecture.message.idDoc) {
+        updateDoc(doc(db, "Messages_Chat", lecture.message.idDoc), { [`Lectures.${qui}`]: Date.now() })
+            .catch(e => console.error("Le livre : lecture terminée", e));
+    }
+}
+window.etatLectureRecit = () => etatLecture();
+
 // LE COMBAT DU RÉCIT (v278, combat_rp.js) : son bouton vivait dans l'ancien
 // parchemin du MJ ; dans le livre, une note rouge sort du haut du livre —
 // « le destin hésite », puis COMBATTRE (ou rejoindre la bataille).
@@ -1488,7 +1577,7 @@ function sortir() {
     clearInterval(etat.minuteur); etat.minuteur = null;
     const g = G();
     if (g && g.ecran()) g.ecran().removeEventListener("grimoire-page", majInterface);
-    if (elts) ["avatars", "notes", "postit", "ecriture", "poussiere"].forEach(k => { if (elts[k]) elts[k].remove(); });
+    if (elts) ["avatars", "notes", "postit", "ecriture", "lecture", "poussiere"].forEach(k => { if (elts[k]) elts[k].remove(); });
     elts = null;
     if (mesureur) { mesureur.remove(); mesureur = null; }
     etat.elements = []; etat.htmlPages = []; etat.pagesRecit = 0;
