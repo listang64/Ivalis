@@ -296,6 +296,26 @@ window.DESCRIPTIFS_CLASSES = {
                        "Renvoie 33 % des dégâts qu'il subit à qui les lui inflige · une fois par combat"] }
         ]
     },
+    // (v368) LE CHAMAN, la dernière classe.
+    CLASSE_CHAMAN: {
+        presentation: "Il plante des totems qui sèment la peur, le poison ou le soin autour d'eux, "
+            + "et les relie par des faisceaux d'énergie verte que personne ne traverse sans y laisser quelque chose.",
+        paliers: [
+            { niveau: 1, titre: "Technique : Totem",
+              points: ["Un totem sur le terrain · +1 aux soins · +5 PV",
+                       "Initiative 20 · fatigue 65, puis 15 bloqués (pas dépensés) par totem · posé à 2 cases, en vue",
+                       "15 PV, 5 manches ; son effet, au choix (Charisme, Sagesse ou Intelligence à 14), touche tout le monde à 1 case autour de lui"] },
+            { niveau: 3, titre: "Un deuxième totem",
+              points: ["Deux totems sur le terrain · +1 compétence",
+                       "À 4 cases au plus, sans mur entre eux, deux totems se relient : qui traverse le faisceau vert subit leurs deux effets"] },
+            { niveau: 5, titre: "Un troisième totem",
+              points: ["Trois totems sur le terrain (chaque paire reliée a son faisceau)",
+                       "Ses totems ne coûtent plus que 60 de fatigue et 10 de réserve"] },
+            { niveau: 9, titre: "Technique : Renforcement chamanique",
+              points: ["Ses totems ont 20 PV",
+                       "Initiative 100 · aucune fatigue · une fois par combat : tous ses totems soignés et remis à 5 manches"] }
+        ]
+    },
     CLASSE_MAUDIT: {
         presentation: "Il ronge ses ennemis de malédictions qui s'accumulent, paie sa puissance de son "
             + "propre sang, et lie son destin à celui de sa victime.",
@@ -522,7 +542,8 @@ const nomAffiche = (c) => (typeof window.nomClasseGenre === "function")
 // (v358) L'Inquisiteur a ses règles : il se choisit.
 // (v359) Le Prêtre de la lumière aussi ; (v360) le Berserker aussi.
 // (v362) Le Maudit aussi.
-window.CLASSES_BIENTOT = ["CLASSE_CHAMAN"];
+// (v368) Plus aucune classe en attente : le Chaman est jouable.
+window.CLASSES_BIENTOT = [];
 window.classeBientot = (c) => !!c && window.CLASSES_BIENTOT.includes(c.id);
 
 window.rendreGrilleClasses = function(classes) {

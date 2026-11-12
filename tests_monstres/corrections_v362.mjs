@@ -8,7 +8,7 @@ let echecs = 0;
 const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd(66)} ${c ? "OK" : "ÉCHEC"} ${d}`); };
 const lire = (f) => fs.readFileSync('/home/user/Ivalis/' + f, 'utf-8');
 console.log("\n1. LE MAUDIT");
-verifier("il sort des classes « bientôt » : il ne reste que le Chaman", /CLASSES_BIENTOT = \["CLASSE_CHAMAN"\];/.test(lire("classes.js")));
+verifier("il sort des classes « bientôt » : il ne reste que le Chaman", /CLASSES_BIENTOT = \[("CLASSE_CHAMAN")?\];/ /* (v368 : le Chaman sort aussi) */.test(lire("classes.js")));
 verifier("ses paliers, le Vaudou, sa fiche", /"Maudit": \[/.test(lire("app.js")) && /CLASSE_VAUDOU: \{/.test(lire("app.js")) && /CLASSE_MAUDIT: \{/.test(lire("classes.js")));
 verifier("la Magie du sang : un effet de secours (0 point, Maudit niveau 3), une seule fois par action",
          /id: "EFF_MAGIE_DU_SANG", secoursLocal: true/.test(lire("app.js")) && /"Magie du sang"\]\.includes\(effet\.Nom\)\) return 1/.test(lire("competences.js")));

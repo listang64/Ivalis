@@ -4073,7 +4073,8 @@ window.appliquerTokensVTT = function(tokensMap) {
         img.onerror = () => { img.style.display = "none"; };
         // L'Illusion reprend le token du lanceur mais à 50% d'opacité, pour rester reconnaissable
         // comme un leurre plutôt qu'un vrai personnage.
-        if (pData && pData.estIllusion) img.style.opacity = "0.4";
+        // (v368) Un totem du Chaman est un « leurre » sans tour, mais bien réel : opaque.
+        if (pData && pData.estIllusion && !pData.estTotem) img.style.opacity = "0.4";
 
         divToken.appendChild(img);
 
@@ -4671,6 +4672,12 @@ function dessinerHexZonePersistante(type, hex, R, leger, px, sfx = "") {
                 <circle r="${(R * 0.09).toFixed(1)}" fill="url(#zp-grad-etincelle-soin${sfx})"${halo} class="zp-anim"
                     style="animation: zpBulle ${(2.2 + rnd(k + 17) * 1.8).toFixed(2)}s ease-out infinite; animation-delay:-${(rnd(k + 23) * 3).toFixed(2)}s"/></g>`;
         }
+    } else if (type === "totem" || type === "totem-lien") {
+        // (v368) LES TOTEMS DU CHAMAN : leur zone, teintée de leur caractéristique ;
+        // le faisceau qui relie deux totems, d'un vert chamanique qui pulse.
+        const teinte = type === "totem-lien" ? "#5dff8a" : ({ cha: "#b07ae8", sag: "#5fd36f", int: "#5f9df0" }[hex.carac] || "#5fd36f");
+        contour = teinte;
+        deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="${teinte}" opacity="${type === "totem-lien" ? 0.28 : 0.18}" class="zp-anim" style="animation: zpSocle 2.2s ease-in-out infinite"/>`;
     } else {
         deco += `<polygon points="${pointsHexZone(0, 0, R)}" fill="rgba(255,76,76,0.22)" class="zp-anim" style="animation: zpSocle 2.6s ease-in-out infinite"/>`;
     }
@@ -4886,8 +4893,14 @@ window.appliquerZonesPersistantes = function() {
     let corps = "";
     zones.forEach(zone => {
         (zone.hexes || []).forEach(hex => {
-            corps += dessinerHexZonePersistante(zone.type || "neutre", hex, R, leger);
+            corps += dessinerHexZonePersistante(zone.type || "neutre", zone.carac ? { ...hex, carac: zone.carac } : hex, R, leger);
         });
+    });
+    // (v368) LE FAISCEAU VERT entre deux totems reliés : un trait lumineux de l'un à l'autre.
+    zones.filter(z => z.type === "totem-lien" && z.lien).forEach(z => {
+        const a = window.PLATEAU_VTT.hexToPixel(z.lien.a.q, z.lien.a.r), b = window.PLATEAU_VTT.hexToPixel(z.lien.b.q, z.lien.b.r);
+        corps += `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="#7dffa0" stroke-width="${(R * 0.22).toFixed(1)}" stroke-linecap="round" opacity="0.35"/>`
+               + `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="#e8ffe8" stroke-width="${(R * 0.06).toFixed(1)}" stroke-linecap="round" class="faisceau-totem"/>`;
     });
 
     // On passe par DOMParser plutôt que par innerHTML : l'affectation de balisage SVG via
@@ -6035,6 +6048,8 @@ window.lancerTechniqueClasse = function(idCarte, idLanceur) {
     }
     // Le Mur de terre (Géomancien) : les cases se touchent sur le plateau.
     if (t.cible === "murs") return window.ouvrirPoseMursTerre(idLanceur);
+    // (v368) Le Totem du Chaman : l'effet, puis la case (totems.js).
+    if (t.cible === "totem" && typeof window.ouvrirPoseTotem === "function") return window.ouvrirPoseTotem(idLanceur);
     if (!["allieAdjacent", "allieKO", "ennemiAdjacent", "ennemi", "combattant"].includes(t.cible)) {
         return demande.techniqueClasse(idLanceur, idCarte);
     }

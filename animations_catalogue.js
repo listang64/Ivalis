@@ -3599,6 +3599,64 @@
         }
     ]);
 
+
+    // (v368) LE CHAMAN : ses totems, leur faisceau, leur renforcement.
+    ajouter(8, "Chaman", [
+        {
+            id: "totem-plante", nom: "Niv.1 Totem", sens: "vers l'ennemi",
+            description: "Le Chaman frappe le sol de son bâton : un totem sculpté surgit à 2 cases, sa zone s'allume tout autour (ici, un totem de poison : l'ennemi qui y entre est empoisonné).",
+            async jouer(sc, o) {
+                const { a, b, v } = lieux(sc);
+                const pos = o.voisine(sc.lanceur, a, v);
+                o.son("releve");
+                await o.secouer(sc.lanceur, 3, 300);
+                const totem = o.pionDessine(sc.calque, pos, { contenu: "🗿", fond: "radial-gradient(circle at 40% 35%, #8a5a2b, #3a2210)", bord: "#9a5cd0" });
+                await o.surgir(totem, { duree: 500 });
+                poussiere(o, sc.calque, pos, { n: 8 });
+                o.texte(sc.calque, sc.lanceur, "🗿 Totem", "#e8c46a");
+                const aura = o.aura(sc.calque, pos, { couleur: "#b07ae8", taille: 3.2, fond: "radial-gradient(circle, rgba(176,122,232,0.18), transparent 70%)", pulsations: 3, duree: 1800, sol: true });
+                await o.attendre(600);
+                await effetPoison(o, sc.calque, sc.cible, { texte: "Zone du totem : empoisonné" });
+                await aura;
+                await o.effacer(totem);
+            }
+        },
+        {
+            id: "faisceau-totems", nom: "Niv.3 Faisceau entre deux totems", sens: "vers l'ennemi",
+            description: "Deux totems à 4 cases au plus, sans mur entre eux, se relient d'un faisceau vert : l'ennemi qui le traverse subit les deux effets (ici, poison et brûlure).",
+            async jouer(sc, o) {
+                const { a, b, v } = lieux(sc);
+                const p1 = o.voisine(sc.cible, b, o.tourner(v, Math.PI / 2)), p2 = o.voisine(sc.cible, b, o.tourner(v, -Math.PI / 2));
+                const t1 = o.pionDessine(sc.calque, p1, { contenu: "🗿", bord: "#9a5cd0" }), t2 = o.pionDessine(sc.calque, p2, { contenu: "🗿", bord: "#3a7bd5" });
+                await Promise.all([o.surgir(t1), o.surgir(t2)]);
+                o.son("lien");
+                const fil = o.lien(sc.calque, p1, p2, { couleur: "#7dffa0", epaisseur: 6, fond: "linear-gradient(90deg, #7dffa0, #e8ffe8, #7dffa0)" });
+                await o.attendre(700);
+                o.texte(sc.calque, sc.cible, "Faisceau traversé", "#7dffa0");
+                await effetPoison(o, sc.calque, sc.cible);
+                await effetBrule(o, sc.calque, sc.cible);
+                await Promise.all([o.effacer(fil), o.effacer(t1), o.effacer(t2)]);
+            }
+        },
+        {
+            id: "renforcement-chamanique", nom: "Niv.9 Renforcement chamanique", sens: "sur soi",
+            description: "Le Chaman lève les bras : une sève verte court jusqu'à chacun de ses totems, qui retrouvent tous leurs PV et leurs 5 manches.",
+            async jouer(sc, o) {
+                const { a, v } = lieux(sc);
+                const p1 = o.voisine(sc.lanceur, a, o.tourner(v, Math.PI / 2)), p2 = o.voisine(sc.lanceur, a, o.tourner(v, -Math.PI / 2));
+                const t1 = o.pionDessine(sc.calque, p1, { contenu: "🗿", bord: "#3f9a4a" }), t2 = o.pionDessine(sc.calque, p2, { contenu: "🗿", bord: "#3f9a4a" });
+                await Promise.all([o.surgir(t1), o.surgir(t2)]);
+                o.son("soin");
+                o.eclat(sc.lanceur, "brightness(1.4) drop-shadow(0 0 12px #7dffa0)", 900);
+                await Promise.all([p1, p2].map(p => o.filer(sc.calque, a, p, { couleur: "#7dffa0", taille: 0.2, duree: 600 })));
+                [t1, t2].forEach(t => o.jauge(sc.calque, t, 6, 20, 20, "+14", COULEURS.soin, COULEURS.soin));
+                o.texte(sc.calque, sc.lanceur, "Totems renforcés : 5 manches", "#7dffa0");
+                await Promise.all([p1, p2].map(p => o.aura(sc.calque, p, { couleur: "#7dffa0", taille: 1.3, pulsations: 2, duree: 1100 })));
+                await Promise.all([o.effacer(t1), o.effacer(t2)]);
+            }
+        }
+    ]);
+
     // =====================================================================
     //  9. TALENTS QUI SE VOIENT
     // =====================================================================
@@ -3861,6 +3919,7 @@
         "lumiere-aveuglante", "garde-lumiere", "insensible-aveugle", "appel-lumiere", "aura-soin", "desintegration",
         "rage", "regeneration-insolente", "deux-armes-deux-mains",
         "dot-cumules", "magie-du-sang", "vaudou", "possession",
+        "totem-plante", "faisceau-totems", "renforcement-chamanique",
         // 9. Talents
         "adrenaline", "inertie-martiale", "impact-cinetique", "elan-partage", "bouclier-sages", "degats-illusoires", "immunise", "pugiliste", "diversion"
     ];

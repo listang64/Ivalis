@@ -1451,6 +1451,11 @@ export function chaineDeDegats(cible, attaque, options) {
 //  les étapes à jouer. Elle est appelée au milieu d'une marche déjà en cours
 //  (resoudreMouvement travaille sur sa copie) : lui faire cloner l'état à
 //  chaque case ferait perdre les pas déjà écrits.
+// (v368) LES ZONES DES TOTEMS DU CHAMAN (totems_pur.js) se branchent ici : une
+// zone qui porte des `totemEffets` est confiée à leur module, qui sait ce que
+// chaque effet fait (Peur, poussée, soin d'allié…).
+let effetsDeTotem = null;
+export function brancherEffetsDeTotem(f) { effetsDeTotem = typeof f === "function" ? f : null; }
 export function traverserZones(etat, id, hex, des, options = {}) {
     const etapes = [];
     const cible = combattant(etat, id);
@@ -1472,6 +1477,11 @@ export function traverserZones(etat, id, hex, des, options = {}) {
         // UNE FOIS PAR MANCHE (v253) : qui l'a subie en y entrant ne la
         // resubit pas à la fin de la manche (zonesDeFinDeManche).
         if (!(zone.subies || []).includes(id)) zone.subies = [...(zone.subies || []), id];
+        // (v368) Une zone de totem : son module la joue (le totem n'y est pour rien d'autre).
+        if (zone.totemEffets) {
+            if (effetsDeTotem) etapes.push(...effetsDeTotem(etat, id, hex, zone, des, options));
+            return;
+        }
         // Le jet de défense d'abord, comme pour une attaque d'opportunité :
         // une seule chance de passer au travers, quel que soit le contenu.
         const esquive = esquiveDe(cible), parade = paradeDe(cible);
@@ -1624,7 +1634,9 @@ export function creerZonePure(etat, action, hexes, idLanceur) {
 // ce qu'elle recouvre, et se retrouverait avec deux nappes superposées là où le
 // cerveau n'en a qu'une. Une divergence silencieuse, celle qui coûte le plus
 // cher à retrouver.
-export const familleDeZone = (z) => (z && z.type === "neutre") ? "degats" : "element";
+// (v368) Les zones des totems sont à part : rien ne les ampute ni ne les efface.
+export const familleDeZone = (z) => (z && (z.totemEffets || z.type === "totem" || z.type === "totem-lien")) ? "totem"
+    : (z && z.type === "neutre") ? "degats" : "element";
 export function poserZone(etat, zone) {
     const etapes = [];
     const prises = new Set((zone.hexes || []).map(h => h.q + "," + h.r));
@@ -1665,7 +1677,8 @@ export function zonesDeFinDeManche(etat, des) {
         const c = combattant(etat, id);
         if (!c || c.aTerre || c.q === null || c.q === undefined) return;
         const hex = { q: nombre(c.q), r: nombre(c.r) };
-        etapes.push(...traverserZones(etat, id, hex, des, { seulement: z => !(z.subies || []).includes(id) }));
+        // (v368) Le faisceau entre deux totems ne frappe que qui le TRAVERSE.
+        etapes.push(...traverserZones(etat, id, hex, des, { seulement: z => !(z.subies || []).includes(id) && !z.entreeSeule }));
     });
     return etapes;
 }
@@ -2831,6 +2844,12 @@ export function resoudreCarte(etat, action, plateau) {
             //  La triche des créatures (bonusMonstreDe) s'ajoute ici, sur le
             //  soin lui-même — jamais sur un gain de bouclier, qui n'est ni un
             //  dégât ni un soin.
+            // (v368) UN TOTEM DU CHAMAN NE SE SOIGNE PAS (seul le Renforcement
+            // chamanique le remet à neuf) ; un bouclier, lui, s'y pose.
+            if (attaque.isHeal && cible.totem) {
+                etapes.push({ type: "message", cible: idCible, acteur: idLanceur, texte: "Un totem ne se soigne pas", couleur: "#9be08a" });
+                return;
+            }
             if (attaque.isHeal) {
                 const avant = cible.pv;
                 // (Un soin étalé ne critique pas, v260.)

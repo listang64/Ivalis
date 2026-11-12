@@ -6322,3 +6322,30 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
     text-shadow: 0 1px 2px #000;
 }
 .bouton-rejoindre-combat:hover { filter: brightness(1.15); }
+
+/* v368 — LA FENÊTRE DES TOTEMS DU CHAMAN (totems.js) : trois colonnes, une par
+   caractéristique ; celle qui n'atteint pas 14 est grisée. */
+.fenetre-choix-totem {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20050;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto;
+    padding: 18px 20px; box-sizing: border-box;
+    background: linear-gradient(180deg, #2a1a0f, #1a0f08); border: 2px solid #c9a24a; border-radius: 14px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.85); color: #e8d5a5; text-align: center;
+}
+.totem-titre { font-family: 'Cinzel', serif; font-size: 22px; font-weight: bold; color: #f3d27a; }
+.totem-texte { font-size: 14px; max-width: 620px; }
+.totem-colonnes { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; width: 100%; }
+.totem-colonne { flex: 1 1 200px; display: flex; flex-direction: column; gap: 8px; padding: 10px;
+    border: 1px solid var(--teinte); border-radius: 10px; background: rgba(0, 0, 0, 0.25); }
+.totem-colonne.fermee { opacity: 0.45; filter: grayscale(0.7); }
+.totem-carac { font-family: 'Cinzel', serif; font-weight: bold; color: var(--teinte); display: flex; flex-direction: column; gap: 2px; }
+.totem-carac small { font-family: inherit; font-weight: normal; font-size: 12px; color: #d8c49a; }
+.totem-effet { display: flex; flex-direction: column; gap: 2px; align-items: center; cursor: pointer;
+    background: #3a2614; color: #f3d27a; border: 1px solid var(--teinte); border-radius: 8px; padding: 8px 10px; font: inherit; }
+.totem-effet span { font-size: 12px; color: #d8c49a; }
+.totem-effet:not([disabled]):hover { background: #4a3218; }
+.totem-effet[disabled] { cursor: not-allowed; }
+.totem-annuler { background: none; border: 1px solid #a07a3a; color: #e8d5a5; border-radius: 8px; padding: 6px 18px; cursor: pointer; font: inherit; }
+.faisceau-totem { animation: faisceauTotem 1.6s ease-in-out infinite; }
+@keyframes faisceauTotem { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }

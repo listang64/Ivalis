@@ -213,6 +213,9 @@ function persoDocVersFront(id, d) {
     equipMainDroite: d.Equip_Main_Droite || null,
     equipMainGauche: d.Equip_Main_Gauche || null,
     estIllusion: d.Est_Illusion === true,
+    // (v368) Un totem du Chaman (sans tour comme un leurre, mais bien réel) et son effet.
+    estTotem: d.Est_Totem === true,
+    totemEffet: d.Totem_Effet || "",
     // LE COMPAGNON DU PISTEUR, décrit à la création (classes.js) : son nom,
     // son allure, son image (paysage) et son pion — générés juste après le
     // héros (genererCompagnonEnArrierePlan).
@@ -1025,6 +1028,18 @@ window.ATOUTS_CLASSES = {
     // +1 compétence ; au niveau 3, la Magie du sang (EFF_MAGIE_DU_SANG dans la
     // Forge : ×1,2 sur les sorts offensifs, 10 % du coût en PV) ; le Vaudou au
     // niveau 5. (La Possession, niveau 9 : v363.)
+    // (v368) LE CHAMAN, la dernière classe (Nico) : un totem de plus aux niveaux 1,
+    // 3 et 5 (totemsMax : 1, 2, 3 — le Totem se repose tant qu'il en a moins) ;
+    // +1 aux soins et +5 PV au niveau 1 ; +1 compétence au niveau 3 ; au niveau 5,
+    // ses totems ne coûtent plus que 60 de fatigue et 10 de réserve
+    // (totemsAlleges) ; au niveau 9, 20 PV par totem (totemPvBonus) et le
+    // Renforcement chamanique (totems_pur.js).
+    "Chaman": [
+        { niveau: 1,  totemsMax: 1, bonusSoin: 1, pvMax: 5, techniques: ["CLASSE_TOTEM"] },
+        { niveau: 3,  totemsMax: 1, competences: 1 },
+        { niveau: 5,  totemsMax: 1, totemsAlleges: true },
+        { niveau: 9,  totemPvBonus: 5, techniques: ["CLASSE_RENFORCEMENT_CHAMANIQUE"] }
+    ],
     "Maudit": [
         { niveau: 1,  dotCumulables: true, sansSurpuissanceOffensive: true, pvMax: 5, competences: 1 },
         { niveau: 3,  magieDuSang: true, effets: ["EFF_MAGIE_DU_SANG"] },
@@ -1225,6 +1240,24 @@ window.TECHNIQUES_CLASSE = {
     // (v364) LA POSSESSION : un monstre à 6 cases, en vue (ni boss, ni leader),
     // passe 3 manches dans son camp, joué depuis son poste ; lui reste inerte.
     // Réserve : 80 bloqués (pas dépensés) pendant la possession.
+    // (v368) LE TOTEM DU CHAMAN : posé à 2 cases, en vue, avec l'effet choisi
+    // (12 effets, par caractéristique, 14 au moins) ; réutilisable tant qu'il en
+    // a moins que son maximum. Fatigue 65 puis 15 bloqués par totem (60 et 10 au
+    // niveau 5). Les règles : totems_pur.js.
+    CLASSE_TOTEM: {
+        Nom: "Totem", classe: "Chaman", niveau: 1, Initiative: 20, Fatigue: 65, cible: "totem", portee: 2, reutilisable: true,
+        desc: "Plante un totem à 2 cases, en vue (15 PV, 5 manches) avec l'effet choisi, qui touche tout le monde dans 1 case "
+            + "autour de lui (2 pour l'Immobilisation et l'Attraction) : à l'entrée, et en fin de manche. Deux totems à 4 cases "
+            + "au plus, sans mur entre eux, sont reliés par un faisceau vert : qui le traverse subit les deux effets. "
+            + "Fatigue 65, puis 15 d'énergie bloqués (pas dépensés) tant qu'il tient (60 et 10 au niveau 5). "
+            + "Un totem ne se soigne pas ; un bouclier, oui."
+    },
+    // (v368) LE RENFORCEMENT CHAMANIQUE (niveau 9) : chaque totem debout retrouve
+    // tous ses PV et ses 5 manches. Une fois par combat.
+    CLASSE_RENFORCEMENT_CHAMANIQUE: {
+        Nom: "Renforcement chamanique", classe: "Chaman", niveau: 9, Initiative: 100, Fatigue: 0, cible: "soi",
+        desc: "Soigne entièrement tous ses totems et remet leur durée à 5 manches. Une fois par combat."
+    },
     CLASSE_POSSESSION: {
         Nom: "Possession", classe: "Maudit", niveau: 9, Initiative: 100, Fatigue: 80, cible: "ennemi", portee: 6,
         reserve: { parTour: 80, tours: 3, sansRelache: true },
@@ -1796,6 +1829,9 @@ window.texteAtout = function(cle, valeur) {
                                               : "Le malus de brûlure s'annule : il brûle comme tout le monde";
         case "degatsContreVargen": return `${plus(n)} dégâts contre les Vargens`;
         case "degatsContreMages": return `${plus(n)} dégâts contre les monstres Mage et Soutien`;
+        case "totemsMax":      return `${plus(n)} totem sur le terrain`;
+        case "totemsAlleges":  return "Ses totems ne coûtent plus que 60 de fatigue et 10 de réserve";
+        case "totemPvBonus":   return `Ses totems ont ${15 + n} PV`;
         case "dotCumulables":  return "Malédiction avancée : ses dégâts sur la durée se cumulent sur une même cible (un rond dit combien)";
         case "sansSurpuissanceOffensive": return "Ses sorts offensifs n'ont pas la surpuissance classique";
         case "magieDuSang":    return "Magie du sang : dans la Forge, ×1,2 sur un sort offensif, contre 10 % de son coût en fatigue, en PV";

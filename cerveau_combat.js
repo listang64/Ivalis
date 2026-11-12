@@ -58,6 +58,9 @@ import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissip
          finirPossessions, PORTEE_POSSESSION } from './moteur_pur.js';
 import { resoudreMouvement, resoudreBond, resoudrePeur, resoudreRepli, distance, planifierTrajet,
          occupantVivant, fureurDeLaSentinelle, voisinsDe } from './mouvement_pur.js';
+// (v368) Les totems du Chaman : leurs règles, et leur branchement sur les zones.
+import { TECHNIQUE_TOTEM, TECHNIQUE_RENFORCEMENT, raisonRefusTotem, poserTotem, surveillerTotems, vieillirTotems,
+         renforcementChamanique, retenirPlateauTotems, totemsDe } from './totems_pur.js';
 import { deciderTourCreature, choisirZone, choisirRepli, ennemiLePlusProche, casesAccessibles,
          ennemiAtteignable, pasJusquAuContact, detourDesMurs, DETOUR_MAX_MURS, pasMaxDe } from './ia_pure.js';
 
@@ -261,6 +264,16 @@ export function validerIntention(etat, intention, plateau) {
         if (!idCarte) return refus("technique sans identité");
         if (!((acteur.atouts && acteur.atouts.techniques) || []).includes(idCarte)) {
             return refus(`${intention.acteur} n'a pas la technique ${idCarte}`);
+        }
+        // (v368) Le Totem du Chaman se repose tant qu'il en a moins que son maximum.
+        if (idCarte === TECHNIQUE_TOTEM) {
+            const raison = raisonRefusTotem(etat, acteur, intention.totem, plateau);
+            if (raison) return refus(raison);
+            if (tete.carte && tete.carte !== idCarte) return refus(`la carte de ce tour est ${tete.carte}`);
+            return { ok: true, raison: null };
+        }
+        if (idCarte === TECHNIQUE_RENFORCEMENT && totemsDe(etat, acteur.id).length === 0) {
+            return refus("Renforcement chamanique : aucun totem sur le terrain");
         }
         if (idCarte !== TECHNIQUE_MUR_TERRE && (acteur.techniquesUtilisees || []).includes(idCarte)) {
             return refus(`${idCarte} déjà utilisée dans ce combat`);
@@ -469,6 +482,9 @@ function fabriquerPas(etatAvant, etatApres, etapes, cause, acteur, des) {
     // retrouve sa place.
     if (Array.isArray(etapes)) etapes.push(...finirPossessions(suivant));
     if (Array.isArray(etapes)) etapes.push(...surveillerRage(suivant));
+    // (v368) UN TOTEM TOMBÉ (frappé à zéro) : sa réserve revient au Chaman, ses
+    // zones et ses faisceaux s'éteignent.
+    if (Array.isArray(etapes)) etapes.push(...surveillerTotems(suivant));
     suivant.version = nombre(etatAvant.version) + 1;
 
     // LE COMPTEUR DE CASES MARCHÉES SUIT LES ÉTAPES, ICI ET POUR TOUS LES PAS.
@@ -613,6 +629,9 @@ export function cloturerTour(etat, des) {
         // sous ce régime, où plus personne ne « finit » le round de son côté :
         // une zone posée une fois serait restée jusqu'à la fin du combat.
         etapes.push(...vieillirZones(etat));
+        // (v368) Les totems du Chaman : une manche de moins (5 en tout) ; une
+        // réserve que son énergie ne couvre plus fait tomber le plus récent.
+        etapes.push(...vieillirTotems(etat));
         etapes.push({ type: "manche", numero: etat.manche });
     }
     return { fini: partie.id, etapes };
@@ -627,7 +646,8 @@ export function reservesDeFinDeManche(etat) {
     (etat.ordre || Object.keys(etat.combattants || {})).forEach(id => {
         const c = combattant(etat, id);
         if (!c || !Array.isArray(c.etats)) return;
-        c.etats.filter(e => e && e.maintien).forEach(m => {
+        // (v368) La réserve d'un totem se gère totem par totem (vieillirTotems).
+        c.etats.filter(e => e && e.maintien && e.maintien !== TECHNIQUE_TOTEM).forEach(m => {
             if (c.aTerre) { etapes.push(...relacherMaintien(etat, id, m.maintien)); return; }
             // (v354) La réserve du Dernier sursis : le sursis fini, elle s'en va ;
             // à court d'énergie, le sursis s'arrête — il tombe KO.
@@ -1135,6 +1155,8 @@ export const ETAT_BOUCLIER_SAGES = "Bouclier des Sages";
 
 export function appliquerIntention(etat, intention, plateau) {
     const des = creerDes(etat.graine);
+    // (v368) Les zones et les déplacements des totems ont besoin des murs.
+    retenirPlateauTotems(plateau);
 
     if (intention.type === "finTour") return avancerFile(etat, des);
 
@@ -1190,6 +1212,15 @@ export function appliquerIntention(etat, intention, plateau) {
 
     // UNE TECHNIQUE DE CLASSE : son effet, puis la fin du tour — comme une
     // carte, elle occupe le tour du héros.
+    // (v368) LE TOTEM DU CHAMAN : posé, sa réserve tenue, ses zones et ses
+    // faisceaux tracés ; puis la fin du tour.
+    if (intention.type === "classe" && intention.idCarte === TECHNIQUE_TOTEM) {
+        const suivant = clonerEtat(etat);
+        const etapes = poserTotem(suivant, intention.acteur, intention.totem, plateau);
+        const clot = cloturerTour(suivant, des);
+        if (clot) etapes.push(...clot.etapes);
+        return fabriquerPas(etat, suivant, etapes, intention.id, intention.acteur, des);
+    }
     if (intention.type === "classe" && intention.idCarte === TECHNIQUE_MUR_TERRE) {
         const suivant = clonerEtat(etat);
         const etapes = leverMursDeTerre(suivant, intention.acteur, intention.murs || [], des, plateau);
@@ -1259,6 +1290,10 @@ export function appliquerIntention(etat, intention, plateau) {
         }
         // (v358) LA COMBUSTION INSTANTANÉE : un dé par ennemi debout (ordre des
         // ids), 75 % moins sa résistance au feu ; un immunisé ne brûle jamais.
+        // (v368) LE RENFORCEMENT CHAMANIQUE : chaque totem debout, remis à neuf.
+        if (intention.idCarte === TECHNIQUE_RENFORCEMENT) {
+            etapes.push(...renforcementChamanique(suivant, intention.acteur));
+        }
         if (intention.idCarte === "CLASSE_COMBUSTION") {
             const pris = Object.fromEntries(ennemisSurLaCarte(suivant, intention.acteur).map(x =>
                 [x.id, des.d100() <= chanceFaceA(x, "Brûlé", CHANCE_COMBUSTION)]));

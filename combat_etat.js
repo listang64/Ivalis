@@ -228,6 +228,11 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         // (resoudreCarte), et sa Magie du sang lui coûte des PV.
         dotCumulables: !!race.dotCumulables,
         magieDuSang: !!race.magieDuSang,
+        // (v368) Le Chaman : combien de totems à la fois (1, 2 puis 3), leur prix
+        // allégé au niveau 5 (60 de fatigue, 10 en réserve), leurs PV en plus au niveau 9.
+        totemsMax: nombre(race.totemsMax),
+        totemsAlleges: !!race.totemsAlleges,
+        totemPvBonus: nombre(race.totemPvBonus),
         auraSoin: nombre(race.auraSoin),
         // …et désormais, à la place, le feu le PREND plus facilement : +20 %
         // de chance d'être Brûlé par un sort qui brûle (tirerDesCarte).
@@ -1319,6 +1324,13 @@ export const APPLICATEURS = {
         if (e.manche !== undefined) etat.manche = nombre(e.manche, etat.manche);
         if (Array.isArray(e.ontJoue)) etat.ontJoue = [...e.ontJoue];
         if (e.positions) memoriserPositions(etat, nombre(etat.manche), e.positions);
+    },
+
+    // (v368) Un totem du Chaman : ses manches qui restent (le RÉSULTAT).
+    totem(etat, e) {
+        const c = combattant(etat, e.cible);
+        if (!c || !e.totem) return;
+        c.totem = { ...e.totem };
     },
 
     // Un renfort entre en scène.

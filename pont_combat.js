@@ -517,7 +517,8 @@ const SCENES = {
     // forme (animations_jeu.js).
     arrivee(e) {
         return { geste: "arrivee", pion: e.combattant && e.combattant.id,
-                 ...(e.combattant && e.combattant.estIllusion ? { illusion: true } : {}),
+                 // (v368) Un totem du Chaman surgit du sol (pas une illusion).
+                 ...(e.combattant && e.combattant.estIllusion && !e.combattant.totem ? { illusion: true } : {}),
                  // Surgie d'un piège (v268) : elle entre dans un nuage de fumée.
                  ...(e.combattant && e.combattant.piege ? { piege: true } : {}) };
     },
@@ -528,6 +529,12 @@ const SCENES = {
                  reaction: { sorte: "piege", pion: e.acteur, remplace: true } };
     },
     zone(e)    { return { geste: "zone", id: e.id, zone: e.zone || null, retiree: !!e.retiree }; },
+    // (v368) Un totem du Chaman : ses manches qui restent (rien à montrer), ou
+    // remis à neuf par le Renforcement chamanique.
+    totem(e) {
+        return e.renforcement ? { geste: "message", pion: e.cible, texte: "🌿 Renforcé : 5 manches", couleur: "#7dffa0", duree: RYTHME.message }
+            : { geste: "rien" };
+    },
 
     chute(e, etat) {
         const c = combattantDe(etat, e.cible);
@@ -536,7 +543,7 @@ const SCENES = {
                  // vole en éclats (l'Illusion brisée).
                  // La fin du sursis (« on garde, tu peux intégrer ») : le sablier
                  // se renverse et il s'effondre.
-                 reaction: { sorte: e.finSursis ? "sursis-fin" : c && c.estIllusion ? "illusion-brisee" : "ko", pion: e.cible,
+                 reaction: { sorte: e.finSursis ? "sursis-fin" : c && c.estIllusion && !c.totem ? "illusion-brisee" : "ko", pion: e.cible,
                              depuis: e.acteur && e.acteur !== e.cible ? e.acteur : null, remplace: true } };
     },
 
@@ -605,6 +612,9 @@ const SCENES = {
                        CLASSE_FUREUR_SENTINELLE: "⚔️ Assaut de la sentinelle",
                        CLASSE_TIR_PRECIS: "🪢 Lancer de bolas",
                        CLASSE_MUR_DE_TERRE: "🪨 Mur de terre",
+                       // (v368) Le Chaman.
+                       CLASSE_TOTEM: "🗿 Totem",
+                       CLASSE_RENFORCEMENT_CHAMANIQUE: "🌿 Renforcement chamanique",
                        CLASSE_LIEN_DE_SANG: "🩸 Lien de sang" };
         return { geste: "message", pion: e.acteur, texte: noms[e.idCarte] || "Technique de classe",
                  couleur: "#e8c46a", duree: RYTHME.message };

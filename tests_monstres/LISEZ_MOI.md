@@ -11547,3 +11547,28 @@ corrections_v366.mjs le vérifie : la Forge commencée puis rouverte (sur l'anci
   - L'illustration en double page se fond dans le papier (haut, bas, bord extérieur) et en prend le grain.
 
 corrections_v367.mjs le vérifie, dans la vraie page (clans, Forge, onglet DEV, bouton du combat, jauges, peuples des pions, ennemis de l'image) et dans le code (LIA, ✔ et lots de Traction, retour après la défaite, bords de l'image).
+
+## v368 — Le Chaman, la dernière classe : les totems
+
+- **Les paliers** (app.js, `"Chaman"`) :
+  - Niveau 1 : 1 totem sur le terrain, +1 aux soins, +5 PV, la technique Totem.
+  - Niveau 3 : 2 totems, +1 compétence.
+  - Niveau 5 : 3 totems, qui ne coûtent plus que 60 de fatigue et 10 de réserve.
+  - Niveau 9 : 20 PV par totem, et le Renforcement chamanique (init 100, 0 fatigue, une fois par combat : tous ses totems soignés et remis à 5 manches).
+- **Le Totem** (`CLASSE_TOTEM`, réutilisable tant qu'il en a moins que son maximum ; les règles : `totems_pur.js`) :
+  - Init 20, fatigue 65 au lancement, puis 15 bloqués par totem (la réserve de la v361, totem par totem).
+  - Posé à 2 cases au plus, en vue, sur une case libre ; 15 PV, 5 manches.
+  - C'est un combattant de son camp sans tour, comme un leurre (`estIllusion` + `totem`) : il ne prend ni ne donne d'attaque d'opportunité, ne compte pas pour la victoire ou la défaite, s'efface quand il tombe. On peut le frapper et lui poser un bouclier, pas le soigner.
+- **Son effet**, choisi parmi 12 (4 par caractéristique : Charisme, Sagesse, Intelligence ; 14 au moins, vérifié dans la fenêtre) :
+  - Zone de 1 case autour de lui, 2 pour l'Immobilisation et l'Attraction.
+  - L'effet se tente à l'entrée et en fin de manche (une fois par manche et par zone).
+  - Les effets néfastes touchent tout le monde ; le soin (+3 PV par manche) et la purification (60 %, retire un état), les alliés seuls. Le totem ne subit rien.
+- **Les faisceaux** : deux totems du même Chaman, à 4 cases au plus, sans case bloquée ni mur de terre entre eux, se relient. Qui entre sur une case du faisceau subit les deux effets (pas en fin de manche). Avec trois totems, chaque paire reliée a son faisceau. Les zones des totems sont une famille à part : aucune autre zone ne les ampute.
+- **À l'écran** (`totems.js`) :
+  - La fenêtre des 12 effets (une caractéristique sous 14 est grisée), puis le bandeau de la case.
+  - Le totem naît comme le leurre de l'Illusion : sa fiche (`Est_Totem`) et son pion (un mât sculpté aux couleurs de sa caractéristique), puis la demande au cerveau. Refusé par le cerveau, il est effacé.
+  - Les zones sont teintées de leur caractéristique ; le faisceau est un trait vert qui pulse ; le pion reste opaque.
+- **La classe se choisit** : plus aucune classe « bientôt ».
+- **Le studio** : Totem, Faisceau entre deux totems, Renforcement chamanique (171 animations).
+
+chaman.mjs vérifie les règles : les paliers, la pose et ses refus, le rejeu, les effets (tout le monde, les alliés pour le soin), les faisceaux, le soin refusé et le bouclier, la chute, la fin après 5 manches, le Renforcement. corrections_v368.mjs vérifie la page : la classe, la fenêtre, les cases, la naissance du totem, l'écran, le studio. Mis à jour : corrections_v343/v358/v359/v360/v362, classes_feminin (plus de « bientôt »), studio_catalogue_1, studio_animation (171).

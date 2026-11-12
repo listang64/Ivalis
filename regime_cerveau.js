@@ -707,7 +707,10 @@ export function creerRegime(contexte) {
                        ? { murs: extra.murs.map(h => ({ q: nombre(h.q), r: nombre(h.r) })) } : {}),
                    // Les Pointes de glace : les cases du cône.
                    ...(extra && Array.isArray(extra.cases)
-                       ? { cases: extra.cases.map(h => ({ q: nombre(h.q), r: nombre(h.r) })) } : {}) });
+                       ? { cases: extra.cases.map(h => ({ q: nombre(h.q), r: nombre(h.r) })) } : {}),
+                   // (v368) Le Totem du Chaman : son identité, sa case, son effet.
+                   ...(extra && extra.totem
+                       ? { totem: { id: String(extra.totem.id || ""), q: nombre(extra.totem.q), r: nombre(extra.totem.r), effet: String(extra.totem.effet || "") } } : {}) });
 
     // Le OK de la fenêtre sombre. Purement local, comme avant : chacun lit à
     // son rythme et rattrape ensuite. Aucun poste n'attend un autre.

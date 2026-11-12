@@ -119,7 +119,7 @@ console.log("\n2. LE CHOIX DE CLASSE D'UNE HÉROÏNE");
     const autre = { texte: !!carte("CLASSE_SORCIER").querySelector(".carte-classe-bientot-texte"),
                     opacite: parseFloat(getComputedStyle(carte("CLASSE_SORCIER").querySelector(".carte-classe-image")).opacity) };
     window.afficherGrilleClasses();
-    window.ouvrirFicheClasse("CLASSE_CHAMAN");   // (v362 : le Maudit se choisit ; le Chaman attend encore)
+    window.ouvrirFicheClasse("CLASSE_CHAMAN");   // (v368 : le Chaman se choisit, plus rien n'attend)
     const fermee = getComputedStyle(document.getElementById("vue-fiche-classe")).display === "none";
     const message = (document.getElementById("message-classe-interdite") || {}).textContent || "";
     return { noms, titre, retenue, nomsH, bientot, autre, fermee, message, bientotIds: [...window.CLASSES_BIENTOT] };
@@ -133,10 +133,9 @@ console.log("\n2. LE CHOIX DE CLASSE D'UNE HÉROÏNE");
   verifier("mais la fiche du personnage retient « Sorcier »", r.retenue === "Sorcier", r.retenue);
   // (v358 : l'Inquisiteur a ses règles et se choisit ; v359 : le Prêtre de la lumière ; v360 : le Berserker.)
   // (v362 : le Maudit aussi.)
-  verifier("celle qui attend encore (Chaman) : « Arrive bientôt », image à 35 %",
-           r.bientot.length === 1 && !r.bientotIds.includes("CLASSE_INQUISITEUR") && !r.bientotIds.includes("CLASSE_PRETRE_DE_LA_LUMIERE") && r.bientot.every(b => b.texte === "Arrive bientôt" && Math.abs(b.opacite - 0.35) < 0.01), JSON.stringify(r.bientot));
+  verifier("plus aucune classe n'attend (v368 : le Chaman est jouable)", r.bientot.length === 0 && r.bientotIds.length === 0, JSON.stringify(r.bientotIds));
   verifier("les autres : ni texte ni voile", !r.autre.texte && r.autre.opacite === 1);
-  verifier("elles ne s'ouvrent pas : un message le dit", r.fermee && /arrive bientôt/.test(r.message), r.message);
+  verifier("la fiche du Chaman s'ouvre (v368)", !r.fermee && !/arrive bientôt/.test(r.message), r.message);
   verifier("un héros : la grille au masculin", r.nomsH.includes("Sorcier") && r.nomsH.includes("Pisteur") && !r.nomsH.includes("Sorcière"));
 }
 
