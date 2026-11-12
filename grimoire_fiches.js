@@ -175,7 +175,13 @@ function pageClan(c, cote, i) {
     const lignes = c.heros.map((h, k) => {
         const r = hasard("clan-" + h.idPersonnage);
         const penche = ((r() * 2 - 1) * 1.6).toFixed(2);
-        return `<li style="--penche:${penche}deg"><button type="button" class="ligne-aventurier" data-action="fiches" data-fa="heros" data-id="${echapper(h.idPersonnage)}">
+        // (v367, Nico : « que les joueurs puissent choisir le personnage actif dans leur
+        // groupe, comme une case à cocher ») : sur son propre clan, une case par héros ;
+        // un seul actif à la fois (cocher l'un met les autres au repos).
+        const actif = h.actif !== false;
+        const caseActif = moi ? `<button type="button" class="case-actif${actif ? " cochee" : ""}" data-action="fiches" data-fa="actif" data-id="${echapper(h.idPersonnage)}"
+                  aria-pressed="${actif}" title="${actif ? "Le héros que tu joues" : "Jouer ce héros"}"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="boite" d="M 4 5 Q 12 3.6 20 4.6 L 19.4 19.6 Q 12 20.6 4.6 19.4 Z"/>${actif ? `<path class="coche" d="M 7 12.5 L 10.6 16 L 18 7"/>` : ""}</svg></button>` : "";
+        return `<li style="--penche:${penche}deg"${moi ? ` class="avec-case"` : ""}>${caseActif}<button type="button" class="ligne-aventurier" data-action="fiches" data-fa="heros" data-id="${echapper(h.idPersonnage)}">
                   <span class="nom-aventurier">${echapper(nomHeros(h))}</span>${classeDe(h) ? ` <span class="tiret-aventurier">-</span> <span class="classe-aventurier">${echapper(classeDe(h))}</span>` : ""}
                   ${h.actif === false ? `<span class="aventurier-absent">(au repos)</span>` : ""}</button></li>`;
     }).join("");
@@ -187,6 +193,20 @@ function pageClan(c, cote, i) {
         ${moi ? `<button type="button" class="nouvel-aventurier" data-action="fiches" data-fa="creer">${lavis({ couleurs: ["#c9772e", "#e0a046", "#a5532a"], opacite: 0.5, nom: "nouvel" }, "nouvel-" + c.id)}${cadre("nouvel-" + c.id, 1.4)}<span>+ Un nouvel aventurier</span></button>` : ""}
       </div>`;
     return el;
+}
+// (v367) LE HÉROS ACTIF DU JOUEUR : celui-ci joue, ses autres héros passent au repos
+// (basculerActivationPersonnage, app.js : le plateau, l'initiative, le tour de parole).
+async function choisirHerosActif(id) {
+    const h = tousLesHeros().find(x => x.idPersonnage === id);
+    if (!h || typeof window.basculerActivationPersonnage !== "function") return;
+    const joueur = h.idJoueur || idJoueurCourant();
+    const siens = tousLesHeros().filter(x => (x.idJoueur || "") === joueur);
+    if (h.actif === false) await window.basculerActivationPersonnage(id, true);
+    for (const x of siens) if (x.idPersonnage !== id && x.actif !== false) await window.basculerActivationPersonnage(x.idPersonnage, false);
+    // Les deux listes de la partie disent la même chose.
+    [window.PERSOS_PARTIE, window.PERSOS_JOUEURS_PARTIE].forEach(l => (l || []).forEach(x => { if (x && siens.some(y => y.idPersonnage === x.idPersonnage)) x.actif = x.idPersonnage === id; }));
+    signatures.clans = "";
+    majPlus(true);
 }
 function pageClanVide(i) {
     const el = page("clan-" + i, "droite", "page-clan page-clan-vide");
@@ -811,6 +831,8 @@ const ARMES_FORGE = [
     ["Arme légère CAC", "Arme légère"], ["Arme lourde CAC", "Arme lourde"], ["Arme polyvalente", "Arme polyvalente"],
     ["Arme légère Distance", "Arme à distance"], ["Magie", "Magie"], ["Sans arme / Arme rp", "Sans arme"]
 ];
+// Magie et Sans arme se forgent toujours, quelle que soit l'arme en main.
+const ARMES_TOUJOURS_FORGE = ["Magie", "Sans arme / Arme rp"];
 function htmlForgeVide() {
     return [`<div class="contenu-page page-forge"><div class="entete-fiche"><span class="titre-page-fiche">La Forge</span></div>
               <p class="fiche-attente">Depuis les compétences, « Forger une compétence » ouvre ici l'enclume.</p></div>`,
@@ -860,6 +882,7 @@ async function ouvrirForge() {
         if (el && !el.querySelector(":scope > .lavis-bulle")) el.insertAdjacentHTML("afterbegin", lavis(teinte, "forge-" + teinte).replace('class="lavis ', 'class="lavis lavis-bulle '));
     });
     aller(g);
+    majCodex.choixOuvert = false;
     try { await window.ouvrirCreationCompetence(); } catch (err) { console.error("Le livre : la Forge", err); }
     cacherModalesForge();
     majCodex();
@@ -875,7 +898,24 @@ function majCodex() {
     if (!forgeDansLeLivre) return;
     const arme = window.forgeState && window.forgeState.armePrincipale;
     const armes = document.getElementById("forge-livre-armes");
-    if (armes) armes.hidden = !!arme;
+    // (v367, Nico : « avant d'avoir les effets il faut choisir un type d'arme :
+    // affiche que les types d'arme selon celui équipé, et aussi Magie et Sans arme ;
+    // une fois sélectionné, les autres disparaissent pour cette technique ») :
+    // l'arme choisie reste seule ; la toucher de nouveau rouvre le choix.
+    if (armes) {
+        armes.hidden = false;
+        const outils = window.outilsForge;
+        const enMain = outils && typeof outils.typesArmesEquipeesPourForge === "function" ? outils.typesArmesEquipeesPourForge() : null;
+        const ouvert = !arme || majCodex.choixOuvert;
+        armes.querySelectorAll(".arme-forge").forEach(b => {
+            const v = b.dataset.arme;
+            const permise = ARMES_TOUJOURS_FORGE.includes(v) || !enMain || enMain.has(v);
+            b.hidden = !permise || (!ouvert && v !== arme);
+            b.classList.toggle("choisie", v === arme);
+        });
+        const invite = armes.querySelector(".fiche-attente");
+        if (invite) invite.hidden = !ouvert;
+    }
     if (arme && typeof window.ouvrirMenuAjoutForge === "function") {
         majCodex.encours = true;
         try { window.ouvrirMenuAjoutForge(); } catch (e) { console.error("Le livre : le codex", e); }
@@ -894,6 +934,30 @@ function fermerForge(versCompetences) {
     preparerPagesForge();
     majPlus(true);
     if (versCompetences) aller(pagesFiche["comp-g"]);
+}
+// (v367) LE RESET DES CARACTÉRISTIQUES (onglet DEV) : Nico, « le bouton qui lance le
+// reset de carac n'a pas l'air de marcher ». Il lisait le héros dans le champ caché de
+// l'ancienne fiche — vide ou d'un autre héros tant que celle-ci se remplit (« Ouvrez
+// d'abord la fiche d'un héros existant »). Dans le livre : le héros ouvert ; puis la
+// fiche se redessine (le bouton « Répartir ses caractéristiques » à la place des caracs).
+function brancherResetCaracs() {
+    const avant = window.reinitialiserCaracsDev;
+    if (typeof avant !== "function" || avant.__livre) return;
+    const g = async function (...args) {
+        const h = herosParId(heros);
+        if (h && livreDisponible()) {
+            const champ = document.getElementById("champ-id-personnage");
+            if (champ) champ.value = h.idPersonnage;
+            const nom = document.getElementById("champ-nom");
+            if (nom) nom.value = nomHeros(h);
+        }
+        const r = await avant.apply(this, args);
+        signatures.fiche = "";
+        majPlus(true);
+        return r;
+    };
+    g.__livre = true;
+    window.reinitialiserCaracsDev = g;
 }
 // Les fonctions de la Forge, tant qu'elle est dans le livre.
 function brancherForge() {
@@ -916,7 +980,7 @@ function brancherForge() {
         finally { if (forgeDansLeLivre && !majCodex.encours) setTimeout(() => { majCodex(); majApercuForge(); }, 0); }
     };
     if (typeof armeMenu === "function") window.ouvrirMenuArme = function () {
-        if (forgeDansLeLivre) { const a = document.getElementById("forge-livre-armes"); if (a) { a.hidden = false; a.classList.remove("appelle"); void a.offsetWidth; a.classList.add("appelle"); } return; }
+        if (forgeDansLeLivre) { majCodex.choixOuvert = true; majCodex(); const a = document.getElementById("forge-livre-armes"); if (a) { a.classList.remove("appelle"); void a.offsetWidth; a.classList.add("appelle"); } return; }
         return armeMenu.apply(this, arguments);
     };
 }
@@ -1173,6 +1237,7 @@ function majPlus(force) {
     if (!g || !g.enPartie || !g.enPartie()) return;
     brancherFicheAncienne();
     brancherForge();
+    brancherResetCaracs();
     const changeClans = construireClans();
     creerPagesFiche();
     if (!heros || !herosParId(heros)) {
@@ -1234,6 +1299,7 @@ function agir(cible) {
     if (Date.now() - dernierAppuiLong < 700) return;          // un appui long montrait une note
     const fa = cible.dataset.fa, h = herosParId(heros);
     if (fa === "heros") { son(); ouvrirHeros(cible.dataset.id); return; }
+    if (fa === "actif") { choisirHerosActif(cible.dataset.id); return; }
     // (v319) La création se fait dans le livre (grimoire_creation.js) ; l'ancienne fenêtre en secours.
     if (fa === "creer") { son(); if (window.GRIMOIRE_CREATION && window.GRIMOIRE_CREATION.commencer()) return; if (typeof window.ouvrirCreationHero === "function") window.ouvrirCreationHero(); return; }
     if (!h) return;
@@ -1251,7 +1317,16 @@ function agir(cible) {
     if (fa === "effacer") { if (typeof window.supprimerCompetencePerso === "function") { window.ID_PERSONNAGE_DECK = h.idPersonnage; window.supprimerCompetencePerso(cible.dataset.id).then(() => majPlus(true)); } return; }
     if (fa === "forger") { son(); ouvrirForge(); return; }
     if (fa === "fermer-forge") { son(); if (typeof window.fermerForgeCompetence === "function") window.fermerForgeCompetence(); else fermerForge(true); return; }
-    if (fa === "arme") { son(); if (typeof window.selectionnerArme === "function") window.selectionnerArme(cible.dataset.arme); setTimeout(majCodex, 30); return; }
+    if (fa === "arme") {
+        son();
+        const choisie = window.forgeState && window.forgeState.armePrincipale;
+        // (v367) L'arme déjà choisie, touchée : le choix se rouvre (rien ne change encore).
+        if (choisie && cible.dataset.arme === choisie && !majCodex.choixOuvert) { majCodex.choixOuvert = true; majCodex(); return; }
+        majCodex.choixOuvert = false;
+        if (typeof window.selectionnerArme === "function") window.selectionnerArme(cible.dataset.arme);
+        setTimeout(majCodex, 30);
+        return;
+    }
     // Les talents ont leur double page (v315) ; un talent qu'on peut prendre
     // ouvre la même demande que l'ancienne fenêtre (talents_ui.js).
     if (fa === "talents") { son(); aller(pagesFiche["tal-g"]); return; }

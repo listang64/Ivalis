@@ -516,8 +516,8 @@ titre("11. UN CLIC SUR UN PION : SES PV ET SA FATIGUE EN CHIFFRES SUR SES JAUGES
     const c = document.querySelector(".jauges-selection-token .jauge-selection-chiffre");
     return { chiffres, taille: c ? parseFloat(getComputedStyle(c).fontSize) : 0 };
   });
-  verifier("« 34/50 » sur la vie, « 80/120 » sur la fatigue", JSON.stringify(r.chiffres) === '["34/50","80/120"]', JSON.stringify(r.chiffres));
-  verifier("…lisibles (à la taille du pion)", r.taille >= 6, `${r.taille}px`);
+  // (v367, Nico : « enlève les nombres sur les barres de vie et fatigue des tokens quand on clique ».)
+  verifier("plus de chiffres sur les jauges (v367)", JSON.stringify(r.chiffres) === '[]', JSON.stringify(r.chiffres));
 }
 
 titre("12. LE MENU PRINCIPAL : LE NOM DU JOUEUR EST UN BOUTON, À DROITE, À GAUCHE DE LA CROIX");

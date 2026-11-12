@@ -13,15 +13,15 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=134">
+  <link rel="stylesheet" href="style.css?v=135">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
   <link rel="stylesheet" href="grimoire.css?v=14">
-  <link rel="stylesheet" href="grimoire_recit.css?v=17">
+  <link rel="stylesheet" href="grimoire_recit.css?v=18">
   <link rel="stylesheet" href="grimoire_carte.css?v=2">
   <link rel="stylesheet" href="grimoire_regions.css?v=5">
   <link rel="stylesheet" href="loupe_cartes.css?v=3">
-  <link rel="stylesheet" href="grimoire_fiches.css?v=6">
+  <link rel="stylesheet" href="grimoire_fiches.css?v=7">
   <link rel="stylesheet" href="grimoire_creation.css?v=6">
 
  
@@ -2420,7 +2420,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=256"></script>
+<script src="trace_combat.js?v=257"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2485,7 +2485,7 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=54"></script>
 <script type="module" src="ia_master.js?v=25"></script>
-<script type="module" src="illustrations_recit.js?v=9"></script>
+<script type="module" src="illustrations_recit.js?v=10"></script>
 <script type="module" src="app.js?v=164"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=4"></script>
@@ -2495,7 +2495,7 @@
 <script type="module" src="grimoire_carte.js?v=6"></script>
 <script src="grimoire_regions.js?v=12"></script>
 <script src="loupe_cartes.js?v=5"></script>
-<script type="module" src="grimoire_fiches.js?v=9"></script>
+<script type="module" src="grimoire_fiches.js?v=10"></script>
 <script type="module" src="grimoire_creation.js?v=8"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=4"></script>
@@ -2541,7 +2541,7 @@
 <script src="zones_procedurales.js?v=6"></script>
 <script type="module" src="studio_animation.js?v=13"></script>
 <!-- LIA, l'aide à la création de la Forge -->
-<script type="module" src="lia_forge.js?v=8"></script>
+<script type="module" src="lia_forge.js?v=9"></script>
 <!-- L'illustration des compétences (prompt IA + image IA, en file) -->
 <script type="module" src="illustration_competence.js?v=10"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
@@ -2550,11 +2550,11 @@
 <script type="module" src="sequence_tour.js?v=25"></script>
 <script src="zombie_token.js?v=1"></script>
 <script src="murs_terre.js?v=10"></script>
-<script type="module" src="combat.js?v=174"></script>
+<script type="module" src="combat.js?v=175"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=41"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=106"></script>
+<script type="module" src="moteur_effets.js?v=107"></script>
 <!-- LES APPARITIONS (v268) : le tableau de Nico, son tirage, sa fenêtre de
      réglage. Avant monstres.js, qui le lit dès son chargement. -->
 <script src="apparitions.js?v=3"></script>
@@ -2567,7 +2567,7 @@
 <script type="module" src="objets_ia.js?v=18"></script>
 <script type="module" src="loot.js?v=34"></script>
 <!-- LES COMBATS DU RÉCIT (v278) : la détection, la préparation, le retour au récit. -->
-<script type="module" src="combat_rp.js?v=11"></script>
+<script type="module" src="combat_rp.js?v=12"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

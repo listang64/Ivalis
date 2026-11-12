@@ -175,6 +175,10 @@ function grosPlanForce(texteMJ) {
     };
 }
 window.grosPlanForceIllustrateur = grosPlanForce;   // (pour les bancs)
+// (v367) Ce qu'un héros a en main : main droite, main gauche (une arme, un bouclier).
+const armesDuHeros = (h) => [h && h.equipMainDroite, h && h.equipMainGauche].filter(o => o && o.nom)
+    .map(o => ({ nom: String(o.nom), type: String(o.type || ""), image: String(o.image || "") }));
+window.armesDuHerosIllustrateur = armesDuHeros;   // (pour les bancs)
 const decrireHeros = (h) => [h.genre ? (/f/i.test(h.genre) ? "a woman" : "a man") : "", h.race, h.classe].filter(Boolean).join(", ");
 window.herosDuCroquisIllustrateur = herosDuCroquis;   // (pour les bancs)
 // Le chroniqueur (le « je » du Narrateur) n'est jamais dessiné : ses phrases
@@ -282,25 +286,33 @@ async function dessiner(prompt, references, sujet, options) {
     const cles = lireCles();
     // LES RÉFÉRENCES, comme l'avatar rhabillé : le portrait mis en PNG carré sur
     // le blanc (v325 ; imageVersBlobPng), joint dans l'ordre que le texte annonce.
+    // (v367) Les personnages d'abord (4 au plus), puis les armes des héros (4 au plus).
     const blobs = [];
-    for (const r of references || []) {
+    const refs = [...(references || []).filter(r => !r.arme), ...(references || []).filter(r => r.arme)];
+    for (const r of refs) {
         if (!r.url || typeof window.imageVersBlobPng !== "function") continue;
+        if (blobs.filter(b => !!b.arme === !!r.arme).length >= 4) continue;
         const b = await window.imageVersBlobPng(r.url, "#FFFFFF").catch(() => null);
         if (b) blobs.push({ ...r, blob: b });
-        else console.warn(`[MIA_ILLUSTRATEUR] Le portrait de ${r.nom} est illisible (${r.url}).`);
-        if (blobs.length >= 4) break;
+        else console.warn(`[MIA_ILLUSTRATEUR] ${r.arme ? "L'image de l'arme" : "Le portrait"} de ${r.nom} est illisible (${r.url}).`);
     }
     // Des héros sans leur image : on ne dessine pas des inconnus à leur place.
     if (o.herosAttendus && blobs.filter(b => b.heros).length < o.herosAttendus) {
         throw new Error(`MIA_ILLUSTRATEUR : ${o.herosAttendus} héros attendus, ${blobs.filter(b => b.heros).length} référence(s) lisible(s) — pas d'illustration`);
     }
     console.log(`🖋️ [MIA_ILLUSTRATEUR] ${blobs.length} référence(s) jointe(s)${blobs.length ? " : " + blobs.map(b => b.nom).join(", ") : ""}.`);
-    const refsTexte = blobs.length ? ` The ${blobs.length} attached reference image${blobs.length > 1 ? "s show" : " shows"} the EXACT character${blobs.length > 1 ? "s" : ""} to draw, in this order: `
-        + blobs.map((b, i) => `image ${i + 1} is ${b.nom}${b.qui ? " (" + b.qui + ")" : ""}${b.scene ? " — in the scene: " + b.scene : ""}`).join("; ")
+    const persos = blobs.filter(b => !b.arme), armes = blobs.filter(b => b.arme);
+    const refsTexte = (persos.length ? ` The first ${persos.length} attached reference image${persos.length > 1 ? "s show" : " shows"} the EXACT character${persos.length > 1 ? "s" : ""} to draw, in this order: `
+        + persos.map((b, i) => `image ${i + 1} is ${b.nom}${b.qui ? " (" + b.qui + ")" : ""}${b.scene ? " — in the scene: " + b.scene : ""}`).join("; ")
         + ". Each of them must be clearly recognisable as the person in their reference image: same face, hairstyle, hair colour, beard or not, build, "
         + "age, clothing, colours and equipment — in the illustration's style. Do not copy the references' backgrounds or poses: "
         + "pose them as the staging says. "
-        + "Do not add any other person than those named here and in the description." : "";
+        + "Do not add any other person than those named here and in the description." : "")
+        // (v367, Nico : « rajouter les armes dans la génération des images du RP, donne
+        // les armes en référence ») : l'arme de chaque héros, telle qu'en jeu.
+        + (armes.length ? ` The next ${armes.length} reference image${armes.length > 1 ? "s are" : " is"} the heroes' WEAPONS, in this order: `
+        + armes.map((b, i) => `image ${persos.length + i + 1} is ${b.nom}`).join("; ")
+        + ". Each hero carries exactly their own weapon (same shape, materials and colours), held or worn naturally at the right hand-held scale; never draw a weapon as a separate object lying around, and never swap weapons between heroes." : "");
     const mise = (o.miseEnScene ? ` STAGING: ${o.miseEnScene}.` : "")
         + (o.extrait ? ` The moment, exactly as the journal tells it (French; its writer, the "je"/"nous", is never drawn): « ${o.extrait} ». Stay faithful to it: who does what to whom, who hides, who sees whom.` : "");
     const style = typeof window.instructionStyleIvalis === "function" ? await window.instructionStyleIvalis().catch(() => "") : "";
@@ -446,6 +458,22 @@ window.illustrerLeRecit = async function (options) {
             return null;
         }
         heros.forEach(h => refs.push({ nom: h.prenom, qui: decrireHeros(h), url: h.urlPortraitReference || h.urlCloudinary || "", heros: true, scene: acteurs.scene[h.prenom] || "" }));
+        // (v367) Leurs armes : en image quand l'objet en a une, sinon en mots.
+        const enMots = [];
+        heros.forEach(h => armesDuHeros(h).forEach(o => {
+            if (o.image) refs.push({ nom: `${h.prenom}'s weapon (${o.nom})`, url: o.image, arme: true });
+            else enMots.push(`${h.prenom} carries ${o.nom}${o.type ? " (" + o.type + ")" : ""}.`);
+        }));
+        if (enMots.length) a.description += " " + enMots.join(" ");
+        // (v367) Les ennemis du combat, s'ils sont dans l'image : comme sur leurs pions.
+        const ennemis = typeof window.ennemisDecritsCombatRP === "function" ? window.ennemisDecritsCombatRP() : [];
+        if (ennemis.length && !lieu) {
+            const scene = [a.description, a.extrait, ...(acteurs.autres || [])].join(" ");
+            let montres = ennemis.filter(x => x.noms.some(n => nommeDans(scene, n)));
+            if (!montres.length && (acteurs.autres || []).length) montres = ennemis;
+            if (montres.length) a.description += " The enemies in this scene look exactly like this (the same creatures as on the battle map tokens): "
+                + montres.slice(0, 3).map(x => `${x.noms.length ? x.noms.join(", ") + ": " : ""}${String(x.description).slice(0, 700)}`).join(" | ");
+        }
         // Les héros du croquis se nomment dans la description (le dessinateur
         // relie ainsi chaque prénom à son image).
         const manquants = heros.filter(h => !nommeDans(a.description, h.prenom)).map(h => h.prenom);

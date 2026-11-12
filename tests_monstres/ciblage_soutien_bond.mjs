@@ -137,8 +137,9 @@ console.log("1. ATTAQUE PUIS SOIN : DEUX CIBLES, DEUX TEMPS");
   verifier("le lanceur est présélectionné pour le soin", JSON.stringify(r.phase2.soin) === '["J1"]',
            JSON.stringify(r.phase2.soin));
   verifier("l'attaque garde sa cible pendant ce temps", JSON.stringify(r.phase2.attaque) === '["M1"]');
-  verifier("un message dit qu'on vise le soin, RÉSOUDRE est là",
-           /soin/i.test(r.phase2.message) && r.phase2.boutons, r.phase2.message);
+  // (v367 : plus de barre RÉSOUDRE ; le ✔ de la cible choisie lance la carte.)
+  verifier("un message dit qu'on vise le soin (plus de barre RÉSOUDRE, v367)",
+           /soin/i.test(r.phase2.message) && !r.phase2.boutons, r.phase2.message);
   verifier("le soin refuse l'ennemi", JSON.stringify(r.soinSurEnnemi.soin) === '["J1"]'
            && r.soinSurEnnemi.messages.includes("Cible invalide"), JSON.stringify(r.soinSurEnnemi));
   verifier("et accepte un allié", JSON.stringify(r.soinSurAllie) === '["J2"]', JSON.stringify(r.soinSurAllie));

@@ -229,25 +229,9 @@ titre("3. LES CHIFFRES DES JAUGES : DANS LEUR JAUGE, LE PLUS GRAND POSSIBLE, À 
     }, echelle));
   }
   const toutes = mesures.flat();
-  verifier("deux chiffres par pion, à chaque zoom", toutes.length === 6, `(${toutes.length})`);
-  verifier("à chaque zoom, le texte tient dans sa jauge (largeur et hauteur)",
-           toutes.length > 0 && toutes.every(m => m.texteL <= m.jaugeL + 0.5 && m.texteH <= m.jaugeH + 0.5),
-           toutes.map(m => `${m.echelle}:${m.texteL.toFixed(0)}/${m.jaugeL.toFixed(0)}×${m.texteH.toFixed(1)}/${m.jaugeH.toFixed(1)}`).join(" "));
-  // (À 0,5×, la barre ne fait que 4 px de haut, dont 2 de bordure : on juge
-  // la place utile aux zooms où il y en a.)
-  const lisibles = toutes.filter(m => m.echelle >= 1);
-  verifier("…et il en occupe l'essentiel (≥ 80 % de la hauteur utile, ou ≥ 85 % de sa largeur)",
-           lisibles.length === 4 && lisibles.every(m => m.texteH >= 0.8 * m.utileH || m.texteL >= 0.85 * m.utileL),
-           lisibles.map(m => `${m.echelle}:${(m.texteH / m.utileH * 100).toFixed(0)} %`).join(" "));
-  const vie = mesures.map(l => l[0] || {});
-  verifier("il grandit avec la jauge quand on zoome (même proportion de la place utile)",
-           vie.length === 3 && vie[2].texteH > vie[1].texteH && vie[1].texteH >= vie[0].texteH
-           // (v339) les jauges ont une taille minimale (56 × 14 px) : aux petits zooms, le
-           // texte (« 1234/1250 ») y est tenu par la largeur, un peu moins haut (≈ 0,82).
-           && Math.abs(vie[2].texteH / vie[2].utileH - vie[1].texteH / vie[1].utileH) < 0.16,
-           vie.map(m => (m.texteH / m.utileH).toFixed(2)).join(" / "));
-  verifier("plus de taille en dur : la feuille de style la tire de la jauge", toutes.every(m => !m.enLigne && Number(m.car) > 0)
-           && /container-type:\s*size/.test(lire('style.css')) && /cqh/.test(lire('style.css')));
+  // (v367, Nico : « enlève les nombres sur les barres de vie et fatigue des tokens quand
+  // on clique ») : plus aucun chiffre dans les jauges, à aucun zoom.
+  verifier("plus de chiffres dans les jauges, à aucun zoom (v367)", toutes.length === 0, `(${toutes.length})`);
 }
 
 // =========================================================================

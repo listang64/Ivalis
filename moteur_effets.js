@@ -2771,47 +2771,12 @@ window.barreCiblageResolution = function() {
 // unique les ouvre, et la phase du soin (voir passerAuCiblageDuSoutien) aussi —
 // même quand l'attaque, elle, s'est visée en zone et ne les avait pas posés.
 window.poserBoutonsCibleUnique = function(idCarte) {
-    // LES DEUX BOUTONS VIVENT SUR L'APERÇU DE LA CARTE, et cet aperçu naît
-    // paresseusement (competences.js) : il peut ne pas être là. Il l'était
-    // forcément du temps où l'on cliquait « Appliquer », qui était posé
-    // dessus ; depuis que c'est le bouton fin de tour qui lance le ciblage,
-    // plus rien ne le garantit. Un appendChild sur `null` levait alors une
-    // exception EN PLEIN MILIEU du ciblage : l'état était posé, mais ni les
-    // anneaux ni les boutons n'arrivaient — la carte ne partait jamais et
-    // rien à l'écran ne disait pourquoi.
-    // LA CARTE NE S'OUVRE PLUS AU LANCEMENT (Nico : « elle apparaît puis
-    // disparaît, ne la fais pas apparaître »). Les deux boutons ont donc leur
-    // propre barre, en bas de l'écran, au lieu de se poser sur son aperçu.
-    const hoteBoutons = window.barreCiblageResolution();
-    {
-        let btnResoudre = document.getElementById("btn-resoudre-carte");
-        if (!btnResoudre) {
-            btnResoudre = document.createElement("div");
-            btnResoudre.id = "btn-resoudre-carte";
-            btnResoudre.className = "bouton-barre-ciblage bouton-resoudre";
-            hoteBoutons.appendChild(btnResoudre);
-        }
-        btnResoudre.innerText = "RÉSOUDRE";
-        btnResoudre.style.pointerEvents = "auto";
-        btnResoudre.onclick = () => window.declencherResolutionAvecBondEventuel();
-
-        // Annuler le ciblage sans perdre son tour : la carte revient au repos et le
-        // joueur peut continuer son déplacement, exactement comme le ✖ déjà offert
-        // en mode zone (bulle-validation-zone, plus haut). À ne pas confondre avec
-        // le bouton fin de tour, qui affiche « fin de tour » pendant le ciblage et
-        // termine le tour pour de bon (voir combat.js, actionBoutonFinTour).
-        let btnAnnuler = document.getElementById("btn-annuler-ciblage");
-        if (!btnAnnuler) {
-            btnAnnuler = document.createElement("div");
-            btnAnnuler.id = "btn-annuler-ciblage";
-            btnAnnuler.className = "bouton-barre-ciblage bouton-annuler";
-            // ANNULER à gauche, RÉSOUDRE à droite, comme sur l'ancienne carte.
-            hoteBoutons.insertBefore(btnAnnuler, hoteBoutons.firstChild);
-        }
-        btnAnnuler.innerText = "ANNULER";
-        btnAnnuler.style.pointerEvents = "auto";
-        btnAnnuler.onclick = () => window.nettoyerCiblage();
-    }
+    // (v367, Nico : « quand on fait la compétence pour la lancer, en bas il y a un
+    // encart Résoudre, faut le virer : on sélectionne la cible, on valide, et ça
+    // lance la compétence ») : plus de barre RÉSOUDRE / ANNULER. La cible choisie
+    // porte sa bulle ✔ (actualiserVisuelCiblage), le lanceur sa croix ✖ (combat.js).
+    const barre = document.getElementById("barre-ciblage-resolution");
+    if (barre) barre.remove();
 };
 
 // LA SECONDE PHASE : LE SOUTIEN SE VISE À PART. Appelée juste avant de
@@ -3259,8 +3224,10 @@ window.dessinerAnneauxCiblage = function() {
                 let bulle = porteur.querySelector(".bulle-validation-cible");
                 // DES TRACTIONS RESTENT À POSER (v253) : pas encore de ✔ — il
                 // se touchait en visant la cible d'à côté et lançait tout avec
-                // une seule cible. RÉSOUDRE, en bas, part plus tôt si l'on veut.
-                if (tractionRestante > 0) {
+                // une seule cible. (v367 : plus de RÉSOUDRE en bas. Des LOTS de
+                // Traction veulent chacun leur cible : s'il en reste à poser, le ✔
+                // vient quand même, sinon faute de cibles on ne lancerait jamais.)
+                if (tractionRestante > 0 && !window.tractionEnLots(window.ETAT_CIBLAGE, phase)) {
                     if (bulle) bulle.remove();
                 } else if (!bulle) {
                     bulle = document.createElement("div");

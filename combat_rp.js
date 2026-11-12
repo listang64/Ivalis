@@ -123,6 +123,51 @@ function descriptionAvecRace(description) {
 }
 window.descriptionPionAvecRace = descriptionAvecRace;
 
+// (v367) LE PEUPLE D'UN VISUEL : celui que l'IA donne s'il est de la liste du
+// Grimoire (« bete », « mythe » : une bête ou une créature antique), sinon le
+// premier peuple que sa description nomme ; "" si aucun.
+function peupleDuVisuel(propose, description) {
+    const liste = typeof window.peuplesDuMonde === "function" ? window.peuplesDuMonde() : [];
+    const sansAcc = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const p = sansAcc(propose);
+    if (p === "bete" || p === "mythe") return p;
+    const trouve = liste.find(r => sansAcc(r.nom) === p) || liste.find(r => p && (sansAcc(r.nom).startsWith(p) || p.startsWith(sansAcc(r.nom))));
+    if (trouve) return trouve.nom;
+    const nommes = typeof window.racesNommeesDans === "function" ? window.racesNommeesDans(description || "") : [];
+    return nommes.length ? nommes[0].nom : "";
+}
+window.peupleDuVisuelCombatRP = peupleDuVisuel;
+// (v367, Nico : « le visuel était celui d'un homme avec des cornes : chaque token,
+// même les renforts, doit suivre les races de mon monde ») : le peuple et son
+// apparence (le Grimoire des Races) passent EN TÊTE de la description du pion.
+function descriptionDuPion(v) {
+    const d = String((v && v.Description) || "").trim();
+    const liste = typeof window.peuplesDuMonde === "function" ? window.peuplesDuMonde() : [];
+    const r = v && v.Peuple ? liste.find(x => x.nom === v.Peuple) : null;
+    if (r && r.physique) {
+        return `A ${r.nom}, one of this world's own peoples. What every ${r.nom} looks like (follow it exactly, skin, face, head and body traits): ${r.physique}. `
+            + `Do not turn them into a generic human, nor add horns, animal features or any trait the ${r.nom} description does not have. This individual: ${d}`;
+    }
+    return descriptionAvecRace(d);
+}
+window.descriptionDuPionCombatRP = descriptionDuPion;
+
+// (v367, Nico : « pour la génération des images dans le RP, quand il y a des ennemis
+// dans l'image, qu'elle prenne en compte le descriptif qu'on envoie à l'IA pour leurs
+// tokens ») : les ennemis du combat en cours (ou du dernier de cette séance), un par
+// visuel : leurs noms et la description de leur pion.
+let derniersEnnemis = null;
+window.ennemisDecritsCombatRP = function () {
+    const c = etat();
+    const e = (c && c.Ennemis) || derniersEnnemis;
+    if (!e || !e.Visuels) return [];
+    const creatures = [...((e.Tirage && e.Tirage.depart) || []), ...((e.Tirage && e.Tirage.renforts) || [])];
+    return Object.keys(e.Visuels).map(cle => ({
+        noms: [...new Set(creatures.filter(x => x && x.visuel === cle).map(x => x.nom).filter(Boolean))],
+        description: descriptionDuPion(e.Visuels[cle])
+    })).filter(x => x.description);
+};
+
 // =========================================================================
 //  1. L'ÉTAT (Systeme_Parties/{id}.Combat_RP)
 // =========================================================================
@@ -636,8 +681,9 @@ RÈGLES :
 - Chaque description physique commence par le peuple ou l'espèce, et décrit une tenue et des armes antiques.
 - L'APPARENCE D'UN PEUPLE (v309) : quand un peuple a une APPARENCE dans la liste (le Grimoire des Races), la description physique la suit fidèlement (peau, traits, taille, signes du peuple), puis y ajoute ce qui est propre à cet individu.
 - "visuel" : une clé courte, commune aux créatures qui se RESSEMBLENT (trois loups gris identiques partagent la même clé) ; au plus 5 visuels différents. Chaque visuel a une description physique précise de la tête et du haut du corps (elle servira à sculpter un médaillon).
+- (v367) "peuple" : pour CHAQUE visuel, renforts compris, le nom EXACT d'un des peuples d'Elyria de la liste (« Vargen », « Ankylar »…), ou "bete" pour un animal de la faune, ou "mythe" pour une créature de la mythologie antique. Jamais un peuple inventé. Un membre d'un peuple a l'APPARENCE de ce peuple (la liste), pas celle d'un humain avec des cornes ou d'une race d'un autre univers.
 
-Réponds UNIQUEMENT en JSON : {"creatures": [{"numero": 1, "nom": "...", "visuel": "loup", "pnj": "", "lien": ""}], "visuels": [{"cle": "loup", "description_physique": "..."}]}`;
+Réponds UNIQUEMENT en JSON : {"creatures": [{"numero": 1, "nom": "...", "visuel": "loup", "pnj": "", "lien": ""}], "visuels": [{"cle": "loup", "peuple": "bete", "description_physique": "..."}]}`;
 
 const ROLES = {
     "DPS CAC": "combattant au contact", "TANK CAC": "brute massive qui encaisse au contact",
@@ -695,6 +741,7 @@ async function composerLesEnnemis() {
 function habiller(tous, habits, analyse, pnjs) {
     const parNumero = new Map(((habits && habits.creatures) || []).map(x => [Number(x.numero), x]));
     const descriptions = new Map(((habits && habits.visuels) || []).map(v => [String(v.cle || "").trim(), String(v.description_physique || "").trim()]));
+    const peuples = new Map(((habits && habits.visuels) || []).map(v => [String(v.cle || "").trim(), String(v.peuple || "").trim()]));
     const recit = (analyse && analyse.ennemis) || [];
     const pnjParNom = new Map(pnjs.map(x => [normaliser(x.Nom_PNJ), x]));
     const cles = new Map();
@@ -722,8 +769,11 @@ function habiller(tous, habits, analyse, pnjs) {
             else {
                 const cle = "v" + (cles.size + 1);
                 cles.set(brute, cle);
+                const description = pnj ? (pnj.Description_Physique || descriptions.get(h.visuel) || "") : (descriptions.get(String(h.visuel || "").trim()) || r.description_physique || `${ROLES[x.m.archetype] || "créature"}, stature ${x.m.palier}`);
+                const peuple = peupleDuVisuel(peuples.get(String(h.visuel || "").trim()) || (pnj && pnj.Race) || "", description);
                 visuels[cle] = {
-                    Description: pnj ? (pnj.Description_Physique || descriptions.get(h.visuel) || "") : (descriptions.get(String(h.visuel || "").trim()) || r.description_physique || `${ROLES[x.m.archetype] || "créature"}, stature ${x.m.palier}`),
+                    Description: description,
+                    ...(peuple ? { Peuple: peuple } : {}),
                     ...(pnj ? { PNJ: pnj.Nom_PNJ, Portrait: pnj.URL_Cloudinary || "" } : {})
                 };
             }
@@ -750,7 +800,7 @@ async function dessinerLesPions() {
             let url = "";
             try {
                 url = typeof window.fabriquerTokenIA === "function"
-                    ? await window.fabriquerTokenIA({ portrait: v.Portrait || "", description: descriptionAvecRace(v.Description), sujet: v.PNJ ? "character" : "creature" })
+                    ? await window.fabriquerTokenIA({ portrait: v.Portrait || "", description: descriptionDuPion(v), sujet: v.PNJ ? "character" : "creature" })
                     : "";
             } catch (e) { console.error(`⚔️ [Pion ennemi] ${cle} :`, e); }
             // "" : le pion commun des ennemis le remplacera.
@@ -1672,7 +1722,35 @@ window.changerGrilleCombatRP = changerGrille;
 // =========================================================================
 //  7. À CHAQUE NOUVELLE DE LA PARTIE (app.js)
 // =========================================================================
+// --- 6.6 LE BOUTON POUR TOUS (v367) ----------------------------------------
+// Nico : « quand le combat se lance, fais en sorte que tous les joueurs puissent
+// avoir le bouton pour se téléporter dans la map de combat ». La note du livre ne
+// se voit que dans le récit : ce bouton-ci flotte au-dessus de tout, pour chaque
+// joueur de la partie, tant que le combat se prépare ou se joue et que sa fenêtre
+// de combat n'est pas ouverte.
+function actualiserBoutonRejoindre() {
+    const c = etat();
+    const fenetre = $("fenetre-combat");
+    const dansLeCombat = !!(fenetre && fenetre.style.display === "block");
+    const enPartie = !!window.ID_PARTIE_COURANTE;
+    const voulu = enPartie && !!c && ["preparation", "en_cours"].includes(c.Etat) && !dansLeCombat;
+    let b = $("bouton-rejoindre-combat");
+    if (!voulu) { if (b) b.remove(); return; }
+    if (!b) {
+        b = document.createElement("button");
+        b.type = "button";
+        b.id = "bouton-rejoindre-combat";
+        b.className = "bouton-rejoindre-combat";
+        b.addEventListener("click", () => { if (typeof window.jouerSonClic === "function") window.jouerSonClic(); window.rejoindreCombatRP(); });
+        document.body.appendChild(b);
+    }
+    const texte = c.Etat === "preparation" ? "⚔️ Le combat se prépare — Rejoindre" : "⚔️ Rejoindre le combat";
+    if (b.textContent !== texte) b.textContent = texte;
+}
+setInterval(() => { try { actualiserBoutonRejoindre(); } catch (e) {} }, 1000);
+
 function actualiserTout() {
+    try { actualiserBoutonRejoindre(); } catch (e) { console.error("Combat du récit (bouton) :", e); }
     try { actualiserChat(); } catch (e) { console.error("Combat du récit (chat) :", e); }
     try { actualiserEncarts(); } catch (e) { console.error("Combat du récit (encarts) :", e); }
     try { actualiserFenetreCombat(); } catch (e) { console.error("Combat du récit (fenêtre) :", e); }
@@ -1682,6 +1760,7 @@ window.actualiserCombatRPAffichage = actualiserTout;
 window.appliquerCombatRPDeLaPartie = function(p) {
     partieVue = p || {};
     const c = etat(partieVue);
+    if (c && c.Ennemis && c.Ennemis.Visuels) derniersEnnemis = c.Ennemis;
     // (v335) Un combat du récit se prépare ou se joue : le plateau de combat se charge.
     if (c && ["preparation", "en_cours"].includes(c.Etat) && typeof window.assurerPlateauCombat === "function") window.assurerPlateauCombat();
     actualiserRecit(c);
@@ -1692,8 +1771,15 @@ window.appliquerCombatRPDeLaPartie = function(p) {
         else verifierRelais(c);
     } else if (c.Etat === "en_cours") {
         suivreLaFin(c, partieVue);
-    } else if (c.Etat === "narration" && Date.now() - (Number(c.Narration_Le) || 0) > R.narrationBloqueeMs) {
-        transaction((data) => (data.Combat_RP && data.Combat_RP.Id === c.Id && data.Combat_RP.Etat === "narration") ? { maj: { Combat_RP: deleteField() } } : null);
+    } else if (c.Etat === "narration") {
+        // (v367, Nico : « après le combat perdu, j'ai été téléporté sur le RP, niquel,
+        // mais pas mes deux frères ») : le récit reprend dès qu'un poste croit tout le
+        // monde revenu ; un poste encore au combat revient lui aussi (sa défaite vue,
+        // ou son butin refermé), au lieu d'y rester. (Seulement avec sa fin connue :
+        // sans elle, suivreLaFin croirait le combat abandonné.)
+        if (partieVue.Fin_Combat && partieVue.Fin_Combat.idRencontre === c.ID_Rencontre) suivreLaFin(c, partieVue);
+        if (Date.now() - (Number(c.Narration_Le) || 0) > R.narrationBloqueeMs)
+            transaction((data) => (data.Combat_RP && data.Combat_RP.Id === c.Id && data.Combat_RP.Etat === "narration") ? { maj: { Combat_RP: deleteField() } } : null);
     }
 };
 

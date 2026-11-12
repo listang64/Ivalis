@@ -316,9 +316,9 @@ await section(async () => {
   const pions = openai.slice(avantImg).filter(x => /medallion/.test(x.prompt));
   const chef = pions.find(x => /Vargen massif/.test(x.prompt)), guerrier = pions.find(x => /guerrier vargen/.test(x.prompt)), loup = pions.find(x => /grand loup gris des steppes/.test(x.prompt));
   verifier("le pion du chef vargen : sa description + l'apparence d'un Vargen selon le Grimoire",
-           !!chef && /What a Vargen looks like in this world: Humanoïdes lupins de deux mètres[^)]*Crinière tressée d'os/.test(chef.prompt), chef ? chef.prompt.slice(0, 120) : `${pions.length} pion(s)`);
-  verifier("… le guerrier vargen aussi", !!guerrier && /What a Vargen looks like in this world/.test(guerrier.prompt));
-  verifier("le loup (aucun peuple nommé) : sa description seule", !!loup && !/looks like in this world/.test(loup.prompt), pions.map(x => x.prompt.slice(0, 200)).join(" || "));
+           !!chef && /(What a Vargen looks like in this world|What every Vargen looks like \(follow it exactly[^)]*\)): Humanoïdes lupins de deux mètres[^)]*Crinière tressée d'os/.test(chef.prompt) /* (v367 : le peuple en tête) */, chef ? chef.prompt.slice(0, 120) : `${pions.length} pion(s)`);
+  verifier("… le guerrier vargen aussi", !!guerrier && /What a Vargen looks like in this world|What every Vargen looks like/.test(guerrier.prompt));
+  verifier("le loup (aucun peuple nommé) : sa description seule", !!loup && !/looks like in this world|What every \w+ looks like/.test(loup.prompt), pions.map(x => x.prompt.slice(0, 200)).join(" || "));
   verifier("le dessin garde l'interdit : jamais d'orc", !!chef && /never draw an orc/.test(chef.prompt));
 });
 

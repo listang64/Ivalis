@@ -353,6 +353,22 @@
    des classes (grimoire_creation.css, .fond-classe) ; le texte s'écrit par-dessus à
    gauche. L'image arrive en fondu une fois chargée (grimoire_recit.js, chargerImagesRecit). */
 .page-recit > .fond-recit.gauche ~ :not(.fleche-suite) { position: relative; z-index: 1; }
+/* v367 — Nico : « les images créées dans le RP, les bords ne suivent pas les bords de la
+   page, il faut qu'elles soient mieux intégrées ». L'image se fond dans le papier : en haut,
+   en bas et sur le bord extérieur de la page, un dégradé la fait disparaître dans la feuille
+   (le pli, au milieu, reste net : l'image passe d'une page à l'autre) ; et le grain du
+   papier transparaît un peu dans l'image. */
+.fond-classe.fond-recit.droite {
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 82%, rgba(0, 0, 0, 0.35) 94%, transparent 100%), linear-gradient(to bottom, transparent 0%, #000 9%, #000 91%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, #000 0%, #000 82%, rgba(0, 0, 0, 0.35) 94%, transparent 100%), linear-gradient(to bottom, transparent 0%, #000 9%, #000 91%, transparent 100%);
+  mask-composite: intersect; }
+.fond-classe.fond-recit.gauche {
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.1) 12%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%), linear-gradient(to bottom, transparent 0%, #000 9%, #000 91%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.1) 12%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%), linear-gradient(to bottom, transparent 0%, #000 9%, #000 91%, transparent 100%);
+  mask-composite: intersect; }
+.fond-classe.fond-recit img { mix-blend-mode: multiply; filter: saturate(0.92) contrast(1.03); }
 .fond-recit img, .portrait-avatar img { opacity: 0; transition: opacity 1.2s ease; }
 .fond-recit img.pret, .portrait-avatar img.pret { opacity: 1; }
 /* Le portrait d'un PNJ nouveau, fait comme l'avatar des héros : en couleur, détouré. */

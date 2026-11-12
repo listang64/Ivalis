@@ -6311,3 +6311,14 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 .depenses-tva { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; font-size: 14px; color: #3a2210; cursor: pointer; }
 .depenses-tva input { width: 18px; height: 18px; accent-color: #8c6a45; }
 .depenses-ligne.hors-tour td { background: rgba(120, 140, 160, 0.08); }
+
+/* v367 — LE BOUTON « REJOINDRE LE COMBAT », pour chaque joueur, où qu'il soit
+   (combat_rp.js, actualiserBoutonRejoindre). */
+.bouton-rejoindre-combat {
+    position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 10050;
+    font-family: 'Cinzel', serif; font-weight: bold; font-size: 17px; letter-spacing: 0.03em;
+    color: #fff4dc; background: linear-gradient(180deg, #8a1a10, #5a0e08); border: 2px solid #e8c97a; border-radius: 26px;
+    padding: 10px 26px; cursor: pointer; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.7), 0 0 12px rgba(232, 201, 122, 0.45);
+    text-shadow: 0 1px 2px #000;
+}
+.bouton-rejoindre-combat:hover { filter: brightness(1.15); }

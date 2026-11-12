@@ -325,17 +325,15 @@ await section(async () => {
     }, echelle));
   }
   const toutes = mesures.flat();
-  verifier("deux chiffres sous le pion, à chaque zoom", toutes.length === 6, String(toutes.length));
-  verifier("au cadrage d'entrée (pion d'une vingtaine de pixels), ils se lisent (≥ 9 px)", mesures[0].every(m => m.police >= 9), mesures[0].map(m => m.police.toFixed(1)).join(" / "));
-  verifier("à tout zoom, ils tiennent dans leur jauge", toutes.every(m => m.tl <= m.jl + 0.5 && m.th <= m.jh + 0.5), toutes.map(m => `${m.echelle}:${m.tl.toFixed(0)}/${m.jl.toFixed(0)}`).join(" "));
-  verifier("…et grandissent encore quand on zoome", mesures[2][0].police > mesures[0][0].police, `${mesures[0][0].police.toFixed(1)} → ${mesures[2][0].police.toFixed(1)}`);
-  verifier("les chiffres justes (34/62)", toutes.some(m => m.texte === "34/62"));
+  // (v367) Plus de chiffres dans les jauges.
+  verifier("plus de chiffres sous le pion, à aucun zoom (v367)", toutes.length === 0, String(toutes.length));
   // Au vrai clic sur le pion.
   const clic = await p.evaluate(async () => { window.TOKEN_SELECTIONNE = null; window.VTT_SCALE = 0.42; window.appliquerTransformPlateau(); window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
     await new Promise(r => setTimeout(r, 150)); const t = document.getElementById("token-H1"); const r = t.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
   await p.evaluate(() => document.getElementById("token-H1").click()); await p.waitForTimeout(250);
   const vu = await p.evaluate(() => [...document.querySelectorAll('.jauge-selection-chiffre')].map(x => parseFloat(getComputedStyle(x).fontSize)));
-  verifier("un clic sur le pion montre ses PV, lisibles", vu.length === 2 && vu.every(v => v >= 9), JSON.stringify(vu));
+  // (v367) Le clic montre les jauges, sans chiffres dessus (ils restent dans la bulle du survol).
+  verifier("un clic sur le pion montre ses jauges, sans chiffres (v367)", vu.length === 0 && (await p.evaluate(() => !!document.querySelector(".jauges-selection-token"))), JSON.stringify(vu));
 });
 
 // =========================================================================

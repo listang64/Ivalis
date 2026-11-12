@@ -34,13 +34,13 @@ const verifier = (l, c, d = "") => { if (!c) echecs++; console.log(`  ${l.padEnd
 
 console.log("1. LE CODE CÂBLE BIEN UN BOUTON ANNULER EN MODE CIBLE UNIQUE");
 {
-    const debut = moteur.indexOf('let btnResoudre = document.getElementById("btn-resoudre-carte");');
-    verifier("le bloc du bouton RÉSOUDRE (ciblage à une cible) est repérable", debut > 0);
-    const bloc = moteur.slice(debut, debut + 3000);
-    verifier("un bouton « btn-annuler-ciblage » y est créé", bloc.includes('btn-annuler-ciblage'));
-    verifier("son texte est bien ANNULER", /btnAnnuler\.innerText = "ANNULER"/.test(bloc));
-    verifier("il appelle nettoyerCiblage (pas une simple fermeture visuelle)",
-             /btnAnnuler\.onclick = \(\) => window\.nettoyerCiblage\(\)/.test(bloc));
+    // (v367, Nico : « l'encart Résoudre, faut le virer ») : plus de barre RÉSOUDRE /
+    // ANNULER ; on renonce par la croix ✖ posée sur le pion du lanceur (combat.js).
+    const pose = moteur.slice(moteur.indexOf('window.poserBoutonsCibleUnique = function'), moteur.indexOf('// LA SECONDE PHASE : LE SOUTIEN SE VISE À PART.'));
+    verifier("le ciblage à une cible ne pose plus RÉSOUDRE ni ANNULER", pose.length > 0 && !pose.includes('btn-resoudre-carte') && !pose.includes('btn-annuler-ciblage'));
+    const combatJs = fs.readFileSync('/home/user/Ivalis/combat.js', 'utf-8');
+    verifier("la croix du lanceur annule le ciblage (nettoyerCiblage)",
+             /poserCroix\("croix-annuler-ciblage", "Annuler le ciblage",\s*\(\) => \{ if \(typeof window\.nettoyerCiblage === "function"\) window\.nettoyerCiblage\(\); \}\)/.test(combatJs));
 
     // L'ancien bouton doré « Appliquer » (qui démarrait le ciblage) est parti :
     // c'est le bouton fin de tour, sous son image « lancer », qui le remplace.

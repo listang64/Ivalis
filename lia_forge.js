@@ -37,6 +37,11 @@ const borne = (n, min, max) => Math.max(min, Math.min(max, Math.round(Number(n) 
 // Les armes que ce héros peut vraiment utiliser : celles qu'il a en main,
 // plus la Magie et le Sans arme / Arme rp. Fiche illisible : les quatre.
 function armesPermises() {
+    // (v367, Nico : « j'ai choisi une compétence avec la catégorie sans arme, et il
+    // me l'a créée en arme légère ») : l'arme déjà choisie dans la Forge est la seule
+    // que LIA peut prendre.
+    const choisie = window.forgeState && window.forgeState.armePrincipale;
+    if (choisie) return [choisie];
     const enMain = outils().typesArmesEquipeesPourForge();
     return [...ARMES_PHYSIQUES.filter(a => !enMain || enMain.has(a)), ...ARMES_TOUJOURS];
 }

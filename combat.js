@@ -2831,23 +2831,10 @@ window.poserJaugesSelection = function(divToken, perso, existantes) {
                        + `<div class="jauge-selection jauge-selection-fatigue"><div class="jauge-selection-remplie"></div></div>`
                        + `<div class="jauges-selection-nom"></div>`;
     }
-    // LES CHIFFRES SUR LES JAUGES (v267, Nico : « quand on clique sur un token,
-    // affiche le nombre de PV et de fatigue sur ses jauges en dessous ») :
-    // « 34/50 » dans la barre de vie, « 80/120 » dans celle de la fatigue.
-    // LA TAILLE SUIT LA JAUGE, PAS LE ZOOM (v270, Nico : « ne les fais pas
-    // rétrécir avec le zoom, juste qu'ils restent dans leur jauge, le plus
-    // grand possible sans les déformer ») : la feuille de style la tire de la
-    // hauteur et de la largeur de la barre (unités de conteneur), le nombre de
-    // caractères disant combien il en faut loger en largeur.
-    [[".jauge-selection-vie", `${m.pv}/${m.pvMax}`], [".jauge-selection-fatigue", `${m.energie}/${m.energieMax}`]].forEach(([sel, texte]) => {
-        const jauge = bloc.querySelector(sel);
-        if (!jauge) return;
-        let chiffre = jauge.querySelector(".jauge-selection-chiffre");
-        if (!chiffre) { chiffre = document.createElement("span"); chiffre.className = "jauge-selection-chiffre"; jauge.appendChild(chiffre); }
-        chiffre.textContent = texte;
-        chiffre.style.fontSize = "";
-        chiffre.style.setProperty("--nb-car", String(Math.max(1, texte.length)));
-    });
+    // (v367, Nico : « enlève les nombres sur les barres de vie et fatigue des
+    // tokens quand on clique ») : plus de chiffres dans les jauges (v267-v270) ;
+    // ils restent dans la bulle du survol (bloc.title).
+    bloc.querySelectorAll(".jauge-selection-chiffre").forEach(c => c.remove());
     // LE NOM, EN TOUT PETIT, SOUS LES JAUGES (Nico, v255), une ombre portée
     // dessous pour le relief. Sa taille suit celle du pion.
     let nom = bloc.querySelector(".jauges-selection-nom");

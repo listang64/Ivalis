@@ -39,6 +39,12 @@
 .classe-aventurier { font-style: italic; }
 .aventurier-absent { font-size: 0.65em; color: #8a6a4a; font-style: italic; }
 .ligne-aventurier:hover .nom-aventurier { text-decoration: underline; text-underline-offset: 0.15em; }
+/* v367 — la case du héros actif, tracée à l'encre devant son nom. */
+.liste-aventuriers li.avec-case { display: flex; align-items: center; gap: calc(var(--u) * 1.4); }
+.case-actif { flex: none; width: calc(var(--u) * 5.4); height: calc(var(--u) * 5.4); padding: 0; border: 0; background: none; cursor: pointer; }
+.case-actif svg { width: 100%; height: 100%; overflow: visible; }
+.case-actif .boite { fill: rgba(255, 244, 214, 0.5); stroke: #2b1a0e; stroke-width: 1.6; stroke-linejoin: round; }
+.case-actif .coche { fill: none; stroke: #7a1a10; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
 .clan-vide { font-style: italic; color: #6b4a2b; font-size: calc(var(--u) * 3.6); }
 .nouvel-aventurier { margin-top: calc(var(--u) * 5); font-size: calc(var(--u) * 3.6) !important; color: #5c3a21 !important; text-decoration: underline; }
 
@@ -149,7 +155,14 @@
 .separation-classe { display: flex; align-items: center; gap: calc(var(--u) * 2); margin: calc(var(--u) * 1.6) 0 calc(var(--u) * 0.6); }
 .separation-classe::before, .separation-classe::after { content: ""; flex: 1; border-top: 1px solid rgba(43, 26, 14, 0.6); }
 .separation-classe span { font-size: calc(var(--u) * 3.6 * var(--echelle-titres, 1)); }
-.bouton-forger { margin-top: auto; }
+/* v367 — Nico : « le bouton Forger une compétence plus gros » : un vrai bouton tracé à
+   l'encre, centré, sur toute la largeur de la page. */
+.page-fiches .bouton-forger { margin-top: auto; align-self: stretch; text-align: center; text-decoration: none;
+  font-size: calc(var(--u) * 5.2) !important; padding: calc(var(--u) * 2) calc(var(--u) * 2.4);
+  border: 2px solid #3a2210; border-radius: calc(var(--u) * 1.2); background: rgba(255, 244, 214, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(58, 34, 16, 0.25), 0 2px 0 rgba(58, 34, 16, 0.35); }
+.page-fiches .bouton-forger:hover { background: rgba(255, 236, 190, 0.8); }
+.bouton-forger small { display: block; font-size: 0.6em; margin-top: 0.2em; }
 .bouton-forger.eteint { opacity: 0.5; }
 
 /* LA CARTE, qui monte dans le papier comme de l'encre. */
@@ -186,6 +199,9 @@
 .codex-liste { flex: 1; min-height: 0; }
 .codex-armes { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 1.4) calc(var(--u) * 4); }
 .codex-armes .fiche-attente { width: 100%; }
+.codex-armes [hidden] { display: none !important; }
+/* v367 : l'arme choisie, seule, cerclée ; la toucher rouvre le choix. */
+.codex-armes .arme-forge.choisie { font-weight: bold; text-decoration: none; padding: 0 calc(var(--u) * 1.2); border: 1.5px solid #3a2210; border-radius: calc(var(--u) * 3); }
 .codex-armes.appelle { animation: codex-appelle 0.6s ease 2; }
 @keyframes codex-appelle { 50% { color: #6b1a10; transform: translateX(calc(var(--u) * 0.6)); } }
 .compte-tags { font-size: calc(var(--u) * 3); color: #5c3a21; }

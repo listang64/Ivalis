@@ -11526,3 +11526,24 @@ corrections_v365.mjs le vérifie. Les anciens tests qui attendaient le féminin 
   - Nouvelles : Assassin (Maître des poisons, Instinct cumulable), Chasseur (fléau des mages, Briseur d'arcane), Profanateur (glace physique), Géomancien (Coulée de lave), Sentinelle (Défenseur), Oracle (l'arcane qui ralentit, Retour dans le passé), Inquisiteur (son feu, sa résistance, Combustion instantanée, Terreur ardente), Prêtre (Purification et Lumière protectrice, insensible à l'Aveuglement, aura de soin, Désintégration), Berserker (Rage, Régénération insolente, deux armes à deux mains), Maudit (DOT cumulés avec leur rond chiffré, Magie du sang, Vaudou, Possession).
 
 corrections_v366.mjs le vérifie : la Forge commencée puis rouverte (sur l'ancien code, il retrouve les trois erreurs de la console) ; les animations de chaque classe, les niveaux, l'ordre. studio_catalogue_1 et studio_animation comptent 168 animations ; _studio_commun connaît les nouveaux déplacements (Assaut, Terreur ardente, Retour dans le passé). studio_catalogue_2 joue les 24 nouvelles jusqu'au bout.
+
+## v367 — Héros actif, Forge, reset des caracs, combat, pions ennemis, images du récit
+
+- **Le héros actif** : sur les pages des clans, une case à cocher devant chacun de SES héros. Un seul actif par joueur : cocher l'un met les autres au repos (`basculerActivationPersonnage`).
+- **La Forge** :
+  - « Forger une compétence » devient un vrai bouton, gros et tracé à l'encre.
+  - Le codex ne propose que les types d'arme en main, plus Magie et Sans arme. Une fois l'arme choisie, elle reste seule (cerclée) ; la toucher rouvre le choix.
+  - LIA ne peut plus prendre une autre arme que celle déjà choisie : la technique « Sans arme » forgée en arme légère.
+- **Le reset des caractéristiques** (onglet DEV) : le bouton lisait le héros dans le champ caché de l'ancienne fiche, vide dans le livre (« Ouvrez d'abord la fiche d'un héros existant »). Il prend désormais le héros ouvert, et la fiche montre « Répartir ses caractéristiques » à la place des caracs.
+- **Le combat** :
+  - Un bouton « Rejoindre le combat » flotte pour chaque joueur, où qu'il soit, tant que le combat se prépare ou se joue.
+  - Plus de barre RÉSOUDRE / ANNULER : on choisit la cible, son ✔ lance la compétence, la croix du lanceur annule.
+  - Plus de chiffres sur les jauges d'un pion cliqué.
+  - Après une défaite, un poste resté au combat revient au récit quand le combat passe en narration (les frères de Nico n'étaient pas renvoyés).
+- **Les pions ennemis** : chaque visuel, renforts compris, porte son peuple (de la liste du Grimoire, ou bête / mythe). Le pion part de ce peuple et de son apparence, en tête de la description : plus d'« homme à cornes ».
+- **Les images du récit** :
+  - Les armes en main des héros partent en référence (image, sinon leur nom).
+  - Les ennemis présents sont décrits comme leurs pions.
+  - L'illustration en double page se fond dans le papier (haut, bas, bord extérieur) et en prend le grain.
+
+corrections_v367.mjs le vérifie, dans la vraie page (clans, Forge, onglet DEV, bouton du combat, jauges, peuples des pions, ennemis de l'image) et dans le code (LIA, ✔ et lots de Traction, retour après la défaite, bords de l'image).
