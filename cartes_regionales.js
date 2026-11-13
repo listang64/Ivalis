@@ -35,19 +35,15 @@
 //  celui qui l'a ouverte ; aucun autre poste ne bouge.
 //
 //  LA BASE : une fiche par carte, Cartes_Regionales/{numéro de la boîte} —
-//  { Numero, Nom, Image, Description, Titre: {x, y, taille}, Usure:
-//  {colonnes, lignes, cases} }. Le nom et l'image ont une valeur par défaut
-//  ici (la liste de Nico) ; la fiche l'emporte quand elle en porte une. Un
-//  poste en DEV crée les fiches qui manquent. L'usure vaut pour TOUTES les
-//  parties : elle fait partie de la carte. (Les Nuages peints avant v286
-//  restent en base, ignorés : plus de nuages sur les cartes régionales.)
+//  { Numero, Nom, Image, Description, Titre: {x, y, taille} }. Le nom et
+//  l'image ont une valeur par défaut ici (la liste de Nico) ; la fiche
+//  l'emporte quand elle en porte une. Un poste en DEV crée les fiches qui
+//  manquent. (Les Nuages peints avant v286, l'Usure et la Coupe d'avant v332,
+//  restent en base, ignorés.)
 //
 //  LE DEV (le bouton rouge du bas, popup des régions) : sur une carte
-//  régionale, un pinceau peint en orange, provisoirement, où le parchemin peut
-//  brûler, se déchirer, se percer (v283) ; une gomme l'efface ; « Valider
-//  l'usure » l'enregistre.
-//  Une case « Édition du titre » : le titre se déplace, le carré de son coin
-//  haut droit l'agrandit ou le rétrécit ; décocher l'enregistre.
+//  régionale, une case « Édition du titre » : le titre se déplace, le carré de
+//  son coin haut droit l'agrandit ou le rétrécit ; décocher l'enregistre.
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import {
@@ -60,7 +56,6 @@ const ZOOM_MONDE_PLONGEE = 2.4;   // la carte du monde plonge vers la région
 const ECHELLE_ARRIVEE = 1.12;     // la carte régionale arrive un peu trop grande
 const DUREE_PLONGEE_MS = 950;
 const DUREE_ARRIVEE_MS = 1300;
-const GRILLE_COLONNES = 240;      // la grille des zones de nuages, en largeur
 const TITRE_DEFAUT = { x: 0.5, y: 0.09, taille: 0.075 };
 const SEUIL_GLISSE = 5;
 
@@ -150,11 +145,6 @@ function composerCartes() {
                 y: Number.isFinite(Number(titre.y)) ? borne(Number(titre.y), 0, 1) : TITRE_DEFAUT.y,
                 taille: Number.isFinite(Number(titre.taille)) ? borne(Number(titre.taille), 0.015, 0.4) : TITRE_DEFAUT.taille
             },
-            // L'USURE DU PARCHEMIN (v283, bords_parchemin.js) : là où le DEV a
-            // peint que le bord peut brûler, se déchirer, se percer (même codage).
-            usure: fiche.Usure && fiche.Usure.cases ? { colonnes: Number(fiche.Usure.colonnes), lignes: Number(fiche.Usure.lignes), cases: String(fiche.Usure.cases) } : null,
-            // LES MORCEAUX RETIRÉS (v311) : là, le papier manque (même codage).
-            coupe: fiche.Coupe && fiche.Coupe.cases ? { colonnes: Number(fiche.Coupe.colonnes), lignes: Number(fiche.Coupe.lignes), cases: String(fiche.Coupe.cases) } : null,
             // LES TERRAINS PRATICABLES (v275, terrains_regionaux.js) : des
             // polygones en fractions de l'image, et ses proportions (largeur /
             // hauteur) pour les calculs faits carte fermée.
@@ -200,15 +190,9 @@ window.appliquerCartesRegionalesDeLaBase = function(liste, options) {
     const avant = etat.ouverte && window.CARTES_REGIONALES[etat.ouverte];
     composerCartes();
     // La carte ouverte suit ce que la base vient de dire (un autre poste DEV
-    // a peint l'usure, déplacé le titre) — sauf ce qu'on est en train d'éditer.
+    // a déplacé le titre) — sauf ce qu'on est en train d'éditer.
     if (etat.ouverte && avant) {
-        const apres = window.CARTES_REGIONALES[etat.ouverte];
         if (!etat.editionTitre) poserTitre();
-        if (JSON.stringify(avant.usure) !== JSON.stringify(apres.usure) || JSON.stringify(avant.coupe) !== JSON.stringify(apres.coupe)) {
-            ["usure", "coupe"].forEach(c => { if (!brouillonDu(c).modifie) oublierBrouillon(c); });
-            poserBord();
-            dessinerPeinture();
-        }
     }
     semerFichesManquantes();
     remettreANeufLesNouvellesCartes();
@@ -289,12 +273,6 @@ const etat = {
     zoom: 1, base: 1, panX: 0, panY: 0,
     cadrageMonde: null,       // le cadrage de la carte du monde avant la plongée
     centreMonde: null,        // le centre de la boîte cliquée (carte du monde)
-    outil: null,              // "pinceau" | "gomme" | null
-    taillePinceau: 50,        // en pixels d'écran (le rayon)
-    calque: "usure",          // ce que peint le pinceau : l'usure du parchemin (v283 ; les nuages, retirés en v286)
-    brouillon: null,          // la grille peinte du calque en main (Uint8Array), pas encore validée
-    brouillonModifie: false,
-    reserve: {},              // le brouillon de l'autre calque, mis de côté : { brouillon, modifie }
     editionTitre: false
 };
 window.carteRegionaleOuverte = () => etat.ouverte;
@@ -320,7 +298,6 @@ function construireVue() {
         <div class="table-ombre"></div>
         <div id="carte-region" class="carte-region">
           <img id="carte-region-image" class="carte-region-image" alt="" draggable="false">
-          <canvas id="carte-region-peinture" class="carte-region-peinture"></canvas>
         </div>
         <div id="carte-region-dessus" class="carte-region-dessus">
           <div id="carte-region-titre" class="carte-region-titre"><span class="carte-region-titre-texte"></span><span class="carte-region-titre-poignee" title="Agrandir ou rétrécir"></span></div>
@@ -480,8 +457,8 @@ function signaler(ouverte, numero) {
 }
 
 // --- LES GESTES ------------------------------------------------------------
-//  Un doigt (ou la souris) : glisser la carte — ou peindre, le pinceau ou la
-//  gomme en main ; ou déplacer le titre en édition. Deux doigts : zoomer
+//  Un doigt (ou la souris) : glisser la carte — ou déplacer le titre en
+//  édition. Deux doigts : zoomer
 //  autour d'eux, et glisser. La molette : zoomer autour du pointeur.
 const pointeurs = new Map();
 let geste = null;
@@ -502,7 +479,7 @@ function brancherGestes(vue) {
         if (etat.enGrand) e.stopPropagation();          // (v334) en grand, la carte garde tous ses gestes
         else if (etat.dansLeLivre) {
             // (v331) Plus de zoom : sans outil, tous les doigts sont pour le livre (tourner la page).
-            const libre = !etat.outil && !etat.editionTitre;
+            const libre = !etat.editionTitre;
             if (libre) { pointeurs.set(e.pointerId, { x: e.clientX, y: e.clientY, livre: true }); return; }
             if (pointeurs.size === 1 && [...pointeurs.values()][0].livre && window.GRIMOIRE && window.GRIMOIRE.annulerPrise) window.GRIMOIRE.annulerPrise();
             e.stopPropagation();
@@ -520,12 +497,6 @@ function brancherGestes(vue) {
             e.preventDefault();
             return;
         }
-        if (etat.outil && estDev()) {
-            geste = { type: "peinture", dernier: pointImage(e.clientX, e.clientY) };
-            peindre(geste.dernier, geste.dernier);
-            e.preventDefault();
-            return;
-        }
         geste = { type: "glisser", x: e.clientX, y: e.clientY, panX: etat.panX, panY: etat.panY };
     });
     vue.addEventListener("pointermove", (e) => {
@@ -540,10 +511,6 @@ function brancherGestes(vue) {
             etat.panX = geste.panX + (e.clientX - geste.x);
             etat.panY = geste.panY + (e.clientY - geste.y);
             bornerPan(); poserCarte();
-        } else if (geste.type === "peinture") {
-            const ici = pointImage(e.clientX, e.clientY);
-            peindre(geste.dernier, ici);
-            geste.dernier = ici;
         } else if (geste.type === "titre" || geste.type === "taille") {
             suivreTitre(e.clientX - geste.x, e.clientY - geste.y);
         }
@@ -560,7 +527,6 @@ function brancherGestes(vue) {
             return;
         }
         if (pointeurs.size === 0) {
-            if (geste && geste.type === "peinture") demanderApercuBord();
             geste = null;
         }
     };
@@ -777,13 +743,8 @@ window.ouvrirCarteRegionale = async function(numero, options) {
     }
     const sansTransition = !!(options && options.sansTransition) || !!livre;
     etat.enTransition = true;
-    // Le pinceau d'usure de la carte du monde (v283) se pose en partant.
-    if (typeof window.lacherOutilUsureMonde === "function") window.lacherOutilUsureMonde();
     const url = window.urlImageCarteRegionale(carte.image);
     const chargement = chargerImage(url);       // pendant la plongée et les nuages
-    // Le bord de parchemin (v282) se calcule pendant ce temps (à part).
-    const graineBord = typeof window.graineParcheminRegion === "function" ? window.graineParcheminRegion(n) : n;
-    chargement.then(img => { if (img && window.BordsParchemin) window.BordsParchemin.preparer({ graine: graineBord, aspect: img.naturalWidth / img.naturalHeight, cote: 2048, zones: carte.usure, coupe: carte.coupe }); });
     const region = (window.REGIONS_CARTE || {})[n];
     etat.centreMonde = region && typeof window.centreRegion === "function" ? window.centreRegion(region.points) : { x: 1920, y: 1080 };
     if (!livre && typeof window.replierMenuLateral === "function") window.replierMenuLateral({ silencieux: true });
@@ -796,23 +757,16 @@ window.ouvrirCarteRegionale = async function(numero, options) {
         etat.ouverte = n;
         etat.largeur = (img && img.naturalWidth) || 1920;
         etat.hauteur = (img && img.naturalHeight) || 1080;
-        etat.outil = null; etat.brouillon = null; etat.brouillonModifie = false; etat.editionTitre = false;
-        etat.calque = "usure"; etat.reserve = {};
+        etat.editionTitre = false;
         const imageEl = $("carte-region-image");
         if (img && img.crossOrigin) imageEl.crossOrigin = "anonymous"; else imageEl.removeAttribute("crossorigin");
         imageEl.src = img ? img.src : url;
         etat.urlImage = img ? img.src : url;
-        // LES BORDS DE PARCHEMIN (v282, bords_parchemin.js) : la carte entière
-        // (son image, ses nuages, ses lieux) est découpée le long d'un bord usé ;
-        // l'usure se pose sur l'image, sous tout le reste. Brûlé, déchiré,
-        // percé là où le DEV l'a peint (v283).
-        poserBord();
         const vue = $("vue-carte-region");
         vue.style.display = "block";
         vue.classList.add("arrivee");
         cadrer(false);
         poserTitre();
-        dessinerPeinture();
         // Le bouton de retour (au-dessus de tout) attend que les nuages se
         // soient dissipés : il ne flotte pas sur l'écran blanc (v279).
         if (sansTransition && !livre) $("btn-retour-monde").style.display = "flex";
@@ -858,7 +812,6 @@ window.fermerCarteRegionale = async function(options) {
     etat.enTransition = true;
     // Un titre en cours d'édition s'enregistre en partant.
     if (etat.editionTitre) window.basculerEditionTitreRegion(false);
-    etat.outil = null;
     actualiserDev();
     const vue = $("vue-carte-region");
     const mondeEl = $("carte-fond-jeu");
@@ -903,204 +856,6 @@ window.fermerCarteRegionale = async function(options) {
 };
 
 // =========================================================================
-//  LES ZONES DE NUAGES (la grille) ET LEUR PEINTURE (DEV)
-// =========================================================================
-//  Une grille de GRILLE_COLONNES colonnes, posée sur l'image (autant de lignes
-//  que ses proportions le veulent) : une case vaut 1 sous les nuages. En base,
-//  ses bits en base64 (Nuages.cases) — quelques kilo-octets.
-function dimensionsGrille() {
-    const colonnes = GRILLE_COLONNES;
-    const lignes = Math.max(1, Math.round(colonnes * (etat.hauteur || 1) / (etat.largeur || 1)));
-    return { colonnes, lignes };
-}
-window.encoderGrilleNuages = function(cases) {
-    const octets = new Uint8Array(Math.ceil(cases.length / 8));
-    cases.forEach((v, i) => { if (v) octets[i >> 3] |= (1 << (i & 7)); });
-    let s = "";
-    octets.forEach(o => { s += String.fromCharCode(o); });
-    return btoa(s);
-};
-window.decoderGrilleNuages = function(texte, total) {
-    const cases = new Uint8Array(total);
-    let s = "";
-    try { s = atob(texte || ""); } catch (e) { return cases; }
-    for (let i = 0; i < total; i++) cases[i] = (s.charCodeAt(i >> 3) >> (i & 7)) & 1;
-    return cases;
-};
-// La grille enregistrée de la carte ouverte (aux dimensions de son image) :
-// l'usure du parchemin.
-function grilleEnregistree(calque) {
-    const { colonnes, lignes } = dimensionsGrille();
-    const carte = window.CARTES_REGIONALES[etat.ouverte];
-    const n = carte && carte[calque || etat.calque];
-    if (!n || n.colonnes !== colonnes || n.lignes !== lignes) return new Uint8Array(colonnes * lignes);
-    return window.decoderGrilleNuages(n.cases, colonnes * lignes);
-}
-// LES CALQUES DU PINCEAU : l'usure du parchemin (v283) ; les MORCEAUX RETIRÉS
-// (v311, « coupe » : là, le papier manque). Les nuages, l'ancien calque, sont
-// retirés (v286).
-const CALQUES = ["usure", "coupe"];
-const CHAMP_CALQUE = { usure: "Usure", coupe: "Coupe" };
-function brouillonDu(calque) {
-    if (calque === etat.calque) return { brouillon: etat.brouillon, modifie: etat.brouillonModifie };
-    return etat.reserve[calque] || { brouillon: null, modifie: false };
-}
-function oublierBrouillon(calque) {
-    if (calque === etat.calque) { etat.brouillon = null; etat.brouillonModifie = false; }
-    else delete etat.reserve[calque];
-}
-window.grilleNuagesRegion = () => null;      // plus de nuages régionaux (v286)
-window.grilleUsureRegion = () => (etat.ouverte ? (brouillonDu("usure").brouillon || grilleEnregistree("usure")) : null);
-window.grilleCoupeRegion = () => (etat.ouverte ? (brouillonDu("coupe").brouillon || grilleEnregistree("coupe")) : null);
-window.calqueCarteRegion = () => etat.calque;
-window.choisirCalqueRegion = function(calque) {
-    if (!etat.ouverte || !estDev() || !CALQUES.includes(calque)) return etat.calque;
-    if (calque !== etat.calque) {
-        etat.reserve[etat.calque] = { brouillon: etat.brouillon, modifie: etat.brouillonModifie };
-        const autre = etat.reserve[calque] || { brouillon: null, modifie: false };
-        delete etat.reserve[calque];
-        etat.calque = calque;
-        etat.brouillon = autre.brouillon; etat.brouillonModifie = autre.modifie;
-    }
-    dessinerPeinture();
-    actualiserDev();
-    return etat.calque;
-};
-
-// LE BORD DE PARCHEMIN de la carte ouverte (bords_parchemin.js) : l'usure
-// enregistrée — ou, pendant que le DEV peint l'usure, son brouillon en aperçu
-// (`apercu`, pas gardé).
-function poserBord(apercu) {
-    if (!window.BordsParchemin || !etat.ouverte || !etat.largeur) return null;
-    const carte = window.CARTES_REGIONALES[etat.ouverte];
-    // L'usure et les morceaux retirés (v311) : chacun son brouillon en aperçu, sinon ce qui est enregistré.
-    let provisoire = false;
-    const grille = (calque) => {
-        const b = brouillonDu(calque);
-        if (apercu && b.modifie && b.brouillon) { provisoire = true; return Object.assign(dimensionsGrille(), { cases: b.brouillon }); }
-        return (carte && carte[calque]) || null;
-    };
-    const zones = grille("usure"), coupe = grille("coupe");
-    const graine = typeof window.graineParcheminRegion === "function" ? window.graineParcheminRegion(etat.ouverte) : etat.ouverte;
-    return window.BordsParchemin.appliquer($("carte-region"), { graine, aspect: etat.largeur / etat.hauteur, cote: 2048,
-                                                               apres: $("carte-region-image"), zones, coupe, provisoire })
-        .catch(e => { console.error("Bord de parchemin :", e); return null; });
-}
-window.poserBordCarteRegion = poserBord;
-// L'aperçu suit le pinceau d'usure, un instant après chaque trait.
-let apercuEnAttente = null;
-function demanderApercuBord() {
-    if (apercuEnAttente) clearTimeout(apercuEnAttente);
-    apercuEnAttente = setTimeout(() => { apercuEnAttente = null; if (etat.brouillonModifie) poserBord(true); }, 350);
-}
-
-// Le pinceau (ou la gomme) passe de `a` à `b` (en pixels de l'image).
-function peindre(a, b) {
-    if (!etat.ouverte || !etat.outil) return;
-    const { colonnes, lignes } = dimensionsGrille();
-    if (!etat.brouillon) etat.brouillon = grilleEnregistree(etat.calque);
-    const cellule = etat.largeur / colonnes;
-    const rayon = etat.taillePinceau / etat.zoom;          // le rayon en pixels de l'image
-    const valeur = etat.outil === "pinceau" ? 1 : 0;
-    const pas = Math.max(1, rayon / 2);
-    const longueur = Math.hypot(b.x - a.x, b.y - a.y);
-    const n = Math.max(1, Math.ceil(longueur / pas));
-    for (let k = 0; k <= n; k++) {
-        const x = a.x + (b.x - a.x) * k / n, y = a.y + (b.y - a.y) * k / n;
-        const c0 = Math.max(0, Math.floor((x - rayon) / cellule)), c1 = Math.min(colonnes - 1, Math.floor((x + rayon) / cellule));
-        const l0 = Math.max(0, Math.floor((y - rayon) / cellule)), l1 = Math.min(lignes - 1, Math.floor((y + rayon) / cellule));
-        for (let l = l0; l <= l1; l++) for (let c = c0; c <= c1; c++) {
-            if (Math.hypot((c + 0.5) * cellule - x, (l + 0.5) * cellule - y) <= rayon) etat.brouillon[l * colonnes + c] = valeur;
-        }
-    }
-    etat.brouillonModifie = true;
-    dessinerPeinture();
-    actualiserDev();
-}
-// Pour les bancs (et un futur outil) : peindre en un point de l'écran.
-window.peindreCarteRegion = function(x, y, x2, y2) {
-    peindre(pointImage(x, y), pointImage(x2 === undefined ? x : x2, y2 === undefined ? y : y2));
-    demanderApercuBord();
-};
-
-// Les zones rouges, semi-transparentes : la grille du brouillon, agrandie
-// (lissée) sur toute l'image. Visibles tant qu'un outil est en main ou qu'un
-// brouillon attend d'être validé.
-function dessinerPeinture() {
-    const toile = $("carte-region-peinture");
-    if (!toile || !etat.ouverte) return;
-    toile.dataset.calque = etat.calque;
-    const visible = estDev() && (!!etat.outil || etat.brouillonModifie);
-    toile.style.display = visible ? "block" : "none";
-    if (!visible) return;
-    const { colonnes, lignes } = dimensionsGrille();
-    const grille = etat.brouillon || grilleEnregistree(etat.calque);
-    // L'usure du parchemin, en orange brûlé.
-    // (v311) Les morceaux retirés, en bleu : on voit lequel des deux on peint.
-    const teinte = etat.calque === "coupe" ? [38, 104, 226] : [236, 118, 18];
-    const petite = document.createElement("canvas");
-    petite.width = colonnes; petite.height = lignes;
-    const img = petite.getContext("2d").createImageData(colonnes, lignes);
-    for (let i = 0; i < grille.length; i++) {
-        if (!grille[i]) continue;
-        img.data[i * 4] = teinte[0]; img.data[i * 4 + 1] = teinte[1]; img.data[i * 4 + 2] = teinte[2]; img.data[i * 4 + 3] = 125;
-    }
-    petite.getContext("2d").putImageData(img, 0, 0);
-    // Agrandie trois fois en douceur : un bord lisse, pas un escalier de cases.
-    toile.width = colonnes * 3; toile.height = lignes * 3;
-    const ctx = toile.getContext("2d");
-    ctx.imageSmoothingEnabled = true;
-    if ("imageSmoothingQuality" in ctx) ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(petite, 0, 0, toile.width, toile.height);
-}
-
-// (v311) Le pinceau brûle (l'usure), les ciseaux retirent des morceaux (la
-// coupe) ; la gomme efface sur le calque en cours. Retouché, l'outil se pose.
-window.choisirOutilRegion = function(outil) {
-    if (!etat.ouverte || !estDev()) return null;
-    if (outil === "pinceau" || outil === "ciseaux") {
-        const calque = outil === "ciseaux" ? "coupe" : "usure";
-        const deja = etat.outil === "pinceau" && etat.calque === calque;
-        if (calque !== etat.calque) window.choisirCalqueRegion(calque);
-        etat.outil = deja ? null : "pinceau";
-    } else etat.outil = etat.outil === outil ? null : (outil === "gomme" ? "gomme" : null);
-    if (etat.outil && etat.editionTitre) window.basculerEditionTitreRegion(false);
-    dessinerPeinture();
-    actualiserDev();
-    return etat.outil === "pinceau" && outil === "ciseaux" ? "ciseaux" : etat.outil;
-};
-window.outilCarteRegion = () => etat.outil;
-window.reglerTaillePinceauRegion = function(v) {
-    etat.taillePinceau = borne(Number(v) || 50, 6, 200);
-    return etat.taillePinceau;
-};
-// Valide l'usure peinte (Usure). Le nom vient des nuages, d'avant v286.
-window.validerNuagesRegion = async function() {
-    if (!etat.ouverte || !etat.brouillon) return false;
-    const { colonnes, lignes } = dimensionsGrille();
-    const grille = { colonnes, lignes, cases: window.encoderGrilleNuages(etat.brouillon) };
-    const champ = CHAMP_CALQUE[etat.calque] || "Usure";
-    const carte = window.CARTES_REGIONALES[etat.ouverte];
-    carte[etat.calque] = grille;
-    fichesBase[etat.ouverte] = Object.assign({}, fichesBase[etat.ouverte], { [champ]: grille });
-    etat.brouillon = null; etat.brouillonModifie = false; etat.outil = null;
-    poserBord();
-    dessinerPeinture();
-    actualiserDev();
-    return enregistrerFiche(etat.ouverte, { [champ]: grille });
-};
-window.validerPeintureRegion = window.validerNuagesRegion;
-window.annulerNuagesRegion = function() {
-    if (!etat.ouverte) return false;
-    const apercu = etat.brouillonModifie;
-    etat.brouillon = null; etat.brouillonModifie = false;
-    if (apercu) poserBord();
-    dessinerPeinture();
-    actualiserDev();
-    return true;
-};
-
-// =========================================================================
 //  PLUS DE NUAGES SUR LES CARTES RÉGIONALES (v286)
 // =========================================================================
 //  Nico : « enlève-moi le bouton pour faire les nuages dans les maps
@@ -1140,7 +895,6 @@ window.basculerEditionTitreRegion = function(oui) {
     const voulu = typeof oui === "boolean" ? oui : !etat.editionTitre;
     if (voulu === etat.editionTitre) return voulu;
     etat.editionTitre = voulu && estDev();
-    if (etat.editionTitre && etat.outil) { etat.outil = null; dessinerPeinture(); }
     poserTitre();
     actualiserDev();
     // EN SORTANT DU MODE : on enregistre (Nico).
@@ -1170,32 +924,8 @@ function actualiserDev() {
     const carte = window.CARTES_REGIONALES[etat.ouverte];
     const nom = $("regions-dev-carte-nom");
     if (nom) nom.textContent = `${carte.numero} · ${carte.nom}`;
-    const pinceau = $("btn-region-pinceau"), gomme = $("btn-region-gomme"), ciseaux = $("btn-region-ciseaux");
-    if (pinceau) pinceau.classList.toggle("actif", etat.outil === "pinceau" && etat.calque === "usure");
-    if (ciseaux) ciseaux.classList.toggle("actif", etat.outil === "pinceau" && etat.calque === "coupe");
-    if (gomme) gomme.classList.toggle("actif", etat.outil === "gomme");
-    const valider = $("btn-region-valider-nuages"), annuler = $("btn-region-annuler-nuages");
-    CALQUES.forEach(c => {
-        const b = $(`btn-region-calque-${c}`);
-        if (b) { b.classList.toggle("actif", etat.calque === c); b.setAttribute("aria-pressed", etat.calque === c ? "true" : "false"); }
-    });
-    const aide = $("aide-calque-usure");
-    if (aide) aide.style.display = etat.calque === "usure" ? "block" : "none";
-    const aideCoupe = $("aide-calque-coupe");
-    if (aideCoupe) aideCoupe.style.display = etat.calque === "coupe" ? "block" : "none";
-    if (pinceau) pinceau.title = "Pinceau : peindre où le parchemin peut brûler, se déchirer, se percer";
-    if (valider) valider.textContent = etat.calque === "coupe" ? "Valider les morceaux retirés" : "Valider l'usure";
-    if (valider) valider.disabled = !etat.brouillonModifie;
-    if (annuler) annuler.disabled = !etat.brouillonModifie;
     const caseTitre = $("case-region-titre");
     if (caseTitre) caseTitre.checked = etat.editionTitre;
-    const taille = $("taille-pinceau-region");
-    if (taille && Number(taille.value) !== etat.taillePinceau) taille.value = String(etat.taillePinceau);
-    const vue = $("vue-carte-region");
-    if (vue) {
-        vue.classList.toggle("outil-pinceau", etat.outil === "pinceau");
-        vue.classList.toggle("outil-gomme", etat.outil === "gomme");
-    }
     if (typeof window.actualiserDevVillages === "function") window.actualiserDevVillages();
 }
 window.actualiserDevCarteRegionale = actualiserDev;
@@ -1212,15 +942,13 @@ window.actualiserDevCarteRegionale = actualiserDev;
     const lancer = () => {
         construireVue();
         if (typeof window.dessinerRegions === "function") window.dessinerRegions();
-        // Le mode DEV change : la popup suit, et on lâche les outils.
+        // Le mode DEV change : la popup suit, et on lâche l'édition du titre.
         const avant = window.actualiserRegionsDev;
         if (typeof avant === "function" && !avant.__cartesRegionales) {
             const enveloppe = function() {
                 const r = avant.apply(this, arguments);
                 if (!estDev()) {
                     if (etat.editionTitre) window.basculerEditionTitreRegion(false);
-                    etat.outil = null;
-                    dessinerPeinture();
                 } else semerFichesManquantes();
                 actualiserDev();
                 return r;

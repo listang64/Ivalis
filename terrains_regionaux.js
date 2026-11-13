@@ -394,15 +394,13 @@ function actualiserPopup() {
         total.textContent = k === 0 ? "Aucun terrain praticable tracé : le groupe marche partout" : `${k} terrain${k > 1 ? "s" : ""} praticable${k > 1 ? "s" : ""} sur cette carte`;
     }
 }
-// Afficher les terrains, c'est les éditer : le pinceau, la gomme et le titre
-// sont lâchés (un seul outil à la fois).
+// Afficher les terrains, c'est les éditer : le titre est lâché (un seul
+// outil à la fois).
 window.basculerEditionTerrains = function(oui) {
     const voulu = (typeof oui === "boolean" ? oui : !edition) && estDev() && !!carteOuverte();
     edition = voulu;
     if (edition) {
         const c = cadrage();
-        if (typeof window.outilCarteRegion === "function" && window.outilCarteRegion() && typeof window.choisirOutilRegion === "function")
-            window.choisirOutilRegion(window.outilCarteRegion());
         if (c && typeof window.basculerEditionTitreRegion === "function") window.basculerEditionTitreRegion(false);
     } else selection = null;
     dessiner();
@@ -435,13 +433,7 @@ window.basculerEditionTerrains = function(oui) {
     const lancer = () => {
         const vue = $("vue-carte-region");
         if (vue) { vue.addEventListener("wheel", suivreZoom, { passive: true }); vue.addEventListener("pointermove", suivreZoom, { passive: true }); }
-        // Un outil choisi, ou le titre en édition : les terrains se rangent.
-        const outil = window.choisirOutilRegion;
-        if (typeof outil === "function" && !outil.__terrains) {
-            const env = function() { const r = outil.apply(this, arguments); if (r && edition) { edition = false; selection = null; dessiner(); } return r; };
-            env.__terrains = true;
-            window.choisirOutilRegion = env;
-        }
+        // Le titre en édition : les terrains se rangent.
         const titre = window.basculerEditionTitreRegion;
         if (typeof titre === "function" && !titre.__terrains) {
             const env = function() { const r = titre.apply(this, arguments); if (r && edition) { edition = false; selection = null; dessiner(); } return r; };

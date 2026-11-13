@@ -99,9 +99,7 @@
             g.innerHTML = `<div class="region-titre-page"><span class="region-sur">Carte de la région</span><span class="region-nom">${nom}</span>${TRAIT}${boutonDescriptif(r)}</div>`;
             d.innerHTML = carteImg(url, boites.droite, nom);
         }
-        r.usureSig = null;
         r.lieuxSig = null;          // (v344) les lieux de la page se reposent (poserLieux)
-        bruler(r);
     }
     // --- (v344) LES LIEUX SUR LES PAGES ----------------------------------------
     // Nico : « pour les maps régionales, précharger les icônes et les images des pages
@@ -173,24 +171,6 @@
         k.querySelectorAll(".copie-carte-region.instantane").forEach(x => x.remove());
         k.classList.remove("avec-instantane");
     }
-    // LE PARCHEMIN BRÛLÉ SUR LES PAGES (v310). Nico : « l'effet de brûlure de la
-    // map au pinceau se fait très très mal sur la page ». La carte vivante est
-    // brûlée (bords_parchemin.js) mais l'image de la page, dessous, ne l'était
-    // pas : chaque trou montrait la carte intacte. Les pages portent maintenant
-    // le même bord (même graine, même usure), et sous la carte vivante leur image
-    // s'efface : les trous montrent le papier du livre.
-    function bruler(r) {
-        const fiche = window.CARTES_REGIONALES && window.CARTES_REGIONALES[r.numero];
-        const usure = (fiche && fiche.usure) || null, coupe = (fiche && fiche.coupe) || null;   // (v311) et les morceaux retirés
-        const sig = JSON.stringify([usure, coupe, r.aspect || 0]);
-        if (r.usureSig === sig || !window.BordsParchemin || !r.aspect) return;
-        r.usureSig = sig;
-        const graine = typeof window.graineParcheminRegion === "function" ? window.graineParcheminRegion(r.numero) : r.numero;
-        r.pages.forEach(pg => pg.querySelectorAll(".region-carte-cadre").forEach(cadre => {
-            window.BordsParchemin.appliquer(cadre, { graine, aspect: r.aspect, cote: 2048, apres: cadre.querySelector("img"), zones: usure, coupe })
-                .catch(e => console.error("Le livre : le bord de la carte", e));
-        }));
-    }
     function pagePour(r, cote) {
         const el = document.createElement("div");
         el.className = `page-grimoire page-papier ${cote} page-region`;
@@ -218,8 +198,6 @@
         if (!g || !g.enPartie()) return;
         const liste = voulues();
         const sig = liste.map(x => `${x.zone}:${x.numero}:${x.carte.image}:${x.carte.nom}`).join("|");
-        // (v310) L'usure validée en DEV : les pages se brûlent à nouveau.
-        regions.forEach(bruler);
         if (sig === signature) return;
         signature = sig;
         const anciennes = regions;

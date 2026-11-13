@@ -5652,7 +5652,6 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 .vue-carte-region { position: absolute; inset: 0; z-index: 5; overflow: hidden; background-color: #1a140c;
   touch-action: none; transform-origin: 50% 50%; cursor: grab; user-select: none; -webkit-user-select: none; }
 .vue-carte-region:active { cursor: grabbing; }
-.vue-carte-region.outil-pinceau, .vue-carte-region.outil-gomme { cursor: crosshair; }
 .carte-region { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
 /* (v344) Une copie figée de la carte vivante (pages du livre, loupe) : rien n'y réagit au doigt. */
 .copie-carte-region, .copie-carte-region * { pointer-events: none !important; }
@@ -5661,9 +5660,6 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
    découpent, posé sur un calque jumeau (même taille, même cadrage). */
 .carte-region-dessus { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; pointer-events: none; }
 .carte-region-image { display: block; width: 100%; height: 100%; pointer-events: none; -webkit-user-drag: none; }
-/* Les nuages (v279) : la toile est recalée à chaque image sur la partie visible de la carte. */
-.carte-region-peinture { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.carte-region-peinture { display: none; image-rendering: auto; }
 
 /* LE TITRE, dans l'or brossé du nom des combattants (#voile-tour-nom) — et
    dans sa police : celle du jeu (Almendra, que l'étoile du haut impose
@@ -5705,25 +5701,6 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 /* LA TRAVERSÉE DES NUAGES : par-dessus tout l'écran de jeu (sauf les menus),
    et elle retient les doigts tant qu'elle dure. */
 .traversee-nuages { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 9500; pointer-events: auto; }
-
-/* Les outils de la carte régionale, dans la popup DEV. */
-.popup-regions-outils { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; }
-.popup-regions-outil { width: 40px; height: 40px; padding: 6px; border-radius: 8px; cursor: pointer; flex: none;
-  background: #fff8e6; border: 2px solid #a01212; }
-.popup-regions-outil svg { display: block; width: 100%; height: 100%; fill: none; stroke: #7a0d0d; stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; }
-.popup-regions-outil.actif { background: #a01212; }
-.popup-regions-outil.actif svg { stroke: #fff; }
-.popup-regions-taille { flex: 1; display: flex; align-items: center; }
-/* v283 : le pinceau d'usure de la carte du monde (usure_monde.js) — au-dessus
-   des boîtes en édition ; il ne prend le doigt qu'avec un outil en main. */
-.carte-monde-usure-peinture { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: none; z-index: 70; pointer-events: none; }
-.carte-monde-usure-peinture.outil { pointer-events: auto; cursor: crosshair; touch-action: none; }
-/* v283 : ce que peint le pinceau (les nuages, l'usure du parchemin). */
-.popup-regions-calques { display: flex; gap: 6px; margin: 2px 0 6px; }
-.popup-regions-calque { flex: 1; padding: 6px 4px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 12px;
-  background: #fff8e6; border: 2px solid #a01212; color: #5a0a0a; }
-.popup-regions-calque.actif { background: #a01212; color: #fff; }
-.popup-regions-taille input { width: 100%; accent-color: #a01212; }
 
 /* =========================================================================
    LES VILLAGES DES CARTES RÉGIONALES (v273, villages_regionaux.js)
@@ -5906,10 +5883,6 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 .boite-voyage .boite-voyage-dev { margin-top: 8px; width: 100%; background: #fff; color: #a01212; border: 2px dashed #e01b1b; font-size: 12.5px; }
 .boite-voyage-boutons .boite-voyage-dev { width: auto; flex: 1; }
 /* « Discuter autour du feu de camp » (v281) : ouvre le chat, sans voter. */
-/* LES BORDS DE PARCHEMIN (v282, bords_parchemin.js) : la carte est découpée
-   (mask-image, posé en ligne) ; l'usure — le bruni, le brûlé, les fibres — se
-   pose sur son image, sous tout le reste. */
-.parchemin-usure { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background-size: 100% 100%; background-repeat: no-repeat; pointer-events: none; }
 /* Pendant un combat du récit, le bouton voyage est éteint (v282). */
 .btn-voyage.bloque { filter: grayscale(1) brightness(0.7); opacity: 0.6; }
 .boite-voyage .boite-voyage-feu { margin-top: 8px; width: 100%; background: linear-gradient(180deg, #7a3a12, #4a2008); color: #ffe2b0;

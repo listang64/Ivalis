@@ -11613,3 +11613,14 @@ corrections_v372.mjs le vérifie dans le livre (cadre, aquarelle, marteau, polic
   - Ce sont les mêmes éléments et les mêmes boutons (voyage_groupe.js, villages_regionaux.js) : seulement rangés et réécrits par grimoire_regions.css.
 
 corrections_v373.mjs le vérifie : les ombres, le choix (page de gauche, sans boîte, fondu, titre qui remonte puis redescend), le vote (bouton tracé, le toucher vote sans tourner la page), la nuit, la marche, « JOUR 2 », les messages, l'aperçu d'un lieu, la loupe (parchemin, retour sur la page), le post-it du monde (choix, vote d'une région à l'autre entier au-dessus du livre), le retour à l'écran de jeu dans le récit, les versions. Mis à jour : corrections_v310, v345, v346 (plus de pliure), v344 (contrôle de version). Échecs déjà présents avant, sans lien : v310 (le livre part vers le récit dans ce banc, usure des pages), v344 (« l'île attend », aléatoire), v275 (ancienne interface).
+
+## v374 — Ménage du code mort (1/6) : le parchemin brûlé
+
+- Nico : « analyse le code de mon jeu et dis-moi si on a du code mort […] fais tout ça, assure-toi de ne pas casser le jeu ». Premier bloc : ce qui restait du parchemin brûlé, retiré du jeu en v332.
+- **bords_parchemin.js** et **usure_monde.js** sont supprimés : ils n'étaient plus chargés depuis la v332.
+- **cartes_regionales.js** : plus de pinceau d'usure, de gomme, de ciseaux, de calques, de brouillon, de toile de peinture (`carte-region-peinture`), d'aperçu du bord. Leurs boutons avaient quitté la popup DEV en v332 : aucun outil ne pouvait plus être choisi. La fiche composée ne lit plus `Usure` ni `Coupe` (la remise à neuf DEV les efface toujours en base). L'édition du titre, les terrains et les villages ne changent pas.
+- **grimoire_regions.js** : plus de brûlure des pages (`bruler`), qui attendait `window.BordsParchemin`.
+- **terrains_regionaux.js** : n'enveloppe plus `choisirOutilRegion`, disparu ; l'édition des terrains lâche toujours le titre.
+- **style.css** : les règles du pinceau, des calques, de la toile, de l'usure du monde et de `.parchemin-usure`.
+
+corrections_v374.mjs le vérifie : fichiers et fonctions partis, et dans la vraie page la carte régionale qui s'ouvre, son titre édité en DEV, les terrains qui lâchent le titre (enregistré), la fermeture, sans erreur.

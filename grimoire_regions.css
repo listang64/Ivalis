@@ -4,7 +4,7 @@
 /* Les pages : la carte sur la page de droite (portrait) ou sur la double page
    (paysage) ; le nom de la région à la plume sur la page de gauche. */
 .page-region .region-moitie { position: absolute; inset: 0; overflow: hidden; }
-/* (v310) La boîte exacte de l'image : son bord brûlé (bords_parchemin.js) s'y pose. */
+/* (v310) La boîte exacte de l'image. */
 .page-region .region-carte-cadre { position: absolute; }
 .page-region .region-carte-cadre .region-carte-img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; max-width: none; display: block; }
 /* Sous la carte vivante, l'image de la page s'efface : un trou brûlé montre le papier du livre. */
