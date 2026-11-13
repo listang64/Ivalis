@@ -430,6 +430,8 @@ window.COMBAT_PERSOS_JOUEUR = [];
 // connaît. L'arène est fermée tant que le combat du récit n'est pas terminé :
 // ils partagent le même plateau.
 window.ouvrirPopupRencontre = function() {
+    // (v388) En partie, dans le livre : les combats ont leur double page (grimoire_combats.js).
+    if (window.GRIMOIRE_COMBATS && window.GRIMOIRE_COMBATS.ouvrir()) return;
     const modale = document.getElementById("modale-pre-combat");
     if (modale) {
         modale.style.display = "flex"; // Utilise flexbox pour centrer le contenu

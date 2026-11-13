@@ -16,13 +16,14 @@
   <link rel="stylesheet" href="style.css?v=144">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
-  <link rel="stylesheet" href="grimoire.css?v=18">
-  <link rel="stylesheet" href="grimoire_recit.css?v=21">
+  <link rel="stylesheet" href="grimoire.css?v=19">
+  <link rel="stylesheet" href="grimoire_recit.css?v=22">
   <link rel="stylesheet" href="grimoire_carte.css?v=2">
   <link rel="stylesheet" href="grimoire_regions.css?v=7">
   <link rel="stylesheet" href="loupe_cartes.css?v=5">
   <link rel="stylesheet" href="grimoire_fiches.css?v=9">
-  <link rel="stylesheet" href="grimoire_creation.css?v=8">
+  <link rel="stylesheet" href="grimoire_creation.css?v=9">
+  <link rel="stylesheet" href="grimoire_combats.css?v=1">
 
  
   <!-- ===================================================================== -->
@@ -2254,7 +2255,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=277"></script>
+<script src="trace_combat.js?v=278"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2264,7 +2265,7 @@
 <!-- LE GRIMOIRE (v297) : StPageFlip 2.0.7 (MIT, dans vendor/), puis le livre -->
 <script src="vendor/page-flip/page-flip.browser.js?v=2.0.7"></script>
 <script src="police_titres.js?v=2"></script>
-<script src="grimoire.js?v=27"></script>
+<script src="grimoire.js?v=28"></script>
 <!-- LES DÉPENSES DU MJ (v293) : tokens et coût en euros de chaque réponse -->
 <script src="depenses_ia.js?v=4"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
@@ -2332,6 +2333,8 @@
 <script src="loupe_cartes.js?v=6"></script>
 <script type="module" src="grimoire_fiches.js?v=13"></script>
 <script type="module" src="grimoire_creation.js?v=11"></script>
+<!-- Les combats dans le livre (v388) : la double page du menu Combat. -->
+<script type="module" src="grimoire_combats.js?v=1"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=4"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région et son titre (plus de nuages dessus, v286). -->
@@ -2386,7 +2389,7 @@
 <script src="murs_terre.js?v=10"></script>
 <!-- (v368) Les totems du Chaman : la fenêtre des effets, la pose, le pion. -->
 <script type="module" src="totems.js?v=1"></script>
-<script type="module" src="combat.js?v=179"></script>
+<script type="module" src="combat.js?v=180"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=41"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
@@ -2403,7 +2406,7 @@
 <script type="module" src="objets_ia.js?v=18"></script>
 <script type="module" src="loot.js?v=35"></script>
 <!-- LES COMBATS DU RÉCIT (v278) : la détection, la préparation, le retour au récit. -->
-<script type="module" src="combat_rp.js?v=17"></script>
+<script type="module" src="combat_rp.js?v=18"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

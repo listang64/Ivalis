@@ -1,0 +1,80 @@
+/* =========================================================================
+   v388 — LES COMBATS DANS LE LIVRE (grimoire_combats.js)
+   À gauche le contenu de l'ancienne popup ; à droite le champ de bataille qui
+   se prépare, ses belligérants, puis le bouton pour rejoindre le combat.
+   --u : 1 % d'une page.
+   ========================================================================= */
+.page-combats .contenu-page { gap: calc(var(--u) * 2) !important; }
+.fleuron-combats { width: 44%; height: auto; align-self: center; margin: calc(var(--u) * -0.6) 0 calc(var(--u) * 0.4); }
+/* La page de droite défile : rien ne s'y tasse. */
+.page-combats-droite > * { flex-shrink: 0; }
+
+/* LA PAGE DE GAUCHE */
+.page-combats-gauche { align-items: stretch; }
+.entete-combats { display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 2.4); }
+.lames-combats { width: calc(var(--u) * 8); height: calc(var(--u) * 8); flex: none; overflow: visible; }
+.lames-combats path { fill: rgba(27, 16, 9, 0.12); stroke: #1b1009; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.encart-combat-livre, .encart-arene-livre { cursor: pointer; padding: calc(var(--u) * 3) calc(var(--u) * 3.4) !important; transition: transform 0.18s ease; }
+.encart-combat-livre > .lavis, .encart-arene-livre > .lavis { left: -2%; top: -6%; width: 104%; height: 112%; }
+.encart-combat-livre.vivant:hover, .encart-arene-livre:not(.eteint):hover { transform: rotate(-0.5deg) scale(1.015); }
+.encart-combat-livre.eteint, .encart-arene-livre.eteint { cursor: default; }
+.encart-combat-livre.eteint > :not(.lavis):not(.cadre-main), .encart-arene-livre.eteint > :not(.lavis):not(.cadre-main) { opacity: 0.62; }
+.titre-encart-combats { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important;
+  font-size: calc(var(--u) * 5.6 * var(--echelle-titres, 1)); color: #24150a; line-height: 1.1; margin-bottom: calc(var(--u) * 1); }
+.texte-encart-combats { font-size: calc(var(--u) * 3.3); line-height: 1.4; color: #2b1a0e; }
+.texte-encart-combats em { color: #5c3a21; }
+.appel-encart-combats { margin-top: calc(var(--u) * 1.4); text-align: right; font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important;
+  font-size: calc(var(--u) * 3.8 * var(--echelle-titres, 1)); color: #6b1a10; }
+.note-encart-combats { margin-top: calc(var(--u) * 1.2); font-style: italic; font-size: calc(var(--u) * 3); color: #6b1a10; }
+.dev-combats { margin-top: auto; display: flex; justify-content: center; }
+.dev-combat { color: #8b1a10 !important; font-size: calc(var(--u) * 2.9) !important; }
+
+/* LA PAGE DE DROITE */
+.entete-champ { justify-content: center !important; text-align: center; }
+.entete-champ .titre-page-fiche { font-size: calc(var(--u) * 6.2 * var(--echelle-titres, 1)); }
+.lieu-champ { text-align: center; font-style: italic; font-size: calc(var(--u) * 3.4); color: #5c3a21; margin-top: calc(var(--u) * -1); min-height: 1.2em; }
+.attente-champ { text-align: center; margin-top: calc(var(--u) * 6) !important; }
+.etapes-champ { list-style: none; margin: 0; padding: 0 calc(var(--u) * 4); display: flex; flex-direction: column; gap: calc(var(--u) * 1); }
+.etapes-champ li { display: flex; align-items: center; gap: calc(var(--u) * 1.8); font-size: calc(var(--u) * 3.4); color: #5c3a21; }
+.etapes-champ li.fait { color: #1b1009; }
+.case-belligerant { flex: none; width: calc(var(--u) * 4.6); height: calc(var(--u) * 4.6); overflow: visible; }
+.case-belligerant .boite { fill: rgba(255, 244, 214, 0.5); stroke: #2b1a0e; stroke-width: 1.6; stroke-linejoin: round; }
+.case-belligerant .coche { fill: none; stroke: #7a1a10; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+/* Une étape qui attend : sa case, plus pâle, respire doucement. */
+.etapes-champ li:not(.fait) .case-belligerant { opacity: 0.55; }
+.etapes-champ li:not(.fait):first-of-type, .etapes-champ li.fait + li:not(.fait) { color: #24150a; font-weight: 700; }
+.etapes-champ li.fait + li:not(.fait) .case-belligerant, .etapes-champ li:not(.fait):first-of-type .case-belligerant { animation: etape-attend 1.8s ease-in-out infinite; opacity: 1; }
+@keyframes etape-attend { 50% { transform: scale(0.88); opacity: 0.5; } }
+@media (prefers-reduced-motion: reduce) { .etapes-champ .case-belligerant { animation: none !important; } }
+
+/* LES BELLIGÉRANTS : visibles par tous ; à valider, chacun se décoche. */
+.belligerants-livre { display: flex; flex-direction: column; gap: calc(var(--u) * 1.2); margin-top: calc(var(--u) * 1); padding-top: calc(var(--u) * 1.6); border-top: 1px dotted rgba(43, 26, 14, 0.45); }
+.titre-belligerants { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 5 * var(--echelle-titres, 1)); color: #24150a; text-align: center; }
+.aide-belligerants { margin: 0; font-size: calc(var(--u) * 2.9); font-style: italic; color: #5c3a21; text-align: center; line-height: 1.35; }
+.colonnes-belligerants { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 3); }
+.sous-titre-belligerants { font-size: calc(var(--u) * 2.7); letter-spacing: 0.12em; text-transform: uppercase; color: #6b4a2b; margin-bottom: calc(var(--u) * 0.8); }
+.colonnes-belligerants ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(var(--u) * 0.8); }
+.page-combats .belligerant { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: calc(var(--u) * 1.4); align-items: center; width: 100%;
+  padding: 0; border: 0; background: none; text-align: left; color: #1b1009; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.belligerant.fixe { grid-template-columns: 1fr; cursor: default; }
+.belligerant .case-belligerant { grid-row: 1 / 3; }
+.nom-belligerant { font-weight: 700; font-size: calc(var(--u) * 3.3); line-height: 1.15; }
+.role-belligerant { font-size: calc(var(--u) * 2.6); color: #5c3a21; font-style: italic; line-height: 1.2; }
+.belligerant.ecarte .nom-belligerant, .belligerant.ecarte .role-belligerant { text-decoration: line-through; opacity: 0.5; }
+.colonnes-belligerants li.vide { font-size: calc(var(--u) * 3); color: #6b4a2b; }
+.note-belligerants { margin: 0; min-height: 1.2em; text-align: center; font-style: italic; color: #6b1a10; font-size: calc(var(--u) * 3); }
+.boutons-belligerants { display: flex; justify-content: space-between; align-items: center; gap: calc(var(--u) * 2); }
+.page-combats .bouton-encre-combats { position: relative; isolation: isolate; padding: calc(var(--u) * 1.2) calc(var(--u) * 4.4) !important; border: 0; background: none; cursor: pointer; color: #24150a;
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 4.4 * var(--echelle-titres, 1)); transition: transform 0.15s ease; }
+.bouton-encre-combats > .cadre-main, .bouton-rejoindre-livre > .cadre-main { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.bouton-encre-combats:hover { background: radial-gradient(ellipse at 50% 50%, rgba(196, 154, 98, 0.25), transparent 75%); }
+.bouton-encre-combats:active, .bouton-rejoindre-livre:active { transform: scale(0.97); }
+
+/* LE BOUTON POUR REJOINDRE : tracé à la main, à l'aquarelle couleur de sang séché. */
+.page-combats .bouton-rejoindre-livre { position: relative; isolation: isolate; align-self: center; margin-top: calc(var(--u) * 3); display: flex; align-items: center; gap: calc(var(--u) * 2.4);
+  padding: calc(var(--u) * 2.4) calc(var(--u) * 5.4) !important; border: 0; background: none; cursor: pointer; color: #1b1009;
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important;
+  font-size: calc(var(--u) * 6 * var(--echelle-titres, 1)); transition: transform 0.15s ease; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.bouton-rejoindre-livre > .lavis { left: -3%; top: -8%; width: 106%; height: 116%; }
+.bouton-rejoindre-livre .lames-combats { width: calc(var(--u) * 7); height: calc(var(--u) * 7); }
+.bouton-rejoindre-livre:hover { transform: rotate(-0.8deg) scale(1.03); }

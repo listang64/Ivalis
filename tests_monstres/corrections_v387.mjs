@@ -323,8 +323,8 @@ await section(async () => {
   const pa = await p.evaluate(() => { const cs = getComputedStyle(document.querySelector("#recit-avatar .papier-usure")); return { points: (cs.clipPath.match(/%/g) || []).length / 2, fibres: /feTurbulence/.test(cs.backgroundImage), coin: getComputedStyle(document.querySelector("#recit-avatar .papier-usure"), "::before").content }; });
   verifier("les papiers des avatars : un bord déchiré plus fin, des fibres, un coin relevé", pa.points > 50 && pa.fibres && pa.coin !== "none", JSON.stringify(pa));
   const css = lire("grimoire_recit.css"), cc = lire("grimoire_creation.css");
-  verifier("les images du récit : une toute petite marge fondue (le voile vers la page de gauche reste)", /fond-recit\.droite \{[^}]*#000 96%, transparent 100%[^}]*#000 3%, #000 97%/.test(css) && /fond-recit\.gauche \{[^}]*0\.55\) 82%/.test(css) && !/#000 9%, #000 91%/.test(css));
-  verifier("… et de même pour les images des peuples et des classes", /\.fond-classe\.droite \{ -webkit-mask-image: linear-gradient\(to right, #000 0%, #000 96%, transparent 100%\)/.test(cc) && /\.fond-classe\.gauche \{[^}]*#000 3%, #000 97%/.test(cc));
+  verifier("les images du récit : une toute petite marge fondue (le voile vers la page de gauche reste)", /fond-recit\.droite \{[^}]*#000 calc\(100% - var\(--fondu-bord\)\), transparent 100%/.test(css) /* (v388) un liseré encore plus fin */ && /fond-recit\.gauche \{[^}]*0\.55\) 82%/.test(css) && !/#000 9%, #000 91%/.test(css));
+  verifier("… et de même pour les images des peuples et des classes", /\.fond-classe\.droite \{ -webkit-mask-image: linear-gradient\(to right, #000 0, #000 calc\(100% - var\(--fondu-bord\)\), transparent 100%\)/.test(cc) && /\.fond-classe\.gauche \{[^}]*#000 var\(--fondu-bord\)/.test(cc) /* (v388) */);
   verifier("l'ombre des onglets des peuples et des classes s'éteint en dégradé, sans marche au bord de la page", /\.papier-onglet::after \{[^}]*0\.36\) calc\(var\(--bord\)[^}]*rgba\(34, 17, 5, 0\) calc\(\(var\(--bord\) \+ 84\)/.test(cc) && !/0\.7\) calc\(var\(--bord\)/.test(cc));
   const lc = lire("loupe_cartes.css");
   verifier("sous la loupe, le marque-page de la marche en haut à gauche ; le verre au repos noir", /\.loupe-postit \{ position: absolute; top: 0; left: 28px;/.test(lc) && /\.loupe-lentille, \.loupe-voile \{ background: radial-gradient\(circle at 42% 38%, #2b2b2b 0, #111 48%, #000 100%\); \}/.test(lc));
@@ -335,9 +335,11 @@ titre("6. LES VERSIONS");
 // =========================================================================
 await section(async () => {
   const html = lire("index.html");
-  verifier("index.html charge les nouvelles versions", [/style\.css\?v=144"/, /grimoire\.css\?v=18"/, /grimoire_recit\.css\?v=21"/, /loupe_cartes\.css\?v=5"/, /grimoire_fiches\.css\?v=9"/, /grimoire_creation\.css\?v=8"/,
-    /app\.js\?v=173"/, /grimoire_recit\.js\?v=25"/, /grimoire_fiches\.js\?v=13"/, /grimoire_creation\.js\?v=11"/, /creation_personnage\.js\?v=28"/, /competences\.js\?v=75"/].every(r => r.test(html)));
-  verifier("la version du jeu : 387", /VERSION_IVALIS = 387/.test(lire("trace_combat.js")) && JSON.parse(lire("version.json")).version === 387);
+  // (v388) Au moins ces versions : les suivantes les montent encore.
+  const auMoins = [["style.css", 144], ["grimoire.css", 18], ["grimoire_recit.css", 21], ["loupe_cartes.css", 5], ["grimoire_fiches.css", 9], ["grimoire_creation.css", 8],
+    ["app.js", 173], ["grimoire_recit.js", 25], ["grimoire_fiches.js", 13], ["grimoire_creation.js", 11], ["creation_personnage.js", 28], ["competences.js", 75]];
+  verifier("index.html charge les nouvelles versions (ou plus récentes)", auMoins.every(([f, n]) => Number((new RegExp('["/]' + f.replace(".", "\\.") + '\\?v=(\\d+)"').exec(html) || [])[1]) >= n));
+  verifier("la version du jeu : 387 ou plus", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 387 && JSON.parse(lire("version.json")).version >= 387);
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

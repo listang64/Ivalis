@@ -176,12 +176,12 @@ await section(async () => {
   await attendreQue(() => p.evaluate(() => window.GRIMOIRE_REGIONS.regions().length === 4), 6000);
   await monteeSur(5);
   await pose();
-  const r = await p.evaluate(() => ({ regions: window.GRIMOIRE_REGIONS.regions(), suite: window.GRIMOIRE.premiereDeLaSuite(), fiches: window.GRIMOIRE.pagesFiches().length, n: window.grimoireEtat().nbPages,
+  const r = await p.evaluate(() => ({ regions: window.GRIMOIRE_REGIONS.regions(), suite: window.GRIMOIRE.premiereDeLaSuite(), fiches: window.GRIMOIRE.pagesFiches().length, combats: (window.GRIMOIRE.pagesCombats ? window.GRIMOIRE.pagesCombats().length : 0), n: window.grimoireEtat().nbPages,
     pages: [...document.querySelectorAll("#grimoire-livre .page-region")].map(pg => ({ id: pg.id, cote: pg.classList.contains("gauche") ? "g" : "d", nom: (pg.querySelector(".region-nom") || {}).textContent || "", img: !!pg.querySelector("img.region-carte-img") })) }));
   verifier("quatre régions, rangées dans l'ordre des boîtes (1, 3, 7, 8), à partir de la page 7", JSON.stringify(r.regions.map(x => [x.zone, x.numero, x.page])) === "[[1,1,7],[3,5,9],[7,3,11],[8,7,13]]", JSON.stringify(r.regions.map(x => [x.zone, x.numero, x.page])));
   verifier("le nom de chaque région, à la plume, sur sa page de gauche", r.pages.filter(x => x.cote === "g").map(x => x.nom).join(" | ") === "La forêt des murmures | Le désert d'Etheria | Le mont Pletia | L'île aux marchés", r.pages.filter(x => x.cote === "g").map(x => x.nom).join(" | "));
   // (v322 : les aventuriers viennent entre les régions et le récit.)
-  verifier("le récit vient après elles et les aventuriers (le sommaire page 15 + les fiches)", r.suite === 15 + r.fiches, `sommaire ${r.suite}, ${r.fiches} pages d'aventuriers, ${r.n} pages`);
+  verifier("le récit vient après elles, les aventuriers et (v388) les combats (le sommaire page 15 + les fiches + 2)", r.suite === 15 + r.fiches + r.combats && r.combats === 2, `sommaire ${r.suite}, ${r.fiches} pages d'aventuriers, ${r.combats} de combats, ${r.n} pages`);
   // (v331, Nico : « les maps régionales en pleine page de droite ») : plus de double page, même en paysage.
   verifier("v331 : toutes les cartes sur la page de droite, même en paysage (le désert, l'île)", r.regions.every(x => !x.paysage), r.regions.map(x => x.paysage).join(","));
 });

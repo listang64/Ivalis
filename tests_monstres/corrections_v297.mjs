@@ -123,14 +123,14 @@ await section(async () => {
     const t = (sel) => (document.querySelector(sel) || {}).textContent || "";
     const nom = document.querySelector(".nom-surligne");
     return { texG: /page\.webp/.test(g.backgroundImage) && /matrix\(-1, 0, 0, 1/.test(g.transform), texD: /page\.webp/.test(d.backgroundImage) && (d.transform === "none" || /matrix\(1, 0, 0, 1/.test(d.transform)),
-             titre: t(".titre-ivalis"), sous: t(".titre-sous"), auteurs: document.querySelector(".titre-auteurs").innerText.replace(/\s+/g, " ").trim(),
+             titre: t(".titre-ivalis"), sous: t(".titre-sous"), auteurs: !!document.querySelector(".titre-auteurs, .titre-haut"),
              journal: t(".journal-entete").replace(/\s+/g, " ").trim(), sansNom: !nom, surligne: !!nom && !!nom.querySelector(".surligneur path") && nom.querySelector("b").textContent === "Nico",
              bordure: document.querySelectorAll("#grimoire-page-2 .bordure-plume path").length >= 2 && getComputedStyle(document.querySelector("#grimoire-page-2 .bordure-plume path")).stroke === "rgb(18, 11, 6)",
              entrees: Array.from(document.querySelectorAll(".journal-entrees .bouton-grimoire")).map(b => b.textContent.trim() + (b.querySelectorAll(".cadre-main path").length === 2 ? "✎" : "")) };
   });
   verifier("texture de page : à droite telle quelle, à gauche retournée (bord lisse vers le dos)", r.texG && r.texD);
   verifier("page de gauche : « Ivalis — le jeu de rôle »", /Ivalis/i.test(r.titre) && /le jeu de rôle/.test(r.sous), `${r.titre} / ${r.sous}`);
-  verifier("… « Imaginé par Benjamin et Nicolas Duval »", r.auteurs === "Imaginé par Benjamin et Nicolas Duval", r.auteurs);
+  verifier("… (v388) sans « Imaginé par… » ni « Les Chroniques »", r.auteurs === false, String(r.auteurs));
   // v300 : Nico, « remplace "Journal de …" par : Journal d'un aventurier, sans surlignage, un peu plus gros ».
   verifier("page de droite : « Journal d'un aventurier » (v300 ; « Journal de Nico » surligné en v297)", r.journal === "Journal d'un aventurier" && r.sansNom, r.journal);
   verifier("… bordée à la plume noire", r.bordure);

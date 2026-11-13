@@ -9,8 +9,7 @@
 //    · sur fond beige, le livre fermé — on ne voit que sa couverture ;
 //    · un toucher : la couverture tourne (StPageFlip, vendor/page-flip), le
 //      livre ouvert apparaît derrière et grossit, une petite marge en haut ;
-//    · page de gauche : « Ivalis, le jeu de rôle », imaginé par Benjamin et
-//      Nicolas Duval ; page de droite, bordée à la plume : « Journal de » et
+//    · page de gauche : « Ivalis, le jeu de rôle » (v388 : sans les auteurs) ; page de droite, bordée à la plume : « Journal de » et
 //      le nom du joueur surligné, puis Nouvelle partie, Charger partie et
 //      Compte dans des cadres tracés à la main ;
 //    · chaque entrée remplit la double page suivante et le livre y tourne
@@ -127,7 +126,9 @@
     // fin, et toujours 6 pages vierges après la dernière page de récit » ; le
     // livre en partie : carte, régions, aventuriers, récit, 6 vierges, le dos.
     let pagesFiches = [];
-    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesFiches.length : 0);
+    // (v388) La double page des combats (grimoire_combats.js), après les Aventuriers.
+    let pagesCombats = [];
+    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesFiches.length + pagesCombats.length : 0);
     // LA CARTE DU MONDE (v302) : sa double page vient juste après l'index (5-6),
     // en partie seulement ; la suite (le récit) commence alors à la page 7.
     // Nico : « page de gauche cette partie de la map, page de droite celle-là ;
@@ -207,14 +208,14 @@
     };
 
     function pageTitre() {
+        // (v388) Nico : « sur la page principale, enlève Imaginé par Benjamin et Nicolas Duval,
+        // et centre tout ce qui reste ; enlève aussi Les Chroniques ».
         return `<div class="contenu-page page-titre">
-            <div class="titre-haut">Les Chroniques</div>
             <h1 class="titre-ivalis">Ivalis</h1>
             <div class="titre-sous">le jeu de rôle</div>
             <svg class="fleuron" viewBox="0 0 200 24" aria-hidden="true">
               <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/>
               <circle cx="100" cy="12" r="2.2"/></svg>
-            <div class="titre-auteurs">Imaginé par<br><span>Benjamin et Nicolas Duval</span></div>
           </div>`;
     }
 
@@ -988,7 +989,7 @@
     function definirSuite(elements) {
         suite = (elements || []).slice();
         if (!pageFlip) return;
-        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesFiches] : []), ...suite, ...vierges, dos];
+        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesFiches, ...pagesCombats] : []), ...suite, ...vierges, dos];
         const generation = ++definirSuite.generation;      // seule la dernière demande s'applique
         const appliquer = () => {
             if (generation !== definirSuite.generation) return;
@@ -1190,7 +1191,8 @@
         recit: () => window.GRIMOIRE_RECIT && (window.GRIMOIRE_RECIT.allerAuSommaireDuRecit || window.GRIMOIRE_RECIT.allerAuRecit)(),
         // v313 : les Aventuriers sont dans le livre (grimoire_fiches.js).
         fiches: () => (window.GRIMOIRE_FICHES ? window.GRIMOIRE_FICHES.allerAuxAventuriers() : (window.ouvrirMenuPersonnages && window.ouvrirMenuPersonnages())),
-        combats: () => window.ouvrirPopupRencontre && window.ouvrirPopupRencontre(),
+        // (v388) Les combats ont leur double page (grimoire_combats.js) ; la popup en secours.
+        combats: () => (window.GRIMOIRE_COMBATS && window.GRIMOIRE_COMBATS.ouvrir()) || (window.ouvrirPopupRencontre && window.ouvrirPopupRencontre()),
         parametres: () => window.ouvrirParametres && window.ouvrirParametres()
     };
     const BIENTOT = { village: "Le village : ce chapitre s'écrira bientôt." };
@@ -1227,6 +1229,7 @@
         // (v313) Les pages des Aventuriers ont leurs propres gestes (grimoire_fiches.js).
         if (action === "fiches") { if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.agir(cible); return; }
         if (action === "creation") { if (window.GRIMOIRE_CREATION) window.GRIMOIRE_CREATION.agir(cible); return; }
+        if (action === "combats") { if (window.GRIMOIRE_COMBATS) window.GRIMOIRE_COMBATS.agir(cible); return; }
         // (v312) Le marque-page du menu : la page principale (le journal), en partie ou non.
         if (action === "marque-menu") {
             if (!pageFlip || !ouvert) return;
@@ -1333,6 +1336,9 @@
         // (v313) les pages des Aventuriers, et la place d'une page dans le livre
         definirFiches: (els) => { pagesFiches = (els || []).slice(); if (enPartie) definirSuite(suite); },
         pagesFiches: () => pagesFiches.slice(), indexDe: (el) => listeActuelle.indexOf(el),
+        // (v388) la double page des combats
+        definirCombats: (els) => { pagesCombats = (els || []).slice(); if (enPartie) definirSuite(suite); },
+        pagesCombats: () => pagesCombats.slice(),
         dessins: { cadreMain, bordurePlume, hasard, souligneFond },
         pagesRegions: () => pagesRegions.slice(), annulerPrise: () => { if (brancherPrise.annuler) brancherPrise.annuler(); },
         // (v313) Le livre s'ouvre sur le sommaire, une seule fois : les cartes régionales

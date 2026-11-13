@@ -1344,6 +1344,13 @@ if (typeof fermerFenetreButinAvant === "function") {
 window.rejoindreCombatRP = function() {
     const c = etat();
     if (!c || !["preparation", "en_cours"].includes(c.Etat)) return false;
+    // (v388) Tant que le champ de bataille se prépare, on le suit dans le livre (sa double
+    // page des combats : l'avancement, les belligérants) ; la carte prête, on y entre.
+    if (c.Etat === "preparation" && window.GRIMOIRE_COMBATS && window.GRIMOIRE_COMBATS.ouvrir()) {
+        if (typeof window.fermerPopupRencontre === "function") { const m = $("modale-pre-combat"); if (m && m.style.display !== "none") window.fermerPopupRencontre(); }
+        actualiserTout();
+        return true;
+    }
     if (typeof window.fermerPopupRencontre === "function") { const m = $("modale-pre-combat"); if (m && m.style.display !== "none") window.fermerPopupRencontre(); }
     if (typeof window.ouvrirCombat === "function") window.ouvrirCombat();
     actualiserTout();
@@ -1485,13 +1492,16 @@ function actualiserValidationEnnemis(c) {
     $("btn-valider-ennemis").onclick = () => window.validerEnnemisCombatRP();
     $("btn-relancer-ennemis").onclick = () => window.relancerEnnemisCombatRP();
 }
-window.validerEnnemisCombatRP = async function() {
+// (v388) `choix` : ceux qu'on a écartés ailleurs ({ depart, renforts } : des Set d'indices),
+// depuis la double page des combats du livre (grimoire_combats.js) ; sans lui, les cases
+// de la fenêtre de combat.
+window.validerEnnemisCombatRP = async function(choix) {
     const c = etat();
     if (!c || c.Etat !== "preparation" || !c.Ennemis || c.Ennemis_Valides) return false;
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
     const f = $("validation-ennemis-rp");
-    const retires = { depart: new Set(), renforts: new Set() };
-    if (f) f.querySelectorAll(".garder-ennemi").forEach(el => { if (!el.checked) retires[el.dataset.groupe].add(Number(el.dataset.i)); });
+    const retires = { depart: new Set(choix && choix.depart ? choix.depart : []), renforts: new Set(choix && choix.renforts ? choix.renforts : []) };
+    if (f && !choix) f.querySelectorAll(".garder-ennemi").forEach(el => { if (!el.checked) retires[el.dataset.groupe].add(Number(el.dataset.i)); });
     const t0 = c.Ennemis.Tirage || {};
     const restants = (t0.depart || []).length - retires.depart.size + (t0.renforts || []).length - retires.renforts.size;
     if (restants <= 0 || (t0.depart || []).length - retires.depart.size <= 0) {
@@ -1542,7 +1552,9 @@ function actualiserBoutonRejoindre() {
     const fenetre = $("fenetre-combat");
     const dansLeCombat = !!(fenetre && fenetre.style.display === "block");
     const enPartie = !!window.ID_PARTIE_COURANTE;
-    const voulu = enPartie && !!c && ["preparation", "en_cours"].includes(c.Etat) && !dansLeCombat;
+    // (v388) Pas sur la double page des combats du livre : elle a son propre bouton.
+    const surLaPage = !!(window.GRIMOIRE_COMBATS && window.GRIMOIRE_COMBATS.ouverte());
+    const voulu = enPartie && !!c && ["preparation", "en_cours"].includes(c.Etat) && !dansLeCombat && !surLaPage;
     let b = $("bouton-rejoindre-combat");
     if (!voulu) { if (b) b.remove(); return; }
     if (!b) {
@@ -1553,17 +1565,23 @@ function actualiserBoutonRejoindre() {
         b.addEventListener("click", () => { if (typeof window.jouerSonClic === "function") window.jouerSonClic(); window.rejoindreCombatRP(); });
         document.body.appendChild(b);
     }
-    const texte = c.Etat === "preparation" ? "⚔️ Le combat se prépare — Rejoindre" : "⚔️ Rejoindre le combat";
+    const texte = c.Etat === "preparation" ? (window.GRIMOIRE_COMBATS ? "⚔️ Le combat se prépare" : "⚔️ Le combat se prépare — Rejoindre") : "⚔️ Rejoindre le combat";
     if (b.textContent !== texte) b.textContent = texte;
 }
 setInterval(() => { if (document.hidden) return; try { actualiserBoutonRejoindre(); } catch (e) {} }, 1000);   // (v385) endormi en arrière-plan
 
 function actualiserTout() {
     try { actualiserBoutonRejoindre(); } catch (e) { console.error("Combat du récit (bouton) :", e); }
+    try { if (window.GRIMOIRE_COMBATS) window.GRIMOIRE_COMBATS.maj(); } catch (e) { console.error("Combat du récit (livre) :", e); }
     try { actualiserEncarts(); } catch (e) { console.error("Combat du récit (encarts) :", e); }
     try { actualiserFenetreCombat(); } catch (e) { console.error("Combat du récit (fenêtre) :", e); }
 }
 window.actualiserCombatRPAffichage = actualiserTout;
+// (v388) Ce que la double page des combats du livre lit (grimoire_combats.js).
+window.combatRPLivre = {
+    etat: () => etat(), etapes: (c) => etapesPreparation(c), roles: ROLES,
+    motAttente: () => MOTS_ATTENTE[Math.floor(Date.now() / 6000) % MOTS_ATTENTE.length]
+};
 
 window.appliquerCombatRPDeLaPartie = function(p) {
     partieVue = p || {};

@@ -224,13 +224,17 @@ body.creation-livre #overlay-jeu-modale { display: none !important; }
     var(--bulle) 0 0 / 100% 100% no-repeat !important; }
 .page-creation select.input-perso:disabled { background: var(--bulle) 0 0 / 100% 100% no-repeat !important; opacity: 0.7 !important; }
 
+/* (v388) Nico : « réduis énormément le fondu en bord d'image (récit, classes, races) : je ne
+   veux que la fine bordure en dégradé d'opacité ». Une même largeur partout, fixe (et non plus
+   un pourcentage de la page) : un liseré d'un peu plus d'un centième de page. */
+.fond-classe { --fondu-bord: calc(var(--u, 5px) * 1.1); }
 /* (v387) Les images des peuples et des classes : une toute petite marge fondue sur les bords
    (le haut, le bas, le bord extérieur), comme celles du récit ; le voile vers la page de gauche reste. */
-.fond-classe.gauche { -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.07) 3%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%), linear-gradient(to bottom, transparent 0%, #000 3%, #000 97%, transparent 100%);
+.fond-classe.gauche { -webkit-mask-image: linear-gradient(to right, transparent 0, rgba(0, 0, 0, 0.07) var(--fondu-bord), rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%), linear-gradient(to bottom, transparent 0, #000 var(--fondu-bord), #000 calc(100% - var(--fondu-bord)), transparent 100%);
   -webkit-mask-composite: source-in;
-  mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.07) 3%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%), linear-gradient(to bottom, transparent 0%, #000 3%, #000 97%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, rgba(0, 0, 0, 0.07) var(--fondu-bord), rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%), linear-gradient(to bottom, transparent 0, #000 var(--fondu-bord), #000 calc(100% - var(--fondu-bord)), transparent 100%);
   mask-composite: intersect; }
-.fond-classe.droite { -webkit-mask-image: linear-gradient(to right, #000 0%, #000 96%, transparent 100%), linear-gradient(to bottom, transparent 0%, #000 3%, #000 97%, transparent 100%);
+.fond-classe.droite { -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - var(--fondu-bord)), transparent 100%), linear-gradient(to bottom, transparent 0, #000 var(--fondu-bord), #000 calc(100% - var(--fondu-bord)), transparent 100%);
   -webkit-mask-composite: source-in;
-  mask-image: linear-gradient(to right, #000 0%, #000 96%, transparent 100%), linear-gradient(to bottom, transparent 0%, #000 3%, #000 97%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - var(--fondu-bord)), transparent 100%), linear-gradient(to bottom, transparent 0, #000 var(--fondu-bord), #000 calc(100% - var(--fondu-bord)), transparent 100%);
   mask-composite: intersect; }
