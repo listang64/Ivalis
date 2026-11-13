@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=141">
+  <link rel="stylesheet" href="style.css?v=142">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
   <link rel="stylesheet" href="grimoire.css?v=16">
@@ -201,8 +201,7 @@
         { cible: '#ecran-accueil' },
         { cible: '#ecran-identification' },
         { cible: '#fenetre-combat' },
-        { cible: '#ecran-jeu', calque: '#carte-fond-jeu', suivreRect: true },
-        { cible: '#ecran-menu', calque: '.bg-menu' }
+        { cible: '#ecran-jeu', calque: '#carte-fond-jeu', suivreRect: true }
       ];
 
       function estVisible(element) {
@@ -307,11 +306,6 @@
   <!-- Le clic des boutons n'est plus un fichier : c'est la Goutte de la
        Fabrique (fabrique_sons.js, window.SON_CLIC_JEU), jouée par jouerSonClic. -->
 
-  <div class="preload-images">
-    <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781375437/nouvelle_partie_brillle_hpnomi.png" alt="preload">
-    <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781375437/charger_partie_brille_owinuh.png" alt="preload">
-  </div>
-
   <!-- =========================================================
        SCENE 1 : ACCUEIL
        ========================================================= -->
@@ -349,87 +343,14 @@
        =========================================================
        Après la connexion, l'accueil est un vieux livre : sa couverture, puis
        le titre et le journal du joueur, et une double page par chapitre
-       (nouvelle partie, charger partie, compte). Il remplace le menu
-       ci-dessous, gardé pour les vieux bancs. -->
+       (nouvelle partie, charger partie, compte). Il a remplacé l'ancien menu
+       et ses fenêtres (retirés en v379). -->
   <div id="ecran-grimoire"></div>
 
   <!-- =========================================================
-       SCENE 3 : MENU PRINCIPAL
-       ========================================================= -->
-  <div id="ecran-menu">
-    <div class="layer bg-menu"></div>
-    <div class="layer brume-lointaine"></div>
-    <div class="layer brume-proche"></div>
-    <!-- NOUVEAU : BOUTON QUITTER EN HAUT À DROITE -->
-    <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781472665/exit_rkpaeh.png" id="btn-quitter-accueil" title="Quitter Ivalis" onclick="jouerSonClic(); demanderQuitterJeu()">
-    <!-- LE JOUEUR CONNECTÉ (v259, comptes.js) : son nom, son compte, la
-         déconnexion — et pour Nico et Ben, les demandes d'inscription. -->
-    <!-- v267 (Nico) : le nom du joueur devient un bouton, à droite, juste à
-         gauche de la croix ; une petite flèche beige dit qu'il s'ouvre, et
-         dessous viennent Mon compte, l'autorisation de création (Nico et Ben)
-         et la déconnexion (basculerMenuCompte, comptes.js). -->
-    <div id="barre-compte" class="barre-compte" style="display: none;">
-      <button type="button" class="btn-nom-compte" id="btn-nom-compte" aria-haspopup="true" aria-expanded="false"
-              onclick="jouerSonClic(); basculerMenuCompte()">
-        <span class="barre-compte-nom">⚜ <b id="barre-compte-nom"></b></span>
-        <span class="pastille-demandes" id="pastille-demandes-nom" style="display: none;">0</span>
-        <svg class="fleche-menu-compte" viewBox="0 0 12 8" width="12" height="8" aria-hidden="true"><path d="M1 1.5 L6 6.5 L11 1.5" fill="none" stroke="#e8d5a5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <div id="menu-compte" class="menu-compte" style="display: none;">
-        <button type="button" class="btn-barre-compte" id="btn-mon-compte" onclick="jouerSonClic(); fermerMenuCompte(); ouvrirMonCompte()">Mon compte</button>
-        <button type="button" class="btn-barre-compte" id="btn-demandes" style="display: none;" onclick="jouerSonClic(); fermerMenuCompte(); ouvrirDemandesInscription()">Autorisation de création <span class="pastille-demandes" id="pastille-demandes" style="display: none;">0</span></button>
-        <!-- v281 : rester connecté d'un lancement à l'autre (comptes.js). -->
-        <label class="case-menu-compte" for="case-connexion-auto"><input type="checkbox" id="case-connexion-auto" onchange="jouerSonClic(); window.basculerConnexionAuto(this.checked)"> Connexion automatique</label>
-        <button type="button" class="btn-barre-compte" id="btn-se-deconnecter" onclick="jouerSonClic(); fermerMenuCompte(); seDeconnecter()">Déconnexion</button>
-      </div>
-    </div>
-    <div class="conteneur-boutons">
-      <button class="btn-jeu btn-nouvelle" onclick="jouerSonClic(); ouvrirModalNouvellePartie()"></button>
-      <button class="btn-jeu btn-charger" onclick="jouerSonClic(); ouvrirModalChargerPartie()"></button>
-    </div>
-  </div>
-
-  <!-- =========================================================
-       MODALES : NOUVELLE PARTIE / CHARGEMENT
+       LA FENÊTRE DES DEMANDES D'INSCRIPTION (comptes.js, ouverte par le grimoire)
        ========================================================= -->
   <div id="overlay-modale"></div>
-
-  <div id="modale-cle" class="modale-parchemin">
-    <h2>Clé de Rune</h2>
-    <p>Veuillez inscrire la clé pour déverrouiller le Grimoire.</p>
-    <input type="password" id="saisie-cle" class="input-parchemin" placeholder="Mot de passe...">
-    <br>
-    <button class="btn-modale" onclick="jouerSonClic(); validerCle(event)">Ouvrir</button>
-    <button class="btn-modale" onclick="jouerSonClic(); fermerModales()">Annuler</button>
-    <p id="msg-erreur" style="color: darkred; display: none; font-weight: bold;">Clé incorrecte.</p>
-  </div>
-
-  <div id="modale-groupe" class="modale-parchemin">
-    <h2>Fondation du Groupe</h2>
-    <input type="text" id="saisie-nom-groupe" class="input-parchemin" placeholder="Nom du Groupe">
-    <input type="password" id="saisie-mdp-groupe" class="input-parchemin" placeholder="Mot de passe de l'équipe">
-    <div class="groupe-boutons">
-      <button class="btn-modale" id="btn-creer-groupe" onclick="jouerSonClic(); validerCreationGroupe()">Créer</button>
-      <button class="btn-modale" onclick="jouerSonClic(); fermerModales()">Annuler</button>
-    </div>
-  </div>
-
-  <!-- MON COMPTE (v259) -->
-  <div id="modale-compte" class="modale-parchemin modale-compte">
-    <h2>Mon compte</h2>
-    <p class="compte-ligne"><span>Nom</span><b id="compte-nom"></b></p>
-    <p class="compte-ligne"><span>E-mail</span><b id="compte-email"></b></p>
-    <p class="compte-ligne"><span>Rôle</span><b id="compte-role"></b></p>
-    <h3 class="compte-sous-titre">Changer de mot de passe</h3>
-    <form id="form-changer-mdp" class="form-connexion" novalidate>
-      <input type="password" id="compte-mdp-actuel" class="input-parchemin" placeholder="Mot de passe actuel" autocomplete="current-password">
-      <input type="password" id="compte-mdp-nouveau" class="input-parchemin" placeholder="Nouveau mot de passe" autocomplete="new-password">
-      <input type="password" id="compte-mdp-confirmer" class="input-parchemin" placeholder="Confirme le nouveau" autocomplete="new-password">
-      <button type="submit" class="btn-modale">Changer</button>
-    </form>
-    <p class="message-connexion" id="message-compte"></p>
-    <button type="button" class="btn-modale" onclick="jouerSonClic(); fermerModalesCompte()">Fermer</button>
-  </div>
 
   <!-- LES DEMANDES D'INSCRIPTION (v259) : Nico et Ben seulement. -->
   <div id="modale-demandes" class="modale-parchemin modale-demandes">
@@ -437,26 +358,6 @@
     <div id="liste-demandes"></div>
     <p class="message-connexion ok" id="message-demandes"></p>
     <button type="button" class="btn-modale" onclick="jouerSonClic(); fermerModalesCompte()">Fermer</button>
-  </div>
-
-  <div id="modale-charger" class="modale-parchemin">
-    <h2>Archives d'Ivalis</h2>
-    <p>Sélectionnez la session à réveiller :</p>
-    <div id="chargement-parties" style="font-style: italic; margin-bottom: 20px;">Recherche dans les grimoires...</div>
-    <ul id="liste-parties" class="liste-choix-partie" style="display:none;"></ul>
-    <div class="groupe-boutons">
-      <button class="btn-modale" onclick="jouerSonClic(); fermerModales()">Annuler</button>
-    </div>
-  </div>
-
-  <div id="modale-mdp-partie" class="modale-parchemin">
-    <h2>Sceau de sécurité</h2>
-    <p>Le Grimoire est scellé. Entrez le mot de passe de ce groupe :</p>
-    <input type="password" id="saisie-mdp-partie" class="input-parchemin" placeholder="Mot de passe...">
-    <br>
-    <button class="btn-modale" id="btn-valider-mdp-partie" onclick="jouerSonClic(); validerMdpPartie()">Déverrouiller</button>
-    <button class="btn-modale" onclick="jouerSonClic(); fermerModales()">Annuler</button>
-    <p id="msg-erreur-partie" style="color: darkred; display: none; font-weight: bold;">Mot de passe incorrect.</p>
   </div>
 
   <!-- =========================================================
@@ -2310,7 +2211,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=268"></script>
+<script src="trace_combat.js?v=269"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2320,7 +2221,7 @@
 <!-- LE GRIMOIRE (v297) : StPageFlip 2.0.7 (MIT, dans vendor/), puis le livre -->
 <script src="vendor/page-flip/page-flip.browser.js?v=2.0.7"></script>
 <script src="police_titres.js?v=2"></script>
-<script src="grimoire.js?v=23"></script>
+<script src="grimoire.js?v=24"></script>
 <!-- LES DÉPENSES DU MJ (v293) : tokens et coût en euros de chaque réponse -->
 <script src="depenses_ia.js?v=4"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
@@ -2377,9 +2278,9 @@
 <script type="module" src="regime_cerveau.js?v=55"></script>
 <script type="module" src="ia_master.js?v=27"></script>
 <script type="module" src="illustrations_recit.js?v=10"></script>
-<script type="module" src="app.js?v=169"></script>
+<script type="module" src="app.js?v=170"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
-<script type="module" src="comptes.js?v=4"></script>
+<script type="module" src="comptes.js?v=5"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
 <script type="module" src="grimoire_recit.js?v=23"></script>
 <!-- LA CARTE DU MONDE DANS LE GRIMOIRE (v302) : sa double page, ses zones (DEV). -->

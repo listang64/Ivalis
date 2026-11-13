@@ -1279,8 +1279,6 @@
     window.afficherGrimoire = function (options) {
         if (!construire()) return false;
         const surLeJournal = !!(options && options.ouvert);
-        const menu = document.getElementById("ecran-menu");
-        if (menu) menu.style.display = "none";
         const nom = document.getElementById("grimoire-nom-joueur");
         if (nom) nom.textContent = nomJoueur();
         quitterLaPartie();

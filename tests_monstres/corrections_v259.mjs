@@ -120,7 +120,7 @@ console.log("\n2. UN BANC (faux Firebase, sans Auth) : comme un compte déjà va
   verifier("après le sceau : « BIENVENUE », sans formulaire", /BIENVENUE/.test(await p.textContent(".titre-etranger")) && !(await p.$("#form-connexion")));
   await p.waitForTimeout(3300);
   verifier("puis le menu (l'écran de connexion s'en va)", await p.evaluate(() => getComputedStyle(document.getElementById("ecran-identification")).display === "none"));
-  verifier("pas de barre de compte pour un banc", await p.evaluate(() => { const el = document.getElementById("barre-compte"); return !!el && getComputedStyle(el).display === "none"; }));
+  verifier("pas de barre de compte pour un banc (v379 : plus de barre du tout)", await p.evaluate(() => { const el = document.getElementById("barre-compte"); return !el || getComputedStyle(el).display === "none"; }));
   const n = await p.evaluate(() => {
     const C = window.ComptesIvalis;
     if (!C) return {};
@@ -168,10 +168,12 @@ console.log("\n3. SANS COMPTE, LA PAGE NE LIT RIEN DANS LA BASE");
 console.log("\n4. LE MENU ET SES FENÊTRES");
 {
   const html = lire('index.html');
-  verifier("la barre du compte : nom, Demandes d'inscription, Mon compte, Se déconnecter",
-           /id="barre-compte"/.test(html) && /id="btn-demandes"/.test(html) && /ouvrirMonCompte\(\)/.test(html) && /seDeconnecter\(\)/.test(html));
-  verifier("les fenêtres Mon compte (changer de mot de passe) et Demandes d'inscription",
-           /id="modale-compte"/.test(html) && /id="form-changer-mdp"/.test(html) && /id="modale-demandes"/.test(html));
+  // (v379) La barre du compte et « Mon compte » sont partis avec l'ancien menu : la page Compte
+  // du grimoire porte le nom, le changement de mot de passe, les demandes et la déconnexion.
+  const grim = lire('grimoire.js');
+  verifier("la page Compte du grimoire : demandes d'inscription, déconnexion, changement de mot de passe",
+           /ouvrirDemandesInscription/.test(grim) && /seDeconnecter/.test(grim) && /changerMotDePasseCompte/.test(grim) && !/id="barre-compte"/.test(html));
+  verifier("la fenêtre des demandes d'inscription reste", /id="modale-demandes"/.test(html) && !/id="modale-compte"/.test(html));
   const scripts = [...html.matchAll(/<script[^>]*src="([^"?]+)/g)].map(m => m[1]);
   const premierModule = html.search(/<script type="module" src=/);
   verifier("la porte se charge avant tout module, les comptes juste après app.js",

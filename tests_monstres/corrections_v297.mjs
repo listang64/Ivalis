@@ -78,7 +78,7 @@ await section(async () => {
     const ecran = document.getElementById("ecran-grimoire"), scene = document.getElementById("grimoire-scene");
     const fond = getComputedStyle(ecran).backgroundImage + getComputedStyle(ecran, "::before").backgroundImage /* v299 : le fond sur ::before */, couv = document.querySelector(".page-couverture img");
     const rc = couv.getBoundingClientRect();
-    return { menu: getComputedStyle(document.getElementById("ecran-menu")).display, ferme: scene.classList.contains("ferme"),
+    return { menu: document.getElementById("ecran-menu") ? getComputedStyle(document.getElementById("ecran-menu")).display : "none" /* (v379 : l'ancien menu est parti) */, ferme: scene.classList.contains("ferme"),
              fondBeige: !!document.getElementById("grimoire-table") /* v305 : la table de bois remplace le beige */, couverture: couv.complete && couv.naturalWidth === 1344 && /IMG_2214_etfv11/.test(couv.src),
              couvCentre: Math.abs((rc.left + rc.right) / 2 - innerWidth / 2), livreOuvertCache: getComputedStyle(document.querySelector(".grimoire-fond-livre")).opacity === "0",
              pf: !!window.GRIMOIRE_PAGEFLIP, page: window.GRIMOIRE_PAGEFLIP ? window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() : -1, zoom: getComputedStyle(scene).transform };
@@ -189,7 +189,7 @@ titre("5. RETOUR AU MENU : LE GRIMOIRE SE ROUVRE SUR LE JOURNAL");
 await section(async () => {
   await p.evaluate(() => { window.fermerToutesLesFenetres = () => {}; window.confirmerRetourMenu(); });
   await p.waitForTimeout(1500);
-  const r = await p.evaluate(() => ({ e: window.grimoireEtat(), menu: getComputedStyle(document.getElementById("ecran-menu")).display, jeu: getComputedStyle(document.getElementById("ecran-jeu")).display }));
+  const r = await p.evaluate(() => ({ e: window.grimoireEtat(), menu: document.getElementById("ecran-menu") ? getComputedStyle(document.getElementById("ecran-menu")).display : "none", jeu: getComputedStyle(document.getElementById("ecran-jeu")).display }));
   verifier("« Retour au menu » : le grimoire, ouvert sur le journal (pas l'ancien menu)", r.e.visible && r.e.ouvert && r.e.page === 1 && r.menu === "none" && r.jeu === "none", JSON.stringify(r));
   const a = await alignement();
   verifier("… toujours bien posé sur le livre", a.ecart < 3, `${a.ecart.toFixed(1)} px`);

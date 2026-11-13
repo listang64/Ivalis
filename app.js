@@ -58,7 +58,6 @@ const DOC_CONFIG_MDP = "config";
 //  VARIABLES GLOBALES (les "badges" de l'ancienne logique)
 // =========================================================================
 window.ID_PARTIE_COURANTE = null;
-window.ID_PARTIE_EN_ATTENTE = null;
 
 // La porte du joueur (porte_joueur.js, v259) : ce qui lit la base attend que
 // le compte soit reconnu. Sans la porte (un banc qui isole ce fichier), tout
@@ -4528,149 +4527,8 @@ function entrerDansLeJeu() {
   }, 1500);
 }
 
-// =========================================================================
-//  MODALES : NOUVELLE PARTIE / CHARGEMENT
-// =========================================================================
-function ouvrirModalNouvellePartie() {
-  document.getElementById("overlay-modale").style.display = "block";
-  document.getElementById("modale-cle").style.display = "block";
-  document.getElementById("saisie-cle").value = "";
-  document.getElementById("msg-erreur").style.display = "none";
-}
-
-function fermerModales() {
-  document.getElementById("overlay-modale").style.display = "none";
-  document.getElementById("modale-cle").style.display = "none";
-  document.getElementById("modale-groupe").style.display = "none";
-  document.getElementById("modale-charger").style.display = "none";
-  document.getElementById("modale-mdp-partie").style.display = "none";
-}
-
-async function validerCle(evenement) {
-  const saisie = document.getElementById("saisie-cle").value;
-  const btnOuvrir = evenement ? evenement.target : null;
-  if (btnOuvrir) btnOuvrir.innerText = "Vérification...";
-
-  const estValide = await verifierMotDePasse(saisie);
-  if (btnOuvrir) btnOuvrir.innerText = "Ouvrir";
-
-  if (estValide) {
-    document.getElementById("modale-cle").style.display = "none";
-    document.getElementById("modale-groupe").style.display = "block";
-  } else {
-    document.getElementById("msg-erreur").style.display = "block";
-  }
-}
-
-async function validerCreationGroupe() {
-  const nomGroupe = document.getElementById("saisie-nom-groupe").value.trim();
-  const mdpGroupe = document.getElementById("saisie-mdp-groupe").value.trim();
-  const btnCreer = document.getElementById("btn-creer-groupe");
-
-  if (nomGroupe === "" || mdpGroupe === "") {
-    alert("Le Grimoire exige un nom de groupe et un mot de passe valides.");
-    return;
-  }
-
-  btnCreer.innerText = "Création...";
-  btnCreer.disabled = true;
-
-  try {
-    const nouvelID = await creerNouvellePartie(nomGroupe, mdpGroupe);
-    window.ID_PARTIE_COURANTE = nouvelID;
-
-    fermerModales();
-    btnCreer.innerText = "Créer";
-    btnCreer.disabled = false;
-
-    document.getElementById("ecran-menu").style.display = "none";
-    document.getElementById("ecran-jeu").style.display = "block";
-    // On charge immédiatement les données de la partie pour placer le pion !
-    ecouterPersonnagesDeLaPartie(window.ID_PARTIE_COURANTE);
-  } catch (e) {
-    console.error(e);
-    alert("Une erreur est survenue lors de la fondation du groupe.");
-    btnCreer.innerText = "Créer";
-    btnCreer.disabled = false;
-  }
-}
-
-function ouvrirModalChargerPartie() {
-  document.getElementById("overlay-modale").style.display = "block";
-  document.getElementById("modale-charger").style.display = "block";
-
-  // Plus besoin de message de chargement, c'est instantané
-  document.getElementById("chargement-parties").style.display = "none";
-  document.getElementById("liste-parties").style.display = "none";
-  document.getElementById("liste-parties").innerHTML = "";
-
-  // On utilise directement le cache prêt en mémoire
-  afficherListeParties(window.LISTE_PARTIES_CACHE);
-}
-
-function afficherListeParties(partiesActives) {
-  const divChargement = document.getElementById("chargement-parties");
-  const ulListe = document.getElementById("liste-parties");
-
-  divChargement.style.display = "none";
-  ulListe.style.display = "block";
-
-  if (partiesActives.length === 0) {
-    ulListe.innerHTML = '<li style="text-align:center; color: darkred; padding:10px; list-style:none;">Aucune expédition en cours.</li>';
-    return;
-  }
-
-  partiesActives.forEach((partie) => {
-    const li = document.createElement("li");
-    li.className = "item-partie";
-    li.onclick = function () {
-      jouerSonClic();
-      demanderMdpPartie(partie.id);
-    };
-    li.innerHTML = '<span class="item-nom">' + partie.nom + "</span>";
-    ulListe.appendChild(li);
-  });
-}
-
-function demanderMdpPartie(idChoisi) {
-  window.ID_PARTIE_EN_ATTENTE = idChoisi;
-  document.getElementById("modale-charger").style.display = "none";
-  document.getElementById("modale-mdp-partie").style.display = "block";
-  document.getElementById("saisie-mdp-partie").value = "";
-  document.getElementById("msg-erreur-partie").style.display = "none";
-}
-
-async function validerMdpPartie() {
-  const saisie = document.getElementById("saisie-mdp-partie").value;
-  const btnValider = document.getElementById("btn-valider-mdp-partie");
-  const idPartie = window.ID_PARTIE_EN_ATTENTE;
-
-  // LE CHEMIN DE CHARGEMENT SE CHRONOMÈTRE, parce qu'il a déjà coûté une minute
-  // sur un iPad sans qu'on puisse dire OÙ. Ces trois mesures répondent à la
-  // seule question qui compte : est-ce la base qui met du temps à répondre, ou
-  // l'écran qui met du temps à se dessiner ? Elles ne coûtent rien et elles
-  // tiennent en trois lignes de console à recopier.
-  const depart = Date.now();
-  btnValider.innerText = "Vérification...";
-  const verdict = await verifierMotDePassePartie(idPartie, saisie);
-  console.log("⏱️ mot de passe vérifié en " + (Date.now() - depart) + " ms"
-              + " (" + (verdict.source === "memoire" ? "déjà en mémoire" : "lu sur le réseau") + ")");
-  btnValider.innerText = "Déverrouiller";
-
-  if (verdict.ok) {
-    document.getElementById("modale-mdp-partie").style.display = "none";
-    lancerPartieChargee(idPartie);
-  } else {
-    const message = document.getElementById("msg-erreur-partie");
-    message.innerText = verdict.raison === "injoignable"
-      ? "Le Grimoire ne répond pas. Vérifie la connexion, puis réessaie."
-      : "Mot de passe incorrect.";
-    message.style.display = "block";
-  }
-}
-
-// LES PORTES DU GRIMOIRE (v297, grimoire.js) : ses pages appellent les mêmes
-// vérifications et la même entrée en partie que les anciennes modales.
+// LES PORTES DU GRIMOIRE (v297, grimoire.js) : ses pages appellent les
+// vérifications et l'entrée en partie (les anciennes modales sont parties en v379).
 window.PORTES_GRIMOIRE = {
   verifierCle: (saisie) => verifierMotDePasse(saisie),
   creerPartie: (nom, mdp) => creerNouvellePartie(nom, mdp),
@@ -4681,8 +4539,6 @@ window.PORTES_GRIMOIRE = {
 function lancerPartieChargee(idChoisi) {
   const depart = Date.now();
   window.ID_PARTIE_COURANTE = idChoisi;
-  fermerModales();
-  document.getElementById("ecran-menu").style.display = "none";
   document.getElementById("ecran-jeu").style.display = "block";
   console.log("⏱️ table de jeu dessinée en " + (Date.now() - depart) + " ms");
   // On charge immédiatement les données de la partie pour placer le pion !
@@ -4746,9 +4602,7 @@ function confirmerRetourMenu() {
   fermerModalesJeu();
   document.getElementById("ecran-jeu").style.display = "none";
   // Le menu, c'est le grimoire (v297), rouvert sur le journal du joueur.
-  if (!(typeof window.afficherGrimoire === "function" && window.afficherGrimoire({ ouvert: true }))) {
-    document.getElementById("ecran-menu").style.display = "block";
-  }
+  if (typeof window.afficherGrimoire === "function") window.afficherGrimoire({ ouvert: true });
   window.ID_PARTIE_COURANTE = null;
   if (unsubscribePersonnages) { unsubscribePersonnages(); unsubscribePersonnages = null; }
   // De retour au menu : la liste des parties redevient utile.
@@ -6882,9 +6736,6 @@ window.ajouterLigneRaceVide = function() {
 Object.assign(window, {
   // Accueil / identification
   entrerDansLeJeu, jouerSonClic,
-  // Modales nouvelle partie / chargement
-  ouvrirModalNouvellePartie, fermerModales, validerCle, validerCreationGroupe,
-  ouvrirModalChargerPartie, demanderMdpPartie, validerMdpPartie,
   // Ecran de jeu
   jouerSonSurvolParchemin, toggleBulleVolume,
   fermerModalesJeu, demanderRetourMenu, demanderQuitterJeu,

@@ -230,205 +230,9 @@ body {
 .message-connexion.ok { color: #2f5d1e; }
 .message-connexion:empty { display: none; }
 
-/* --- SCENE 3 : LE MENU PRINCIPAL --- */
-#ecran-menu {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  z-index: 10;
-}
-
-.layer {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-}
-
-.bg-menu {
-  background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781364922/ivalis_background_be8iur.jpg');
-  background-size: 100% 100%; /* Force l'étirement total sur les deux axes */
-  background-repeat: no-repeat;
-  background-position: center;
-  z-index: 1;
-}
-
-/* Meme detection tactile que le JS (pas de souris = iPad/tactile) : image de menu dediee sur ces appareils */
-@media (hover: none) and (pointer: coarse) {
-  .bg-menu {
-    background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1787900056/IMG_2057_ez0wu9.png');
-  }
-}
-
-.brume-lointaine {
-  background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781374953/brume_lointaine_gxbkar.png');
-  background-repeat: repeat-x;
-  background-size: auto 100%;
-  z-index: 2;
-  opacity: 0.7;
-  animation: defilementGauche 80s linear infinite alternate;
-}
-
-.brume-proche {
-  background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781374953/sable_proche_cyydei.png');
-  background-repeat: repeat-x;
-  background-size: auto 100%;
-  z-index: 3;
-  animation: defilementDroite 20s linear infinite alternate;
-}
-
-@keyframes defilementGauche {
-  from { background-position-x: 0; }
-  to { background-position-x: -1200px; }
-}
-@keyframes defilementDroite {
-  from { background-position-x: 0; }
-  to { background-position-x: 1200px; }
-}
-
-/* --- BOUTON QUITTER ECRAN ACCUEIL --- */
-#btn-quitter-accueil {
-    position: absolute;
-    top: 3vh;
-    right: 2vw;
-    width: 2vw;
-    min-width: 30px; 
-    height: auto;
-    cursor: pointer;
-    z-index: 50;
-    filter: drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.8));
-    transition: filter 0.3s ease, transform 0.2s ease;
-}
-
-/* LE JOUEUR CONNECTÉ, EN HAUT À DROITE, À GAUCHE DE LA CROIX (v259, v267) :
-   son nom est un bouton, la petite flèche beige dit qu'il s'ouvre, et ses
-   trois boutons tombent dessous. */
-.barre-compte {
-  position: absolute;
-  top: 3vh;
-  right: calc(2vw + max(2vw, 30px) + 14px);
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-  max-width: 70vw;
-}
-.btn-nom-compte {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 10px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
-}
-.btn-nom-compte:hover, .btn-nom-compte[aria-expanded="true"] { background: rgba(30, 18, 10, 0.55); border-color: rgba(176, 138, 58, 0.7); }
-.barre-compte-nom {
-  color: #f3e2b8;
-  font-family: 'Cinzel', 'Georgia', serif;
-  font-size: 20px;
-  text-shadow: 0 2px 6px #000;
-  white-space: nowrap;
-}
-.fleche-menu-compte { flex-shrink: 0; filter: drop-shadow(0 1px 2px #000); transition: transform 0.25s ease; }
-.btn-nom-compte[aria-expanded="true"] .fleche-menu-compte { transform: rotate(180deg); }
-.menu-compte {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  min-width: 190px;
-  padding: 8px;
-  border: 1px solid #b08a3a;
-  border-radius: 8px;
-  background: rgba(20, 12, 6, 0.9);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
-}
-.menu-compte .btn-barre-compte { text-align: left; }
-.case-menu-compte { display: flex; align-items: center; gap: 8px; padding: 6px 10px; color: #e8d5a5; font-size: 14px; cursor: pointer; user-select: none; }
-.case-menu-compte input { width: 18px; height: 18px; accent-color: #c2a878; cursor: pointer; }
-.btn-barre-compte {
-  background: rgba(30, 18, 10, 0.78);
-  color: #f3e2b8;
-  border: 1px solid #b08a3a;
-  border-radius: 6px;
-  padding: 7px 12px;
-  font-family: 'Georgia', serif;
-  font-size: 14px;
-  cursor: pointer;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
-  transition: border-color 0.2s, color 0.2s;
-}
-.btn-barre-compte:hover { border-color: #f3d27a; color: #ffffff; }
-.pastille-demandes {
-  display: inline-block;
-  min-width: 18px;
-  margin-left: 4px;
-  padding: 1px 6px;
-  border-radius: 10px;
-  background: #c41c1c;
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: bold;
-}
-
-#btn-quitter-accueil:hover {
-    filter: drop-shadow(0px 6px 10px rgba(0, 0, 0, 1)) brightness(1.15);
-    transform: scale(1.1);
-}
-
-/* --- LES BOUTONS DU MENU --- */
-.conteneur-boutons {
-  position: absolute;
-  right: 10%;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 100px;
-  z-index: 10;
-}
-
-.btn-jeu {
-  position: relative;
-  width: 300px;
-  height: 80px;
-  background-color: transparent;
-  border: none;
-  cursor: pointer;
-  outline: none;
-}
-
-.btn-jeu::before {
-  content: "";
-  position: absolute;
-  top: 50%; left: 50%; transform: translate(-50%, -50%);
-  width: 700px; height: 160px;
-  background-size: contain; background-repeat: no-repeat; background-position: center;
-  pointer-events: none; transition: all 0.3s ease;
-  filter: drop-shadow(0px 10px 10px rgba(0, 0, 0, 0.8));
-}
-
-.btn-nouvelle::before { background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781375437/nouvelle_partie_gajfyb.png'); }
-.btn-charger::before { background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781375436/charger_partie_f70wdb.png'); }
-
-/* Effet au survol : uniquement sur les appareils avec une vraie souris (pas de "hover collant" sur iPad/tactile) */
-@media (hover: hover) {
-  .btn-jeu:hover::before {
-    transform: translate(-50%, -50%) scale(1.05);
-    filter: drop-shadow(0px 20px 20px rgba(0, 0, 0, 1));
-  }
-
-  .btn-nouvelle:hover::before { background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781375437/nouvelle_partie_brillle_hpnomi.png'); }
-  .btn-charger:hover::before { background-image: url('https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781375437/charger_partie_brille_owinuh.png'); }
-}
-
-.preload-images { position: absolute; width: 0; height: 0; overflow: hidden; z-index: -1; }
 
 /* =========================================================================
-   MODALES - NOUVELLE PARTIE / CHARGER PARTIE
+   MODALES (les demandes d'inscription ; les fenêtres de parchemin)
    ========================================================================= */
 #overlay-modale {
   display: none;
@@ -464,30 +268,13 @@ body {
   margin-bottom: 25px;
 }
 
-/* MON COMPTE ET LES DEMANDES D'INSCRIPTION (v259) */
-.modale-compte, .modale-demandes {
+/* LES DEMANDES D'INSCRIPTION (v259) */
+.modale-demandes {
   width: min(440px, 92vw);
   box-sizing: border-box;
   max-height: 90vh;
   overflow-y: auto;
 }
-.compte-ligne {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 6px 0;
-  font-size: 16px;
-  text-align: right;
-}
-.compte-ligne span { color: #5c3a21; text-align: left; }
-.compte-ligne b { word-break: break-all; }
-.compte-sous-titre {
-  margin: 18px 0 10px;
-  padding-top: 14px;
-  border-top: 1px solid #b08a3a;
-  font-size: 18px;
-}
-.modale-compte .input-parchemin { width: 90%; margin-bottom: 10px; }
 .demande-inscription {
   display: flex;
   justify-content: space-between;
@@ -554,47 +341,6 @@ body {
   gap: 15px;
   margin-top: 10px;
 }
-
-/* --- LISTE DES SAUVEGARDES --- */
-.liste-choix-partie {
-  max-height: 250px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  margin-bottom: 20px;
-  padding: 0;
-  list-style: none;
-}
-
-.item-partie {
-  background-color: #f6ebd1;
-  border: 1px solid #5c3a21;
-  margin-bottom: 10px;
-  padding: 12px;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.item-partie:hover {
-  background-color: #e8d5a5;
-  border-color: #00ffff;
-  box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
-  transform: translateY(-2px);
-}
-
-.item-nom {
-  font-weight: bold;
-  font-size: 18px;
-  color: #2c1e16;
-  text-align: center;
-}
-
-.liste-choix-partie::-webkit-scrollbar { width: 8px; }
-.liste-choix-partie::-webkit-scrollbar-track { background: #e8d5a5; border-radius: 4px; }
-.liste-choix-partie::-webkit-scrollbar-thumb { background: #5c3a21; border-radius: 4px; }
 
 /* =========================================================================
    L'ECRAN DE JEU PRINCIPAL

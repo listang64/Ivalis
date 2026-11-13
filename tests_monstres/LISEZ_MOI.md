@@ -11664,3 +11664,15 @@ corrections_v377.mjs le vérifie : le texte, et dans la vraie page « ouvrir le 
 - Tests adaptés : corrections_v252 (l'ordre du menu), v256 (section 1 : le menu qui se range), v267 (section 13), v299 (le menu sous le livre), et la mise en place de v276, v277, v281, v287, v327 (qui montraient le petit bouton pour faire apparaître celui du voyage).
 
 corrections_v378.mjs le vérifie : le texte, et dans la vraie page les fonctions parties, les fenêtres qui le touchaient (tout fermer, tables des rencontres et du butin, entrée en partie) sans erreur, et ses images qui ne sont plus demandées.
+
+## v379 — Ménage du code mort (6/6 des anciennes interfaces) : l'ancien menu d'accueil
+
+- Le grimoire (v297) a remplacé le menu d'accueil et ses fenêtres ; ils restaient dans la page, « gardés pour les vieux bancs ». Visible derrière l'écran de connexion, le menu téléchargeait à chaque lancement son fond, ses deux brumes (animées sans fin), ses boutons et leurs reflets préchargés.
+- **index.html** : `#ecran-menu` (le fond, les brumes, la croix, la barre du compte et son menu, les boutons Nouvelle partie / Charger), les fenêtres de la Clé de Rune, de la fondation du groupe, des archives, du sceau et de « Mon compte », les deux images préchargées des boutons, et l'entrée `#ecran-menu` du fond recopié derrière la page. La fenêtre des demandes d'inscription reste : le grimoire l'ouvre.
+- **app.js** : `ouvrirModalNouvellePartie`, `fermerModales`, `validerCle`, `validerCreationGroupe`, `ouvrirModalChargerPartie`, `afficherListeParties`, `demanderMdpPartie`, `validerMdpPartie`, `ID_PARTIE_EN_ATTENTE` ; `lancerPartieChargee` et le retour au menu ne touchent plus l'ancien menu. Les portes du grimoire (`PORTES_GRIMOIRE` : la clé, la fondation, le sceau, l'entrée) gardent les mêmes vérifications.
+- **comptes.js** : la barre du compte (`rendreBarre`, `basculerMenuCompte`, `fermerMenuCompte`, sa case de connexion automatique) et « Mon compte » (`ouvrirMonCompte`, son formulaire). Restent : `changerMotDePasseCompte`, la connexion automatique, les demandes d'inscription, la déconnexion — tout ce dont la page Compte du grimoire se sert.
+- **grimoire.js** : ne cache plus un menu qui n'existe plus. **style.css** : le menu, ses brumes, ses boutons, la barre du compte, « Mon compte », la liste des sauvegardes.
+- Tests adaptés : mot_de_passe_partie (le sceau passe par les portes du grimoire, même vérification), corrections_v259 (plus de barre du compte), v267 (section 12), v281 (section 9 : la connexion automatique), v297 (l'ancien menu absent).
+- ⚠️ **_comptes_emulateur.mjs** (hors suite : il lui faut l'émulateur Firebase) pilote encore la barre du compte et « Mon compte » : à passer sur la page Compte du grimoire avant de le relancer.
+
+corrections_v379.mjs le vérifie : le texte, et dans la vraie page les fonctions parties, la fondation et l'entrée par les portes du grimoire, le retour au menu, les demandes d'inscription, et les images de l'ancien menu qui ne sont plus demandées.

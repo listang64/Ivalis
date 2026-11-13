@@ -506,30 +506,25 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("9. LA CONNEXION AUTOMATIQUE, DANS LE MENU DU COMPTE");
+titre("9. LA CONNEXION AUTOMATIQUE (v379 : sur la page Compte du grimoire ; l'ancien menu du compte est parti)");
 // =========================================================================
 await section(async () => {
-  const r = await p.evaluate(() => {
+  const r = await p.evaluate(async () => {
     localStorage.removeItem("ivalis_CONNEXION_AUTO");
-    const barre = document.getElementById("barre-compte"); barre.style.display = "flex";
-    window.basculerMenuCompte(true);
-    const caseAuto = document.getElementById("case-connexion-auto"), menu = document.getElementById("menu-compte");
-    const r = { dansMenu: !!caseAuto && menu.contains(caseAuto), libelle: caseAuto && caseAuto.closest("label").textContent.trim(), coche: caseAuto && caseAuto.checked };
-    return r;
+    const parDefaut = window.connexionAutomatique();
+    await window.basculerConnexionAuto(false);
+    const off = { v: localStorage.getItem("ivalis_CONNEXION_AUTO"), fonction: window.connexionAutomatique() };
+    await window.basculerConnexionAuto(true);
+    return { parDefaut, off, on: localStorage.getItem("ivalis_CONNEXION_AUTO"), ancienneCase: !!document.getElementById("case-connexion-auto") };
   });
-  verifier("une case « Connexion automatique » dans le menu du compte", r.dansMenu && r.libelle === "Connexion automatique", r.libelle);
-  verifier("cochée par défaut (on reste connecté d'un lancement à l'autre)", r.coche === true);
-  await p.evaluate(() => document.getElementById("case-connexion-auto").click());
-  const r2 = await p.evaluate(() => { const v = localStorage.getItem("ivalis_CONNEXION_AUTO"); window.basculerMenuCompte(false); window.basculerMenuCompte(true);
-    return { v, coche: document.getElementById("case-connexion-auto").checked, fonction: window.connexionAutomatique() }; });
-  verifier("décochée : retenu sur l'appareil, et relu à la réouverture du menu", r2.v === "off" && r2.coche === false && r2.fonction === false, JSON.stringify(r2));
-  await p.evaluate(() => document.getElementById("case-connexion-auto").click());
-  verifier("recochée : de nouveau automatique", (await p.evaluate(() => localStorage.getItem("ivalis_CONNEXION_AUTO"))) === "on");
+  verifier("automatique par défaut (on reste connecté d'un lancement à l'autre)", r.parDefaut === true);
+  verifier("décochée : retenu sur l'appareil", r.off.v === "off" && r.off.fonction === false, JSON.stringify(r.off));
+  verifier("recochée : de nouveau automatique", r.on === "on");
+  verifier("la case vit sur la page Compte du grimoire (plus dans l'ancien menu)", !r.ancienneCase && /grimoire-connexion-auto/.test(lire('grimoire.js')));
   const src = lire('comptes.js');
   verifier("la session suit le choix (Firebase : locale et durable, ou le temps de l'application) ; le mot de passe n'est jamais gardé",
-           /indexedDBLocalPersistence/.test(src) && /browserSessionPersistence/.test(src) && /setPersistence/.test(src) && /await appliquerConnexionAuto\(\)/.test(src)
+           /indexedDBLocalPersistence/.test(src) && /browserSessionPersistence/.test(src) && /setPersistence/.test(src) && /return appliquerConnexionAuto\(\)/.test(src)
            && !/localStorage\.setItem\([^)]*(mdp|password|Mot_De_Passe)/i.test(src));
-  await p.evaluate(() => { window.basculerMenuCompte(false); document.getElementById("barre-compte").style.display = "none"; });
 });
 
 // =========================================================================

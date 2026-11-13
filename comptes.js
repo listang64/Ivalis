@@ -121,7 +121,6 @@ function passerA(phase) {
     const change = etat.phase !== phase;
     etat.phase = phase;
     if (change) { etat.message = ""; rendrePanneau(); }
-    rendreBarre();
     if ((phase === "valide" || phase === "banc") && etat.ecranDemande) accueillir();
 }
 
@@ -568,42 +567,8 @@ window.seDeconnecter = async function () {
 };
 
 // =========================================================================
-//  LE MENU : LE JOUEUR CONNECTÉ, SON COMPTE, LES DEMANDES
+//  LE COMPTE : LA CONNEXION AUTOMATIQUE, LES DEMANDES
 // =========================================================================
-function rendreBarre() {
-    const barre = document.getElementById("barre-compte");
-    if (!barre) return;
-    const c = window.COMPTE_JOUEUR;
-    barre.style.display = (etat.phase === "valide" && c) ? "flex" : "none";
-    if (!c) return;
-    const nom = document.getElementById("barre-compte-nom");
-    if (nom) nom.textContent = c.nom;
-    const btn = document.getElementById("btn-demandes");
-    if (btn) btn.style.display = c.admin ? "" : "none";
-    // La pastille des demandes : sur le bouton du menu, et sur le nom tant que
-    // le menu est fermé (il y a quelque chose à voir dessous).
-    ["pastille-demandes", "pastille-demandes-nom"].forEach(id => {
-        const pastille = document.getElementById(id);
-        if (!pastille) return;
-        pastille.textContent = String(etat.demandes.length);
-        pastille.style.display = (c.admin && etat.demandes.length) ? "" : "none";
-    });
-}
-
-// LE MENU DU JOUEUR (v267) : son nom l'ouvre et le ferme ; un toucher ailleurs
-// le referme.
-window.basculerMenuCompte = function (ouvrir) {
-    const menu = document.getElementById("menu-compte");
-    const bouton = document.getElementById("btn-nom-compte");
-    if (!menu) return false;
-    const ouvert = ouvrir === undefined ? menu.style.display === "none" : !!ouvrir;
-    menu.style.display = ouvert ? "flex" : "none";
-    if (bouton) bouton.setAttribute("aria-expanded", ouvert ? "true" : "false");
-    if (ouvert) synchroniserCaseConnexionAuto();
-    return ouvert;
-};
-window.fermerMenuCompte = function () { window.basculerMenuCompte(false); };
-
 // LA CONNEXION AUTOMATIQUE (v281). Nico : « dans le menu compte, une case à
 // cocher : connexion automatique ». Cochée (par défaut), la session reste sur
 // l'appareil d'un lancement à l'autre : on entre sans retaper son e-mail et son
@@ -628,22 +593,8 @@ async function appliquerConnexionAuto() {
 }
 window.basculerConnexionAuto = async function (coche) {
     try { localStorage.setItem(CLE_CONNEXION_AUTO, coche ? "on" : "off"); } catch (e) { /* stockage fermé */ }
-    synchroniserCaseConnexionAuto();
     return appliquerConnexionAuto();
 };
-function synchroniserCaseConnexionAuto() {
-    const caseAuto = document.getElementById("case-connexion-auto");
-    if (caseAuto) caseAuto.checked = connexionAuto();
-}
-if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
-    document.addEventListener("click", (ev) => {
-        const barre = document.getElementById("barre-compte");
-        const menu = document.getElementById("menu-compte");
-        if (!barre || !menu || menu.style.display === "none") return;
-        if (ev.target && barre.contains(ev.target)) return;
-        window.fermerMenuCompte();
-    });
-}
 
 function ouvrirModale(id) {
     const overlay = document.getElementById("overlay-modale");
@@ -652,30 +603,14 @@ function ouvrirModale(id) {
     if (m) m.style.display = "block";
 }
 window.fermerModalesCompte = function () {
-    ["modale-compte", "modale-demandes"].forEach(id => {
-        const m = document.getElementById(id);
-        if (m) m.style.display = "none";
-    });
+    const m = document.getElementById("modale-demandes");
+    if (m) m.style.display = "none";
     const overlay = document.getElementById("overlay-modale");
     if (overlay) overlay.style.display = "none";
 };
 
-window.ouvrirMonCompte = function () {
-    const c = window.COMPTE_JOUEUR;
-    if (!c) return;
-    const poser = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
-    poser("compte-nom", c.nom);
-    poser("compte-email", c.email);
-    poser("compte-role", c.admin ? "Valide les inscriptions" : "Joueur");
-    ["compte-mdp-actuel", "compte-mdp-nouveau", "compte-mdp-confirmer"].forEach(id => {
-        const el = document.getElementById(id); if (el) el.value = "";
-    });
-    poser("message-compte", "");
-    ouvrirModale("modale-compte");
-};
-
-// Changer de mot de passe : rend { ok, texte }. La fenêtre « Mon compte » et
-// la page Compte du grimoire (v297, changerMotDePasseCompte) s'en servent.
+// Changer de mot de passe : rend { ok, texte }. La page Compte du grimoire
+// (v297, changerMotDePasseCompte) s'en sert.
 async function changerMdp(actuel, nouveau, confirme) {
     if (!sdk || !sdk.auth.currentUser) return { ok: false, texte: "Aucun compte connecté." };
     if (!actuel) return { ok: false, texte: "Entre ton mot de passe actuel." };
@@ -693,20 +628,6 @@ async function changerMdp(actuel, nouveau, confirme) {
 }
 window.changerMotDePasseCompte = changerMdp;
 
-async function changerMotDePasse(form) {
-    const msg = document.getElementById("message-compte");
-    const dire = (t, ok) => { if (msg) { msg.textContent = t; msg.classList.toggle("ok", !!ok); } };
-    if (!sdk || !sdk.auth.currentUser) return;
-    occupe(form, true);
-    try {
-        const r = await changerMdp(valeur("compte-mdp-actuel"), valeur("compte-mdp-nouveau"), valeur("compte-mdp-confirmer"));
-        if (r.ok) form.reset();
-        dire(r.texte, r.ok);
-    } finally {
-        occupe(form, false);
-    }
-}
-
 // Nico et Ben : les demandes en attente, écoutées tant que le compte est ouvert.
 function ecouterDemandes() {
     if (arretDemandes || !sdk) return;
@@ -718,7 +639,6 @@ function ecouterDemandes() {
         const quand = (x) => (x.Cree_Le && typeof x.Cree_Le.toMillis === "function") ? x.Cree_Le.toMillis() : 0;
         liste.sort((a, b) => quand(a) - quand(b));
         etat.demandes = liste;
-        rendreBarre();
         rendreDemandes();
     }, (err) => console.error("Comptes : demandes d'inscription", err));
 }
@@ -815,10 +735,7 @@ export async function refuserDemande(uid) {
 //  BRANCHEMENTS
 // =========================================================================
 function brancherMenu() {
-    const form = document.getElementById("form-changer-mdp");
-    if (form) form.addEventListener("submit", (ev) => { ev.preventDefault(); changerMotDePasse(form); });
     rendrePanneau();
-    rendreBarre();
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", brancherMenu);
 else brancherMenu();

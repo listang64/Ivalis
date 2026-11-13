@@ -131,22 +131,27 @@ async function poste(scenario) {
 }
 
 // Le geste réel : on choisit la partie, on tape, on déverrouille, et on
-// chronomètre ce que le joueur, lui, passe à attendre.
+// chronomètre ce que le joueur, lui, passe à attendre. (v379) L'ancienne fenêtre
+// « Sceau de sécurité » est partie : la page du grimoire passe par ses portes
+// (PORTES_GRIMOIRE) — la même vérification, la même entrée en partie — et dit
+// son verdict comme elle (grimoire.js, validerPartie).
 async function deverrouiller(p, idPartie, motDePasse) {
   return await p.evaluate(async ({ idPartie, motDePasse }) => {
-    window.demanderMdpPartie(idPartie);
-    document.getElementById("saisie-mdp-partie").value = motDePasse;
+    const portes = window.PORTES_GRIMOIRE;
     const depart = Date.now();
-    await window.validerMdpPartie();
+    let verdict = null;
+    try { verdict = await portes.verifierMdpPartie(idPartie, motDePasse); } catch (e) { verdict = { ok: false }; }
     const ms = Date.now() - depart;
-    const message = document.getElementById("msg-erreur-partie");
+    if (verdict && verdict.ok) portes.entrerDansPartie(idPartie);
+    const ok = !!(verdict && verdict.ok);
     return {
       ms,
       entre: document.getElementById("ecran-jeu").style.display === "block",
       partieCourante: window.ID_PARTIE_COURANTE || "",
-      erreurVisible: message.style.display === "block",
-      erreurTexte: (message.innerText || "").trim(),
-      bouton: document.getElementById("btn-valider-mdp-partie").innerText,
+      erreurVisible: !ok,
+      erreurTexte: ok ? "" : (verdict && verdict.raison === "injoignable"
+        ? "Le grimoire ne répond pas. Vérifie la connexion, puis réessaie." : "Mot de passe incorrect."),
+      rendu: !!verdict,
       lecturesParties: (globalThis.__GETDOC || []).filter(c => c.startsWith("Systeme_Parties/"))
     };
   }, { idPartie, motDePasse });
@@ -221,10 +226,7 @@ console.log("\n4. UNE BASE MUETTE NE FIGE PLUS LE BOUTON — ET NE MENT PAS");
   const r = await deverrouiller(p, "GAME_1", "cybile");
 
   verifier("ON N'ATTEND PAS INDÉFINIMENT", r.ms < 2000, `${r.ms} ms`);
-  // innerText rend le texte tel qu'il s'affiche, et la feuille de style le met
-  // en capitales : on compare sans se soucier de la casse.
-  verifier("le bouton est rendu au joueur",
-           (r.bouton || "").toLowerCase() === "déverrouiller", r.bouton);
+  verifier("la main est rendue au joueur (le verdict arrive)", r.rendu === true);
   verifier("le message parle de la connexion, pas du mot de passe",
            /ne répond pas|connexion/i.test(r.erreurTexte) && !/incorrect/i.test(r.erreurTexte),
            r.erreurTexte);

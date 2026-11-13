@@ -520,39 +520,10 @@ titre("11. UN CLIC SUR UN PION : SES PV ET SA FATIGUE EN CHIFFRES SUR SES JAUGES
   verifier("plus de chiffres sur les jauges (v367)", JSON.stringify(r.chiffres) === '[]', JSON.stringify(r.chiffres));
 }
 
-titre("12. LE MENU PRINCIPAL : LE NOM DU JOUEUR EST UN BOUTON, À DROITE, À GAUCHE DE LA CROIX");
+titre("12. LE MENU PRINCIPAL ET SA BARRE DU COMPTE : RETIRÉS EN v379 (le grimoire a sa page Compte)");
 {
-  const r = await p.evaluate(async () => {
-    const menu = document.getElementById("ecran-menu");
-    document.querySelectorAll('body > div[id^="ecran-"]').forEach(e => e.style.display = "none");
-    menu.style.display = "block";
-    const barre = document.getElementById("barre-compte");
-    barre.style.display = "flex";
-    document.getElementById("barre-compte-nom").textContent = "Nico";
-    const bouton = document.getElementById("btn-nom-compte");
-    const sous = document.getElementById("menu-compte");
-    const avant = sous ? getComputedStyle(sous).display : "?";
-    if (bouton) bouton.click();
-    await new Promise(r2 => setTimeout(r2, 50));
-    const apres = sous ? getComputedStyle(sous).display : "?";
-    const boutons = sous ? [...sous.querySelectorAll("button")].map(b => b.textContent.replace(/\s*\d+$/, "").trim()) : [];
-    const croix = document.getElementById("btn-quitter-accueil").getBoundingClientRect();
-    const b = (bouton || barre).getBoundingClientRect();
-    const fleche = bouton && bouton.querySelector(".fleche-menu-compte");
-    const couleurFleche = fleche ? (fleche.querySelector("path") || {}).getAttribute("stroke") : null;
-    const bs = sous ? sous.getBoundingClientRect() : { top: 0 };
-    document.body.click();
-    await new Promise(r2 => setTimeout(r2, 50));
-    const refermé = sous ? getComputedStyle(sous).display : "?";
-    menu.style.display = "none";
-    return { avant, apres, boutons, aDroite: b.left > window.innerWidth / 2, aGaucheDeLaCroix: b.right <= croix.left + 2, memeHauteur: Math.abs((b.top + b.bottom) / 2 - (croix.top + croix.bottom) / 2) < 30,
-             dessous: bs.top >= b.bottom - 1, couleurFleche, refermé };
-  });
-  verifier("le nom est un bouton qui ouvre son menu", r.avant === "none" && r.apres === "flex", `${r.avant} → ${r.apres}`);
-  verifier("dessous : Mon compte, Autorisation de création, Déconnexion", JSON.stringify(r.boutons) === '["Mon compte","Autorisation de création","Déconnexion"]', JSON.stringify(r.boutons));
-  verifier("une petite flèche beige à droite du nom", !!r.couleurFleche && /^#e8d5a5$/i.test(r.couleurFleche), r.couleurFleche);
-  verifier("EN HAUT À DROITE, juste à gauche de la croix", r.aDroite && r.aGaucheDeLaCroix && r.memeHauteur, JSON.stringify(r));
-  verifier("le menu tombe dessous, et se referme d'un toucher ailleurs", r.dessous && r.refermé === "none", JSON.stringify({ d: r.dessous, f: r.refermé }));
+  const r = await p.evaluate(() => ({ menu: !!document.getElementById("ecran-menu"), barre: !!document.getElementById("barre-compte"), basculer: typeof window.basculerMenuCompte }));
+  verifier("(v379) plus d'ancien menu ni de barre du compte", !r.menu && !r.barre && r.basculer === "undefined", JSON.stringify(r));
 }
 
 titre("13. LA CARTE DU MONDE : LE MENU DROIT — RETIRÉ EN v378");
