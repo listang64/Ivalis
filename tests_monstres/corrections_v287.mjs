@@ -214,7 +214,7 @@ await p.evaluate(({ VILLAGE }) => {
   window.__docs["Cartes_Regionales/2"] = { Numero: 2, Aspect: 1.6, Prochain_Terrain: 2, Terrains: { 1: { Numero: 1, Points: [{ x: 0.15, y: 0.2 }, { x: 0.85, y: 0.2 }, { x: 0.85, y: 0.8 }, { x: 0.15, y: 0.8 }] } } };
   if (typeof window.appliquerVillagesDeLaBase === "function")
     window.appliquerVillagesDeLaBase([{ id: VILLAGE, data: { Nom_Du_Lieu: "Brumefosse", Carte_Regionale: 2, Position_Region: { x: 0.7, y: 0.66, taille: 0.08 }, URL_Calque_Region: "" } }]);
-  document.getElementById("btn-rouvrir-menu").style.display = "block";
+  // (v378 : plus de menu latéral ni de petit bouton qui le rouvrait.)
   window.__relaisPartie = true;
   if (typeof window.appliquerVoyageDeLaPartie === "function") window.appliquerVoyageDeLaPartie(JSON.parse(JSON.stringify(window.__docs["Systeme_Parties/P1"])));
 }, { VILLAGE });

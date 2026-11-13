@@ -747,7 +747,6 @@ window.ouvrirCarteRegionale = async function(numero, options) {
     const chargement = chargerImage(url);       // pendant la plongée et les nuages
     const region = (window.REGIONS_CARTE || {})[n];
     etat.centreMonde = region && typeof window.centreRegion === "function" ? window.centreRegion(region.points) : { x: 1920, y: 1080 };
-    if (!livre && typeof window.replierMenuLateral === "function") window.replierMenuLateral({ silencieux: true });
     const mondeEl = $("carte-fond-jeu");
     const plongee = plongeeMonde(etat.centreMonde);
     etat.cadrageMonde = plongee.cadre;

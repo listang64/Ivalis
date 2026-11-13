@@ -11653,3 +11653,14 @@ corrections_v376.mjs le vérifie (le texte, et dans la vraie page les fonctions 
 - Suite complète sur v376 : en dehors des échecs déjà là (données effets_reels/gabarits_reels absentes, et les échecs connus), rien de nouveau ; v304 et v369 ont échoué une fois sous la charge de la suite (minutages), et passent seuls.
 
 corrections_v377.mjs le vérifie : le texte, et dans la vraie page « ouvrir le chat » qui ouvre le récit, les messages d'une partie qui arrivent au livre et aux jets demandés, rien de dessiné dans un chat caché, sans erreur.
+
+## v378 — Ménage du code mort (5/6) : l'ancien menu latéral
+
+- En partie, le livre cachait le menu de droite (`#menu-lateral`, `#btn-rouvrir-menu` : `display: none !important`, grimoire.css). Ses onze images (le parchemin de la date, les bannières, les icônes) et celle du petit bouton se téléchargeaient pourtant à chaque lancement, et un observateur suivait son style.
+- **index.html** : le menu (la date, Narration, Héros, Rencontre, Journal, Paramètres, la flèche) et le petit bouton qui le rouvrait sont retirés. Le sommaire du livre mène aux mêmes fenêtres.
+- **app.js** : le menu qui se range (v256) — `replierMenuLateral`, `deplierMenuLateral`, `menuLateralReplie`, `synchroniserBoutonRouvrirMenu`, `rangerMenuALArrivee`, l'observateur, le choix gardé en localStorage — et l'affichage de la date sur son parchemin (la date reste en mémoire : `DATE_EN_JEU_ACTUELLE`).
+- **Les fenêtres qui le cachaient ou le remontraient** (`menuLat.style.display`) : app.js (fermer tout, paramètres, effets, races), combat.js, loot.js, monstres.js ; cartes_regionales.js ne le range plus ; voyage_groupe.js ne suit plus le petit bouton (le bouton du voyage ne se montre que sur les cartes du livre).
+- **style.css, grimoire.css** : ses règles. `.icone-menu` reste (le bouton de sortie du combat).
+- Tests adaptés : corrections_v252 (l'ordre du menu), v256 (section 1 : le menu qui se range), v267 (section 13), v299 (le menu sous le livre), et la mise en place de v276, v277, v281, v287, v327 (qui montraient le petit bouton pour faire apparaître celui du voyage).
+
+corrections_v378.mjs le vérifie : le texte, et dans la vraie page les fonctions parties, les fenêtres qui le touchaient (tout fermer, tables des rencontres et du butin, entrée en partie) sans erreur, et ses images qui ne sont plus demandées.

@@ -649,18 +649,6 @@ body {
 .carte-glissable #carte-fond-jeu { cursor: grab; }
 .carte-glissable #carte-fond-jeu:active { cursor: grabbing; }
 
-/* --- LE MENU LATERAL FIXE (PC par défaut : x2 par rapport à l'original) --- */
-#menu-lateral {
-  position: absolute;
-  right: 30px; 
-  top: 30px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 20px; 
-  z-index: 9999;
-}
-
 /* --- LES ICONES GLOBALES (Taille PC doublée) --- */
 .icone-menu {
   width: 20vw; /* 2x plus grand (était 10vw) */
@@ -682,90 +670,16 @@ body {
   transform: scale(1.05);
 }
 
-/* --- LE PREMIER BOUTON GEANT (Taille PC doublée) --- */
-.icone-menu:first-child {
-  width: 30vw; /* 2x plus grand (était 15vw) */
-  max-width: 320px;
-  position: relative;
-}
-
-.icone-menu:first-child img {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-/* --- LE TEXTE DE LA DATE SUR LE PARCHEMIN --- */
-.texte-sur-parchemin {
-  position: absolute;
-  top: 48%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  color: #2c1e16;
-  font-size: clamp(16px, 1.8vw, 24px);
-  font-weight: bold;
-  width: 90%;
-  pointer-events: none;
-  line-height: 1.4;
-}
-
-.texte-sur-parchemin span {
-  font-size: clamp(20px, 2.5vw, 32px);
-  font-weight: 900;
-}
-
-/* --- ANIMATION DES BANNIERES LATERALES --- */
-.conteneur-bouton-lateral {
-  position: relative;
-  display: flex;
-  justify-content: flex-end;
-}
-
-/* LA FLÈCHE QUI RANGE LE MENU (v256) : centrée sous les icônes, beige comme
-   les bannières ; le menu rangé reste dans la page mais ne se voit ni ne se
-   touche plus. Le petit bouton du coin haut droit le fait revenir. */
-#menu-lateral.menu-replie { visibility: hidden; pointer-events: none; }
-.conteneur-fleche-menu { width: 20vw; max-width: 160px; display: flex; justify-content: center; margin-top: -6px; }
-.btn-replier-menu {
-  width: 40px; height: 40px; padding: 0; border: none; border-radius: 50%; background: transparent; cursor: pointer;
-  filter: drop-shadow(-3px 4px 4px rgba(0, 0, 0, 0.75));
-  transition: transform 0.2s ease, filter 0.2s ease;
-}
-.btn-replier-menu svg { display: block; width: 100%; height: 100%; fill: none; stroke: #e8d5a5; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
-.btn-replier-menu:hover { transform: translateY(-3px); filter: drop-shadow(-3px 4px 4px rgba(0, 0, 0, 0.75)) brightness(1.15); }
-.btn-replier-menu:focus-visible { outline: 2px solid #e8d5a5; outline-offset: 2px; }
-.btn-rouvrir-menu {
-  position: fixed; top: calc(env(safe-area-inset-top, 0px) + 2vh); right: calc(env(safe-area-inset-right, 0px) + 1.2vw);
-  width: 2.8vw; min-width: 34px; max-width: 54px; height: auto; z-index: 10004; cursor: pointer;
-  filter: drop-shadow(-4px 4px 6px rgba(0, 0, 0, 0.7));
-  transition: transform 0.2s ease;
-}
-.btn-rouvrir-menu:hover { transform: scale(1.08); }
-
 /* =========================================
    ADAPTATION SPECIALE IPAD / TACTILE (Taille encore augmentée !)
    ========================================= */
 @media (hover: none) and (pointer: coarse) {
-  #menu-lateral { gap: 25px; right: 30px; top: 30px; }
-  .conteneur-fleche-menu { width: 25vw; max-width: 160px; min-width: 110px; }
-  .btn-replier-menu { width: 46px; height: 46px; }
-  
   .icone-menu { 
      width: 25vw; /* Encore plus gros (+0.5x) */
      max-width: 160px; 
      min-width: 110px; 
   }
   
-  .icone-menu:first-child { 
-     width: 37.5vw; /* Parchemin encore plus gros */
-     max-width: 280px;
-     min-width: 200px; 
-  }
-  
-  .texte-sur-parchemin { font-size: clamp(16px, 3vw, 22px); }
-  .texte-sur-parchemin span { font-size: clamp(22px, 3.5vw, 30px); }
-
     /* ========================================= */
     /* RÉDUCTIONS SPÉCIFIQUES IPAD (MODE COMBAT) */
     /* ========================================= */
@@ -780,52 +694,6 @@ body {
         min-width: 45px !important; 
         width: 6vw !important; 
     }
-}
-
-.masque-banniere {
-  position: absolute;
-  right: 3vw;
-  top: -30%;
-  height: 160%;
-  width: 18vw;
-  overflow: hidden;
-  z-index: -1;
-  pointer-events: none;
-}
-
-.banniere-glissante {
-  position: absolute;
-  right: -16vw;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 15vw;
-  transition: right 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-  filter: drop-shadow(0px 8px 10px rgba(0, 0, 0, 0.6));
-}
-
-.banniere-glissante img {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.texte-banniere {
-  position: absolute;
-  top: 48%;
-  left: 42%;
-  transform: translate(-50%, -50%);
-  color: #2c1e16;
-  font-size: 1.5vw;
-  font-weight: bold;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-/* MAGIE CSS : N'active l'animation de survol QUE sur les appareils avec une vraie souris (PC) */
-@media (hover: hover) {
-  .conteneur-bouton-lateral:hover .banniere-glissante {
-    right: 0vw;
-  }
 }
 
 /* --- LE MENU DE NAVIGATION (BAS DROITE) --- */

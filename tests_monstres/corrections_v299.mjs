@@ -317,7 +317,7 @@ await section(async () => {
     return { entrees: window.__entrees.slice(), e: window.grimoireEtat(), parent: ecran.parentNode.id, jeu: getComputedStyle(document.getElementById("ecran-jeu")).display,
              fond: getComputedStyle(ecran, "::before").opacity, z: getComputedStyle(ecran).zIndex, nav: document.getElementById("menu-navigation-bas").parentNode.id,
              marque: document.getElementById("grimoire-marque-page").classList.contains("inactif"), voyage: getComputedStyle(document.getElementById("btn-voyage-essai")).display, marche: !document.getElementById("grimoire-marque-marche").classList.contains("inactif"),
-             menu: getComputedStyle(document.getElementById("menu-lateral")).display };
+             menu: !!document.getElementById("menu-lateral") };
   });
   verifier("on entre dans la partie (la carte du jeu s'installe)", r.entrees.join(",") === "P1" && r.jeu === "block", JSON.stringify(r.entrees));
   verifier("le livre reste, posé dans l'écran de jeu, au-dessus de la carte", r.e.visible && r.e.enPartie && r.parent === "ecran-jeu" && Number(r.z) > 5 && Number(r.z) < 40, `${r.parent}, z ${r.z}`);
@@ -326,7 +326,7 @@ await section(async () => {
   verifier("v300 : le fond beige reste, la carte est masquée sous le livre", r.fond === "1" && await dans(6, 6, "#ecran-grimoire"), `opacité ${r.fond}, ${await dessus(6, 6)}`);
   // v304 : « après avoir chargé la partie, ouvre sur la page map globale ».
   verifier("le livre ouvert (v313 : sur le sommaire)", r.e.ouvert && r.e.page === 3, JSON.stringify(r.e));
-  verifier("v300 : l'ancien menu de droite se cache sous le livre", r.menu === "none", r.menu);
+  verifier("v300 : l'ancien menu de droite n'est plus là (retiré en v378)", r.menu === false, String(r.menu));
   verifier("v300 : les petits boutons restent dans le livre (en haut à droite)", r.nav === "ecran-grimoire");
   verifier("en partie, le marque-page s'allume", r.marque === false);
   // v308 : le voyage revient dans le livre — son bouton se montre sur ses cartes (le livre s'ouvre sur la carte du monde).

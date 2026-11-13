@@ -13,10 +13,10 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=140">
+  <link rel="stylesheet" href="style.css?v=141">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
-  <link rel="stylesheet" href="grimoire.css?v=15">
+  <link rel="stylesheet" href="grimoire.css?v=16">
   <link rel="stylesheet" href="grimoire_recit.css?v=19">
   <link rel="stylesheet" href="grimoire_carte.css?v=2">
   <link rel="stylesheet" href="grimoire_regions.css?v=7">
@@ -474,94 +474,6 @@
     <div id="affichage-tokens" style="display:none; position:absolute; top:15px; right:20px; color:white; font-family: sans-serif; font-size:14px; font-weight:bold; text-shadow:2px 2px 4px black, 0px 0px 10px #4a2e1b; z-index:9000;">
       Tokens : <span id="valeur-tokens">0</span>
     </div>
-
-    <div id="menu-lateral">
-
-      <!-- Bouton Geant Date -->
-      <div class="icone-menu" onclick="jouerSonClic(); ouvrirGestionDate()">
-        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/parchemin_u9fib7.png" alt="Parchemin">
-        <div class="texte-sur-parchemin">
-          Jour <span id="affichage-jour">...</span><br>
-          De l'an <span id="affichage-an">...</span>
-        </div>
-      </div>
-
-      <!-- BOUTON CHAT : NARRATION -->
-      <div class="conteneur-bouton-lateral" onmouseenter="jouerSonSurvolParchemin()">
-        <div class="masque-banniere">
-          <div class="banniere-glissante">
-            <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/banniere_okbe27.png" alt="Bannière">
-            <span class="texte-banniere">Narration</span>
-          </div>
-        </div>
-        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/chat_vk0zac.png" class="icone-menu" alt="Chat" onclick="jouerSonClic(); ouvrirChatbox()">
-      </div>
-
-      <div class="conteneur-bouton-lateral" onmouseenter="jouerSonSurvolParchemin()">
-        <div class="masque-banniere">
-          <div class="banniere-glissante">
-            <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/banniere_okbe27.png" alt="Bannière">
-            <span class="texte-banniere">Héros</span>
-          </div>
-        </div>
-        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/personnages_qhidpu.png" class="icone-menu" alt="Personnages" onclick="jouerSonClic(); ouvrirMenuPersonnages()">
-      </div>
-
-
-      <!-- BOUTON COMBAT : RENCONTRE -->
-      <div class="conteneur-bouton-lateral" onmouseenter="jouerSonSurvolParchemin()">
-        <div class="masque-banniere">
-          <div class="banniere-glissante">
-            <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/banniere_okbe27.png" alt="Bannière">
-            <span class="texte-banniere">Rencontre</span>
-          </div>
-        </div>
-        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/combat_syxo0p.png" class="icone-menu" alt="Combat" onclick="jouerSonClic(); window.ouvrirPopupRencontre()">
-      </div>
-
-      <!-- BOUTON MISSIONS : JOURNAL -->
-      <div class="conteneur-bouton-lateral" onmouseenter="jouerSonSurvolParchemin()">
-        <div class="masque-banniere">
-          <div class="banniere-glissante">
-            <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/banniere_okbe27.png" alt="Bannière">
-            <span class="texte-banniere">Journal</span>
-          </div>
-        </div>
-        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/missions_wo5tws.png" class="icone-menu" alt="Missions" onclick="jouerSonClic()">
-      </div>
-
-      <!-- Paramètres : en bas, sous Combat et Mission (Nico, v252). -->
-      <div class="conteneur-bouton-lateral" onmouseenter="jouerSonSurvolParchemin()">
-        <div class="masque-banniere">
-          <div class="banniere-glissante">
-            <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781548169/banniere_okbe27.png" alt="Bannière">
-            <span class="texte-banniere">Paramètres</span>
-          </div>
-        </div>
-        <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1781438084/param%C3%A8tres_gttwna.png" class="icone-menu" alt="Paramètres" onclick="jouerSonClic(); ouvrirParametres()">
-      </div>
-
-      <!-- LA FLÈCHE QUI RANGE LE MENU (v256) : les boutons remontent hors de
-           l'écran, le petit bouton du coin haut droit les fait redescendre
-           (replierMenuLateral / deplierMenuLateral, app.js). -->
-      <div class="conteneur-fleche-menu">
-        <button type="button" id="btn-replier-menu" class="btn-replier-menu" title="Ranger le menu"
-                aria-label="Ranger le menu" onclick="window.replierMenuLateral()">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15.5 L12 8.5 L19 15.5"/></svg>
-        </button>
-      </div>
-
-    </div>
-
-    <!-- Le menu rangé : le même bouton que dans la page de narration, en plus
-         petit, dans le coin haut droit. Il ne se montre que menu rangé. -->
-    <img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783264616/A39F53B8-528E-4052-92AD-E9EDC3F700EB_lbr2mo.png"
-         id="btn-rouvrir-menu"
-         class="btn-rouvrir-menu"
-         alt="Afficher le menu"
-         title="Afficher le menu"
-         style="display: none;"
-         onclick="window.deplierMenuLateral()">
 
     <!-- MODALE PRÉ-COMBAT (POPUP RENCONTRE) -->
     <div id="modale-pre-combat" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: var(--app-h); background-color: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center;">
@@ -2398,7 +2310,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=267"></script>
+<script src="trace_combat.js?v=268"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2465,7 +2377,7 @@
 <script type="module" src="regime_cerveau.js?v=55"></script>
 <script type="module" src="ia_master.js?v=27"></script>
 <script type="module" src="illustrations_recit.js?v=10"></script>
-<script type="module" src="app.js?v=168"></script>
+<script type="module" src="app.js?v=169"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=4"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
@@ -2481,7 +2393,7 @@
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région et son titre (plus de nuages dessus, v286). -->
 <!-- Les nuages réalistes (v279) : la carte graphique les calcule (la traversée entre les cartes). -->
 <script src="nuages_realistes.js?v=3"></script>
-<script type="module" src="cartes_regionales.js?v=22"></script>
+<script type="module" src="cartes_regionales.js?v=23"></script>
 <!-- Le lore du monde, par région (v273), puis les villages des cartes régionales et MIA_VILLAGE. -->
 <script src="lore_ivalis.js?v=4"></script>
 <script type="module" src="villages_regionaux.js?v=11"></script>
@@ -2490,7 +2402,7 @@
 <!-- Le déplacement des PJ (v275) : les terrains praticables des cartes régionales,
      puis le groupe, son bouton voyage, les tracés, les votes, la marche et les nuits. -->
 <script type="module" src="terrains_regionaux.js?v=3"></script>
-<script type="module" src="voyage_groupe.js?v=16"></script>
+<script type="module" src="voyage_groupe.js?v=17"></script>
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
 <script type="module" src="environnement_mj.js?v=5"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->
@@ -2530,7 +2442,7 @@
 <script src="murs_terre.js?v=10"></script>
 <!-- (v368) Les totems du Chaman : la fenêtre des effets, la pose, le pion. -->
 <script type="module" src="totems.js?v=1"></script>
-<script type="module" src="combat.js?v=176"></script>
+<script type="module" src="combat.js?v=177"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=41"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
@@ -2538,14 +2450,14 @@
 <!-- LES APPARITIONS (v268) : le tableau de Nico, son tirage, sa fenêtre de
      réglage. Avant monstres.js, qui le lit dès son chargement. -->
 <script src="apparitions.js?v=3"></script>
-<script type="module" src="monstres.js?v=48"></script>
+<script type="module" src="monstres.js?v=49"></script>
 <script type="module" src="monstres_competences.js?v=30"></script>
 <script type="module" src="monstres_ia.js?v=43"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
 <script type="module" src="objets.js?v=23"></script>
 <script src="variations_tenues.js?v=2"></script>
 <script type="module" src="objets_ia.js?v=18"></script>
-<script type="module" src="loot.js?v=34"></script>
+<script type="module" src="loot.js?v=35"></script>
 <!-- LES COMBATS DU RÉCIT (v278) : la détection, la préparation, le retour au récit. -->
 <script type="module" src="combat_rp.js?v=15"></script>
 

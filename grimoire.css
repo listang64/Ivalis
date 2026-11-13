@@ -27,7 +27,7 @@
    flottait au-dessus de la carte se cache. */
 #ecran-grimoire.en-partie { z-index: 30; }
 #ecran-grimoire.en-partie .grimoire-invite { display: none; }
-#ecran-jeu.livre-leve #menu-lateral, #ecran-jeu.livre-leve #btn-rouvrir-menu, #ecran-jeu.livre-leve #affichage-tokens,
+#ecran-jeu.livre-leve #affichage-tokens,
 /* v310 : sur le livre, le marque-page de la marche remplace le bouton du voyage. */
 #ecran-jeu.livre-leve .btn-voyage, #ecran-jeu.livre-leve .btn-retour-monde { display: none !important; }
 /* (v308) Le voyage revient dans le livre : son bouton sur les cartes du livre

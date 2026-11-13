@@ -1430,11 +1430,10 @@ window.etatVoyageLivre = () => {
 function actualiserBouton() {
     const b = bouton();
     if (!b) return;
-    const rouvrir = $("btn-rouvrir-menu");
     // (v308) Le livre levé : le bouton se montre sur ses cartes (le monde, une région).
     const surLeLivre = document.getElementById("ecran-jeu") && document.getElementById("ecran-jeu").classList.contains("livre-leve");
     const carteDuLivre = surLeLivre && document.getElementById("ecran-jeu").classList.contains("livre-carte");
-    const visible = !!window.ID_PARTIE_COURANTE && (surLeLivre ? carteDuLivre : (!!rouvrir && rouvrir.style.display !== "none"));
+    const visible = !!window.ID_PARTIE_COURANTE && !!carteDuLivre;
     b.style.display = visible ? "block" : "none";
     if (b.getAttribute("src") !== IMAGE_BOUTON_VOYAGE) b.src = IMAGE_BOUTON_VOYAGE;
     b.alt = "Voyager";
@@ -2145,11 +2144,6 @@ function actualiserDev() {
         bouton();
         pionMonde();
         calquesRegion();
-        // Le bouton suit celui qui déplie le menu (il se montre avec lui).
-        const rouvrir = $("btn-rouvrir-menu");
-        if (rouvrir && typeof MutationObserver === "function") {
-            new MutationObserver(actualiserBouton).observe(rouvrir, { attributes: true, attributeFilter: ["style"] });
-        }
         // Le DEV s'éteint : le téléport s'arrête.
         const avant = window.actualiserRegionsDev;
         if (typeof avant === "function" && !avant.__voyage) {

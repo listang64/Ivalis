@@ -314,9 +314,9 @@ console.log("\n1b. EN HAUT DU TABLEAU DES MONSTRES : LA TRICHE ET LA MARCHE, À 
 
 console.log("\n2. LE BOUTON PARAMÈTRES, EN BAS, SOUS COMBAT ET MISSION");
 {
-  const ordre = await p.evaluate(() => [...document.querySelectorAll("#menu-lateral .texte-banniere")].map(e => e.textContent.trim()));
-  verifier("le menu : Narration, Héros, Rencontre, Journal, puis Paramètres",
-           ordre.join(",") === "Narration,Héros,Rencontre,Journal,Paramètres", ordre.join(", "));
+  // (v378) Le menu latéral est retiré : le livre a son sommaire.
+  const menu = await p.evaluate(() => !!document.getElementById("menu-lateral"));
+  verifier("(v378) plus de menu latéral (le sommaire du livre l'a remplacé)", !menu);
 }
 
 console.log("\n4. LE VARGEN PAIE SA MARCHE MOITIÉ PRIX (vérification)");

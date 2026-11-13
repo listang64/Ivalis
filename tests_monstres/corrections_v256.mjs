@@ -66,84 +66,13 @@ await p.evaluate(() => {
   window.jouerSonEvenement = (id, f) => { window.__sons.push(id); return vrai ? vrai(id, f) : false; };
 });
 
-console.log("\n1. LE MENU QUI SE RANGE");
+console.log("\n1. LE MENU QUI SE RANGE : RETIRÉ EN v378 (le livre a remplacé le menu latéral)");
 {
-  const r = await p.evaluate(async () => { try {
-    const attendre = (ms) => new Promise(res => setTimeout(res, ms));
-    const menu = document.getElementById("menu-lateral");
-    try { localStorage.removeItem("ivalis_MENU_REPLIE"); } catch (e) {}
-    menu.classList.remove("menu-replie");
-    menu.style.display = "flex";
-    await attendre(300);
-    const fleche = document.getElementById("btn-replier-menu");
-    const rouvrir = document.getElementById("btn-rouvrir-menu");
-    const icones = [...menu.querySelectorAll(".icone-menu")];
-    const param = icones[icones.length - 1].getBoundingClientRect();
-    const f = fleche.getBoundingClientRect();
-    const out = {
-      derniere: menu.lastElementChild === fleche.parentElement,
-      sous: f.top >= param.bottom - 4,
-      centree: Math.abs((f.left + f.width / 2) - (param.left + param.width / 2)),
-      couleur: getComputedStyle(fleche.querySelector("svg")).stroke,
-      cacheAuDepart: getComputedStyle(rouvrir).display === "none"
-    };
-    // La flèche : les boutons s'envolent un à un.
-    const hauts = () => [...menu.children].map(el => el.getBoundingClientRect().top);
-    const avant = hauts();
-    fleche.click();
-    await attendre(230);
-    const pendant = hauts();
-    out.montent = pendant.some((t, i) => t < avant[i] - 20);
-    out.leBasPartEnPremier = (avant[avant.length - 1] - pendant[pendant.length - 1]) > (avant[0] - pendant[0]);
-    await attendre(1100);
-    out.range = menu.classList.contains("menu-replie") && getComputedStyle(menu).visibility === "hidden";
-    const b = rouvrir.getBoundingClientRect();
-    out.bouton = getComputedStyle(rouvrir).display !== "none";
-    out.coin = { droite: innerWidth - b.right, haut: b.top, largeur: b.width };
-    out.memeImage = rouvrir.src === document.getElementById("btn-fermer-chat-nouveau").src;
-    out.plusPetit = b.width < innerWidth * 0.04;
-    out.memoire = localStorage.getItem("ivalis_MENU_REPLIE");
-    // Une fenêtre cache le menu (la narration, le combat) : le petit bouton aussi.
-    menu.style.display = "none"; await attendre(30);
-    out.cacheAvecLeMenu = getComputedStyle(rouvrir).display === "none";
-    menu.style.display = "flex"; await attendre(30);
-    out.revientAvecLeMenu = getComputedStyle(rouvrir).display !== "none";
-    // Le petit bouton : les boutons redescendent.
-    rouvrir.click();
-    await attendre(200);
-    const redescente = hauts();
-    out.redescendent = !menu.classList.contains("menu-replie") && redescente.some((t, i) => t < avant[i] - 20);
-    await attendre(1200);
-    const apres = hauts();
-    out.enPlace = apres.every((t, i) => Math.abs(t - avant[i]) < 2);
-    out.boutonParti = getComputedStyle(rouvrir).display === "none";
-    out.memoire2 = localStorage.getItem("ivalis_MENU_REPLIE");
-    // La narration : son bouton « Afficher l'interface » ramène un menu rangé.
-    window.replierMenuLateral({ sansAnimation: true });
-    window.ouvrirChatbox();
-    await attendre(30);
-    out.chatCache = getComputedStyle(rouvrir).display === "none" && menu.style.display === "none";
-    window.afficherMenusDansChat();
-    await attendre(30);
-    out.chatDeplie = !menu.classList.contains("menu-replie") && menu.style.display !== "none" && getComputedStyle(rouvrir).display === "none";
-    window.fermerToutesLesFenetres();
-    return out;
-  } catch (e) { return { erreur: e.message }; } });
-  verifier("la flèche : dernier élément du menu, sous Paramètres, centrée sous les icônes",
-           r.derniere && r.sous && r.centree < 6, JSON.stringify({ sous: r.sous, centree: r.centree }));
-  verifier("…beige", /rgb\(232, 213, 165\)/.test(r.couleur), r.couleur);
-  verifier("le petit bouton n'est pas là tant que le menu est déplié", r.cacheAuDepart);
-  verifier("la flèche touchée : les boutons remontent, ceux du bas d'abord", r.montent && r.leBasPartEnPremier, JSON.stringify(r));
-  verifier("…puis le menu est rangé (invisible, intouchable)", r.range);
-  verifier("le même bouton que la narration, plus petit, dans le coin haut droit",
-           r.bouton && r.memeImage && r.plusPetit && !!r.coin && r.coin.droite < 60 && r.coin.haut < 60, JSON.stringify(r.coin));
-  verifier("le choix reste sur ce poste", r.memoire === "1" && r.memoire2 === "0", `${r.memoire} → ${r.memoire2}`);
-  verifier("une fenêtre qui cache le menu cache aussi le petit bouton ; il revient avec lui", r.cacheAvecLeMenu && r.revientAvecLeMenu);
-  verifier("le petit bouton touché : les boutons redescendent à leur place", r.redescendent && r.enPlace && r.boutonParti, JSON.stringify(r));
-  verifier("la narration : « Afficher l'interface » ramène un menu rangé", r.chatCache && r.chatDeplie);
+    const r = await p.evaluate(() => ({ menu: !!document.getElementById("menu-lateral"), bouton: !!document.getElementById("btn-rouvrir-menu"),
+                                        replier: typeof window.replierMenuLateral, deplier: typeof window.deplierMenuLateral }));
+    verifier("(v378) plus de menu latéral, de flèche ni de petit bouton qui le rouvrait", !r.menu && !r.bouton && r.replier === "undefined" && r.deplier === "undefined", JSON.stringify(r));
 }
 
-// -------------------------------------------------------------------------
 console.log("\n2. LA MONTÉE DE NIVEAU");
 {
   const r = await p.evaluate(async () => { try {

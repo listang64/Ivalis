@@ -463,9 +463,7 @@ window.ouvrirCombat = function() {
         window.fermerToutesLesFenetres();
     }
 
-    const menuLat = document.getElementById('menu-lateral');
     const menuNav = document.getElementById('menu-navigation-bas');
-    if (menuLat) menuLat.style.display = 'none';
     if (menuNav) menuNav.style.display = 'none';
 
     const btnFermer = document.getElementById('btn-fermer-combat');

@@ -555,18 +555,10 @@ titre("12. LE MENU PRINCIPAL : LE NOM DU JOUEUR EST UN BOUTON, À DROITE, À GAU
   verifier("le menu tombe dessous, et se referme d'un toucher ailleurs", r.dessous && r.refermé === "none", JSON.stringify({ d: r.dessous, f: r.refermé }));
 }
 
-titre("13. LA CARTE DU MONDE : LE MENU DROIT REPLIÉ À L'ARRIVÉE");
+titre("13. LA CARTE DU MONDE : LE MENU DROIT — RETIRÉ EN v378");
 {
-  const r = await p.evaluate(() => {
-    const menu = document.getElementById("menu-lateral");
-    try { localStorage.setItem("ivalis_MENU_REPLIE", "0"); } catch (e) {}
-    menu.classList.remove("menu-replie");
-    window.__ou(() => window.rangerMenuALArrivee(), null);
-    return { replie: menu.classList.contains("menu-replie"), bouton: !!document.getElementById("btn-rouvrir-menu") };
-  });
-  const chargement = lire('app.js');
-  verifier("une partie chargée ou créée : le menu se range (même si on l'avait laissé ouvert)", r.replie && (chargement.match(/rangerMenuALArrivee\(\)/g) || []).length >= 2, JSON.stringify(r));
-  verifier("…au chargement de la page aussi (replié par défaut)", /REPLIÉ PAR DÉFAUT[\s\S]{0,400}menu\.classList\.add\('menu-replie'\)/.test(chargement));
+  const r = await p.evaluate(() => ({ menu: !!document.getElementById("menu-lateral"), ranger: typeof window.rangerMenuALArrivee }));
+  verifier("(v378) plus de menu latéral à ranger à l'arrivée", !r.menu && r.ranger === "undefined", JSON.stringify(r));
 }
 
 titre("14. LE LEADER : +40 % D'XP ; UN LEADER DANS 60 % DES COMBATS ; PLUS QUE TROIS RÉGLAGES");

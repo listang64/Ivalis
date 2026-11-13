@@ -751,8 +751,6 @@ window.calerEnteteMonstres = function() {
 if (typeof window.addEventListener === "function") window.addEventListener("resize", () => window.calerEnteteMonstres());
 
 window.ouvrirGestionMonstres = async function() {
-    const menuLat = document.getElementById("menu-lateral");
-    if (menuLat) menuLat.style.display = "none";
 
     window.naviguerFenetre("etape-menu-outils", "etape-gestion-monstres");
     // Elle s'affiche au bout du fondu (naviguerFenetre) : on mesure alors.
@@ -782,8 +780,6 @@ window.fermerGestionMonstres = function() {
         if (!confirm("Des modifications n'ont pas été enregistrées. Fermer quand même ?")) return;
     }
     modificationsEnAttente = {};
-    const menuLat = document.getElementById("menu-lateral");
-    if (menuLat) menuLat.style.display = "flex";
     window.naviguerFenetre("etape-gestion-monstres", "etape-menu-outils");
 };
 
@@ -989,14 +985,10 @@ function hasard(tableau) {
 window.ARCHETYPES_MONSTRES = Object.keys(AMBIANCE_ARCHETYPES);
 
 window.ouvrirTableRencontres = function() {
-    const menuLat = document.getElementById("menu-lateral");
-    if (menuLat) menuLat.style.display = "none";
     window.naviguerFenetre("etape-menu-outils", "etape-rencontres-monstres");
     window.dessinerTableRencontres();
 };
 window.fermerTableRencontres = function() {
-    const menuLat = document.getElementById("menu-lateral");
-    if (menuLat) menuLat.style.display = "flex";
     window.naviguerFenetre("etape-rencontres-monstres", "etape-menu-outils");
 };
 // -------------------------------------------------------------------------

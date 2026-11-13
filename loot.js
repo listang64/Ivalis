@@ -749,15 +749,11 @@ window.raretesManquantes = function(items, raretes) {
 window.BROUILLON_BUTIN = null;
 
 window.ouvrirTableButin = function() {
-    const menuLat = document.getElementById("menu-lateral");
-    if (menuLat) menuLat.style.display = "none";
     window.BROUILLON_BUTIN = null;
     if (typeof window.naviguerFenetre === "function") window.naviguerFenetre("etape-menu-outils", "etape-table-butin");
     window.dessinerTableButin();
 };
 window.fermerTableButin = function() {
-    const menuLat = document.getElementById("menu-lateral");
-    if (menuLat) menuLat.style.display = "flex";
     window.BROUILLON_BUTIN = null;
     if (typeof window.naviguerFenetre === "function") window.naviguerFenetre("etape-table-butin", "etape-menu-outils");
 };

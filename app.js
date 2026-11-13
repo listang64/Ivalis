@@ -3917,10 +3917,6 @@ function ecouterDateEnJeu() {
     window.DATE_EN_JEU_ACTUELLE.jour = d.Jour ?? "";
     window.DATE_EN_JEU_ACTUELLE.annee = d.Annee ?? "";
 
-    const elJour = document.getElementById("affichage-jour");
-    const elAn = document.getElementById("affichage-an");
-    if (elJour) elJour.innerText = d.Jour ?? "...";
-    if (elAn) elAn.innerText = d.Annee ?? "...";
   }, (err) => console.error("onSnapshot Date_En_Jeu :", err));
 }
 
@@ -4589,7 +4585,6 @@ async function validerCreationGroupe() {
 
     document.getElementById("ecran-menu").style.display = "none";
     document.getElementById("ecran-jeu").style.display = "block";
-    if (typeof window.rangerMenuALArrivee === "function") window.rangerMenuALArrivee();
     // On charge immédiatement les données de la partie pour placer le pion !
     ecouterPersonnagesDeLaPartie(window.ID_PARTIE_COURANTE);
   } catch (e) {
@@ -4689,7 +4684,6 @@ function lancerPartieChargee(idChoisi) {
   fermerModales();
   document.getElementById("ecran-menu").style.display = "none";
   document.getElementById("ecran-jeu").style.display = "block";
-  if (typeof window.rangerMenuALArrivee === "function") window.rangerMenuALArrivee();
   console.log("⏱️ table de jeu dessinée en " + (Date.now() - depart) + " ms");
   // On charge immédiatement les données de la partie pour placer le pion !
   window.DEBUT_ECOUTE_PARTIE = Date.now();
@@ -4834,10 +4828,6 @@ function fermerParametres(immediat) {
   const fermer = () => {
     conteneur.classList.remove("ouvert");
     conteneur.style.display = "none";
-    
-    // NOUVEAU : Sécurité pour restaurer le menu latéral quoiqu'il arrive
-    const menuLat = document.getElementById('menu-lateral');
-    if (menuLat) menuLat.style.display = 'flex';
   };
 
   if (immediat) { fermer(); return; }
@@ -5004,9 +4994,6 @@ async function validerSuppression() {
 // =========================================================================
 
 window.ouvrirGestionEffets = async function() {
-    // NOUVEAU : Masque complètement le menu de droite
-    const menuLat = document.getElementById('menu-lateral');
-    if (menuLat) menuLat.style.display = 'none';
 
     naviguerFenetre('etape-menu-outils', 'etape-gestion-effets');
     document.getElementById("chargement-effets").style.display = "block";
@@ -5016,8 +5003,6 @@ window.ouvrirGestionEffets = async function() {
 
 // NOUVEAU : Fonction dédiée pour fermer proprement et restaurer le menu
 window.fermerGestionEffets = function() {
-    const menuLat = document.getElementById('menu-lateral');
-    if (menuLat) menuLat.style.display = 'flex';
     naviguerFenetre('etape-gestion-effets', 'etape-menu-outils');
 };
 
@@ -5893,10 +5878,8 @@ window.fermerToutesLesFenetres = function() {
   const popupRencontre = document.getElementById('modale-pre-combat');
   if (popupRencontre) popupRencontre.style.display = 'none';
 
-  const menuLat = document.getElementById('menu-lateral');
   const menuNav = document.getElementById('menu-navigation-bas');
   const btnFermerCombat = document.getElementById('btn-fermer-combat');
-  if (menuLat) menuLat.style.display = 'flex';
   if (menuNav) menuNav.style.display = 'flex';
   if (btnFermerCombat) btnFermerCombat.style.display = 'none';
 
@@ -5944,135 +5927,6 @@ window.fermerToutesLesFenetres = function() {
 window.ouvrirChatbox = function() {
   if (window.GRIMOIRE_RECIT && typeof window.GRIMOIRE_RECIT.allerAuRecit === "function") window.GRIMOIRE_RECIT.allerAuRecit();
 };
-
-// =========================================================================
-//  LE MENU QUI SE RANGE (v256)
-// =========================================================================
-//  Nico : « sous les boutons du menu, une petite flèche beige pour remonter en
-//  animation tous les boutons vers le haut ; s'affiche alors le même bouton que
-//  dans la page chatbox, en plus petit, dans le coin haut droit ; si on clique
-//  dessus, ça réouvre le menu ».
-//
-//  Le menu rangé garde sa place dans la page (la classe menu-replie le rend
-//  invisible et intouchable) : les fenêtres qui le montrent ou le cachent
-//  (style.display) continuent de le faire sans rien savoir de la flèche. Le
-//  petit bouton suit les deux à la fois — menu rangé ET menu affiché — par un
-//  observateur sur le menu (synchroniserBoutonRouvrirMenu). Le choix reste sur
-//  ce poste (localStorage).
-const CLE_MENU_REPLIE = "ivalis_MENU_REPLIE";
-const DUREE_MENU_MS = 420, ECART_MENU_MS = 55;
-let menuEnMouvement = false;
-
-window.menuLateralReplie = function() {
-  const menu = document.getElementById('menu-lateral');
-  return !!(menu && menu.classList.contains('menu-replie'));
-};
-
-function synchroniserBoutonRouvrirMenu() {
-  const menu = document.getElementById('menu-lateral');
-  const bouton = document.getElementById('btn-rouvrir-menu');
-  if (!menu || !bouton) return;
-  const visible = menu.classList.contains('menu-replie') && menu.style.display !== 'none';
-  const avant = bouton.style.display !== 'none';
-  bouton.style.display = visible ? 'block' : 'none';
-  if (visible && !avant && !mouvementReduit() && typeof bouton.animate === "function") {
-    bouton.animate([{ opacity: 0, transform: 'scale(0.6)' }, { opacity: 1, transform: 'scale(1)' }],
-                   { duration: 260, easing: 'cubic-bezier(.2,.8,.3,1.2)' });
-  }
-}
-window.synchroniserBoutonRouvrirMenu = synchroniserBoutonRouvrirMenu;
-
-function mouvementReduit() {
-  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
-}
-function memoriserMenuReplie(replie) {
-  try { localStorage.setItem(CLE_MENU_REPLIE, replie ? "1" : "0"); } catch (e) { /* poste sans stockage */ }
-}
-
-// Les boutons s'envolent un à un, du bas vers le haut, jusqu'au-dessus de
-// l'écran ; une fois tous partis, le menu est rangé.
-window.replierMenuLateral = function(options) {
-  const menu = document.getElementById('menu-lateral');
-  if (!menu || menuEnMouvement || menu.classList.contains('menu-replie')) return false;
-  const sansAnimation = (options && options.sansAnimation) || mouvementReduit();
-  memoriserMenuReplie(true);
-  if (!(options && options.silencieux)) {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    if (typeof window.jouerSonSurvolParchemin === "function") window.jouerSonSurvolParchemin();
-  }
-  const enfants = [...menu.children];
-  if (sansAnimation || typeof menu.animate !== "function" || menu.style.display === 'none') {
-    menu.classList.add('menu-replie');
-    synchroniserBoutonRouvrirMenu();
-    return true;
-  }
-  menuEnMouvement = true;
-  const animations = enfants.map((el, i) => {
-    const bas = el.getBoundingClientRect().bottom;
-    return el.animate([{ transform: 'translateY(0)', opacity: 1 },
-                       { transform: `translateY(${-(bas + 40)}px)`, opacity: 0 }],
-                      { duration: DUREE_MENU_MS, delay: (enfants.length - 1 - i) * ECART_MENU_MS,
-                        easing: 'cubic-bezier(.55,0,.75,.2)', fill: 'forwards' });
-  });
-  Promise.all(animations.map(a => a.finished.catch(() => null))).then(() => {
-    menu.classList.add('menu-replie');
-    animations.forEach(a => a.cancel());
-    menuEnMouvement = false;
-    synchroniserBoutonRouvrirMenu();
-  });
-  return true;
-};
-
-// Le chemin inverse : les boutons redescendent, le premier en tête.
-window.deplierMenuLateral = function(options) {
-  const menu = document.getElementById('menu-lateral');
-  if (!menu || menuEnMouvement || !menu.classList.contains('menu-replie')) return false;
-  const sansAnimation = (options && options.sansAnimation) || mouvementReduit();
-  memoriserMenuReplie(false);
-  if (!(options && options.silencieux) && !(options && options.sansAnimation)) {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    if (typeof window.jouerSonSurvolParchemin === "function") window.jouerSonSurvolParchemin();
-  }
-  menu.classList.remove('menu-replie');
-  synchroniserBoutonRouvrirMenu();
-  if (sansAnimation || typeof menu.animate !== "function" || menu.style.display === 'none') return true;
-  menuEnMouvement = true;
-  const enfants = [...menu.children];
-  const animations = enfants.map((el, i) => {
-    const bas = el.getBoundingClientRect().bottom;
-    return el.animate([{ transform: `translateY(${-(bas + 40)}px)`, opacity: 0 },
-                       { transform: 'translateY(0)', opacity: 1 }],
-                      { duration: DUREE_MENU_MS, delay: i * ECART_MENU_MS,
-                        easing: 'cubic-bezier(.2,.8,.35,1)', fill: 'backwards' });
-  });
-  Promise.all(animations.map(a => a.finished.catch(() => null))).then(() => { menuEnMouvement = false; });
-  return true;
-};
-
-// L'arrivée sur la carte du monde (une partie créée ou chargée) : menu rangé.
-window.rangerMenuALArrivee = function() {
-  if (typeof window.replierMenuLateral === "function") window.replierMenuLateral({ sansAnimation: true, silencieux: true });
-};
-
-// Au chargement : le choix de ce poste, et l'observateur qui tient le petit
-// bouton à jour quoi qu'il arrive au menu.
-(function initialiserMenuRangeable() {
-  const demarrer = () => {
-    const menu = document.getElementById('menu-lateral');
-    if (!menu) return;
-    // REPLIÉ PAR DÉFAUT (v267, Nico : « quand on arrive sur la map globale du
-    // jeu, le menu droit est par défaut enroulé ») : on arrive toujours menu
-    // rangé, quel qu'ait été le choix de la fois d'avant ; la flèche du coin le
-    // rouvre (et l'arrivée en partie le range encore : rangerMenuALArrivee).
-    menu.classList.add('menu-replie');
-    if (typeof MutationObserver === "function") {
-      new MutationObserver(synchroniserBoutonRouvrirMenu).observe(menu, { attributes: true, attributeFilter: ['style', 'class'] });
-    }
-    synchroniserBoutonRouvrirMenu();
-  };
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", demarrer);
-  else demarrer();
-})();
 
 // 3. Bouton Personnages
 window.ouvrirMenuPersonnages = function() {
@@ -6915,8 +6769,6 @@ window.masquerTooltipLieu = function() {
 // =========================================================================
 
 window.ouvrirGestionRaces = async function() {
-    const menuLat = document.getElementById('menu-lateral');
-    if (menuLat) menuLat.style.display = 'none';
 
     naviguerFenetre('etape-menu-outils', 'etape-gestion-races');
     document.getElementById("chargement-races").style.display = "block";
@@ -6925,8 +6777,6 @@ window.ouvrirGestionRaces = async function() {
 };
 
 window.fermerGestionRaces = function() {
-    const menuLat = document.getElementById('menu-lateral');
-    if (menuLat) menuLat.style.display = 'flex';
     naviguerFenetre('etape-gestion-races', 'etape-menu-outils');
 };
 
