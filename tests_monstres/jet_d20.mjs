@@ -287,10 +287,10 @@ console.log("\n6. LE LANCER DEPUIS LA FICHE DIT QUI LANCE");
   verifier("et un jet cohérent", a && a.totalFinal === a.resultatBrut + 3 && a.resultatBrut >= 1 && a.resultatBrut <= 20);
 }
 
-console.log("\n6 bis. LA SCÈNE SE JOUE CHEZ TOUS LES JOUEURS — ET LES MONSTRES RESTENT HORS DES BULLES");
+console.log("\n6 bis. LA SCÈNE SE JOUE CHEZ TOUS LES JOUEURS (v377 : plus de bulles de l'ancien chat)");
 {
-  // Un poste qui N'A PAS lancé : il écoute la partie (ouvrirChatbox → écoute
-  // du document de la partie), et c'est ce document qui porte le jet.
+  // Un poste qui N'A PAS lancé : il écoute la partie (l'entrée en partie →
+  // écoute du document de la partie), et c'est ce document qui porte le jet.
   const r = await p.evaluate(async () => {
     window.fermerJetD20();
     await new Promise(r => setTimeout(r, 700));
@@ -298,8 +298,7 @@ console.log("\n6 bis. LA SCÈNE SE JOUE CHEZ TOUS LES JOUEURS — ET LES MONSTRE
     window.__messages = [];
     window.__ecoutes = [];
     window.ID_PARTIE_COURANTE = "PARTIE_X";
-    document.getElementById("fenetre-chatbox").style.display = "none";
-    window.ouvrirChatbox();
+    window.PORTES_GRIMOIRE.entrerDansPartie("PARTIE_X");
     const ecoute = (window.__ecoutes || []).find(e => e.ref && e.ref.chemin === "Systeme_Parties/PARTIE_X");
     if (!ecoute) return { ecoute: false };
     // Pendant un combat : les monstres sont dans la liste des combattants.
@@ -312,7 +311,7 @@ console.log("\n6 bis. LA SCÈNE SE JOUE CHEZ TOUS LES JOUEURS — ET LES MONSTRE
     const base = { Ordre_Initiative: ["P1"], Index_Initiative: 0, Tour_Combat: 1 };
     let erreur = null;
     try { ecoute.cb(snap(base)); } catch (e) { erreur = "scan 1 : " + e.message; }
-    const bulles = [...document.querySelectorAll("#zone-noms-bulles .bulle-personnage")].map(b => b.innerText);
+    const bulles = [...document.querySelectorAll(".bulle-personnage")].map(b => b.innerText);
     const portraits = [...document.querySelectorAll(".bulle-portrait-hover-joueur")].map(i => i.getAttribute("src"));
     try {
       ecoute.cb(snap({ ...base, Action_Des: { idLancer: "UN_AUTRE_POSTE", idPerso: "P1", nomPerso: "Cybile",
@@ -330,10 +329,7 @@ console.log("\n6 bis. LA SCÈNE SE JOUE CHEZ TOUS LES JOUEURS — ET LES MONSTRE
   verifier("le jet d'un AUTRE poste ouvre la scène ici aussi", r.ouverte === true);
   verifier("et la déroule jusqu'au résultat (8 + 2 = 10)", r.final === "10", r.final);
   verifier("ce poste ne poste pas le message (ce n'est pas lui qui a lancé)", r.messages === 0, String(r.messages));
-  verifier("les bulles du chat : les héros (et le MJ), pas le monstre ni le leurre",
-           JSON.stringify(r.bulles.filter(n => n !== "MJ")) === '["Cybile"]',
-           JSON.stringify(r.bulles));
-  verifier("ni son portrait au survol", !r.portraits.some(u => /goule/.test(u || "")), JSON.stringify(r.portraits));
+  verifier("(v377) plus de bulles ni de portraits de l'ancien chat", r.bulles.length === 0 && r.portraits.length === 0, JSON.stringify([r.bulles, r.portraits]));
   await p.evaluate(() => window.fermerJetD20());
 }
 

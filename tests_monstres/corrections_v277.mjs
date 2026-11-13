@@ -303,8 +303,8 @@ await section(async () => {
   verifier("pas hors du terrain praticable", r.horsTerrain === false);
   const nuages = await p.evaluate(() => {
     const avant = window.CARTES_REGIONALES[2].nuages;
-    const total = 240 * 150, cases = Array.from({ length: total }, (_, i) => (i % 240) < 120 ? 1 : 0);
-    window.CARTES_REGIONALES[2].nuages = { colonnes: 240, lignes: 150, cases: window.encoderGrilleNuages(cases) };
+    // (v374) Le codage des grilles est parti avec le pinceau : des cases quelconques suffisent.
+    window.CARTES_REGIONALES[2].nuages = { colonnes: 240, lignes: 150, cases: "////////" };
     const r = { ouest: window.placePoiValable(2, 0.4, 0.4), est: window.placePoiValable(2, 0.6, 0.35) };
     window.CARTES_REGIONALES[2].nuages = avant;
     return r;
@@ -418,24 +418,26 @@ await section(async () => {
 titre("6. ARRIVÉS AU POI, ILS Y SONT (v281) : LE CHAT S'OUVRE, LE MJ PARLE, AUCUNE QUESTION");
 // =========================================================================
 await section(async () => {
-  await p.evaluate(() => { window.__ajouts = []; window.__tourIA = 0; const vrai = window.declencherTourIA; window.declencherTourIA = async () => { window.__tourIA++; return vrai(); }; });
+  await p.evaluate(() => { window.__ajouts = []; window.__tourIA = 0; const vrai = window.declencherTourIA; window.declencherTourIA = async () => { window.__tourIA++; return vrai(); };
+    // (v377) « Ouvrir le chat », c'est aller au récit du livre.
+    window.__recit = 0; if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.allerAuRecit = () => { window.__recit++; }; });
   await finir();
   const d = await partie();
   // v281 (Nico : « une fois arrivés, ils y sont : pas besoin de demander s'ils veulent rester »).
   verifier("au bout du détour : le voyage s'achève au lieu ; le groupe y est", !d.Voyage_Groupe && d.Voyage_Termine && d.Voyage_Termine.Poi
            && d.Voyage_Termine.Poi.Lieu === idLieu && d.Lieu_Actuel === idLieu && d.Situation === "Dans un lieu" && d.Position_Groupe.Region === 2, JSON.stringify(d.Voyage_Termine));
   await p.waitForTimeout(700);
-  const r = await p.evaluate(() => ({ chat: document.getElementById("fenetre-chatbox").style.display, tour: window.__tourIA,
+  const r = await p.evaluate(() => ({ recit: window.__recit, tour: window.__tourIA,
     msg: (window.__ajouts || []).filter(a => a.col === "Messages_Chat").map(a => a.data), boite: document.getElementById("boite-voyage").textContent,
     boutons: [...document.querySelectorAll("#boite-voyage button")].map(b => b.textContent.trim()) }));
-  verifier("le chat s'ouvre", r.chat === "flex");
+  verifier("(v377) le récit du livre s'ouvre (l'ancien chat n'existe plus)", r.recit >= 1, String(r.recit));
   verifier("le Destin pose l'arrivée, le MJ est réveillé", r.msg.some(m => m.Auteur_ID === "DESTIN" && /s'approche de Kalymnos/.test(m.Texte)) && r.tour === 1, r.tour);
   const narr = requetes.filter(q => /Continue l'histoire/.test(q.systeme)).pop();
   verifier("le MJ reçoit les données du lieu (description, accroche, bâtiments)", narr && /Trois huttes de branchages/.test(narr.systeme) && /fils du charbonnier/.test(narr.systeme)
            && /La meule d'Hestor/.test(narr.systeme));
   verifier("…et le MJ parle dans le chat", r.msg.some(m => m.Auteur_ID === "MJ" && /volutes de fumée/.test(m.Texte)));
   verifier("aucune question : ni « Reprendre la route », ni « Rester ici »", r.boutons.length === 0, JSON.stringify(r.boutons));
-  await p.evaluate(() => { const c = document.getElementById("fenetre-chatbox"); if (typeof window.fermerToutesLesFenetres === "function") window.fermerToutesLesFenetres(); else c.style.display = "none"; });
+  await p.evaluate(() => { if (typeof window.fermerToutesLesFenetres === "function") window.fermerToutesLesFenetres(); });
   await p.waitForTimeout(150);
   const lieu = await p.evaluate((id) => { const v = window.VILLAGES_REGIONAUX[id], el = document.querySelector(`.village-region[data-id="${id}"]`), img = el && el.querySelector("img");
     return { v: v && { nom: v.nom, type: v.type, image: v.image }, calque: img && img.getAttribute("src"), poi: getComputedStyle(document.getElementById("poi-voyage")).display }; }, idLieu);

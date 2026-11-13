@@ -55,7 +55,7 @@ try {
     window.ID_PARTIE_COURANTE = "P1";
     window.PERSOS_PARTIE = [{ idPersonnage: "H1", idJoueur: "P_01", prenom: "Thorin" }, { idPersonnage: "H2", idJoueur: "P_02", prenom: "Lyra" }];
     window.PARTIE_DATA = { Ordre_Initiative: ["H2", "H1"], Index_Initiative: 0 };   // la parole est à Lyra
-    const tour = window.tourDeParole(window.PARTIE_DATA, window.PERSOS_PARTIE).id;
+    const tour = window.PARTIE_DATA.Ordre_Initiative[window.PARTIE_DATA.Index_Initiative];   // (v377 : tourDeParole est parti avec l'ancien chat)
     document.getElementById("champ-id-personnage").value = "H1";
     document.getElementById("titre-nom-personnage").innerText = "Thorin";
     window.fermerFichePerso = () => {};

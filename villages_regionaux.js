@@ -110,14 +110,9 @@ window.appliquerLieuLocal = function(id, data) {
     suivreBulleDuLieu();
     return v;
 };
-// La bulle du chat montre l'image du lieu où est le groupe : elle suit
-// l'illustration d'un POI, qui arrive après le lieu (v277).
 function suivreBulleDuLieu() {
     // Les lieux ont changé : qui les montre (le voyage, son POI) suit.
     try { window.dispatchEvent(new CustomEvent("villages-regionaux-maj")); } catch (e) { /* vieux navigateur */ }
-    const lieu = window.PARTIE_DATA && window.PARTIE_DATA.Lieu_Actuel;
-    const v = lieu && villages[lieu];
-    if (v && v.image && v.image !== window.LIEU_ACTUEL_IMAGE && typeof window.mettreAJourBulleLieu === "function") window.mettreAJourBulleLieu(lieu);
 }
 const villagesDeLaCarte = (numero) => Object.values(villages).filter(v => v.numero === Number(numero));
 

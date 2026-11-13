@@ -300,7 +300,9 @@ titre("3. ARRIVÉS AU POI, ILS Y SONT : PAS DE QUESTION, LE CHAT S'OUVRE, LE MJ 
 let idPoi = null;
 await section(async () => {
   await p.evaluate(() => { window.__ajouts = []; window.__tourIA = 0; const vrai = window.declencherTourIA; window.declencherTourIA = async () => { window.__tourIA++; return vrai && vrai(); };
-    window.fermerToutesLesFenetres && window.fermerToutesLesFenetres(); });
+    window.fermerToutesLesFenetres && window.fermerToutesLesFenetres();
+    // (v377) « Ouvrir le chat », c'est aller au récit du livre.
+    window.__recit = 0; if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.allerAuRecit = () => { window.__recit++; }; });
   reglagesFaux.poiRetard = 1800;
   await joueur("P_01"); await p.evaluate(() => window.voterPoiGroupe("oui"));
   await joueur("P_02"); await p.evaluate(() => window.voterPoiGroupe("oui"));
@@ -313,13 +315,13 @@ await section(async () => {
   await p.waitForTimeout(700);
   const d = await partie();
   idPoi = d.Lieu_Actuel;
-  const r = await p.evaluate(() => ({ chat: document.getElementById("fenetre-chatbox").style.display, tour: window.__tourIA,
+  const r = await p.evaluate(() => ({ recit: window.__recit, tour: window.__tourIA,
     msg: (window.__ajouts || []).filter(a => a.col === "Messages_Chat").map(a => a.data), boite: getComputedStyle(document.getElementById("boite-voyage")).display,
     boutons: [...document.querySelectorAll("#boite-voyage button")].map(x => x.textContent.trim()) }));
   verifier("le lieu né : le voyage s'achève là, le groupe y est (Voyage_Termine.Poi)", !d.Voyage_Groupe && d.Voyage_Termine && d.Voyage_Termine.Poi && d.Voyage_Termine.Poi.Lieu === idPoi
            && /^L_/.test(idPoi) && d.Situation === "Dans un lieu" && d.Position_Groupe.Region === 2, JSON.stringify(d.Voyage_Termine));
   verifier("aucune question : ni « Reprendre la route », ni « Rester ici »", r.boite === "none" && r.boutons.length === 0, JSON.stringify(r.boutons));
-  verifier("le chat s'ouvre ; le Destin pose l'arrivée ; le MJ est réveillé", r.chat === "flex" && r.msg.some(m => m.Auteur_ID === "DESTIN" && /s'approche de/.test(m.Texte)) && r.tour === 1, `${r.chat} ${r.tour}`);
+  verifier("le récit du livre s'ouvre (v377) ; le Destin pose l'arrivée ; le MJ est réveillé", r.recit >= 1 && r.msg.some(m => m.Auteur_ID === "DESTIN" && /s'approche de/.test(m.Texte)) && r.tour === 1, `${r.recit} ${r.tour}`);
   const bord = await p.evaluate((dd) => { const lieu = window.VILLAGES_REGIONAUX[dd.Lieu_Actuel]; return lieu && Math.hypot((dd.Position_Groupe.x - lieu.x) * 1.6, dd.Position_Groupe.y - lieu.y); }, d);
   verifier("le groupe s'arrête au bord du lieu (son dessin reste visible)", bord > 0.005 && bord < 0.1, bord && bord.toFixed(3));
   reglagesFaux.poiRetard = 0;
@@ -417,7 +419,8 @@ await section(async () => {
 titre("6. LA NUIT : « REPARTIR À L'AUBE », « RESTER ICI », ET LE FEU DE CAMP QUI OUVRE LE CHAT");
 // =========================================================================
 await section(async () => {
-  await p.evaluate(() => { window.appliquerReglagesGroupeDeLaBase({ Chance_POI: 0 }); window.fermerToutesLesFenetres && window.fermerToutesLesFenetres(); });
+  await p.evaluate(() => { window.appliquerReglagesGroupeDeLaBase({ Chance_POI: 0 }); window.fermerToutesLesFenetres && window.fermerToutesLesFenetres();
+    window.__recit = 0; if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.allerAuRecit = () => { window.__recit++; }; });
   await lancerVoyageRegional({ x: 0.25, y: 0.6 }, { x: 0.8, y: 0.3 });
   await finir();
   const n = await v();
@@ -426,31 +429,20 @@ await section(async () => {
   verifier("…et « Discuter autour du feu de camp »", r.boutons.some(b => /Discuter autour du feu de camp/.test(b)));
   await p.click('#boite-voyage [data-action="feu-de-camp"]');
   await p.waitForTimeout(200);
-  const f = await p.evaluate(() => ({ chat: document.getElementById("fenetre-chatbox").style.display, boite: getComputedStyle(document.getElementById("boite-voyage")).display }));
+  const f = await p.evaluate(() => ({ recit: window.__recit, boite: getComputedStyle(document.getElementById("boite-voyage")).display }));
   const n2 = await v();
-  verifier("un toucher : le chat s'ouvre ; le vote de la nuit attend (rien de choisi)", f.chat === "flex" && n2.Etat === "nuit" && Object.keys(n2.Choix_Nuit || {}).length === 0, JSON.stringify(f));
+  verifier("un toucher : le récit du livre s'ouvre (v377) ; le vote de la nuit attend (rien de choisi)", f.recit === 1 && n2.Etat === "nuit" && Object.keys(n2.Choix_Nuit || {}).length === 0, JSON.stringify(f));
   await p.evaluate(() => window.discuterAutourDuFeu());
-  verifier("un second toucher ne le referme pas", (await p.evaluate(() => document.getElementById("fenetre-chatbox").style.display)) === "flex");
+  verifier("un second toucher y ramène encore, sans rien refermer", (await p.evaluate(() => window.__recit)) === 2);
   await p.screenshot({ path: S + "/v281_nuit.png" });
   await p.evaluate(() => { window.fermerToutesLesFenetres && window.fermerToutesLesFenetres(); window.choisirNuitVoyageGroupe("rester", { forcer: true }); });
   await p.waitForTimeout(150);
 });
 
 // =========================================================================
-titre("7. LE TOUR DE PAROLE : L'AVATAR DE CELUI QUI PARLE, MÊME QUAND L'ORDRE DÉSIGNE UNE CRÉATURE");
+titre("7. LE TOUR DE PAROLE : LE MÉLANGE NE PREND QUE LES HÉROS (v377 : plus de bulles ni de tourDeParole)");
 // =========================================================================
 await section(async () => {
-  const t = await p.evaluate(() => {
-    const H = [{ idPersonnage: "H1", prenom: "Thorin" }, { idPersonnage: "H2", prenom: "Lyra" }, { idPersonnage: "M1", prenom: "Loup", estMonstre: true },
-               { idPersonnage: "H3", prenom: "Ombre", estIllusion: true }, { idPersonnage: "H5", prenom: "Absent", actif: false }];
-    const tour = (o, i) => window.tourDeParole({ Ordre_Initiative: o, Index_Initiative: i }, H);
-    return { normal: tour(["H1", "H2"], 1).id, monstre: tour(["M1", "H1", "H2"], 0), inconnu: tour(["X9", "Y8"], 0), mj: tour(["H1"], 999).index,
-             leurre: tour(["H3", "H5", "H2"], 0).id, vide: tour([], 0).index };
-  });
-  verifier("l'ordre normal : Lyra", t.normal === "H2");
-  verifier("l'ordre désigne une créature : le tour passe au héros suivant (Thorin)", t.monstre.id === "H1" && t.monstre.index === 1, JSON.stringify(t.monstre));
-  verifier("un leurre, un héros sorti du jeu : sautés aussi", t.leurre === "H2");
-  verifier("personne de valable dans l'ordre (ou l'ordre vide) : le MJ", t.inconnu.index === 999 && t.mj === 999 && t.vide === 999);
   // Le mélange (après chaque réponse du MJ) ne prend plus que les héros.
   const ordre = await p.evaluate(async () => {
     window.PERSOS_PARTIE = [{ idPersonnage: "H1", prenom: "Thorin" }, { idPersonnage: "H2", prenom: "Lyra" }, { idPersonnage: "M1", prenom: "Loup", estMonstre: true }, { idPersonnage: "H3", prenom: "Ombre", estIllusion: true }];
@@ -458,17 +450,6 @@ await section(async () => {
     return window.__docs["Systeme_Parties/P1"].Ordre_Initiative;
   });
   verifier("le mélange ne prend plus que les héros (ni créature, ni leurre)", Array.isArray(ordre) && ordre.length === 2 && ordre.every(x => x === "H1" || x === "H2"), JSON.stringify(ordre));
-  // Les bulles du chat, ouvert à la main, l'ordre sur une créature.
-  const b = await p.evaluate(async () => {
-    window.PARTIE_DATA = Object.assign({}, window.PARTIE_DATA, { Ordre_Initiative: ["M1", "H1", "H2"], Index_Initiative: 0, Lieu_Actuel: "" });
-    window.ouvrirChatbox();
-    window.afficherBullesChat([{ idPersonnage: "H1", idJoueur: "P_01", prenom: "Thorin", urlCloudinary: "https://res.cloudinary.com/x/portrait_thorin.png" },
-                               { idPersonnage: "H2", idJoueur: "P_02", prenom: "Lyra", urlCloudinary: "https://res.cloudinary.com/x/portrait_lyra.png" }]);
-    const vus = [...document.querySelectorAll(".bulle-portrait-hover-joueur, .bulle-portrait-hover-mj")].filter(i => getComputedStyle(i).display !== "none").map(i => i.src.split("/").pop());
-    return { vus, actif: [...document.querySelectorAll("#zone-noms-bulles .tour-actif")].map(e => e.innerText) };
-  });
-  verifier("chat ouvert à la main, l'ordre sur une créature : l'avatar de Thorin s'affiche", b.actif.join() === "Thorin" && b.vus.join() === "portrait_thorin.png", JSON.stringify(b));
-  await p.evaluate(() => { window.fermerToutesLesFenetres && window.fermerToutesLesFenetres(); });
 });
 
 // =========================================================================

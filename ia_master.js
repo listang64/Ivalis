@@ -334,7 +334,6 @@ ATTENTION - RÈGLE ABSOLUE ANTI-ANTICIPATION : Voir un lieu de loin, en entendre
             genererEtStockerImageBatiment(args.prompt_image || args.nouveau_nom).then(async (url) => {
                 if (url) {
                     await updateDoc(doc(db, "Monde_Batiment", nouvelID), { URL_Cloudinary: url });
-                    if (typeof window.mettreAJourBulleLieu === "function") window.mettreAJourBulleLieu(nouvelID);
                 }
             });
             return nouvelID;
@@ -1570,9 +1569,6 @@ window.regenererImagesLieuActuel = async function() {
         // 4. On écrase les anciennes images dans la BDD
         if (Object.keys(maj).length > 0) {
             await updateDoc(doc(db, "Monde_Lieux", idLieu), maj);
-            
-            // On force le rafraîchissement visuel pour les joueurs !
-            if (typeof window.mettreAJourBulleLieu === "function") window.mettreAJourBulleLieu(snapPartie.data().Lieu_Actuel);
         }
     } catch (e) {
         console.error("Erreur lors de la régénération :", e);

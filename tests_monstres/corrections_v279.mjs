@@ -265,7 +265,7 @@ titre("1. LA VICTOIRE : LE RÉCIT ATTEND QUE CHACUN AIT QUITTÉ LE BUTIN");
 const etatEnCours = (id, extra = {}) => ({ Id: id, Etat: "en_cours", ID_Rencontre: "renc_" + id, Message: 0, Createur: { id: "P_09:x", t: Date.now() },
   Lieu: { Titre: "La cour", Description: "Une cour.", Interieur: false }, Ennemis: { Apparition: 1, Tirage: { depart: [{ nom: "Garde" }], renforts: [] }, Visuels: {} }, ...extra });
 await section(async () => {
-  await p.evaluate(() => { window.__ajouts = []; });
+  await p.evaluate(() => { window.__ajouts = []; window.__recit = 0; if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.allerAuRecit = () => { window.__recit++; }; });
   const avant = requetes.length;
   await ecrirePartie({ Combat_RP: etatEnCours("v1"), ID_Rencontre: "renc_v1",
     Fin_Combat: { id: "f1", idRencontre: "renc_v1", issue: "victoire", ts: Date.now(), participants: ["H1", "H2"], blessures: {} },
@@ -274,10 +274,10 @@ await section(async () => {
   // Nico quitte sa dernière fenêtre de butin (la croix).
   await p.evaluate(() => window.fermerButinLocalement());
   await p.waitForTimeout(400);
-  const r1 = await p.evaluate(() => ({ combat: document.getElementById("fenetre-combat").style.display, chat: document.getElementById("fenetre-chatbox").style.display,
+  const r1 = await p.evaluate(() => ({ combat: document.getElementById("fenetre-combat").style.display, recit: window.__recit,
     sortis: Object.keys((window.__docs["Systeme_Parties/P1"].Combat_RP || {}).Sortis || {}), etat: (window.__docs["Systeme_Parties/P1"].Combat_RP || {}).Etat,
     ouvert: window.__docs["Systeme_Parties/P1"].Butin.ouvert, attendus: window.joueursAttendusCombatRP ? window.joueursAttendusCombatRP(window.__docs["Systeme_Parties/P1"].Fin_Combat) : null }));
-  verifier("Nico quitte sa fenêtre de butin : il revient au récit, et le dit", r1.combat === "none" && r1.chat === "flex" && JSON.stringify(r1.sortis) === '["P_01"]', JSON.stringify(r1));
+  verifier("Nico quitte sa fenêtre de butin : il revient au récit (v377 : celui du livre), et le dit", r1.combat === "none" && r1.recit >= 1 && JSON.stringify(r1.sortis) === '["P_01"]', JSON.stringify(r1));
   verifier("les joueurs attendus : ceux des héros du combat (Nico, Ben)", JSON.stringify(r1.attendus) === '["P_01","P_02"]', JSON.stringify(r1.attendus));
   verifier("Ben n'a pas quitté le sien : le récit reste en pause, le butin reste ouvert pour lui", r1.etat === "en_cours" && r1.ouvert === true, `${r1.etat} / ${r1.ouvert}`);
   // Plus de minuteur : 3 s plus tard (le minuteur d'avant était réglé ici sur 600 s, il n'existe plus du tout).

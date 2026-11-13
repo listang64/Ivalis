@@ -3967,90 +3967,6 @@ window.unsubscribeMessages = null;
 window.PARTIE_DATA = null;
 window.PERSOS_PARTIE = null;
 
-// --- Mise à jour de la Bulle Lieu ET du Pion ---
-window.LIEU_ACTUEL_NOM = "";
-window.LIEU_ACTUEL_IMAGE = "";
-
-window.afficherBulleLieuChat = function() {
-    const conteneur = document.getElementById("zone-noms-bulles");
-    if (!conteneur) return;
-
-    // On nettoie l'ancienne bulle si elle existe
-    const existing = document.getElementById("bulle-lieu-chat");
-    if (existing) existing.remove();
-    const existingImg = document.getElementById("img-hover-lieu-chat");
-    if (existingImg) existingImg.remove();
-
-    if (!window.LIEU_ACTUEL_NOM || window.LIEU_ACTUEL_NOM === "") return;
-
-    // Création de la bulle
-    const bulle = document.createElement("div");
-    bulle.id = "bulle-lieu-chat";
-    bulle.className = "bulle-personnage bulle-lieu";
-    bulle.innerText = "📍 " + window.LIEU_ACTUEL_NOM;
-    
-    // Si une image existe, on gère le survol
-    if (window.LIEU_ACTUEL_IMAGE && window.LIEU_ACTUEL_IMAGE !== "") {
-        const imgHover = document.createElement("img");
-        imgHover.id = "img-hover-lieu-chat";
-        imgHover.className = "bulle-image-hover-lieu";
-        imgHover.src = window.LIEU_ACTUEL_IMAGE;
-        document.getElementById("ecran-jeu").appendChild(imgHover);
-
-        bulle.addEventListener("mouseenter", () => {
-            imgHover.style.display = "block";
-            if (window.imageTourActive && window.imageTourActive !== imgHover) {
-                window.imageTourActive.style.display = "none";
-            }
-        });
-        bulle.addEventListener("mouseleave", () => {
-            imgHover.style.display = "none";
-            const isChatOpen = document.getElementById("fenetre-chatbox")?.style.display === "flex";
-            if (window.imageTourActive && isChatOpen) {
-                window.imageTourActive.style.display = "block";
-            }
-        });
-    }
-    conteneur.appendChild(bulle);
-};
-
-window.mettreAJourBulleLieu = async function(idLieu) {
-    if (!idLieu || idLieu === "") {
-        window.LIEU_ACTUEL_NOM = "";
-        window.LIEU_ACTUEL_IMAGE = "";
-        if (typeof window.afficherBulleLieuChat === "function") window.afficherBulleLieuChat();
-        return;
-    }
-
-    let nom = "Lieu Inconnu";
-    let urlImage = "";
-
-    try {
-        if (idLieu.startsWith("L")) {
-            const snap = await getDoc(doc(db, "Monde_Lieux", idLieu));
-            if (snap.exists()) {
-                const data = snap.data();
-                nom = data.Nom_Du_Lieu || "Lieu sans nom";
-                urlImage = data.URL_Cloudinary || "";
-            }
-        } else if (idLieu.startsWith("B")) {
-            const snapBat = await getDoc(doc(db, "Monde_Batiment", idLieu));
-            if (snapBat.exists()) {
-                const dataBat = snapBat.data();
-                nom = dataBat.Nom_Batiment || "Bâtiment sans nom";
-                urlImage = dataBat.URL_Cloudinary || "";
-            }
-        }
-    } catch (e) {
-        console.error("Erreur récupération lieu :", e);
-    }
-
-    window.LIEU_ACTUEL_NOM = nom;
-    window.LIEU_ACTUEL_IMAGE = urlImage;
-
-    if (typeof window.afficherBulleLieuChat === "function") window.afficherBulleLieuChat();
-}
-
 // 1. Écoute globale (Personnages + Tour + Historique du Chat)
 function ecouterPersonnagesDeLaPartie(idPartie) {
   if (unsubscribePersonnages) { unsubscribePersonnages(); unsubscribePersonnages = null; }
@@ -4059,7 +3975,6 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
 
   if (!idPartie) {
     afficherListePersonnages([]);
-    afficherBullesPersonnages([]);
     if (window.UNSUBSCRIBE_VTT) {
       window.UNSUBSCRIBE_VTT();
       window.UNSUBSCRIBE_VTT = null;
@@ -4087,11 +4002,6 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
      if(snap.exists()) {
          const dataPartie = snap.data();
          
-         const ancienLieu = window.PARTIE_DATA ? window.PARTIE_DATA.Lieu_Actuel : null;
-         if (dataPartie.Lieu_Actuel !== ancienLieu) {
-             mettreAJourBulleLieu(dataPartie.Lieu_Actuel);
-         }
-
          if (dataPartie.IA_En_Cours === true) {
              if (typeof window.afficherEcranAttente === "function") window.afficherEcranAttente();
          } else {
@@ -4218,8 +4128,6 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
          if (typeof window.verifierChangementTour === "function") {
              window.verifierChangementTour(dataPartie.Tour_Combat || 1);
          }
-         // Sans le filtre, les leurres se mettraient à parler dans les bulles de noms.
-         if (window.PERSOS_PARTIE) afficherBullesPersonnages(window.PERSOS_PARTIE.filter(p => !p.estIllusion));
 
          // GRANDE SUPPRESSION : les six blocs Action_Mouvement/Action_Moteur/
          // Action_Bond/Action_Poussee/Action_Traction/Action_Peur qui vivaient
@@ -4260,40 +4168,15 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
   
   window.INITIAL_CHAT_LOADED = false;
 
-  // 🔻 NOUVEAU : On vide le chat au premier chargement de la partie
-  const zoneChat = document.getElementById("zone-messages-chat");
-  if (zoneChat) zoneChat.innerHTML = "";
-
   window.unsubscribeMessages = onSnapshot(qMsg, (snap) => {
-      // On analyse chirurgicalement chaque changement (Ajout ou Suppression)
+      // Les nouveaux messages : les jets demandés par l'arbitre des dés.
       snap.docChanges().forEach(change => {
-          let data = change.doc.data();
-          data.idDoc = change.doc.id; // On récupère l'ID exact de Firebase
-
-          if (change.type === "added") {
-              suivreJetsDemandes(data);
-              if (window.INITIAL_CHAT_LOADED && data.Auteur_ID === "ARBITRE_DES" && typeof window.annoncerJetsDemandes === "function") {
-                  window.annoncerJetsDemandes(data);
-              }
-              // 🔻 NOUVEAU : On injecte uniquement ce nouveau message !
-              ajouterUnSeulMessageChat(data);
-          }
-
-          // LE MESSAGE DU MJ GRANDIT (v291) : un paragraphe de plus, un
-          // portrait posé. Le chat le redessine à sa place, le parchemin suit.
-          if (change.type === "modified") {
-              const ancien = document.getElementById("msg-" + data.idDoc);
-              const suivant = ancien ? ancien.nextSibling : null;
-              if (ancien) ancien.remove();
-              ajouterUnSeulMessageChat(data);
-              const nouveau = document.getElementById("msg-" + data.idDoc);
-              if (ancien && nouveau && suivant && zoneChat) zoneChat.insertBefore(nouveau, suivant);
-          }
-          
-          if (change.type === "removed") {
-              // 🔻 NOUVEAU : On détruit uniquement le message effacé !
-              const msgDiv = document.getElementById("msg-" + data.idDoc);
-              if (msgDiv) msgDiv.remove();
+          if (change.type !== "added") return;
+          const data = change.doc.data();
+          data.idDoc = change.doc.id;
+          suivreJetsDemandes(data);
+          if (window.INITIAL_CHAT_LOADED && data.Auteur_ID === "ARBITRE_DES" && typeof window.annoncerJetsDemandes === "function") {
+              window.annoncerJetsDemandes(data);
           }
       });
 
@@ -4305,9 +4188,6 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
       }
 
       window.INITIAL_CHAT_LOADED = true;
-
-      // On descend l'ascenseur du chat s'il y a eu une modification
-      if (zoneChat) zoneChat.scrollTop = zoneChat.scrollHeight;
   });
 
   // C. Écoute des Personnages
@@ -4363,13 +4243,10 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
 
     // Les illusions sont de vrais combattants (le moteur doit les voir dans PERSOS_PARTIE),
     // mais ce sont des leurres temporaires : elles n'ont rien à faire dans la liste des
-    // fiches de personnages ni dans les bulles de noms.
+    // fiches de personnages. La LISTE garde tout le monde : c'est là que se coche et se
+    // décoche l'activation.
     const persosReels = persos.filter(p => !p.estIllusion);
-    // La LISTE garde tout le monde : c'est là que se coche et se décoche
-    // l'activation. Les bulles de la chatbox, elles, ne montrent que ceux qui
-    // sont en jeu.
     afficherListePersonnages(persosReels);
-    afficherBullesPersonnages(persosReels.filter(p => p.actif !== false));
 
     // =========================================================
     // OPTIMISATION IPAD : PRÉCHARGEMENT DES COMPÉTENCES EN CACHE
@@ -4402,270 +4279,9 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
   }, (err) => console.error("onSnapshot Personnages :", err));
 }
 
-// 2. Affichage des bulles (les bancs l'appellent par window.afficherBullesChat)
-window.afficherBullesChat = (persos) => afficherBullesPersonnages(persos);
-function afficherBullesPersonnages(persos) {
-  const conteneur = document.getElementById("zone-noms-bulles");
-  if (!conteneur) return;
-  // LES BULLES DU CHAT SONT CELLES DES HÉROS. Pendant un combat, la liste des
-  // combattants de la partie (PERSOS_PARTIE) contient aussi les monstres : ils
-  // s'invitaient dans la barre du chat, avec leur portrait au survol. Le
-  // filtre vit ici, pour tous les appelants : ni créature, ni leurre.
-  persos = (persos || []).filter(p => p && !p.estMonstre && !p.estIllusion);
-  conteneur.innerHTML = "";
-
-  document.querySelectorAll('.bulle-portrait-hover-joueur, .bulle-portrait-hover-mj').forEach(el => el.remove());
-
-  const partie = window.PARTIE_DATA || {};
-  const ordre = partie.Ordre_Initiative || [];
-  const tour = window.tourDeParole(partie, persos);
-  const indexTour = tour.index;
-  const idPersoActif = tour.id;
-
-  const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
-  let estMonTour = false;
-  let nomActif = "MJ";
-
-  // 🔻 NOUVEAU : On vérifie si la fenêtre de chat est bien ouverte avant d'afficher quiconque !
-  const isChatOpen = document.getElementById("fenetre-chatbox")?.style.display === "flex";
-
-  persos.forEach((p) => {
-    const bulle = document.createElement("div");
-    bulle.className = "bulle-personnage";
-    bulle.innerText = p.prenom;
-    if (p.couleur) bulle.style.setProperty('--couleur-perso', p.couleur);
-
-    let estPersoActif = false; 
-
-    if (p.idPersonnage === idPersoActif) {
-        bulle.classList.add("tour-actif");
-        nomActif = p.prenom;
-        estPersoActif = true;
-        if (p.idJoueur === currentUserId) estMonTour = true;
-    }
-
-    if (p.urlCloudinary && p.urlCloudinary !== "") {
-      const imgHover = document.createElement("img");
-      imgHover.className = "bulle-portrait-hover-joueur";
-      imgHover.src = p.urlCloudinary;
-      
-      document.getElementById("ecran-jeu").appendChild(imgHover);
-
-      if (estPersoActif) {
-          window.imageTourActive = imgHover;
-          if (isChatOpen) imgHover.style.display = "block";
-      }
-
-      bulle.addEventListener("mouseenter", () => { 
-          if (window.matchMedia("(hover: none)").matches) return; 
-          // 🔻 NOUVEAU : On bloque le survol si la fiche perso est ouverte
-          if (document.getElementById("fenetre-fiche-perso")?.style.display === "flex") return; 
-
-          if (window.imageTourActive && window.imageTourActive !== imgHover) window.imageTourActive.style.display = "none";
-          imgHover.style.display = "block"; 
-      });
-      
-      bulle.addEventListener("mouseleave", () => { 
-          if (window.matchMedia("(hover: none)").matches) return; 
-          imgHover.style.display = "none"; 
-          const isChatOuvert = document.getElementById("fenetre-chatbox")?.style.display === "flex";
-          const isFicheOuverte = document.getElementById("fenetre-fiche-perso")?.style.display === "flex";
-          
-          // 🔻 NOUVEAU : On ne restaure l'image QUE si la fiche est fermée !
-          if (window.imageTourActive && isChatOuvert && !isFicheOuverte) {
-              window.imageTourActive.style.display = "block"; 
-          }
-      });
-    }
-
-    // NOUVEAU : Un simple clic ouvre la fiche perso directement (Ultra robuste sur iPad)
-    bulle.onclick = function() {
-      if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-      if (typeof window.ouvrirFichePerso === "function") window.ouvrirFichePerso(p.idPersonnage, p.prenom, p.nom, p.couleur);
-      const fiche = document.getElementById('fenetre-fiche-perso');
-      if (fiche) fiche.style.zIndex = "1500";
-      
-      // Force l'onglet caractéristiques par défaut
-      setTimeout(() => {
-        const btnCaracs = document.querySelector("button[onclick*='onglet-caracs']");
-        if (btnCaracs) btnCaracs.click();
-      }, 10);
-    };
-
-    conteneur.appendChild(bulle);
-  });
-
-  // --- Bulle MJ ---
-  const bulleMJ = document.createElement("div");
-  bulleMJ.className = "bulle-personnage bulle-mj";
-  bulleMJ.innerText = "MJ";
-
-  const imgHoverMJ = document.createElement("img");
-  imgHoverMJ.className = "bulle-portrait-hover-mj";
-  imgHoverMJ.src = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782164835/maitre_du_jeu_kemkf2.png";
-  
-  document.getElementById("ecran-jeu").appendChild(imgHoverMJ);
-
-  let estMjActif = false;
-  if (indexTour === 999 || indexTour >= ordre.length) {
-      bulleMJ.classList.add("tour-actif");
-      nomActif = "MJ";
-      estMjActif = true;
-  }
-
-  if (estMjActif) {
-      window.imageTourActive = imgHoverMJ;
-      if (isChatOpen) imgHoverMJ.style.display = "block";
-  }
-
-  bulleMJ.addEventListener("mouseenter", () => { 
-      if (window.matchMedia("(hover: none)").matches) return; 
-      // 🔻 NOUVEAU : On bloque le survol si la fiche perso est ouverte
-      if (document.getElementById("fenetre-fiche-perso")?.style.display === "flex") return;
-
-      if (window.imageTourActive && window.imageTourActive !== imgHoverMJ) window.imageTourActive.style.display = "none";
-      imgHoverMJ.style.display = "block"; 
-  });
-  
-  bulleMJ.addEventListener("mouseleave", () => { 
-      if (window.matchMedia("(hover: none)").matches) return; 
-      imgHoverMJ.style.display = "none"; 
-      const isChatOuvert = document.getElementById("fenetre-chatbox")?.style.display === "flex";
-      const isFicheOuverte = document.getElementById("fenetre-fiche-perso")?.style.display === "flex";
-      
-      // 🔻 NOUVEAU : On ne restaure l'image QUE si la fiche est fermée !
-      if (window.imageTourActive && isChatOuvert && !isFicheOuverte) {
-          window.imageTourActive.style.display = "block";
-      }
-  });
-
-  if (partie.IA_En_Cours === true) {
-      bulleMJ.style.opacity = "0.4";
-      bulleMJ.style.pointerEvents = "none";
-      bulleMJ.style.filter = "grayscale(100%)";
-  } else {
-      bulleMJ.onclick = function() {
-          if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-          if (typeof window.declencherTourIA === "function") {
-              window.declencherTourIA();
-          }
-      };
-  }
-  conteneur.appendChild(bulleMJ);
-
-  // NOUVEAU : On rajoute la bulle du lieu tout à droite !
-  if (typeof window.afficherBulleLieuChat === "function") {
-      window.afficherBulleLieuChat();
-  }
-
-  // --- Mise à jour de la barre de saisie ---
-  const inputChat = document.getElementById("input-chat");
-  const btnEnvoyer = document.getElementById("btn-envoyer-chat");
-
-  if (inputChat && btnEnvoyer) {
-      inputChat.disabled = false;
-      inputChat.style.opacity = "1";
-
-      if (nomActif === "MJ") {
-          inputChat.placeholder = "Le MJ écrit... (Préparez votre texte)";
-          btnEnvoyer.disabled = true;  
-          btnEnvoyer.style.opacity = "0.5";
-          btnEnvoyer.style.cursor = "not-allowed";
-      } else if (!estMonTour) {
-          inputChat.placeholder = "Au tour de " + nomActif + "... (Préparez votre texte)";
-          btnEnvoyer.disabled = true; 
-          btnEnvoyer.style.opacity = "0.5";
-          btnEnvoyer.style.cursor = "not-allowed";
-      } else {
-          inputChat.placeholder = "C'est à votre tour, " + nomActif + " !";
-          btnEnvoyer.disabled = false;
-          btnEnvoyer.style.opacity = "1";
-          btnEnvoyer.style.cursor = "pointer";
-      }
-  }
-
-}
-
-// 3. Rendu visuel dans le chat (Injection chirurgicale optimisée)
-function ajouterUnSeulMessageChat(m) {
-   const zone = document.getElementById("zone-messages-chat");
-   if (!zone) return;
-   
-   // Sécurité anti-doublon (au cas où)
-   if (document.getElementById("msg-" + m.idDoc)) return;
-
-   const div = document.createElement("div");
-   div.id = "msg-" + m.idDoc; // 🔻 INDISPENSABLE pour pouvoir le supprimer plus tard 🔻
-   div.className = "message-chat";
-   div.style.setProperty("--couleur-perso", m.Auteur_Couleur);
-
-   const nom = document.createElement("div");
-   nom.className = "message-nom-vertical";
-   nom.innerText = m.Auteur_Nom;
-
-   const ligne = document.createElement("div");
-   ligne.className = "message-separateur";
-
-   const texte = document.createElement("div");
-   texte.className = "message-contenu";
-   texte.innerHTML = m.Texte;
-
-   const btnSuppr = document.createElement("button");
-   btnSuppr.className = "btn-supprimer-msg";
-   btnSuppr.innerText = "✖";
-   btnSuppr.onclick = async function() {
-       if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-       // Cela déclenchera le change.type === "removed" chez tous les joueurs instantanément !
-       await deleteDoc(doc(db, COL.MESSAGES, m.idDoc)); 
-   };
-
-   div.appendChild(nom);
-   div.appendChild(ligne);
-   div.appendChild(texte);
-   div.appendChild(btnSuppr);
-   zone.appendChild(div);
-
-   // DÉTECTION DU SURVOL DES PNJ
-   const spansPnj = div.querySelectorAll(".pnj-chat-hover");
-   spansPnj.forEach(span => {
-       span.addEventListener("mouseenter", () => {
-           // 🔻 NOUVEAU : On bloque le survol si la fiche perso est ouverte
-           if (document.getElementById("fenetre-fiche-perso")?.style.display === "flex") return;
-           if (window.imageTourActive) window.imageTourActive.style.display = "none";
-       });
-       span.addEventListener("mouseleave", () => {
-           const isChatOpen = document.getElementById("fenetre-chatbox")?.style.display === "flex";
-           const isFicheOuverte = document.getElementById("fenetre-fiche-perso")?.style.display === "flex";
-           
-           // 🔻 NOUVEAU : On ne restaure l'image QUE si la fiche est fermée !
-           if (window.imageTourActive && isChatOpen && !isFicheOuverte) {
-               window.imageTourActive.style.display = "block";
-           }
-       });
-   });
-}
-
-// LE TOUR DE PAROLE EFFECTIF (v281). Nico : « quand on ouvre le chat
-// manuellement, l'avatar de celui à qui c'est le tour de parler n'est pas
-// affiché ». L'ordre pouvait désigner une créature (le mélange prenait tous
-// les combattants de la partie) ou un héros sorti du jeu : personne n'était mis
-// en avant, et personne ne pouvait plus parler. Ceux qui ne parlent pas sont
-// sautés : le tour va au héros suivant de l'ordre ; s'il n'y en a plus, au MJ.
-// `heros` : les héros qui parlent (pas de créature, pas de leurre).
-const herosQuiParlent = (liste) => (liste || []).filter(p => p && !p.estMonstre && !p.estIllusion && p.actif !== false);
-window.tourDeParole = function(partie, heros) {
-  const ordre = (partie && partie.Ordre_Initiative) || [];
-  const index = partie && partie.Index_Initiative !== undefined ? partie.Index_Initiative : 999;
-  const liste = herosQuiParlent(heros);
-  if (index === 999 || !(index >= 0) || index >= ordre.length) return { index: 999, id: null, perso: null };
-  for (let i = index; i < ordre.length; i++) {
-    const perso = liste.find(p => p.idPersonnage === ordre[i]);
-    if (perso) return { index: i, id: perso.idPersonnage, perso };
-  }
-  return { index: 999, id: null, perso: null };
-};
-
 // 4. Mélange aléatoire (les héros seulement, v281)
+// `herosQuiParlent` : ni créature, ni leurre, ni héros sorti du jeu.
+const herosQuiParlent = (liste) => (liste || []).filter(p => p && !p.estMonstre && !p.estIllusion && p.actif !== false);
 window.relancerInitiativeChat = async function() {
   if (!window.ID_PARTIE_COURANTE || !window.PERSOS_PARTIE || window.PERSOS_PARTIE.length === 0) return;
   let ids = herosQuiParlent(window.PERSOS_PARTIE).map(p => p.idPersonnage);
@@ -4674,108 +4290,6 @@ window.relancerInitiativeChat = async function() {
     Ordre_Initiative: ids,
     Index_Initiative: 0
   });
-};
-
-// 5. Envoi du message (avec ajout de la Date issue de Firestore et sécurité)
-window.envoyerMessageChat = async function() {
-   if (window.estEnTrainEcouter && window.recognition) {
-       window.recognition.stop();
-   }
-   window.texteAvantEcoute = "";
-
-   const input = document.getElementById("input-chat");
-   const texte = input.value.trim();
-   if(texte === "" || !window.ID_PARTIE_COURANTE) return;
-   // Pendant un combat du récit, le chat ne s'écrit plus (v278).
-   if (typeof window.combatRPActif === "function" && window.combatRPActif()) return;
-
-   const partie = window.PARTIE_DATA || {};
-   const ordre = partie.Ordre_Initiative || [];
-   const indexTour = window.tourDeParole(partie, window.PERSOS_PARTIE).index;
-
-   // NOUVEAU : On identifie si c'est bien à moi de parler
-   const currentUserId = localStorage.getItem("ID_JOUEUR_COURANT");
-   let estMonTour = false;
-
-   let auteurNom = "MJ";
-   let auteurCouleur = "#ffffff";
-   let idAuteur = "MJ";
-
-   if (indexTour !== 999 && indexTour < ordre.length && window.PERSOS_PARTIE) {
-       const idActif = ordre[indexTour];
-       const persoActif = window.PERSOS_PARTIE.find(p => p.idPersonnage === idActif);
-       if (persoActif) {
-           auteurNom = persoActif.prenom;
-           auteurCouleur = persoActif.couleur;
-           idAuteur = persoActif.idPersonnage;
-           
-           // Si c'est mon personnage, j'ai le droit de parler
-           if (persoActif.idJoueur === currentUserId) estMonTour = true;
-       }
-   }
-
-   // --- SÉCURITÉ ANTI-TRICHE CHAT ---
-   // Si c'est le tour de l'IA (999) ou si ce n'est pas mon tour, je ne peux rien envoyer !
-   if (indexTour === 999 || !estMonTour) {
-        const btn = document.getElementById("btn-envoyer-chat");
-        if(btn) {
-            // Petit effet de tremblement pour indiquer que l'action est refusée
-            btn.style.transform = "translateX(5px)";
-            setTimeout(() => btn.style.transform = "translateX(-5px)", 50);
-            setTimeout(() => btn.style.transform = "translateX(0)", 100);
-        }
-        return; 
-   }
-
-   const jourEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.jour : "";
-   const anEnJeu = window.DATE_EN_JEU_ACTUELLE ? window.DATE_EN_JEU_ACTUELLE.annee : "";
-
-   const nouveauMsg = {
-       ID_Partie: window.ID_PARTIE_COURANTE,
-       Auteur_ID: idAuteur,
-       Auteur_Nom: auteurNom,
-       Auteur_Couleur: auteurCouleur,
-       Texte: texte,
-       Date_Jour: jourEnJeu, 
-       Date_An: anEnJeu,     
-       Timestamp: new Date().getTime()
-   };
-
-   await addDoc(collection(db, COL.MESSAGES), nouveauMsg);
-   input.value = ""; 
-
-   if (indexTour !== 999) {
-       let nouvelIndex = indexTour + 1;
-       if (nouvelIndex >= ordre.length) nouvelIndex = 999; 
-       await updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), {
-           Index_Initiative: nouvelIndex
-       });
-   }
-};
-
-// 6. PASSER SON TOUR (v287). Nico : « dans le chatbox, mets un bouton pour que
-// ton perso passe son tour : il ne dit rien ». Le tour de parole avance comme
-// après un message, sans rien écrire — seulement quand c'est son tour.
-window.passerTourChat = async function() {
-   if (!window.ID_PARTIE_COURANTE) return false;
-   if (typeof window.combatRPActif === "function" && window.combatRPActif()) return false;
-   const partie = window.PARTIE_DATA || {};
-   const ordre = partie.Ordre_Initiative || [];
-   const tour = window.tourDeParole(partie, window.PERSOS_PARTIE);
-   const moi = localStorage.getItem("ID_JOUEUR_COURANT");
-   if (tour.index === 999 || !tour.perso || tour.perso.idJoueur !== moi) {
-       const btn = document.getElementById("btn-passer-tour");
-       if (btn) {
-           btn.style.transform = "translateX(5px)";
-           setTimeout(() => btn.style.transform = "translateX(-5px)", 50);
-           setTimeout(() => btn.style.transform = "translateX(0)", 100);
-       }
-       return false;
-   }
-   let nouvelIndex = tour.index + 1;
-   if (nouvelIndex >= ordre.length) nouvelIndex = 999;
-   await updateDoc(doc(db, COL.PARTIES, window.ID_PARTIE_COURANTE), { Index_Initiative: nouvelIndex });
-   return true;
 };
 
 // =========================================================================
@@ -5289,11 +4803,6 @@ function estPanneauPersonnagesOuvert() {
 function fermerToutPersonnages(immediat) {
   document.getElementById("fenetre-fiche-perso").style.display = "none";
   document.getElementById("voile-suppression-perso").style.display = "none";
-
-  const isChatOuvert = document.getElementById("fenetre-chatbox")?.style.display === "flex";
-  if (window.imageTourActive && isChatOuvert) {
-      window.imageTourActive.style.display = "block";
-  }
 
   // FORCE LA DÉSÉLECTION ET CACHE LA CARTE HD
   window.CARTE_EN_APERCU = null;
@@ -6000,8 +5509,6 @@ function montrerOngletPerso(nomOnglet) {
 async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPerso, ongletInitial) {
   const fiche = document.getElementById("fenetre-fiche-perso");
 
-  if (window.imageTourActive) window.imageTourActive.style.display = "none";
-
   fiche.style.display = "flex";
   const fenetreHauteur = fiche.offsetHeight;
   fiche.style.left = "2vw";
@@ -6060,11 +5567,6 @@ async function ouvrirFichePerso(idPersonnage, prenomPerso, nomPerso, couleurPers
 function fermerFichePerso() {
   document.getElementById("fenetre-fiche-perso").style.display = "none";
   document.getElementById("voile-suppression-perso").style.display = "none";
-
-  const isChatOuvert = document.getElementById("fenetre-chatbox")?.style.display === "flex";
-  if (window.imageTourActive && isChatOuvert) {
-      window.imageTourActive.style.display = "block";
-  }
 
   // FORCE LA DÉSÉLECTION ET CACHE LA CARTE HD
   window.CARTE_EN_APERCU = null;
@@ -6384,10 +5886,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 // 1. Fonction centrale pour tout fermer et nettoyer l'écran instantanément
 window.fermerToutesLesFenetres = function() {
-  // Fermer le chat
-  const chatbox = document.getElementById('fenetre-chatbox');
-  if (chatbox) chatbox.style.display = 'none';
-
   // --- Fermer l'interface de combat et le popup ---
   const fenetreCombat = document.getElementById('fenetre-combat');
   if (fenetreCombat) fenetreCombat.style.display = 'none';
@@ -6395,15 +5893,11 @@ window.fermerToutesLesFenetres = function() {
   const popupRencontre = document.getElementById('modale-pre-combat');
   if (popupRencontre) popupRencontre.style.display = 'none';
 
-  document.querySelectorAll('.bulle-portrait-hover-joueur, .bulle-portrait-hover-mj').forEach(img => img.style.display = 'none');
-
   const menuLat = document.getElementById('menu-lateral');
   const menuNav = document.getElementById('menu-navigation-bas');
-  const btnFermerChat = document.getElementById('btn-fermer-chat-nouveau');
   const btnFermerCombat = document.getElementById('btn-fermer-combat');
   if (menuLat) menuLat.style.display = 'flex';
   if (menuNav) menuNav.style.display = 'flex';
-  if (btnFermerChat) btnFermerChat.style.display = 'none';
   if (btnFermerCombat) btnFermerCombat.style.display = 'none';
 
   const btnEngrenageCombat = document.getElementById('btn-engrenage-combat');
@@ -6444,57 +5938,11 @@ window.fermerToutesLesFenetres = function() {
   }
 };
 
-// 2. Boutons Chatbox
+// 2. « Ouvrir le chat » (v377) : l'ancien chat n'existe plus ; c'est le récit
+// du livre qui s'ouvre, à la page à lire (l'arrivée à un lieu, le feu de camp,
+// le retour d'un combat — voyage_groupe.js, combat_rp.js).
 window.ouvrirChatbox = function() {
-  const chatbox = document.getElementById('fenetre-chatbox');
-  const estDejaOuvert = (chatbox.style.display === 'flex');
-  
-  window.fermerToutesLesFenetres();
-
-  if (!estDejaOuvert) {
-    chatbox.style.display = 'flex';
-
-    // 🔻 NOUVEAU : Cacher les menus pour libérer l'écran et afficher le bouton de retour 🔻
-    const menuLat = document.getElementById('menu-lateral');
-    const menuNav = document.getElementById('menu-navigation-bas');
-    const btnFermerChat = document.getElementById('btn-fermer-chat-nouveau');
-    if (menuLat) menuLat.style.display = 'none';
-    if (menuNav) menuNav.style.display = 'none';
-    if (btnFermerChat) btnFermerChat.style.display = 'block';
-
-    if (window.ID_PARTIE_COURANTE) {
-      ecouterPersonnagesDeLaPartie(window.ID_PARTIE_COURANTE);
-    }
-  }
-};
-
-window.fermerChatbox = function() {
-  // On joue le bruit du parchemin avant de fermer
-  if (typeof window.jouerSonSurvolParchemin === "function") {
-      window.jouerSonSurvolParchemin();
-  }
-  
-  // Puis on ferme l'interface du chat pour restaurer la carte
-  window.fermerToutesLesFenetres();
-};
-
-window.afficherMenusDansChat = function() {
-  // 1. On joue le bruit du parchemin
-  if (typeof window.jouerSonSurvolParchemin === "function") {
-      window.jouerSonSurvolParchemin();
-  }
-  
-  // 2. On fait réapparaître les menus sans toucher au chat
-  const menuLat = document.getElementById('menu-lateral');
-  const menuNav = document.getElementById('menu-navigation-bas');
-  if (menuLat) menuLat.style.display = 'flex';
-  if (menuNav) menuNav.style.display = 'flex';
-  
-  // 3. On cache ce bouton puisqu'il a fait son travail
-  const btnActuel = document.getElementById('btn-fermer-chat-nouveau');
-  if (btnActuel) btnActuel.style.display = 'none';
-  // On demande l'interface : un menu rangé revient avec elle.
-  if (typeof window.deplierMenuLateral === "function") window.deplierMenuLateral({ sansAnimation: true });
+  if (window.GRIMOIRE_RECIT && typeof window.GRIMOIRE_RECIT.allerAuRecit === "function") window.GRIMOIRE_RECIT.allerAuRecit();
 };
 
 // =========================================================================
@@ -7365,81 +6813,6 @@ window.posterJetDansLeChat = function(donnees) {
 };
 
 // =========================================================================
-//  DICTÉE VOCALE (MICROPHONE)
-// =========================================================================
-window.recognition = null;
-window.estEnTrainEcouter = false;
-window.texteAvantEcoute = "";
-
-window.toggleMicro = function() {
-    const btn = document.getElementById("btn-micro");
-    const input = document.getElementById("input-chat");
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (!SpeechRecognition) {
-        const zone = document.getElementById("zone-messages-chat");
-        zone.insertAdjacentHTML('beforeend', `<div style="color: #ff4c4c; text-align: center; margin: 10px; font-weight: bold;">Ton navigateur ne supporte pas la magie de la voix (Utilise Google Chrome ou Microsoft Edge).</div>`);
-        zone.scrollTop = zone.scrollHeight;
-        return;
-    }
-
-    if (!window.estEnTrainEcouter) {
-        // NOUVEAU : On recrée l'objet à chaque fois pour forcer l'iPad à ouvrir/fermer le canal proprement
-        if (window.recognition) {
-            window.recognition.abort();
-            window.recognition = null;
-        }
-
-        window.recognition = new SpeechRecognition();
-        window.recognition.lang = 'fr-FR';
-        window.recognition.interimResults = true;
-        window.recognition.continuous = true;
-
-        window.recognition.onresult = (event) => {
-            let transcriptTemp = "";
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                transcriptTemp += event.results[i][0].transcript;
-            }
-            
-            let separateur = (window.texteAvantEcoute.length > 0 && !window.texteAvantEcoute.endsWith(" ")) ? " " : "";
-            input.value = window.texteAvantEcoute + separateur + transcriptTemp;
-        };
-
-        window.recognition.onend = () => {
-            window.estEnTrainEcouter = false;
-            if(btn) {
-                btn.style.color = "white"; 
-                btn.innerHTML = "🎤";
-                btn.style.textShadow = "none";
-            }
-            
-            // NOUVEAU : On force l'application à recharger le volume du jeu 0.5s après la fermeture du micro
-            // pour dire à l'iPad "La communication est finie, remets la musique fort"
-            setTimeout(() => {
-                if (typeof window.appliquerVolumesAudio === "function") {
-                    window.appliquerVolumesAudio();
-                }
-            }, 500);
-        };
-
-        window.texteAvantEcoute = input.value; 
-        window.estEnTrainEcouter = true;
-        window.recognition.start();
-        
-        btn.style.color = "#ff4c4c"; 
-        btn.innerHTML = "🔴";
-        btn.style.textShadow = "0 0 10px red";
-        
-    } else {
-        // NOUVEAU : On utilise abort() au lieu de stop() pour forcer la coupure matérielle
-        if (window.recognition) {
-            window.recognition.abort();
-        }
-    }
-};
-
-// =========================================================================
 //  LE TEMPS QUI PASSE
 // =========================================================================
 // Outil automatisé pour avancer la date d'un coup
@@ -7664,7 +7037,6 @@ Object.assign(window, {
   ouvrirModalChargerPartie, demanderMdpPartie, validerMdpPartie,
   // Ecran de jeu
   jouerSonSurvolParchemin, toggleBulleVolume,
-  afficherMenusDansChat: window.afficherMenusDansChat,
   fermerModalesJeu, demanderRetourMenu, demanderQuitterJeu,
   confirmerRetourMenu, confirmerQuitterJeu, recadrerCarte: window.recadrerCarte,
   // Parametres / Cerveau IA
@@ -7684,7 +7056,7 @@ Object.assign(window, {
   creerFichierExempleClesApi, importerFichierClesApi,
   afficherAlerteCles, fermerAlerteCles, ouvrirParametresDepuisAlerte,
   // Outils
-  syncTemperature, sauvegarderTemperature, basculerAffichageTokens, basculerDevMode: window.basculerDevMode, toggleMicro,
+  syncTemperature, sauvegarderTemperature, basculerAffichageTokens, basculerDevMode: window.basculerDevMode,
   ouvrirRegenerationToken: window.ouvrirRegenerationToken,
   lancerRegenerationTokenManuelle: window.lancerRegenerationTokenManuelle,
   // Gestion Effets de Combat

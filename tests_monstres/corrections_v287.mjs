@@ -303,42 +303,18 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("3. LE CHAT : LA CROIX QUI LE FERME, « PASSER » SON TOUR");
+titre("3. LE CHAT : RETIRÉ EN v377 (ni croix, ni « Passer » : le livre a son récit)");
 // =========================================================================
 await section(async () => {
   await p.evaluate(async () => { await window.fermerCarteRegionale({ sansTransition: true }); });
   await p.waitForTimeout(200);
-  const avant = await p.evaluate(() => { const b = document.getElementById("btn-voyage"); return { src: b && b.getAttribute("src"), titre: b && b.title }; });
-  await p.evaluate(() => window.ouvrirChatbox());
-  await p.waitForTimeout(200);
-  const ouvert = await p.evaluate(() => { const b = document.getElementById("btn-voyage"); return { src: b.getAttribute("src"), titre: b.title, vu: getComputedStyle(b).display, croix: b.classList.contains("fermer-chat") }; });
-  await p.screenshot({ path: S + "/v287_chat.png" });
-  verifier("chat ouvert : à la place du bouton voyage, une croix qui ferme le chat", ouvert.croix && /svg/.test(ouvert.src) && ouvert.src !== avant.src && /Fermer le chat/.test(ouvert.titre) && ouvert.vu !== "none",
-           JSON.stringify([ouvert.titre, ouvert.vu, avant.titre]));
-  await p.evaluate(() => document.getElementById("btn-voyage").click());
-  await p.waitForTimeout(200);
-  const ferme = await p.evaluate(() => { const b = document.getElementById("btn-voyage"); return { chat: document.getElementById("fenetre-chatbox").style.display, src: b.getAttribute("src"), mode: typeof window.modeChoixCarte === "function" ? window.modeChoixCarte() : null }; });
-  verifier("un clic sur la croix : le chat se ferme, le bouton redevient « Voyager » (sans lancer de voyage)", ferme.chat !== "flex" && ferme.src === avant.src && !ferme.mode, JSON.stringify(ferme));
-  // PASSER SON TOUR : seulement à son tour ; rien ne s'écrit dans le chat.
-  const r = await p.evaluate(async () => {
-    window.PERSOS_PARTIE = window.PERSOS_PARTIE && window.PERSOS_PARTIE.length ? window.PERSOS_PARTIE : window.PERSOS_JOUEURS_PARTIE;
-    const d = window.__docs["Systeme_Parties/P1"];
-    d.Ordre_Initiative = ["H1", "H2"]; d.Index_Initiative = 1;
-    window.PARTIE_DATA = Object.assign(window.PARTIE_DATA || {}, { Ordre_Initiative: ["H1", "H2"], Index_Initiative: 1 });
-    localStorage.setItem("ID_JOUEUR_COURANT", "P_01");
-    window.__ajouts = [];
-    const refus = await window.passerTourChat();
-    const apresRefus = window.__docs["Systeme_Parties/P1"].Index_Initiative;
-    localStorage.setItem("ID_JOUEUR_COURANT", "P_02");
-    const ok = await window.passerTourChat();
-    const apres = window.__docs["Systeme_Parties/P1"].Index_Initiative;
-    localStorage.setItem("ID_JOUEUR_COURANT", "P_01");
-    const btn = document.getElementById("btn-passer-tour");
-    return { refus, apresRefus, ok, apres, messages: (window.__ajouts || []).filter(a => a.col === "Messages_Chat").length, bouton: !!btn && btn.closest("#zone-saisie-chat") !== null, texte: btn && btn.textContent };
+  const r = await p.evaluate(() => {
+    window.ouvrirChatbox();
+    const b = document.getElementById("btn-voyage");
+    window.PARTIE_DATA = window.PARTIE_DATA || {};   // (la section 4 s'en sert)
+    return { croix: !!b && b.classList.contains("fermer-chat"), passer: typeof window.passerTourChat, chat: !!document.getElementById("fenetre-chatbox") };
   });
-  verifier("un bouton « Passer » dans la saisie du chat", r.bouton && /Passer/.test(r.texte || ""), r.texte);
-  verifier("pas son tour : refusé, rien ne bouge", r.refus === false && r.apresRefus === 1, JSON.stringify([r.refus, r.apresRefus]));
-  verifier("son tour : le tour passe au suivant (ici le MJ), sans aucun message", r.ok === true && r.apres === 999 && r.messages === 0, JSON.stringify([r.ok, r.apres, r.messages]));
+  verifier("(v377) plus d'ancien chat : ni croix à la place du bouton voyage, ni « Passer »", !r.croix && r.passer === "undefined" && !r.chat, JSON.stringify(r));
 });
 
 // =========================================================================

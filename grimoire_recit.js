@@ -1539,11 +1539,8 @@ function faireTaireLAncienChat() {
     };
     envelopper("annoncerJetsDemandes", () => true);
     envelopper("afficherEcranAttente", (texte) => !texte);
-    // v311 : Nico, « mon groupe s'est déplacé vers un POI, l'ancien code entre en
-    // conflit : l'avatar de mon perso est apparu en gros à droite de l'écran ».
-    // L'arrivée au POI (et le feu de camp, le retour d'un combat) ouvrait l'ancien
-    // chat ; dans le livre, c'est le récit qui s'ouvre, là où on n'a pas encore lu.
-    envelopper("ouvrirChatbox", () => { allerAuRecit(); return true; });
+    // (v311) L'arrivée au POI, le feu de camp, le retour d'un combat ouvraient
+    // l'ancien chat : depuis la v377, ouvrirChatbox (app.js) va au récit du livre.
 }
 function entrer(idPartie) {
     const g = G();

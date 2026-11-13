@@ -11641,3 +11641,13 @@ corrections_v375.mjs le vérifie (le texte, les fonctions parties et leurs voisi
 - corrections_v371, v372, v373 : leur contrôle de version passe en « ou plus ».
 
 corrections_v376.mjs le vérifie (le texte, et dans la vraie page les fonctions parties, le livre et le combat du récit présents, sans erreur).
+
+## v377 — Ménage du code mort (4/6) : l'ancien chat
+
+- En partie, le livre cache l'ancien chat (`#fenetre-chatbox`, `display: none !important`, grimoire.css) et `ouvrirChatbox` était détourné vers le récit du livre. Pourtant, à chaque message reçu, app.js le dessinait dans ce chat invisible (`ajouterUnSeulMessageChat`) ; à chaque mise à jour des héros ou de la partie, il refaisait les bulles de noms et leurs portraits au survol (`afficherBullesPersonnages`, des `<img>` recréées) ; à chaque changement de lieu, il relisait Monde_Lieux ou Monde_Batiment pour une bulle cachée (`mettreAJourBulleLieu`).
+- Tout cela est retiré, avec la fenêtre du chat (index.html : messages, bulles, saisie, micro, « Passer »), le bouton « Afficher l'interface », `envoyerMessageChat`, `passerTourChat`, la dictée (`toggleMicro`), `fermerChatbox`, `afficherMenusDansChat`, `tourDeParole`, le bandeau « Combat en cours » du chat (combat_rp.js), la croix du chat à la place du bouton voyage (voyage_groupe.js), et leur CSS (environ 370 lignes).
+- **« Ouvrir le chat »** (`ouvrirChatbox`, app.js) va maintenant tout droit au récit du livre (`GRIMOIRE_RECIT.allerAuRecit`) : l'arrivée à un lieu, le feu de camp, le retour d'un combat y mènent comme avant. grimoire_recit.js n'a plus à l'envelopper.
+- Ce qui reste : l'écoute des messages (le livre les reçoit par `livreRecitMessages`, les jets demandés par l'arbitre sont suivis), le mélange du tour de parole (`relancerInitiativeChat`, ia_master.js), le survol des noms des PNJ (`.pnj-chat-hover`, utilisé par le livre).
+- Tests adaptés (ils vérifiaient l'ancien chat, le parchemin ou des fonctions retirées) : corrections_v259 (plus de lecture des factions, v375), v277 (le codage des grilles est parti en v374 ; l'arrivée au POI ouvre le récit), v278 (section du parchemin retirée en v376 ; plus de bandeau ; le retour au récit), v279, v281 (arrivée, feu de camp : le récit ; plus de bulles ni de `tourDeParole`), v287 (plus de croix ni de « Passer »), v296, jet_d20 (l'écoute de la partie part de l'entrée en partie). corrections_v256 (le menu qui se range) est traité avec le menu latéral, en v378.
+
+corrections_v377.mjs le vérifie : le texte, et dans la vraie page « ouvrir le chat » qui ouvre le récit, les messages d'une partie qui arrivent au livre et aux jets demandés, rien de dessiné dans un chat caché, sans erreur.

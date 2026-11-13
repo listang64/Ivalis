@@ -182,7 +182,6 @@ window.creerLieuPoi = async function(options) {
                     maj.URL_Cloudinary = url;
                     await updateDoc(doc(db, "Monde_Lieux", id), { URL_Cloudinary: url });
                     if (typeof window.appliquerLieuLocal === "function") window.appliquerLieuLocal(id, { ...fiche, ...maj });
-                    if (typeof window.mettreAJourBulleLieu === "function" && window.PARTIE_DATA && window.PARTIE_DATA.Lieu_Actuel === id) window.mettreAJourBulleLieu(id);
                 }
             }
         } catch (e) { console.error("[MIA_POI] L'illustration n'a pas abouti :", e); }

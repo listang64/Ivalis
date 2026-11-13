@@ -826,8 +826,7 @@ async function reclamerCreationPoi(v) {
 async function arriverAuPoi(poi) {
     if (!poi || !poi.Id || arriveesVues.has(poi.Id)) return;
     arriveesVues.add(poi.Id);
-    const chat = $("fenetre-chatbox");
-    if (ecranJeuVisible() && typeof window.ouvrirChatbox === "function" && !(chat && chat.style.display === "flex")) {
+    if (ecranJeuVisible() && typeof window.ouvrirChatbox === "function") {
         try { window.ouvrirChatbox(); } catch (e) { console.error("Chat (le voyage continue) :", e); }
     }
     if (!creationsIci.has(poi.Id)) return;
@@ -1412,26 +1411,14 @@ function bouton() {
         b.title = "Voyager";
         b.draggable = false;
         b.style.display = "none";
-        // Le chat ouvert, c'est la croix qui le ferme (v287).
         b.addEventListener("click", () => {
             clic();
-            if (chatOuvert()) { if (typeof window.fermerChatbox === "function") window.fermerChatbox(); return; }
             window.basculerModeVoyage();
         });
         ecran.appendChild(b);
-        // Le chat s'ouvre ou se ferme : le bouton change de visage.
-        const chat = $("fenetre-chatbox");
-        if (chat && typeof MutationObserver === "function") new MutationObserver(actualiserBouton).observe(chat, { attributes: true, attributeFilter: ["style"] });
     }
     return b;
 }
-// v287 — Nico : « quand le chat est ouvert, à la place du bouton déplacement,
-// mets une croix pour fermer le chatbox ». Le même bouton, à la même place.
-const chatOuvert = () => { const chat = $("fenetre-chatbox"); return !!chat && chat.style.display === "flex"; };
-const IMAGE_CROIX_CHAT = "data:image/svg+xml;utf8," + encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="29" fill="#e8d5a5" stroke="#5c3a21" stroke-width="4"/>`
-    + `<path d="M21 21 L43 43 M43 21 L21 43" stroke="#5c3a21" stroke-width="6" stroke-linecap="round"/></svg>`);
-window.chatOuvertVoyage = chatOuvert;
 window.actualiserBoutonVoyage = () => actualiserBouton();
 // (v310) Le marque-page de la marche, sur le livre (grimoire_regions.js) : il
 // ne sort que quand on peut voyager — une partie, ni voyage en route, ni combat.
@@ -1444,19 +1431,12 @@ function actualiserBouton() {
     const b = bouton();
     if (!b) return;
     const rouvrir = $("btn-rouvrir-menu");
-    const fermerChat = chatOuvert();
-    // Le chat ouvert cache le menu (et son bouton) : la croix, elle, se montre.
     // (v308) Le livre levé : le bouton se montre sur ses cartes (le monde, une région).
     const surLeLivre = document.getElementById("ecran-jeu") && document.getElementById("ecran-jeu").classList.contains("livre-leve");
     const carteDuLivre = surLeLivre && document.getElementById("ecran-jeu").classList.contains("livre-carte");
-    const visible = !!window.ID_PARTIE_COURANTE && (surLeLivre ? (carteDuLivre && !fermerChat) : (fermerChat || (!!rouvrir && rouvrir.style.display !== "none")));
+    const visible = !!window.ID_PARTIE_COURANTE && (surLeLivre ? carteDuLivre : (!!rouvrir && rouvrir.style.display !== "none"));
     b.style.display = visible ? "block" : "none";
-    b.classList.toggle("fermer-chat", fermerChat);
-    // Les boutons voisins (le retour au monde) se poussent d'une place.
-    document.body.classList.toggle("chat-ouvert", fermerChat);
-    const image = fermerChat ? IMAGE_CROIX_CHAT : IMAGE_BOUTON_VOYAGE;
-    if (b.getAttribute("src") !== image) b.src = image;
-    if (fermerChat) { b.alt = b.title = "Fermer le chat"; b.classList.remove("occupe", "bloque", "actif"); return; }
+    if (b.getAttribute("src") !== IMAGE_BOUTON_VOYAGE) b.src = IMAGE_BOUTON_VOYAGE;
     b.alt = "Voyager";
     const combat = combatEnCours();
     b.classList.toggle("occupe", !!voyage);
@@ -1760,8 +1740,6 @@ function boite() {
 // nuit attend, la boîte reste là.
 window.discuterAutourDuFeu = function() {
     clic();
-    const chat = $("fenetre-chatbox");
-    if (chat && chat.style.display === "flex") return true;
     if (typeof window.ouvrirChatbox !== "function") return false;
     try { window.ouvrirChatbox(); } catch (e) { console.error("Chat (le voyage continue) :", e); return false; }
     return true;

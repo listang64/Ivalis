@@ -350,66 +350,11 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("3. LE PARCHEMIN : « LE DESTIN HÉSITE… », PUIS COMBATTRE (OU RIEN)");
+titre("3. LE PARCHEMIN : RETIRÉ EN v376 (le livre l'a remplacé)");
 // =========================================================================
-const lireParchemin = async () => {
-  for (let i = 0; i < 40; i++) {
-    const fin = await p.evaluate(() => !!document.getElementById("fin-recit-combat") || document.getElementById("ecran-recit-dynamique")?.style.display === "none");
-    if (fin) return;
-    await p.evaluate(() => document.getElementById("ecran-recit-dynamique")?.click());
-    await p.waitForTimeout(120);
-  }
-};
 await section(async () => {
-  const ts = Date.now();
-  await ecrirePartie({ Combat_RP: { Id: "crp_essai", Etat: "detection", Message: ts, Le: Date.now() } });
-  await p.evaluate((ts) => window.lancerRecitDynamique("Les gardes s'avancent.<br>« Rendez-vous ! » crie Dame Koré.", { ts }), ts);
-  await p.waitForTimeout(1300);
-  await lireParchemin();
-  const attente = await p.evaluate(() => ({ fin: !!document.getElementById("fin-recit-combat"), texte: (document.getElementById("fin-recit-combat") || {}).textContent || "",
-                                           ouvert: document.getElementById("ecran-recit-dynamique")?.style.display }));
-  verifier("le verdict n'est pas tombé : la dernière page attend (« Le destin hésite… »)", attente.fin && /Le destin hésite/.test(attente.texte) && attente.ouvert === "block", JSON.stringify(attente));
-  await p.evaluate(() => document.getElementById("ecran-recit-dynamique").click());
-  const resteLa = await p.evaluate(() => !!document.getElementById("fin-recit-combat"));
-  verifier("un toucher sur le parchemin ne la referme pas", resteLa);
-  await ecrirePartie({ Combat_RP: { Id: "crp_essai", Etat: "preparation", Message: ts, Adversaires: "Dame Koré et ses gardes", Createur: { id: "AUTRE:zz", t: Date.now() } } });
-  await p.waitForTimeout(150);
-  const bouton = await p.evaluate(() => {
-    const b = document.getElementById("bouton-combattre");
-    return b ? { mot: b.textContent.trim(), gouttes: b.querySelectorAll(".goutte-sang").length, fond: getComputedStyle(b).backgroundImage, titre: (document.querySelector(".fin-recit-combat-titre") || {}).textContent } : null;
-  });
-  verifier("le verdict est COMBAT : un beau bouton « Combattre », rouge, des gouttes de sang", !!bouton && /Combattre/i.test(bouton.mot) && bouton.gouttes >= 6 && /linear-gradient/.test(bouton.fond),
-           JSON.stringify(bouton && { ...bouton, fond: bouton.fond.slice(0, 40) }));
-  verifier("il dit qui l'on affronte", !!bouton && /Dame Koré/.test(bouton.titre || ""), bouton && bouton.titre);
-  await p.screenshot({ path: '/tmp/claude-0/-home-user-Ivalis/3718c626-55b5-577c-9b4f-a49012fd3784/scratchpad/v278_bouton.png' }).catch(() => {});
-  await p.evaluate(() => document.getElementById("bouton-combattre").click());
-  await p.waitForTimeout(300);
-  const apres = await p.evaluate(() => ({ combat: document.getElementById("fenetre-combat").style.display, fin: !!document.getElementById("fin-recit-combat") }));
-  verifier("COMBATTRE envoie directement dans le combat en cours", apres.combat === "block" && !apres.fin, JSON.stringify(apres));
-  await p.evaluate(() => { window.fermerCombat(); window.fermerToutesLesFenetres(); });
-  await p.waitForTimeout(1600);
-
-  // Pas de combat : le parchemin se referme.
-  const ts2 = Date.now();
-  await ecrirePartie({ Combat_RP: { Id: "crp_essai2", Etat: "detection", Message: ts2, Le: Date.now() } });
-  await p.evaluate((ts) => window.lancerRecitDynamique("Rien ne se passe.", { ts }), ts2);
-  await p.waitForTimeout(1300);
-  await lireParchemin();
-  await ecrirePartie({ Combat_RP: { Id: "crp_essai2", Etat: "aucun", Message: ts2 } });
-  await p.waitForTimeout(1800);
-  const ferme = await p.evaluate(() => ({ fin: !!document.getElementById("fin-recit-combat"), ouvert: document.getElementById("ecran-recit-dynamique")?.style.display }));
-  verifier("le verdict est « pas de combat » : le parchemin se referme", !ferme.fin && ferme.ouvert === "none", JSON.stringify(ferme));
-
-  // Un verdict qui ne vient jamais : la dernière page n'attend pas plus de 30 s (1,5 s au banc).
-  const ts3 = Date.now();
-  await ecrirePartie({ Combat_RP: { Id: "crp_essai3", Etat: "detection", Message: ts3, Le: Date.now() } });
-  await p.evaluate((ts) => window.lancerRecitDynamique("Le vent souffle.", { ts }), ts3);
-  await p.waitForTimeout(1300);
-  await lireParchemin();
-  await p.waitForTimeout(3300);
-  const delai = await p.evaluate(() => document.getElementById("ecran-recit-dynamique")?.style.display);
-  verifier("sans verdict, la dernière page se referme d'elle-même", delai === "none", delai);
-  await ecrirePartie({ Combat_RP: null });
+  const r = await p.evaluate(() => ({ parchemin: typeof window.lancerRecitDynamique, fin: typeof window.finRecitCombat, rejoindre: typeof window.rejoindreCombatRP }));
+  verifier("(v376) l'ancien parchemin et sa fin « Combattre » n'existent plus ; rejoindre le combat reste", r.parchemin === "undefined" && r.fin === "undefined" && r.rejoindre === "function", JSON.stringify(r));
 });
 
 // =========================================================================
@@ -602,45 +547,34 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("9. LE CHAT PENDANT LE COMBAT : « COMBAT EN COURS », LE MJ SE TAIT");
+titre("9. PENDANT LE COMBAT, LE MJ SE TAIT (v377 : plus d'ancien chat ni de bandeau)");
 // =========================================================================
 await section(async () => {
-  await p.evaluate(() => { window.fermerCombat(); window.ouvrirChatbox(); });
+  await p.evaluate(() => { window.fermerCombat(); });
   await p.waitForTimeout(200);
   const r = await p.evaluate(async () => {
-    const bandeau = document.getElementById("bandeau-combat-chat");
-    const saisie = document.getElementById("zone-saisie-chat");
     window.__ajouts = [];
-    const d = window.__docs["Systeme_Parties/P1"]; d.Index_Initiative = 0; d.Ordre_Initiative = ["H1"];
-    window.PARTIE_DATA.Index_Initiative = 0; window.PARTIE_DATA.Ordre_Initiative = ["H1"];
-    document.getElementById("input-chat").value = "Je veux parler !";
-    await window.envoyerMessageChat();
-    const envoye = (window.__ajouts || []).filter(a => a.col === "Messages_Chat").length;
-    const avantMJ = (window.__ajouts || []).length;
     await window.declencherTourIA();
-    return { bandeau: !!bandeau && bandeau.style.display === "flex" && /Combat en cours/.test(bandeau.textContent), saisie: saisie.style.display,
-             envoye, mjMuet: (window.__ajouts || []).length === avantMJ, bouton: !!(bandeau && bandeau.querySelector(".bandeau-combat-bouton")) };
+    return { mjMuet: (window.__ajouts || []).length === 0 };
   });
-  verifier("dans le chat : « Combat en cours » à la place de la saisie", r.bandeau && r.saisie === "none", JSON.stringify(r));
-  verifier("plus un message ne s'écrit, même à son tour", r.envoye === 0, r.envoye);
   verifier("le MJ se tait jusqu'à la fin du combat", r.mjMuet);
-  await p.evaluate(() => document.querySelector("#bandeau-combat-chat .bandeau-combat-bouton").click());
+  await p.evaluate(() => window.rejoindreCombatRP());
   const rejoint = await p.evaluate(() => document.getElementById("fenetre-combat").style.display);
-  verifier("le bandeau mène au combat", r.bouton && rejoint === "block", rejoint);
+  verifier("rejoindre le combat (le bouton pour tous, v367) y mène", rejoint === "block", rejoint);
 });
 
 // =========================================================================
 titre("10. LA VICTOIRE : LA DERNIÈRE FENÊTRE DE BUTIN, LE RETOUR AU RÉCIT, LE MJ");
 // =========================================================================
 await section(async () => {
-  await p.evaluate(() => { window.__ajouts = []; });
+  await p.evaluate(() => { window.__ajouts = []; window.__recit = 0; if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.allerAuRecit = () => { window.__recit++; }; });
   const avant = requetes.length;
   // Le combat est gagné, le butin réparti et refermé ; le plateau nettoyé.
   await ecrirePartie({ Fin_Combat: { id: "fin_1", idRencontre, issue: "victoire", ts: Date.now(), participants: ["H1", "H2"], blessures: {} },
                        Butin: { idRencontre, etape: "termine", resolu: true, ouvert: false } });
   await p.waitForTimeout(300);
-  const retour = await p.evaluate(() => ({ combat: document.getElementById("fenetre-combat").style.display, chat: document.getElementById("fenetre-chatbox").style.display }));
-  verifier("la fenêtre de combat se ferme et le récit revient (le chat)", retour.combat === "none" && retour.chat === "flex", JSON.stringify(retour));
+  const retour = await p.evaluate(() => ({ combat: document.getElementById("fenetre-combat").style.display, recit: window.__recit }));
+  verifier("la fenêtre de combat se ferme et le récit revient (v377 : le récit du livre)", retour.combat === "none" && retour.recit >= 1, JSON.stringify(retour));
   // (v279 : le récit attend que CHAQUE joueur du combat soit revenu — Lyra aussi.)
   await p.evaluate(() => { const c = window.__docs["Systeme_Parties/P1"].Combat_RP; c.Sortis = Object.assign({}, c.Sortis, { P_02: Date.now() }); });
   await ecrirePartie({ ID_Rencontre: null });
@@ -649,7 +583,7 @@ await section(async () => {
   const destin = await p.evaluate(() => (window.__ajouts || []).find(a => a.col === "Messages_Chat" && a.data.Auteur_ID === "DESTIN"));
   verifier("un message du Destin, puis le MJ narrateur", !!destin && !!narr, destin && destin.data.Texte);
   verifier("le MJ apprend la victoire et le lieu saccagé (combat à l'intérieur)", !!narr && /REMPORTÉ/.test(narr.systeme) && /SACCAGÉ/.test(narr.systeme), narr ? narr.systeme.split("--- LE COMBAT")[1]?.slice(0, 160) : "");
-  verifier("le combat du récit est clos : le chat se rouvre", fini && await p.evaluate(() => document.getElementById("zone-saisie-chat").style.display !== "none"));
+  verifier("le combat du récit est clos", fini);
   const v = await vtt();
   verifier("l'arène retrouve sa carte, sa grille et ses couches", v.URL_Map === URL_ARENE && JSON.stringify(v.Tuiles_Murs) === '["0,0","1,0"]' && !v.Arene_Sauvegarde, `${v.URL_Map} ${JSON.stringify(v.Tuiles_Murs)}`);
 });
@@ -737,7 +671,7 @@ await section(async () => {
   const vv = (f) => Number((html.match(new RegExp(f.replace(".", "\\.") + "\\?v=(\\d+)")) || [])[1]);
   verifier("cles_gemini.js et combat_rp.js chargés ; les modules touchés ont changé de version",
            /cles_gemini\.js\?v=\d+/.test(html) && /combat_rp\.js\?v=\d+/.test(html) && vv("ia_master.js") >= 11 && vv("app.js") >= 125 && vv("combat.js") >= 156
-           && vv("monstres.js") >= 43 && vv("recit_dynamique.js") >= 5 && vv("style.css") >= 109);
+           && vv("monstres.js") >= 43 && vv("style.css") >= 109);
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

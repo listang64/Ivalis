@@ -1104,8 +1104,7 @@ function retourAuRecit(idRencontre) {
     const butin = $("fenetre-butin");
     if (butin) butin.style.display = "none";
     const jeu = $("ecran-jeu");
-    const chat = $("fenetre-chatbox");
-    if (jeu && jeu.style.display !== "none" && typeof window.ouvrirChatbox === "function" && !(chat && chat.style.display === "flex")) {
+    if (jeu && jeu.style.display !== "none" && typeof window.ouvrirChatbox === "function") {
         try { window.ouvrirChatbox(); } catch (e) { console.error(e); }
     }
     // CE JOUEUR EST REVENU : le récit reprendra quand tous le seront.
@@ -1382,34 +1381,6 @@ function actualiserEncarts() {
 }
 window.actualiserEncartsCombatRP = actualiserEncarts;
 
-// --- 6.4 LE CHAT : « Combat en cours » à la place de la saisie ------------
-function actualiserChat() {
-    const c = etat();
-    const chat = $("fenetre-chatbox");
-    const saisie = $("zone-saisie-chat");
-    if (!chat || !saisie) return;
-    let bandeau = $("bandeau-combat-chat");
-    const actif = window.combatRPActif();
-    if (!actif) {
-        if (bandeau) bandeau.style.display = "none";
-        saisie.style.display = "";
-        return;
-    }
-    if (!bandeau) {
-        bandeau = document.createElement("div");
-        bandeau.id = "bandeau-combat-chat";
-        bandeau.className = "bandeau-combat-chat";
-        saisie.parentNode.insertBefore(bandeau, saisie);
-    }
-    bandeau.style.display = "flex";
-    saisie.style.display = "none";
-    const contenu = c.Etat === "narration"
-        ? `<span class="bandeau-combat-mot">⚔️ Le combat s'achève</span><span class="bandeau-combat-sous">Le récit reprend…</span>`
-        : `<span class="bandeau-combat-mot">⚔️ Combat en cours</span><span class="bandeau-combat-sous">${c.Etat === "preparation" ? "Le champ de bataille se prépare…" : "La bataille fait rage."}</span>
-           <button type="button" class="bandeau-combat-bouton" onclick="window.jouerSonClic && window.jouerSonClic(); window.rejoindreCombatRP()">Rejoindre le combat</button>`;
-    if (bandeau.dataset.contenu !== contenu) { bandeau.dataset.contenu = contenu; bandeau.innerHTML = contenu; }
-}
-
 // --- 6.5 LA FENÊTRE DE COMBAT PENDANT LA PRÉPARATION -----------------------
 const MOTS_ATTENTE = [
     "Les éclaireurs reconnaissent le terrain…",
@@ -1590,7 +1561,6 @@ setInterval(() => { try { actualiserBoutonRejoindre(); } catch (e) {} }, 1000);
 
 function actualiserTout() {
     try { actualiserBoutonRejoindre(); } catch (e) { console.error("Combat du récit (bouton) :", e); }
-    try { actualiserChat(); } catch (e) { console.error("Combat du récit (chat) :", e); }
     try { actualiserEncarts(); } catch (e) { console.error("Combat du récit (encarts) :", e); }
     try { actualiserFenetreCombat(); } catch (e) { console.error("Combat du récit (fenêtre) :", e); }
 }
