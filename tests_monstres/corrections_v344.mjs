@@ -213,7 +213,9 @@ await section(async () => {
   verifier("la forêt : ses deux lieux sur la page (dessin et nom)", JSON.stringify(l[0].fixe.map(x => x.nom)) === '["Sylvanis","Myrtée"]', JSON.stringify(l[0].fixe));
   verifier("…le désert, le mont Pletia, l'île : les leurs", l[1].fixe.map(x => x.nom).join() === "Ostrakon" && l[2].fixe.map(x => x.nom).join() === "Pletiane" && l[3].fixe.map(x => x.nom).join() === "Agoréa");
   verifier("la page ouverte et la suivante (le désert) : leurs dessins déjà chargés", l[0].fixe.every(x => x.pret) && l[1].fixe.every(x => x.pret), JSON.stringify([l[0].fixe, l[1].fixe]));
-  verifier("…l'île, plus loin, attend", l[3].fixe.every(x => !x.img), JSON.stringify(l[3].fixe));
+  // (v383) Nico : « que les images ne se chargent pas quand la page est ouverte » : toutes les
+  // régions se préparent dès l'entrée en partie, la plus lointaine aussi (l'île).
+  verifier("…l'île, plus loin, est déjà prête elle aussi (v383)", l[3].fixe.every(x => !!x.img), JSON.stringify(l[3].fixe));
   verifier("l'image fine de la carte vivante du désert est déjà demandée", await p.evaluate(() => true) && imagesDemandees.some(u => /w_3072/.test(u) && /IMG_2231/.test(u)), imagesDemandees.filter(u => /IMG_2231/.test(u)).join(" ").slice(0, 160));
   // Les lieux de la page tombent exactement sous ceux de la carte vivante.
   const ecarts = await p.evaluate(() => {
@@ -276,9 +278,11 @@ titre("3. LA LOUPE : LES LIEUX ET LE PION SONT LÀ DÈS LE DÉBUT");
 await section(async () => {
   await p.evaluate((pg) => window.GRIMOIRE.allerALaPage(pg), regions[1].page);
   await p.waitForTimeout(2500); await pose(); await monteeSur(5); await p.waitForTimeout(1200);
-  const repos = await p.evaluate(() => { const c = document.querySelector("#loupe-bouton .loupe-lentille-contenu .copie-carte-region");
-    return { copie: !!c, lieux: c ? c.querySelectorAll(".village-region").length : 0, ids: c ? c.querySelectorAll("[id]").length === [...c.querySelectorAll("[id]")].filter(x => !document.getElementById(x.id) || document.getElementById(x.id) === x).length : false }; });
-  verifier("au repos, le verre de la loupe grossit aussi le lieu et le pion", repos.copie && repos.lieux === 1, JSON.stringify(repos));
+  // (v383) Au repos, le verre est grisâtre (plus de copie) ; la copie figée des lieux et du pion
+  // est préparée pour la glisse, sous le verre de l'écran de la loupe.
+  const repos = await p.evaluate(() => { const c = document.querySelector("#loupe-ecran .loupe-dessous .copie-carte-region");
+    return { copie: !!c, lieux: c ? c.querySelectorAll(".village-region").length : 0, verre: document.querySelectorAll("#loupe-bouton .loupe-lentille .copie-carte-region").length }; });
+  verifier("au repos, la glisse a déjà sa copie du lieu et du pion (le verre, lui, reste grisâtre)", repos.copie && repos.lieux === 1 && repos.verre === 0, JSON.stringify(repos));
   await p.evaluate(() => { window.LOUPE_CARTES.figer(0.5); window.LOUPE_CARTES.ouvrir(); });
   await p.waitForTimeout(400);
   const glisse = await p.evaluate(() => {

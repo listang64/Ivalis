@@ -197,14 +197,14 @@ await section(async () => {
   verifier("sur la carte du monde, la loupe sort", !a.cachee && a.bouton, JSON.stringify(a));
   verifier("…dans le coin haut droit, son manche dépasse de l'écran", !!ib && ib.x + ib.w > ib.vw && ib.y < 200 && ib.x > ib.vw * 0.75, JSON.stringify(ib));
   verifier("…et l'image de la loupe est bien chargée", loupeDemandee > 0, String(loupeDemandee));
-  // (v336) deux fois plus grande, et une vraie lentille dedans
-  const lt = await p.evaluate(() => { const l = document.querySelector("#loupe-bouton .loupe-lentille"), r = l.getBoundingClientRect(), c = l.querySelector(".loupe-lentille-contenu");
-    return { d: r.width, imgs: c.querySelectorAll("img").length, zoom: getComputedStyle(c).transform, filtre: getComputedStyle(l.querySelector(".loupe-lentille-bombe")).filter,
+  // (v336) deux fois plus grande ; (v383) au repos, un verre grisâtre, opaque, sans effet lourd
+  const lt = await p.evaluate(() => { const l = document.querySelector("#loupe-bouton .loupe-lentille"), r = l.getBoundingClientRect();
+    return { d: r.width, imgs: l.querySelectorAll("img").length, fond: getComputedStyle(l).backgroundImage,
              svg: !!document.getElementById("loupe-filtre-bombe"), verre: getComputedStyle(l.querySelector(".loupe-lentille-verre")).backgroundImage,
              touche: (() => { const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!(e && e.closest(".loupe-lentille")); })() }; });
   verifier("v336 : au repos, la loupe est deux fois plus grande (verre de 104 px et plus)", lt.d >= 104, JSON.stringify(lt));
-  verifier("v336 : dans le verre, la table, le livre et la carte, grossis 1,6 fois", lt.imgs >= 2 && /matrix\(1\.6, 0, 0, 1\.6/.test(lt.zoom), JSON.stringify(lt));
-  verifier("v336 : …bombés comme une lentille (filtre de déplacement), avec reflet", lt.svg && /loupe-filtre-bombe/.test(lt.filtre) && /radial-gradient/.test(lt.verre), JSON.stringify(lt));
+  verifier("v383 : au repos, le verre est grisâtre et opaque (ni copie d'images, ni filtre de déplacement)", lt.imgs === 0 && !lt.svg && /radial-gradient/.test(lt.fond), JSON.stringify(lt));
+  verifier("…avec son reflet", /radial-gradient/.test(lt.verre), JSON.stringify(lt));
   verifier("v336 : c'est le verre qu'on touche", lt.touche, JSON.stringify(lt));
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v334_monde_repos.png" });
 });

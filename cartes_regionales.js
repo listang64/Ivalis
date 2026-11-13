@@ -409,8 +409,21 @@ window.copieCarteRegionale = (suffixe) => {
     copie.style.setProperty("--zoom-region", "1");
     return { element: copie, numero: etat.ouverte, largeur: etat.largeur, hauteur: etat.hauteur };
 };
-// Toutes les images de la carte vivante sont-elles prêtes (chargées) ?
-window.carteRegionalePrete = () => [...document.querySelectorAll("#carte-region img")].every(i => !i.getAttribute("src") || i.complete);
+// Toutes les images de la carte vivante sont-elles prêtes ? (v383) Chargées ET décodées :
+// tant qu'une image ne l'est pas, l'image de la page reste dessous (grimoire_regions.js),
+// et rien ne se peint sous les yeux. Une image en erreur ne bloque pas.
+const imagesDecodees = new WeakSet(), imagesEnDecodage = new WeakSet();
+window.carteRegionalePrete = () => [...document.querySelectorAll("#carte-region img")].every(i => {
+    if (!i.getAttribute("src") || imagesDecodees.has(i)) return true;
+    if (!i.complete) return false;
+    if (!i.naturalWidth || typeof i.decode !== "function") return true;
+    if (!imagesEnDecodage.has(i)) {
+        imagesEnDecodage.add(i);
+        const fini = () => imagesDecodees.add(i);
+        i.decode().then(fini, fini);
+    }
+    return false;
+});
 window.rendreCarteRegionaleALaPage = () => {
     const vue = $("vue-carte-region"), avant = etat.enGrand;
     if (!avant || !vue) return false;
@@ -707,12 +720,18 @@ const fin = (a) => (a ? a.finished.catch(() => null) : Promise.resolve());
 // MIA_VILLAGE en découpe des carrés, ce qu'une image « opaque » interdirait.
 // Cloudinary l'autorise ; un hôte qui refuserait retombe sur un chargement
 // ordinaire (la carte s'affiche, seuls les villages ne pourront pas s'y faire).
+// (v383) Nico : « les images sur les cartes ne doivent pas se charger quand la page est
+// ouverte, je le vois ». L'image est aussi DÉCODÉE avant d'être rendue : la carte ne se
+// montre qu'entière, jamais en train de se peindre.
 function chargerImage(url) {
     const essai = (cors) => new Promise((resoudre) => {
         const img = new Image();
         img.decoding = "async";
         if (cors) img.crossOrigin = "anonymous";
-        img.onload = () => resoudre(img);
+        img.onload = () => {
+            if (typeof img.decode !== "function") return resoudre(img);
+            img.decode().then(() => resoudre(img), () => resoudre(img));
+        };
         img.onerror = () => resoudre(null);
         img.src = url;
     });

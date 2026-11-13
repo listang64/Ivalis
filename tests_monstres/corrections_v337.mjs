@@ -168,14 +168,15 @@ const vueDuLivre = () => p.evaluate(() => {
 
 
 const etatLoupe = () => p.evaluate(() => { const b = document.getElementById("loupe-bouton"); return { cachee: !!b && b.classList.contains("cachee"), etat: window.LOUPE_CARTES.etat(),
-  imgs: [...document.querySelectorAll("#loupe-bouton .loupe-lentille-contenu img")].map(i => i.getAttribute("src")) }; });
+  imgs: [...document.querySelectorAll("#loupe-bouton .loupe-lentille img")].map(i => i.getAttribute("src")) }; });
 // Pendant une tourne : la loupe reste-t-elle, et son verre est-il recopié ?
 const suivreTourne = async (aller) => {
   await p.evaluate(() => {
     window.__suivi = { cachee: 0, releves: 0, recopies: 0, tourne: 0 };
-    const c = document.querySelector("#loupe-bouton .loupe-lentille-contenu");
-    window.__obs = new MutationObserver(() => { if (window.GRIMOIRE_PAGEFLIP.getState() !== "read" || window.GRIMOIRE.defileEnCours()) window.__suivi.recopies++; });
-    window.__obs.observe(c, { childList: true });
+    // (v383) le verre au repos ne recopie plus rien : on surveille qu'il ne bouge pas du tout
+    const c = document.querySelector("#loupe-bouton .loupe-lentille");
+    window.__obs = new MutationObserver(() => { window.__suivi.recopies++; });
+    window.__obs.observe(c, { childList: true, subtree: true });
     window.__iv = setInterval(() => { const b = document.getElementById("loupe-bouton"), pf = window.GRIMOIRE_PAGEFLIP;
       window.__suivi.releves++; if (pf.getState() !== "read" || window.GRIMOIRE.defileEnCours()) window.__suivi.tourne++; if (b.classList.contains("cachee")) window.__suivi.cachee++; }, 25);
   });
@@ -206,7 +207,8 @@ await section(async () => {
   verifier("…et son verre n'est pas recopié pendant la tourne (rien ne ralentit la page)", s1.recopies === 0, JSON.stringify(s1));
   await p.waitForTimeout(600);
   const b2 = await etatLoupe();
-  verifier("arrivée : le verre montre la nouvelle carte", !b2.cachee && b2.imgs.some(u => regions[1].numero === 5 ? /IMG_2231/.test(u) : true) && JSON.stringify(b2.imgs) !== JSON.stringify(a.imgs), JSON.stringify({ avant: a.imgs.length, apres: b2.imgs }));
+  // (v383) Nico : « elle clignote à chaque changement de page » : le verre grisâtre ne change plus.
+  verifier("arrivée : le verre reste le même verre grisâtre (rien n'y clignote)", !b2.cachee && b2.imgs.length === 0 && a.imgs.length === 0, JSON.stringify({ avant: a.imgs, apres: b2.imgs }));
   // de la région à la carte du monde (les pages défilent)
   const s2 = await suivreTourne(() => p.evaluate(() => window.GRIMOIRE.allerALaCarte()));
   verifier("de la région à la carte du monde (les pages défilent) : la loupe reste", s2.tourne > 0 && s2.cachee === 0 && s2.recopies === 0, JSON.stringify(s2));

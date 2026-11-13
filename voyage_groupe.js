@@ -1967,6 +1967,7 @@ function synchroniserAnimation() {
         const t = anim.duree > anim.delai ? (performance.now() - anim.debut - anim.delai) / (anim.duree - anim.delai) : 1;
         anim.f = anim.de + (anim.a - anim.de) * adoucir(t);
         placerPions();
+        if (typeof window.suivreGroupeSurLeLivre === "function") { try { window.suivreGroupeSurLeLivre(); } catch (e) {} }
         if (t < 1) rafAnim = requestAnimationFrame(tick);
         else rafAnim = null;
     };

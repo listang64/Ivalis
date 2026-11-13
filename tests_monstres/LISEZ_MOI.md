@@ -11721,3 +11721,21 @@ corrections_v382.mjs le vérifie : les règles parties, puis CHAQUE règle resta
 - Adaptés : corrections_v300 (l'ancien menu de droite absent), v311 (n'y bouchonne plus `ouvrirChatbox`, qui mène lui-même au récit), fabrique_sons (plus de bouton du menu latéral à survoler), ecran_chargement (les fonds de l'ancien menu sont partis ; la mesure « mot de passe vérifié » vivait dans l'ancienne fenêtre du sceau, que le grimoire n'empruntait plus).
 - Sous la charge de la suite (trois bancs à la fois), corrections_v302, v304, v318, v334 et v369 ont parfois échoué sur des minutages ; seuls, ils passent (v334 : 5 fois sur 6 — l'opacité de la croix mesurée à 0,98 au lieu de 0,99). Le contrôle « il s'en va EN FONDU » d'ecran_chargement échoue une fois sur deux, avant comme après ce ménage.
 - Suite complète finale (v382) : 274 bancs passent sur 363 ; tous les échecs restants étaient déjà là avant le ménage (55 bancs sans leurs données effets_reels/gabarits_reels, et les échecs connus), à part ces minutages. Le préchargement ramasse 13 images au lieu de 28 (ecran_chargement).
+
+## v383 — Les boucles (1 et 2) : les cartes du livre et la loupe
+
+Nico : « que les images sur les cartes ne se chargent pas quand la page est ouverte, je le vois, ce n'est pas immersif » ; « la loupe clignote à chaque changement de page ; au repos, rends juste le milieu opaque, grisâtre, sans effet lourd ».
+
+- Les cartes du livre (grimoire_regions.js) :
+  - dès l'entrée en partie, chaque région prépare ses images (l'image de sa page, puis la grande carte vivante), la plus proche d'abord, en arrière-plan (`prechargerTout`) ; en tournant les pages, les trois pages de part et d'autre se préparent aussi ;
+  - une image n'est prête que **décodée** (cartes_regionales.js : `chargerImage` attend `img.decode()`, `carteRegionalePrete` aussi) : la carte vivante ne remplace l'image de la page qu'une fois peinte, plus jamais à moitié chargée sous les yeux ;
+  - la veille ne repasse plus tout 5 fois par seconde : elle se réveille aux événements (la carte qui change, les villages, les cartes, la fenêtre redimensionnée, le retour dans l'onglet), avec un filet de 250 ms qui dort quand l'onglet est caché ; les lieux ne se reposent que s'ils ont changé, la copie de la vue ne se refait que si la vue a bougé (`versionVue`, tenue par un MutationObserver), la taille se mesure au ResizeObserver ;
+  - le pion du groupe suit la marche image par image sur la carte du monde du livre (`suivreGroupeSurLeLivre`, appelé par le tic de voyage_groupe.js).
+- La loupe (loupe_cartes.js, loupe_cartes.css) :
+  - au repos, son verre est un disque grisâtre, opaque, avec un léger reflet : plus de copie de la carte ni de filtre de déplacement à refaire à chaque page — plus de clignotement ;
+  - le même voile gris couvre le verre au début de la glisse et s'efface (le premier tiers), puis la carte grossie apparaît comme avant ;
+  - sa veille se réveille aux pages qui tournent (`changeState`, `flip`), à la carte qui change, à la fenêtre ; filet de 500 ms, endormi quand l'onglet est caché.
+
+corrections_v383.mjs le vérifie : le texte, puis dans la vraie page, qu'une image chargée mais pas encore décodée n'est pas prête, qu'elle l'est une fois décodée, et qu'une image en erreur ne bloque pas la carte.
+
+Adaptés : corrections_v334 (le verre au repos est gris), v337 (rien ne bouge dans le verre au repos), v344 (la copie vivante n'est plus dans le verre au repos, seulement sous la loupe ouverte ; la grande carte de l'île est préparée dès l'entrée).

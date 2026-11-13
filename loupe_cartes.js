@@ -89,9 +89,12 @@
         bouton.id = "loupe-bouton";
         bouton.className = "loupe-bouton cachee";
         bouton.title = bouton.ariaLabel = "Regarder la carte à la loupe";
-        // (v336) Le verre au repos : ce qui est dessous (la table, le livre, la carte), grossi
-        // et bombé comme à travers une lentille ; le cadre de laiton par-dessus.
-        bouton.innerHTML = `<span class="loupe-lentille"><span class="loupe-lentille-bombe"><span class="loupe-lentille-contenu"></span></span><span class="loupe-lentille-verre"></span></span>`
+        // (v383) Le verre au repos : un verre grisâtre, simple. Nico : « elle clignote à chaque
+        // changement de page, c'est moche ; au repos, rends juste le milieu opaque, grisâtre,
+        // sans effet lourd ». Avant (v336), il recopiait ce qu'il y avait dessous (la table, le
+        // livre, la carte), grossi et bombé par un filtre : à chaque page, ces copies étaient
+        // refaites, vides le temps de se peindre. Le cadre de laiton par-dessus.
+        bouton.innerHTML = `<span class="loupe-lentille"><span class="loupe-lentille-verre"></span></span>`
             + `<img class="loupe-cadre" src="${IMAGE_LOUPE}" alt="" draggable="false">`;
         bouton.addEventListener("click", (e) => { e.stopPropagation(); ouvrir(); });
         const ecranLoupe = document.createElement("div");
@@ -108,6 +111,7 @@
                 </div>
                 <img class="loupe-statique" id="loupe-statique" alt="" draggable="false">
               </div></div>
+              <div class="loupe-voile"></div>
               <div class="loupe-reflet"></div>
             </div>
             <img class="loupe-image" src="${IMAGE_LOUPE}" alt="" draggable="false">
@@ -122,7 +126,7 @@
             net: ecranLoupe.querySelector(".loupe-papier.net"), flou: ecranLoupe.querySelector(".loupe-papier.flou"),
             scene: ecranLoupe.querySelector(".loupe-scene"), plan: ecranLoupe.querySelector(".loupe-plan"),
             planche: ecranLoupe.querySelector(".loupe-planche"), statique: ecranLoupe.querySelector(".loupe-statique"),
-            reflet: ecranLoupe.querySelector(".loupe-reflet"), image: ecranLoupe.querySelector(".loupe-image"),
+            reflet: ecranLoupe.querySelector(".loupe-reflet"), voile: ecranLoupe.querySelector(".loupe-voile"), image: ecranLoupe.querySelector(".loupe-image"),
             croix: ecranLoupe.querySelector(".loupe-croix"), postit: ecranLoupe.querySelector(".loupe-postit")
         };
         // Le dessin de la marche (les pas du marque-page) sur le post-it.
@@ -163,10 +167,9 @@
         img.style.transform = `translate(${(c.x - ox).toFixed(2)}px, ${(c.y - oy).toFixed(2)}px) rotate(${a.toFixed(2)}deg) scale(${k.toFixed(4)})`;
         if (opacite !== undefined) img.style.opacity = String(opacite);
     }
-    // --- LA LENTILLE (v336) : ce qu'il y a sous le verre, grossi et bombé ---------
+    // --- CE QUE LA GLISSE MONTRE SOUS LE VERRE --------------------------------
     // Les images visibles à cet endroit (la table, le livre, la carte de la double
-    // page), recopiées à leur place à l'écran ; le verre les grossit autour de son
-    // centre, et un filtre (une carte de déplacement) les bombe comme une lentille.
+    // page), recopiées à leur place à l'écran ; la glisse les grossit sous le verre.
     function imagesDessous() {
         const l = [$("grimoire-table"), document.querySelector("#ecran-grimoire .grimoire-fond-livre")];
         const ici = carteOuverte();
@@ -184,7 +187,7 @@
     // (v344) Nico : « quand on fait la loupe, qu'on ait l'impression que ça ne charge pas
     // mais que ça fait partie intégrante de la carte ». Les lieux, le pion et la route
     // d'une carte régionale vivent dans sa carte vivante : la loupe en grossit une copie
-    // figée (copieCarteRegionale), posée sur l'image, au repos comme pendant l'animation.
+    // figée (copieCarteRegionale), posée sur l'image pendant l'animation.
     // Sans elle, ils n'apparaissaient qu'à la fin, quand la carte vivante prenait la place.
     function copieVivante(dx, dy) {
         const carte = $("carte-region"), v = $("vue-carte-region"), ici = carteOuverte();
@@ -195,52 +198,25 @@
         Object.assign(c.element.style, { position: "absolute", left: (r.left - E.x - dx).toFixed(1) + "px", top: (r.top - E.y - dy).toFixed(1) + "px", transformOrigin: "0 0", transform: `scale(${(r.width / c.largeur).toFixed(6)})` });
         return c.element;
     }
-    const signatureVivante = () => { const carte = $("carte-region"); return carte ? carte.innerHTML.length : 0; };
+    // (v383) Ce que porte la carte vivante a-t-il changé ? grimoire_regions.js le compte
+    // (un observateur) : plus de relecture de tout son HTML.
+    const signatureVivante = () => {
+        const R = window.GRIMOIRE_REGIONS;
+        if (R && typeof R.versionVue === "function") return R.versionVue();
+        const carte = $("carte-region"); return carte ? carte.innerHTML.length : 0;
+    };
     const htmlImages = (items, dx, dy) => items.map(i => `<img src="${i.src.replace(/"/g, "&quot;")}" alt="" draggable="false" style="left:${(i.x - dx).toFixed(1)}px;top:${(i.y - dy).toFixed(1)}px;width:${i.w.toFixed(1)}px;height:${i.h.toFixed(1)}px;object-fit:${i.fit};object-position:${i.pos}">`).join("");
-    function filtreLentille() {
-        if ($("loupe-filtre-bombe")) return;
-        // La carte de déplacement : chaque point du verre lit plus près du centre,
-        // d'autant plus qu'il est près du centre (le bombé d'une lentille).
-        const N = 128, K = 0.34, S = 0.5;
-        const toile = document.createElement("canvas"); toile.width = toile.height = N;
-        const ctx = toile.getContext("2d"), im = ctx.createImageData(N, N);
-        for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-            const u = (i + 0.5) / N - 0.5, v = (j + 0.5) / N - 0.5, d2 = (u * u + v * v) / 0.25;
-            const f = d2 < 1 ? K * (1 - d2) : 0, k = (j * N + i) * 4;
-            im.data[k] = Math.round(255 * Math.max(0, Math.min(1, 0.5 - u * f / S)));
-            im.data[k + 1] = Math.round(255 * Math.max(0, Math.min(1, 0.5 - v * f / S)));
-            im.data[k + 2] = 128; im.data[k + 3] = 255;
-        }
-        ctx.putImageData(im, 0, 0);
-        const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
-        svg.setAttribute("width", "0"); svg.setAttribute("height", "0"); svg.setAttribute("aria-hidden", "true");
-        svg.style.position = "absolute"; svg.style.width = svg.style.height = "0";
-        svg.innerHTML = `<filter id="loupe-filtre-bombe" x="0" y="0" width="1" height="1" filterUnits="objectBoundingBox" primitiveUnits="objectBoundingBox" color-interpolation-filters="sRGB">
-            <feImage href="${toile.toDataURL("image/png")}" x="0" y="0" width="1" height="1" preserveAspectRatio="none" result="bombe"/>
-            <feDisplacementMap in="SourceGraphic" in2="bombe" scale="${S}" xChannelSelector="R" yChannelSelector="G"/></filter>`;
-        document.body.appendChild(svg);
-    }
+    // Le verre au repos (v383) : seulement sa place et sa taille.
     function poserLentille(a) {
         const lent = el.lentille;
         if (!lent) return;
-        filtreLentille();
-        const d = 2 * a.r, x0 = a.c.x - a.r, y0 = a.c.y - a.r;
-        Object.assign(lent.style, { left: x0 + "px", top: y0 + "px", width: d + "px", height: d + "px" });
-        const items = imagesDessous();
-        const sig = JSON.stringify([Math.round(d), Math.round(x0), Math.round(y0), items.map(i => [i.src, Math.round(i.x), Math.round(i.y), Math.round(i.w), Math.round(i.h)]), signatureVivante()]);
-        if (lent.__sig === sig) return;
-        lent.__sig = sig;
-        const contenu = lent.querySelector(".loupe-lentille-contenu");
-        contenu.innerHTML = htmlImages(items, x0, y0);
-        const copie = copieVivante(x0, y0);
-        if (copie) contenu.appendChild(copie);
-        decoder(contenu);
-        contenu.style.transformOrigin = `${a.r}px ${a.r}px`;
-        contenu.style.transform = `scale(${GROSSISSEMENT_REPOS})`;
+        const d = 2 * a.r;
+        Object.assign(lent.style, { left: (a.c.x - a.r) + "px", top: (a.c.y - a.r) + "px", width: d + "px", height: d + "px" });
     }
-    // Pendant les animations, la même chose sous le verre de l'écran de la loupe.
-    // Les images neuves sont décodées tout de suite (img.decode) : sans quoi les
-    // premières images de la glisse montraient un verre vide.
+    // Sous le verre de l'écran de la loupe, pendant les animations. Les images neuves
+    // sont décodées tout de suite (img.decode) ; et (v383) le voile grisâtre du verre au
+    // repos ne s'efface qu'au début de la glisse (rendreGlisse) : on ne voit jamais un
+    // verre vide.
     const decoder = (racine) => racine.querySelectorAll("img").forEach(i => { try { if (i.decode) i.decode().catch(() => {}); } catch (e) {} });
     function remplirDessous() {
         const items = imagesDessous();
@@ -428,6 +404,9 @@
         poserDessous(c, m, 1);
         el.flou.style.opacity = "0";
         el.reflet.style.opacity = "1";
+        // (v383) Le voile grisâtre du verre au repos s'efface sur le premier tiers de la
+        // glisse (et revient à la fin du retour) : du verre du coin à la carte grossie.
+        el.voile.style.opacity = String(Math.max(0, 1 - t / 0.35).toFixed(3));
     }
     // La plongée (t : 0 la loupe au centre, 1 la carte en grand).
     function rendrePlongee(S, B, t) {
@@ -440,6 +419,7 @@
         poserDessous(C, GROSSISSEMENT * Math.exp(t * 0.9), 1 - t);
         el.flou.style.opacity = String(t);
         el.reflet.style.opacity = String(1 - t);
+        el.voile.style.opacity = "0";
     }
     // Le contenu des animations : une image fixe de la carte, à la place S.
     function poserStatique(S) {
@@ -568,10 +548,15 @@
         // de la région n'est pas encore montée : elle reste. Ailleurs, elle se range.
         const montrer = !!ici || surUnePageDeCarte();
         el.bouton.classList.toggle("cachee", !montrer);
-        const a = repos();
-        poserImage(el.cadre, a.c, a.r, a.a);
-        if (ici) { poserLentille(a); preparer(); }
+        // (v383) La loupe ne se repose que si l'écran a changé de taille, et ce que la glisse
+        // montrera ne se prépare que si la carte a changé : au repos, plus rien ne se refait.
+        const a = repos(), place = `${Math.round(a.c.x)}:${Math.round(a.c.y)}:${Math.round(a.r)}`;
+        if (place !== placeRepos) { placeRepos = place; poserImage(el.cadre, a.c, a.r, a.a); poserLentille(a); }
+        if (!ici) return;
+        const carte = $("carte-region-image"), cle = [ici.type, ici.page, ici.numero || "", place, signatureVivante(), carte ? carte.currentSrc || carte.src : ""].join("|");
+        if (cle !== clePreparee) { clePreparee = cle; preparer(); }
     }
+    let placeRepos = "", clePreparee = "";
     function surUnePageDeCarte() {
         const g = G(), pf = g && g.pageFlip && g.pageFlip();
         if (!g || !pf || !g.enPartie() || !g.ouvert()) return false;
@@ -581,8 +566,22 @@
         return !!(R && R.actif() && R.regions().some(x => x.page === gauche));
     }
     window.addEventListener("keydown", (e) => { if (e.key === "Escape" && etat === "ouverte") fermer(); });
+    // (v383) La veille réagit : une page qui tourne ou se pose, une carte régionale qui
+    // s'ouvre ou se ferme, l'écran redimensionné, l'app qui revient au premier plan. Le
+    // minuteur n'est plus qu'un filet, et il dort quand l'app est en arrière-plan.
+    let bientot = null;
+    const veillerBientot = () => { if (!bientot) bientot = setTimeout(() => { bientot = null; veiller(); }, 0); };
+    let livreEcoute = null;
+    const ecouterLeLivre = () => {
+        const g = G(), pf = g && g.pageFlip && g.pageFlip();
+        if (!pf || pf === livreEcoute) return;
+        livreEcoute = pf;
+        try { pf.on("changeState", veillerBientot); pf.on("flip", veillerBientot); } catch (e) {}
+    };
+    window.addEventListener("carte-regionale", veillerBientot);
     window.addEventListener("resize", () => setTimeout(veiller, 60));
-    setInterval(veiller, 200);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) veillerBientot(); });
+    setInterval(() => { if (document.hidden) return; ecouterLeLivre(); veiller(); }, 500);
 
     window.LOUPE_CARTES = {
         ouvrir, fermer, fermerVite, etat: () => etat, cible: () => (cible ? { ...cible } : null),

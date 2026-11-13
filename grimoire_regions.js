@@ -43,6 +43,7 @@
     let montee = null;           // la région dont la carte vivante est posée sur le livre
     let ouvertureFaite = false;
     let enCours = false;
+    let lieuxAJour = false;      // (v383) les lieux des pages sont-ils posés et à jour ?
     const aspects = {};          // numéro → largeur / hauteur (lu sur l'image)
 
     // --- LES RÉGIONS DU LIVRE -------------------------------------------------
@@ -100,6 +101,7 @@
             d.innerHTML = carteImg(url, boites.droite, nom);
         }
         r.lieuxSig = null;          // (v344) les lieux de la page se reposent (poserLieux)
+        lieuxAJour = false;
     }
     // --- (v344) LES LIEUX SUR LES PAGES ----------------------------------------
     // Nico : « pour les maps régionales, précharger les icônes et les images des pages
@@ -118,39 +120,68 @@
         if (!k) { k = document.createElement("div"); k.className = "region-calques"; k.setAttribute("aria-hidden", "true"); cadre.appendChild(k); }
         return k;
     }
+    // (v383) Rend vrai quand la page porte ses lieux à jour. La signature (tous les lieux
+    // de la carte) ne se recalcule plus à chaque veille : seulement quand les lieux ou les
+    // fiches changent (lieuxAJour, remis à faux par leurs événements).
     function poserLieux(r) {
-        if (!r.aspect || typeof window.calqueVillagesFixe !== "function" || typeof window.signatureVillagesCarte !== "function") return;
+        if (!r.aspect || typeof window.calqueVillagesFixe !== "function" || typeof window.signatureVillagesCarte !== "function") return false;
         const k = calquesDe(r);
-        if (!k) return;
+        if (!k) return false;
         const sig = window.signatureVillagesCarte(r.numero) + "|" + r.aspect;
-        if (r.lieuxSig === sig && k.querySelector(".region-lieux")) return;
+        if (r.lieuxSig === sig && k.querySelector(".region-lieux")) return true;
         r.lieuxSig = sig;
         const lieux = document.createElement("div");
         lieux.className = "region-lieux";
         lieux.appendChild(window.calqueVillagesFixe(r.numero, r.aspect, "-page-" + r.numero));
         const ancien = k.querySelector(".region-lieux");
         if (ancien) ancien.replaceWith(lieux); else k.prepend(lieux);
-        if (r.prechargee) chargerImagesDe(r);
+        if (r.prechargee) chargerImagesDe(r, false);
+        return true;
     }
+    // (v383) Nico : « que les images sur les cartes ne se chargent pas quand la page est
+    // ouverte, je le vois ». Les dessins des lieux d'une page sont chargés ET décodés à
+    // l'avance (toutes les régions, dès l'entrée en partie, de proche en proche : voir
+    // prechargerTout) ; l'image de la page aussi. `vivante` : l'image fine de la carte
+    // vivante en plus (seulement autour de la page ouverte : elle est lourde).
     const prechargees = new Set();
-    function chargerImagesDe(r) {
+    const decoder = (img) => { if (typeof img.decode === "function") img.decode().catch(() => {}); };
+    function chargerImagesDe(r, vivante) {
         r.prechargee = true;
         const k = calquesDe(r);
-        if (k) k.querySelectorAll("img[data-src]").forEach(img => {
-            if (img.getAttribute("src") === img.dataset.src) return;
-            img.src = img.dataset.src;
-            if (typeof img.decode === "function") img.decode().catch(() => {});
-        });
+        if (k && r.imagesPosees !== r.lieuxSig) {
+            r.imagesPosees = r.lieuxSig;
+            k.querySelectorAll("img[data-src]").forEach(img => {
+                if (img.getAttribute("src") === img.dataset.src) return;
+                img.src = img.dataset.src;
+                decoder(img);
+            });
+        }
+        const page = cadreDe(r) && cadreDe(r).querySelector(".region-carte-img");
+        if (page && page.__decodee !== page.src) { page.__decodee = page.src; decoder(page); }
+        if (!vivante) return;
         // L'image de la carte vivante (plus fine que celle de la page) : dans le cache.
         const carte = (window.CARTES_REGIONALES || {})[r.numero];
         const url = carte && carte.image && (typeof window.urlImageCarteRegionale === "function" ? window.urlImageCarteRegionale(carte.image) : carte.image);
         if (url && !prechargees.has(url)) { prechargees.add(url); const i = new Image(); i.decoding = "async"; i.crossOrigin = "anonymous"; i.src = url; }
     }
     // La copie figée de la carte vivante, sur la page ouverte : refaite quand elle change.
+    // (v383) « Elle a changé » : un observateur le note (versionVue), au lieu de relire tout
+    // le HTML de la carte à chaque veille.
+    let versionVue = 0, observee = null;
+    function suivreLaVue(carte) {
+        if (observee === carte || typeof MutationObserver !== "function") return;
+        observee = carte;
+        // Le cadrage de la carte (son transform) ne change pas ce qu'elle porte : ignoré.
+        new MutationObserver((liste) => {
+            if (!liste.some(m => !(m.target === carte && m.type === "attributes"))) return;
+            versionVue++; prete = null;
+        }).observe(carte, { childList: true, subtree: true, attributes: true, characterData: true });
+    }
     function copierLaVue(r) {
         const k = calquesDe(r), carte = $("carte-region");
         if (!k || !carte || typeof window.copieCarteRegionale !== "function") return;
-        const sig = carte.innerHTML.length + "|" + carte.childElementCount;
+        suivreLaVue(carte);
+        const sig = observee === carte ? "v" + versionVue : carte.innerHTML.length + "|" + carte.childElementCount;
         let copie = k.querySelector(".copie-carte-region.instantane");
         if (copie && copie.__sig === sig) return poserEchelle(k);
         const c = window.copieCarteRegionale("page");
@@ -212,8 +243,33 @@
             return r;
         });
         g.definirRegions(regions.flatMap(r => r.pages));
+        prechargerTout();
         // Les pages arrivées, le livre s'ouvre sur la région du groupe (une fois par partie).
         if (!ouvertureFaite && regions.length) { ouvertureFaite = true; setTimeout(() => { if (G() && G().ouvrirSurLeGroupe) G().ouvrirSurLeGroupe(); }, 250); }
+    }
+
+    // (v383) TOUTES LES CARTES DU LIVRE, PRÉPARÉES À L'AVANCE. Dès l'entrée en partie, les
+    // dessins des lieux et l'image de chaque page de région se chargent et se décodent,
+    // une région après l'autre (de la plus proche de la page ouverte à la plus lointaine,
+    // en laissant respirer le reste du jeu entre deux) : une page qu'on ouvre, même de
+    // loin (le sommaire, le groupe qui part), a déjà tout.
+    let prechargement = null;
+    function prechargerTout() {
+        if (prechargement) clearTimeout(prechargement);
+        const g = G(), pf = g && g.pageFlip && g.pageFlip();
+        const ici = pf ? pf.getCurrentPageIndex() : 0;
+        const file = regions.slice().sort((a, b) => Math.abs(pageDe(a) - ici) - Math.abs(pageDe(b) - ici));
+        const suivante = () => {
+            prechargement = null;
+            const r = file.shift();
+            if (!r || regions.indexOf(r) < 0) return;
+            // Une page pas encore prête (ses proportions arrivent avec son image) repasse
+            // en fin de file ; au bout de vingt essais, on la laisse à la veille.
+            if (!poserLieux(r)) { r.essaisPrechargement = (r.essaisPrechargement || 0) + 1; if (r.essaisPrechargement < 20) file.push(r); }
+            else chargerImagesDe(r, false);
+            if (file.length) prechargement = setTimeout(suivante, file.every(x => x.essaisPrechargement) ? 600 : 150);
+        };
+        prechargement = setTimeout(suivante, 400);
     }
 
     // --- OÙ EST LE LECTEUR --------------------------------------------------
@@ -354,6 +410,13 @@
         svg.innerHTML = html;
     }
     window.poserGroupeSurLaCarteDuLivre = () => poserGroupeSurLeMonde(true);
+    // (v383) Pendant la marche d'une région à l'autre, le pion du groupe suit l'animation
+    // image par image (voyage_groupe.js), au lieu d'avancer au rythme de la veille.
+    window.suivreGroupeSurLeLivre = () => {
+        const g = G(), pf = g && g.pageFlip && g.pageFlip();
+        if (!g || !g.enPartie || !g.enPartie() || !pf || pf.getState() !== "read") return;
+        if (surLaCarteDuMonde()) poserGroupeSurLeMonde(true);
+    };
     // LES FENÊTRES DU VOYAGE DANS LE LIVRE (v373). Nico : « toutes les popups qui
     // s'ouvrent pour les déplacements sur les maps : plutôt que des popups, que ça
     // s'affiche en fondu sur la page de gauche ». Ses réponses : toutes (le choix de
@@ -408,7 +471,10 @@
         if (postit) postit.classList.toggle("sortie", occupe && !r && !!monde);
     }
     window.rangerFenetresVoyageLivre = rangerFenetresVoyage;
-    let tailleVue = "";
+    let tailleVue = "", vueObservee = null, vueRedimensionnee = true;
+    // (v383) La carte vivante prête (images chargées et décodées), retenue tant que
+    // la région posée et ce que porte la carte ne changent pas : null = à revoir.
+    let prete = null, preteDe = null;
     let etaitEnPartie = false, posee = true;
     function veiller() {
         const g = G();
@@ -472,19 +538,28 @@
         // de la page s'efface (ses trous brûlés montrent le papier, pas la carte).
         // (v344) …mais seulement une fois la carte vivante prête (ses images chargées) :
         // sinon, un instant, ni l'une ni l'autre.
-        const prete = typeof window.carteRegionalePrete !== "function" || window.carteRegionalePrete();
-        regions.forEach(x => x.pages.forEach(pg => pg.classList.toggle("sous-la-vue", lu && montee === x.numero && prete)));
+        if (preteDe !== montee) { preteDe = montee; prete = null; }
+        if (!prete && montee) prete = typeof window.carteRegionalePrete !== "function" || window.carteRegionalePrete();
+        regions.forEach(x => x.pages.forEach(pg => pg.classList.toggle("sous-la-vue", !!(lu && montee === x.numero && prete))));
         // (v344) Les lieux sur chaque page ; les images autour de la page ouverte ; la
         // copie figée de la carte vivante sur sa page (elle y reste pendant qu'elle tourne).
         const ici = pf ? pf.getCurrentPageIndex() : -1;
+        if ($("carte-region")) suivreLaVue($("carte-region"));
+        if (!lieuxAJour) lieuxAJour = regions.map(poserLieux).every(Boolean);
         regions.forEach(x => {
-            poserLieux(x);
-            if (Math.abs(pageDe(x) - ici) <= 3) chargerImagesDe(x);
+            if (Math.abs(pageDe(x) - ici) <= 3) chargerImagesDe(x, true);
             if (lu && montee === x.numero && prete && window.carteRegionaleOuverte && window.carteRegionaleOuverte() === x.numero) copierLaVue(x);
             else if (lu && montee !== x.numero) oublierLaVue(x);
         });
         // (v310) La place de la carte a changé de taille (écran tourné, livre posé) : on recadre.
-        if (vue && montee) {
+        // (v383) Mesurée seulement quand un observateur dit qu'elle a changé : plus de
+        // mesure (et de recalcul de la mise en page) à chaque veille.
+        if (vue && vueObservee !== vue && typeof ResizeObserver === "function") {
+            vueObservee = vue;
+            new ResizeObserver(() => { vueRedimensionnee = true; veillerBientot(); }).observe(vue);
+        }
+        if (vue && montee && (vueRedimensionnee || vueObservee !== vue)) {
+            vueRedimensionnee = false;
             const taille = vue.offsetWidth + "x" + vue.offsetHeight;
             if (taille !== tailleVue && typeof window.recadrerCarteRegionale === "function") window.recadrerCarteRegionale();
             tailleVue = taille;
@@ -538,7 +613,24 @@
     window.GRIMOIRE_REGIONS = {
         ZONE_VERS_REGION, actif: () => !!(G() && G().enPartie() && regions.length),
         regions: () => regions.map(r => ({ zone: r.zone, numero: r.numero, nom: r.nom, page: pageDe(r), paysage: paysage(r) })),
-        ouvrir, versLeMonde, pageDuGroupe, montee: () => montee, veiller
+        ouvrir, versLeMonde, pageDuGroupe, montee: () => montee, veiller,
+        versionVue: () => versionVue           // (v383) ce que porte la carte vivante a changé (loupe_cartes.js)
     };
-    setInterval(veiller, 180);
+    // (v383) LA VEILLE RÉAGIT AUX CHANGEMENTS au lieu de tout revoir 5 fois par seconde :
+    // une page qui tourne (déjà écouté), une carte régionale ouverte ou fermée, des lieux
+    // ou des fiches de carte qui changent, l'écran redimensionné. Le minuteur reste en
+    // filet (les fenêtres du voyage qui s'ouvrent, l'état du groupe), mais chaque passage
+    // ne fait plus que comparer : les lieux, la copie de la carte vivante, sa taille et
+    // ses images ne se refont que quand ils ont changé. Rien ne tourne en arrière-plan.
+    let bientot = null;
+    function veillerBientot() {
+        if (bientot) return;
+        bientot = setTimeout(() => { bientot = null; veiller(); }, 0);
+    }
+    window.addEventListener("carte-regionale", veillerBientot);
+    window.addEventListener("villages-regionaux-maj", () => { lieuxAJour = false; veillerBientot(); });
+    window.addEventListener("cartes-regionales-maj", () => { lieuxAJour = false; veillerBientot(); });
+    window.addEventListener("resize", veillerBientot);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) veillerBientot(); });
+    setInterval(() => { if (!document.hidden) veiller(); }, 250);
 })();
