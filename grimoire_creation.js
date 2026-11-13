@@ -260,8 +260,20 @@ function pageFormulaire(cle, titre) {
             ${modeDev() ? `<button type="button" class="lien-fiche dev-creation" data-action="creation" data-ca="creer-vite">[DEV] Création rapide (sans IA)</button>` : ""}
           </div>` : ""}
         ${cle === "form1-g" ? renoncer : ""}
-      </div>`;
+      </div>${cle === "form1-d" ? TOURNER : ""}`;
 }
+// (v371) Nico : « les titres des parties avec une couleur aquarelle en dessous, comme
+// sur les fiches personnages » : le même lavis, une teinte par partie.
+const TEINTES_TITRES = {
+    "identite": "beige", "visage / tete": "rouge", "details": "jaune", "physique / corps": "vert",
+    "apparence": "bleu", "equipement de depart": "beige", "autres": "gris"
+};
+// (v371) Nico : « sur la première double page, une flèche pour indiquer qu'il faut
+// tourner la page pour accéder à la suite du formulaire ». Un toucher la tourne.
+const TOURNER = `<button type="button" class="tourner-creation" data-action="creation" data-ca="tourner" aria-label="Tourner la page pour la suite">
+    <span>La suite</span>
+    <svg viewBox="0 0 80 32" aria-hidden="true"><path d="M4 20 C20 10 40 26 58 15 L70 10"/><path d="M60 4 L71 10 L62 19"/></svg>
+  </button>`;
 function rangerFormulaire() {
     const modale = document.getElementById("modale-creation-hero");
     if (!modale) return;
@@ -269,7 +281,13 @@ function rangerFormulaire() {
     const parTitre = (t) => blocs.find(b => sansAccent((b.querySelector("h4") || {}).textContent || "").trim() === t);
     BLOCS.forEach(([cle, titres]) => {
         const ici = pg[cle] && pg[cle].querySelector(".blocs-creation");
-        titres.forEach(t => { const b = parTitre(t); if (b && ici) ranger(b, ici); });
+        titres.forEach(t => {
+            const b = parTitre(t);
+            if (!b || !ici) return;
+            ranger(b, ici);
+            const h4 = b.querySelector("h4");
+            if (h4 && !h4.querySelector(":scope > .lavis")) h4.insertAdjacentHTML("afterbegin", lavis(TEINTES_TITRES[t] || "beige", "titre-creation-" + t));
+        });
     });
 }
 // L'ancienne fenêtre remettait ses champs à zéro elle-même ; rangés ici, ils
@@ -483,6 +501,7 @@ function attendreHeros(id, onglet, essai) {
 // ---------------------------------------------------------------------
 function agir(cible) {
     const ca = cible.dataset.ca;
+    if (ca === "tourner") { son(); aller(pg["form2-g"]); return; }
     if (ca === "renoncer") {
         son();
         const clans = F() && F().pages ? F().pages().clans : [];

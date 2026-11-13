@@ -11586,3 +11586,10 @@ corrections_v369.mjs le vérifie dans le livre : l'encart et les noms, le clic (
 ## v370 — Le Narrateur ne se relance pas pendant la lecture
 
 Tant que tous les joueurs attendus n'ont pas cliqué « Lecture terminée » (ou que les 3 minutes ne sont pas passées), le marque-page du Narrateur reste éteint : personne ne peut le relancer avant que tout le monde ait lu. corrections_v369.mjs le vérifie (marque-page éteint pendant la lecture, rallumé ensuite).
+
+## v371 — La création d'un héros : l'aquarelle sous les titres, la flèche « La suite »
+
+- Les titres des parties du formulaire (Identité, Visage / Tête, Détails, Physique / Corps, Apparence, Équipement de départ, Autres) ont une aquarelle dessous, le même lavis que les encarts des fiches personnages, une teinte par partie. Elle remplace le trait d'encre et suit la longueur du titre. Rendus à l'ancienne fenêtre (en secours), les blocs la cachent.
+- Sur la première double page du formulaire, une flèche « La suite » en bas à droite indique qu'il faut tourner la page. Un toucher la tourne.
+
+corrections_v371.mjs le vérifie dans le livre : l'aquarelle sous les sept titres (visible, à la taille du titre, cinq teintes au moins, plus de trait), la flèche (en bas à droite, rien dessus, seulement sur la première double page), le toucher qui tourne la page, l'ancienne fenêtre sans aquarelle, les versions. corrections_v319 passe toujours.

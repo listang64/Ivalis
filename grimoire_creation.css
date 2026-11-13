@@ -105,6 +105,20 @@ body.creation-livre #overlay-jeu-modale { display: none !important; }
 .page-creation .bloc-formulaire { background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: auto !important; }
 .page-creation .bloc-formulaire h4 { margin: 0 0 calc(var(--u) * 1) !important; font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important;
   font-size: calc(var(--u) * 4.6 * var(--echelle-titres, 1)) !important; color: #24150a !important; border-bottom: 1px solid rgba(43, 26, 14, 0.45) !important; text-align: left !important; background: none !important; }
+/* (v371) L'aquarelle sous le titre, comme les encarts des fiches ; elle remplace le trait.
+   Rendus à l'ancienne fenêtre, les blocs la cachent. */
+.page-creation .bloc-formulaire h4 { position: relative; isolation: isolate; width: fit-content; padding: 0 calc(var(--u) * 2) !important; border-bottom: 0 !important; }
+.bloc-formulaire h4 > .lavis { display: none; }
+.page-creation .bloc-formulaire h4 > .lavis { display: block; left: -4%; top: -14%; width: 108%; height: 128%; }
+/* (v371) La flèche « La suite » au coin de la première double page : il faut la tourner. */
+.tourner-creation { position: absolute; right: calc(var(--u) * 5); bottom: calc(var(--u) * 3.5); z-index: 3; display: flex; align-items: center; gap: calc(var(--u) * 1);
+  color: #24150a !important; animation: pousser-page 2.4s ease-in-out infinite; }
+.tourner-creation span { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 3.8 * var(--echelle-titres, 1)); }
+.tourner-creation svg { width: calc(var(--u) * 12); height: calc(var(--u) * 5); overflow: visible; }
+.tourner-creation path { fill: none; stroke: #1b1009; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tourner-creation:hover { color: #000 !important; }
+@keyframes pousser-page { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(calc(var(--u) * 1.4)); } }
+@media (prefers-reduced-motion: reduce) { .tourner-creation { animation: none; } }
 .page-creation .champ-formulaire { display: flex; flex-direction: column; gap: calc(var(--u) * 0.3); margin-bottom: calc(var(--u) * 1.2) !important; }
 .page-creation .champ-formulaire label { font-size: calc(var(--u) * 2.7) !important; color: #6b4a2b !important; letter-spacing: 0.06em; text-align: left; }
 .page-creation .input-perso { background: transparent !important; background-color: transparent !important; border: 0 !important; border-bottom: 1px solid #2b1a0e !important;
