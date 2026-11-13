@@ -11739,3 +11739,13 @@ Nico : « que les images sur les cartes ne se chargent pas quand la page est ouv
 corrections_v383.mjs le vérifie : le texte, puis dans la vraie page, qu'une image chargée mais pas encore décodée n'est pas prête, qu'elle l'est une fois décodée, et qu'une image en erreur ne bloque pas la carte.
 
 Adaptés : corrections_v334 (le verre au repos est gris), v337 (rien ne bouge dans le verre au repos), v344 (la copie vivante n'est plus dans le verre au repos, seulement sous la loupe ouverte ; la grande carte de l'île est préparée dès l'entrée).
+
+## v384 — Les boucles (3) : le fond de la page
+
+Le fond de la page (html) recopie le décor de la scène visible : c'est lui qu'on voit dans les bords de l'iPad et quand la page rebondit. Il se refaisait toutes les 400 ms, en mesurant au passage la carte du monde (qui n'a plus d'image depuis v335).
+
+- index.html : il se refait maintenant quand une scène change (son style, sa classe, la classe du body — la création dans le livre en cache), à la fin de ses fondus (`transitionend`, `animationend`), au retour dans l'onglet, au redimensionnement comme avant ; un filet de 2 s rattrape le reste et dort quand l'onglet est caché. La recopie attend l'image suivante (une seule pour plusieurs changements).
+- La carte du monde sans image n'est plus mesurée (plus de `getBoundingClientRect` forcé).
+- Le combat coupe toujours la veille et la reprend en sortant (`suspendreSynchroCanvas`, `reprendreSynchroCanvas`).
+
+corrections_v384.mjs le vérifie : le texte, puis dans la vraie page, qu'au calme il n'y a plus que le filet, que le fond suit la fenêtre de combat à l'image suivante, le choix de classe et la classe du body, que la veille coupée ne réagit plus et qu'en reprenant elle rattrape la scène, et que la carte sans image n'est pas mesurée.

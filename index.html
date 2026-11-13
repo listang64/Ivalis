@@ -241,7 +241,9 @@
             }
           }
 
-          if (scenes[i].suivreRect) {
+          /* (v384) Sans image, ni taille ni position : on ne mesure pas le calque (la
+             carte du monde n'a plus d'image depuis v335). */
+          if (scenes[i].suivreRect && image !== 'none') {
             var rect = source.getBoundingClientRect();
             taille = Math.round(rect.width) + 'px ' + Math.round(rect.height) + 'px';
             position = Math.round(rect.left) + 'px ' + Math.round(rect.top) + 'px';
@@ -273,17 +275,61 @@
         window.visualViewport.addEventListener('resize', window.ajusterHauteurEcran);
       }
 
-      /* Les scenes s'ouvrent et se ferment depuis une dizaine d'endroits du jeu :
-         une veille legere evite d'avoir a instrumenter chacun d'eux. */
-      window.addEventListener('DOMContentLoaded', function () {
+      /* Les scenes s'ouvrent et se ferment depuis une dizaine d'endroits du jeu : plutot que
+         de les instrumenter, on les veille. (v384) Plus toutes les 400 ms : le fond se recopie
+         quand une scene change (son style, sa classe, la classe du body), a la fin de ses
+         fondus, et au retour dans l'onglet ; un filet de 2 s rattrape le reste, endormi quand
+         l'onglet est cache. */
+      var veilleFond = null, elementsVeilles = [], synchroPrevue = false;
+
+      function synchroniserBientot() {
+        if (synchroPrevue) return;
+        synchroPrevue = true;
+        requestAnimationFrame(function () {
+          synchroPrevue = false;
+          window.synchroniserFondCanvas();
+        });
+      }
+
+      function veillerLeFond() {
+        if (veilleFond || !document.body) return;
+        elementsVeilles = [document.body];
+        scenes.forEach(function (s) {
+          var scene = document.querySelector(s.cible);
+          if (!scene) return;
+          elementsVeilles.push(scene);
+          var calque = s.calque ? scene.querySelector(s.calque) : null;
+          if (calque) elementsVeilles.push(calque);
+        });
+        veilleFond = new MutationObserver(synchroniserBientot);
+        elementsVeilles.forEach(function (el) {
+          veilleFond.observe(el, { attributes: true, attributeFilter: ['style', 'class'] });
+        });
+        window._intervalSynchroCanvas = setInterval(function () {
+          if (!document.hidden) window.synchroniserFondCanvas();
+        }, 2000);
         window.synchroniserFondCanvas();
-        window._intervalSynchroCanvas = setInterval(window.synchroniserFondCanvas, 400);
+      }
+
+      ['transitionend', 'animationend'].forEach(function (evenement) {
+        document.addEventListener(evenement, function (e) {
+          if (veilleFond && elementsVeilles.indexOf(e.target) !== -1) synchroniserBientot();
+        }, true);
       });
+      document.addEventListener('visibilitychange', function () {
+        if (veilleFond && !document.hidden) window.synchroniserFondCanvas();
+      });
+
+      window.addEventListener('DOMContentLoaded', veillerLeFond);
 
       /* La fenetre de combat n'a pas besoin de cette veille (aucune des scenes qu'elle
          surveille n'est visible pendant un combat) : on la coupe pour laisser le CPU/GPU
          de l'iPad au plateau tactique, et on la reprend en sortant du combat. */
       window.suspendreSynchroCanvas = function () {
+        if (veilleFond) {
+          veilleFond.disconnect();
+          veilleFond = null;
+        }
         if (window._intervalSynchroCanvas) {
           clearInterval(window._intervalSynchroCanvas);
           window._intervalSynchroCanvas = null;
@@ -291,10 +337,7 @@
       };
 
       window.reprendreSynchroCanvas = function () {
-        if (!window._intervalSynchroCanvas) {
-          window.synchroniserFondCanvas();
-          window._intervalSynchroCanvas = setInterval(window.synchroniserFondCanvas, 400);
-        }
+        veillerLeFond();
       };
 
     })();
@@ -2211,7 +2254,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=273"></script>
+<script src="trace_combat.js?v=274"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
