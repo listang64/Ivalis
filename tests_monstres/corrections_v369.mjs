@@ -203,6 +203,8 @@ await section(async () => {
   await pose(); await p.waitForTimeout(400);
   const r = await vu();
   verifier("l'encart sort, le papier d'écriture reste rentré", r.lecture && !r.ecriture, JSON.stringify(r));
+  const postit = await p.evaluate(() => { const b = document.getElementById("recit-postit"); return { desactive: b.disabled, eteint: b.classList.contains("eteint") }; });
+  verifier("(v370) pendant la lecture, le Narrateur ne se relance pas (son marque-page éteint)", postit.desactive && postit.eteint, JSON.stringify(postit));
   verifier("…les joueurs attendus (un héros actif chacun) : Benjamin et Nico", /En attente : /.test(r.attente) && /Benjamin/.test(r.attente) && /Nico/.test(r.attente), r.attente);
   await cap("v369_lecture");
   await cliquer("#recit-lecture-bouton"); await p.waitForTimeout(800);
@@ -215,6 +217,7 @@ await section(async () => {
   await attendreQue(() => p.evaluate(() => document.getElementById("recit-ecriture").classList.contains("sortie")), 10000);
   const r3 = await vu();
   verifier("tout le monde a lu : l'encart disparaît, le papier d'écriture sort", !r3.lecture && r3.ecriture, JSON.stringify(r3));
+  verifier("(v370) …et le Narrateur peut de nouveau être relancé", await p.evaluate(() => !document.getElementById("recit-postit").disabled));
 });
 
 // =========================================================================
@@ -239,7 +242,7 @@ await section(async () => {
   const r3 = await vu();
   verifier("une ancienne réponse (sans la marque) : l'écriture s'ouvre tout de suite", !r3.lecture && r3.ecriture, JSON.stringify(r3));
   verifier("le Narrateur marque ses nouvelles réponses (ia_master.js)", /Est_Narration_IA: true,[^\n]*\n[^\n]*\n\s*Lecture_Attendue: true,/.test(code("ia_master.js")));
-  verifier("version 369 ou plus", Number((/VERSION_IVALIS = (\d+);/.exec(code("trace_combat.js")) || [])[1]) >= 369 && JSON.parse(code("version.json")).version >= 369);
+  verifier("version 370 ou plus", Number((/VERSION_IVALIS = (\d+);/.exec(code("trace_combat.js")) || [])[1]) >= 370 && JSON.parse(code("version.json")).version >= 370);
 });
 
 console.log(erreurs.length ? "\nErreurs de page : " + erreurs.slice(0, 5).join(" | ") : "");

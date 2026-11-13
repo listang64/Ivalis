@@ -11582,3 +11582,7 @@ chaman.mjs vérifie les règles : les paliers, la pose et ses refus, le rejeu, l
 - Personne ne reste bloqué par un absent : 3 minutes après la réponse, le papier s'ouvre de lui-même. Les réponses d'avant (sans la marque) n'attendent personne.
 
 corrections_v369.mjs le vérifie dans le livre : l'encart et les noms, le clic (écrit en base), le dernier clic qui ouvre l'écriture, un héros au repos, les 3 minutes, les anciennes réponses.
+
+## v370 — Le Narrateur ne se relance pas pendant la lecture
+
+Tant que tous les joueurs attendus n'ont pas cliqué « Lecture terminée » (ou que les 3 minutes ne sont pas passées), le marque-page du Narrateur reste éteint : personne ne peut le relancer avant que tout le monde ait lu. corrections_v369.mjs le vérifie (marque-page éteint pendant la lecture, rallumé ensuite).

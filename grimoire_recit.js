@@ -1054,7 +1054,8 @@ function majInterface() {
     // parler ». Touché, il rentre ; il reste rentré tant que le Narrateur a la main
     // (son tour, les dés qu'il attend, sa page qui s'écrit).
     if (etat.narrateurDemande && (etat.verrou || attente.manquants.length || Date.now() - etat.narrateurDemande > 15000)) etat.narrateurDemande = 0;
-    const narrateurOccupe = !!etat.narrateurDemande || bloque || ecrit;
+    // (v370) Tant que tout le monde n'a pas fini de lire, on ne relance pas le Narrateur.
+    const narrateurOccupe = !!etat.narrateurDemande || bloque || ecrit || lecture.enAttente;
     if (!fige) elts.postit.classList.toggle("sortie", recit && posee && !narrateurOccupe);
     if (etat.narrateurDemande) { clearTimeout(etat.revoirNarrateur); etat.revoirNarrateur = setTimeout(majInterface, 15200); }
     // (v306) Son papier : sorti tant qu'on est dans le récit, avec l'avatar de son héros.
