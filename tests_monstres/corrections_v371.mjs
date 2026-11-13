@@ -253,7 +253,8 @@ titre("4. LES VERSIONS");
 // =========================================================================
 await section(async () => {
   const html = lire("index.html");
-  verifier("index.html charge les nouvelles versions (grimoire_creation js 9, css 7)", /grimoire_creation\.js\?v=9"/.test(html) && /grimoire_creation\.css\?v=7"/.test(html));
+  // (v385) au moins ces versions : grimoire_creation.js a depuis monté (la veille endormie en arrière-plan).
+  verifier("index.html charge les nouvelles versions (grimoire_creation js 9, css 7, ou plus)", Number((html.match(/grimoire_creation\.js\?v=(\d+)"/) || [])[1]) >= 9 && Number((html.match(/grimoire_creation\.css\?v=(\d+)"/) || [])[1]) >= 7);
   verifier("la version du jeu : 371 ou plus", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 371 && JSON.parse(lire("version.json")).version >= 371);
 });
 
