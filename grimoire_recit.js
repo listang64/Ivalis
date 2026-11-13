@@ -1537,8 +1537,6 @@ function faireTaireLAncienChat() {
         g.__livre = true;
         window[nom] = g;
     };
-    envelopper("lancerRecitDynamique", () => true);
-    envelopper("majRecitDynamique", () => true);
     envelopper("annoncerJetsDemandes", () => true);
     envelopper("afficherEcranAttente", (texte) => !texte);
     // v311 : Nico, « mon groupe s'est déplacé vers un POI, l'ancien code entre en

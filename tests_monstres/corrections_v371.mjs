@@ -254,7 +254,7 @@ titre("4. LES VERSIONS");
 await section(async () => {
   const html = lire("index.html");
   verifier("index.html charge les nouvelles versions (grimoire_creation js 9, css 7)", /grimoire_creation\.js\?v=9"/.test(html) && /grimoire_creation\.css\?v=7"/.test(html));
-  verifier("la version du jeu : 371", /VERSION_IVALIS = 371/.test(lire("trace_combat.js")) && JSON.parse(lire("version.json")).version === 371);
+  verifier("la version du jeu : 371 ou plus", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 371 && JSON.parse(lire("version.json")).version >= 371);
 });
 
 console.log(erreurs.length ? "\nErreurs de page : " + erreurs.slice(0, 5).join(" | ") : "");

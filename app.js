@@ -4255,30 +4255,16 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
       }
   };
 
-  // L'état d'un message du MJ pour le parchemin (v291). Un message d'avant
-  // (sans `Recit_En_Cours`) est complet, portraits compris.
-  const etatRecitDuMessage = (m) => {
-      const nouveauFormat = Object.prototype.hasOwnProperty.call(m, "Recit_En_Cours");
-      return { enCours: m.Recit_En_Cours === true, pnjAttendus: Array.isArray(m.PNJ_Attendus) ? m.PNJ_Attendus : null,
-               pnjAnnonces: Array.isArray(m.PNJ_Annonces) ? m.PNJ_Annonces : [],
-               pnjPrets: !nouveauFormat || m.PNJ_Prets === true };
-  };
-
   // B. Écoute de l'historique du Chat
   const qMsg = query(collection(db, COL.MESSAGES), where("ID_Partie", "==", idPartie), orderBy("Timestamp", "asc"));
   
   window.INITIAL_CHAT_LOADED = false;
-  let timestampChargement = new Date().getTime();
 
   // 🔻 NOUVEAU : On vide le chat au premier chargement de la partie
   const zoneChat = document.getElementById("zone-messages-chat");
   if (zoneChat) zoneChat.innerHTML = "";
 
   window.unsubscribeMessages = onSnapshot(qMsg, (snap) => {
-      let recitDeclenche = null; 
-      let recitHorodatage = 0;
-      let recitEtat = {};
-
       // On analyse chirurgicalement chaque changement (Ajout ou Suppression)
       snap.docChanges().forEach(change => {
           let data = change.doc.data();
@@ -4288,11 +4274,6 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
               suivreJetsDemandes(data);
               if (window.INITIAL_CHAT_LOADED && data.Auteur_ID === "ARBITRE_DES" && typeof window.annoncerJetsDemandes === "function") {
                   window.annoncerJetsDemandes(data);
-              }
-              if (window.INITIAL_CHAT_LOADED && data.Est_Narration_IA && data.Timestamp >= (timestampChargement - 1000)) {
-                  recitDeclenche = data.Texte;
-                  recitHorodatage = data.Timestamp;
-                  recitEtat = etatRecitDuMessage(data);
               }
               // 🔻 NOUVEAU : On injecte uniquement ce nouveau message !
               ajouterUnSeulMessageChat(data);
@@ -4307,9 +4288,6 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
               ajouterUnSeulMessageChat(data);
               const nouveau = document.getElementById("msg-" + data.idDoc);
               if (ancien && nouveau && suivant && zoneChat) zoneChat.insertBefore(nouveau, suivant);
-              if (data.Est_Narration_IA && typeof window.majRecitDynamique === "function") {
-                  window.majRecitDynamique(data.Timestamp, data.Texte, etatRecitDuMessage(data));
-              }
           }
           
           if (change.type === "removed") {
@@ -4330,10 +4308,6 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
 
       // On descend l'ascenseur du chat s'il y a eu une modification
       if (zoneChat) zoneChat.scrollTop = zoneChat.scrollHeight;
-
-      if (recitDeclenche && typeof window.lancerRecitDynamique === "function") {
-          window.lancerRecitDynamique(recitDeclenche, { ts: recitHorodatage, ...recitEtat });
-      }
   });
 
   // C. Écoute des Personnages

@@ -348,8 +348,8 @@ titre("7. LES VERSIONS");
 // =========================================================================
 await section(async () => {
   const html = lire("index.html");
-  verifier("index.html charge les nouvelles versions (grimoire_regions js 13, css 6)", /grimoire_regions\.js\?v=13"/.test(html) && /grimoire_regions\.css\?v=6"/.test(html));
-  verifier("la version du jeu : 373", /VERSION_IVALIS = 373/.test(lire("trace_combat.js")) && JSON.parse(lire("version.json")).version === 373);
+  verifier("index.html charge les nouvelles versions (grimoire_regions js 13, css 6, ou plus)", Number((/grimoire_regions\.js\?v=(\d+)"/.exec(html) || [])[1]) >= 13 && Number((/grimoire_regions\.css\?v=(\d+)"/.exec(html) || [])[1]) >= 6);
+  verifier("la version du jeu : 373 ou plus", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 373 && JSON.parse(lire("version.json")).version >= 373);
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

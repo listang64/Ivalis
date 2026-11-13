@@ -11632,3 +11632,12 @@ corrections_v374.mjs le vérifie : fichiers et fonctions partis, et dans la vrai
 - **Les factions** (app.js). À chaque connexion, toute la collection `Monde_Factions` était lue pour remplir un menu `#champ-faction` disparu de la fiche : la lecture et le remplissage sont retirés. Le champ `ID_Faction` d'un personnage est toujours conservé.
 
 corrections_v375.mjs le vérifie (le texte, les fonctions parties et leurs voisines dans la vraie page, sans erreur).
+
+## v376 — Ménage du code mort (3/6) : l'ancien parchemin du récit
+
+- **recit_dynamique.js** est supprimé. Le « visual novel » plein écran du MJ (le parchemin, le portrait, le texte qui s'écrit) était réduit au silence par le livre depuis la v300 : grimoire_recit.js enveloppait `lancerRecitDynamique` et `majRecitDynamique` pour qu'ils ne fassent rien, et en partie le livre est toujours là. app.js ne les appelle plus (ni `etatRecitDuMessage`) ; le livre reçoit les messages comme avant (`livreRecitMessages`).
+- **combat_rp.js** : la fin du parchemin (« Le destin hésite… », puis le bouton COMBATTRE) n'était appelée que par ce parchemin : `finRecitCombat`, `dessinerFinRecit`, `actualiserRecit` et `attenteVerdictMs` sont retirés. Rejoindre le combat passe par le bouton pour tous (v367) et le livre.
+- **style.css** : la fin du parchemin, les gouttes de sang, l'attente sous le texte (`.attente-recit`). L'animation `destin-hesite` reste : la fenêtre de préparation du combat s'en sert.
+- corrections_v371, v372, v373 : leur contrôle de version passe en « ou plus ».
+
+corrections_v376.mjs le vérifie (le texte, et dans la vraie page les fonctions parties, le livre et le combat du récit présents, sans erreur).

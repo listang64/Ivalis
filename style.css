@@ -6017,70 +6017,8 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
     border-radius: 6px; padding: 8px 16px; cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,0.6);
 }
 
-/* La fin du parchemin : « Le destin hésite… », puis COMBATTRE. */
-.fin-recit-combat {
-    position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); z-index: 20;
-    display: flex; flex-direction: column; align-items: center; gap: 26px; cursor: default;
-}
-.destin-hesite {
-    font-family: 'Almendra', serif; font-style: italic; font-size: 3vw; color: #4a2511;
-    text-shadow: 0 0 1px rgba(0,0,0,0.3); animation: destin-hesite 2.4s ease-in-out infinite;
-}
-@keyframes destin-hesite { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
-.fin-recit-combat-titre {
-    font-family: 'Cinzel', serif; font-size: 2.1vw; font-weight: bold; color: #5c1210; text-align: center;
-    max-width: 60vw; text-shadow: 0 2px 6px rgba(0,0,0,0.25); animation: combattre-apparait 0.9s ease-out both;
-}
-.bouton-combattre {
-    position: relative; overflow: visible; cursor: pointer;
-    padding: 2.2vh 5.5vw; border-radius: 14px;
-    font-family: 'Cinzel', serif; font-weight: bold; font-size: 3.4vw; letter-spacing: 0.5vw; text-transform: uppercase;
-    color: #fff0e8; text-shadow: 0 2px 0 #3a0605, 0 0 18px rgba(255, 80, 60, 0.75);
-    border: 3px solid #2a0403;
-    background:
-        radial-gradient(ellipse at 22% 30%, rgba(255, 120, 100, 0.35), transparent 45%),
-        radial-gradient(ellipse at 78% 75%, rgba(40, 0, 0, 0.55), transparent 50%),
-        linear-gradient(180deg, #c3161a 0%, #8a0b0e 48%, #4c0406 100%);
-    box-shadow: 0 0 0 4px rgba(120, 10, 10, 0.35), 0 12px 30px rgba(60, 0, 0, 0.65), inset 0 2px 0 rgba(255, 170, 150, 0.4), inset 0 -6px 14px rgba(0,0,0,0.5);
-    animation: combattre-apparait 0.9s ease-out both, combattre-pouls 2.6s ease-in-out 0.9s infinite;
-}
-.bouton-combattre:hover { filter: brightness(1.12); }
-.bouton-combattre:active { transform: scale(0.97); }
-.bouton-combattre-mot { position: relative; z-index: 2; }
-/* Des éclaboussures sombres sur le métal du bouton. */
-.bouton-combattre-eclats {
-    position: absolute; inset: 0; border-radius: 12px; pointer-events: none; z-index: 1; opacity: 0.55;
-    background:
-        radial-gradient(circle at 12% 70%, #3a0303 0 6px, transparent 7px),
-        radial-gradient(circle at 16% 62%, #3a0303 0 3px, transparent 4px),
-        radial-gradient(circle at 88% 25%, #3a0303 0 7px, transparent 8px),
-        radial-gradient(circle at 83% 34%, #3a0303 0 3px, transparent 4px),
-        radial-gradient(circle at 64% 82%, #3a0303 0 4px, transparent 5px);
-}
-/* Les gouttes de sang qui perlent sous le bouton. */
-.goutte-sang {
-    position: absolute; top: 100%; width: 9px; height: var(--h, 18px); margin-left: -4px; z-index: 0;
-    background: linear-gradient(180deg, #4c0406, #9b0d10 70%, #c3161a);
-    border-radius: 0 0 50% 50% / 0 0 70% 70%; transform-origin: top center;
-    animation: goutte-sang 2.6s ease-in infinite;
-}
-.goutte-sang::after {
-    content: ""; position: absolute; left: 50%; bottom: -7px; width: 11px; height: 11px; margin-left: -5.5px;
-    border-radius: 50%; background: #9b0d10; box-shadow: inset -2px -2px 3px rgba(0,0,0,0.35);
-}
-@keyframes goutte-sang {
-    0% { transform: scaleY(0.2); opacity: 0; }
-    25% { opacity: 1; }
-    70% { transform: scaleY(1); opacity: 1; }
-    100% { transform: scaleY(1) translateY(36px); opacity: 0; }
-}
-@keyframes combattre-apparait { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
-@keyframes combattre-pouls {
-    0%, 100% { box-shadow: 0 0 0 4px rgba(120, 10, 10, 0.35), 0 12px 30px rgba(60, 0, 0, 0.65), inset 0 2px 0 rgba(255, 170, 150, 0.4), inset 0 -6px 14px rgba(0,0,0,0.5); }
-    50% { box-shadow: 0 0 0 8px rgba(160, 15, 15, 0.25), 0 0 46px rgba(200, 20, 20, 0.55), inset 0 2px 0 rgba(255, 170, 150, 0.4), inset 0 -6px 14px rgba(0,0,0,0.5); }
-}
-
 /* La fenêtre de combat pendant la préparation. */
+@keyframes destin-hesite { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 .voile-combat-rp {
     position: absolute; z-index: 30; display: none; flex-direction: column; align-items: center; gap: 12px;
     pointer-events: none; text-align: center; box-sizing: border-box;
@@ -6133,16 +6071,6 @@ body.chat-ouvert .btn-retour-monde { right: calc(env(safe-area-inset-right, 0px)
 #table-monde { width: 3840px; height: 2160px; }
 .table-ombre { position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(ellipse 80% 75% at 50% 45%, rgba(40, 25, 5, 0) 45%, rgba(40, 25, 5, 0.3) 100%); }
-
-/* L'ATTENTE DU PARCHEMIN (v291) : le MJ écrit encore, ou le portrait d'un
-   nouveau venu se dessine. Une ligne à la plume qui respire, sous le texte. */
-.attente-recit {
-  position: absolute; left: 50%; bottom: 14vh; transform: translateX(-50%);
-  font-family: 'Almendra', serif; font-style: italic; font-size: 1.6vw; color: #4a2511;
-  opacity: 0; pointer-events: none; transition: opacity 0.6s ease-in-out; white-space: nowrap; z-index: 11;
-}
-.attente-recit.visible { opacity: 1; animation: attente-recit-souffle 1.8s ease-in-out infinite; }
-@keyframes attente-recit-souffle { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
 
 /* LES DÉPENSES DU MJ (v293, depenses_ia.js) : quatre cartes de cumul, puis
    une ligne par réponse (un toucher ouvre le détail). */

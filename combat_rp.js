@@ -81,7 +81,6 @@ const R = window.REGLAGES_COMBAT_RP = {
     qualiteCarte: "medium",    // celle des portraits des héros
     visuelsMax: 5,             // au plus cinq pions différents à dessiner
     pionsEnParallele: 2,
-    attenteVerdictMs: 30000,   // la fin du parchemin attend le verdict, pas plus
     battementMs: 15000,        // le poste qui prépare dit qu'il est là
     relaisMs: 60000,           // au-delà, un autre poste reprend
     narrationApresMs: { victoire: 1500, defaite: 1500 },
@@ -1343,69 +1342,6 @@ if (typeof fermerFenetreButinAvant === "function") {
 // =========================================================================
 //  6. CE QUE CHACUN VOIT
 // =========================================================================
-// --- 6.1 LE PARCHEMIN : « Le destin hésite… », puis COMBATTRE ------------
-let recitEnAttente = null;
-window.finRecitCombat = function(ts, ctx) {
-    const c = etat();
-    if (!c || !ts || Number(c.Message) !== Number(ts)) return false;
-    if (!["detection", "preparation", "en_cours"].includes(c.Etat)) return false;
-    if (c.Etat === "detection" && Date.now() - (Number(c.Le) || 0) > R.attenteVerdictMs * 3) return false;
-    recitEnAttente = { ts: Number(ts), fermer: (ctx && ctx.fermer) || (() => {}), debut: Date.now() };
-    dessinerFinRecit(c);
-    setTimeout(() => {
-        const x = etat();
-        if (recitEnAttente && recitEnAttente.ts === Number(ts) && (!x || x.Etat === "detection")) fermerRecit();
-    }, R.attenteVerdictMs);
-    return true;
-};
-function fermerRecit() {
-    const r = recitEnAttente;
-    recitEnAttente = null;
-    const fin = $("fin-recit-combat");
-    if (fin) fin.remove();
-    if (r) r.fermer();
-}
-function dessinerFinRecit(c) {
-    const ecran = $("ecran-recit-dynamique");
-    if (!ecran || !recitEnAttente) return;
-    let fin = $("fin-recit-combat");
-    if (!fin) {
-        fin = document.createElement("div");
-        fin.id = "fin-recit-combat";
-        fin.className = "fin-recit-combat";
-        fin.addEventListener("click", (e) => e.stopPropagation());
-        ecran.appendChild(fin);
-    }
-    ["contenu-texte-recit", "nom-recit-dynamique", "portrait-recit-dynamique"].forEach(id => { const el = $(id); if (el) el.style.opacity = "0"; });
-    const etatFin = c.Etat === "detection" ? "attente" : "combat";
-    if (fin.dataset.etat === etatFin) return;
-    fin.dataset.etat = etatFin;
-    if (etatFin === "attente") {
-        fin.innerHTML = `<div class="destin-hesite">Le destin hésite…</div>`;
-        return;
-    }
-    const gouttes = [8, 19, 31, 46, 58, 71, 84, 93].map((x, i) =>
-        `<span class="goutte-sang" style="left:${x}%; animation-delay:${(i * 0.37) % 2.2}s; --h:${14 + (i * 7) % 16}px"></span>`).join("");
-    fin.innerHTML = `<div class="fin-recit-combat-titre">${echapper(c.Adversaires ? "Face à " + c.Adversaires : "Le combat éclate")}</div>
-        <button type="button" class="bouton-combattre" id="bouton-combattre">
-            <span class="bouton-combattre-eclats"></span>
-            <span class="bouton-combattre-mot">Combattre</span>
-            ${gouttes}
-        </button>`;
-    if (typeof window.jouerSonEvenement === "function") { try { window.jouerSonEvenement("gong-blessure"); } catch (e) {} }
-    $("bouton-combattre").onclick = (e) => {
-        e.stopPropagation();
-        if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-        fermerRecit();
-        window.rejoindreCombatRP();
-    };
-}
-function actualiserRecit(c) {
-    if (!recitEnAttente) return;
-    if (!c || Number(c.Message) !== recitEnAttente.ts || c.Etat === "aucun") { fermerRecit(); return; }
-    dessinerFinRecit(c);
-}
-
 // --- 6.2 REJOINDRE LE COMBAT ----------------------------------------------
 window.rejoindreCombatRP = function() {
     const c = etat();
@@ -1666,7 +1602,6 @@ window.appliquerCombatRPDeLaPartie = function(p) {
     if (c && c.Ennemis && c.Ennemis.Visuels) derniersEnnemis = c.Ennemis;
     // (v335) Un combat du récit se prépare ou se joue : le plateau de combat se charge.
     if (c && ["preparation", "en_cours"].includes(c.Etat) && typeof window.assurerPlateauCombat === "function") window.assurerPlateauCombat();
-    actualiserRecit(c);
     actualiserTout();
     if (!c) return;
     if (c.Etat === "preparation") {
