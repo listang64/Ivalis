@@ -11765,3 +11765,12 @@ corrections_v385.mjs le vérifie : le texte, puis dans la vraie page, que la pla
 - Un seul banc a régressé : corrections_v371, qui exigeait exactement la version 9 de grimoire_creation.js ; il accepte maintenant cette version ou une plus récente, comme les autres bancs de versions, et repasse.
 - Tous les autres échecs étaient déjà là en v382 (les bancs sans leurs données effets_reels/gabarits_reels, et les échecs connus).
 - Mesure (10 s au repos sur une page de carte du livre, Chromium) : le temps de script baisse d'environ 20 %. Le reste du travail de la page vient du livre lui-même : StPageFlip (vendor/page-flip) redessine toutes ses pages à chaque image (60 fois par seconde), même immobile — non modifié ici.
+
+## v386 — Le livre ne se redessine plus quand il ne bouge pas
+
+Nico : « oui, optimise ce livre ». StPageFlip (vendor/page-flip, la bibliothèque qui fait tourner les pages du grimoire) redessinait toutes les pages à chaque image, 60 fois par seconde, même livre immobile : chaque page recevait de nouveau son style, et la page entière se recalculait.
+
+- grimoire.js (à côté du correctif v333, sans toucher à la bibliothèque) : au repos — rien ne tourne, aucune page tenue, pas d'ombre — le livre ne redessine plus que si quelque chose a changé : la double page ouverte, la taille du livre, la liste des pages, ou le style d'une page touché par un autre code (un MutationObserver le remarque ; les styles que le livre pose lui-même ne comptent pas). Pendant qu'une page tourne ou qu'on la tient, il dessine toujours chaque image.
+- Mesure (10 s au repos sur une page de carte du livre, Chromium) : 598 recalculs de style en v382, 0 en v386 ; temps de script ~115 ms → ~39 ms ; travail total de la page ~660 ms → ~130 ms.
+
+corrections_v386.mjs le vérifie : le texte (la bibliothèque inchangée), puis dans la vraie page, qu'au repos plus aucun style n'est réécrit sur les pages (1 440 écritures en 2 s avant) et que la page ne se recalcule plus (120 fois en 2 s avant), que seule la double page ouverte est montrée, qu'une page tourne toujours image par image et se pose sur la suivante, que le livre se tait ensuite, qu'un style de page dérangé d'ailleurs est remis à l'image suivante, et que les pages suivent la fenêtre qui rétrécit.

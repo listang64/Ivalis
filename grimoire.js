@@ -616,6 +616,36 @@
                 rendu.render = (t) => { if (rendu.animation && rendu.animation.startedAt === null) rendu.animation.startedAt = t; dessiner(t); };
             }
         } catch (e) {}
+        // (v386) LE LIVRE NE SE REDESSINE PLUS QUAND IL NE BOUGE PAS. StPageFlip redessinait toutes
+        // ses pages à chaque image (60 fois par seconde), même immobile : chaque page recevait de
+        // nouveau son style, et la page entière se recalculait. Au repos (rien ne tourne, aucune
+        // page tenue, pas d'ombre), il ne redessine plus que si quelque chose a changé : la double
+        // page, la taille du livre, la liste des pages, ou le style d'une page touché d'ailleurs.
+        try {
+            const rendu = pageFlip.getRender();
+            if (rendu && typeof rendu.drawFrame === "function" && typeof MutationObserver === "function") {
+                const dessinerPages = rendu.drawFrame.bind(rendu);
+                let dernier = null, touche = true, pagesVeillees = null;
+                const veille = new MutationObserver(() => { touche = true; });
+                const veillerPages = (pages) => {
+                    veille.disconnect();
+                    pages.forEach(p => { const el = p && typeof p.getElement === "function" ? p.getElement() : null; if (el) veille.observe(el, { attributes: true, attributeFilter: ["style"] }); });
+                    pagesVeillees = pages;
+                };
+                rendu.drawFrame = () => {
+                    const collection = pageFlip.getPageCollection(), pages = collection ? collection.getPages() : [];
+                    const r = rendu.getRect() || {};
+                    const repos = pageFlip.getState() === "read" && !rendu.animation && !rendu.flippingPage && !rendu.bottomPage && !rendu.shadow;
+                    const sig = repos ? [rendu.leftPage, rendu.rightPage, pages, pages.length, rendu.orientation, r.left, r.top, r.width, r.height, r.pageWidth] : null;
+                    if (sig && dernier && !touche && sig.every((v, i) => v === dernier[i])) return;
+                    if (pages !== pagesVeillees) veillerPages(pages);
+                    dessinerPages();
+                    veille.takeRecords();   // ses propres styles ne comptent pas comme un changement
+                    touche = false;
+                    dernier = sig;
+                };
+            }
+        } catch (e) {}
         pageFlip.on("flip", (e) => surTourne(Number(e.data)));
         // LES BRUITS DE PAGES (fabrique_sons.js) : le doigt qui saisit une page
         // (v298), puis la page qui se pose de l'autre côté — le vieux bruit de
