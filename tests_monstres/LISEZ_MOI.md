@@ -11758,3 +11758,10 @@ corrections_v384.mjs le vérifie : le texte, puis dans la vraie page, qu'au calm
 - Ces veilles, le bouton « Rejoindre le combat » (combat_rp.js) et les marque-pages de la création (grimoire_creation.js) dorment quand l'onglet est caché (`document.hidden`). Les veilles du jeu à plusieurs (le battement du combat du récit, le guet du cerveau, les lieux du voyage) ne changent pas.
 
 corrections_v385.mjs le vérifie : le texte, puis dans la vraie page, que la plaque et le bandeau sont bien dans la fenêtre de combat, que hors combat rien ne se pose ni ne se dessine, qu'un reste de brouillard s'efface, qu'en combat tout reprend, qu'onglet caché tout dort, et qu'un voile de nuit resté allumé s'éteint.
+
+### Après la suite complète (v385)
+
+- Suite complète : 279 bancs passent sur 366 (contre 274 sur 363 en v382) ; les trois nouveaux (v383 à v385) passent ; corrections_v304, v309 et v369 (des minutages) passent cette fois.
+- Un seul banc a régressé : corrections_v371, qui exigeait exactement la version 9 de grimoire_creation.js ; il accepte maintenant cette version ou une plus récente, comme les autres bancs de versions, et repasse.
+- Tous les autres échecs étaient déjà là en v382 (les bancs sans leurs données effets_reels/gabarits_reels, et les échecs connus).
+- Mesure (10 s au repos sur une page de carte du livre, Chromium) : le temps de script baisse d'environ 20 %. Le reste du travail de la page vient du livre lui-même : StPageFlip (vendor/page-flip) redessine toutes ses pages à chaque image (60 fois par seconde), même immobile — non modifié ici.
