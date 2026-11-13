@@ -11692,3 +11692,16 @@ corrections_v379.mjs le vérifie : le texte, et dans la vraie page les fonctions
 - ⚠️ À regarder : `marquerTourIATermine` était le seul à remplir `TOURS_IA_TERMINES` et le drapeau `fini` du verrou de l'IA (monstres_ia.js). Le cerveau jouant désormais les tours des créatures, plus rien ne l'appelait : ce garde-fou contre un tour joué deux fois n'est donc plus alimenté (c'était déjà le cas avant ce ménage).
 
 corrections_v380.mjs le vérifie (chaque fichier, les voisines gardées, la page sans erreur).
+
+## v381 — Ménage du code mort (E) : le JS qui cherchait des éléments disparus
+
+- Des lignes allaient chercher dans la page des éléments que plus rien ne crée, et ne faisaient donc rien :
+  - combat.js : le bouton « Choisir » (`#btn-choisir-action`), d'avant le deck ;
+  - app.js : l'engrenage du combat (`#btn-engrenage-combat`) dans « tout fermer », et le sol de l'ancienne carte du monde (`#table-monde`) ;
+  - moteur_effets.js : RÉSOUDRE et ANNULER (`#btn-resoudre-carte`, `#btn-annuler-ciblage`) et leur barre dans `nettoyerCiblage` (plus jamais posés depuis la v367 ; `poserBoutonsCibleUnique`, vérifié par ses bancs, ne change pas) ;
+  - competences.js : le menu des éléments de la Forge (`#forge-element`) ;
+  - grimoire.js : le nom du joueur (`#grimoire-nom-joueur`) ;
+  - cartes_regionales.js : la plongée et le retour animent la carte du monde seule (le sol `#table-monde` n'existe plus).
+- annuler_ciblage.mjs adapté : il posait de faux boutons RÉSOUDRE / ANNULER pour vérifier qu'on les retirait ; il vérifie maintenant qu'ils n'existent plus et que le moteur ne les cherche plus.
+
+corrections_v381.mjs le vérifie (le texte, et dans la vraie page le grimoire, « tout fermer », la plongée vers une carte régionale et le retour, sans erreur).

@@ -5518,9 +5518,6 @@ function tailleEcranCarte() {
 function poserCarteMonde() {
   const carte = document.getElementById("carte-fond-jeu");
   if (carte) carte.style.transform = `translate(${cartePanX}px, ${cartePanY}px) scale(${carteZoom})`;
-  // Le sol (le sable, v288) suit la carte (v286).
-  const table = document.getElementById("table-monde");
-  if (table && carte) table.style.transform = carte.style.transform;
   const conteneur = document.getElementById("conteneur-carte-fond");
   if (conteneur) {
     const { largeur, hauteur } = tailleEcranCarte();
@@ -5697,8 +5694,6 @@ window.fermerToutesLesFenetres = function() {
   if (menuNav) menuNav.style.display = 'flex';
   if (btnFermerCombat) btnFermerCombat.style.display = 'none';
 
-  const btnEngrenageCombat = document.getElementById('btn-engrenage-combat');
-  if (btnEngrenageCombat) btnEngrenageCombat.style.display = 'none';
   if (typeof window.fermerMenusCoulissantsCombat === "function") {
       window.fermerMenusCoulissantsCombat();
   }

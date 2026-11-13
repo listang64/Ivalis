@@ -1267,8 +1267,6 @@
     window.afficherGrimoire = function (options) {
         if (!construire()) return false;
         const surLeJournal = !!(options && options.ouvert);
-        const nom = document.getElementById("grimoire-nom-joueur");
-        if (nom) nom.textContent = nomJoueur();
         quitterLaPartie();
         ecran.style.display = "block";
         void ecran.offsetWidth;

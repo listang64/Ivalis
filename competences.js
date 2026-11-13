@@ -1538,8 +1538,6 @@ window.ouvrirCreationCompetence = async function() {
         if (btnValiderForge) btnValiderForge.innerText = LIBELLE_VALIDER_FORGE;
 
         document.getElementById("forge-nom").value = "";
-        const selectElement = document.getElementById("forge-element");
-        if (selectElement) selectElement.value = "Aucun";
 
         const idPerso = document.getElementById("champ-id-personnage").value;
         window.forgeState.idPersonnage = idPerso;

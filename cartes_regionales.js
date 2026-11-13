@@ -693,15 +693,13 @@ function plongeeMonde(centre) {
 }
 const animer = (el, images, duree, easing) => (el && typeof el.animate === "function")
     ? el.animate(images, { duration: duree, easing, fill: "forwards" }) : null;
-// La carte du monde, et le sol (le sable) avec elle (v286) : la même animation,
-// annulée ensemble.
+// La carte du monde (son sol d'avant, #table-monde, n'existe plus).
 function animerMonde(images, duree, easing) {
-    const a = animer($("carte-fond-jeu"), images, duree, easing), b = animer($("table-monde"), images, duree, easing);
-    if (a && b) a.addEventListener("cancel", () => b.cancel());
-    return a;
+    return animer($("carte-fond-jeu"), images, duree, easing);
 }
 function poserTransformMonde(t) {
-    [$("carte-fond-jeu"), $("table-monde")].forEach(el => { if (el) el.style.transform = t; });
+    const el = $("carte-fond-jeu");
+    if (el) el.style.transform = t;
 }
 const fin = (a) => (a ? a.finished.catch(() => null) : Promise.resolve());
 

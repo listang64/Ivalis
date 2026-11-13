@@ -54,7 +54,7 @@ console.log("1. LE CODE CÂBLE BIEN UN BOUTON ANNULER EN MODE CIBLE UNIQUE");
              ouverture.includes('window.actualiserBoutonFinTour()'));
 }
 
-console.log("\n2. nettoyerCiblage RETIRE LES BOUTONS, LÈVE LE VERROU ET REND LA MAIN");
+console.log("\n2. nettoyerCiblage LÈVE LE VERROU ET REND LA MAIN (v381 : plus de boutons RÉSOUDRE / ANNULER à retirer)");
 {
     const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
     const b = await chromium.launch();
@@ -74,10 +74,6 @@ console.log("\n2. nettoyerCiblage RETIRE LES BOUTONS, LÈVE LE VERROU ET REND LA
         window.VTT_CIBLAGE_CLICK = () => {}; window.VTT_CIBLAGE_TOUCHSTART = () => {};
         window.VTT_CIBLAGE_TOUCHMOVE = () => {};
 
-        const btnResoudre = document.createElement("div"); btnResoudre.id = "btn-resoudre-carte";
-        const btnAnnuler = document.createElement("div"); btnAnnuler.id = "btn-annuler-ciblage";
-        document.body.append(btnResoudre, btnAnnuler);
-
         eval(src);
         window.nettoyerCiblage();
 
@@ -91,8 +87,9 @@ console.log("\n2. nettoyerCiblage RETIRE LES BOUTONS, LÈVE LE VERROU ET REND LA
     }, SRC_NETTOIE);
 
     verifier("le ciblage n'est plus actif", res.actif === false);
-    verifier("le bouton RÉSOUDRE a disparu", !res.resoudrePresent);
-    verifier("le bouton ANNULER a disparu aussi", !res.annulerPresent);
+    // (v367 : la barre RÉSOUDRE / ANNULER n'est plus jamais posée ; v381 : nettoyerCiblage ne la cherche plus.)
+    verifier("plus de bouton RÉSOUDRE ni ANNULER, et le moteur ne les cherche plus", !res.resoudrePresent && !res.annulerPresent
+             && !/btn-resoudre-carte|btn-annuler-ciblage/.test(SRC_NETTOIE));
     verifier("la fenêtre de tour est rafraîchie (la compétence redevient lançable)", res.voileRafraichi === true);
     verifier("le bouton fin de tour repasse sur « lancer »", res.boutonRafraichi === true);
 

@@ -3402,13 +3402,6 @@ window.nettoyerCiblage = function() {
     window.removeEventListener("touchstart", window.VTT_CIBLAGE_TOUCHSTART, {capture: true, passive: false});
     window.removeEventListener("touchmove", window.VTT_CIBLAGE_TOUCHMOVE, {capture: true, passive: false});
 
-    const btnResoudre = document.getElementById("btn-resoudre-carte");
-    const btnAnnuler = document.getElementById("btn-annuler-ciblage");
-    if (btnResoudre) btnResoudre.remove();
-    if (btnAnnuler) btnAnnuler.remove();
-    const barreResolution = document.getElementById("barre-ciblage-resolution");
-    if (barreResolution && !barreResolution.children.length) barreResolution.remove();
-
     // Et les pions avec, pour que la croix rouge du lanceur s'en aille en même
     // temps que le ciblage qu'elle annulait.
     if (typeof window.appliquerTokensVTT === "function" && window.TOKENS_VTT_DATA) {

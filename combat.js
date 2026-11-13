@@ -5083,9 +5083,6 @@ window.jouerCarteCombat = async function(idCarte) {
         }
     }
 
-    const btn = document.getElementById("btn-choisir-action");
-    if(btn) { btn.innerText = "Préparation..."; btn.disabled = true; }
-
     // 🔻 EFFET VISUEL IMMÉDIAT (N'attend pas le réseau)
     //
     // LA CARTE RETENUE S'EN VA, ELLE AUSSI. Elle restait posée en grand au
@@ -5163,8 +5160,6 @@ window.jouerCarteCombat = async function(idCarte) {
         console.error("Erreur jouerCarteCombat:", e);
         if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
         if (typeof window.rouvrirDeckApresEchec === "function") window.rouvrirDeckApresEchec();
-        const btn = document.getElementById("btn-choisir-action");
-        if (btn) { btn.innerText = "Choisir"; btn.disabled = false; }
         window.mettreAJourJaugeFatigue(0);
         // Le quota épuisé a son propre bandeau, qui dit quand ça reviendra ;
         // toute autre panne, on la dit ici — le joueur doit rechoisir.
