@@ -11705,3 +11705,13 @@ corrections_v380.mjs le vérifie (chaque fichier, les voisines gardées, la page
 - annuler_ciblage.mjs adapté : il posait de faux boutons RÉSOUDRE / ANNULER pour vérifier qu'on les retirait ; il vérifie maintenant qu'ils n'existent plus et que le moteur ne les cherche plus.
 
 corrections_v381.mjs le vérifie (le texte, et dans la vraie page le grimoire, « tout fermer », la plongée vers une carte régionale et le retour, sans erreur).
+
+## v382 — Ménage du code mort (F) : le CSS sans cible
+
+- Des règles visaient des éléments ou des classes que plus rien ne crée :
+  - style.css : le bouton « Choisir » sous la carte HD (`.btn-choisir-combat`), le halo du coût de fatigue (`.barre-fatigue-cout` et son animation), les menus coulissants du combat (`.menu-coulissant-droit`, `.bouton-tourne-hover`), la barre RÉSOUDRE / ANNULER (`#barre-ciblage-resolution`, `.bouton-barre-ciblage`, `.bouton-resoudre`, `.bouton-annuler`), le sol de l'ancienne carte du monde (`#table-monde`), la validation des visuels des ennemis (`.liste-visuels-valider`, `.qui-visuel`, `.description-visuel-valider`) ;
+  - grimoire.css : le surligneur, le marque-page de la terre et son dessin (`.surligneur`, `.marque-terre`, `.dessin-terre`) ;
+  - grimoire_recit.css : le post-it appuyé (`.recit-postit.appuye`).
+- Avec les blocs précédents (v374 à v379), plus aucune règle des feuilles du jeu ne vise un élément ou une classe disparus.
+
+corrections_v382.mjs le vérifie : les règles parties, puis CHAQUE règle restante de chaque feuille du jeu, confrontée aux classes et identifiants du HTML et du JS chargés (et aux préfixes que les scripts complètent), et les feuilles qui se lisent dans la vraie page, sans erreur.

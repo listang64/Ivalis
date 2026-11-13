@@ -1489,47 +1489,6 @@ textarea.input-texte-parchemin {
 }
 
 /* ========================================================================= */
-/* MODE COMBAT : BOUTON CHOISIR (SOUS LA CARTE HD)                           */
-/* ========================================================================= */
-.btn-choisir-combat {
-    background-color: rgba(10, 10, 10, 0.95);
-    color: #c2a878;
-    font-family: 'Cinzel', serif;
-    font-size: 18px;
-    font-weight: bold;
-    border: 1px solid #222;
-    border-radius: 30px;
-    padding: 10px 30px;
-    cursor: pointer;
-    box-shadow: 0 0 25px 12px rgba(5, 5, 5, 0.9);
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    transition: all 0.3s ease;
-}
-
-.btn-choisir-combat:hover {
-    color: #ffffff;
-    background-color: rgba(25, 25, 25, 0.95);
-    box-shadow: 0 0 30px 15px rgba(194, 168, 120, 0.3);
-    transform: scale(1.05);
-}
-
-/* ========================================================================= */
-/* ANIMATION JAUGE DE FATIGUE                                                */
-/* ========================================================================= */
-/* Anime l'opacite plutot que box-shadow/filter : ces deux proprietes forcent un repaint a
-   chaque frame quand elles changent, alors qu'une opacite se compose sur le GPU. */
-@keyframes effetHaloRougeFatigue {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 1; }
-}
-
-.barre-fatigue-cout {
-    box-shadow: 0 0 12px rgba(255, 76, 76, 0.85);
-    animation: effetHaloRougeFatigue 1.5s infinite;
-}
-
-/* ========================================================================= */
 /* SURBRILLANCE DE L'EFFET EN COURS SUR L'APERÇU HD DE LA CARTE              */
 /* ========================================================================= */
 /* Pareil qu'au-dessus : seule l'opacite du halo est animee (GPU), la lueur elle-meme
@@ -1556,42 +1515,6 @@ textarea.input-texte-parchemin {
     animation: clignoteEffetActifCarte 0.9s ease-in-out infinite;
     pointer-events: none;
     z-index: -1;
-}
-
-/* ========================================================================= */
-/* MENUS COULISSANTS DE COMBAT                                               */
-/* ========================================================================= */
-
-.menu-coulissant-droit {
-    position: absolute;
-    top: 10vh;
-    right: -300px;
-    width: 80px; 
-    bottom: 5vh;
-    background: rgba(20, 15, 10, 0.95);
-    border: 2px solid #5c3a21;
-    border-right: none;
-    border-radius: 15px 0 0 15px;
-    padding: 20px 10px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    z-index: 100;
-    transition: right 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-    box-shadow: -5px 5px 25px rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(5px);
-}
-
-.menu-coulissant-droit.ouvert {
-    right: 0;
-}
-
-.bouton-tourne-hover {
-    transition: transform 0.4s ease, filter 0.2s ease !important;
-}
-
-.bouton-tourne-hover:hover {
-    transform: rotate(90deg) scale(1.1) !important;
 }
 
 /* ========================================================================= */
@@ -3609,23 +3532,6 @@ textarea.input-texte-parchemin {
 .fleche-liste-bas { bottom: 4px; }
 @keyframes fleche-liste-pulse { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
 
-/* La barre de résolution d'un ciblage : ANNULER et RÉSOUDRE, en bas de l'écran
-   (la carte ne s'ouvre plus au lancement). */
-#barre-ciblage-resolution {
-  position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 60;
-  display: flex; gap: 14px; padding: 8px 14px; border-radius: 12px;
-  background: linear-gradient(180deg, rgba(43, 28, 16, 0.94), rgba(26, 17, 9, 0.96));
-  border: 2px solid #a8841f; box-shadow: 0 6px 18px rgba(0,0,0,0.75), inset 0 0 0 1px rgba(255,225,140,0.18);
-}
-.bouton-barre-ciblage {
-  font-family: 'Cinzel', serif; font-size: 16px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase;
-  padding: 6px 16px; border-radius: 8px; cursor: pointer; user-select: none; transition: transform 0.15s, background 0.15s;
-  text-shadow: 1px 1px 2px black;
-}
-.bouton-barre-ciblage:hover { transform: scale(1.06); }
-.bouton-resoudre { color: #d7fbff; border: 1px solid #36c9d6; background: rgba(0, 120, 140, 0.35); text-shadow: 1px 1px 2px black, 0 0 8px #00ffff; }
-.bouton-annuler { color: #ffd6d6; border: 1px solid #c94a4a; background: rgba(140, 20, 20, 0.35); text-shadow: 1px 1px 2px black, 0 0 8px #ff4c4c; }
-
 /* =========================================================================
    LA FORGE, AUX COULEURS DU JEU
    Parchemin, cuir et or, comme les autres fenêtres : plus de blanc ni de bleu
@@ -5300,10 +5206,6 @@ textarea.input-texte-parchemin {
    parent), sinon il n'adoucirait que le rectangle. */
 .ombre-parchemin { position: absolute; inset: 0; transform: translate(14px, 26px); filter: blur(22px); pointer-events: none; }
 .ombre-parchemin-forme { position: absolute; inset: 0; background: rgba(45, 28, 8, 0.6); }
-/* La carte du monde fait 3840 px et s'affiche bien plus réduite : son ombre,
-   en pixels de la carte, est plus grande d'autant. */
-#table-monde .ombre-parchemin { transform: translate(26px, 46px); filter: blur(40px); }
-#table-monde { width: 3840px; height: 2160px; }
 .table-ombre { position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(ellipse 80% 75% at 50% 45%, rgba(40, 25, 5, 0) 45%, rgba(40, 25, 5, 0.3) 100%); }
 
@@ -5403,10 +5305,6 @@ textarea.input-texte-parchemin {
 .nom-ennemi-valider { background: transparent; border: 0; border-bottom: 1px dashed rgba(43, 26, 14, 0.45); font-size: 18px; font-weight: 700; color: #1b1009; padding: 2px 0; outline: none; }
 .nom-ennemi-valider:focus { border-bottom-style: solid; }
 .role-ennemi-valider { font-size: 13px; color: #6b4a2b; font-style: italic; }
-.liste-visuels-valider { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.qui-visuel { display: block; font-weight: 700; font-size: 14px; }
-.description-visuel-valider { width: 100%; box-sizing: border-box; resize: vertical; background: rgba(255, 248, 230, 0.35); border: 1px solid rgba(43, 26, 14, 0.3);
-  border-radius: 4px; font-size: 14px; color: #1b1009; padding: 4px 6px; }
 .boutons-feuille-ennemis { display: flex; justify-content: space-between; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
 .boutons-feuille-ennemis button { background: none; border: 1.5px solid #2b1a0e; border-radius: 40% 46% 42% 48% / 50% 44% 52% 46%; padding: 8px 20px; font-size: 17px;
   color: #2b1a0e; cursor: pointer; }

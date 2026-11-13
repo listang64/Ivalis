@@ -130,7 +130,6 @@
 .papier-postit svg { width: calc(var(--u) * 4); height: calc(var(--u) * 4); flex: none; }
 .recit-postit.sortie { transform: translateX(0) rotate(4deg); }
 .recit-postit.sortie:not(.eteint):hover { transform: translateX(4%) rotate(2deg); }
-.recit-postit.appuye { transform: translateX(-4%) rotate(5deg) scale(0.97); }
 .recit-postit.eteint { filter: grayscale(0.7) brightness(0.92) drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.4) rgba(40, 20, 6, 0.3)); cursor: default; }
 /* (v307) rentré, il disparaît tout entier sous la page de droite. */
 .recit-postit:not(.sortie) { transform: translateX(-80%) rotate(0deg); pointer-events: none; }
