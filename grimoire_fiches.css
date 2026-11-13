@@ -155,14 +155,23 @@
 .separation-classe { display: flex; align-items: center; gap: calc(var(--u) * 2); margin: calc(var(--u) * 1.6) 0 calc(var(--u) * 0.6); }
 .separation-classe::before, .separation-classe::after { content: ""; flex: 1; border-top: 1px solid rgba(43, 26, 14, 0.6); }
 .separation-classe span { font-size: calc(var(--u) * 3.6 * var(--echelle-titres, 1)); }
-/* v367 — Nico : « le bouton Forger une compétence plus gros » : un vrai bouton tracé à
-   l'encre, centré, sur toute la largeur de la page. */
-.page-fiches .bouton-forger { margin-top: auto; align-self: stretch; text-align: center; text-decoration: none;
-  font-size: calc(var(--u) * 5.2) !important; padding: calc(var(--u) * 2) calc(var(--u) * 2.4);
-  border: 2px solid #3a2210; border-radius: calc(var(--u) * 1.2); background: rgba(255, 244, 214, 0.55);
-  box-shadow: inset 0 0 0 1px rgba(58, 34, 16, 0.25), 0 2px 0 rgba(58, 34, 16, 0.35); }
-.page-fiches .bouton-forger:hover { background: rgba(255, 236, 190, 0.8); }
-.bouton-forger small { display: block; font-size: 0.6em; margin-top: 0.2em; }
+/* v367 — Nico : « le bouton Forger une compétence plus gros » : centré, sur toute la
+   largeur de la page. v372 : « comme dessiné à la main et coloré à l'aquarelle » : le cadre
+   à la plume et le lavis de braise (le procédé de « + Un nouvel aventurier »). */
+.page-fiches .bouton-forger { margin-top: auto; align-self: stretch; text-decoration: none !important; position: relative; isolation: isolate;
+  display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 2);
+  font-size: calc(var(--u) * 5.2) !important; padding: calc(var(--u) * 2.2) calc(var(--u) * 3) !important; color: #24150a !important;
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important; transition: transform 0.15s ease; }
+.page-fiches .bouton-forger > .cadre-main { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.page-fiches .bouton-forger > .lavis { left: -2%; top: -8%; width: 104%; height: 116%; }
+.page-fiches .bouton-forger:hover { transform: rotate(-0.6deg) scale(1.02); }
+.page-fiches .bouton-forger:active { transform: scale(0.97); }
+.texte-forger { text-align: center; line-height: 1.1; }
+.bouton-forger small { display: block; font-size: 0.55em; margin-top: 0.25em; font-family: 'Almendra', serif !important; color: #5c3a21; }
+.marteau-forger { flex: none; width: calc(var(--u) * 9); height: calc(var(--u) * 9); overflow: visible; transform: rotate(-8deg); }
+.marteau-forger path { fill: none; stroke: #1b1009; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.marteau-forger path.plein { fill: rgba(27, 16, 9, 0.18); }
+.marteau-forger path.etincelle { stroke: #a8431c; stroke-width: 1.4; }
 .bouton-forger.eteint { opacity: 0.5; }
 
 /* LA CARTE, qui monte dans le papier comme de l'encre. */

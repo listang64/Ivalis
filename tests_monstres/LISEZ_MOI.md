@@ -11593,3 +11593,11 @@ Tant que tous les joueurs attendus n'ont pas cliqué « Lecture terminée » (ou
 - Sur la première double page du formulaire, une flèche « La suite » en bas à droite indique qu'il faut tourner la page. Un toucher la tourne.
 
 corrections_v371.mjs le vérifie dans le livre : l'aquarelle sous les sept titres (visible, à la taille du titre, cinq teintes au moins, plus de trait), la flèche (en bas à droite, rien dessus, seulement sur la première double page), le toucher qui tourne la page, l'ancienne fenêtre sans aquarelle, les versions. corrections_v319 passe toujours.
+
+## v372 — Le bouton « Forger une compétence », dessiné à la main et coloré à l'aquarelle
+
+- Le procédé de « + Un nouvel aventurier » : un cadre tracé à la plume, une aquarelle couleur de braise dedans, l'écriture des titres du livre.
+- Un marteau de forge à la plume, avec trois étincelles, remplace l'émoji ⚒.
+- Plus rien à créer : le bouton pâlit et son aquarelle passe au gris.
+
+corrections_v372.mjs le vérifie dans le livre (cadre, aquarelle, marteau, police, largeur, ouverture de la Forge, versions). corrections_v367 vérifie maintenant le cadre à la place de l'ancien bord.

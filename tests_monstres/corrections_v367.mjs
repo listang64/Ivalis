@@ -214,8 +214,8 @@ titre("2. LA FORGE : LE GROS BOUTON, LES ARMES EN MAIN, LIA GARDE L'ARME CHOISIE
 await section(async () => {
   await p.evaluate(() => window.GRIMOIRE_FICHES.ouvrir("H1", "onglet-competences")); await p.waitForTimeout(2600); await pose();
   const t = await p.evaluate(() => { const b = document.querySelector("#grimoire-fiches-comp-g .bouton-forger"); const cs = getComputedStyle(b);
-    return { taille: parseFloat(cs.fontSize), bord: cs.borderTopStyle, lien: (document.querySelector("#grimoire-fiches-comp-g .lien-fiche:not(.bouton-forger)") ? parseFloat(getComputedStyle(document.querySelector("#grimoire-fiches-comp-g .lien-fiche:not(.bouton-forger)")).fontSize) : 0) }; });
-  verifier("« Forger une compétence » : un vrai bouton, plus gros que les liens de la page", t.taille > 1.4 * (t.lien || 10) && t.bord === "solid", JSON.stringify(t));
+    return { taille: parseFloat(cs.fontSize), bord: !!b.querySelector(":scope > .cadre-main") /* v372 : le cadre tracé à la main */, lien: (document.querySelector("#grimoire-fiches-comp-g .lien-fiche:not(.bouton-forger)") ? parseFloat(getComputedStyle(document.querySelector("#grimoire-fiches-comp-g .lien-fiche:not(.bouton-forger)")).fontSize) : 0) }; });
+  verifier("« Forger une compétence » : un vrai bouton, plus gros que les liens de la page", t.taille > 1.4 * (t.lien || 10) && t.bord, JSON.stringify(t));
   await cap("v367_bouton_forger");
   await cliquer("#grimoire-fiches-comp-g .bouton-forger"); await p.waitForTimeout(2600); await pose();
   // Une arme légère en main.

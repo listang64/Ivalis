@@ -701,9 +701,15 @@ function htmlCompetencesGauche(h) {
         <div class="entete-fiche"><span class="titre-page-fiche">Compétences</span>
           <span class="compte-memoire" ${aide("Mémorisées", "Les compétences que le héros emporte au combat. Touche une bannière pour voir sa carte ; touche-la encore (ou « Mémoriser ») pour l'emporter ou la laisser.")}>Mémorisées <b>${e.deck.length}</b> / ${e.max}</span></div>
         <div class="liste-bannieres">${bannieres || `<p class="fiche-attente">Le héros n'a pas encore forgé ses techniques de combat.</p>`}${classe}</div>
-        ${moi ? `<button type="button" class="lien-fiche bouton-forger${e.restantes > 0 ? "" : " eteint"}" data-action="fiches" data-fa="forger">⚒ Forger une compétence <small>(${e.restantes} à créer)</small></button>` : ""}
+        ${moi ? `<button type="button" class="lien-fiche bouton-forger${e.restantes > 0 ? "" : " eteint"}" data-action="fiches" data-fa="forger">${lavis(e.restantes > 0 ? TEINTE_FORGE : "gris", "forger-" + h.idPersonnage)}${cadre("forger-" + h.idPersonnage, 1.4)}${MARTEAU}<span class="texte-forger">Forger une compétence <small>(${e.restantes} à créer)</small></span></button>` : ""}
       </div>`;
 }
+// (v372) Nico : « le bouton Forger une compétence, dans le même style et esprit que le
+// reste du livre : comme dessiné à la main et coloré à l'aquarelle ». Le procédé de
+// « + Un nouvel aventurier » : le cadre tracé à la plume, un lavis couleur de braise, et
+// un marteau à la plume à la place de l'émoji.
+const TEINTE_FORGE = { couleurs: ["#b8552a", "#d98a3a", "#8f3a1e"], opacite: 0.5, nom: "forge" };
+const MARTEAU = `<svg class="marteau-forger" viewBox="0 0 40 40" aria-hidden="true"><g transform="rotate(-35 20 20)"><path class="plein" d="M11 5.5 L30 5 C31 7.5 31 11 30.5 13.5 L11.5 14 C10.5 11 10.5 8 11 5.5 Z"/><path d="M11 5.5 L30 5 C31 7.5 31 11 30.5 13.5 L11.5 14 C10.5 11 10.5 8 11 5.5 Z M14.5 6 L14.8 13.6 M19 14 C19.2 21 18.6 29 19.4 36.5 C20.4 37.6 21.8 37.6 22.6 36.4 C22.2 29 22.4 21 22 14"/></g><path class="etincelle" d="M31 22 l5 -2 M30 27 l4 2 M33 17 l3 -4"/></svg>`;
 // LA CARTE DE LA COMPÉTENCE, à l'encre, moins haute qu'avant : il n'y a plus
 // d'image (Nico).
 function lignesEffets(data, porteur) {
