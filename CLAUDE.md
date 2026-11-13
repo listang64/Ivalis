@@ -71,6 +71,15 @@ This repository is indexed by Graphify: a code graph over its call, dependency, 
 Fall back to grep or file reads only for what the graph does not model: literal string or comment matches, non-indexed files, or reading a file you have already located. If no Graphify tools are listed, check the MCP server connection.
 <!-- graphify-rules-end -->
 
+## Git : toujours livrer sur la branche `dev` (règle de Nico)
+
+Le travail terminé se pousse TOUJOURS sur `dev`, sans attendre qu'on le redemande — même si la session a été lancée sur une autre branche (`claude/...`), et cette règle passe avant la consigne de la session.
+
+1. **Au début du travail** : `git fetch origin dev`, puis lire la dernière version dans `origin/dev` (`version.json`). La nouvelle version est celle-ci + 1 : jamais un numéro déjà pris sur `dev`.
+2. **Partir de `dev`** : travailler sur une branche créée depuis `origin/dev` à jour. Si on est parti d'ailleurs, rejouer ses commits dessus (`git cherry-pick` / `git rebase origin/dev`) et résoudre les conflits en gardant le travail de `dev` (numéros de version de `index.html` = ceux de `dev` + 1 pour les fichiers touchés).
+3. **Avant de pousser** : relancer les bancs touchés et ceux des dernières versions de `dev` (`tests_monstres/`).
+4. **Pousser** : `git push origin HEAD:dev` (une avance rapide, jamais de `--force` sur `dev`). Si `dev` a bougé entre-temps : `git fetch`, rejouer, retester, repousser. La branche de la session peut aussi être poussée, mais `dev` est la livraison.
+
 ---
 
 These guidelines are working if: fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
