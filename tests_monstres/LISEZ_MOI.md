@@ -11806,3 +11806,9 @@ corrections_v388.mjs le vérifie dans le livre : la page principale (texte, cent
 - **La page qui tourne** : l'échantillon « page-tourne » est le son de Nico (« Pages qu'on tourne », La Sonothèque, 1,2 s, Cloudinary). Il joue quand une page se pose, et aussi quand plusieurs pages défilent (un lien, un marque-page). Le bruit de la feuille qu'on attrape (« page-prise ») ne change pas.
 
 corrections_v389.mjs le vérifie dans le livre : le son des boutons vide (clic, survol, un bouton du livre), l'échantillon demandé et décodé, joué par une page qui tourne, par les pages qui défilent et par une vraie page tournée du livre, la prise inchangée, les versions. Le banc sert le son depuis tests_monstres/_son_page.wav (le banc n'a pas Internet). Mis à jour : fabrique_sons.mjs (les menus se taisent), corrections_v299 (le nouveau son ; et, oubliés en v387-v388 : le tissu des marque-pages, la double page des combats), v388 (version 388 ou plus).
+
+## v390 — La surpuissance de la Forge, sans encadré
+
+- Dans la bulle de la fatigue, le texte de la surpuissance active n'a plus de cadre arrondi ni de fond (style.css, `.forge-surpuissance.active`) : il ne déborde plus du médaillon. Il reste en gras.
+
+corrections_v390.mjs le vérifie (ni bord, ni fond, ni marge intérieure ; le gras ; les versions). corrections_v389 accepte les versions plus récentes. (surpuissance.mjs et corrections_v241 ne tournent pas ici : il leur manque tests_monstres/effets_reels.json, absent du dépôt.)

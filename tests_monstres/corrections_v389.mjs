@@ -201,8 +201,9 @@ titre("3. LES VERSIONS");
 // =========================================================================
 await section(async () => {
   const html = lire("index.html");
-  verifier("index.html charge les nouvelles versions (fabrique_sons 22, app 174)", /fabrique_sons\.js\?v=22"/.test(html) && /app\.js\?v=174"/.test(html));
-  verifier("la version du jeu : 389", /VERSION_IVALIS = 389/.test(lire("trace_combat.js")) && JSON.parse(lire("version.json")).version === 389);
+  const v = (f) => Number((new RegExp('["/]' + f.replace(".", "\\.") + '\\?v=(\\d+)"').exec(html) || [])[1]);
+  verifier("index.html charge les nouvelles versions (fabrique_sons 22, app 174, ou plus)", v("fabrique_sons.js") >= 22 && v("app.js") >= 174);
+  verifier("la version du jeu : 389 ou plus", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 389 && JSON.parse(lire("version.json")).version >= 389);
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

@@ -3363,10 +3363,10 @@ textarea.input-texte-parchemin {
     margin-top: 6px; max-width: 190px; text-align: center; line-height: 1.25;
     font-size: 11.5px; font-style: italic; color: #8a7050;
 }
+/* (v390) Nico : « enlève l'encadré autour du texte de surpuissance, comme ça ça ne dépassera pas » :
+   plus de cadre ni de fond, seulement le texte en rouge. */
 .forge-surpuissance.active {
     font-style: normal; font-weight: bold; font-size: 12.5px; color: #b91c1c;
-    padding: 3px 8px; border-radius: 10px; background: rgba(217, 119, 6, 0.14);
-    border: 1px solid rgba(185, 28, 28, 0.35);
 }
 .ligne-surpuissance .titre-effet-hd { color: #ffb347 !important; }
 .forge-valeur-surpuissante { display: block; margin-top: 2px; color: #b91c1c; font-weight: bold; font-style: normal; }
