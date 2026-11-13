@@ -11601,3 +11601,15 @@ corrections_v371.mjs le vérifie dans le livre : l'aquarelle sous les sept titre
 - Plus rien à créer : le bouton pâlit et son aquarelle passe au gris.
 
 corrections_v372.mjs le vérifie dans le livre (cadre, aquarelle, marteau, police, largeur, ouverture de la Forge, versions). corrections_v367 vérifie maintenant le cadre à la place de l'ancien bord.
+
+## v373 — Les cartes du livre : plus d'ombre ; les fenêtres du voyage en fondu sur la page de gauche
+
+- **Plus d'ombre sur les cartes** : l'ombre de pliure posée par-dessus la carte vivante (v310, coupée à la carte en v346 : le « carré ») est retirée. La page de droite des régions et la double page du monde n'ont plus l'ombre du dos. Les autres pages la gardent.
+- **Les fenêtres du voyage dans le livre** (grimoire_regions.js, `rangerFenetresVoyage`) : le choix de la destination, le vote, la nuit, le détour, la halte, « En route vers… », l'attente du lieu, les petits messages, « JOUR 2 » et l'aperçu d'un lieu.
+  - Sur une carte régionale, elles s'écrivent en fondu sur la page de gauche, à l'encre, sans boîte. Les boutons sont tracés à la main avec une aquarelle de braise. Le titre de la région remonte en haut de la page, plus petit, et redescend quand la page se vide.
+  - Sur la carte du monde (sans page libre), elles s'écrivent dans un post-it qui sort par le haut du livre, comme le papier d'écriture du récit.
+  - Sous la loupe (la carte en grand), elles restent des fenêtres flottantes, habillées en bouts de parchemin déchirés.
+  - Ailleurs dans le livre (récit, fiches…), elles sont rendues à l'écran de jeu comme avant.
+  - Ce sont les mêmes éléments et les mêmes boutons (voyage_groupe.js, villages_regionaux.js) : seulement rangés et réécrits par grimoire_regions.css.
+
+corrections_v373.mjs le vérifie : les ombres, le choix (page de gauche, sans boîte, fondu, titre qui remonte puis redescend), le vote (bouton tracé, le toucher vote sans tourner la page), la nuit, la marche, « JOUR 2 », les messages, l'aperçu d'un lieu, la loupe (parchemin, retour sur la page), le post-it du monde (choix, vote d'une région à l'autre entier au-dessus du livre), le retour à l'écran de jeu dans le récit, les versions. Mis à jour : corrections_v310, v345, v346 (plus de pliure), v344 (contrôle de version). Échecs déjà présents avant, sans lien : v310 (le livre part vers le récit dans ce banc, usure des pages), v344 (« l'île attend », aléatoire), v275 (ancienne interface).

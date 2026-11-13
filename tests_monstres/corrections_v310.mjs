@@ -195,10 +195,8 @@ await section(async () => {
   });
   const g = await geo();
   // (v331 : toutes les cartes en page de droite — la pliure reste, sans le mode paysage.)
-  verifier("le désert d'Etheria (v331 : en page de droite) : l'ombre de la pliure est posée sur le livre, par-dessus la carte",
-           !!r && r.parent === "grimoire-livre" && r.z > r.zVue && !r.paysage && /linear-gradient/.test(r.g) && /linear-gradient/.test(r.d), JSON.stringify(r));   // (v331 : la carte à droite — seule la moitié droite de la pliure la couvre)
-  verifier("… au milieu du livre (le dos), sans prendre le doigt", !!g.pliure && Math.abs((g.pliure.l + g.pliure.w / 2) - (g.livre.l + g.livre.w / 2)) < 2 && r.evts === "none",
-           g.pliure ? `${(g.pliure.l + g.pliure.w / 2).toFixed(0)} / ${(g.livre.l + g.livre.w / 2).toFixed(0)}` : "absente");
+  // (v373) Nico : « une ombre carrée disgracieuse : pas besoin d'ombrage sur ces maps » : plus de pliure posée.
+  verifier("le désert d'Etheria : plus d'ombre de pliure par-dessus la carte (v373)", r === null && !g.pliure, JSON.stringify(r));
   const dessus = await p.evaluate(([x, y]) => { const el = document.elementFromPoint(x, y); return el ? (el.closest("#region-pliure") ? "pliure" : el.closest("#vue-carte-region") ? "carte" : el.id || el.className) : "rien"; }, [g.livre.l + g.livre.w * 0.75, g.livre.t + g.livre.h / 2]);   // (v331 : la carte est sur la page de droite)
   verifier("… et la carte se touche encore à travers elle", dessus === "carte", dessus);
   // Pendant une tourne, elle part avec la carte vivante.
@@ -210,7 +208,7 @@ await section(async () => {
   // La région suivante : le mont Pletia (portrait), la carte sur la page de droite.
   await monteeSur(3); await p.waitForTimeout(300);
   const q = await p.evaluate(() => { const pl = document.getElementById("region-pliure"); return pl ? { paysage: pl.classList.contains("paysage"), g: getComputedStyle(pl.querySelector(".gauche")).visibility, d: getComputedStyle(pl.querySelector(".droite")).visibility } : null; });
-  verifier("une carte en portrait (page de droite) : seule la moitié droite de la pliure", !!q && !q.paysage && q.g === "hidden" && q.d === "visible", JSON.stringify(q));
+  verifier("une carte en portrait (page de droite) : pas de pliure non plus (v373)", q === null, JSON.stringify(q));
 });
 
 // =========================================================================

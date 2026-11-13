@@ -300,26 +300,10 @@
         m.setAttribute("aria-disabled", String(!oui));
         if (m.title !== titre) m.title = m.ariaLabel = titre;
     }
-    // L'ombre de la pliure (v310). Nico : « sur les maps régionales sur les deux
-    // pages, mets l'ombre de la pliure du livre par-dessus l'image, comme si
-    // l'image épousait la page ». La même que celle des pages (grimoire.css).
-    function poserPliure(r) {
-        let el = $("region-pliure");
-        if (!r) { if (el) el.remove(); return; }
-        if (!el) { el = document.createElement("div"); el.id = "region-pliure"; el.className = "region-pliure"; el.innerHTML = `<i class="gauche"></i><i class="droite"></i>`; }
-        if (el.parentNode !== G().livre()) G().livre().appendChild(el);
-        el.classList.toggle("paysage", paysage(r));
-        // (v346) Nico : « une ombre vient se mettre en plus au milieu, et disparaît dès
-        // que je sélectionne pour tourner ». Hors de la carte vivante (le papier entre le
-        // dos et le cadre), la page a déjà sa propre ombre : la pliure ne couvre que la carte.
-        const vue = $("vue-carte-region"), image = $("carte-region-image"), e = el.getBoundingClientRect();
-        const a = vue && vue.getBoundingClientRect(), b = image ? image.getBoundingClientRect() : a;
-        if (!a || !e.width || !el.offsetWidth) return;
-        const v = { top: Math.max(a.top, b.top), right: Math.min(a.right, b.right), bottom: Math.min(a.bottom, b.bottom), left: Math.max(a.left, b.left) };
-        const k = el.offsetWidth / e.width, px = (n) => Math.max(0, Math.round(n * k)) + "px";
-        const clip = `inset(${px(v.top - e.top)} ${px(e.right - v.right)} ${px(e.bottom - v.bottom)} ${px(v.left - e.left)})`;
-        if (el.style.clipPath !== clip) el.style.clipPath = clip;
-    }
+    // (v373) Nico : « sur toutes mes pages map une ombre carrée disgracieuse : enlève-les,
+    // pas besoin d'ombrage sur ces maps ». L'ombre de la pliure posée sur la carte vivante
+    // (v310, coupée à la carte en v346 : le carré) n'existe plus ; les pages des cartes
+    // n'ont plus l'ombre du dos (grimoire_regions.css).
     // LE GROUPE SUR LA CARTE DU MONDE DU LIVRE (v312). Nico : « rebranche sur la map
     // globale le token de là où se trouve le groupe, et les traces de déplacement
     // d'une région à l'autre ». La carte du livre a ses propres boîtes (Carte_Livre,
@@ -392,6 +376,60 @@
         svg.innerHTML = html;
     }
     window.poserGroupeSurLaCarteDuLivre = () => poserGroupeSurLeMonde(true);
+    // LES FENÊTRES DU VOYAGE DANS LE LIVRE (v373). Nico : « toutes les popups qui
+    // s'ouvrent pour les déplacements sur les maps : plutôt que des popups, que ça
+    // s'affiche en fondu sur la page de gauche ». Ses réponses : toutes (le choix de
+    // la destination, le vote, la nuit, le détour, la halte, « en route », l'attente
+    // du lieu, les petits messages, « JOUR 2 », l'aperçu d'un lieu) ; le titre de la
+    // région remonte en haut de la page ; à l'encre sur le papier ; sur la carte du
+    // monde (sans page libre), « un post-it qui sort par le haut ».
+    // Les fenêtres restent celles de voyage_groupe.js et villages_regionaux.js (mêmes
+    // éléments, mêmes boutons) : elles sont RANGÉES sur la page le temps qu'on y est,
+    // et rendues à l'écran de jeu ailleurs (grimoire_regions.css les réécrit à l'encre).
+    const FENETRES_VOYAGE = ["annonce-jour-voyage", "attente-poi", "bandeau-voyage", "boite-voyage", "annonce-voyage", "apercu-lieu"];
+    const fenetreVisible = (el) => el.classList.contains("visible") || (["bandeau-voyage", "boite-voyage"].includes(el.id) && el.style.display !== "none" && el.innerHTML.trim() !== "");
+    function papierDuMonde() {
+        let el = $("voyage-postit");
+        const g = G(), scene = g && g.scene && g.scene(), livre = g && g.livre && g.livre();
+        if (!el && scene && livre) {
+            el = document.createElement("div");
+            el.id = "voyage-postit";
+            el.className = "recit-ecriture voyage-postit";
+            el.innerHTML = `<div class="papier-ecriture papier-voyage voyage-livre" id="voyage-postit-papier"></div>`;
+            scene.insertBefore(el, livre);
+        }
+        return el;
+    }
+    function rangerFenetresVoyage(r, monde) {
+        // (v373) Nico : « si on est en mode zoom de la map (la loupe), tu peux laisser la
+        // popup, mais en mode bout de papier parchemin » : sous la loupe, elles flottent
+        // à l'écran, habillées en bouts de parchemin (grimoire_regions.css, .loupe-voyage).
+        const loupe = !!window.LOUPE_CARTES && window.LOUPE_CARTES.etat() !== "repos";
+        document.body.classList.toggle("loupe-voyage", loupe);
+        if (loupe) r = monde = null;
+        let ici = null;
+        if (r) {
+            const page = r.pages[0];
+            ici = page.querySelector(":scope > .voyage-page");
+            if (!ici) { ici = document.createElement("div"); ici.className = "voyage-page voyage-livre"; page.appendChild(ici); }
+        } else if (monde) {
+            const postit = papierDuMonde();
+            ici = postit && postit.querySelector(".papier-voyage");
+        }
+        const dehors = $("ecran-jeu") || document.body;
+        FENETRES_VOYAGE.forEach(id => {
+            const el = $(id);
+            if (!el) return;
+            const voulu = ici || (id === "apercu-lieu" ? document.body : dehors);
+            if (el.parentNode !== voulu) voulu.appendChild(el);
+        });
+        // Le titre de la région remonte quand une fenêtre s'écrit sur la page ; le post-it sort.
+        const occupe = !!ici && [...ici.children].some(fenetreVisible);
+        regions.forEach(x => x.pages[0].classList.toggle("avec-voyage", occupe && x === r));
+        const postit = $("voyage-postit");
+        if (postit) postit.classList.toggle("sortie", occupe && !r && !!monde);
+    }
+    window.rangerFenetresVoyageLivre = rangerFenetresVoyage;
     let tailleVue = "";
     let etaitEnPartie = false, posee = true;
     function veiller() {
@@ -405,7 +443,7 @@
                 if (typeof window.placerOutilsRegionDev === "function") window.placerOutilsRegionDev(false);
                 allumerMarche(false, false, "Voyager");
                 poserGroupeSurLeMonde(false);
-                poserPliure(null);
+                rangerFenetresVoyage(null, false);
                 const jeu = $("ecran-jeu");
                 if (jeu) jeu.classList.remove("livre-carte");
                 demonter().then(rendreLaVue);
@@ -449,6 +487,9 @@
         const ev = typeof window.etatVoyageLivre === "function" ? window.etatVoyageLivre() : null;
         allumerMarche(carteDuLivre && !!ev && ev.possible, !!ev && ev.actif, ev ? ev.titre : "Voyager");
         poserGroupeSurLeMonde(lu && surLaCarteDuMonde());
+        // (v373) Les fenêtres du voyage sur la page de gauche (ou le post-it du monde) ;
+        // pendant qu'une page tourne, elles restent où elles sont.
+        if (lu) rangerFenetresVoyage(r && montee === r.numero ? r : null, surLaCarteDuMonde());
         // (v310) La pliure du livre par-dessus la carte vivante ; sous elle, l'image
         // de la page s'efface (ses trous brûlés montrent le papier, pas la carte).
         // (v344) …mais seulement une fois la carte vivante prête (ses images chargées) :
@@ -464,7 +505,6 @@
             if (lu && montee === x.numero && prete && window.carteRegionaleOuverte && window.carteRegionaleOuverte() === x.numero) copierLaVue(x);
             else if (lu && montee !== x.numero) oublierLaVue(x);
         });
-        poserPliure(lu && montee && r && montee === r.numero ? r : null);
         // (v310) La place de la carte a changé de taille (écran tourné, livre posé) : on recadre.
         if (vue && montee) {
             const taille = vue.offsetWidth + "x" + vue.offsetHeight;

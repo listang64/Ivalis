@@ -33,16 +33,10 @@
 .vue-carte-region.dans-le-livre #carte-region-table, .vue-carte-region.dans-le-livre .table-ombre,
 .vue-carte-region.dans-le-livre #carte-region-dessus { display: none !important; }
 .vue-carte-region.dans-le-livre.en-tourne { visibility: hidden; }
-/* L'OMBRE DE LA PLIURE PAR-DESSUS LA CARTE VIVANTE (v310) : la même que celle
-   des pages (grimoire.css, .page-papier::after) — 40 % de chaque page, du dos
-   vers l'extérieur ; la carte paraît épouser le creux du livre. */
-.region-pliure { position: absolute; left: 30%; top: 0; width: 40%; height: 100%; z-index: 42; pointer-events: none; display: flex; }
-.region-pliure i { flex: 1; mix-blend-mode: multiply; }
-.region-pliure .gauche { background: linear-gradient(to left, rgba(36, 18, 3, 0.72) 0%, rgba(44, 22, 5, 0.52) 4%, rgba(54, 28, 7, 0.34) 12%,
-                                     rgba(64, 36, 10, 0.2) 25%, rgba(70, 40, 12, 0.08) 50%, rgba(70, 40, 12, 0) 100%); }
-.region-pliure .droite { background: linear-gradient(to right, rgba(36, 18, 3, 0.72) 0%, rgba(44, 22, 5, 0.52) 4%, rgba(54, 28, 7, 0.34) 12%,
-                                      rgba(64, 36, 10, 0.2) 25%, rgba(70, 40, 12, 0.08) 50%, rgba(70, 40, 12, 0) 100%); }
-.region-pliure:not(.paysage) .gauche { visibility: hidden; }
+/* (v373) Plus d'ombre sur les cartes (Nico : « pas besoin d'ombrage sur ces maps ») : ni la
+   pliure par-dessus la carte vivante (retirée), ni l'ombre du dos sur les pages qui portent
+   une carte (la page de droite des régions, la double page du monde). */
+.page-region.droite::after, .page-region.paysage::after, .page-carte::after { display: none; }
 .region-titre-livre { position: absolute; left: 0; top: 0; width: 50%; height: 100%; z-index: 45; pointer-events: none; }
 .region-titre-livre.en-tourne { visibility: hidden; }
 /* (v310) Le bouton du voyage n'est plus sur le livre : le marque-page de la marche le remplace (grimoire.css). */
@@ -62,3 +56,115 @@
     pointer-events: auto; touch-action: manipulation; }
 .bouton-descriptif-region:hover { background: rgba(255, 238, 205, 0.85); }
 body.dev-descriptifs-regions .bouton-descriptif-region { display: inline-block; }
+
+/* =========================================================================
+   v373 — LES FENÊTRES DU VOYAGE DANS LE LIVRE (grimoire_regions.js, rangerFenetresVoyage).
+   Nico : « plutôt que les popups, que ça s'affiche en fondu sur la page de gauche » ;
+   à l'encre sur le papier ; sur la carte du monde, un post-it qui sort par le haut.
+   Les fenêtres gardent leur contenu et leurs boutons (voyage_groupe.js) : elles perdent
+   ici leur boîte et s'écrivent sur la page.
+   ========================================================================= */
+/* Sur une carte du livre, une fenêtre pas encore rangée ne se montre pas (un instant). */
+body:not(.loupe-voyage) #ecran-jeu.livre-carte > #bandeau-voyage, body:not(.loupe-voyage) #ecran-jeu.livre-carte > #boite-voyage,
+body:not(.loupe-voyage) #ecran-jeu.livre-carte > #attente-poi, body:not(.loupe-voyage) #ecran-jeu.livre-carte > #annonce-voyage,
+body:not(.loupe-voyage) #ecran-jeu.livre-carte > #annonce-jour-voyage { visibility: hidden; }
+
+/* Le titre de la région remonte, plus petit, quand une fenêtre s'écrit dessous. */
+.page-region .region-titre-page { transition: top 0.6s ease, transform 0.6s ease; transform-origin: 50% 0; }
+.page-region.avec-voyage .region-titre-page { top: 6%; transform: scale(0.7); }
+.voyage-page { position: absolute; left: 12%; right: 10%; top: 25%; bottom: 7%; z-index: 3; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 2.4); pointer-events: auto; }
+
+/* L'écriture : plus de boîte, de l'encre sur le papier, qui arrive en fondu. */
+.voyage-livre > * { position: static !important; inset: auto !important; left: auto !important; top: auto !important; right: auto !important; bottom: auto !important;
+  transform: none !important; z-index: auto !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important;
+  background: none !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  color: #24150a !important; text-align: center; pointer-events: auto; animation: fondu-voyage-livre 0.7s ease both !important; }
+.voyage-livre > .attente-poi:not(.visible), .voyage-livre > .annonce-voyage:not(.visible),
+.voyage-livre > .annonce-jour-voyage:not(.visible), .voyage-livre > .apercu-lieu:not(.visible) { display: none !important; }
+@keyframes fondu-voyage-livre { from { opacity: 0; filter: blur(2px); } to { opacity: 1; filter: none; } }
+@media (prefers-reduced-motion: reduce) { .voyage-livre > * { animation: none !important; } }
+.voyage-livre, .voyage-livre * { font-family: 'IM Fell English', 'Almendra', serif !important; }
+.voyage-livre b { color: #7a1d12 !important; }
+
+/* Les titres (« Voyage proposé », « Nuit 1 au campement »…) dans l'écriture des titres du livre. */
+.voyage-livre .boite-voyage-tete, .voyage-livre .bandeau-voyage-titre {
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important;
+  font-size: calc(var(--u) * 5 * var(--echelle-titres, 1)) !important; color: #1d1209 !important; line-height: 1.15; margin-bottom: calc(var(--u) * 1) !important; }
+.voyage-livre .boite-voyage-tete.compacte { font-size: calc(var(--u) * 4 * var(--echelle-titres, 1)) !important; margin: 0 !important; }
+.voyage-livre .boite-voyage-tete *, .voyage-livre .bandeau-voyage-titre * { font-family: inherit !important; }
+.voyage-livre .boite-voyage-texte, .voyage-livre .bandeau-voyage-aide { font-size: calc(var(--u) * 3.3) !important; line-height: 1.4; color: #3a2210 !important; margin: 0 0 calc(var(--u) * 1.4) !important; font-style: italic; }
+.voyage-livre .boite-voyage-etat { font-size: calc(var(--u) * 2.9) !important; color: #5c3a21 !important; margin-top: calc(var(--u) * 1.2) !important; }
+/* Les votants : une liste à la plume, pointillée. */
+.voyage-livre .boite-voyage-votants { width: 80%; margin: 0 auto calc(var(--u) * 1.6) !important; }
+.voyage-livre .boite-voyage-votants li { font-size: calc(var(--u) * 3.3) !important; border-bottom: 1px dotted rgba(43, 26, 14, 0.5) !important; padding: calc(var(--u) * 0.5) 0 !important; }
+.voyage-livre .boite-voyage-votants li.oui b { color: #2f6b2a !important; }
+.voyage-livre .boite-voyage-votants li.non b { color: #8b1a10 !important; }
+/* Les boutons : tracés à la main (un bord tremblé), une aquarelle de braise dessous. */
+.voyage-livre .boite-voyage-boutons, .voyage-livre .bandeau-voyage-boutons { gap: calc(var(--u) * 2) !important; flex-wrap: wrap; justify-content: center; }
+.voyage-livre button { position: relative; isolation: isolate; font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important;
+  font-size: calc(var(--u) * 3.6) !important; color: #1d1209 !important; padding: calc(var(--u) * 1.1) calc(var(--u) * 3) !important; cursor: pointer;
+  background: radial-gradient(ellipse 62% 58% at 46% 54%, rgba(196, 88, 40, 0.42), rgba(217, 138, 58, 0.22) 62%, transparent 100%) !important;
+  border: 2px solid #2b1a0e !important; border-radius: 18px 4px 16px 5px / 5px 15px 4px 17px !important; box-shadow: none !important; filter: none !important;
+  transition: transform 0.15s ease; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.voyage-livre button.secondaire { background: radial-gradient(ellipse 62% 58% at 54% 48%, rgba(150, 120, 80, 0.2), transparent 100%) !important; border-width: 1.5px !important; }
+.voyage-livre button:hover:not(:disabled) { transform: rotate(-0.8deg) scale(1.03); }
+.voyage-livre button:disabled { opacity: 0.6; border-style: dashed !important; cursor: default; }
+.voyage-livre button.choisi { background: radial-gradient(ellipse 62% 58% at 50% 50%, rgba(196, 150, 40, 0.55), rgba(196, 150, 40, 0.15) 70%, transparent 100%) !important; }
+.voyage-livre .boite-voyage-dev { font-family: 'Almendra', serif !important; font-size: calc(var(--u) * 2.8) !important; color: #8b1a10 !important; background: none !important; border: 1px dashed #b02a1a !important; }
+.voyage-livre .boite-voyage-feu { margin: calc(var(--u) * 1) auto 0 !important; display: block; }
+/* L'attente du lieu, « JOUR 2 », les petits messages, l'aperçu d'un lieu. */
+.voyage-livre .attente-poi-carte { background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; max-width: none !important; color: #24150a !important; }
+.voyage-livre .attente-poi-signe { background: none !important; border: 2px solid #2b1a0e !important; color: #7a1d12 !important; }
+.voyage-livre .attente-poi-texte { font-size: calc(var(--u) * 3.6) !important; color: #3a2210 !important; }
+.voyage-livre .attente-poi-points span { background: #3a2210 !important; }
+.voyage-livre > .annonce-jour-voyage.visible { display: flex !important; align-items: center; justify-content: center; gap: calc(var(--u) * 2); animation: jour-voyage-livre 2.7s ease both !important; }
+.voyage-livre .annonce-jour-texte { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 8 * var(--echelle-titres, 1)) !important;
+  color: #1d1209 !important; background: none !important; -webkit-text-fill-color: #1d1209 !important; text-shadow: none !important; letter-spacing: 0.12em; }
+.voyage-livre .annonce-jour-ligne { flex: 1; max-width: 22%; height: 0 !important; background: none !important; border-top: 1.5px solid #2b1a0e !important; }
+@keyframes jour-voyage-livre { 0% { opacity: 0; filter: blur(3px); } 20%, 75% { opacity: 1; filter: none; } 100% { opacity: 0; } }
+.voyage-livre > .annonce-voyage { font-size: calc(var(--u) * 3.4) !important; font-style: italic; opacity: 1 !important; color: #3a2210 !important; }
+.voyage-livre > .apercu-lieu.visible { display: block !important; cursor: pointer; }
+.voyage-livre .apercu-lieu-cadre { border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: none !important; max-width: none !important; }
+.voyage-livre .apercu-lieu-image { max-height: 44vh; mix-blend-mode: multiply;
+  -webkit-mask-image: radial-gradient(ellipse 72% 70% at 50% 50%, #000 58%, transparent 100%); mask-image: radial-gradient(ellipse 72% 70% at 50% 50%, #000 58%, transparent 100%); }
+.voyage-livre .apercu-lieu-cadre figcaption { background: none !important; color: #24150a !important; justify-content: center !important; flex-direction: column; align-items: center !important; gap: calc(var(--u) * 0.4) !important; }
+.voyage-livre .apercu-lieu-nom { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 5 * var(--echelle-titres, 1)) !important; }
+.voyage-livre .apercu-lieu-type { font-size: calc(var(--u) * 3) !important; color: #5c3a21 !important; }
+/* La nuit : la page ne s'assombrit pas, l'encre reste brune. */
+.voyage-livre .boite-voyage.etat-nuit .boite-voyage-tete, .voyage-livre .boite-voyage.etat-nuit .boite-voyage-texte b { color: #1d1209 !important; }
+
+/* LE POST-IT DE LA CARTE DU MONDE : le papier d'écriture du récit (grimoire_recit.css),
+   au-dessus du milieu du livre ; il sort par le haut quand une fenêtre s'y écrit. */
+.recit-ecriture.voyage-postit { left: calc(700px * var(--s, 1)); width: calc(600px * var(--s, 1)); top: calc(-250px * var(--s, 1)); height: calc(330px * var(--s, 1)); }
+.papier-ecriture.papier-voyage { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: calc(var(--u) * 1.4);
+  padding: calc(var(--u) * 3.2) calc(var(--u) * 3) calc(var(--u) * 2) !important; overflow: hidden; }
+.papier-voyage .boite-voyage-tete, .papier-voyage .bandeau-voyage-titre { font-size: calc(var(--u) * 4.2 * var(--echelle-titres, 1)) !important; margin-bottom: calc(var(--u) * 0.4) !important; }
+.papier-voyage .boite-voyage-texte, .papier-voyage .bandeau-voyage-aide { font-size: calc(var(--u) * 2.9) !important; margin-bottom: calc(var(--u) * 0.8) !important; }
+.papier-voyage .boite-voyage-votants { margin-bottom: calc(var(--u) * 0.8) !important; }
+.papier-voyage .boite-voyage-votants li { font-size: calc(var(--u) * 2.9) !important; padding: calc(var(--u) * 0.2) 0 !important; }
+.papier-voyage button { font-size: calc(var(--u) * 3.1) !important; padding: calc(var(--u) * 0.7) calc(var(--u) * 2.4) !important; }
+
+/* SOUS LA LOUPE (la carte en grand) : les fenêtres flottent, en bouts de parchemin déchirés
+   (Nico : « tu peux laisser la popup, mais en mode bout de papier parchemin »). */
+body.loupe-voyage #bandeau-voyage, body.loupe-voyage #boite-voyage, body.loupe-voyage .attente-poi-carte, body.loupe-voyage #annonce-voyage {
+  background: radial-gradient(ellipse at 50% 55%, transparent 55%, rgba(110, 64, 20, 0.32) 100%),
+              url('images/grimoire/page.webp?v=1') 60% 70% / 260% auto, #e2cd9f !important;
+  border: 0 !important; border-radius: 0 !important; color: #24150a !important;
+  box-shadow: none !important;
+  clip-path: polygon(0 4%, 6% 1%, 14% 3%, 23% 0, 35% 2.5%, 47% 0.5%, 58% 3%, 70% 0.8%, 81% 2.6%, 92% 0.4%, 100% 2.5%, 99% 30%, 100% 62%, 98.6% 100%,
+                     88% 97.6%, 76% 99.6%, 63% 97.4%, 50% 99.4%, 37% 97.2%, 24% 99.5%, 12% 97.5%, 0 99%, 1.2% 66%, 0 34%); }
+body.loupe-voyage #bandeau-voyage, body.loupe-voyage #boite-voyage { padding: 16px 22px 18px !important; }
+body.loupe-voyage #boite-voyage { transform: rotate(0.6deg); }
+body.loupe-voyage #bandeau-voyage, body.loupe-voyage #boite-voyage, body.loupe-voyage .attente-poi-carte, body.loupe-voyage #annonce-voyage,
+body.loupe-voyage #bandeau-voyage *, body.loupe-voyage #boite-voyage *, body.loupe-voyage .attente-poi-carte *, body.loupe-voyage #annonce-voyage * { font-family: 'IM Fell English', 'Almendra', serif !important; }
+body.loupe-voyage .boite-voyage-tete, body.loupe-voyage .bandeau-voyage-titre { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important; font-size: 21px !important; color: #1d1209 !important; }
+body.loupe-voyage .boite-voyage-tete b, body.loupe-voyage .boite-voyage-texte b, body.loupe-voyage .bandeau-voyage-titre b { color: #7a1d12 !important; font-family: inherit !important; }
+body.loupe-voyage .boite-voyage-texte, body.loupe-voyage .bandeau-voyage-aide { font-style: italic; color: #3a2210 !important; }
+body.loupe-voyage .boite-voyage-votants li { border-bottom-color: rgba(43, 26, 14, 0.5) !important; }
+body.loupe-voyage .boite-voyage.etat-nuit .boite-voyage-tete, body.loupe-voyage .boite-voyage.etat-nuit .boite-voyage-texte b { color: #1d1209 !important; }
+body.loupe-voyage #bandeau-voyage button, body.loupe-voyage #boite-voyage button { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; color: #1d1209 !important;
+  background: radial-gradient(ellipse 62% 58% at 46% 54%, rgba(196, 88, 40, 0.42), rgba(217, 138, 58, 0.22) 62%, transparent 100%) !important;
+  border: 2px solid #2b1a0e !important; border-radius: 18px 4px 16px 5px / 5px 15px 4px 17px !important; box-shadow: none !important; }
+body.loupe-voyage #bandeau-voyage button.secondaire, body.loupe-voyage #boite-voyage button.secondaire { background: radial-gradient(ellipse 62% 58% at 54% 48%, rgba(150, 120, 80, 0.2), transparent 100%) !important; border-width: 1.5px !important; }
+body.loupe-voyage #boite-voyage .boite-voyage-dev { font-family: 'Almendra', serif !important; color: #8b1a10 !important; background: none !important; border: 1px dashed #b02a1a !important; }

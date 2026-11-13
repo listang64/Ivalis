@@ -215,7 +215,7 @@ const arreter = () => p.evaluate(() => { window.__suivre = false; return window.
 const juger = (l) => {
   const posees = l.filter(x => x.etat === "read");
   const fausses = l.filter(x => x.visible && x.etat === "read" && x.carte !== x.page);
-  const sansOmbre = l.filter(x => x.visible && !x.pliure);
+  const sansOmbre = [];   // (v373) plus d'ombre de pliure sur les cartes (Nico) : rien à compter
   return { images: l.length, posees: posees.length, fausses: fausses.length, sansOmbre: sansOmbre.length, exemple: (fausses[0] || sansOmbre[0]) };
 };
 
@@ -223,7 +223,7 @@ titre("1. D'UNE CARTE À L'AUTRE : JAMAIS LA CARTE D'AVANT, JAMAIS SANS OMBRE");
 await section(async () => {
   for (let k = 0; k < 5; k++) { await p.evaluate((pg) => window.GRIMOIRE.allerALaPage(pg), regions[1].page); await p.waitForTimeout(2500); await pose(); if (await monteeSur(5)) break; }
   await p.waitForTimeout(1200);
-  verifier("(sur le désert, la carte vivante est posée, avec l'ombre de la pliure)", await p.evaluate(() => window.carteRegionaleOuverte() === 5 && !!document.getElementById("region-pliure")));
+  verifier("(sur le désert, la carte vivante est posée — v373 : sans ombre de pliure)", await p.evaluate(() => window.carteRegionaleOuverte() === 5 && !document.getElementById("region-pliure")));
   for (const [i, n, nom] of [[2, 3, "vers le mont Pletia (une page)"], [1, 5, "retour au désert (une page en arrière)"], [3, 7, "vers l'île aux marchés (les pages défilent)"]]) {
     await suivre();
     await p.evaluate((pg) => window.GRIMOIRE.allerALaPage(pg), regions[i].page);
@@ -250,9 +250,10 @@ await section(async () => {
   while (Date.now() - t0 < 3000) l.push(await profil());
   // Après la tourne, sur la carte du mont Pletia : plus sombre près du dos (l'ombre).
   const apres = l.filter(x => x.etat === "read");
-  const plates = apres.filter(x => !(x.v[0] < x.v[2] - 8));
-  verifier("chaque image après la tourne garde l'ombre sur la carte (plus sombre près du dos)", apres.length > 5 && plates.length === 0,
-           `${apres.length} images, ${plates.length} sans ombre ${JSON.stringify(plates.slice(0, 3))}`);
+  // (v373) Nico : « pas besoin d'ombrage sur ces maps » : la carte reste égale, du dos vers le bord.
+  const ombrees = apres.filter(x => x.v[0] < x.v[2] - 8);
+  verifier("chaque image après la tourne : plus d'ombre sur la carte (v373, aussi claire près du dos)", apres.length > 5 && ombrees.length === 0,
+           `${apres.length} images, ${ombrees.length} ombrée(s) ${JSON.stringify(ombrees.slice(0, 3))}`);
 });
 
 {

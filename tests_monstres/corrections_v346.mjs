@@ -230,7 +230,7 @@ for (const [num, idx, nom] of [[5, 1, "le désert (paysage)"], [3, 2, "le mont P
     const sombres = colonnes.map((f, x) => [x, f]).filter(([, f]) => f > 0.3);
     verifier(`${nom} : au repos, la bande du milieu n'est pas plus sombre que doigt posé (pliure seule)`, etatTourne !== "read" && sombres.length <= 2,
              `${etatTourne}, ${sombres.length} colonne(s) plus sombre(s) sur ${repos.w} ${JSON.stringify(sombres.slice(0, 6))}`);
-    verifier("…et la carte vivante garde son ombre de pliure (limitée à la carte)", await p.evaluate(() => { const el = document.getElementById("region-pliure"); return !!el && /inset\(/.test(el.style.clipPath); }));
+    verifier("…et la carte vivante n'a plus d'ombre de pliure (v373)", await p.evaluate(() => !document.getElementById("region-pliure")));
   });
 }
 
