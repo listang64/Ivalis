@@ -278,8 +278,8 @@ await section(async () => {
              pelage: vu("groupe-pelage"), cornes: vu("groupe-cornes"), cheveux: vu("groupe-cheveux"), modale: getComputedStyle(document.getElementById("modale-creation-hero")).display,
              dansLeLivre: !!document.querySelector("#grimoire-creation-form1-g #champ-nom") };
   });
-  verifier("les blocs de l'ancienne fenêtre, rangés sur deux doubles pages", JSON.stringify(r.titres) === JSON.stringify([["Identité"], ["Visage / Tête", "Détails"], ["Physique / Corps", "Apparence"], ["Équipement de départ", "Autres"]]), JSON.stringify(r.titres));
-  verifier("le peuple, le genre et la classe déjà posés ; les champs du Vargen (pelage, cornes)", r.race === "Vargen" && r.genre === "Femelle" && r.classe === "Pisteur" && r.pelage && r.cornes && !r.cheveux, JSON.stringify(r));
+  verifier("les blocs de l'ancienne fenêtre, rangés sur deux doubles pages", JSON.stringify(r.titres) === JSON.stringify([["Identité"], ["Visage / Tête", "Détails"], ["Physique / Corps"], ["Équipement de départ"]])   /* (v374) plus d'Apparence ni d'Autres */, JSON.stringify(r.titres));
+  verifier("le peuple, le genre et la classe déjà posés ; les champs du Vargen (le pelage ; v374 : plus de cornes)", r.race === "Vargen" && r.genre === "Femelle" && r.classe === "Pisteur" && r.pelage && !r.cornes && !r.cheveux, JSON.stringify(r));
   verifier("l'ancienne fenêtre reste cachée : tout se remplit dans le livre", r.modale === "none" && r.dansLeLivre, r.modale);
   await p.fill("#champ-nom", "Ysolde");
   await cap("v319_champs");
@@ -336,16 +336,17 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("8. RENONCER : RETOUR AUX CLANS, RIEN NE RESTE");
+titre("8. LA CRÉATION TERMINÉE SANS HÉROS : RIEN NE RESTE (v374 : plus de « Renoncer », les marque-pages suffisent)");
 // =========================================================================
 await section(async () => {
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2600); await pose();
   await action(".page-clan .nouvel-aventurier"); await p.waitForTimeout(2800); await pose();
   const avant = await p.evaluate(() => window.GRIMOIRE_CREATION.actif());
-  await action('#grimoire-creation-race-0 [data-ca="renoncer"]'); await p.waitForTimeout(2800); await pose();
+  verifier("plus de « Renoncer à ce héros » (v374)", await p.evaluate(() => !document.querySelector('[data-ca="renoncer"]')));
+  await p.evaluate(() => { window.GRIMOIRE_CREATION.terminer(); window.GRIMOIRE_FICHES.allerAuxAventuriers(); }); await p.waitForTimeout(2800); await pose();
   const r = await p.evaluate(() => ({ actif: window.GRIMOIRE_CREATION.actif(), pages: document.querySelectorAll(".page-creation").length,
     clan: window.GRIMOIRE.indexDe(window.GRIMOIRE_FICHES.pages().clans[0]), ici: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() }));
-  verifier("« Renoncer à ce héros » : les pages s'effacent, retour à la page du clan", avant && !r.actif && r.pages === 0 && Math.abs(r.ici - r.clan) <= 1, JSON.stringify(r));
+  verifier("terminée : les pages s'effacent, retour à la page du clan", avant && !r.actif && r.pages === 0 && Math.abs(r.ici - r.clan) <= 1, JSON.stringify(r));
 });
 
 console.log(erreurs.length ? "\nErreurs de page : " + erreurs.slice(0, 5).join(" | ") : "");

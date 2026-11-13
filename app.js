@@ -7078,7 +7078,7 @@ window.validerCreationCaracs = async function() {
         const prenomNom = document.getElementById("titre-nom-personnage").innerText;
         const prenom = prenomNom.split(" ")[0] || "";
         const nom = prenomNom.substring(prenom.length).trim() || "";
-        const couleur = document.getElementById("champ-couleur-token").value || "#2a1a0f";
+        const couleur = "#2a1a0f";
         
         window.ouvrirFichePerso(idPersonnage, prenom, nom, couleur, 'onglet-inventaire');
     } else {

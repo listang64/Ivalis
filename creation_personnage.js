@@ -118,7 +118,6 @@ window.ouvrirEtapeIdentite = function() {
         if (input.tagName === "SELECT") input.selectedIndex = 0;
         else input.value = "";
     });
-    document.getElementById("champ-couleur-token").value = "#2a1a0f";
 
     // --- AUTO-REMPLISSAGE DES CHAMPS SELECTIONNÉS ---
     document.getElementById("champ-race").value = window.RACE_SELECTIONNEE_TEMP;
@@ -140,7 +139,7 @@ window.adapterFormulaireRace = function(race) {
     // il vaut pour toutes les races et ne se masque jamais.
     const tousLesChamps = [
         "groupe-cheveux", "groupe-yeux", "groupe-pilosite", "groupe-peau",
-        "groupe-ecailles", "groupe-aretes", "groupe-pelage", "groupe-cornes",
+        "groupe-ecailles", "groupe-aretes", "groupe-pelage",
         "groupe-champignons", "groupe-ecorce", "groupe-peau-gob", "groupe-oreilles",
         "groupe-masque", "groupe-colonne", "groupe-expression" // <-- Ajout ici
     ];
@@ -166,7 +165,6 @@ window.adapterFormulaireRace = function(race) {
     
     } else if (race === "Vargen") {
         document.getElementById("groupe-pelage").style.display = "flex";
-        document.getElementById("groupe-cornes").style.display = "flex";
     
     } else if (race === "Ankylar") {
         document.getElementById("groupe-yeux").style.display = "none"; 
@@ -355,13 +353,11 @@ window.validerEtapeDescriptif = async function() {
         peau: document.getElementById("champ-peau") ? document.getElementById("champ-peau").value : "",
         typeArme: document.getElementById("champ-type-arme") ? document.getElementById("champ-type-arme").value : "",
         typeArmure: document.getElementById("champ-tenue") ? document.getElementById("champ-tenue").value : "",
-        couleursDom: document.getElementById("champ-couleurs").value.trim(),
-        couleur: document.getElementById("champ-couleur-token").value,
+        couleur: "#2a1a0f",
         
         ecailles: document.getElementById("champ-ecailles") ? document.getElementById("champ-ecailles").value : "",
         aretes: document.getElementById("champ-aretes") ? document.getElementById("champ-aretes").value : "",
         pelage: document.getElementById("champ-pelage") ? document.getElementById("champ-pelage").value : "",
-        cornes: document.getElementById("champ-cornes") ? document.getElementById("champ-cornes").value : "",
         champignons: document.getElementById("champ-champignons") ? document.getElementById("champ-champignons").value : "",
         ecorce: document.getElementById("champ-ecorce") ? document.getElementById("champ-ecorce").value : "",
         peauGob: document.getElementById("champ-peau-gob") ? document.getElementById("champ-peau-gob").value : "",
@@ -413,7 +409,7 @@ window.validerEtapeDescriptifRapide = async function() {
         compagnon: typeof window.compagnonPourCreation === "function"
             ? window.compagnonPourCreation(document.getElementById("champ-classe") ? document.getElementById("champ-classe").value : "")
             : null,
-        couleur: document.getElementById("champ-couleur-token").value || "#ff4c4c",
+        couleur: "#2a1a0f",
         
         // Même équipement de départ que la création complète : les deux listes
         // sont dans la modale, et à défaut on retombe sur un choix par défaut.

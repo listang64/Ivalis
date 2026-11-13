@@ -227,7 +227,7 @@ await section(async () => {
   verifier("une retouche dans la Forge : l'encart suit (3 crans : 18)", suit === "18", suit);
   await p.evaluate(() => { const pg = document.querySelector("#grimoire-fiches-forge-g .page-forge"); pg.scrollTop = pg.scrollHeight; }); await p.waitForTimeout(300);
   await cap("v316_forge");
-  await cliquer("#grimoire-fiches-forge-g .fermer-forge"); await p.waitForTimeout(2200); await pose();
+  await cliquer("#forge-marque-refermer"); await p.waitForTimeout(2200); await pose();   // (v374) le marque-page « Refermer » remplace le bouton
 });
 
 // =========================================================================

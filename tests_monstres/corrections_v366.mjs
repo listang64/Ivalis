@@ -216,7 +216,7 @@ await section(async () => {
   const codex = consoleErreurs.filter(t => /codex|innerHTML|innerText/.test(t));
   verifier("le choix de l'arme et le codex : sans erreur", !codex.length, codex.slice(0, 2).join(" | ").slice(0, 200));
   // Et refermée : tout revient dans la fenêtre d'origine.
-  await cliquer("#grimoire-fiches-forge-g .fermer-forge"); await p.waitForTimeout(2200); await pose();
+  await cliquer("#forge-marque-refermer"); await p.waitForTimeout(2200); await pose();   // (v374) le marque-page « Refermer » remplace le bouton
   const rentre = await p.evaluate(() => !!document.querySelector("#modale-creation-competence #forge-nom"));
   verifier("refermée : le champ du nom est rentré dans la fenêtre de la Forge", rentre);
 });

@@ -20,7 +20,7 @@
 /* (v336) LE VERRE AU REPOS : ce qui est dessous, grossi et bombé (loupe_cartes.js). C'est lui
    qu'on touche (un disque) : le manche et le cadre laissent passer le doigt. */
 .loupe-lentille { position: absolute; display: block; border-radius: 50%; overflow: hidden; pointer-events: auto; cursor: pointer;
-  -webkit-mask-image: -webkit-radial-gradient(white, black); background: #2a1a0e; }
+  -webkit-mask-image: -webkit-radial-gradient(white, black); background: #000; }
 .loupe-lentille-bombe { position: absolute; inset: 0; display: block; filter: url(#loupe-filtre-bombe); }
 .loupe-lentille-contenu { position: absolute; inset: 0; display: block; }
 .loupe-lentille-contenu > img, .loupe-dessous > img { position: absolute; max-width: none; pointer-events: none; user-select: none; -webkit-user-drag: none; }
@@ -79,7 +79,8 @@
 
 /* LE POST-IT DU VOYAGE : à l'envers, il descend du haut de l'écran (le bout
    taillé en bas), les pas du marque-page de la marche dessus. */
-.loupe-postit { position: absolute; top: 0; left: 60%; width: 74px; height: 128px; padding: 0; border: 0; background: none; cursor: pointer; z-index: 5;
+/* (v374) Nico : « en mode zoomé d'une carte, déplace le marque-page mouvement en haut à gauche de l'écran ». */
+.loupe-postit { position: absolute; top: 0; left: 28px; width: 74px; height: 128px; padding: 0; border: 0; background: none; cursor: pointer; z-index: 5;
   transform-origin: 50% 0; transform: translateY(-112%) rotate(4deg); opacity: 0; pointer-events: none;
   transition: transform 0.5s cubic-bezier(0.45, 0.05, 0.25, 1), opacity 0.3s ease, filter 0.3s ease;
   filter: drop-shadow(2px 5px 5px rgba(40, 20, 6, 0.5)); }

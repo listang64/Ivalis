@@ -203,7 +203,7 @@ await section(async () => {
                trait: getComputedStyle(h).borderBottomWidth, sous: rl ? rl.left <= rh.left + 2 && rl.right >= rh.right - 2 && rl.top <= rh.top + 2 && rl.bottom >= rh.bottom - 2 : false,
                ajuste: rh.width < h.parentNode.getBoundingClientRect().width - 2 }; });
   });
-  verifier("les sept titres des parties ont leur aquarelle, visible", r.length === 7 && r.every(x => x.lavis && x.vu), JSON.stringify(r.map(x => x.t + ":" + x.lavis + "/" + x.vu)));
+  verifier("les cinq titres des parties ont leur aquarelle, visible (v374 : plus d'Apparence ni d'Autres)", r.length === 5 && r.every(x => x.lavis && x.vu), JSON.stringify(r.map(x => x.t + ":" + x.lavis + "/" + x.vu)));
   const ouverts = r.slice(0, 3);   // la première double page (la seconde se mesure une fois tournée)
   verifier("elle passe sous tout le titre, à la taille du titre (pas toute la ligne)", ouverts.every(x => x.sous && x.ajuste), JSON.stringify(ouverts.map(x => x.t + ":" + x.sous + "/" + x.ajuste)));
   verifier("une teinte par partie (au moins cinq différentes), le trait d'encre remplacé", new Set(r.map(x => x.teinte)).size >= 5 && r.every(x => x.trait === "0px"), JSON.stringify(r.map(x => x.teinte + " " + x.trait)));
@@ -234,7 +234,7 @@ await section(async () => {
   const s2 = await p.evaluate(() => ["form2-g", "form2-d"].flatMap(k => [...window.GRIMOIRE_CREATION.page(k).querySelectorAll(".bloc-formulaire h4")]).map(h => {
     const rh = h.getBoundingClientRect(), rl = h.querySelector(":scope > .lavis").getBoundingClientRect();
     return rh.width > 0 && rl.left <= rh.left + 2 && rl.right >= rh.right - 2 && rl.top <= rh.top + 2 && rl.bottom >= rh.bottom - 2; }));
-  verifier("… où les titres ont aussi leur aquarelle dessous", s2.length === 4 && s2.every(Boolean), JSON.stringify(s2));
+  verifier("… où les titres ont aussi leur aquarelle dessous", s2.length === 2 /* (v374) plus d'Apparence ni d'Autres */ && s2.every(Boolean), JSON.stringify(s2));
   await cap("v371_suite");
 });
 
@@ -243,9 +243,9 @@ titre("3. RENONCER : LES BLOCS RETOURNENT À L'ANCIENNE FENÊTRE, SANS L'AQUAREL
 // =========================================================================
 await section(async () => {
   await p.evaluate(() => window.GRIMOIRE.allerALaPage(window.GRIMOIRE.indexDe(window.GRIMOIRE_CREATION.page("form1-g")))); await p.waitForTimeout(2600); await pose();
-  await action('#grimoire-creation-form1-g [data-ca="renoncer"]'); await p.waitForTimeout(2800); await pose();
+  await p.evaluate(() => window.GRIMOIRE_CREATION.terminer()); await p.waitForTimeout(2800); await pose();   // (v374) plus de « Renoncer » : la création se termine
   const r = await p.evaluate(() => [...document.querySelectorAll("#modale-creation-hero .bloc-formulaire h4 > .lavis")].map(l => getComputedStyle(l).display));
-  verifier("dans l'ancienne fenêtre, l'aquarelle des titres est cachée", r.length === 7 && r.every(d => d === "none"), JSON.stringify(r));
+  verifier("dans l'ancienne fenêtre, l'aquarelle des titres est cachée", r.length === 5 && r.every(d => d === "none"), JSON.stringify(r));
 });
 
 // =========================================================================

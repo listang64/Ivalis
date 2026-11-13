@@ -813,6 +813,8 @@ function creerElements() {
     toucherVite(lecture.querySelector("#recit-lecture-bouton"), () => terminerLecture());
     elts.form.addEventListener("submit", (ev) => { ev.preventDefault(); envoyer(); });
     elts.saisie.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); envoyer(); } });
+    elts.saisie.addEventListener("input", surSaisie);          // (v374) la plume se prend à la première lettre
+    ecriture.querySelector(".papier-ecriture").insertAdjacentHTML("beforeend", `<div class="plume-occupee" id="recit-plume-occupee" aria-live="polite"></div>`);
     elts.micro = ecriture.querySelector("#recit-micro");
     toucherVite(elts.micro, () => basculerDictee());
     toucherVite(postit, () => lancerNarrateur());
@@ -872,6 +874,7 @@ function demarrerDictee(SR) {
         }
         dictee.finies = finies;
         elts.saisie.value = joindre(joindre(dictee.base, finies), enCours);
+        surSaisie();
     };
     reco.onend = () => {
         // Une pause a coupé l'écoute : on garde ce qui est dit, et on reprend à la suite.
@@ -1039,7 +1042,15 @@ function majInterface() {
     const lecture = etatLecture();
     const ouvrir = recit && posee && !bloque && !ecrit && !!heros && !lecture.enAttente;
     majLecture(lecture, recit && posee && !ecrit && !combat && lecture.enAttente, fige);
-    elts.saisie.readOnly = !!etat.envoi;
+    // (v374) Un autre joueur a pris la plume : le papier se grise, le temps qu'il envoie.
+    const autre = plumeDUnAutre();
+    elts.ecriture.classList.toggle("grise", !!autre);
+    elts.saisie.readOnly = !!etat.envoi || !!autre;
+    const occupee = document.getElementById("recit-plume-occupee");
+    if (occupee) occupee.textContent = autre ? `${autre.Nom || "Un autre joueur"} écrit… attends la fin de son message.` : "";
+    if (autre && dictee.voulue) arreterDictee();
+    clearTimeout(etat.revoirPlume);
+    if (autre) etat.revoirPlume = setTimeout(majInterface, Math.max(500, (Number(autre.Depuis) || 0) + DELAI_PLUME_MS - Date.now() + 200));
     const etaitSorti = elts.ecriture.classList.contains("sortie");
     if (!fige) elts.ecriture.classList.toggle("sortie", ouvrir);
     if (ouvrir && !etaitSorti && window.matchMedia && !window.matchMedia("(hover: none)").matches) setTimeout(() => { try { elts.saisie.focus({ preventScroll: true }); } catch (e) {} }, 450);
@@ -1255,7 +1266,7 @@ async function envoyer() {
     if (dictee.voulue) arreterDictee();          // (v312) on écrit : la dictée s'arrête
     const texte = elts.saisie.value.trim();
     const heros = monHeros();
-    if (!texte || !heros || !window.ID_PARTIE_COURANTE) return;
+    if (!texte || !heros || !window.ID_PARTIE_COURANTE || plumeDUnAutre()) return;
     etat.envoi = true;
     const vol = poussiere(elts.saisie, pointDArrivee());
     elts.saisie.value = "";
@@ -1274,6 +1285,7 @@ async function envoyer() {
             Texte: texte, Texte_Livre: livre, Livre: true,
             Date_Jour: date.jour || "", Date_An: date.annee || "", Timestamp: Date.now()
         });
+        rendrePlume();                            // (v374) envoyé : la plume est libre pour les autres
     } catch (e) {
         console.error("Le livre : écrire", e);
         elts.saisie.value = texte;
@@ -1516,13 +1528,73 @@ window.livreRecitMessages = function (messages, options) {
 window.livreRecitPartie = function (data) {
     const v = !!(data && data.IA_En_Cours === true);
     const c = (data && data.Combat_RP) || null;
+    const pl = (data && data.Plume_Recit) || null;
     const avant = JSON.stringify(etat.combat && [etat.combat.Etat, etat.combat.Adversaires]);
     const combatChange = avant !== JSON.stringify(c && [c.Etat, c.Adversaires]);
-    if (v === etat.verrou && !combatChange) return;
+    const plumeChange = JSON.stringify(pl) !== JSON.stringify(etat.plume);
+    etat.plume = pl;
+    // (v374) La plume à mon nom dans la base, mais plus rien d'écrit ici (la page
+    // rechargée) : elle est rendue, les autres n'attendent pas l'échéance.
+    if (pl && pl.Joueur === moi() && !etat.plumeMoi && elts && !elts.saisie.value.trim()) rendrePlume(true);
+    if (v === etat.verrou && !combatChange && !plumeChange) return;
     etat.verrou = v;
     etat.combat = c;
     majInterface();
 };
+
+// ---------------------------------------------------------------------
+//  LA PLUME DU RÉCIT (v374)
+// ---------------------------------------------------------------------
+//  Nico : « quand un joueur a écrit la première lettre sur le papier où l'on
+//  écrit son RP, ça grise l'encart de tous les autres joueurs de la partie. Une
+//  fois que le joueur a envoyé son texte ça redevient disponible : que les
+//  joueurs ne parlent pas en même temps et ne créent pas des situations sans
+//  queue ni tête. » La plume vit sur la partie (Plume_Recit : le joueur, le nom
+//  de son héros, l'heure), que tous les postes écoutent déjà. Prise par une
+//  transaction (deux premières lettres en même temps : un seul l'a), rafraîchie
+//  pendant qu'on écrit, rendue à l'envoi ou quand on efface tout. Personne ne
+//  reste bloqué par un absent : sans une lettre pendant 90 s, elle est libre.
+const DELAI_PLUME_MS = 90 * 1000;
+const RAFRAICHIR_PLUME_MS = 20 * 1000;
+function plumeDUnAutre() {
+    const p = etat.plume;
+    if (!p || !p.Joueur || p.Joueur === moi()) return null;
+    if (Date.now() - (Number(p.Depuis) || 0) >= DELAI_PLUME_MS) return null;
+    return p;
+}
+function surSaisie() {
+    if (!elts || plumeDUnAutre()) return;
+    if (elts.saisie.value.trim()) prendrePlume(); else rendrePlume();
+}
+function prendrePlume() {
+    const qui = moi(), heros = monHeros();
+    if (!qui || typeof window.modifierPartie !== "function" || !window.ID_PARTIE_COURANTE) return;
+    if (etat.plumeMoi && Date.now() - (etat.plumeRafraichie || 0) < RAFRAICHIR_PLUME_MS) return;
+    etat.plumeMoi = true;
+    etat.plumeRafraichie = Date.now();
+    const plume = { Joueur: qui, Nom: (heros && heros.prenom) || "", Depuis: Date.now() };
+    Promise.resolve(window.modifierPartie((data) => {
+        const p = data.Plume_Recit;
+        if (p && p.Joueur && p.Joueur !== qui && Date.now() - (Number(p.Depuis) || 0) < DELAI_PLUME_MS) return { resultat: false };
+        return { maj: { Plume_Recit: plume }, resultat: true };
+    })).then((pris) => {
+        // Un autre l'a prise juste avant : mon papier se grise (mon texte reste).
+        if (pris === false) { etat.plumeMoi = false; majInterface(); }
+    }).catch(e => console.warn("Le livre : la plume", e));
+}
+function rendrePlume(force) {
+    if (!etat.plumeMoi && !force) return;
+    etat.plumeMoi = false;
+    etat.plumeRafraichie = 0;
+    const qui = moi();
+    if (!qui || typeof window.modifierPartie !== "function" || !window.ID_PARTIE_COURANTE) return;
+    Promise.resolve(window.modifierPartie((data) => {
+        const p = data.Plume_Recit;
+        if (!p || p.Joueur !== qui) return null;
+        return { maj: { Plume_Recit: null } };
+    })).catch(e => console.warn("Le livre : la plume", e));
+}
+window.plumeRecit = () => ({ autre: plumeDUnAutre(), moi: !!etat.plumeMoi });
 
 // ---------------------------------------------------------------------
 //  ENTRER, SORTIR
@@ -1574,6 +1646,7 @@ function entrer(idPartie) {
 }
 function sortir() {
     if (!etat.actif) return;
+    rendrePlume();
     etat.actif = false;
     clearInterval(etat.minuteur); etat.minuteur = null;
     const g = G();

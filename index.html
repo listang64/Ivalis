@@ -16,13 +16,13 @@
   <link rel="stylesheet" href="style.css?v=136">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
-  <link rel="stylesheet" href="grimoire.css?v=14">
-  <link rel="stylesheet" href="grimoire_recit.css?v=19">
+  <link rel="stylesheet" href="grimoire.css?v=15">
+  <link rel="stylesheet" href="grimoire_recit.css?v=20">
   <link rel="stylesheet" href="grimoire_carte.css?v=2">
   <link rel="stylesheet" href="grimoire_regions.css?v=6">
-  <link rel="stylesheet" href="loupe_cartes.css?v=3">
-  <link rel="stylesheet" href="grimoire_fiches.css?v=8">
-  <link rel="stylesheet" href="grimoire_creation.css?v=7">
+  <link rel="stylesheet" href="loupe_cartes.css?v=4">
+  <link rel="stylesheet" href="grimoire_fiches.css?v=9">
+  <link rel="stylesheet" href="grimoire_creation.css?v=8">
 
  
   <!-- ===================================================================== -->
@@ -2420,7 +2420,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=263"></script>
+<script src="trace_combat.js?v=264"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2487,17 +2487,17 @@
 <script type="module" src="regime_cerveau.js?v=55"></script>
 <script type="module" src="ia_master.js?v=26"></script>
 <script type="module" src="illustrations_recit.js?v=10"></script>
-<script type="module" src="app.js?v=165"></script>
+<script type="module" src="app.js?v=166"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=4"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
-<script type="module" src="grimoire_recit.js?v=21"></script>
+<script type="module" src="grimoire_recit.js?v=22"></script>
 <!-- LA CARTE DU MONDE DANS LE GRIMOIRE (v302) : sa double page, ses zones (DEV). -->
 <script type="module" src="grimoire_carte.js?v=6"></script>
 <script src="grimoire_regions.js?v=13"></script>
 <script src="loupe_cartes.js?v=5"></script>
-<script type="module" src="grimoire_fiches.js?v=12"></script>
-<script type="module" src="grimoire_creation.js?v=9"></script>
+<script type="module" src="grimoire_fiches.js?v=13"></script>
+<script type="module" src="grimoire_creation.js?v=10"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=4"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région et son titre (plus de nuages dessus, v286). -->
@@ -2532,10 +2532,10 @@
 <script src="talents.js?v=6"></script>
 <!-- Les blessures : la table et ses règles (script simple), puis l'écran. -->
 <script src="blessures.js?v=2"></script>
-<script type="module" src="creation_personnage.js?v=27"></script>
+<script type="module" src="creation_personnage.js?v=28"></script>
 <script type="module" src="classes.js?v=47"></script>
 <script type="module" src="recit_dynamique.js?v=7"></script>
-<script type="module" src="competences.js?v=73"></script>
+<script type="module" src="competences.js?v=74"></script>
 <script type="module" src="talents_ui.js?v=2"></script>
 <script type="module" src="blessures_ui.js?v=6"></script>
 <!-- Les zones procédurales : le givre (v243), le brasier (v244), le poison et la foudre (v245), au Studio puis en jeu (v246) ; les gravats (v247) et les chausse-trappes (v248), au Studio puis en jeu (v249) ; la lumière du soin (v250), au Studio. -->
@@ -2787,13 +2787,7 @@
               <option value="">-- Choisir --</option><option value="Petites">Petites</option><option value="Moyennes">Moyennes</option><option value="Grandes">Grandes</option>
             </select>
           </div>
-          
-          <div class="champ-formulaire" id="groupe-cornes" style="display: none;">
-            <label>Taille des cornes</label>
-            <select class="input-perso" id="champ-cornes">
-              <option value="">-- Choisir --</option><option value="Petites">Petites</option><option value="Moyennes">Moyennes</option><option value="Grandes">Grandes</option>
-            </select>
-          </div>
+
         </div>
         <div class="bloc-formulaire">
           <h4>Détails</h4>
@@ -2892,11 +2886,6 @@
           </div>
         </div>
         
-        <div class="bloc-formulaire">
-          <h4>Apparence</h4>
-          <div class="champ-formulaire"><label>Couleurs dominantes</label><input type="text" class="input-perso" id="champ-couleurs"></div>
-        </div>
-
         <!-- Ce que le héros porte au premier jour. Le choix vaut pour TOUTES les
              races : l'arme décide des techniques qu'il pourra lancer à la Forge,
              la tenue de ce qu'il encaisse. Les deux sont tirés en qualité
@@ -2924,14 +2913,7 @@
             </select>
           </div>
         </div>
-        
-        <div class="bloc-formulaire">
-          <h4>Autres</h4>
-          <div class="champ-formulaire">
-            <label>Couleur du Token</label>
-            <input type="color" class="input-perso input-couleur" id="champ-couleur-token" value="#2a1a0f" oninput="appliquerCouleurTheme(this.value)">
-          </div>
-        </div>
+
       </div>
     </div>
 

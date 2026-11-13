@@ -275,7 +275,7 @@ await section(async () => {
   await cap("v318_forge");
   const bulles = await centre("#grimoire-fiches-forge-g .forge-bandeau");
   if (CAPTURES && bulles) await p.screenshot({ path: CAPTURES + "/v318_bulles.png", clip: { x: bulles.x - bulles.w / 2 - 10, y: bulles.y - bulles.h / 2 - 10, width: bulles.w + 20, height: bulles.h + 20 } });
-  await cliquer("#grimoire-fiches-forge-g .fermer-forge"); await p.waitForTimeout(2200); await pose();
+  await cliquer("#forge-marque-refermer"); await p.waitForTimeout(2200); await pose();   // (v374) le marque-page « Refermer » remplace le bouton
   const dehors = await p.evaluate(() => { const l = document.querySelector("#modale-creation-competence .lavis-bulle"); return l ? getComputedStyle(l).display : "aucun"; });
   verifier("hors du livre (la Forge d'avant, en combat), les lavis ne se voient pas", dehors === "none" || dehors === "aucun", dehors);
 });

@@ -238,7 +238,7 @@ await section(async () => {
   await cliquer('#forge-livre-armes [data-arme="Sans arme / Arme rp"]'); await p.waitForTimeout(600);
   verifier("LIA : l'arme choisie dans la Forge est la seule qu'elle peut prendre (plus d'« Arme légère » à la place de « Sans arme »)",
            /const choisie = window\.forgeState && window\.forgeState\.armePrincipale;\s*if \(choisie\) return \[choisie\];/.test(code("lia_forge.js")));
-  await cliquer("#grimoire-fiches-forge-g .fermer-forge"); await p.waitForTimeout(2000); await pose();
+  await cliquer("#forge-marque-refermer"); await p.waitForTimeout(2000); await pose();   // (v374) le marque-page « Refermer » remplace le bouton
 });
 
 // =========================================================================
