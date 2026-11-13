@@ -130,59 +130,6 @@ window.pasMaxMonstre = (m) => {
     return n !== undefined && n !== null ? n : PAS_MAX_MONSTRE;
 };
 
-// Les cases atteignables en quelques pas (selon le palier), avec la longueur
-// réelle du trajet (murs, cases supprimées et combattants contournés par l'A*).
-
-window.casesAccessiblesMonstre = function(idMonstre, pasMax = PAS_MAX_MONSTRE) {
-    const depart = (window.TOKENS_VTT_DATA || {})[idMonstre];
-    if (!depart || !window.PLATEAU_VTT) return [];
-
-    const resultat = [{ q: depart.q, r: depart.r, pas: 0, chemin: [] }];
-    const vues = new Set([`${depart.q},${depart.r}`]);
-
-    // On explore en cercles concentriques puis on demande à l'A* du jeu le vrai
-    // trajet : c'est lui qui fait foi pour les murs et les contournements.
-    for (let rayon = 1; rayon <= pasMax; rayon++) {
-        for (let dq = -rayon; dq <= rayon; dq++) {
-            for (let dr = Math.max(-rayon, -dq - rayon); dr <= Math.min(rayon, -dq + rayon); dr++) {
-                const q = depart.q + dq, r = depart.r + dr;
-                const cle = `${q},${r}`;
-                if (vues.has(cle)) continue;
-                vues.add(cle);
-                if (!caseLibre(q, r, idMonstre)) continue;
-
-                const chemin = window.calculerCheminVTT({ q: depart.q, r: depart.r }, { q, r });
-                if (chemin.length > 0 && chemin.length <= pasMax) {
-                    resultat.push({ q, r, pas: chemin.length, chemin });
-                }
-            }
-        }
-    }
-    return resultat;
-};
-
-// Une case est-elle dans une zone persistante, et à quel point est-ce grave ?
-// ⚠️ window.ZONES_PERSISTANTES est indexé par IDENTIFIANT DE ZONE (« zp_… »),
-// chaque zone portant la liste de ses cases dans `hexes` et ses dégâts dans
-// `degats.valeurBrute` (voir creerZonePersistante, moteur_effets.js). Chercher
-// une case par ses coordonnées dans cet objet ne renvoie jamais rien : le
-// danger serait toujours nul et les créatures prudentes traverseraient le feu
-// sans sourciller.
-function dangerZone(q, r) {
-    let pire = 0;
-    Object.values(window.ZONES_PERSISTANTES || {}).forEach(zone => {
-        if (!zone || !Array.isArray(zone.hexes)) return;
-        if (!zone.hexes.some(h => h.q === q && h.r === r)) return;
-
-        const degats = zone.degats ? (parseFloat(zone.degats.valeurBrute) || 0) : 0;
-        // Les dégâts donnent la mesure du risque ; une zone qui ne pose qu'un
-        // état (brûlure, poison…) reste franchement repoussante.
-        const risque = degats > 0 ? Math.min(1, degats / 8) : 0.6;
-        pire = Math.max(pire, risque);
-    });
-    return pire;
-}
-
 // Combien d'adversaires au corps-à-corps depuis cette case (donc combien
 // d'attaques d'opportunité en partant, et combien de menaces en restant).
 function ennemisAuContactDepuis(q, r, campMonstre) {
@@ -190,20 +137,6 @@ function ennemisAuContactDepuis(q, r, campMonstre) {
     const tokens = window.TOKENS_VTT_DATA || {};
     (window.PERSOS_PARTIE || []).forEach(p => {
         if (p.camp === campMonstre) return;
-        if (typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage)) return;
-        const tk = tokens[p.idPersonnage];
-        if (tk && distanceHex({ q, r }, tk) <= 1) n++;
-    });
-    return n;
-}
-
-// Combien de congénères déjà collés à cette case : sert à les empêcher de
-// s'agglutiner tous au même endroit.
-function allesAdjacents(q, r, campMonstre, idMonstre) {
-    let n = 0;
-    const tokens = window.TOKENS_VTT_DATA || {};
-    (window.PERSOS_PARTIE || []).forEach(p => {
-        if (p.idPersonnage === idMonstre || p.camp !== campMonstre) return;
         if (typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage)) return;
         const tk = tokens[p.idPersonnage];
         if (tk && distanceHex({ q, r }, tk) <= 1) n++;
@@ -666,44 +599,16 @@ const ID_CLIENT = "cli_" + Math.random().toString(36).substring(2, 10);
 // relance — et le rejeu devient le moindre mal.
 // Cette liste-ci est LOCALE, et ne protège donc que de nous-mêmes. La vraie
 // garantie, celle qui vaut d'un appareil à l'autre, est le drapeau `fini` écrit
-// dans le document du verrou (voir marquerTourIATermine) : c'est lui qui a
-// manqué quand une créature a joué deux fois, chacun de son côté, sur deux
-// plateaux qui ne racontaient déjà plus la même histoire.
+// dans le document du verrou : c'est lui qui a manqué quand une créature a
+// joué deux fois, chacun de son côté, sur deux plateaux qui ne racontaient
+// déjà plus la même histoire. (v380 : la fonction qui inscrivait un tour fini,
+// marquerTourIATermine, n'était plus appelée depuis que le cerveau joue les
+// tours des créatures ; elle est retirée. Cette liste et ce drapeau ne sont
+// donc plus remplis.)
 const TOURS_IA_TERMINES = new Map();
 
 function tourIADejaJoue(cle) {
     return TOURS_IA_TERMINES.has(cle);
-}
-
-// « CE TOUR EST JOUÉ » — écrit là où les autres postes peuvent le lire.
-// Un poste qui arrive après coup, verrou périmé ou pas, y trouve la réponse et
-// ne rejoue rien. Sans ça, le verrou ne protégeait que pendant vingt-cinq
-// secondes : au-delà, la créature repartait pour un tour entier, avec un second
-// déplacement et un second coup.
-async function marquerTourIATermine(cle) {
-    TOURS_IA_TERMINES.set(cle, Date.now());
-    if (TOURS_IA_TERMINES.size > 200) TOURS_IA_TERMINES.clear();
-    if (!window.ID_PARTIE_COURANTE) return;
-    try {
-        await runTransaction(db, async (tx) => {
-            const ref = refVerrouIA(window.ID_PARTIE_COURANTE);
-            const partieRef = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
-            const snap = await tx.get(ref);
-            const snapPartie = await tx.get(partieRef);
-            const v = snap.exists() ? snap.data() : {};
-            // On ne réclame pas la propriété du verrou pour le clore : si un
-            // autre poste l'a pris entre-temps sur une AUTRE clé, on ne touche
-            // à rien — c'est son tour à lui, maintenant.
-            if (v.cle && v.cle !== cle) return;
-            const marque = { cle, client: ID_CLIENT, ts: Date.now(), fini: true };
-            tx.set(ref, marque);
-            if (snapPartie.exists()) tx.update(partieRef, { Verrou_IA: marque });
-        });
-    } catch (e) {
-        // Tant pis : la liste locale tient encore ce poste-ci, et le tour
-        // suivant réécrira le verrou proprement.
-        console.error("Clôture du tour de l'IA :", e);
-    }
 }
 
 // DEPUIS QUAND VOIT-ON CE VERROU-LÀ ? Pas « depuis quelle heure il a été

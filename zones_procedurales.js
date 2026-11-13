@@ -57,9 +57,9 @@
 //      qui traîne sous le vent, une bouffée qui se lève de loin en loin.
 //
 //  `creerCoucheProcedurale(conteneur, { type, R, pixel, graine, vent })` rend
-//  la couche (`creerCoucheGivre`, `creerCoucheFeu`, `creerCouchePoison`,
-//  `creerCoucheElectrique`, `creerCouchePieges`, `creerCoucheSoin`,
-//  `creerCoucheGravats` : la même, d'un élément) ;
+//  la couche (`creerCoucheGivre`, `creerCoucheFeu`, `creerCouchePieges`,
+//  `creerCoucheSoin`, `creerCoucheGravats` : la même, d'un élément ; le poison
+//  et l'électrique passent par `creerCoucheProcedurale` avec leur type) ;
 //  elle vit dans le repère de la carte (le conteneur est posé sur elle).
 //  `ajouter(cases, { depuis, duree })` : l'élément gagne les nouvelles cases
 //  depuis `depuis` (la plaque grandit) ; `poser(cases)` : sans animation ;
@@ -1300,8 +1300,6 @@
     };
     window.creerCoucheGivre = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "glace" });
     window.creerCoucheFeu = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "feu" });
-    window.creerCouchePoison = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "poison" });
-    window.creerCoucheElectrique = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "electrique" });
     window.creerCouchePieges = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "neutre" });
     window.creerCoucheSoin = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "soin" });
     window.creerCoucheGravats = (conteneur, options) => window.creerCoucheProcedurale(conteneur, { ...(options || {}), type: "gravats" });

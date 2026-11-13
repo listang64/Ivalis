@@ -1162,7 +1162,6 @@
     //  plusieurs tournent ensemble (un renfort qui se pose pendant qu'un pion
     //  marche), et aucune ne coupe celle du Studio.
     const ANIMATIONS_JEU = {};
-    const lecturesJeu = new Set();
     window.enregistrerAnimationsJeu = function (liste) {
         (liste || []).forEach(a => { if (a && a.id) ANIMATIONS_JEU[a.id] = a; });
     };
@@ -1170,12 +1169,6 @@
     window.jouerAnimationJeu = function (id, scene) {
         const anim = ANIMATIONS_JEU[id];
         if (!anim || !scene || !scene.lanceur || !scene.calque) return Promise.resolve(false);
-        const jeton = nouveauJeton();
-        lecturesJeu.add(jeton);
-        return lire(anim, scene, jeton).then(ok => { lecturesJeu.delete(jeton); return ok; });
-    };
-    window.annulerAnimationsJeu = function () {
-        lecturesJeu.forEach(annulerJeton);
-        lecturesJeu.clear();
+        return lire(anim, scene, nouveauJeton());
     };
 })();

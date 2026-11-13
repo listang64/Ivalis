@@ -1001,20 +1001,6 @@ export function tomber(etat, id, acteur, options) {
 // Un combattant en sursis : debout, la vie bloquée à zéro.
 export const enSursis = (c) => !!(c && c.sursis && nombre(c.sursis.tours) > 0);
 
-export const estADroit = (etat, id) => {
-    const c = combattant(etat, id);
-    return !!c && !c.aTerre;
-};
-
-export const occupantDe = (etat, q, r) => {
-    if (!etat || !etat.combattants) return null;
-    for (const id in etat.combattants) {
-        const c = etat.combattants[id];
-        if (!c.aTerre && c.q === q && c.r === r) return id;
-    }
-    return null;
-};
-
 // =========================================================================
 //  4. APPLIQUER LES ÉTAPES
 // =========================================================================

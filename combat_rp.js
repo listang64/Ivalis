@@ -180,7 +180,6 @@ const etat = (p) => (p || lirePartieVue()).Combat_RP || null;
 
 window.combatRPActif = (p) => { const c = etat(p); return !!c && ["preparation", "en_cours", "narration"].includes(c.Etat); };
 window.combatRPEnPreparation = (p) => (etat(p) || {}).Etat === "preparation";
-window.etatCombatRP = () => etat();
 
 // Une écriture pointée, aussitôt vue ici (l'écoute de la partie la rapportera).
 function appliquerPointe(objet, champs) {

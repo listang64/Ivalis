@@ -445,7 +445,6 @@
         const id = heros && heros.idPersonnage;
         if (id && (window.TOKENS_VTT_DATA || {})[id] && typeof window.centrerMapSurToken === "function") window.centrerMapSurToken(id);
     }
-    window.apparitionsEnCours = () => apparitionsEnAttente;
     function apparaitreAuCentre(id, sorte, plus) {
         apparitionsEnAttente++;
         // Cachée tant que ce n'est pas son tour (un filet la montre quoi qu'il arrive).

@@ -341,8 +341,6 @@ const MESSAGES_ATTENTE_POI = [
     "Vos pas se font plus lents ; chacun retient son souffle…"
 ];
 const taillePoi = () => Number(window.TAILLE_POI) || 0.08;
-// Plus de nuages sur les cartes régionales (v286) : rien ne s'y cache.
-window.sousLesNuagesVoyage = () => false;
 // Une place possible pour un POI : sur la carte, sur le terrain, loin des
 // lieux posés.
 function placePoiValable(n, x, y) {
@@ -1049,7 +1047,6 @@ function placeEnVoyage(v) {
         default: return null;
     }
 }
-window.placeEnVoyageGroupe = () => placeEnVoyage(voyage);
 
 function placerPions() {
     const enPartie = !!window.ID_PARTIE_COURANTE;
@@ -1172,7 +1169,6 @@ window.basculerReglagePionGroupe = function(actif) {
     actualiserDev();
     return reglagePion;
 };
-window.reglagePionGroupeActif = () => reglagePion;
 window.reglerDecalageGroupe = function(vue, axe, valeur, enregistrer) {
     if (!estDev()) return null;
     const d = vue === "monde" ? reglages.decalageMonde : reglages.decalageRegion;
@@ -1551,7 +1547,6 @@ window.regionsVoisines = function (a, b) {
     if (!c[a] || !c[b]) return true;                 // contours inconnus : on ne bloque pas
     return distancePolygones(c[a], c[b]) <= SEUIL_VOISINES;
 };
-window.voisinesDe = (a) => Object.keys(contoursRegions()).map(Number).filter(b => window.regionsVoisines(a, b));
 // (DEV) Déclarer deux régions voisines, ou non.
 window.declarerVoisinesDev = async function (a, b, oui) {
     a = Number(a); b = Number(b);

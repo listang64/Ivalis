@@ -11676,3 +11676,19 @@ corrections_v378.mjs le vérifie : le texte, et dans la vraie page les fonctions
 - ⚠️ **_comptes_emulateur.mjs** (hors suite : il lui faut l'émulateur Firebase) pilote encore la barre du compte et « Mon compte » : à passer sur la page Compte du grimoire avant de le relancer.
 
 corrections_v379.mjs le vérifie : le texte, et dans la vraie page les fonctions parties, la fondation et l'entrée par les portes du grimoire, le retour au menu, les demandes d'inscription, et les images de l'ancien menu qui ne sont plus demandées.
+
+## v380 — Ménage du code mort (D) : les fonctions que personne n'appelait
+
+- Une analyse de tout ce que charge index.html (chaque fonction nommée, suivie de proche en proche depuis le code qui s'exécute, le HTML et les chaînes de caractères), recoupée avec Graphify et relue à la main, a trouvé des fonctions qu'aucun code ni aucun banc n'appelle. Elles sont retirées :
+  - app.js : `libererVerrousAnimation`, `programmerAnimationTour` (le filet), `resisteAEtat`, `recupererPartiesEnCours`, `estPanneauPersonnagesOuvert` ;
+  - sequence_tour.js : `jeJoueCeTour`, `valeurAvantRejeu` (et `ETAT_AVANT_REJEU`, `dejaServiAvant` qui ne servaient qu'à elle), `programmerAnimationTour` ;
+  - combat.js : `changerEspacementBannieres` (son réglage n'avait plus de bouton ; l'espacement gardé sur le poste est toujours lu par competences.js), `degradeBrosse`, `assombrirCouleur` ;
+  - combat_etat.js : `estADroit`, `occupantDe` ; moteur_effets.js : `barreCiblageResolution` (plus de barre RÉSOUDRE / ANNULER depuis la v367) ; combat_rp.js : `etatCombatRP` ;
+  - monstres_ia.js : `casesAccessiblesMonstre`, `dangerZone`, `allesAdjacents`, `marquerTourIATermine` ;
+  - grimoire.js : `dessinTerre` ; grimoire_recit.js : `texteDictee`, `etatLectureRecit` ; villages_regionaux.js : `creationVillagesEnCours` ;
+  - voyage_groupe.js : `sousLesNuagesVoyage`, `placeEnVoyageGroupe`, `reglagePionGroupeActif`, `voisinesDe` ;
+  - animations_combat.js : `annulerAnimationsJeu` (et la liste des lectures qu'elle seule lisait) ; animations_jeu.js : `apparitionsEnCours` ; zones_procedurales.js : `creerCouchePoison`, `creerCoucheElectrique` (le poison et l'électrique passent par `creerCoucheProcedurale`).
+- Gardés exprès : `voirEtat` et `etatDepuisLeJeu` (l'outil à taper dans la console pour débusquer une désynchronisation), et la trentaine de fonctions `window.*` que seuls les bancs appellent.
+- ⚠️ À regarder : `marquerTourIATermine` était le seul à remplir `TOURS_IA_TERMINES` et le drapeau `fini` du verrou de l'IA (monstres_ia.js). Le cerveau jouant désormais les tours des créatures, plus rien ne l'appelait : ce garde-fou contre un tour joué deux fois n'est donc plus alimenté (c'était déjà le cas avant ce ménage).
+
+corrections_v380.mjs le vérifie (chaque fichier, les voisines gardées, la page sans erreur).

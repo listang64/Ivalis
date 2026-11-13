@@ -843,11 +843,6 @@ function creerElements() {
 // prochain toucher.
 const dictee = { reco: null, voulue: false, base: "", finies: "" };
 const joindre = (a, b) => { a = a || ""; b = (b || "").trim(); if (!b) return a; return a + (a && !/\s$/.test(a) ? " " : "") + b; };
-window.texteDictee = (base, resultats) => {           // (pour les bancs) ce que la dictée écrit
-    let finies = "", enCours = "";
-    for (const r of resultats) { if (r.isFinal) finies = joindre(finies, r.texte); else enCours = joindre(enCours, r.texte); }
-    return joindre(joindre(base, finies), enCours);
-};
 function basculerDictee() {
     if (!elts) return;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1144,7 +1139,6 @@ function terminerLecture() {
             .catch(e => console.error("Le livre : lecture terminée", e));
     }
 }
-window.etatLectureRecit = () => etatLecture();
 
 // LE COMBAT DU RÉCIT (v278, combat_rp.js) : son bouton vivait dans l'ancien
 // parchemin du MJ ; dans le livre, une note rouge sort du haut du livre —

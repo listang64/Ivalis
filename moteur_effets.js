@@ -2573,18 +2573,6 @@ window.demarrerCiblage = async function(idCarte, options) {
     window.actualiserVisuelCiblage();
 };
 
-// LA BARRE DE RÉSOLUTION : en bas de l'écran, elle porte ANNULER et RÉSOUDRE
-// pendant un ciblage. Créée à la demande, retirée quand ses boutons partent.
-window.barreCiblageResolution = function() {
-    let barre = document.getElementById("barre-ciblage-resolution");
-    if (!barre) {
-        barre = document.createElement("div");
-        barre.id = "barre-ciblage-resolution";
-        document.body.appendChild(barre);
-    }
-    return barre;
-};
-
 // RÉSOUDRE et ANNULER, posés dans la barre de résolution : le ciblage d'une cible
 // unique les ouvre, et la phase du soin (voir passerAuCiblageDuSoutien) aussi —
 // même quand l'attaque, elle, s'est visée en zone et ne les avait pas posés.

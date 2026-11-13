@@ -470,20 +470,6 @@ window.animationEnCours = function(nom) {
                           && (Date.now() - (leveDepuis[n] || 0)) < DRAPEAUX_ANIMATION[n]);
 };
 
-// Le grand ménage : tout rabaisser. Appelé au retour au premier plan.
-window.libererVerrousAnimation = function() {
-    Object.keys(DRAPEAUX_ANIMATION).forEach(nom => { window[nom] = false; });
-};
-
-// Toutes les animations diffusées par la base passent par ici plutôt que
-// directement par filerAnimation : la séquence de tour (sequence_tour.js) sait
-// alors qu'un poste qui regarde derrière la fenêtre sombre ne doit RIEN jouer —
-// il rejouera le tour depuis son script. Cette version-ci est le filet : si ce
-// module n'est pas chargé, le combat se comporte exactement comme avant.
-window.programmerAnimationTour = function(nom, action, fn) {
-    return window.filerAnimation(nom, fn);
-};
-
 // =========================================================================
 //  LE JOURNAL D'ÉVÉNEMENTS DU COMBAT
 // =========================================================================
@@ -1960,13 +1946,6 @@ window.competencesMaxCombattant = function(perso) {
     return base + (window.atoutRace(perso).competences || 0);
 };
 
-// Ce combattant résiste-t-il à cet état ? (v260 : plus d'immunité — 25 % de
-// chance en moins de l'attraper, par une carte comme par une zone.)
-window.resisteAEtat = function(perso, nomEtat) {
-    const a = window.atoutRace(perso) || {};
-    return [...(a.resistances || []), ...(a.immunites || [])].includes(nomEtat);
-};
-
 // Les soins reçus, multipliés par l'atout du peuple (Éthéré : +25 %).
 window.multiplicateurSoinsRecus = function(perso) {
     return 1 + ((window.atoutRace(perso).soinsRecus || 0) / 100);
@@ -2168,17 +2147,6 @@ async function creerNouvellePartie(nomGroupe, mdpGroupe) {
   });
 
   return nouvelID;
-}
-
-async function recupererPartiesEnCours() {
-  const q = query(collection(db, COL.PARTIES), where("Statut", "==", "En_cours"));
-  const snap = await getDocs(q);
-  const parties = [];
-  snap.forEach((document) => {
-    const d = document.data();
-    parties.push({ id: d.ID_Partie || document.id, nom: d.Nom_Du_Groupe || "" });
-  });
-  return parties;
 }
 
 // =========================================================================
@@ -4638,14 +4606,6 @@ function confirmerQuitterJeu() {
 function estPanneauParametresOuvert() {
   const conteneur = document.getElementById("conteneur-parametres");
   return conteneur && conteneur.classList.contains("ouvert");
-}
-
-function estPanneauPersonnagesOuvert() {
-  const liste = document.getElementById("conteneur-liste-personnages");
-  const fiche = document.getElementById("fenetre-fiche-perso");
-  const listeOuverte = liste && liste.classList.contains("ouvert");
-  const ficheOuverte = fiche && window.getComputedStyle(fiche).display !== "none";
-  return listeOuverte || ficheOuverte;
 }
 
 function fermerToutPersonnages(immediat) {

@@ -77,7 +77,6 @@ let enCours = false;
 let numeroPastille = 1;
 window.VILLAGES_REGIONAUX = villages;
 window.pastillesVillages = () => pastilles.map(p => ({ ...p }));
-window.creationVillagesEnCours = () => enCours;
 
 // --- LES VILLAGES DE LA BASE ---------------------------------------------
 function lireVillage(id, d) {

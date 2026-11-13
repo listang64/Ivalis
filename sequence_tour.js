@@ -97,7 +97,6 @@ window.DELAI_ENTRE_ETAPES_MS = 320;
 // base et ne redéclenche aucun sous-effet — ils sont déjà des événements à part
 // entière, avec leur propre numéro.
 window.REJEU_SCRIPT_EN_COURS = false;
-window.ETAT_AVANT_REJEU = null;
 window.EVENEMENT_EN_COURS = null;
 
 // LE TEMPS DE LIRE. Le premier événement d'un tour qu'on n'a pas joué soi-même
@@ -160,16 +159,6 @@ window.acteurCourantCombat = function(partie) {
     if (etat.phase !== "Resolution") return null;
     const tete = (etat.file || [])[0];
     return tete ? { idPersonnage: tete.id, idCarte: tete.carte || null } : null;
-};
-
-window.jeJoueCeTour = function(partie) {
-    const tete = window.acteurCourantCombat(partie);
-    if (!tete) return false;
-    if (window.IA_MONSTRE_ACTEUR && window.IA_MONSTRE_ACTEUR === tete.idPersonnage) return true;
-    const perso = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === tete.idPersonnage);
-    const estCreature = (typeof window.estMonstre === "function" && window.estMonstre(tete.idPersonnage))
-                        || !!(perso && perso.estMonstre);
-    return !estCreature && !!perso && perso.idJoueur === monPoste();
 };
 
 // « Ce combattant est-il MON héros ? » — posé sur un identifiant, et non sur la
@@ -240,29 +229,6 @@ function resumeDonnee(d) {
     }
     return "";
 }
-
-// =========================================================================
-//  LA RELECTURE, DANS L'ORDRE DES NUMÉROS
-// =========================================================================
-//  LE POINT DE DÉPART, UNE SEULE FOIS. Une carte peut frapper deux fois la même
-//  cible : le moteur retranche alors le second coup de ce que le premier vient
-//  d'écrire. Servir la valeur d'avant à CHAQUE demande cassait cette chaîne —
-//  les deux coups repartaient du même chiffre, et seul le dernier comptait, si
-//  bien qu'un spectateur voyait moins de dégâts que l'auteur. On ne la sert donc
-//  qu'à la première demande pour un combattant et un champ donnés : après quoi
-//  c'est la valeur courante, celle que le coup précédent vient d'inscrire.
-let dejaServiAvant = null;
-
-window.valeurAvantRejeu = function(idCombattant, champ, valeurCourante) {
-    const avant = window.ETAT_AVANT_REJEU;
-    if (!avant) return valeurCourante;
-    const fiche = avant[idCombattant];
-    if (!fiche || fiche[champ] === undefined) return valeurCourante;
-    const cle = idCombattant + "|" + champ;
-    if (dejaServiAvant && dejaServiAvant.has(cle)) return valeurCourante;
-    if (dejaServiAvant) dejaServiAvant.add(cle);
-    return fiche[champ];
-};
 
 // =========================================================================
 //  LA BASE A LE DERNIER MOT
@@ -557,9 +523,7 @@ window.lireJournalCombat = async function() {
             // celui que la file désigne : un poste en retard raconterait sinon
             // le mauvais tour au-dessus des bonnes animations.
             window.EVENEMENT_EN_COURS = ev;
-            window.ETAT_AVANT_REJEU = ev.avant || null;
             window.REJEU_SCRIPT_EN_COURS = true;
-            dejaServiAvant = new Set();
             const garde = gardeDeRejeu(ev);
             tracer("▶️", `${suivant} ${ev.type} ${ev.acteur || "?"}`,
                    `${resumeDonnee(ev.data)} [de ${ev.auteur || "?"} v${ev.v || "?"}]`);
@@ -567,9 +531,7 @@ window.lireJournalCombat = async function() {
                 await window.filerAnimation(ev.type, () => jouer(ev.data));
             } finally {
                 window.REJEU_SCRIPT_EN_COURS = false;
-                window.ETAT_AVANT_REJEU = null;
                 window.EVENEMENT_EN_COURS = null;
-                dejaServiAvant = null;
                 rendreLaGarde(garde);
                 noterCeQuiVientDEtreMontre(ev);
                 tracer("⏹️", `${suivant} ${ev.type}`, garde.length ? `(base prioritaire sur ${garde.join(",")})` : "");
@@ -637,8 +599,8 @@ window.etatSequenceTour = function() {
 
     // Le journal est hors service : il n'annoncera jamais de tour, et la fenêtre
     // resterait sur « le tour se joue… » devant un plateau qu'on ne voit pas.
-    // On l'efface — les animations reprennent leur ancien chemin (voir
-    // programmerAnimationTour), et au moins le combat se regarde.
+    // On l'efface — les animations reprennent leur ancien chemin, et au
+    // moins le combat se regarde.
     if (window.JOURNAL_INDISPONIBLE) return { message: "", okVisible: false, forcerVisible: false, masquee: true };
 
     if (window.monHerosJoue()) return null;      // à moi de jouer : plateau dégagé
@@ -688,35 +650,6 @@ Object.defineProperty(window, "SEQUENCE_TOUR", {
                  voile: true, monTour: window.monHerosJoue() };
     }
 });
-
-// =========================================================================
-//  LES ANIMATIONS DIFFUSÉES À L'ANCIENNE
-// =========================================================================
-//  Les Action_* de la partie existent toujours : c'est par elles que le poste
-//  qui JOUE voit son propre tour se dérouler pendant qu'il le calcule. Mais un
-//  poste qui REGARDE n'en fait plus rien — il connaîtra ce tour par le journal,
-//  numéro par numéro. Sans ce filtre, les animations se déroulaient derrière la
-//  fenêtre sombre, et on les devinait par transparence.
-window.programmerAnimationTour = function(nom, action, fn) {
-    // Un poste qui joue son propre héros voit tout en direct.
-    if (window.monHerosJoue()) return window.filerAnimation(nom, fn);
-
-    // LE JOURNAL EST MUET. Taire une animation en comptant sur un numéro qui
-    // n'arrivera jamais, c'est un plateau où il ne se passe rien. On repasse au
-    // circuit d'avant : moins bien synchronisé, mais on voit le combat.
-    if (window.JOURNAL_INDISPONIBLE) return window.filerAnimation(nom, fn);
-
-    // LA SEULE ANIMATION QU'ON NE PEUT PAS TAIRE CHEZ CELUI QUI CALCULE : la
-    // carte. Ce n'est pas qu'une animation, c'est le moteur de résolution
-    // lui-même — les dégâts, les états, les sous-effets et leurs écritures en
-    // base en sortent. La taire, c'était un tour où il ne se passait rien.
-    if (nom === "carte" && window.jeJoueCeTour()) return window.filerAnimation(nom, fn);
-
-    // Tout le reste attend son numéro. Le pion concerné garde sa case à l'écran
-    // — c'est l'événement pas encore rejoué qui le retient, il n'y a rien à
-    // inscrire nulle part (voir pionsRetenusParLeJournal).
-    return Promise.resolve();
-};
 
 // =========================================================================
 //  LA LECTURE AUTOMATIQUE (mode DEV)

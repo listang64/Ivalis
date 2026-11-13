@@ -4923,41 +4923,6 @@ window.RENDU_ZONES_PERSISTANTES = {
     style: injecterStyleZonesPersistantes
 };
 
-// =========================================================================
-//  NOUVEAU : CONTRÔLE DE L'ESPACEMENT DES BANNIÈRES
-// =========================================================================
-
-window.changerEspacementBannieres = function(delta) {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    
-    // Récupération de l'espacement actuel (ou valeur par défaut)
-    let espacementActuel = parseInt(localStorage.getItem("ivalis_espacement_bannieres")) || -85;
-    let nouvelEspacement = espacementActuel + delta;
-    
-    // On met des limites raisonnables (-120px très serré, 0px très espacé)
-    if (nouvelEspacement < -120) nouvelEspacement = -120;
-    if (nouvelEspacement > 0) nouvelEspacement = 0;
-    
-    // Sauvegarde dans le navigateur
-    localStorage.setItem("ivalis_espacement_bannieres", nouvelEspacement);
-    window.ESPACEMENT_BANNIERES_COMBAT = nouvelEspacement;
-    
-    const label = document.getElementById("label-espacement-bannieres");
-    if (label) label.innerText = nouvelEspacement;
-    
-    // On force le rafraîchissement immédiat de l'UI
-    if (window.COMBAT_PERSOS_JOUEUR && window.COMBAT_PERSOS_JOUEUR.length > 0) {
-        window.afficherPersoCombatActuel();
-    }
-};
-
-// --- INITIALISATION VISUELLE DU LABEL AU DÉMARRAGE ---
-document.addEventListener("DOMContentLoaded", function () {
-    const label = document.getElementById("label-espacement-bannieres");
-    if (label) {
-        label.innerText = parseInt(localStorage.getItem("ivalis_espacement_bannieres")) || -85;
-    }
-});
 
 // =========================================================================
 //  GESTION DU TOUR PAR TOUR ET PISTE D'INITIATIVE
@@ -5466,9 +5431,8 @@ window.actionBoutonFinTour = function() {
 
         // LA CARTE NE S'OUVRE PLUS ICI. Elle s'affichait en grand pour porter
         // RÉSOUDRE et ANNULER, puis disparaissait à la résolution — Nico : « ne
-        // la fais pas apparaître ». Les deux boutons ont maintenant leur barre
-        // (barreCiblageResolution, moteur_effets.js) ; une carte restée ouverte
-        // se referme.
+        // la fais pas apparaître ». (v367 : plus de RÉSOUDRE ni d'ANNULER, la
+        // cible se valide sur le plateau.) Une carte restée ouverte se referme.
         if (typeof window.masquerApercuCarteHD === "function") window.masquerApercuCarteHD(true);
         // ON NOMME LE LANCEUR. Sans ça, demarrerCiblage le déduit du panneau
         // gauche — c'est-à-dire du combattant qu'on regarde, pas de celui qui
@@ -6365,24 +6329,6 @@ window.couleurCombattant = function(perso) {
     if (estCreature) return "#e63946";
     const c = perso && perso.couleur;
     return (typeof c === "string" && /^#[0-9a-fA-F]{3,8}$/.test(c)) ? c : "#e8d5a5";
-};
-
-// Le dégradé brossé du panneau latéral, mais dans la couleur qu'on lui donne :
-// un éclat clair, la couleur pleine, une ombre profonde, puis un reflet. C'est
-// « le même effet », transposé — et non un simple aplat.
-window.degradeBrosse = function(couleur) {
-    return `linear-gradient(135deg, #ffffff 0%, ${couleur} 22%, ${window.assombrirCouleur(couleur, 0.45)} 50%, ${couleur} 74%, #ffffff 100%)`;
-};
-
-window.assombrirCouleur = function(hex, facteur) {
-    let h = String(hex).replace("#", "");
-    if (h.length === 3) h = h.split("").map(c => c + c).join("");
-    const n = parseInt(h.slice(0, 6), 16);
-    if (isNaN(n)) return "#5c3a21";
-    const r = Math.round(((n >> 16) & 255) * (1 - facteur));
-    const v = Math.round(((n >> 8) & 255) * (1 - facteur));
-    const b = Math.round((n & 255) * (1 - facteur));
-    return "#" + [r, v, b].map(x => x.toString(16).padStart(2, "0")).join("");
 };
 
 // Le dessin de la zone d'une technique, en hexagones — le même que sur la carte

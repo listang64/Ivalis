@@ -315,18 +315,6 @@
         return `<svg class="dessin-marque dessin-plume" viewBox="0 0 40 40" aria-hidden="true">`
             + `<path class="plein" d="M34 3 C24 8 15 18 11 31 C18 24 28 16 34 3 Z"/><path d="M34 3 C26 14 18 24 7 37"/></svg>`;
     }
-    // Le dessin du marque-page de la carte (v302) : une terre, au trait noir —
-    // le globe, ses méridiens et parallèles, et des terres esquissées.
-    function dessinTerre() {
-        return `<svg class="dessin-marque dessin-terre" viewBox="0 0 60 80" aria-hidden="true">
-                  <circle class="feuille" cx="30" cy="38" r="21"/>
-                  <path class="ligne" d="M 9.5 38 C 20 41 40 41 50.5 38"/>
-                  <path class="ligne" d="M 13 27 C 22 29.5 38 29.5 47 27 M 13 49 C 22 46.5 38 46.5 47 49"/>
-                  <path class="ligne" d="M 30 17 C 21 26 21 50 30 59 M 30 17 C 39 26 39 50 30 59"/>
-                  <path class="coin" d="M 17 24 C 21 21 26 23 25 27 C 24 31 28 32 27 36 C 26 40 20 39 18 35 C 16 31 14 27 17 24 Z"/>
-                  <path class="coin" d="M 35 30 C 39 27 45 29 46 34 C 47 40 43 45 38 47 C 35 48 33 44 35 41 C 37 38 32 34 35 30 Z"/>
-                  <path class="ligne" d="M 22 66 C 26 64 34 64 38 66 M 30 59 L 30 66"/></svg>`;
-    }
     // Le dessin du marque-page de la marche (v310) : des pas de sandales qui
     // montent, à l'encre, le long d'un chemin en pointillé.
     function dessinPas() {
