@@ -11749,3 +11749,12 @@ Le fond de la page (html) recopie le décor de la scène visible : c'est lui qu'
 - Le combat coupe toujours la veille et la reprend en sortant (`suspendreSynchroCanvas`, `reprendreSynchroCanvas`).
 
 corrections_v384.mjs le vérifie : le texte, puis dans la vraie page, qu'au calme il n'y a plus que le filet, que le fond suit la fenêtre de combat à l'image suivante, le choix de classe et la classe du body, que la veille coupée ne réagit plus et qu'en reprenant elle rattrape la scène, et que la carte sans image n'est pas mesurée.
+
+## v385 — Les boucles (4, 5 et 6) : le bandeau du combat, le brouillard, la nuit, l'arrière-plan
+
+- hud_disposition.js : hors combat, le veilleur du bandeau posait la plaque du tour puis la mesurait à vide toutes les 600 ms (un calcul forcé de la page, pour rien : la plaque et le bandeau vivent dans la fenêtre de combat, cachée). Il ne travaille plus qu'en combat.
+- moteur_effets.js : le brouillard d'aveuglement ne se revoit plus qu'en combat ; hors combat, un passage efface ce qui en resterait.
+- voyage_groupe.js : le voile de la nuit ne se revoit que la nuit, ou pour s'éteindre s'il est resté allumé.
+- Ces veilles, le bouton « Rejoindre le combat » (combat_rp.js) et les marque-pages de la création (grimoire_creation.js) dorment quand l'onglet est caché (`document.hidden`). Les veilles du jeu à plusieurs (le battement du combat du récit, le guet du cerveau, les lieux du voyage) ne changent pas.
+
+corrections_v385.mjs le vérifie : le texte, puis dans la vraie page, que la plaque et le bandeau sont bien dans la fenêtre de combat, que hors combat rien ne se pose ni ne se dessine, qu'un reste de brouillard s'efface, qu'en combat tout reprend, qu'onglet caché tout dort, et qu'un voile de nuit resté allumé s'éteint.

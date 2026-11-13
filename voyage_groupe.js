@@ -964,8 +964,13 @@ function pionMonde() {
 // qu'on la quitte (le voile ne vit plus dans la carte, il ne part plus avec elle).
 const nuitVisible = () => !!(voyage && voyage.Etat === "nuit" && voyage.Arrivee
     && carteOuverte() === Number(voyage.Arrivee.Region) && ecranJeuVisible());
+// (v385) Seulement la nuit (ou pour éteindre un voile resté allumé), et pas quand l'onglet est caché.
 setInterval(() => {
-    try { const n = $("voile-nuit-voyage"); if (n) n.classList.toggle("visible", nuitVisible()); } catch (e) {}
+    try {
+        if (document.hidden) return;
+        const n = $("voile-nuit-voyage");
+        if (n && ((voyage && voyage.Etat === "nuit") || n.classList.contains("visible"))) n.classList.toggle("visible", nuitVisible());
+    } catch (e) {}
 }, 500);
 function calquesRegion() {
     const carte = $("carte-region");

@@ -608,9 +608,10 @@ function terminer() {
 }
 
 // La veille : les marque-pages suivent la page ouverte ; hors partie, tout s'efface.
+// (v385) Endormie quand l'onglet est caché.
 setInterval(() => {
     try {
-        if (!actif) return;
+        if (!actif || document.hidden) return;
         const g = G();
         if (!g || !g.enPartie || !g.enPartie()) { terminer(); return; }
         majOnglets();

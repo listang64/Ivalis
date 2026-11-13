@@ -588,7 +588,14 @@ window.dessinerBrouillardAveuglement = function() {
 };
 if (typeof window !== "undefined" && typeof setInterval === "function" && !window.__brouillardAveugleVeille) {
     window.__brouillardAveugleVeille = setInterval(() => {
-        try { window.dessinerBrouillardAveuglement(); } catch (e) {}
+        try {
+            // (v385) Seulement en combat (ou pour effacer ce qui en resterait), et pas quand
+            // l'onglet est caché.
+            if (document.hidden) return;
+            const fenetre = document.getElementById("fenetre-combat");
+            if ((!fenetre || fenetre.style.display !== "block") && !document.getElementById("svg-brouillard-aveugle")) return;
+            window.dessinerBrouillardAveuglement();
+        } catch (e) {}
     }, 400);
 }
 

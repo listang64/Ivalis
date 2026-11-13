@@ -407,7 +407,13 @@
         window.appliquerReglagesHud();
     }
 
+    // (v385) Hors combat, la fenêtre de combat est cachée : le bandeau et la plaque n'ont
+    // aucune largeur, il n'y a rien à mesurer ni à poser (la plaque, posée puis mesurée à
+    // vide, forçait un calcul de la page toutes les 600 ms). Le veilleur ne travaille
+    // qu'en combat, et dort quand l'onglet est caché.
     function surveiller() {
+        const fenetre = document.getElementById("fenetre-combat");
+        if (document.hidden || !fenetre || fenetre.style.display !== "block") return;
         suivreLaLargeur();
         if (!encartPose || window.ENCART_A_REPOSER) encartPose = window.appliquerReglagesEncart();
     }

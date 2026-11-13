@@ -1556,7 +1556,7 @@ function actualiserBoutonRejoindre() {
     const texte = c.Etat === "preparation" ? "⚔️ Le combat se prépare — Rejoindre" : "⚔️ Rejoindre le combat";
     if (b.textContent !== texte) b.textContent = texte;
 }
-setInterval(() => { try { actualiserBoutonRejoindre(); } catch (e) {} }, 1000);
+setInterval(() => { if (document.hidden) return; try { actualiserBoutonRejoindre(); } catch (e) {} }, 1000);   // (v385) endormi en arrière-plan
 
 function actualiserTout() {
     try { actualiserBoutonRejoindre(); } catch (e) { console.error("Combat du récit (bouton) :", e); }
