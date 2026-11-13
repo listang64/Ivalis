@@ -328,7 +328,7 @@ await section(async () => {
 {
   const html = lire("index.html");
   verifier("version 344 ou plus ; les fichiers touchés ont changé de version", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 344 && JSON.parse(lire("version.json")).version >= 344
-           && ['villages_regionaux.js?v=10"', 'cartes_regionales.js?v=21"', 'loupe_cartes.js?v=5"', 'loupe_cartes.css?v=3"'].every(x => html.includes(x))
+           && [["villages_regionaux.js", 10], ["cartes_regionales.js", 21], ["loupe_cartes.js", 5], ["loupe_cartes.css", 3]].every(([f, n]) => Number((new RegExp(f.replace(".", "\\.") + "\\?v=(\\d+)\"").exec(html) || [])[1]) >= n)
            && Number((/style\.css\?v=(\d+)"/.exec(html) || [])[1]) >= 131
            && Number((/grimoire_regions\.js\?v=(\d+)"/.exec(html) || [])[1]) >= 11 && Number((/grimoire_regions\.css\?v=(\d+)"/.exec(html) || [])[1]) >= 5);
 }

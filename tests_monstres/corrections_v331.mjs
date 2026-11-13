@@ -177,10 +177,10 @@ await section(async () => {
              foretDejaNeuve: { usure: !!c[1].usure, terrains: c[1].terrains.length }, pletia: { image: c[4].image, usure: !!c[4].usure, terrains: c[4].terrains.length } };
   });
   verifier("la forêt des murmures, la vallée de souffre, le désert d'Etheria : les nouvelles images", r.images.every((u, i) => u.includes(Object.values(NOUVELLES)[i])), JSON.stringify(r.images));
-  verifier("la fiche du désert parle encore de l'ancienne image : son usure, ses terrains, son titre, ses proportions sont ignorés", r.desert.usure === null && r.desert.terrains === 0 && r.desert.aspect === null && r.desert.titre.x === 0.5, JSON.stringify(r.desert));
+  verifier("la fiche du désert parle encore de l'ancienne image : son usure, ses terrains, son titre, ses proportions sont ignorés", r.desert.usure == null /* (v374 : plus d'usure du tout) */ && r.desert.terrains === 0 && r.desert.aspect === null && r.desert.titre.x === 0.5, JSON.stringify(r.desert));
   verifier("… mais son nom et son descriptif restent", r.desert.description === "Le sable chante.");
-  verifier("une fiche déjà faite pour la nouvelle image garde ce qu'on y a posé", r.foretDejaNeuve.usure && r.foretDejaNeuve.terrains === 1, JSON.stringify(r.foretDejaNeuve));
-  verifier("une région qui ne change pas d'image (Volcanisse) ne bouge pas", /IMG_1900/.test(r.pletia.image) && r.pletia.usure && r.pletia.terrains === 1, JSON.stringify(r.pletia));
+  verifier("une fiche déjà faite pour la nouvelle image garde ce qu'on y a posé (ses terrains ; plus d'usure depuis la v374)", r.foretDejaNeuve.terrains === 1, JSON.stringify(r.foretDejaNeuve));
+  verifier("une région qui ne change pas d'image (Volcanisse) ne bouge pas", /IMG_1900/.test(r.pletia.image) && r.pletia.terrains === 1, JSON.stringify(r.pletia));
   const d = await p.evaluate(() => { localStorage.setItem("ivalis_DEV_MODE", "on"); window.__sets = []; window.remettreANeufCartesRegionalesBanc();
     return (window.__sets || []).filter(x => /^Cartes_Regionales\//.test(x.chemin)).map(x => ({ chemin: x.chemin, image: x.data.Image, usure: x.data.Usure, terrains: x.data.Terrains, titre: x.data.Titre, aspect: x.data.Aspect, nom: x.data.Nom })); });
   verifier("en DEV, la fiche du désert est remise à neuf (la nouvelle image, plus d'usure ni de terrains ni de titre)", d.length === 1 && d[0].chemin === "Cartes_Regionales/5" && /IMG_2231/.test(d[0].image) && d[0].usure === null && d[0].terrains === null && d[0].titre === null && d[0].aspect === null && d[0].nom === undefined, JSON.stringify(d));

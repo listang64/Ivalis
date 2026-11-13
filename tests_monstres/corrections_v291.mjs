@@ -320,89 +320,11 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("4. LE PARCHEMIN : LE NOM DU NOUVEAU VENU, L'ATTENTE DU PORTRAIT, PUIS SA RÉPLIQUE");
-// =========================================================================
-const etatParchemin = () => p.evaluate(() => {
-  const o = document.getElementById("ecran-recit-dynamique"), nom = document.getElementById("nom-recit-dynamique");
-  const img = document.getElementById("portrait-recit-dynamique"), att = document.getElementById("attente-recit-dynamique");
-  const contenu = document.getElementById("contenu-texte-recit");
-  return { ouvert: !!o && o.style.display !== "none", nom: nom ? nom.textContent : "", nomVisible: !!nom && nom.style.display !== "none" && nom.style.opacity === "1",
-           portrait: img ? img.getAttribute("src") || "" : "", portraitVisible: !!img && img.style.opacity === "1",
-           attente: att ? att.textContent : "", attenteVisible: !!att && att.classList.contains("visible") && getComputedStyle(att).opacity !== "0",
-           texte: contenu ? contenu.textContent : "", texteVisible: contenu ? contenu.style.opacity === "1" : false };
-});
-const cliquer = () => p.evaluate(() => document.getElementById("ecran-recit-dynamique").click());
-const P1 = "Les portes du temple s'ouvrent.";
-const P2_SANS = "Myrto : « Bienvenue, étrangers ! »";
-const P2_AVEC = `<span class="pnj-chat-hover"><strong>Myrto</strong><img src="https://res.cloudinary.com/dlkjq4kvg/image/upload/v1/PNJ/myrto_final.png" class="pnj-hover-img"></span> : « Bienvenue, étrangers ! »`;
-await section(async () => {
-  await p.evaluate(() => { if (typeof window.fermerRecitDynamique === "function") { try { window.fermerRecitDynamique(); } catch (e) {} } });
-  await p.waitForTimeout(1700);
-  const ts = Date.now();
-  await p.evaluate(({ ts, t }) => window.lancerRecitDynamique(t, { ts, enCours: false, pnjAttendus: ["Myrto"], pnjPrets: false }), { ts, t: P1 + "<br>" + P2_SANS });
-  await p.waitForTimeout(1600);
-  await cliquer(); await p.waitForTimeout(150); await cliquer();       // finir la frappe, puis page suivante
-  await p.waitForTimeout(1500);
-  const e1 = await etatParchemin();
-  if (process.env.V291_CAPTURES) await p.screenshot({ path: process.env.V291_CAPTURES + "/v291_attente_portrait.png" });
-  verifier("au moment où Myrto parle sans portrait : son nom s'affiche", e1.ouvert && e1.nom === "Myrto" && e1.nomVisible, JSON.stringify({ nom: e1.nom, visible: e1.nomVisible }));
-  verifier("« Le portrait se dessine… » et le parchemin attend (la réplique ne s'écrit pas)", e1.attenteVisible && /portrait se dessine/.test(e1.attente) && !/Bienvenue/.test(e1.texte),
-           JSON.stringify({ attente: e1.attente, visible: e1.attenteVisible, texte: e1.texte.slice(0, 40) }));
-  await p.evaluate(({ ts, t }) => window.majRecitDynamique(ts, t, { enCours: false, pnjAttendus: ["Myrto"], pnjPrets: false }), { ts, t: P1 + "<br>" + P2_AVEC });
-  await p.waitForTimeout(1800);
-  const e2 = await etatParchemin();
-  verifier("le portrait arrive : il apparaît, et la réplique s'écrit", e2.portraitVisible && /myrto_final/.test(e2.portrait) && /Bienvenue, étrangers/.test(e2.texte) && !e2.attenteVisible,
-           JSON.stringify({ portrait: e2.portrait.slice(-20), texte: e2.texte.slice(0, 40), attente: e2.attenteVisible }));
-  verifier("le nom au-dessus reste Myrto, sans le « Myrto : » répété dans la réplique", e2.nom === "Myrto" && !/^\s*Myrto\s*:/.test(e2.texte), e2.texte.slice(0, 30));
-});
-
-await section(async () => {
-  await p.evaluate(() => window.fermerRecitDynamique()); await p.waitForTimeout(1700);
-  const ts = Date.now();
-  await p.evaluate(({ ts, t }) => window.lancerRecitDynamique(t, { ts, enCours: false, pnjAttendus: ["Myrto"], pnjPrets: false }), { ts, t: P2_SANS });
-  await p.waitForTimeout(1800);
-  const e1 = await etatParchemin();
-  await cliquer(); await p.waitForTimeout(1200);
-  const e2 = await etatParchemin();
-  verifier("un toucher passe l'attente : la réplique s'écrit sans portrait", e1.attenteVisible && /Bienvenue/.test(e2.texte) && !e2.attenteVisible && !e2.portraitVisible,
-           JSON.stringify({ avant: e1.attenteVisible, texte: e2.texte.slice(0, 30) }));
-  await p.evaluate(() => window.fermerRecitDynamique()); await p.waitForTimeout(1700);
-  const ts2 = Date.now();
-  await p.evaluate(({ ts, t }) => window.lancerRecitDynamique(t, { ts, enCours: false, pnjAttendus: null, pnjPrets: false }), { ts: ts2, t: "Thorin : « On y va, les amis. »" });
-  await p.waitForTimeout(1800);
-  const e3 = await etatParchemin();
-  verifier("la réplique d'un héros n'attend jamais de portrait", /On y va/.test(e3.texte) && !e3.attenteVisible, e3.texte.slice(0, 30));
-  await p.evaluate(() => window.fermerRecitDynamique()); await p.waitForTimeout(1700);
-  const ts3 = Date.now();
-  await p.evaluate(({ ts, t }) => window.lancerRecitDynamique(t, { ts }), { ts: ts3, t: P2_SANS });
-  await p.waitForTimeout(1800);
-  const e4 = await etatParchemin();
-  verifier("un message d'avant (sans état) se lit comme avant, sans attente", /Bienvenue/.test(e4.texte) && !e4.attenteVisible, e4.texte.slice(0, 30));
-});
-
-// =========================================================================
-titre("5. LE MJ ÉCRIT ENCORE : LE PARCHEMIN ATTEND LA SUITE AU LIEU DE SE FERMER");
+titre("4-5. LE PARCHEMIN : RETIRÉ EN v376 (le récit du livre l'a remplacé)");
 // =========================================================================
 await section(async () => {
-  await p.evaluate(() => window.fermerRecitDynamique()); await p.waitForTimeout(1700);
-  const ts = Date.now();
-  await p.evaluate(({ ts, t }) => window.lancerRecitDynamique(t, { ts, enCours: true, pnjAttendus: null, pnjPrets: false }), { ts, t: P1 });
-  await p.waitForTimeout(1600);
-  await cliquer(); await p.waitForTimeout(150); await cliquer();
-  await p.waitForTimeout(1300);
-  const e1 = await etatParchemin();
-  verifier("au bout du texte reçu : le parchemin reste ouvert, « Le Maître du Jeu écrit… »", e1.ouvert && e1.attenteVisible && /écrit/.test(e1.attente), JSON.stringify({ ouvert: e1.ouvert, attente: e1.attente }));
-  await cliquer(); await p.waitForTimeout(400);
-  verifier("un toucher ne le ferme pas pendant qu'il écrit", (await etatParchemin()).ouvert);
-  await p.evaluate(({ ts, t }) => window.majRecitDynamique(ts, t, { enCours: false, pnjAttendus: [], pnjPrets: true }), { ts, t: P1 + "<br>La suite arrive enfin, dans la lumière des torches." });
-  await p.waitForTimeout(1200);
-  const e2 = await etatParchemin();
-  verifier("la suite arrive : elle s'écrit aussitôt", /La suite arrive enfin/.test(e2.texte) && !e2.attenteVisible, e2.texte.slice(0, 40));
-  await p.evaluate(({ ts, t }) => window.majRecitDynamique(ts + 1, t, { enCours: false, pnjPrets: true }), { ts, t: "Un autre récit." });
-  await p.waitForTimeout(300);
-  verifier("la mise à jour d'un autre message ne touche pas ce parchemin", /La suite arrive enfin/.test((await etatParchemin()).texte));
-  await cliquer(); await p.waitForTimeout(150); await cliquer(); await p.waitForTimeout(2200);
-  verifier("à la fin du récit complet, le parchemin se referme", !(await etatParchemin()).ouvert);
+  const r = await p.evaluate(() => ({ lancer: typeof window.lancerRecitDynamique, maj: typeof window.majRecitDynamique }));
+  verifier("(v376) l'ancien parchemin n'existe plus", r.lancer === "undefined" && r.maj === "undefined", JSON.stringify(r));
 });
 
 // =========================================================================
@@ -410,12 +332,10 @@ titre("6. LE CHAT SUIT LE MESSAGE QUI GRANDIT");
 // =========================================================================
 await section(async () => {
   const app = lire("app.js");
-  verifier("l'écoute du chat traite les messages modifiés (redessinés à leur place)", /change\.type === "modified"/.test(app) && /insertBefore\(nouveau, suivant\)/.test(app));
-  verifier("et passe chaque version au parchemin (majRecitDynamique), avec son état", /majRecitDynamique\(data\.Timestamp, data\.Texte, etatRecitDuMessage\(data\)\)/.test(app)
-           && /lancerRecitDynamique\(recitDeclenche, \{ ts: recitHorodatage, \.\.\.recitEtat \}\)/.test(app));
+  verifier("(v376-v377) le message qui grandit va au livre : chaque version des messages lui est relayée", /window\.livreRecitMessages\(snap\.docs/.test(app));
   const index = lire("index.html");
   const v = (re) => Number((index.match(re) || [])[1] || 0);
-  verifier("versions : ia_master, recit_dynamique, app, style, trace du combat", v(/ia_master\.js\?v=(\d+)"/) >= 12 && v(/recit_dynamique\.js\?v=(\d+)"/) >= 6 && v(/app\.js\?v=(\d+)"/) >= 130
+  verifier("versions : ia_master, app, style, trace du combat", v(/ia_master\.js\?v=(\d+)"/) >= 12 && v(/app\.js\?v=(\d+)"/) >= 130
            && v(/style\.css\?v=(\d+)"/) >= 120 && v(/trace_combat\.js\?v=(\d+)"/) >= 196
            && Number((lire("trace_combat.js").match(/VERSION_IVALIS = (\d+)/) || [])[1]) >= 291 && Number((lire("version.json").match(/"version": (\d+)/) || [])[1]) >= 291);
 });

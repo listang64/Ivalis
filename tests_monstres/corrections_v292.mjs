@@ -334,26 +334,17 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("6. LE PARCHEMIN ATTEND AUSSI LE PORTRAIT D'UN VISAGE ANNONCÉ");
+titre("6. LE PARCHEMIN : RETIRÉ EN v376 (le récit du livre l'a remplacé)");
 // =========================================================================
 await section(async () => {
-  await p.evaluate(() => { try { window.fermerRecitDynamique(); } catch (e) {} });
-  await p.waitForTimeout(1700);
-  const ts = Date.now();
-  await p.evaluate(({ ts }) => window.lancerRecitDynamique("Myrto : « Entrez donc ! »", { ts, enCours: true, pnjAttendus: null, pnjAnnonces: ["Myrto"], pnjPrets: false }), { ts });
-  await p.waitForTimeout(1800);
-  const e = await p.evaluate(() => ({ nom: document.getElementById("nom-recit-dynamique").textContent, attente: document.getElementById("attente-recit-dynamique").textContent,
-    visible: document.getElementById("attente-recit-dynamique").classList.contains("visible"), texte: document.getElementById("contenu-texte-recit").textContent }));
-  verifier("Myrto annoncée, sans portrait : son nom, « Le portrait se dessine… », la réplique attend", e.nom === "Myrto" && e.visible && /portrait se dessine/.test(e.attente) && !/Entrez donc/.test(e.texte), JSON.stringify(e));
-  await p.evaluate(() => window.fermerRecitDynamique());
-  const app = lire("app.js");
-  verifier("le chat passe PNJ_Annonces au parchemin", /pnjAnnonces: Array\.isArray\(m\.PNJ_Annonces\)/.test(app));
+  const r = await p.evaluate(() => typeof window.lancerRecitDynamique);
+  verifier("(v376) l'ancien parchemin n'existe plus", r === "undefined", r);
 });
 
 await section(async () => {
   const index = lire("index.html");
   const v = (re) => Number((index.match(re) || [])[1] || 0);
-  verifier("versions : ia_master, recit_dynamique, app, trace du combat", v(/ia_master\.js\?v=(\d+)"/) >= 13 && v(/recit_dynamique\.js\?v=(\d+)"/) >= 7 && v(/app\.js\?v=(\d+)"/) >= 131
+  verifier("versions : ia_master, app, trace du combat", v(/ia_master\.js\?v=(\d+)"/) >= 13 && v(/app\.js\?v=(\d+)"/) >= 131
            && v(/trace_combat\.js\?v=(\d+)"/) >= 197 && Number((lire("trace_combat.js").match(/VERSION_IVALIS = (\d+)/) || [])[1]) >= 292
            && Number((lire("version.json").match(/"version": (\d+)/) || [])[1]) >= 292);
 });

@@ -258,8 +258,9 @@ await section(async () => {
   verifier("les PNJ et les héros se touchent ; les héros en gras", ["Le Chaudron Fêlé", "Varos", "Thorin", "Lyra"].every(n => r.noms.includes(n)) && ["Thorin", "Lyra"].every(n => r.heros.includes(n)), r.noms.join(",") + " / " + r.heros.join(","));
   verifier("ce qui était écrit avant l'arrivée est là d'un coup (pas d'encre qui coule)", r.caches === 0, String(r.caches));
   // Une nouvelle page du Narrateur : l'ancien parchemin, l'écran d'attente et le bandeau ne s'ouvrent plus.
-  await p.evaluate(() => { window.__vieux = []; window.lancerRecitDynamique("x"); window.afficherEcranAttente(); window.annoncerJetsDemandes({}); window.afficherEcranAttente("archivage"); });
-  verifier("l'ancien chat se tait (parchemin, écran d'attente, bandeau des dés)", (await p.evaluate(() => window.__vieux.join(","))) === "attente:archivage", await p.evaluate(() => window.__vieux.join(",")));
+  // (v376 : l'ancien parchemin n'existe plus.)
+  await p.evaluate(() => { window.__vieux = []; window.afficherEcranAttente(); window.annoncerJetsDemandes({}); window.afficherEcranAttente("archivage"); });
+  verifier("l'ancien chat se tait (écran d'attente, bandeau des dés ; plus de parchemin depuis la v376)", (await p.evaluate(() => window.__vieux.join(","))) === "attente:archivage", await p.evaluate(() => window.__vieux.join(",")));
 });
 
 // =========================================================================

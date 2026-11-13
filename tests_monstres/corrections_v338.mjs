@@ -164,7 +164,7 @@ await section(async () => {
   }, [U, ANCIENNES, NOMS]);
   const mauvaises = r.filter(x => !x.image.includes(NOUVELLES[x.n]));
   verifier("les huit régions ont leur nouvelle image (même si la fiche nomme l'ancienne)", !mauvaises.length, JSON.stringify(mauvaises.map(x => [x.n, x.image])));
-  const gardees = r.filter(x => x.usure !== null || x.terrains !== 0 || x.aspect !== null || x.titreX !== 0.5);
+  const gardees = r.filter(x => x.usure != null /* (v374 : plus d'usure du tout) */ || x.terrains !== 0 || x.aspect !== null || x.titreX !== 0.5);
   verifier("l'usure, les terrains, le titre, les proportions de l'ancienne image sont ignorés", !gardees.length, JSON.stringify(gardees));
   verifier("… le nom et le descriptif restent", r.every(x => x.nom === NOMS[x.n] && x.description === "Récit de " + x.n));
   const defaut = await p.evaluate(() => Object.fromEntries(Object.entries(window.CARTES_REGIONALES_DEFAUT).map(([n, d]) => [n, d.image])));

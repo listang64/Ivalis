@@ -212,52 +212,23 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("2. LE PARCHEMIN BRÛLÉ : LES PAGES PORTENT LE MÊME BORD, ET S'EFFACENT SOUS LA CARTE VIVANTE");
+titre("2. SOUS LA CARTE VIVANTE, L'IMAGE DES PAGES S'EFFACE (v374 : plus de parchemin brûlé)");
 // =========================================================================
 await section(async () => {
   await p.evaluate(() => window.GRIMOIRE_REGIONS.ouvrir(5));
   await monteeSur(5); await pose(); await p.waitForTimeout(600);
   const pages = () => p.evaluate(() => [...document.querySelectorAll("#grimoire-livre .page-region")].map(pg => ({ id: pg.id, region: pg.dataset.region, sous: pg.classList.contains("sous-la-vue"),
     cadres: [...pg.querySelectorAll(".region-carte-cadre")].map(c => ({ masque: (c.style.maskImage || c.style.webkitMaskImage || "").slice(0, 8), usure: !!c.querySelector(".parchemin-usure"), zones: !!c.__zonesParchemin, vis: getComputedStyle(c).visibility })) })));
-  await attendreQue(async () => (await pages()).flatMap(x => x.cadres).every(c => c.masque === 'url("blo'), 6000);
   let a = await pages();
   const desert = a.filter(x => x.region === "5"), autres = a.filter(x => x.region !== "5");
-  verifier("chaque image de carte des pages a son bord de parchemin (masque et usure, la même graine que la carte)",
-           // (v331 : une image par région, sur sa page de droite)
-           a.flatMap(x => x.cadres).length >= 4 && a.every(x => x.cadres.length === (/-droite$/.test(x.id) ? 1 : 0)) && a.flatMap(x => x.cadres).every(c => c.masque === 'url("blo' && c.usure), JSON.stringify(a.map(x => x.cadres.length)));
   verifier("sous la carte vivante (le désert), l'image des pages s'efface : un trou montre le papier", desert.length === 2 && desert.every(x => x.sous && x.cadres.every(c => c.vis === "hidden")) && desert.some(x => x.cadres.length), JSON.stringify(desert.map(x => [x.sous, x.cadres.map(c => c.vis)])));
   verifier("… les autres régions gardent leur image (elles tournent avec les pages)", autres.length >= 6 && autres.every(x => !x.sous && x.cadres.every(c => c.vis === "visible")) && autres.some(x => x.cadres.length));
-  // Le DEV peint l'usure, et la valide : les pages se brûlent aussi.
-  await p.evaluate(() => localStorage.setItem("ivalis_DEV_MODE", "on"));
-  await p.evaluate(() => { window.choisirOutilRegion("pinceau"); window.reglerTaillePinceauRegion(60); });
-  const v = await centre("#vue-carte-region");
-  await p.evaluate(([x, y, w, h]) => { window.peindreCarteRegion(x - w / 2 + 10, y - h / 2 + 10, x - w / 2 + 10, y + h / 2 - 10); window.peindreCarteRegion(x - w / 2 + 10, y - h / 2 + 10, x + w / 2 - 10, y - h / 2 + 10); window.peindreCarteRegion(x - 60, y, x + 60, y + 40); }, [v.x, v.y, v.w, v.h]);
-  await p.waitForTimeout(1500);
-  if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v310_brulure_au_pinceau.png" });
-  await p.evaluate(() => window.choisirOutilRegion("pinceau"));
-  const ok = await p.evaluate(() => window.validerNuagesRegion());
-  await attendreQue(async () => (await pages()).filter(x => x.region === "5").every(x => x.cadres.every(c => c.zones)), 8000);
-  a = await pages();
-  verifier("l'usure validée : les pages du désert se brûlent comme la carte (leurs zones peintes)", ok && a.filter(x => x.region === "5").every(x => x.cadres.every(c => c.zones && c.masque === 'url("blo')), JSON.stringify(a.filter(x => x.region === "5").map(x => x.cadres)));
-  await p.mouse.move(5, 5);
-  await p.waitForTimeout(1500);
-  // Le long du trait peint au bord gauche, la carte est percée : on y voit le papier de la page
-  // (beige : plus de rouge que de vert), plus la carte (verte au banc).
-  const vr = await centre("#vue-carte-region");
-  const pixel = async (x, y) => { const png = await p.screenshot({ clip: { x, y, width: 1, height: 1 } });
-    return p.evaluate(async (b64) => { const im = new Image(); im.src = "data:image/png;base64," + b64; await im.decode(); const c = document.createElement("canvas"); c.width = c.height = 1;
-      const x = c.getContext("2d"); x.drawImage(im, 0, 0); return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3); }, png.toString("base64")); };
-  let papierVu = 0, carteVue = 0;
-  for (let dx = 6; dx < 40; dx += 4) { const [r, g] = await pixel(Math.round(vr.x - vr.w / 2 + dx), Math.round(vr.y + vr.h * 0.12)); if (r > g + 8) papierVu++; else if (g > r + 4) carteVue++; }
-  verifier("dans un trou brûlé, c'est le papier de la page qu'on voit (plus la carte intacte)", papierVu >= 2, `papier ${papierVu}, carte ${carteVue}`);
-  if (CAPTURES) { await p.mouse.move(5, 5); await p.waitForTimeout(400); await p.screenshot({ path: CAPTURES + "/v310_brulure_validee.png" }); }
-  // Pendant une tourne, la page brûlée se voit (la carte vivante est cachée).
+  // Pendant une tourne, l'image de la page se voit (la carte vivante est cachée).
   await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipPrev("top"));
   await p.waitForTimeout(150);
   const t = await p.evaluate(() => [...document.querySelectorAll('#grimoire-livre .page-region[data-region="5"]')].map(pg => pg.classList.contains("sous-la-vue")));
-  verifier("une page qui tourne : l'image brûlée de la page revient", t.every(x => !x), JSON.stringify(t));
+  verifier("une page qui tourne : l'image de la page revient", t.every(x => !x), JSON.stringify(t));
   await pose(); await p.waitForTimeout(300);
-  await p.evaluate(() => localStorage.setItem("ivalis_DEV_MODE", "off"));
 });
 
 // =========================================================================
