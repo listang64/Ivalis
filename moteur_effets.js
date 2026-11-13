@@ -860,180 +860,9 @@ window.choisirCaseRepli = function(idPerso, portee, depart) {
     });
 };
 
-// =========================================================================
-//  ILLUSION
-//  Crée un leurre statique de 1 PV, avec l'image du lanceur (affichée à 50% d'opacité, voir
-//  appliquerTokensVTT), sur une case libre choisie interactivement (même écran assombri que le
-//  Bond) dans la portée de l'action (1 par défaut, plus si un mod Distance est posé dessus).
-//  N'entre jamais dans la file d'initiative : c'est un pion purement statique, jamais son tour.
-//  Toujours résolue en dernier sur la carte (voir demarrerCiblage / declencherResolutionAvecBondEventuel).
-// =========================================================================
-// PLUSIEURS ILLUSIONS SUR UNE CARTE : autant de poses que de leurres, une case
-// chacune, et jamais deux fois la même. La case d'un leurre qu'on vient de
-// poser n'apparaît plus parmi les choix du suivant — sans cela, le pion tout
-// juste créé n'était pas encore dans la liste des combattants (elle arrive par
-// l'écouteur, plus tard), sa case restait « libre », et le second leurre s'y
-// posait par-dessus : le cerveau le refusait, on n'en voyait qu'un.
-window.poserIllusions = async function(idLanceur, portee, nombre) {
-    const exclues = [];
-    const n = Math.max(1, Math.round(nombre || 1));
-    for (let i = 0; i < n; i++) {
-        const cible = await window.resoudreIllusionInteractif(idLanceur, portee, exclues);
-        if (!cible) break;
-        exclues.push(cible);
-    }
-    return exclues.length;
-};
-
-window.resoudreIllusionInteractif = function(idLanceur, portee, exclues = []) {
-    return new Promise((resolve) => {
-        const tkLanceur = window.TOKENS_VTT_DATA ? window.TOKENS_VTT_DATA[idLanceur] : null;
-        if (!tkLanceur || !window.PLATEAU_VTT) return resolve(false);
-
-        const candidats = window.PLATEAU_VTT.getHexesInRadius(tkLanceur.q, tkLanceur.r, portee);
-        const hexesValides = candidats.filter(h => {
-            if (h.q === tkLanceur.q && h.r === tkLanceur.r) return false;
-            if ((exclues || []).some(x => x && x.q === h.q && x.r === h.r)) return false;
-
-            const state = typeof window.etatCaseCombat === "function"
-                ? window.etatCaseCombat(h.q, h.r) : window.PLATEAU_VTT.getCaseState(h.q, h.r);
-            if (state.isBlocked || state.isDeleted) return false;
-
-            for (let idAutre in window.TOKENS_VTT_DATA) {
-                const autre = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idAutre);
-                if (!autre || autre.statut === "Mort") continue;
-                const tkAutre = window.TOKENS_VTT_DATA[idAutre];
-                if (tkAutre.q === h.q && tkAutre.r === h.r) return false;
-            }
-
-            return verifierLigneDeVue(tkLanceur, h);
-        });
-
-        if (hexesValides.length === 0) {
-            alert("Aucune case libre pour poser l'illusion.");
-            return resolve(false);
-        }
-
-        const conteneur = document.getElementById("conteneur-plateau-vtt");
-        if (!conteneur) return resolve(false);
-
-        const overlay = window.assombrirCasesJouables("svg-illusion-assombrissement", hexesValides);
-        if (!overlay) return resolve(false);
-        window.surlignerEffetCarteActif("Illusion");
-
-        const nettoyer = () => {
-            overlay.remove();
-            window.surlignerEffetCarteActif(null);
-            window.removeEventListener("click", onClick, { capture: true });
-        };
-
-        const onClick = async (e) => {
-            if (!conteneur.contains(e.target)) return;
-            e.stopPropagation();
-
-            const tokenClique = e.target.closest ? e.target.closest(".token-vtt") : null;
-            if (tokenClique) {
-                const tkClique = window.TOKENS_VTT_DATA[tokenClique.id.replace("token-", "")];
-                if (tkClique && typeof window.afficherMessageFlottantHex === "function") {
-                    window.afficherMessageFlottantHex(tkClique.q, tkClique.r, "Case invalide", "#aaaaaa");
-                }
-                return;
-            }
-
-            const canvasX = (e.clientX - window.VTT_POS_X) / window.VTT_SCALE;
-            const canvasY = (e.clientY - window.VTT_POS_Y) / window.VTT_SCALE;
-            const hex = window.PLATEAU_VTT.pixelToHex(canvasX, canvasY);
-            const cible = hexesValides.find(h => h.q === hex.q && h.r === hex.r);
-
-            if (!cible) return; // Hors zone valide : ne fait rien
-
-            nettoyer();
-
-            if (typeof window.creerIllusion === "function") {
-                await window.creerIllusion(idLanceur, cible.q, cible.r);
-            }
-
-            // La case posée : l'appelant l'écarte des choix du leurre suivant.
-            resolve({ q: cible.q, r: cible.r });
-        };
-
-        window.addEventListener("click", onClick, { capture: true });
-    });
-};
-
-// Crée le personnage "Illusion" en base (comme un monstre posé sur le plateau) et
-// son pion sur le plateau : les écouteurs déjà en place sur Personnages/Combat_VTT propagent la
-// création à tous les joueurs, sans diffusion dédiée nécessaire.
-window.creerIllusion = async function(idLanceur, q, r) {
-    if (!window.ID_PARTIE_COURANTE) return;
-    const lanceurData = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idLanceur);
-    if (!lanceurData) return;
-
-    // L'identifiant est tiré ici, une seule fois, par le seul poste qui pose le
-    // leurre : ce n'est pas un jet de dé, c'est un nom propre. Le cerveau le
-    // reçoit tel quel et refuse une illusion qui porterait un nom déjà pris.
-    const idIllusion = "ILLUSION_" + Math.random().toString(36).substring(2, 9);
-    // L'image du TOKEN de combat, pas le portrait du personnage.
-    const imgUrl = (window.TOKENS_VTT_DATA[idLanceur] && window.TOKENS_VTT_DATA[idLanceur].url) || lanceurData.urlCloudinary || "";
-    const taille = (window.TOKENS_VTT_DATA[idLanceur] && window.TOKENS_VTT_DATA[idLanceur].taille) || 55;
-
-    const dataIllusion = {
-        ID_Partie: window.ID_PARTIE_COURANTE,
-        ID_Joueur: lanceurData.idJoueur || "MJ",
-        // Qui l'a créée : c'est ce qui permet d'effacer ses leurres avec elle
-        // quand on supprime un personnage.
-        ID_Lanceur: idLanceur,
-        Camp: lanceurData.camp,
-        Prenom_Personnage: "Illusion de",
-        Nom_Personnage: (lanceurData.prenom || lanceurData.nom || "").trim(),
-        Statut: "Vivant",
-        PV_Max: 1,
-        PV_Actuels: 1,
-        Fatigue_Max: 0,
-        Fatigue_Actuelle: 0,
-        URL_Cloudinary: imgUrl,
-        URL_Token: imgUrl,
-        Couleur: lanceurData.couleur || "#c2a878",
-        Initiative: 0,
-        Esquive: 0,
-        Parade: 0,
-        Critique: 0,
-        Def_Physique: 0,
-        Def_Magique: 0,
-        Competences_Max: 0,
-        Est_Illusion: true
-    };
-
-    try {
-        // LA FICHE D'ABORD, LE COMBATTANT ENSUITE — et dans cet ordre.
-        //
-        // Le document Personnages porte son IDENTITÉ : le nom, l'image, la
-        // couleur. C'est une fiche, comme celle d'un héros, et les écouteurs
-        // déjà en place la propagent à tous les écrans. Le pion, de même : sans
-        // lui, le plateau n'aurait rien à dessiner (il ne fabrique jamais un
-        // pion qu'il ne connaît pas — trois pions fantômes l'ont appris).
-        //
-        // Mais sa VIE DE COMBAT — son point de vie unique, sa case, le fait
-        // qu'on puisse la viser et la faire tomber — appartient au cerveau. Il
-        // arrête sa liste de combattants à l'ouverture du combat : un leurre né
-        // après, écrit seulement ici, n'existait pour lui à aucun moment. On
-        // pouvait le voir sur le plateau et le traverser sans le toucher.
-        await setDoc(doc(db, "Personnages", idIllusion), dataIllusion);
-
-        window.TOKENS_VTT_DATA[idIllusion] = { q, r, url: imgUrl, taille };
-        await window.enregistrerPionsVTT(idIllusion);
-
-        if (window.regimeDemande && window.regimeDemande.actif()) {
-            await window.regimeDemande.illusion(idLanceur, idIllusion, { q, r });
-        }
-    } catch (err) {
-        console.error("Erreur création Illusion :", err);
-    }
-};
-
-// Défait exactement ce que creerIllusion a fait : le document, le pion sur le plateau, et
-// l'entrée dans Combat_VTT. Appelée quand l'illusion tombe à 0 PV (elle n'en a qu'un seul)
-// et lors de la réinitialisation du combat, pour qu'il ne reste jamais de leurre fantôme
+// Défait un leurre (un totem du Chaman, v368 ; l'effet Illusion qui les posait aussi est
+// retiré depuis la v339) : le document, le pion sur le plateau, et l'entrée dans
+// Combat_VTT. Appelée quand il tombe à 0 PV et lors de la réinitialisation du combat, pour qu'il ne reste jamais de leurre fantôme
 // ni en base ni sur la carte. N'est exécutée que par un seul client (voir les appels) : les
 // autres voient l'illusion disparaître via les écouteurs Firestore déjà en place.
 window.detruireIllusion = async function(idIllusion) {
@@ -1305,11 +1134,6 @@ window.demarrerCiblage = async function(idCarte, options) {
     let indexPremierAutreEffet = -1;
     let indexTraction = -1;
     let indexPremiereAttaque = -1;
-    let isIllusion = false;
-    let porteeIllusion = 1;
-    // Combien de leurres la carte pose : deux actions Illusion, ou une Illusion
-    // ×2, c'est DEUX leurres, sur deux cases choisies l'une après l'autre.
-    let nbIllusions = 0;
     // Persistance de terrain : le sort laisse derrière lui une zone dangereuse sur la ou les
     // cases visées (voir creerZonePersistante). Détecté ici, appliqué après la résolution.
     let aPersistanceTerrain = false;
@@ -1559,7 +1383,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             // leurre de plus, l'action qui la porte se joue normalement.
             // (v339) Nico : « enlève l'effet de combat Illusion ». Une ancienne carte
             // qui la porte se joue sans leurre : l'action Illusion ne fait plus rien,
-            // et posée en mod, elle est ignorée (isIllusion reste faux).
+            // et posée en mod, elle est ignorée.
             if (nomLower.includes("illusion")) return;
 
             // L'arme équipée peut transformer l'action en tir, et allonger sa
@@ -2529,12 +2353,7 @@ window.demarrerCiblage = async function(idCarte, options) {
     }
 
     if (attaquesExtraites.length === 0 && alterationsExtraites.length === 0) {
-        // Illusion seule sur la carte (ou dernière chose restante après le Bond) : elle se résout
-        // ici, immédiatement, puisqu'il n'y a rien d'autre après elle.
         if (extraireSeulement) return null;   // rien à frapper : pas de carte
-        if (isIllusion) {
-            await window.poserIllusions(idLanceurBond, porteeIllusion, nbIllusions);
-        }
         // Un Repli seul sur la carte : on choisit quand même où se replier.
         let repliSeul = null;
         if (repliCarte) {
@@ -2655,7 +2474,6 @@ window.demarrerCiblage = async function(idCarte, options) {
         tractionAvantAttaque: tractionAvantAttaque,
         repartitionTraction: {},
         ordreTraction: [],
-        illusionEnAttente: isIllusion ? { idLanceur: idLanceurBond, portee: porteeIllusion, nombre: nbIllusions } : null,
         // { portee, chance } si la carte porte un Repli ; la case, elle, est
         // choisie au moment de résoudre (repliChoisi).
         repli: repliCarte,
@@ -4204,7 +4022,6 @@ window.declencherResolutionAvecBondEventuel = async function() {
     // on ouvre la seconde phase au lieu de résoudre.
     if (window.passerAuCiblageDuSoutien()) return;
     const bondEnAttente = window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.bondApresAttaque;
-    const illusionEnAttente = window.ETAT_CIBLAGE && window.ETAT_CIBLAGE.illusionEnAttente;
     // LE REPLI SE CHOISIT AVANT D'ENVOYER LA CARTE. Il se joue après l'attaque,
     // mais la carte clôt le tour : une demande envoyée après elle serait
     // refusée. La case part donc avec la carte, et le cerveau fait marcher le
@@ -4226,10 +4043,6 @@ window.declencherResolutionAvecBondEventuel = async function() {
                                                               etatRepli.bondChoisi || etatRepli.origineLanceur);
     }
     await window.declencherResolution();
-    // L'Illusion se crée toujours en dernier sur la carte, après tout le reste (attaque, Bond...).
-    if (illusionEnAttente) {
-        await window.poserIllusions(illusionEnAttente.idLanceur, illusionEnAttente.portee, illusionEnAttente.nombre);
-    }
 };
 
 // =========================================================================

@@ -45,7 +45,6 @@ const COL = {
   DATE: "Date_En_Jeu",
   MDP: "MDP_Nouvelle_Partie",
   CERVEAU_IA: "Cerveau_IA",
-  FACTIONS: "Monde_Factions",
   PERSONNAGES: "Personnages",
   MESSAGES: "Messages_Chat",
   CARACTERISTIQUES: "Caracteristiques", // <-- NOUVEAU
@@ -2235,19 +2234,6 @@ async function verifierMotDePassePartie(idPartie, mdpSaisi) {
     console.warn("Lecture de la partie impossible :", e);
     return { ok: false, source: "reseau", raison: "injoignable" };
   }
-}
-
-// --- Factions (menu deroulant) ---
-async function recupererFactionsPourSelect() {
-  const snap = await getDocs(collection(db, COL.FACTIONS));
-  const factions = [];
-  snap.forEach((document) => {
-    const d = document.data();
-    if (d.Nom_Faction) {
-      factions.push({ id: d.ID_Faction || document.id, nom: d.Nom_Faction });
-    }
-  });
-  return factions;
 }
 
 // --- Cerveau IA (instructions) ---
@@ -5913,18 +5899,6 @@ window.exporterEffetsBDD = async function() {
 // =========================================================================
 //  PERSONNAGES / FICHE PERSO
 // =========================================================================
-function remplirSelectFactions(factions) {
-  const select = document.getElementById("champ-faction");
-  if (!select) return;
-  select.innerHTML = '<option value="">-- Aucune / Indépendant --</option>';
-  factions.forEach((f) => {
-    const opt = document.createElement("option");
-    opt.value = f.id;
-    opt.text = f.nom;
-    select.appendChild(opt);
-  });
-}
-
 function fermerMenuPersonnages() {
   fermerToutPersonnages();
 }
@@ -6398,10 +6372,6 @@ document.addEventListener("DOMContentLoaded", function () {
     ecouterPartiesEnCours();
     // Chargement en cache de tous les effets du jeu
     if (typeof window.chargerCacheEffetsBDD === "function") window.chargerCacheEffetsBDD();
-    // Pre-chargement des factions pour le menu deroulant de la fiche
-    recupererFactionsPourSelect()
-      .then(remplirSelectFactions)
-      .catch((e) => console.error("Chargement des factions :", e));
   });
 
   // Catalogue des objets pouvant apparaître en butin.

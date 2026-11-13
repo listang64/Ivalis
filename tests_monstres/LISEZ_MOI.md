@@ -11624,3 +11624,11 @@ corrections_v373.mjs le vérifie : les ombres, le choix (page de gauche, sans bo
 - **style.css** : les règles du pinceau, des calques, de la toile, de l'usure du monde et de `.parchemin-usure`.
 
 corrections_v374.mjs le vérifie : fichiers et fonctions partis, et dans la vraie page la carte régionale qui s'ouvre, son titre édité en DEV, les terrains qui lâchent le titre (enregistré), la fermeture, sans erreur.
+
+## v375 — Ménage du code mort (2/6) : l'Illusion, la boîte de la grille, les factions
+
+- **L'Illusion** (moteur_effets.js). L'effet est retiré depuis la v339 et `isIllusion` ne passait plus jamais à vrai : `poserIllusions`, `resoudreIllusionInteractif` (le choix de la case), `creerIllusion` (le leurre en base) et leurs deux appels sont retirés. Une ancienne carte qui porte l'effet se joue toujours sans leurre. `detruireIllusion` reste : les totems du Chaman sont des leurres, et la remise à zéro du combat s'en sert. Le noyau (cerveau_combat.js, regime_cerveau.js) sait toujours lire un leurre (illusion_cerveau.mjs).
+- **La boîte de la grille** (combat_rp.js, style.css). Masquée depuis la v313 (`false && …` : la grille est validée d'office) : la boîte, ses régleurs (`Regleurs`, `Apercu_Grille`), `teneurGrille`, `changerGrilleCombatRP` et son CSS sont retirés.
+- **Les factions** (app.js). À chaque connexion, toute la collection `Monde_Factions` était lue pour remplir un menu `#champ-faction` disparu de la fiche : la lecture et le remplissage sont retirés. Le champ `ID_Faction` d'un personnage est toujours conservé.
+
+corrections_v375.mjs le vérifie (le texte, les fonctions parties et leurs voisines dans la vraie page, sans erreur).

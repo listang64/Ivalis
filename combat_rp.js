@@ -84,8 +84,6 @@ const R = window.REGLAGES_COMBAT_RP = {
     attenteVerdictMs: 30000,   // la fin du parchemin attend le verdict, pas plus
     battementMs: 15000,        // le poste qui prépare dit qu'il est là
     relaisMs: 60000,           // au-delà, un autre poste reprend
-    regleurFraisMs: 20000,     // un joueur DEV devant la boîte de la grille
-    prioritaires: ["P_01", "P_02"], // Nico, puis Ben
     narrationApresMs: { victoire: 1500, defaite: 1500 },
     abandonMs: 20000,          // le combat a disparu du plateau (réinitialisé)
     narrationBloqueeMs: 180000
@@ -174,8 +172,7 @@ window.ennemisDecritsCombatRP = function () {
 //  { Id, Etat: "detection" | "aucun" | "preparation" | "en_cours" | "narration",
 //    Message (l'horodatage du message du MJ jugé), Raison, Adversaires,
 //    Createur { id, t }, Remise, Lieu { Titre, Description, Interieur },
-//    Carte, Carte_Le, Regleurs { P_xx: { nom, t, depuis } }, Apercu_Grille,
-//    Grille { Taille, Par, Le }, Ennemis { Apparition, Tirage, Visuels },
+//    Carte, Carte_Le, Grille { Taille, Par, Le }, Ennemis { Apparition, Tirage, Visuels },
 //    Tokens { cle: url }, Peinture { murs, inaccessibles, difficiles },
 //    Peint, Deploye, ID_Rencontre, Issue, Narrateur }
 let partieVue = null;
@@ -812,18 +809,7 @@ async function dessinerLesPions() {
 }
 
 // --- 4.6 LA GRILLE --------------------------------------------------------
-// Elle attend qu'un joueur en mode DEV la règle et la valide : pas de minuteur
-// (Nico, v279 : « pareil pour le mode dev pour régler la grille, pas de
-// timer »).
-function teneurGrille(c) {
-    const maintenant = Date.now();
-    const frais = Object.entries((c && c.Regleurs) || {}).filter(([, r]) => r && maintenant - (Number(r.t) || 0) < R.regleurFraisMs);
-    for (const id of R.prioritaires) if (frais.some(([x]) => x === id)) return id;
-    frais.sort((a, b) => (Number(a[1].depuis) || 0) - (Number(b[1].depuis) || 0));
-    return frais.length ? frais[0][0] : null;
-}
-window.teneurGrilleCombatRP = (c) => teneurGrille(c || etat());
-
+// Validée d'office à la taille de l'arène (v313 : plus de boîte DEV).
 window.validerGrilleCombatRP = async function(taille, options) {
     const c = etat();
     if (!c || c.Etat !== "preparation" || c.Grille) return false;
@@ -1524,9 +1510,6 @@ function actualiserFenetreCombat() {
         }
         voileMontre = false;
         if (voile) voile.style.display = "none";
-        const boite = $("boite-grille-rp");
-        if (boite) boite.style.display = "none";
-        arreterRegleur();
         return;
     }
     if (!voile) {
@@ -1544,7 +1527,6 @@ function actualiserFenetreCombat() {
         <div class="voile-combat-rp-sous">${echapper(c.Lieu && c.Lieu.Titre ? c.Lieu.Titre : mot)}</div>
         <div class="voile-combat-rp-etapes">${etapesPreparation(c).map(e => `<span class="${e.fait ? "fait" : ""}">${e.fait ? "✔" : "…"} ${e.nom}</span>`).join("")}</div>`;
     if (voile.dataset.contenu !== contenu) { voile.dataset.contenu = contenu; voile.innerHTML = contenu; }
-    actualiserBoiteGrille(c);
     actualiserValidationEnnemis(c);
 }
 
@@ -1639,85 +1621,6 @@ window.relancerEnnemisCombatRP = async function() {
     if (ok) setTimeout(poursuivre, 0);
     return !!ok;
 };
-
-// --- 6.6 LA BOÎTE DE LA GRILLE (mode DEV) --------------------------------
-let minuteurRegleur = null;
-let apercuEnvoye = null;
-let minuteurApercu = null;
-function arreterRegleur() {
-    if (minuteurRegleur) { clearInterval(minuteurRegleur); minuteurRegleur = null; }
-}
-function inscrireRegleur(c) {
-    const ecrire = () => {
-        const x = etat();
-        if (!x || x.Id !== c.Id || x.Grille || !x.Carte) { arreterRegleur(); return; }
-        const deja = (x.Regleurs || {})[idJoueur()];
-        maj({ [`Combat_RP.Regleurs.${idJoueur()}`]: { nom: nomJoueur(), t: Date.now(), depuis: (deja && deja.depuis) || Date.now() } }).catch(() => {});
-    };
-    if (minuteurRegleur) return;
-    ecrire();
-    minuteurRegleur = setInterval(ecrire, Math.max(1000, Math.round(R.regleurFraisMs / 2.5)));
-}
-function actualiserBoiteGrille(c) {
-    let boite = $("boite-grille-rp");
-    // (v313 : la grille est validée d'office ; la boîte ne sert plus.)
-    const montrer = false && !!c && !!c.Carte && !c.Grille && estDev();
-    if (!montrer) { if (boite) boite.style.display = "none"; arreterRegleur(); return; }
-    if (!boite) {
-        boite = document.createElement("div");
-        boite.id = "boite-grille-rp";
-        boite.className = "boite-grille-rp";
-        boite.innerHTML = `<div class="boite-grille-titre">La grille du champ de bataille</div>
-            <div class="boite-grille-aide">Ajuste les hexagones sur le dessin, puis valide : l'IA étudiera ensuite le terrain.</div>
-            <div class="boite-grille-reglage">
-                <button type="button" data-d="-5">−5</button><button type="button" data-d="-1">−</button>
-                <span class="boite-grille-valeur" id="boite-grille-valeur">60</span>
-                <button type="button" data-d="1">+</button><button type="button" data-d="5">+5</button>
-            </div>
-            <div class="boite-grille-qui" id="boite-grille-qui"></div>
-            <button type="button" class="boite-grille-valider" id="boite-grille-valider">Valider la grille</button>`;
-        boite.addEventListener("click", (e) => e.stopPropagation());
-        boite.querySelectorAll("[data-d]").forEach(b => b.onclick = () => changerGrille(Number(b.dataset.d)));
-        $("fenetre-combat").appendChild(boite);
-        $("boite-grille-valider").onclick = () => window.validerGrilleCombatRP(window.PLATEAU_VTT ? window.PLATEAU_VTT.hexSize : 60);
-    }
-    boite.style.display = "flex";
-    inscrireRegleur(c);
-    const teneur = teneurGrille(c);
-    const aLaMain = !teneur || teneur === idJoueur();
-    boite.classList.toggle("en-lecture", !aLaMain);
-    boite.querySelectorAll("button").forEach(b => { b.disabled = !aLaMain; });
-    const qui = $("boite-grille-qui");
-    if (qui) qui.textContent = aLaMain ? "C'est toi qui règles la grille." : `${((c.Regleurs || {})[teneur] || {}).nom || "Un joueur"} règle la grille…`;
-    // Celui qui n'a pas la main voit la grille de celui qui l'a.
-    if (!aLaMain && Number(c.Apercu_Grille) > 0 && window.PLATEAU_VTT && window.PLATEAU_VTT.hexSize !== Number(c.Apercu_Grille)) poserTailleLocale(Number(c.Apercu_Grille));
-    const valeur = $("boite-grille-valeur");
-    if (valeur && window.PLATEAU_VTT) valeur.textContent = String(window.PLATEAU_VTT.hexSize);
-}
-function poserTailleLocale(t) {
-    const P = window.PLATEAU_VTT;
-    if (!P) return;
-    P.hexSize = t; P.hexWidth = 2 * t; P.hexHeight = Math.sqrt(3) * t;
-    const label = $("label-taille-hexa");
-    if (label) label.innerText = t;
-    P.renderMap();
-    if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA || {});
-    const valeur = $("boite-grille-valeur");
-    if (valeur) valeur.textContent = String(t);
-}
-function changerGrille(delta) {
-    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    const P = window.PLATEAU_VTT;
-    if (!P) return;
-    poserTailleLocale(Math.max(20, Math.min(250, P.hexSize + delta)));
-    clearTimeout(minuteurApercu);
-    minuteurApercu = setTimeout(() => {
-        if (apercuEnvoye === P.hexSize) return;
-        apercuEnvoye = P.hexSize;
-        maj({ "Combat_RP.Apercu_Grille": P.hexSize }).catch(() => {});
-    }, 300);
-}
-window.changerGrilleCombatRP = changerGrille;
 
 // =========================================================================
 //  7. À CHAQUE NOUVELLE DE LA PARTIE (app.js)
