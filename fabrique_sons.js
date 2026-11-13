@@ -237,7 +237,8 @@
     //  Nico : « pour le bruit de posage, tu peux récupérer mon vieux son de
     //  bruit de parchemin ? » — la page du grimoire qui se pose.
     const SOURCES_ECHANTILLONS = {
-        "page-tourne": "https://res.cloudinary.com/dlkjq4kvg/video/upload/v1781420565/clik_bouton_aniy88.mp3"
+        // (v389) Nico : « on change juste le son quand la page se tourne, mets celui-là partout ».
+        "page-tourne": "https://res.cloudinary.com/dlkjq4kvg/video/upload/v1794584312/PAPRHndl_Pages_qu_on_tourne_7_ID_2214__LaSonotheque.fr_crk7oh.wav"
     };
     const ECHANTILLONS = {};          // id → AudioBuffer décodé
     const BRUTS = {};                 // id → ArrayBuffer téléchargé, en attente du contexte
@@ -293,7 +294,10 @@
     // Avant elle : le ding perle, et avant encore le bruit de parchemin
     // (clik_bouton_aniy88.mp3). Changer de son pour tout le jeu, c'est changer
     // cette seule ligne.
-    window.SON_CLIC_JEU = "goutte";
+    // (v389) Nico : « quand on clique sur les boutons, surtout au début, ça fait un bruit :
+    // enlève ça ». Plus de son au clic des boutons ni au survol des menus (vide = silence) ;
+    // remettre "goutte" ici les rendrait.
+    window.SON_CLIC_JEU = "";
 
     // Safari et Chrome n'ouvrent le son qu'après un geste : le contexte se
     // réveille au premier toucher, pour que même un survol sonne ensuite.
@@ -421,6 +425,7 @@
         // tourner, et c'est le vieux bruit de parchemin de Nico
         // (clik_bouton_aniy88.mp3, l'échantillon). En attendant qu'il arrive :
         // un bref froissement, puis la page qui retombe à plat (un « flap »).
+        // (v389) Le nouveau son de Nico (« Pages qu'on tourne », La Sonothèque).
         "page-tourne"(ctx, s) {
             if (jouerEchantillon(ctx, s, "page-tourne", 1)) return;
             bruit(ctx, s, { duree: 0.16, filtre: "bandpass", q: 0.8, balayage: [2600, 1200], gain: 0.22, forme: "cloche" });
@@ -455,6 +460,8 @@
         // très vite — une suite de petits claquements de papier, serrés, qui
         // s'éclaircissent puis s'apaisent.
         "pages-defilent"(ctx, s) {
+            // (v389) Nico : le son de la page qui tourne « partout » — aussi quand les pages défilent.
+            if (jouerEchantillon(ctx, s, "page-tourne", 1)) return;
             const n = 11;
             for (let k = 0; k < n; k++) {
                 const x = k / (n - 1);

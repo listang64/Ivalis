@@ -51,7 +51,8 @@ const FAUX_FIRESTORE = `
   export class FieldPath {} export const Timestamp = { now: () => Date.now() };
 `;
 // Le vieux parchemin de Nico, remplacé ici par un son reconnaissable : 0,6 s de la à 440 Hz (WAV).
-const SON_PARCHEMIN = "https://res.cloudinary.com/dlkjq4kvg/video/upload/v1781420565/clik_bouton_aniy88.mp3";
+// (v389) Le son de la page qui tourne est maintenant celui de Nico, « Pages qu'on tourne ».
+const SON_PARCHEMIN = "https://res.cloudinary.com/dlkjq4kvg/video/upload/v1794584312/PAPRHndl_Pages_qu_on_tourne_7_ID_2214__LaSonotheque.fr_crk7oh.wav";
 const wav = (() => {
   const taux = 44100, n = Math.floor(taux * 0.6), buf = Buffer.alloc(44 + n * 2);
   buf.write("RIFF", 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write("WAVE", 8); buf.write("fmt ", 12);
@@ -68,7 +69,7 @@ const demandes = [];
 await p.route('**', r => r.request().url().startsWith(base) ? r.continue() : r.abort());
 await p.route('**/firebase-app.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_APP }));
 await p.route('**/firebase-firestore.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_FIRESTORE }));
-await p.route('**/clik_bouton_aniy88.mp3', r => { demandes.push(r.request().url()); r.fulfill({ status: 200, contentType: 'audio/wav', headers: {'Access-Control-Allow-Origin':'*'}, body: wav }); });
+await p.route('**/PAPRHndl_Pages_qu_on_tourne_7_ID_2214__LaSonotheque.fr_crk7oh.wav', r => { demandes.push(r.request().url()); r.fulfill({ status: 200, contentType: 'audio/wav', headers: {'Access-Control-Allow-Origin':'*'}, body: wav }); });
 const erreurs = []; p.on('pageerror', e => erreurs.push(e.message));
 await p.goto(base + '/index.html'); await p.waitForTimeout(1200);
 const titre = (t) => console.log("\n" + t);
@@ -270,9 +271,10 @@ await section(async () => {
   const m = /matrix\(([-\d.e]+), ([-\d.e]+)/.exec(geo.transform);
   const angle = m ? Math.atan2(Number(m[2]), Number(m[1])) * 180 / Math.PI : 0;
   verifier("penché légèrement", angle < -2 && angle > -12, `${angle.toFixed(1)}°`);
-  verifier("texture parchemin, le bout taillé", /page\.webp/.test(geo.texture) && /polygon/.test(geo.clip), geo.clip.slice(0, 40));
+  // (v387 : les marque-pages de gauche sont en tissu — corrections_v387.)
+  verifier("texture de tissu (la trame), le bout taillé", /repeating-linear-gradient/.test(geo.texture) && /polygon/.test(geo.clip), geo.clip.slice(0, 40));
   // v312 : Nico, « le marque-page du sommaire, fais une étoile ».
-  verifier("un dessin à la plume noire : une étoile (v312)", geo.feuille && geo.etoile && /rgb\((1[0-9]|[0-9]), /.test(geo.encre), `${geo.etoile} ${geo.encre}`);
+  verifier("une étoile (v312), brodée au fil d'or (v387)", geo.feuille && geo.etoile && /rgb\(2[0-9]{2}, /.test(geo.encre), `${geo.etoile} ${geo.encre}`);
   // Sous les pages : plus bas que leur bord, ce sont les pages que l'on touche.
   const x = (geo.gauche + geo.droite) / 2;
   verifier("glissé sous les pages : sous leur bord, la page le recouvre", geo.avantLivre && !(await dans(x, geo.pagesTop + 40 * geo.k, "#grimoire-marque-page")) && geo.bas > geo.pagesTop + 20, await dessus(x, geo.pagesTop + 40 * geo.k));
@@ -394,12 +396,14 @@ await section(async () => {
   verifier("un toucher sur le marque-page : retour à l'index", r.page === 3 && r.chapitre === "index", JSON.stringify(r));
   // (v312 : les Paramètres ont quitté le sommaire pour le menu principal)
   // (v313 : « Aventuriers » ouvre les fiches dans le livre — corrections_v313)
-  for (const [id, appel] of [["combats", "ouvrirPopupRencontre"]]) {
+  // (v388 : « Les combats » ont leur double page dans le livre — corrections_v388 ; plus de popup.)
+  {
     await p.evaluate(() => { window.__appels = []; });
-    await cliquer("#grimoire-index-" + id);
-    await p.waitForTimeout(300);
-    const a = await p.evaluate(() => ({ appels: window.__appels.slice(), page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() }));
-    verifier(`« ${id} » : l'ancienne fenêtre s'ouvre (${appel}), par-dessus le livre`, a.appels.join(",") === appel && a.page === 3, JSON.stringify(a));
+    await cliquer("#grimoire-index-combats");
+    await p.waitForTimeout(2600);
+    const a = await p.evaluate(() => ({ appels: window.__appels.slice(), page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), combats: window.GRIMOIRE.indexDe(window.GRIMOIRE_COMBATS.pages()[0]) }));
+    verifier("« combats » : la double page des combats, dans le livre (plus de popup)", a.appels.length === 0 && Math.abs(a.page - a.combats) <= 1, JSON.stringify(a));
+    await p.evaluate(() => window.grimoireAllerIndex()); await p.waitForTimeout(2600);
   }
   await cliquer("#grimoire-index-village");
   await p.waitForTimeout(300);

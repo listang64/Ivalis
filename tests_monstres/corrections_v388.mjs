@@ -267,7 +267,7 @@ await section(async () => {
   const html = lire("index.html");
   verifier("index.html charge la double page des combats et les nouvelles versions", [/grimoire_combats\.js\?v=1"/, /grimoire_combats\.css\?v=1"/, /grimoire\.js\?v=28"/, /grimoire\.css\?v=19"/,
     /grimoire_recit\.css\?v=22"/, /grimoire_creation\.css\?v=9"/, /combat_rp\.js\?v=18"/, /combat\.js\?v=180"/].every(r => r.test(html)));
-  verifier("la version du jeu : 388", /VERSION_IVALIS = 388/.test(lire("trace_combat.js")) && JSON.parse(lire("version.json")).version === 388);
+  verifier("la version du jeu : 388 ou plus", Number((/VERSION_IVALIS = (\d+);/.exec(lire("trace_combat.js")) || [])[1]) >= 388 && JSON.parse(lire("version.json")).version >= 388);
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

@@ -257,7 +257,7 @@ console.log("\n4. LE VOLUME DU JEU FAIT LOI, ET LE RETOUR RAMÈNE AU MENU");
   verifier("« Retour » ramène au menu des Paramètres", r.menu && !r.fabrique);
 }
 
-console.log("\n5. LA GOUTTE EST LE SON DE TOUS LES MENUS");
+console.log("\n5. LES MENUS SE TAISENT (v389) ; LA GOUTTE RESTE DANS LA FABRIQUE");
 {
   // Nico : « ok, remplace tous les sons menu par la goutte ». Avant elle, le
   // ding perle ; avant encore, un fichier de parchemin (clik_bouton_aniy88.mp3).
@@ -290,21 +290,22 @@ console.log("\n5. LA GOUTTE EST LE SON DE TOUS LES MENUS");
       const d = (await ctx.startRendering()).getChannelData(0);
       let e = 0; for (const x of d) e += x * x; return Math.sqrt(e / d.length);
     };
-    const goutte = window.SONS_FABRIQUE.find(s => s.id === window.SON_CLIC_JEU);
+    const goutte = window.SONS_FABRIQUE.find(s => s.id === "goutte");
     return { clic, survol, bouton, menu, choisi: window.SON_CLIC_JEU,
              rangGoutte: window.SONS_FABRIQUE.findIndex(s => s.id === "goutte") + 1,
              energie: goutte ? await rendre(goutte.fabriquer) : 0,
-             aMoitie: vrai(window.SON_CLIC_JEU, 0.5), aZero: vrai(window.SON_CLIC_JEU, 0) };
+             aMoitie: vrai("goutte", 0.5), aZero: vrai("goutte", 0) };
   });
-  verifier("le son des menus est la Goutte, la n° 5 de la Fabrique", r.choisi === "goutte" && r.rangGoutte === 5,
-           `${r.choisi} (n° ${r.rangGoutte})`);
-  verifier("la Goutte sonne bien (rendue hors ligne)", r.energie > 0.005, r.energie.toFixed(4));
-  verifier("un clic de bouton joue la Goutte", JSON.stringify(r.clic) === '[["goutte",1]]', JSON.stringify(r.clic));
-  verifier("le survol des menus aussi, à mi-volume comme avant", JSON.stringify(r.survol) === '[["goutte",0.5]]',
-           JSON.stringify(r.survol));
-  verifier("un vrai bouton de la page la joue", r.bouton.some(a => a[0] === "goutte"), JSON.stringify(r.bouton));
+  // (v389) Nico : « quand on clique sur les boutons, ça fait un bruit : enlève ça ».
+  // Le son des menus est vide : les deux portes se taisent. La Goutte reste dans la Fabrique.
+  verifier("(v389) le son des menus est vide ; la Goutte reste la n° 5 de la Fabrique", r.choisi === "" && r.rangGoutte === 5,
+           `« ${r.choisi} » (n° ${r.rangGoutte})`);
+  verifier("la Goutte sonne toujours dans la Fabrique (rendue hors ligne)", r.energie > 0.005, r.energie.toFixed(4));
+  verifier("(v389) un clic de bouton ne joue plus rien", JSON.stringify(r.clic) === '[]', JSON.stringify(r.clic));
+  verifier("(v389) le survol des menus non plus", JSON.stringify(r.survol) === '[]', JSON.stringify(r.survol));
+  verifier("(v389) un vrai bouton de la page reste muet", !r.bouton.some(a => a[0] === "goutte"), JSON.stringify(r.bouton));
   verifier("(v378) plus de menu latéral à survoler", r.menu === null, String(r.menu));
-  verifier("à mi-volume elle joue, à volume nul elle se tait", r.aMoitie === true && r.aZero === false);
+  verifier("la Goutte, jouée par son nom : à mi-volume elle joue, à volume nul elle se tait", r.aMoitie === true && r.aZero === false);
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

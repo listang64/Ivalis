@@ -4264,8 +4264,9 @@ window.relancerInitiativeChat = async function() {
 // LE CLIC DES BOUTONS : la Goutte de la Fabrique (fabrique_sons.js,
 // SON_CLIC_JEU). Le volume suit Interface × Général.
 function jouerSonClic() {
-  if (typeof window.jouerSonFabrique === "function") {
-    window.jouerSonFabrique(window.SON_CLIC_JEU || "goutte");
+  // (v389) SON_CLIC_JEU vide : les boutons ne font plus de bruit (fabrique_sons.js).
+  if (window.SON_CLIC_JEU && typeof window.jouerSonFabrique === "function") {
+    window.jouerSonFabrique(window.SON_CLIC_JEU);
   }
 }
 
@@ -4520,8 +4521,8 @@ function lancerPartieChargee(idChoisi) {
 // Le survol des menus (et l'ouverture/fermeture du chat et du combat) : la
 // même Goutte, à mi-volume comme l'était l'ancien bruit de parchemin.
 function jouerSonSurvolParchemin() {
-  if (typeof window.jouerSonFabrique === "function") {
-    window.jouerSonFabrique(window.SON_CLIC_JEU || "goutte", 0.5);
+  if (window.SON_CLIC_JEU && typeof window.jouerSonFabrique === "function") {
+    window.jouerSonFabrique(window.SON_CLIC_JEU, 0.5);
   }
 }
 
