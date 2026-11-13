@@ -11719,4 +11719,5 @@ corrections_v382.mjs le vérifie : les règles parties, puis CHAQUE règle resta
 ### Après la suite complète (v379, puis v382)
 
 - Adaptés : corrections_v300 (l'ancien menu de droite absent), v311 (n'y bouchonne plus `ouvrirChatbox`, qui mène lui-même au récit), fabrique_sons (plus de bouton du menu latéral à survoler), ecran_chargement (les fonds de l'ancien menu sont partis ; la mesure « mot de passe vérifié » vivait dans l'ancienne fenêtre du sceau, que le grimoire n'empruntait plus).
-- Sous la charge de la suite (trois bancs à la fois), corrections_v302, v304, v318 et v369 ont parfois échoué sur des minutages ; seuls, ils passent.
+- Sous la charge de la suite (trois bancs à la fois), corrections_v302, v304, v318, v334 et v369 ont parfois échoué sur des minutages ; seuls, ils passent (v334 : 5 fois sur 6 — l'opacité de la croix mesurée à 0,98 au lieu de 0,99). Le contrôle « il s'en va EN FONDU » d'ecran_chargement échoue une fois sur deux, avant comme après ce ménage.
+- Suite complète finale (v382) : 274 bancs passent sur 363 ; tous les échecs restants étaient déjà là avant le ménage (55 bancs sans leurs données effets_reels/gabarits_reels, et les échecs connus), à part ces minutages. Le préchargement ramasse 13 images au lieu de 28 (ecran_chargement).
