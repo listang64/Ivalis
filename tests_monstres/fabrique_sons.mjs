@@ -279,9 +279,8 @@ console.log("\n5. LA GOUTTE EST LE SON DE TOUS LES MENUS");
     const survol = await suivre(() => window.jouerSonSurvolParchemin());
     // Un vrai bouton de la page, avec son onclick « jouerSonClic(); … ».
     const bouton = await suivre(() => document.getElementById("btn-ouvrir-fabrique").click());
-    // Un vrai bouton du menu latéral, survolé.
-    const lateral = document.querySelector(".conteneur-bouton-lateral");
-    const menu = await suivre(() => lateral.dispatchEvent(new MouseEvent("mouseenter")));
+    // (v378 : le menu latéral et ses boutons survolés sont partis.)
+    const menu = document.querySelector(".conteneur-bouton-lateral");
     window.jouerSonFabrique = vrai;
     // La Goutte de la Fabrique et celle des menus : le même son, rendu.
     const rendre = async (fabriquer) => {
@@ -304,8 +303,7 @@ console.log("\n5. LA GOUTTE EST LE SON DE TOUS LES MENUS");
   verifier("le survol des menus aussi, à mi-volume comme avant", JSON.stringify(r.survol) === '[["goutte",0.5]]',
            JSON.stringify(r.survol));
   verifier("un vrai bouton de la page la joue", r.bouton.some(a => a[0] === "goutte"), JSON.stringify(r.bouton));
-  verifier("un vrai bouton du menu latéral, au survol, aussi", JSON.stringify(r.menu) === '[["goutte",0.5]]',
-           JSON.stringify(r.menu));
+  verifier("(v378) plus de menu latéral à survoler", r.menu === null, String(r.menu));
   verifier("à mi-volume elle joue, à volume nul elle se tait", r.aMoitie === true && r.aZero === false);
 }
 

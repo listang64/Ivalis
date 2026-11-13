@@ -195,8 +195,9 @@ console.log("\n3. LE JEU SE CHARGE DERRIÈRE LE SCEAU");
   verifier("LA CARTE, LA PLUS LOURDE, EST TIRÉE D'AVANCE", carte,
            `${info.images} image(s) ramassée(s)`);
 
+  // (v379 : les fonds de l'ancien menu — ivalis_background, les brumes — sont partis avec lui.)
   const fonds = demandees.filter(u => /ivalis_background|IMG_2057|brume|sable/.test(u)).length;
-  verifier("les fonds déclarés en CSS le sont aussi", fonds >= 2, `${fonds} fond(s)`);
+  verifier("les fonds déclarés en CSS le sont aussi", fonds >= 1, `${fonds} fond(s)`);
 
   const balises = await p.evaluate(() =>
     [...document.querySelectorAll('img[src^="https://res.cloudinary.com"]')].length);
@@ -273,12 +274,12 @@ console.log("\n4. UNE MUSIQUE QUI NE PEUT PAS JOUER NE NOIE PAS LE RÉSEAU");
 console.log("\n5. LE CHEMIN DE CHARGEMENT SE CHRONOMÈTRE");
 // =========================================================================
 //  Si la minute revient, il faut pouvoir dire OÙ elle passe sans avoir à
-//  brancher un iPad sur un ordinateur. Trois mesures suffisent : la base
-//  répond-elle, l'écran se dessine-t-il, les fiches arrivent-elles.
+//  brancher un iPad sur un ordinateur : l'écran se dessine-t-il, les fiches
+//  arrivent-elles. (v379 : la mesure du mot de passe vivait dans l'ancienne
+//  fenêtre du sceau, que le grimoire n'empruntait plus ; elle est partie avec.)
 {
   const src = fs.readFileSync(RACINE + '/app.js', 'utf-8');
   const jalons = [
-    ["le mot de passe vérifié", /mot de passe vérifié en/],
     ["la table de jeu dessinée", /table de jeu dessinée en/],
     ["les premières fiches reçues", /premières fiches reçues en/]
   ];

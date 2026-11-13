@@ -176,7 +176,7 @@ await section(async () => {
   const r = await p.evaluate(() => {
     const ecran = document.getElementById("ecran-grimoire"), sc = document.getElementById("grimoire-scene").getBoundingClientRect();
     return { e: window.grimoireEtat(), parent: ecran.parentNode.id, fond: getComputedStyle(ecran, "::before").opacity, place: [sc.left, sc.top, sc.width],
-             menu: getComputedStyle(document.getElementById("menu-lateral")).display, nav: document.getElementById("menu-navigation-bas").parentNode.id,
+             menu: document.getElementById("menu-lateral") ? getComputedStyle(document.getElementById("menu-lateral")).display : "none" /* (v378 : parti) */, nav: document.getElementById("menu-navigation-bas").parentNode.id,
              navHaut: document.getElementById("menu-navigation-bas").getBoundingClientRect().top };
   });
   // v304 : « après avoir chargé la partie, ouvre sur la page map globale ».

@@ -11715,3 +11715,8 @@ corrections_v381.mjs le vérifie (le texte, et dans la vraie page le grimoire, �
 - Avec les blocs précédents (v374 à v379), plus aucune règle des feuilles du jeu ne vise un élément ou une classe disparus.
 
 corrections_v382.mjs le vérifie : les règles parties, puis CHAQUE règle restante de chaque feuille du jeu, confrontée aux classes et identifiants du HTML et du JS chargés (et aux préfixes que les scripts complètent), et les feuilles qui se lisent dans la vraie page, sans erreur.
+
+### Après la suite complète (v379, puis v382)
+
+- Adaptés : corrections_v300 (l'ancien menu de droite absent), v311 (n'y bouchonne plus `ouvrirChatbox`, qui mène lui-même au récit), fabrique_sons (plus de bouton du menu latéral à survoler), ecran_chargement (les fonds de l'ancien menu sont partis ; la mesure « mot de passe vérifié » vivait dans l'ancienne fenêtre du sceau, que le grimoire n'empruntait plus).
+- Sous la charge de la suite (trois bancs à la fois), corrections_v302, v304, v318 et v369 ont parfois échoué sur des minutages ; seuls, ils passent.

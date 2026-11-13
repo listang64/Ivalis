@@ -120,7 +120,8 @@ await p.evaluate(() => {
     verifierMdpPartie: async (id, m) => ({ ok: m === "sel" }),
     entrerDansPartie: (id) => { window.__entrees.push(id); window.ID_PARTIE_COURANTE = id; document.getElementById("ecran-jeu").style.display = "block"; }
   };
-  ["ouvrirChatbox", "ouvrirMenuPersonnages", "ouvrirPopupRencontre", "ouvrirParametres"].forEach(n => { window[n] = () => window.__appels.push(n); });
+  // (v377 : ouvrirChatbox n'est plus bouchonné — c'est lui qui mène au récit du livre, le banc le vérifie.)
+  ["ouvrirMenuPersonnages", "ouvrirPopupRencontre", "ouvrirParametres"].forEach(n => { window[n] = () => window.__appels.push(n); });
   window.declencherTourIA = async () => { window.__tours++; };
   window.__vraiJet = window.lancerJetPourHeros;
   window.lancerJetPourHeros = async (id, c) => { window.__jets.push([id, c]); return true; };
@@ -185,13 +186,13 @@ await section(async () => {
   await p.evaluate(() => window.ouvrirChatbox());
   await attendreQue(() => p.evaluate(() => !window.GRIMOIRE.defileEnCours() && window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() >= window.GRIMOIRE.premiereDeLaSuite() + 2), 8000);
   await pose(); await p.waitForTimeout(300);
-  const r = await p.evaluate(() => ({ chat: document.getElementById("fenetre-chatbox").style.display, page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), recit: window.GRIMOIRE.premiereDeLaSuite() + 2,
+  const r = await p.evaluate(() => ({ chat: (document.getElementById("fenetre-chatbox") || { style: {} }).style.display /* (v377 : l'ancien chat est parti) */, page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), recit: window.GRIMOIRE.premiereDeLaSuite() + 2,
     menu: (document.getElementById("menu-navigation-bas") || {}).style ? document.getElementById("menu-navigation-bas").style.display : "" }));
   verifier("ouvrirChatbox (l'arrivée au POI) : l'ancien chat (et son grand avatar) ne s'ouvre pas", r.chat !== "flex", r.chat);
   verifier("… le livre va au récit à la place (v313 : il était sur le sommaire)", avant !== r.page && r.page >= r.recit, `${avant} → ${r.page} (récit ${r.recit})`);
   verifier("… et les petits boutons du livre restent là", r.menu !== "none", r.menu);
   await p.evaluate(() => window.GRIMOIRE_REGIONS.ouvrir(5)); await monteeSur(5); await pose(); await p.waitForTimeout(300);
-  const feu = await p.evaluate(() => { const ok = window.discuterAutourDuFeu ? window.discuterAutourDuFeu() : null; return { ok, chat: document.getElementById("fenetre-chatbox").style.display }; });
+  const feu = await p.evaluate(() => { const ok = window.discuterAutourDuFeu ? window.discuterAutourDuFeu() : null; return { ok, chat: (document.getElementById("fenetre-chatbox") || { style: {} }).style.display }; });
   await attendreQue(() => p.evaluate(() => !window.GRIMOIRE.defileEnCours()), 8000); await pose(); await p.waitForTimeout(300);
   verifier("« Discuter autour du feu de camp » : le récit du livre aussi", feu.chat !== "flex" && (await page()) >= 11, JSON.stringify(feu) + " page " + (await page()));
 });
