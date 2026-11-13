@@ -37,7 +37,6 @@ body.creation-livre #overlay-jeu-modale { display: none !important; }
 .page-creation .bouton-encre:active { transform: scale(0.97); }
 .page-creation .bouton-encre.choisi { background: radial-gradient(ellipse at 50% 50%, rgba(220, 170, 60, 0.42), rgba(220, 170, 60, 0.08) 75%); font-weight: 700; }
 .page-creation .bouton-encre.grand { font-size: calc(var(--u) * 3.8) !important; align-self: center; margin-top: calc(var(--u) * 1); }
-.renoncer-creation { margin-top: auto !important; align-self: flex-start; font-size: calc(var(--u) * 2.7) !important; color: #6b4a2b !important; }
 .page-race-vide { }
 
 /* LES CLASSES : l'image de fond sur toute la double page ; à gauche, voilée en
@@ -112,13 +111,11 @@ body.creation-livre #overlay-jeu-modale { display: none !important; }
 .page-creation .bloc-formulaire h4 > .lavis { display: block; left: -4%; top: -14%; width: 108%; height: 128%; }
 /* (v371) La flèche « La suite » au coin de la première double page : il faut la tourner. */
 .tourner-creation { position: absolute; right: calc(var(--u) * 5); bottom: calc(var(--u) * 3.5); z-index: 3; display: flex; align-items: center; gap: calc(var(--u) * 1);
-  color: #24150a !important; animation: pousser-page 2.4s ease-in-out infinite; }
+  color: #24150a !important; }
 .tourner-creation span { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 3.8 * var(--echelle-titres, 1)); }
 .tourner-creation svg { width: calc(var(--u) * 12); height: calc(var(--u) * 5); overflow: visible; }
 .tourner-creation path { fill: none; stroke: #1b1009; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tourner-creation:hover { color: #000 !important; }
-@keyframes pousser-page { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(calc(var(--u) * 1.4)); } }
-@media (prefers-reduced-motion: reduce) { .tourner-creation { animation: none; } }
 .page-creation .champ-formulaire { display: flex; flex-direction: column; gap: calc(var(--u) * 0.3); margin-bottom: calc(var(--u) * 1.2) !important; }
 .page-creation .champ-formulaire label { font-size: calc(var(--u) * 2.7) !important; color: #6b4a2b !important; letter-spacing: 0.06em; text-align: left; }
 .page-creation .input-perso { background: transparent !important; background-color: transparent !important; border: 0 !important; border-bottom: 1px solid #2b1a0e !important;
@@ -190,12 +187,50 @@ body.creation-livre #overlay-jeu-modale { display: none !important; }
 .papier-onglet > .lavis { left: 0; top: 0; width: 100%; height: 100%; z-index: 0; }
 /* L'ombre de la page posée dessus, là où il sort (le bord de la page à --bord). */
 .papier-onglet::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
-  background: linear-gradient(to right, rgba(34, 17, 5, 0.7) 0, rgba(34, 17, 5, 0.7) calc(var(--bord) * 1px * var(--s, 1)),
-    rgba(34, 17, 5, 0.42) calc(var(--bord) * 1px * var(--s, 1) + 1px), rgba(34, 17, 5, 0.14) calc((var(--bord) + 22) * 1px * var(--s, 1)),
-    rgba(34, 17, 5, 0) calc((var(--bord) + 55) * 1px * var(--s, 1))); }
+  /* (v387) Nico : « que cette ombre ait une fin en dégradé, là elle s'arrête net » : plus de
+     marche au bord de la page (on la voyait quand le marque-page sort un peu plus) ; elle
+     s'éclaircit d'un seul tenant, de sous la page jusqu'à disparaître. */
+  background: linear-gradient(to right, rgba(34, 17, 5, 0.6) 0, rgba(34, 17, 5, 0.52) calc((var(--bord) - 40) * 1px * var(--s, 1)),
+    rgba(34, 17, 5, 0.36) calc(var(--bord) * 1px * var(--s, 1)), rgba(34, 17, 5, 0.2) calc((var(--bord) + 26) * 1px * var(--s, 1)),
+    rgba(34, 17, 5, 0.07) calc((var(--bord) + 56) * 1px * var(--s, 1)), rgba(34, 17, 5, 0) calc((var(--bord) + 84) * 1px * var(--s, 1))); }
 .nom-onglet { position: absolute; z-index: 1; top: 0; bottom: 0; left: calc((var(--bord) + 12) * 1px * var(--s, 1)); right: calc(12px * var(--s, 1));
   display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1; padding: 0;
   font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important;
   font-size: calc(var(--h) * 0.62px * var(--s, 1) * var(--ajuste, 1)); color: #1b1009; white-space: nowrap; }
 .nom-onglet > span { display: block; flex: none; }
 .onglet-creation.ouvert .nom-onglet { text-decoration: underline; text-underline-offset: 0.15em; text-decoration-thickness: 1px; }
+
+/* =========================================================================
+   v387 — LE TITRE « QUI ES-TU ? », LES BULLES DE SAISIE
+   ========================================================================= */
+/* Plus gros, centré, une aquarelle dorée dessous. */
+.sur-titre-qui { align-self: center; text-align: center; }
+.page-creation .titre-qui { position: relative; isolation: isolate; align-self: center; text-align: center; padding: calc(var(--u) * 0.6) calc(var(--u) * 5);
+  font-size: calc(var(--u) * 11 * var(--echelle-titres, 1)); }
+.page-creation .titre-qui > .lavis { left: -6%; top: 8%; width: 112%; height: 96%; }
+.page-formulaire-creation .titre-qui + .fleuron-creation { align-self: center; }
+/* Les champs : une bulle tracée à la main plutôt qu'un trait (Nico : « une bulle de
+   saisie de texte, dessinée comme à la main »). Un contour tremblé, repassé d'un second
+   trait plus pâle, qui s'étire avec le champ (le trait garde son épaisseur). */
+.page-creation .input-perso, .champ-creation input, .champ-creation textarea, .forge-dans-livre #forge-nom.forge-nom {
+  --bulle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 40' preserveAspectRatio='none'%3E%3Cpath d='M9 6 C48 3 96 5 150 4 C204 3 252 5 289 6 C296 8 298 15 297 22 C297 29 295 34 288 35 C240 37 196 36 150 37 C100 38 52 36 11 35 C4 33 2 27 3 20 C3 13 4 8 9 6 Z' fill='rgba(255,249,232,0.42)' stroke='%231b1009' stroke-width='1.35' stroke-linejoin='round' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M7 8 C50 5 110 6 160 5 C214 4 258 6 291 8 C296 12 296 24 294 31 C286 36 230 35 150 36 C90 37 40 36 9 34 C5 30 4 18 7 8 Z' fill='none' stroke='%231b1009' stroke-opacity='0.35' stroke-width='1' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  box-sizing: border-box; border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
+  background: var(--bulle) 0 0 / 100% 100% no-repeat !important; padding: calc(var(--u) * 1) calc(var(--u) * 2.4) !important; }
+.champ-creation textarea { line-height: 1.35; }
+.page-creation .input-perso:focus, .champ-creation input:focus, .champ-creation textarea:focus, .forge-dans-livre #forge-nom.forge-nom:focus {
+  background: radial-gradient(ellipse at 50% 50%, rgba(255, 249, 232, 0.5), rgba(255, 249, 232, 0) 70%), var(--bulle) 0 0 / 100% 100% no-repeat !important; }
+.page-creation select.input-perso { padding-right: calc(var(--u) * 5) !important;
+  background: linear-gradient(45deg, transparent 50%, #2b1a0e 50%) calc(100% - 1.5em) 55% / 0.4em 0.4em no-repeat, linear-gradient(135deg, #2b1a0e 50%, transparent 50%) calc(100% - 1.1em) 55% / 0.4em 0.4em no-repeat,
+    var(--bulle) 0 0 / 100% 100% no-repeat !important; }
+.page-creation select.input-perso:disabled { background: var(--bulle) 0 0 / 100% 100% no-repeat !important; opacity: 0.7 !important; }
+
+/* (v387) Les images des peuples et des classes : une toute petite marge fondue sur les bords
+   (le haut, le bas, le bord extérieur), comme celles du récit ; le voile vers la page de gauche reste. */
+.fond-classe.gauche { -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.07) 3%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%), linear-gradient(to bottom, transparent 0%, #000 3%, #000 97%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.07) 3%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%), linear-gradient(to bottom, transparent 0%, #000 3%, #000 97%, transparent 100%);
+  mask-composite: intersect; }
+.fond-classe.droite { -webkit-mask-image: linear-gradient(to right, #000 0%, #000 96%, transparent 100%), linear-gradient(to bottom, transparent 0%, #000 3%, #000 97%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, #000 0%, #000 96%, transparent 100%), linear-gradient(to bottom, transparent 0%, #000 3%, #000 97%, transparent 100%);
+  mask-composite: intersect; }

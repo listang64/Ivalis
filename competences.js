@@ -363,6 +363,15 @@ window.supprimerCompetencePerso = async function(idCarte, titre) {
         banniere.style.opacity = "0";
         banniere.style.transform = "translateX(-40px)";
     }
+    // (v387) Celle du livre aussi (Nico : « en admin, effacer la compétence d'un perso
+    // qui n'est pas le mien met du temps ») : rien ne bougeait avant la fin de toute la
+    // chaîne réseau (le document, le deck, la transaction de la file du combat).
+    document.querySelectorAll(".rang-banniere").forEach(rang => {
+        if (!rang.querySelector(`[data-id="${CSS.escape(idCarte)}"]`)) return;
+        rang.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+        rang.style.opacity = "0";
+        rang.style.transform = "translateX(-40px)";
+    });
 
     // Son illustration (illustration_competence.js), lue AVANT d'effacer le
     // document : c'est lui qui en garde l'adresse.
@@ -379,6 +388,21 @@ window.supprimerCompetencePerso = async function(idCarte, titre) {
         // 1. Le document de la technique.
         await deleteDoc(doc(db, "Personnages", idPersonnage, "Competences", idCarte));
 
+        // 1 ter. (v387) Les caches en mémoire tout de suite, pour que rien ne la
+        //        ressuscite au prochain rendu, et le livre se redessine sans attendre
+        //        le deck ni la file du combat ci-dessous.
+        if (window.CACHE_COMPETENCES_GLOBAL && window.CACHE_COMPETENCES_GLOBAL[idPersonnage]) {
+            delete window.CACHE_COMPETENCES_GLOBAL[idPersonnage][idCarte];
+        }
+        if (window.COMPETENCES_CACHE) delete window.COMPETENCES_CACHE[idCarte];
+        const persoRam = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
+        if (persoRam && Array.isArray(persoRam.deckEquipe)) {
+            persoRam.deckEquipe = persoRam.deckEquipe.filter(id => id !== idCarte);
+        }
+        if (window.GRIMOIRE_FICHES && typeof window.GRIMOIRE_FICHES.majPlus === "function") {
+            try { window.GRIMOIRE_FICHES.majPlus(); } catch (e) { console.warn("Le livre après l'effacement", e); }
+        }
+
         // 1 bis. Son illustration quitte Cloudinary (sans faire attendre le MJ),
         //        et si elle était encore en file ou en train de se dessiner,
         //        la commande est annulée.
@@ -393,16 +417,6 @@ window.supprimerCompetencePerso = async function(idCarte, titre) {
             await updateDoc(doc(db, "Personnages", idPersonnage), {
                 Deck_Equipe: window.CARTES_SELECTIONNEES
             }).catch(e => console.error("Deck après suppression :", e));
-        }
-
-        // 3. Les caches en mémoire, pour que rien ne la ressuscite au prochain rendu.
-        if (window.CACHE_COMPETENCES_GLOBAL && window.CACHE_COMPETENCES_GLOBAL[idPersonnage]) {
-            delete window.CACHE_COMPETENCES_GLOBAL[idPersonnage][idCarte];
-        }
-        if (window.COMPETENCES_CACHE) delete window.COMPETENCES_CACHE[idCarte];
-        const persoRam = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
-        if (persoRam && Array.isArray(persoRam.deckEquipe)) {
-            persoRam.deckEquipe = persoRam.deckEquipe.filter(id => id !== idCarte);
         }
 
         // 4. La file d'attente du combat, si la carte y était déjà posée : sans ça
@@ -421,6 +435,7 @@ window.supprimerCompetencePerso = async function(idCarte, titre) {
         console.error("Erreur de suppression d'une compétence :", e);
         alert("La technique n'a pas pu être effacée. Vérifie ta connexion.");
         if (banniere) { banniere.style.opacity = "1"; banniere.style.transform = "translateX(0)"; }
+        document.querySelectorAll(".rang-banniere").forEach(rang => { rang.style.opacity = ""; rang.style.transform = ""; });
         return;
     }
 
@@ -1699,7 +1714,7 @@ window.ouvrirMenuAjoutForge = function() {
             });
 
             if (htmlLignes !== "") {
-                conteneurMenu.innerHTML += `<div class="forge-grimoire-groupe">${htmlLignes}</div>`;
+                conteneurMenu.innerHTML += `<div class="forge-grimoire-groupe" data-carac="${carac}">${htmlLignes}</div>`;
             }
         }
     });

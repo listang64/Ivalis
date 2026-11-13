@@ -415,3 +415,52 @@
   background: radial-gradient(ellipse at 40% 50%, rgba(196, 154, 98, 0.16), rgba(196, 154, 98, 0.05) 70%, transparent 100%) !important; }
 .page-codex .forge-grimoire-ligne.desactive { opacity: 0.5; }
 .forge-dans-livre .forge-cout { background: none !important; border-top: 1px solid rgba(27, 16, 9, 0.45) !important; border-bottom: 1px solid rgba(27, 16, 9, 0.45) !important; }
+
+/* =========================================================================
+   v387 — LA FORGE : LE CHOIX DE L'ARME AU CENTRE, LES AQUARELLES, LA BULLE
+   DU NOM, LE MARQUE-PAGE « REFERMER », LA FLÈCHE DU BAS DE PAGE
+   ========================================================================= */
+/* Le titre du codex, centré sur sa page (le compte des tags reste à droite). */
+.page-codex .entete-fiche { position: relative; justify-content: center; }
+.page-codex .compte-tags { position: absolute; right: 0; bottom: 0; }
+/* À l'ouverture : le choix de l'arme seul, en gros, au milieu de la page ; choisi,
+   il glisse en haut (grimoire_fiches.js, glisserChoixArme) et les effets montent en fondu. */
+.page-codex.au-centre .codex-armes { flex: 1; flex-direction: column; flex-wrap: nowrap; justify-content: center; align-items: center;
+  gap: calc(var(--u) * 2.6); font-size: calc(var(--u) * 4.6); padding-bottom: calc(var(--u) * 10); }
+.page-codex.au-centre .codex-armes .fiche-attente { width: auto; text-align: center; font-size: 0.82em; margin-bottom: calc(var(--u) * 1); }
+.page-codex.au-centre .codex-armes .arme-forge { font-size: 1em !important; align-self: center !important; }
+.page-codex.au-centre .codex-liste { display: none; }
+.codex-armes .arme-forge { transform-origin: 50% 50%; }
+/* Une grosse tache d'aquarelle par caractéristique, sous tous ses effets. */
+.page-codex .forge-grimoire-groupe { position: relative; isolation: isolate; padding: calc(var(--u) * 2.2) calc(var(--u) * 1.8); margin-bottom: calc(var(--u) * 1.6); }
+.page-codex .forge-grimoire-groupe > .lavis-carac { left: -2% !important; top: -1% !important; width: 104% !important; height: 102% !important; opacity: 0.85; }
+/* Le nom de la technique : la même bulle tracée à la main que les champs de la création
+   (grimoire_creation.css). */
+.forge-dans-livre #forge-nom.forge-nom { width: 92%; }
+/* Sous les titres des sous-effets et sous les + et -, une aquarelle discrète. */
+.forge-dans-livre .forge-menu-bouton, .forge-dans-livre .forge-compteur, .forge-dans-livre .forge-compteur-duree { position: relative; isolation: isolate; background: transparent !important; }
+.forge-dans-livre .forge-menu-bouton > .lavis { left: -8%; top: -18%; width: 116%; height: 136%; }
+.forge-dans-livre .forge-compteur > .lavis, .forge-dans-livre .forge-compteur-duree > .lavis { left: -10%; top: -22%; width: 120%; height: 144%; }
+/* La flèche du bas de page : immobile, montrée tant qu'il reste à lire plus bas. */
+.fleche-defile { position: absolute; left: 50%; bottom: calc(var(--u) * 0.9); z-index: 4; width: calc(var(--u) * 6); height: calc(var(--u) * 3.6);
+  margin-left: calc(var(--u) * -3); pointer-events: none; opacity: 0; transition: opacity 0.3s ease; }
+.fleche-defile.visible { opacity: 0.85; }
+.fleche-defile svg { width: 100%; height: 100%; overflow: visible; }
+.fleche-defile path { fill: none; stroke: #1b1009; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+/* Le marque-page « Refermer » : glissé sous la page de droite, il sort en biais par le haut. */
+.marque-refermer { position: absolute; left: calc(1560px * var(--s, 1)); top: calc(-40px * var(--s, 1)); width: calc(150px * var(--s, 1)); height: calc(180px * var(--s, 1));
+  padding: 0; border: 0; background: transparent; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transform-origin: 50% 100%; transform: translateY(calc(130px * var(--s, 1))) rotate(11deg); pointer-events: none;
+  transition: transform 0.55s cubic-bezier(0.45, 0.05, 0.25, 1); filter: drop-shadow(calc(var(--u) * 0.25) calc(var(--u) * 0.5) calc(var(--u) * 0.6) rgba(40, 20, 6, 0.5)); }
+.marque-refermer.sortie { transform: rotate(11deg); pointer-events: auto; }
+.marque-refermer.sortie:hover, .marque-refermer.sortie:focus-visible { transform: rotate(9deg) translateY(-5%); outline: none; }
+.marque-refermer.sortie:active { transform: rotate(10deg) translateY(-2%) scale(0.98); }
+.grimoire-scene.ferme .marque-refermer { opacity: 0; pointer-events: none; }
+.papier-refermer { position: absolute; inset: 0; display: flex; justify-content: center; align-items: flex-start; isolation: isolate; overflow: hidden;
+  padding-top: calc(var(--u) * 2.4); box-sizing: border-box;
+  background: url('images/grimoire/page.webp?v=1') 40% 30% / 420% auto, #e2cfa4;
+  box-shadow: inset 0 0 calc(var(--u) * 1.2) rgba(92, 54, 18, 0.55);
+  clip-path: polygon(0 4%, 22% 0, 48% 3%, 74% 0, 100% 3%, 100% 100%, 0 100%); }
+.papier-refermer > .lavis { left: 0; top: 0; width: 100%; height: 62%; z-index: 0; }
+.texte-refermer { position: relative; z-index: 1; font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important;
+  font-size: calc(var(--u) * 4.4 * var(--echelle-titres, 1)); color: #1b1009; line-height: 1; }

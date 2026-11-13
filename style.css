@@ -857,7 +857,6 @@ textarea.input-texte-parchemin {
   transition: 0.3s;
 }
 .input-perso:focus { outline: none; border-color: #00ffff; box-shadow: 0 0 5px rgba(0, 255, 255, 0.3); }
-.input-couleur { height: 35px; padding: 2px; cursor: pointer; }
 .actions-formulaire { grid-column: span 2; display: flex; justify-content: center; gap: 20px; margin-top: 15px; }
 
 #voile-suppression-perso { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.9); z-index: 100; flex-direction: column; justify-content: center; align-items: center; border-radius: 11px; }

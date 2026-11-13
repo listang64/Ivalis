@@ -18,7 +18,7 @@
 //    · LE COMPAGNON DU PISTEUR : une double page à lui (son nom, son allure), et
 //      à droite un loup à la plume, en emblème ;
 //    · LES CHAMPS À REMPLIR : deux doubles pages (l'identité ; le visage ; le
-//      corps et l'apparence ; l'équipement de départ, la couleur du pion) ;
+//      corps ; l'équipement de départ) ;
 //    · LA NAISSANCE : à gauche le portrait qui se dessine (la barre et les
 //      phrases d'attente), à droite la répartition des caractéristiques.
 //
@@ -141,7 +141,8 @@ function toutRemettre() {
 const FLEURON = `<svg class="fleuron fleuron-creation" viewBox="0 0 200 24" aria-hidden="true"><path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>`;
 // (v365, Nico : « virer le se cherche dans le sexe des races ».)
 const GENRES = [["Male", "Mâle"], ["Femelle", "Femelle"]];
-const renoncer = `<button type="button" class="lien-fiche renoncer-creation" data-action="creation" data-ca="renoncer">Renoncer à ce héros</button>`;
+// (v387, Nico : « enlève sur toutes les pages Renoncer à ce héros, il y a déjà
+// les marque-pages si les joueurs veulent suspendre leur création ».)
 
 function htmlRace(r, i, n) {
     const choisi = window.RACE_SELECTIONNEE_TEMP === r.nom && actif && etat.raceChoisie;
@@ -158,7 +159,6 @@ function htmlRace(r, i, n) {
           <div class="consigne-creation">Choisir ce peuple :</div>
           <div class="boutons-genre">${GENRES.map(([v, t]) => `<button type="button" class="bouton-encre${choisi && window.GENRE_SELECTIONNE_TEMP === v ? " choisi" : ""}" data-action="creation" data-ca="race" data-race="${echapper(r.nom)}" data-genre="${echapper(v)}">${cadre("genre-" + r.nom + v, 1.1)}<span>${t}</span></button>`).join("")}</div>
         </div>
-        ${renoncer}
       </div>`;
 }
 // La page de droite d'un peuple : la suite de son image de fond (v339).
@@ -190,8 +190,7 @@ function htmlClasseGauche(c, i, n) {
           ${e.bloquee ? `<p class="classe-bloquee">${echapper(e.raison)}</p>`
             : `<button type="button" class="bouton-encre grand${choisie ? " choisi" : ""}" data-action="creation" data-ca="classe" data-classe="${echapper(c.id)}">${cadre("classe-" + c.id, 1.2)}<span>Choisir cette classe</span></button>`}
         </div>
-        ${renoncer}
-      </div>`;
+      </div>${flecheDefile()}`;
 }
 const htmlClasseDroite = (c) => {
     const fond = c.imageFond || c.imageTarot || "";
@@ -236,7 +235,6 @@ function htmlCompagnonGauche() {
           <textarea id="creation-compagnon-description" maxlength="600" rows="5" placeholder="Un grand loup au pelage gris cendré, une oreille déchirée, des yeux ambrés…">${echapper(deja.description)}</textarea></label>
         <p class="erreur-creation" id="creation-compagnon-erreur"></p>
         <button type="button" class="bouton-encre grand" data-action="creation" data-ca="compagnon">${cadre("compagnon", 1.2)}<span>Il me suit</span></button>
-        ${renoncer}
       </div>`;
 }
 const htmlCompagnonDroite = () => `<div class="contenu-page page-embleme">${LOUP}<p class="devise-compagnon">Fidèle jusqu'au dernier souffle</p></div>`;
@@ -247,26 +245,31 @@ const htmlCompagnonDroite = () => `<div class="contenu-page page-embleme">${LOUP
 const BLOCS = [
     ["form1-g", ["identite"], "Qui es-tu ?"],
     ["form1-d", ["visage / tete", "details"], ""],
-    ["form2-g", ["physique / corps", "apparence"], ""],
-    ["form2-d", ["equipement de depart", "autres"], ""]
+    ["form2-g", ["physique / corps"], ""],
+    ["form2-d", ["equipement de depart"], ""]
 ];
 function pageFormulaire(cle, titre) {
     const el = pg[cle];
     el.innerHTML = `<div class="contenu-page page-formulaire-creation defile-fiche">
-        ${titre ? `<div class="sur-titre-creation">Le nouvel aventurier</div><h2 class="titre-creation">${titre}</h2>${FLEURON}` : ""}
+        ${titre ? `<div class="sur-titre-creation sur-titre-qui">Le nouvel aventurier</div><h2 class="titre-creation titre-qui">${lavis(TEINTE_OR, "titre-qui")}<span>${titre}</span></h2>${FLEURON}` : ""}
         <div class="blocs-creation"></div>
         ${cle === "form2-d" ? `<div class="actions-creation">
             <button type="button" class="bouton-encre grand" data-action="creation" data-ca="creer">${cadre("creer", 1.2)}<span>Donner vie à ce héros</span></button>
             ${modeDev() ? `<button type="button" class="lien-fiche dev-creation" data-action="creation" data-ca="creer-vite">[DEV] Création rapide (sans IA)</button>` : ""}
           </div>` : ""}
-        ${cle === "form1-g" ? renoncer : ""}
       </div>${cle === "form1-d" ? TOURNER : ""}`;
 }
 // (v371) Nico : « les titres des parties avec une couleur aquarelle en dessous, comme
 // sur les fiches personnages » : le même lavis, une teinte par partie.
+// (v387) Nico : « le titre Qui es-tu ? en plus gros et centré, avec une aquarelle dorée en dessous ».
+const TEINTE_OR = { couleurs: ["#d9a93a", "#e8c25a", "#b8862a"], opacite: 0.5, nom: "or" };
+// (v387) Nico : « si le descriptif est trop grand et qu'il faut descendre, une petite
+// flèche qui ne bouge pas en bas de page » : montrée tant qu'il reste à lire
+// (grimoire_fiches.js, majFlechesDefile).
+const flecheDefile = () => (F() && F().FLECHE_DEFILE) || "";
 const TEINTES_TITRES = {
     "identite": "beige", "visage / tete": "rouge", "details": "jaune", "physique / corps": "vert",
-    "apparence": "bleu", "equipement de depart": "beige", "autres": "gris"
+    "equipement de depart": "bleu"
 };
 // (v371) Nico : « sur la première double page, une flèche pour indiquer qu'il faut
 // tourner la page pour accéder à la suite du formulaire ». Un toucher la tourne.
@@ -502,13 +505,6 @@ function attendreHeros(id, onglet, essai) {
 function agir(cible) {
     const ca = cible.dataset.ca;
     if (ca === "tourner") { son(); aller(pg["form2-g"]); return; }
-    if (ca === "renoncer") {
-        son();
-        const clans = F() && F().pages ? F().pages().clans : [];
-        terminer();
-        if (clans && clans[0]) setTimeout(() => aller(clans[0]), 50);
-        return;
-    }
     if (ca === "race") {
         son();
         window.RACE_SELECTIONNEE_TEMP = cible.dataset.race;

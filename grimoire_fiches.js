@@ -822,6 +822,20 @@ function htmlCompetencesDroite(h) {
 //  nom, ses actions), à droite le codex des effets, toujours ouvert.
 // ---------------------------------------------------------------------
 let forgeDansLeLivre = false;
+// (v387) LA FLÈCHE DU BAS DE PAGE. Nico : « si on peut descendre, une petite flèche qui
+// ne bouge pas en bas de page ». Posée dans la page (FLECHE_DEFILE, ici et dans la
+// création, grimoire_creation.js), elle se montre tant que le texte défilant de la page
+// a encore de quoi lire plus bas.
+const FLECHE_DEFILE = `<div class="fleche-defile" aria-hidden="true"><svg viewBox="0 0 40 24"><path d="M6 6 C13 13 17 16 20 19 C24 15 28 12 34 6"/></svg></div>`;
+function majFlechesDefile() {
+    document.querySelectorAll("#grimoire-livre .fleche-defile").forEach(f => {
+        const page = f.parentElement, zone = page && page.querySelector(".defile-fiche");
+        const reste = zone ? zone.scrollHeight - zone.clientHeight - zone.scrollTop : 0;
+        f.classList.toggle("visible", reste > 6);
+    });
+}
+document.addEventListener("scroll", (ev) => { if (ev.target && ev.target.classList && ev.target.classList.contains("defile-fiche")) majFlechesDefile(); }, true);
+setInterval(majFlechesDefile, 400);
 const ranges = new Map();     // élément → { parent, suivant } d'origine
 function ranger(el, dans) {
     if (!el || !dans) return;
@@ -865,17 +879,19 @@ async function ouvrirForge() {
     // la réécriture des pages les détruirait (« Erreur ouverture Forge … null »).
     if (forgeDansLeLivre) fermerForge(false);
     const g = pagesFiche["forge-g"], d = pagesFiche["forge-d"];
-    g.innerHTML = `<div class="contenu-page page-forge defile-fiche"><div class="entete-fiche"><span class="titre-page-fiche">La Forge</span>
-        <button type="button" class="lien-fiche fermer-forge" data-action="fiches" data-fa="fermer-forge">Refermer</button></div>
+    // (v387) Nico : « enlève le bouton Refermer, et fais dépasser un marque-page en biais
+    // en haut de la page de droite avec Refermer » (majMarqueRefermer) ; « si on peut
+    // descendre, une petite flèche en bas de page » (FLECHE_DEFILE).
+    g.innerHTML = `<div class="contenu-page page-forge defile-fiche"><div class="entete-fiche"><span class="titre-page-fiche">La Forge</span></div>
         <div class="forge-dans-livre" id="forge-livre-gauche"></div>
-        <div class="apercu-forge-livre" id="forge-livre-apercu"></div></div>`;
-    d.innerHTML = `<div class="contenu-page page-forge page-codex"><div class="entete-fiche"><span class="titre-page-fiche">Le codex</span>
+        <div class="apercu-forge-livre" id="forge-livre-apercu"></div></div>${FLECHE_DEFILE}`;
+    d.innerHTML = `<div class="contenu-page page-forge page-codex au-centre"><div class="entete-fiche"><span class="titre-page-fiche">Le codex</span>
         <span class="compte-tags" id="forge-livre-tags"></span></div>
         <div class="codex-armes" id="forge-livre-armes">
           <p class="fiche-attente">D'abord, l'arme de la technique :</p>
           ${ARMES_FORGE.map(([v, t]) => `<button type="button" class="lien-fiche arme-forge" data-action="fiches" data-fa="arme" data-arme="${echapper(v)}">${t}</button>`).join("")}
         </div>
-        <div class="defile-fiche codex-liste" id="forge-livre-codex"></div></div>`;
+        <div class="defile-fiche codex-liste" id="forge-livre-codex"></div></div>${FLECHE_DEFILE}`;
     const modale = document.getElementById("modale-creation-competence");
     const gauche = g.querySelector("#forge-livre-gauche");
     forgeDansLeLivre = true;
@@ -923,6 +939,7 @@ function majCodex() {
         });
         const invite = armes.querySelector(".fiche-attente");
         if (invite) invite.hidden = !ouvert;
+        glisserChoixArme(armes, !arme);
     }
     if (arme && typeof window.ouvrirMenuAjoutForge === "function") {
         majCodex.encours = true;
@@ -932,6 +949,82 @@ function majCodex() {
     const tags = document.getElementById("forge-tags-count"), ici = document.getElementById("forge-livre-tags");
     if (ici) ici.textContent = arme ? (tags ? tags.textContent : "") : "";
     cacherModalesForge();
+}
+// (v387) Nico : « quand on ouvre la Forge, avant la liste des effets, en gros et centré
+// sur la page, le choix du type d'arme. Une fois sélectionné, ça glisse à sa place en
+// haut, et la liste des effets apparaît en fondu en dessous. » La glisse : le choix
+// mesuré au centre puis en haut, et l'écart rattrapé en douceur (FLIP).
+function glisserChoixArme(armes, auCentre) {
+    const codex = armes.closest(".page-codex");
+    if (!codex || codex.classList.contains("au-centre") === auCentre) return;
+    const bouton = armes.querySelector(".arme-forge.choisie") || armes;
+    const avant = bouton.getBoundingClientRect();
+    codex.classList.toggle("au-centre", auCentre);
+    if (auCentre || typeof bouton.animate !== "function") return;
+    const apres = bouton.getBoundingClientRect();
+    const dx = avant.left + avant.width / 2 - (apres.left + apres.width / 2), dy = avant.top + avant.height / 2 - (apres.top + apres.height / 2);
+    const k = apres.width ? avant.width / apres.width : 1;
+    bouton.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${k})` }, { transform: "none" }], { duration: 650, easing: "cubic-bezier(0.45, 0.05, 0.25, 1)" });
+    const liste = codex.querySelector(".codex-liste");
+    if (liste) liste.animate([{ opacity: 0 }, { opacity: 0, offset: 0.45 }, { opacity: 1 }], { duration: 1100, easing: "ease-out" });
+}
+// (v387) LES AQUARELLES DE LA FORGE. Nico : « une couleur d'aquarelle différente pour
+// chaque effet relié à une carac : pour tous les effets de Dextérité, une grosse tache
+// d'aquarelle qui réunit tous les effets liés à la Dextérité » ; « des aquarelles de
+// couleur discrète sous les titres des sous-effets (+ Spatial, + Physique, + Magique,
+// + Durée), et sous les + et - qui ajoutent des dégâts ou d'autres effets ».
+const TEINTES_CARACS = {
+    "FORCE": { couleurs: ["#b3402a", "#c9634a", "#8f2d1c"], opacite: 0.24, nom: "force" },
+    "DEXTÉRITÉ": { couleurs: ["#5f9a4a", "#82b36a", "#467a35"], opacite: 0.22, nom: "dexterite" },
+    "CONSTITUTION": { couleurs: ["#b8792e", "#d49a4e", "#93591c"], opacite: 0.24, nom: "constitution" },
+    "INTELLIGENCE": { couleurs: ["#4f7aaa", "#7399c2", "#3a5f8a"], opacite: 0.22, nom: "intelligence" },
+    "SAGESSE": { couleurs: ["#7a5aa8", "#9a7fc2", "#5f448a"], opacite: 0.2, nom: "sagesse" },
+    "CHARISME": { couleurs: ["#d9a93a", "#e8c25a", "#b8862a"], opacite: 0.26, nom: "charisme" },
+    "AUCUN": { couleurs: ["#7d786f", "#9a958b", "#66625a"], opacite: 0.16, nom: "aucun" }
+};
+const TEINTES_SOUS_EFFETS = { "Spatial": "#2f5f8a", "Physique": "#9b2c2c", "Magique": "#6b3fa0", "Durée": "#5b2f86" };
+const teinteDiscrete = (hex, nom) => ({ couleurs: [hex], opacite: 0.16, nom });
+function aquarellerCodex() {
+    const liste = document.getElementById("forge-menu-caracs");
+    if (!liste) return;
+    liste.querySelectorAll(".forge-grimoire-groupe[data-carac]").forEach(gr => {
+        if (gr.querySelector(":scope > .lavis-carac")) return;
+        const t = TEINTES_CARACS[gr.dataset.carac] || TEINTES_CARACS.AUCUN;
+        gr.insertAdjacentHTML("afterbegin", lavis(t, "carac-" + gr.dataset.carac, { deborde: true }).replace('class="lavis ', 'class="lavis lavis-carac '));
+    });
+}
+function aquarellerForge() {
+    const carte = document.getElementById("forge-contenu-carte");
+    if (!carte || !forgeDansLeLivre) return;
+    carte.querySelectorAll(".forge-menu-bouton").forEach(b => {
+        if (b.querySelector(":scope > .lavis")) return;
+        const nom = (b.textContent || "").replace("+", "").trim();
+        b.insertAdjacentHTML("afterbegin", lavis(teinteDiscrete(TEINTES_SOUS_EFFETS[nom] || "#6f6c66", "sous-" + nom), "sous-" + nom));
+    });
+    carte.querySelectorAll(".forge-compteur, .forge-compteur-duree").forEach((c, i) => {
+        if (c.querySelector(":scope > .lavis")) return;
+        c.insertAdjacentHTML("afterbegin", lavis(c.classList.contains("forge-compteur-duree") ? "bleu" : "beige", "compteur-" + (i % 4)));
+    });
+}
+// (v387) LE MARQUE-PAGE « REFERMER » : glissé sous la page de droite, il en sort en
+// biais par le haut tant que la double page de la Forge est ouverte.
+let marqueRefermer = null;
+function majMarqueRefermer() {
+    const g = G(), scene = g && g.scene && g.scene(), livre = g && g.livre && g.livre();
+    if (!forgeDansLeLivre || !scene || !livre) { if (marqueRefermer) marqueRefermer.classList.remove("sortie"); return; }
+    if (!marqueRefermer || !marqueRefermer.isConnected) {
+        marqueRefermer = document.createElement("button");
+        marqueRefermer.type = "button";
+        marqueRefermer.className = "marque-refermer";
+        marqueRefermer.id = "forge-marque-refermer";
+        marqueRefermer.setAttribute("aria-label", "Refermer la Forge");
+        marqueRefermer.innerHTML = `<span class="papier-refermer">${lavis(TEINTE_FORGE, "refermer")}<span class="texte-refermer">Refermer</span></span>`;
+        marqueRefermer.addEventListener("click", (ev) => { ev.stopPropagation(); agir({ dataset: { fa: "fermer-forge" } }); });
+        scene.insertBefore(marqueRefermer, livre);
+    }
+    const pf = g.pageFlip && g.pageFlip(), ici = pf ? pf.getCurrentPageIndex() : -1, i = g.indexDe ? g.indexDe(pagesFiche["forge-g"]) : -1;
+    const ouverte = i >= 0 && (ici === i || ici === i + 1) && pf.getState() === "read";
+    marqueRefermer.classList.toggle("sortie", ouverte);
 }
 function fermerForge(versCompetences) {
     if (!forgeDansLeLivre) return;
@@ -980,12 +1073,12 @@ function brancherForge() {
     };
     window.ouvrirMenuAjoutForge = function () {
         const r = ajout.apply(this, arguments);
-        if (forgeDansLeLivre) { cacherModalesForge(); const m = document.getElementById("modale-menu-arme"); if (m && !window.forgeState.armePrincipale) m.style.display = "none"; }
+        if (forgeDansLeLivre) { aquarellerCodex(); cacherModalesForge(); const m = document.getElementById("modale-menu-arme"); if (m && !window.forgeState.armePrincipale) m.style.display = "none"; }
         return r;
     };
     if (typeof rafraichir === "function") window.rafraichirForge = function () {
         try { return rafraichir.apply(this, arguments); }
-        finally { if (forgeDansLeLivre && !majCodex.encours) setTimeout(() => { majCodex(); majApercuForge(); }, 0); }
+        finally { if (forgeDansLeLivre) aquarellerForge(); if (forgeDansLeLivre && !majCodex.encours) setTimeout(() => { majCodex(); majApercuForge(); }, 0); }
     };
     if (typeof armeMenu === "function") window.ouvrirMenuArme = function () {
         if (forgeDansLeLivre) { majCodex.choixOuvert = true; majCodex(); const a = document.getElementById("forge-livre-armes"); if (a) { a.classList.remove("appelle"); void a.offsetWidth; a.classList.add("appelle"); } return; }
@@ -1481,9 +1574,11 @@ function veiller() {
             // Pas pendant qu'une page tourne : le livre relit ses pages à la fin.
             const pf = g.pageFlip();
             if (!pf || (pf.getState() === "read" && !g.defileEnCours())) majPlus();
+            majMarqueRefermer();
         } else if (heros || pagesClans.length) {
             // Hors partie : on oublie les héros de la partie quittée.
             if (forgeDansLeLivre) fermerForge(false);
+            majMarqueRefermer();
             remettreDev();
             rentrerLesModales();
             const f = fenetreAncienne();
@@ -1508,6 +1603,7 @@ window.GRIMOIRE_FICHES = {
     majPlus: () => majPlus(true),
     // pour les bancs : les dessins ; (v319) pour la création : le lavis, le cadre, la pose des pages
     dessins: { jaugeCrayon, dessinBanniere, piece, lavis, cadre },
+    FLECHE_DEFILE,
     poser: () => { majPlus(true); poserLesPages(); },
     aller: (el) => aller(el),
     herosParId

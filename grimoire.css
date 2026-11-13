@@ -391,3 +391,47 @@ body > #conteneur-parametres { z-index: 95; }
 .dessin-marque.dessin-plume { left: 12%; top: 16%; width: 76%; }
 .dessin-marque.dessin-plume path { stroke: #120b06; stroke-width: 1.6; fill: none; stroke-linecap: round; }
 .dessin-marque.dessin-plume path.plein { fill: rgba(18, 11, 6, 0.12); }
+
+/* =========================================================================
+   v387 — LES TROIS MARQUE-PAGES DE GAUCHE EN TISSU. Nico : « une texture et une
+   forme de tissu réalistes, de couleurs différentes, en gardant le logo dessiné
+   dessus ; des points de couture si besoin ». Un ruban de gros-grain : la trame
+   (fils de chaîne serrés, fils de trame plus fins), le lustre qui roule sur sa
+   largeur, les bords tissés un peu plus sombres, une couture de fil clair de
+   chaque côté, le bout taillé en queue d'aronde, effiloché. Le logo y est brodé
+   au fil d'or.
+   ========================================================================= */
+#grimoire-marque-menu { --tissu: #6e1e24; --tissu-clair: #8e3238; --fil: #e9cf8e; }
+#grimoire-marque-page { --tissu: #24503a; --tissu-clair: #356a4f; --fil: #ecd89a; }
+#grimoire-marque-recit { --tissu: #22355a; --tissu-clair: #344c7a; --fil: #e6d29a; }
+#grimoire-marque-menu .marque-papier, #grimoire-marque-page .marque-papier, #grimoire-marque-recit .marque-papier {
+  background:
+    /* le lustre qui roule sur la largeur du ruban */
+    linear-gradient(90deg, rgba(0, 0, 0, 0.38) 0%, rgba(0, 0, 0, 0.12) 9%, rgba(255, 255, 255, 0.12) 30%, rgba(255, 255, 255, 0.05) 46%, rgba(0, 0, 0, 0.06) 64%, rgba(0, 0, 0, 0.16) 88%, rgba(0, 0, 0, 0.42) 100%),
+    /* les plis doux, de haut en bas */
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(0, 0, 0, 0.08) 22%, rgba(255, 255, 255, 0.05) 41%, rgba(0, 0, 0, 0.1) 63%, rgba(255, 255, 255, 0.04) 80%, rgba(0, 0, 0, 0.22) 100%),
+    /* la trame : les côtes du gros-grain (horizontales) et les fils de chaîne */
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.2) 0 0.6px, rgba(255, 255, 255, 0.07) 0.6px 1.3px, transparent 1.3px 2px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 0.5px, rgba(0, 0, 0, 0.035) 0.5px 1px),
+    /* un grain de fibres */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.08 0.9' numOctaves='2' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.55 -0.15'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23f)'/%3E%3C/svg%3E"),
+    linear-gradient(90deg, var(--tissu) 0%, var(--tissu-clair) 35%, var(--tissu) 100%);
+  box-shadow: inset calc(var(--u) * 0.35) 0 0 rgba(0, 0, 0, 0.28), inset calc(var(--u) * -0.35) 0 0 rgba(0, 0, 0, 0.28), inset 0 calc(var(--u) * -1) calc(var(--u) * 1.2) rgba(0, 0, 0, 0.3);
+  /* la queue d'aronde, ses fils qui s'effilochent */
+  clip-path: polygon(0 0, 6% 1.2%, 12% 0.4%, 20% 2.4%, 28% 3.6%, 36% 6%, 44% 8.4%, 50% 10.5%, 56% 8.4%, 64% 6%, 72% 3.6%, 80% 2.4%, 88% 0.4%, 94% 1.2%, 100% 0, 100% 100%, 0 100%);
+}
+/* Les coutures : un fil clair en points, de chaque côté, qui suit le bout taillé. */
+#grimoire-marque-menu .marque-papier::before, #grimoire-marque-page .marque-papier::before, #grimoire-marque-recit .marque-papier::before {
+  content: ""; position: absolute; top: 14%; bottom: -2%; left: 11%; right: 11%; pointer-events: none;
+  border-left: calc(var(--u) * 0.32) dashed var(--fil); border-right: calc(var(--u) * 0.32) dashed var(--fil);
+  opacity: 0.8; filter: drop-shadow(0 calc(var(--u) * 0.12) 0 rgba(0, 0, 0, 0.45)); }
+/* Les brins effilochés du bout. */
+#grimoire-marque-menu .marque-papier::after, #grimoire-marque-page .marque-papier::after, #grimoire-marque-recit .marque-papier::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 12%; pointer-events: none;
+  background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.25) 0 1px, transparent 1px 3px, rgba(255, 255, 255, 0.12) 3px 4px, transparent 4px 6px);
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent); mask-image: linear-gradient(to bottom, #000, transparent); }
+/* Le logo, brodé au fil d'or, en relief sur le tissu. */
+#grimoire-marque-menu .dessin-marque, #grimoire-marque-page .dessin-marque, #grimoire-marque-recit .dessin-marque { z-index: 1;
+  filter: drop-shadow(0 calc(var(--u) * 0.15) 0 rgba(0, 0, 0, 0.55)); }
+#grimoire-marque-menu .dessin-marque path, #grimoire-marque-page .dessin-marque path, #grimoire-marque-recit .dessin-marque path { stroke: var(--fil) !important; }
+#grimoire-marque-page .dessin-marque .feuille, #grimoire-marque-recit .dessin-marque path.plein { fill: rgba(233, 207, 142, 0.22) !important; }

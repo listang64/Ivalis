@@ -17,10 +17,11 @@
 }
 .loupe-bouton:hover > img.loupe-cadre, .loupe-bouton:focus-visible > img.loupe-cadre { filter: drop-shadow(3px 6px 6px rgba(20, 10, 4, 0.55)) drop-shadow(0 0 10px rgba(255, 214, 140, 0.75)); }
 .loupe-bouton:focus { outline: none; }
-/* (v383) LE VERRE AU REPOS : un verre grisâtre, opaque, sans effet lourd (Nico). C'est lui
+/* (v383) LE VERRE AU REPOS : un verre opaque, sans effet lourd (Nico). C'est lui
    qu'on touche (un disque) : le manche et le cadre laissent passer le doigt. Le même voile
-   couvre le verre de l'écran de la loupe au début de la glisse (.loupe-voile). */
-.loupe-lentille, .loupe-voile { background: radial-gradient(circle at 42% 38%, #d9d6cf 0, #b9b5ac 48%, #8f8a81 100%); }
+   couvre le verre de l'écran de la loupe au début de la glisse (.loupe-voile).
+   (v387) Nico : « l'intérieur de la loupe au repos, plutôt que gris, fais noir ». */
+.loupe-lentille, .loupe-voile { background: radial-gradient(circle at 42% 38%, #2b2b2b 0, #111 48%, #000 100%); }
 .loupe-lentille { position: absolute; display: block; border-radius: 50%; overflow: hidden; pointer-events: auto; cursor: pointer; }
 .loupe-dessous > img { position: absolute; max-width: none; pointer-events: none; user-select: none; -webkit-user-drag: none; }
 .loupe-lentille-verre { position: absolute; inset: 0; display: block; border-radius: 50%; pointer-events: none;
@@ -80,7 +81,8 @@
 
 /* LE POST-IT DU VOYAGE : à l'envers, il descend du haut de l'écran (le bout
    taillé en bas), les pas du marque-page de la marche dessus. */
-.loupe-postit { position: absolute; top: 0; left: 60%; width: 74px; height: 128px; padding: 0; border: 0; background: none; cursor: pointer; z-index: 5;
+/* (v387) Nico : « en mode zoomé d'une carte, déplace le marque-page mouvement en haut à gauche de l'écran ». */
+.loupe-postit { position: absolute; top: 0; left: 28px; width: 74px; height: 128px; padding: 0; border: 0; background: none; cursor: pointer; z-index: 5;
   transform-origin: 50% 0; transform: translateY(-112%) rotate(4deg); opacity: 0; pointer-events: none;
   transition: transform 0.5s cubic-bezier(0.45, 0.05, 0.25, 1), opacity 0.3s ease, filter 0.3s ease;
   filter: drop-shadow(2px 5px 5px rgba(40, 20, 6, 0.5)); }

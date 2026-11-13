@@ -281,7 +281,7 @@ await section(async () => {
   verifier("« Forger une compétence » tourne jusqu'à la Forge, rangée dans le livre (nom, actions, Forger)", (await ici()) === "forge-g" && r.dans && r.modale === "none", JSON.stringify(r));
   verifier("à droite, le codex des effets ; d'abord le choix de l'arme", r.codex && r.armes.length === 6, JSON.stringify(r.armes));
   await cap("v313_forge");
-  await cliquer("#grimoire-fiches-forge-g .fermer-forge"); await p.waitForTimeout(2200); await pose();
+  await cliquer("#forge-marque-refermer"); await p.waitForTimeout(2200); await pose();   // (v387) le marque-page « Refermer » remplace le bouton
   const rendu = await p.evaluate(() => ({ modale: !!document.querySelector("#modale-creation-competence #forge-nom"), menu: !!document.querySelector("#modale-menu-ajout #forge-menu-caracs") }));
   verifier("« Refermer » rend la Forge à sa fenêtre et revient aux compétences", rendu.modale && rendu.menu && (await ici()) === "comp-g", JSON.stringify(rendu));
 });
