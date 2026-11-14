@@ -1903,6 +1903,8 @@ if (typeof window !== "undefined") {
     const marquerDemande = (acteur) => {
         const etat = REGIME && REGIME.etatAffiche();
         demandeEnVol = (acteur || "") + "|" + nombre(etat && etat.manche, 1);
+        // (v393) Le bouton du tour s'éteint tout de suite (actualiserBoutonFinTour, combat.js).
+        setTimeout(() => { if (typeof window.actualiserBoutonFinTour === "function") window.actualiserBoutonFinTour(); }, 0);
     };
 
     // Appelée à chaque projection : si la tête de file n'est plus celle qu'on

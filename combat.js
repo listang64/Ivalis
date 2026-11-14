@@ -5353,6 +5353,13 @@ window.actualiserBoutonFinTour = function(queueParam, phaseParam) {
 
     if (!estMonTour) return poser("eteint", false);
 
+    // (v393) Nico : « au moment où on valide la compétence, il y a bien Fin de tour, mais
+    // quand l'animation se passe ça se remet sur Valider compétence : affiche plutôt
+    // direct la version grisée ». La carte (ou la fin du tour) est partie : la demande
+    // reste en vol jusqu'à ce que l'écran ait rejoué la fin de son tour — le bouton
+    // reste éteint pendant ce temps, animation comprise.
+    if (typeof window.competenceDejaJouee === "function" && window.competenceDejaJouee(idQuiJoue)) return poser("eteint", false);
+
     // 1. LE CIBLAGE EST OUVERT : la carte se joue par ses propres boutons
     // (RÉSOUDRE / ANNULER, ou la bulle des zones). Ce bouton-ci n'offre plus
     // qu'une sortie : finir son tour sans lancer, donc sans rien dépenser.
