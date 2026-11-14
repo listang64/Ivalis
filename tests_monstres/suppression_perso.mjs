@@ -47,7 +47,9 @@ function creerBase() {
                  URL_Token:"https://res.cloudinary.com/x/upload/v1/pion.png",
                  Equip_Armure: { uid:"o1", nom:"Cotte", image:"https://res.cloudinary.com/x/upload/v1/cotte.png" },
                  Equip_Main_Droite: { uid:"o2", nom:"Épée", image:"https://res.cloudinary.com/x/upload/v1/epee.png" },
-                 Equip_Main_Gauche: { uid:"o3", nom:"Écu", image:"https://res.cloudinary.com/x/upload/v1/ecu.png" } },
+                 Equip_Main_Gauche: { uid:"o3", nom:"Écu", image:"https://res.cloudinary.com/x/upload/v1/ecu.png" },
+                 // (v397) l'arme rangée dans le stockage du livre
+                 Equip_Stock: { uid:"o4", nom:"Dague", image:"https://res.cloudinary.com/x/upload/v1/dague_stock.png" } },
       PERSO_2: { Prenom_Personnage:"Jade", ID_Partie:"GAME_1", ID_Joueur:"P_02" },
       ILLUSION_a: { Est_Illusion:true, ID_Lanceur:"PERSO_1", ID_Partie:"GAME_1", Nom_Personnage:"Pliors" },
       ILLUSION_b: { Est_Illusion:true, ID_Lanceur:"PERSO_2", ID_Partie:"GAME_1", Nom_Personnage:"Jade" }
@@ -170,13 +172,13 @@ console.log("1. AVEC LA PARTIE OUVERTE À L'ÉCRAN");
   verifier("les autres pions restent", !!vtt.Tokens.PERSO_2);
   verifier("ses zones persistantes disparaissent", !vtt.Zones_Persistantes.zp_1);
   verifier("celles des autres restent", !!vtt.Zones_Persistantes.zp_2);
-  // SIX IMAGES, PAS DEUX. Le portrait et le pion partaient déjà ; l'avatar
+  // SEPT IMAGES, PAS DEUX (v397 : avec l'arme du stockage). Le portrait et le pion partaient déjà ; l'avatar
   // habillé (redessiné à chaque armure équipée) et les trois dessins de son
   // équipement restaient sur Cloudinary pour toujours.
   const nomsPartis = imagesDetruites.map(u => u.split("/").pop());
   verifier("TOUTES SES IMAGES SONT DÉTRUITES, pas seulement son portrait",
-           imagesDetruites.length === 6, `(${imagesDetruites.length} : ${nomsPartis.join(", ")})`);
-  ["portrait.png", "avatar_habille.png", "pion.png", "cotte.png", "epee.png", "ecu.png"]
+           imagesDetruites.length === 7, `(${imagesDetruites.length} : ${nomsPartis.join(", ")})`);
+  ["portrait.png", "avatar_habille.png", "pion.png", "cotte.png", "epee.png", "ecu.png", "dague_stock.png"]
     .forEach(nom => verifier("  · " + nom, nomsPartis.includes(nom)));
   verifier("ET RIEN DE CE QUE PORTE UN AUTRE HÉROS",
            !nomsPartis.some(n => /jade/.test(n)), nomsPartis.join(", "));
@@ -215,7 +217,9 @@ console.log("\n4. ON N'EFFACE JAMAIS UNE IMAGE ENCORE UTILISÉE");
         // Une arme à DEUX MAINS occupe les deux emplacements avec le même
         // dessin : le relever deux fois ne doit pas l'effacer deux fois.
         equipMainDroite: { uid:"d", image:"https://res.cloudinary.com/x/upload/v1/hache.png" },
-        equipMainGauche: { uid:"d", image:"https://res.cloudinary.com/x/upload/v1/hache.png" } }
+        equipMainGauche: { uid:"d", image:"https://res.cloudinary.com/x/upload/v1/hache.png" },
+        // (v397) une arme rangée dans le stockage du livre
+        equipStock: { uid:"s", image:"https://res.cloudinary.com/x/upload/v1/arc_range.png" } }
     ],
     // Un objet du butin encore ouvert est à l'écran ; un objet resté en réserve
     // attend la rencontre suivante. Ni l'un ni l'autre n'est perdu.
@@ -233,6 +237,8 @@ console.log("\n4. ON N'EFFACE JAMAIS UNE IMAGE ENCORE UTILISÉE");
 
   verifier("une arme encore en main est épargnée",
            await essayer("https://res.cloudinary.com/x/upload/v1/hache.png") === 0);
+  verifier("(v397) une arme rangée dans le stockage d'un héros aussi",
+           await essayer("https://res.cloudinary.com/x/upload/v1/arc_range.png") === 0);
   verifier("un objet du butin à l'écran aussi",
            await essayer("https://res.cloudinary.com/x/upload/v1/pool.png") === 0);
   verifier("un objet du lot d'un héros aussi",

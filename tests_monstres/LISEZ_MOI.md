@@ -11872,3 +11872,12 @@ corrections_v395.mjs le vérifie dans la page (captures : V395_CAPTURES=dossier)
 - Le micro demande le site en **https** (GitHub Pages l'est).
 
 corrections_v396.mjs le vérifie avec deux vraies pages reliées en WebRTC (faux micro de Chromium, base partagée par Node) ; captures : V396_CAPTURES=dossier.
+
+## v397 — Le ménage de Cloudinary ; le nouveau fond du sommaire ; les fonds de l'Inquisiteur et du Berserker
+
+- **Un héros effacé** (app.js, `supprimerPersonnageBDD`) : l'objet rangé dans le stockage du livre (`Equip_Stock`, souvent une arme) part de Cloudinary avec l'armure et les deux mains — il y restait. Et `imagesEncoreUtilisees` (loot.js) protège l'objet du stockage des héros vivants. suppression_perso.mjs : sept images.
+- **Un combat du récit clos** (combat_rp.js, `surveillerImagesDuCombat`) : gagné ou perdu, la fin se joue sur le poste du MJ (toutes les clés) et rendreLArene efface la carte et les pions ; mais un combat abandonné ou disparu du plateau peut se clore sur un poste sans les clés Cloudinary, et ses pions restaient. Désormais chaque poste qui a les clés retient le dernier combat vu et fait le ménage quand il disparaît (ou qu'un autre le remplace) ; une autre partie ouverte entre-temps ne compte pas ; une seule fois par combat.
+- **Le sommaire** : la nouvelle image de Nico en fond (l'espace glissé dans le lien retiré), opacité 0,2 → 0,3. corrections_v312 et ecran_chargement suivent.
+- **L'Inquisiteur et le Berserker** (classes.js) : leurs nouveaux fonds de double page ; l'ancien fond gardé en base est remplacé (`ANCIENS_FONDS_CLASSES`, comme le Protecteur en v339) ; leur carte de tarot ne change pas. corrections_v343 suit.
+
+corrections_v397.mjs le vérifie (captures : V397_CAPTURES=dossier).

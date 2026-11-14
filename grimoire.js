@@ -34,7 +34,8 @@
         // v305 : la table de bois, l'encrier et la plume (l'image de Nico).
         table: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793777473/BG_tjiigl.png",
         // v312 : le fond du sommaire (l'image de Nico), à 20 %, étiré sur la double page.
-        sommaire: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1787900056/IMG_2057_ez0wu9.png"
+        // (v397) Nico : « la nouvelle image à mettre en fond de page du sommaire, un peu plus opaque ».
+        sommaire: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794693462/27006076-F2BA-4D58-A6B1-4CE047FD11C0_bxp3xw.png"
     };
     const LIVRE = { w: 2000, h: 1117 };
     const ZONE = { x: 251, y: 62, w: 1514, h: 984 };       // les deux pages

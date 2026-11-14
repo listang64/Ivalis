@@ -2591,7 +2591,10 @@ async function supprimerPersonnageBDD(idPersonnage) {
   //    Puis (v252) les illustrations de ses compétences, relevées à l'étape 4,
   //    et le portrait et le pion de son compagnon (Pisteur).
   if (data && typeof window.oublierImages === "function") {
-      const objets = [data.Equip_Armure, data.Equip_Main_Droite, data.Equip_Main_Gauche]
+      // (v397) Nico : « assure-toi que quand on supprime un personnage, les images
+      // des armes sont bien supprimées de Cloudinary » : le stockage du livre
+      // (Equip_Stock, v313) en porte une aussi — elle restait sur Cloudinary.
+      const objets = [data.Equip_Armure, data.Equip_Main_Droite, data.Equip_Main_Gauche, data.Equip_Stock]
           .filter(o => o && o.image).map(o => o.image);
       const images = [data.URL_Cloudinary, data.URL_Avatar_Equipe, data.URL_Token, ...objets,
                       data.Compagnon_Image, data.Compagnon_Token, ...illustrations]

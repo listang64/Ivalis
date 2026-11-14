@@ -194,7 +194,8 @@ await p.route(/res\.cloudinary\.com\/.*IMG_22(49|5[0-7])_/, r => { demandes.push
 await p.route(/res\.cloudinary\.com\/.*v1794360161\//, r => r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: CARTE_PAYSAGE }));
 // (v360 : le Berzerker s'appelle désormais Berserker.)
 const NOUVELLES = ["Inquisiteur", "Chaman", "Berserker", "Maudit", "Prêtre de la lumière"];
-const IMAGES = { "Inquisiteur": "inquisiteur_mtcrjp", "Chaman": "chaman_dbjpiw", "Berserker": "beserker_h9l0fy", "Maudit": "maudit_b6xsnz", "Prêtre de la lumière": "prete_lumi%C3%A8re_yfuwp3" };
+// (v397) l'Inquisiteur et le Berserker ont un nouveau fond.
+const IMAGES = { "Inquisiteur": "bv3d28", "Chaman": "chaman_dbjpiw", "Berserker": "gh6wwh", "Maudit": "maudit_b6xsnz", "Prêtre de la lumière": "prete_lumi%C3%A8re_yfuwp3" };
 
 titre("1. LA LISTE DES CLASSES, ET CE QUE LA BASE EN DIT");
 await section(async () => {

@@ -63,10 +63,11 @@ window.CLASSES_PAR_DEFAUT = [
     // (v343) Nico : « vire l'Élémentariste et le Mage du chaos ; ajoute Inquisiteur,
     // Chaman, Berzerker, Maudit et Prêtre de la lumière ». Une seule image chacune :
     // le fond de sa double page (elle sert aussi de carte dans l'ancienne grille).
-    C(14, "Inquisiteur",          "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/inquisiteur_mtcrjp.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/inquisiteur_mtcrjp.png"),
+    // (v397) Nico : « la nouvelle image de fond de la classe Inquisiteur », et celle du Berserker.
+    C(14, "Inquisiteur",          "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/inquisiteur_mtcrjp.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794693920/8743B6D2-58F5-4E31-A322-5A8C7E6BBD80_bv3d28.png"),
     C(15, "Chaman",               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/chaman_dbjpiw.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/chaman_dbjpiw.png"),
     // (v360) « Berzerker » devient « Berserker » (Nico) : CLASSES_DOC_RENOMMEES.
-    C(16, "Berserker",            "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/beserker_h9l0fy.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/beserker_h9l0fy.png"),
+    C(16, "Berserker",            "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/beserker_h9l0fy.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794693921/139F7204-B75C-42AF-B084-20A541983F30_gh6wwh.png"),
     C(17, "Maudit",               "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/maudit_b6xsnz.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/maudit_b6xsnz.png"),
     C(18, "Prêtre de la lumière", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/prete_lumi%C3%A8re_yfuwp3.png", "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794360161/prete_lumi%C3%A8re_yfuwp3.png")
 ];
@@ -457,7 +458,8 @@ window.CLASSES_RETIREES = ["CLASSE_ENSORCELEUR", "CLASSE_MAGE_DU_CHAOS", "CLASSE
 // LES FONDS REMPLACÉS (v339, Nico : « remplace l'image de la classe Protecteur ») :
 // la base qui garde encore l'ancienne image prend celle d'ici. Un fond changé depuis
 // (une autre image en base) reste le sien.
-window.ANCIENS_FONDS_CLASSES = ["Hoplite_fond_jzi0f3"];
+// (v397) Les anciens fonds de l'Inquisiteur et du Berserker (leur carte de tarot reste la même).
+window.ANCIENS_FONDS_CLASSES = ["Hoplite_fond_jzi0f3", "inquisiteur_mtcrjp", "beserker_h9l0fy"];
 const fondPerime = (url) => !!url && window.ANCIENS_FONDS_CLASSES.some(a => String(url).includes(a));
 window.classeDepuisDocument = function(idBase, d) {
     const renommee = window.CLASSES_DOC_RENOMMEES[idBase];

@@ -349,7 +349,8 @@
 .numero-index { color: inherit; margin-right: 0.15em; }
 /* Le fond du sommaire : l'image de Nico à 20 %, étirée sur la double page
    (chaque page en montre sa moitié, jusqu'à ses bords). */
-.fond-sommaire { position: absolute; inset: 0; background-repeat: no-repeat; background-size: 200% 100%; opacity: 0.2; pointer-events: none; }
+/* (v397) la nouvelle image, un peu plus présente : 0.2 → 0.3 */
+.fond-sommaire { position: absolute; inset: 0; background-repeat: no-repeat; background-size: 200% 100%; opacity: 0.3; pointer-events: none; }
 .fond-sommaire.gauche { background-position: 0 0; }
 .fond-sommaire.droite { background-position: 100% 0; }
 

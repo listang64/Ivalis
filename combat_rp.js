@@ -1277,6 +1277,22 @@ function effacerImagesDuCombat(c) {
     }, R.effacerImagesApresMs || 4000);
 }
 window.effacerImagesDuCombatRP = effacerImagesDuCombat;
+// (v397) Nico : « assure-toi que quand un combat est clos, les images des tokens
+// ennemis sont supprimées de Cloudinary ». La fin d'un combat se joue sur le
+// poste qui la déclenche : gagné ou perdu, c'est celui du MJ (toutes les clés) ;
+// mais un combat abandonné, ou disparu du plateau, peut se clore sur un poste
+// sans les clés Cloudinary — ses pions restaient alors pour toujours. Chaque
+// poste qui a les clés retient donc le dernier combat du récit qu'il a vu, et
+// fait le ménage quand il s'en va (ou qu'un autre le remplace), quel que soit
+// celui qui l'a clos. (Une autre partie ouverte entre-temps ne compte pas.)
+let combatConnu = null;
+function surveillerImagesDuCombat(c) {
+    const partie = window.ID_PARTIE_COURANTE || "";
+    let cles = false;
+    try { cles = !!(localStorage.getItem("ivalis_CLOUDINARY_API_SECRET") || "").trim(); } catch (e) {}
+    if (combatConnu && combatConnu.partie === partie && (!c || c.Id !== combatConnu.c.Id) && cles) effacerImagesDuCombat(combatConnu.c);
+    combatConnu = c && c.Id ? { c, partie } : null;
+}
 
 const debutsAbandon = {};
 function suivreLaFin(c, p) {
@@ -1587,6 +1603,7 @@ window.appliquerCombatRPDeLaPartie = function(p) {
     partieVue = p || {};
     const c = etat(partieVue);
     if (c && c.Ennemis && c.Ennemis.Visuels) derniersEnnemis = c.Ennemis;
+    surveillerImagesDuCombat(c);
     // (v335) Un combat du récit se prépare ou se joue : le plateau de combat se charge.
     if (c && ["preparation", "en_cours"].includes(c.Etat) && typeof window.assurerPlateauCombat === "function") window.assurerPlateauCombat();
     actualiserTout();

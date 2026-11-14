@@ -58,7 +58,8 @@ window.imagesEncoreUtilisees = function(options) {
         if (seulementHeros && p.camp && p.camp !== "Allié") return;
         ajouter(p.urlCloudinary); ajouter(p.urlPortraitReference);
         ajouter(p.urlAvatarEquipe); ajouter(p.urlToken);
-        [p.equipArmure, p.equipMainDroite, p.equipMainGauche].forEach(ajouterObjet);
+        // (v397) l'objet rangé dans le stockage du livre est à lui aussi : on ne l'efface pas.
+        [p.equipArmure, p.equipMainDroite, p.equipMainGauche, p.equipStock].forEach(ajouterObjet);
     });
 
     // Le butin encore ouvert : ses objets sont à l'écran, et rien n'est joué

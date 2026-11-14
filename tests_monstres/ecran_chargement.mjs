@@ -196,7 +196,7 @@ console.log("\n3. LE JEU SE CHARGE DERRIÈRE LE SCEAU");
            `${info.images} image(s) ramassée(s)`);
 
   // (v379 : les fonds de l'ancien menu — ivalis_background, les brumes — sont partis avec lui.)
-  const fonds = demandees.filter(u => /ivalis_background|IMG_2057|brume|sable/.test(u)).length;
+  const fonds = demandees.filter(u => /ivalis_background|IMG_2057|bxp3xw|brume|sable/.test(u)).length;
   verifier("les fonds déclarés en CSS le sont aussi", fonds >= 1, `${fonds} fond(s)`);
 
   const balises = await p.evaluate(() =>

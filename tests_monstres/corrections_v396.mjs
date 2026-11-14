@@ -351,7 +351,7 @@ await section(async () => {
   verifier("index.html charge vocal.js et vocal.css", /<script type="module" src="vocal\.js\?v=\d+"><\/script>/.test(html) && /href="vocal\.css\?v=\d+"/.test(html));
   verifier("vocal.js importe le même firebase-config que les autres", /firebase-config\.js\?v=2"/.test(lire("vocal.js")));
   const v = JSON.parse(lire("version.json")).version;
-  verifier("version.json et VERSION_IVALIS d'accord (396)", v === 396 && new RegExp("VERSION_IVALIS = " + v + ";").test(lire("trace_combat.js")), String(v));
+  verifier("version.json et VERSION_IVALIS d'accord (396 ou plus)", v >= 396 && new RegExp("VERSION_IVALIS = " + v + ";").test(lire("trace_combat.js")), String(v));
   verifier("pas d'erreur dans les pages", !erreurs.length, erreurs.slice(0, 3).join(" | "));
 });
 
