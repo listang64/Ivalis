@@ -464,3 +464,20 @@
 .papier-refermer > .lavis { left: 0; top: 0; width: 100%; height: 62%; z-index: 0; }
 .texte-refermer { position: relative; z-index: 1; font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important;
   font-size: calc(var(--u) * 4.4 * var(--echelle-titres, 1)); color: #1b1009; line-height: 1; }
+
+/* =========================================================================
+   v392 — L'ENCART DE LA FORGE : LES CHIFFRES ET LEURS SYMBOLES CENTRÉS
+   Nico : « dans l'aperçu des compétences, mets les chiffres et symboles centrés
+   dans leur encart ». Les montants (le symbole et son chiffre) et leurs
+   sous-effets se centrent dans la carte (à côté de la zone, s'il y en a une) ;
+   le chiffre se cale au milieu de son symbole, quelle que soit la police
+   (line-height 1), comme celui du cercle d'initiative et ceux du coin.
+   ========================================================================= */
+.apercu-forge .carte-corps { align-items: center; }
+.apercu-forge .carte-effets-encart { text-align: center; }
+.apercu-forge .carte-effets-encart .encart-montant { justify-content: center; }
+.apercu-forge .carte-effets-encart > div > div + div { margin-left: 0 !important; }
+.apercu-forge .carte-effets-encart > div[style*="margin-left"] { margin-left: 0 !important; }
+.apercu-forge .encart-chiffre, .apercu-forge .carte-init, .apercu-forge .carte-fatigue, .apercu-forge .carte-distance b { line-height: 1; }
+.apercu-forge .carte-init { display: flex; align-items: center; justify-content: center; }
+.apercu-forge .carte-fatigue, .apercu-forge .carte-distance { display: inline-flex; align-items: center; gap: 0.25em; }

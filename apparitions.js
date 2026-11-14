@@ -270,7 +270,10 @@
     // (« aleatoire ») en tire une des quatre. Rend le départ, les renforts
     // avec leur heure (entreeManche, surReleve, quandVide, tantQueVivant) et
     // ce que le cas change (pièges, butin).
-    window.tirerApparition = function (choix) {
+    // (v392) `casChoisi` : le mode voulu dans cette apparition (son rang dans la table),
+    // choisi dans l'arène (Nico : « dans chaque apparition, pouvoir choisir quel mode ») ;
+    // sans lui, ou pour une apparition tirée au hasard, le mode se tire selon ses chances.
+    window.tirerApparition = function (choix, casChoisi) {
         const table = window.APPARITIONS || window.normaliserTableApparitions(null);
         const choisie = window.NUMEROS_APPARITION.includes(Number(choix));
         const numero = choisie ? Number(choix) : hasard(window.NUMEROS_APPARITION);
@@ -282,6 +285,7 @@
             if (jet < Math.max(0, def.cas[i].chance)) { indexCas = i; break; }
             jet -= Math.max(0, def.cas[i].chance);
         }
+        if (choisie && Number.isInteger(casChoisi) && def.cas[casChoisi]) indexCas = casChoisi;
         const cas = def.cas[indexCas];
 
         const depart = tirerVague(cas.depart).map(m => ({

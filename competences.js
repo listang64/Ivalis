@@ -1504,6 +1504,8 @@ function purgeDisconnectedZoneHexes(hexes, hasDistance) {
             }
         });
     }
+    // (v392) La case du lanceur, cochée (un soin), reste cochée : elle est le centre.
+    if (hexes.some(h => h.q === 0 && h.r === 0)) connected.unshift({ q: 0, r: 0 });
     return connected;
 }
 
@@ -2300,10 +2302,14 @@ window.fermerEditeurZone = function(valider) {
     window.rafraichirForge();
 };
 
+// (v392) Nico : « pour un sort de soin, quand on met une zone, que l'on puisse aussi
+// sélectionner l'emplacement du personnage lanceur » : sa case se coche comme les autres.
+const zoneSoinAvecLanceur = (act) => !!(act && act.baseEffet && estUnSoinDeBase(act.baseEffet.Nom));
+
 window.clicHexagoneZone = function(q, r) {
     const act = window.forgeState.actions.find(a => a.idInst === window.forgeState.zoneActionIdEnCours);
     const hasDist = actionHasDistance(act);
-    const isPlayer = (q === 0 && r === 0 && !hasDist);
+    const isPlayer = (q === 0 && r === 0 && !hasDist && !zoneSoinAvecLanceur(act));
 
     if (isPlayer) return; 
 
@@ -2338,9 +2344,11 @@ window.dessinerGrilleZone = function() {
     const act = window.forgeState.actions.find(a => a.idInst === window.forgeState.zoneActionIdEnCours);
     const hasDist = actionHasDistance(act);
 
+    const soinLanceur = zoneSoinAvecLanceur(act);
     document.getElementById("zone-description-texte").innerText = hasDist ? 
         "Cible à distance. N'importe quel hexagone est cliquable." : 
-        "Sort au corps-à-corps. Les hexagones doivent toucher le lanceur (centre).";
+        soinLanceur ? "Soin au corps-à-corps. Les hexagones doivent toucher le lanceur (centre) ; sa propre case peut aussi être soignée."
+        : "Sort au corps-à-corps. Les hexagones doivent toucher le lanceur (centre).";
 
     const modZone = window.forgeState.effetsBDD.find(e => e.Nom === "Zone");
     const costPC = modZone ? parseFrenchFloat(modZone.Cout_PT) : 1.5;
@@ -2364,8 +2372,10 @@ window.dessinerGrilleZone = function() {
 
         for (let r = r1; r <= r2; r++) {
             const isCenter = (q === 0 && r === 0);
-            const isPlayer = isCenter && !hasDist;
             const isSelected = window.forgeState.selectedZoneHexes.some(h => h.q === q && h.r === r);
+            // Le lanceur : une case grise et figée — sauf pour un soin, où elle se coche.
+            const lanceurIci = isCenter && !hasDist;
+            const isPlayer = lanceurIci && !soinLanceur;
 
             // MÊME GÉOMÉTRIE QUE LA MAP DE COMBAT (Plateau.js, hexToPixel) :
             // hexagones à bord plat en haut. On choisit la zone sur la forme
@@ -2391,12 +2401,13 @@ window.dessinerGrilleZone = function() {
             polygon.setAttribute("stroke", "rgba(0,0,0,0.2)");
             polygon.setAttribute("stroke-width", "1");
             polygon.style.cursor = isPlayer ? "default" : "pointer";
+            if (lanceurIci) polygon.setAttribute("data-lanceur", soinLanceur ? "soin" : "fige");
             
             polygon.onclick = () => window.clicHexagoneZone(q, r);
 
             svg.appendChild(polygon);
 
-            if (isPlayer) {
+            if (lanceurIci) {
                 const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
                 text.setAttribute("x", x);
                 text.setAttribute("y", y + 4);

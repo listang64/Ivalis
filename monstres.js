@@ -1302,7 +1302,7 @@ window.genererRencontreMonstres = async function(choix, options) {
         console.error("Relecture des gabarits impossible, on garde ceux en mémoire :", e);
     }
 
-    const tirage = options && options.tirage ? options.tirage : window.tirerApparition(choix);
+    const tirage = options && options.tirage ? options.tirage : window.tirerApparition(choix, options && options.cas);
     if (tirage.depart.length === 0) {
         alert("Aucun gabarit de monstre disponible : ouvre Paramètres > Outils > Monstres pour les initialiser.");
         return;
@@ -1699,6 +1699,7 @@ window.ouvrirGenerationRencontre = function() {
     const voile = document.getElementById("etape-generation-rencontre");
     if (!voile) return;
 
+    afficherModesApparitions();
     window.choisirApparitionRencontre("aleatoire");
     window.actualiserNiveauGroupe();
     window.afficherNiveauGroupe();
@@ -1714,10 +1715,42 @@ window.fermerGenerationRencontre = function() {
     if (voile) voile.style.display = "none";
 };
 
-window.choisirApparitionRencontre = function(choix) {
+// (v392) LE MODE DE CHAQUE APPARITION. Nico : « dans le choix des apparitions en mode
+// arène, que l'on puisse choisir dans chaque apparition quel mode choisir ». Sous chaque
+// apparition, ses modes (lus dans la table, celle de l'éditeur comprise) et « Au hasard » ;
+// en toucher un choisit l'apparition et ce mode.
+function afficherModesApparitions() {
+    const table = window.APPARITIONS || (typeof window.normaliserTableApparitions === "function" ? window.normaliserTableApparitions(null) : null);
+    if (!table) return;
+    const echapper = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    document.querySelectorAll(".choix-apparition-rencontre[data-apparition]").forEach(el => {
+        const n = Number(el.dataset.apparition), def = table[n];
+        let modes = el.querySelector(".modes-apparition");
+        if (!def || !Array.isArray(def.cas)) { if (modes) modes.remove(); return; }
+        if (!modes) { modes = document.createElement("div"); modes.className = "modes-apparition"; el.appendChild(modes); }
+        modes.innerHTML = `<button type="button" class="mode-apparition" data-cas="">Au hasard</button>`
+            + def.cas.map((c, i) => `<button type="button" class="mode-apparition" data-cas="${i}">${echapper(c.nom || ("Mode " + (i + 1)))}</button>`).join("");
+        modes.onclick = (ev) => {
+            const b = ev.target.closest(".mode-apparition");
+            if (!b) return;
+            ev.stopPropagation();
+            if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+            window.choisirApparitionRencontre(n, b.dataset.cas === "" ? null : Number(b.dataset.cas));
+        };
+    });
+}
+
+window.choisirApparitionRencontre = function(choix, cas) {
     window.APPARITION_RENCONTRE_CHOISIE = (window.NUMEROS_APPARITION || [1, 2, 3, 4]).includes(Number(choix)) ? Number(choix) : "aleatoire";
+    // Toucher l'apparition elle-même : son mode au hasard.
+    window.MODE_RENCONTRE_CHOISI = window.APPARITION_RENCONTRE_CHOISIE !== "aleatoire" && Number.isInteger(cas) ? cas : null;
     document.querySelectorAll(".choix-apparition-rencontre").forEach(el => {
-        el.classList.toggle("actif", el.dataset.apparition === String(window.APPARITION_RENCONTRE_CHOISIE));
+        const ici = el.dataset.apparition === String(window.APPARITION_RENCONTRE_CHOISIE);
+        el.classList.toggle("actif", ici);
+        el.querySelectorAll(".mode-apparition").forEach(b => {
+            const c = b.dataset.cas === "" ? null : Number(b.dataset.cas);
+            b.classList.toggle("choisi", ici && c === window.MODE_RENCONTRE_CHOISI);
+        });
     });
 };
 
@@ -1728,7 +1761,7 @@ window.validerGenerationRencontre = async function() {
     if (btn) { btn.disabled = true; btn.innerText = "Invocation..."; }
 
     try {
-        await window.genererRencontreMonstres(window.APPARITION_RENCONTRE_CHOISIE);
+        await window.genererRencontreMonstres(window.APPARITION_RENCONTRE_CHOISIE, { cas: window.MODE_RENCONTRE_CHOISI });
         window.fermerGenerationRencontre();
     } catch (e) {
         console.error("Erreur de génération de la rencontre :", e);
