@@ -70,7 +70,7 @@ const VILLAGE = await (async () => { const pg = await b.newPage(); const u = awa
   x.fillStyle = "#e9d8b0"; x.font = "bold 120px serif"; x.fillText("VILLAGE", 560, 500); x.fillStyle = "#c00"; x.fillRect(0, 0, 40, 941); x.fillStyle = "#00c"; x.fillRect(1632, 0, 40, 941);
   return c.toDataURL("image/png"); }); await pg.close(); return Buffer.from(u.split(",")[1], "base64"); })();
 const villageDemande = [];
-await p.route(/res\.cloudinary\.com\/.*IMG_2271_o16tpv/, r => { villageDemande.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: VILLAGE }); });
+await p.route(/res\.cloudinary\.com\/.*IMG_2272_t1qzz5/, r => { villageDemande.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: VILLAGE }); });
 await p.route('**/firebase-app.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_APP }));
 await p.route('**/firebase-firestore.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_FIRESTORE }));
 await p.route('**/generativelanguage.googleapis.com/**', r => {
@@ -175,7 +175,9 @@ await section(async () => {
   verifier("le livre tourne jusqu'à la double page du village", r.gauche > 0 && r.droite === r.gauche + 1 && (r.ici === r.gauche || r.ici === r.droite), JSON.stringify(r));
   verifier("…une double page : la gauche à gauche (index impair), la droite à côté", r.gauche % 2 === 1, JSON.stringify(r));
   verifier("plus de note « ce chapitre s'écrira bientôt »", !r.note);
-  verifier("l'image de Nico est demandée (IMG_2271)", villageDemande.length > 0 && /IMG_2271_o16tpv\.png/.test(villageDemande[0]), villageDemande[0] || "");
+  // (v399) la nouvelle image du village
+  verifier("l'image de Nico est demandée (v399 : IMG_2272)", villageDemande.length > 0 && /v1794695518\/IMG_2272_t1qzz5\.png/.test(villageDemande[0]), villageDemande[0] || "");
+  verifier("…plus l'ancienne (IMG_2271)", !/IMG_2271/.test(lire("grimoire.js")));
   await cap("v398_village");
 });
 
@@ -220,9 +222,9 @@ await section(async () => {
 titre("4. LA VERSION");
 await section(async () => {
   const v = JSON.parse(lire("version.json")).version;
-  verifier("version.json et VERSION_IVALIS d'accord (398)", v === 398 && new RegExp("VERSION_IVALIS = " + v + ";").test(lire("trace_combat.js")), String(v));
+  verifier("version.json et VERSION_IVALIS d'accord (398 ou plus)", v >= 398 && new RegExp("VERSION_IVALIS = " + v + ";").test(lire("trace_combat.js")), String(v));
   const html = lire("index.html");
-  verifier("index.html charge les nouvelles versions (grimoire.js 32, grimoire.css 22)", /grimoire\.js\?v=32"/.test(html) && /grimoire\.css\?v=22"/.test(html));
+  verifier("index.html charge les nouvelles versions (grimoire.js 32, grimoire.css 22)", /grimoire\.js\?v=(3[2-9]|[4-9]\d)"/.test(html) && /grimoire\.css\?v=(2[2-9]|[3-9]\d)"/.test(html));
   verifier("pas d'erreur dans la page", !erreurs.length, erreurs.slice(0, 3).join(" | "));
 });
 

@@ -149,7 +149,8 @@
     // on clique sur le village du sommaire ; en gros, sur les deux pages ». Un dessin
     // à fond transparent (1672 × 941) posé à même le papier, à cheval sur la reliure :
     // la moitié gauche sur la page de gauche, l'autre sur celle de droite.
-    const IMAGE_VILLAGE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794694918/IMG_2271_o16tpv.png";
+    // (v399) Nico : « change l'image du village par celle-là plutôt » (même taille, même fond transparent).
+    const IMAGE_VILLAGE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794695518/IMG_2272_t1qzz5.png";
     const IMAGE_VILLAGE_PAGES = reduite(IMAGE_VILLAGE, 1600);
     const ASPECT_VILLAGE = 1672 / 941;
     const pages = {};

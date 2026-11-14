@@ -11889,3 +11889,7 @@ corrections_v397.mjs le vérifie (captures : V397_CAPTURES=dossier).
 - corrections_v299 suit (le village ouvre sa double page) ; corrections_v397 accepte les versions suivantes.
 
 corrections_v398.mjs le vérifie (captures : V398_CAPTURES=dossier).
+
+## v399 — La nouvelle image du village
+
+- La double page du village (v398) montre la nouvelle image de Nico (IMG_2272, même taille, même fond transparent) ; plus l'ancienne. corrections_v398 la vérifie (et accepte les versions suivantes).
