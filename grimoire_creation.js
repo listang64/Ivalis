@@ -472,10 +472,12 @@ function poserCrochets() {
     };
     // La répartition validée, app.js ouvre la fiche : le héros vient de naître,
     // on attend qu'il arrive dans la partie, puis on ouvre SA fiche du livre.
+    // (v391) Nico : « quand on valide les caracs, que ça aille sur la première page de
+    // cette fiche personnage » (et plus sur l'inventaire).
     crochets.fiche = window.ouvrirFichePerso;
-    window.ouvrirFichePerso = function (id, prenom, nom, couleur, onglet) {
+    window.ouvrirFichePerso = function (id) {
         if (!actif) return crochets.fiche && crochets.fiche.apply(this, arguments);
-        attendreHeros(id, onglet || "onglet-inventaire");
+        attendreHeros(id, "onglet-stats");
         return Promise.resolve();
     };
     document.body.classList.add("creation-livre");

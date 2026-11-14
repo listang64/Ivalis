@@ -723,6 +723,15 @@ window.objetDeDepartUneMain = function(familles, rarete) {
     return window.fabriquerObjet(auHasard(modeles), rarete || "Commun", { depart: true });
 };
 
+// (v391) Nico : « pour le choix des armes, mettre l'option bague de soin ou de
+// dégâts » : le joueur choisit le modèle de sa bague. « Magie » seul (une fiche
+// d'avant) en tire toujours une des deux au hasard.
+const CHOIX_BAGUE = { "Magie Soins": "Bagues Soins", "Magie DPS": "Bagues DPS" };
+function bagueDeDepart(modele) {
+    const m = (window.MODELES_OBJETS || []).find(x => x.modele === modele);
+    return m ? window.fabriquerObjet(m, "Commun", { depart: true }) : window.objetDeDepart("Magie");
+}
+
 // Les deux (ou trois, avec le bouclier) objets qu'un héros porte à sa création.
 // Renvoie toujours un objet, même partiel : un type inconnu ne doit pas
 // empêcher la création du personnage.
@@ -732,6 +741,7 @@ window.equipementDeDepart = function(typeArme, typeArmure) {
     const estArmeBouclier = !!famillesAvecBouclier;
     return {
         arme: estArmeBouclier ? window.objetDeDepartUneMain(famillesAvecBouclier)
+              : CHOIX_BAGUE[typeArme] ? bagueDeDepart(CHOIX_BAGUE[typeArme])
               : typeArme ? window.objetDeDepart(typeArme) : null,
         bouclier: estArmeBouclier ? window.objetDeDepart("Bouclier") : null,
         // L'armure de départ : aucun prérequis, et ses résistances au plus bas

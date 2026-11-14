@@ -328,10 +328,10 @@ await section(async () => {
   await p.waitForTimeout(4500); await pose();
   const r = await p.evaluate(() => ({ actif: window.GRIMOIRE_CREATION.actif(), pages: document.querySelectorAll(".page-creation").length, onglets: !!document.getElementById("onglets-creation"),
     corps: document.body.classList.contains("creation-livre"), heros: window.GRIMOIRE_FICHES.herosAffiche(), page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(),
-    inv: window.GRIMOIRE.indexDe(window.GRIMOIRE_FICHES.pages()["inv-g"]), rendus: !!document.querySelector("#modale-creation-hero #champ-nom") && !!document.querySelector("#ecran-chargement-ia #barre-progression-creation") && !!document.querySelector("#modale-creation-caracs #grille-creation-caracs"),
+    inv: window.GRIMOIRE.indexDe(window.GRIMOIRE_FICHES.pages()["fiche-g"]), rendus: !!document.querySelector("#modale-creation-hero #champ-nom") && !!document.querySelector("#ecran-chargement-ia #barre-progression-creation") && !!document.querySelector("#modale-creation-caracs #grille-creation-caracs"),
     fenetre: getComputedStyle(document.getElementById("fenetre-fiche-perso")).display }));
   verifier("les pages de la création ont disparu du livre (et ses marque-pages)", !r.actif && r.pages === 0 && !r.onglets && !r.corps, JSON.stringify(r));
-  verifier("la fiche du nouveau héros s'ouvre dans le livre, sur son inventaire", r.heros === "H9" && Math.abs(r.page - r.inv) <= 1, JSON.stringify(r));
+  verifier("la fiche du nouveau héros s'ouvre dans le livre, sur sa première page (v391 ; avant : l'inventaire)", r.heros === "H9" && Math.abs(r.page - r.inv) <= 1, JSON.stringify(r));
   verifier("les champs, la barre et la répartition retournent dans l'ancienne fenêtre (en secours)", r.rendus);
 });
 

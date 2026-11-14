@@ -2255,7 +2255,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=280"></script>
+<script src="trace_combat.js?v=281"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2322,7 +2322,7 @@
 <script type="module" src="regime_cerveau.js?v=55"></script>
 <script type="module" src="ia_master.js?v=27"></script>
 <script type="module" src="illustrations_recit.js?v=10"></script>
-<script type="module" src="app.js?v=174"></script>
+<script type="module" src="app.js?v=175"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=5"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
@@ -2332,7 +2332,7 @@
 <script src="grimoire_regions.js?v=15"></script>
 <script src="loupe_cartes.js?v=6"></script>
 <script type="module" src="grimoire_fiches.js?v=13"></script>
-<script type="module" src="grimoire_creation.js?v=11"></script>
+<script type="module" src="grimoire_creation.js?v=12"></script>
 <!-- Les combats dans le livre (v388) : la double page du menu Combat. -->
 <script type="module" src="grimoire_combats.js?v=1"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
@@ -2371,14 +2371,14 @@
 <script src="blessures.js?v=2"></script>
 <script type="module" src="creation_personnage.js?v=28"></script>
 <script type="module" src="classes.js?v=47"></script>
-<script type="module" src="competences.js?v=75"></script>
+<script type="module" src="competences.js?v=76"></script>
 <script type="module" src="talents_ui.js?v=2"></script>
 <script type="module" src="blessures_ui.js?v=6"></script>
 <!-- Les zones procédurales : le givre (v243), le brasier (v244), le poison et la foudre (v245), au Studio puis en jeu (v246) ; les gravats (v247) et les chausse-trappes (v248), au Studio puis en jeu (v249) ; la lumière du soin (v250), au Studio. -->
 <script src="zones_procedurales.js?v=7"></script>
 <script type="module" src="studio_animation.js?v=13"></script>
 <!-- LIA, l'aide à la création de la Forge -->
-<script type="module" src="lia_forge.js?v=9"></script>
+<script type="module" src="lia_forge.js?v=10"></script>
 <!-- L'illustration des compétences (prompt IA + image IA, en file) -->
 <script type="module" src="illustration_competence.js?v=10"></script>
 <!-- Le plateau porte désormais son ?v= comme les autres : sans lui, un iPad
@@ -2401,7 +2401,7 @@
 <script type="module" src="monstres_competences.js?v=30"></script>
 <script type="module" src="monstres_ia.js?v=44"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
-<script type="module" src="objets.js?v=23"></script>
+<script type="module" src="objets.js?v=24"></script>
 <script src="variations_tenues.js?v=2"></script>
 <script type="module" src="objets_ia.js?v=18"></script>
 <script type="module" src="loot.js?v=35"></script>
@@ -2737,7 +2737,8 @@
               <option value="Arme légère Distance">Arme à distance</option>
               <option value="Arme légère + Bouclier">Arme légère + Bouclier</option>
               <option value="Arme lourde + Bouclier">Arme lourde + Bouclier</option>
-              <option value="Magie">Magie (bague)</option>
+              <option value="Magie Soins">Magie : bague de soin</option>
+              <option value="Magie DPS">Magie : bague de dégâts</option>
             </select>
           </div>
           <div class="champ-formulaire" id="groupe-tenue">

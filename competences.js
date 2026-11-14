@@ -1674,6 +1674,9 @@ window.ouvrirMenuAjoutForge = function() {
 
     // 🔻 On vérifie si une attaque a déjà été posée sur le parchemin
     const aDejaUneAttaque = window.forgeState.actions.some(act => estUneAttaqueDeBase(act.baseEffet.Nom));
+    // (v391) Nico : « quand dans la Forge on met un soin, qu'on ne puisse plus mettre un
+    // autre effet de soin » : un seul soin par technique, comme une seule attaque.
+    const aDejaUnSoin = window.forgeState.actions.some(act => estUnSoinDeBase(act.baseEffet.Nom));
 
     ORDRE_CARACS.forEach(carac => {
         const effets = window.forgeState.effetsBDD.filter(e => {
@@ -1697,7 +1700,9 @@ window.ouvrirMenuAjoutForge = function() {
                 // qu'aucune attaque n'a été posée.
                 const isPoisonLocked = !aDejaUneAttaque && (eff.Nom || "").toLowerCase().includes("poison");
 
-                const isDisabled = isLocked || capAtteint || isArmeIncompatible || isAttackLocked || isPoisonLocked;
+                const isSoinLocked = aDejaUnSoin && estUnSoinDeBase(eff.Nom);
+
+                const isDisabled = isLocked || capAtteint || isArmeIncompatible || isAttackLocked || isPoisonLocked || isSoinLocked;
                 
                 // Calcul de la fatigue
                 const coutFatigue = parseFrenchFloat(eff.Cout_PT) * 5;
@@ -2532,7 +2537,9 @@ function etatSousEffet(mod, actionCourante, activeTags) {
 
     const isLocked = tags.size >= 2 && mod.Modificateur !== "AUCUN" && !tags.has(String(mod.Modificateur).toUpperCase());
     const isAttackLocked = aDejaUneAttaque && estUneAttaqueDeBase(mod.Nom);
-    if (isLocked || isAttackLocked) return "masque";
+    // (v391) Un seul soin par technique : un sous-effet de soin non plus, s'il y en a déjà un.
+    const isSoinLocked = aDejaUnSoin && estUnSoinDeBase(mod.Nom);
+    if (isLocked || isAttackLocked || isSoinLocked) return "masque";
 
     const estActionPoussee = !!actionCourante && actionContientPoussee(actionCourante);
     const estActionIllusion = !!actionCourante && actionContientIllusion(actionCourante);

@@ -473,6 +473,8 @@ function appliquerPlanLIA(plan, recit) {
         if (!estRacine(eff)) { notes.push(`${nom} n'est pas une action : écarté`); return; }
         if (O.estIncompatibleAvecArme(eff.Nom, arme)) { notes.push(`${nom} impossible avec ${arme}`); return; }
         if (O.estUneAttaqueDeBase(eff.Nom) && aUneAttaque()) { notes.push(`${nom} : une seule attaque par technique`); return; }
+        // (v391) Les mêmes règles que le joueur : un seul soin par technique.
+        if (O.estUnSoinDeBase(eff.Nom) && fs.actions.some(a => O.estUnSoinDeBase(a.baseEffet.Nom))) { notes.push(`${nom} : un seul soin par technique`); return; }
         if ((eff.Nom || "").toLowerCase().includes("poison") && !aUneAttaque()) { notes.push(`${nom} exige une attaque`); return; }
         const act = { idInst: idInstance(), baseEffet: eff, count: borne(pa.crans, 1, O.getMaxStacks(eff)),
                       mods: {}, zoneHexes: [], baseDuree: 0, modsDuree: {} };

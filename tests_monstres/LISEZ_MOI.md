@@ -11812,3 +11812,14 @@ corrections_v389.mjs le vérifie dans le livre : le son des boutons vide (clic, 
 - Dans la bulle de la fatigue, le texte de la surpuissance active n'a plus de cadre arrondi ni de fond (style.css, `.forge-surpuissance.active`) : il ne déborde plus du médaillon. Il reste en gras.
 
 corrections_v390.mjs le vérifie (ni bord, ni fond, ni marge intérieure ; le gras ; les versions). corrections_v389 accepte les versions plus récentes. (surpuissance.mjs et corrections_v241 ne tournent pas ici : il leur manque tests_monstres/effets_reels.json, absent du dépôt.)
+
+## v391 — La création finit sur la fiche ; les bagues de départ ; un seul héros coché ; un seul soin
+
+- **Les caracs validées** (grimoire_creation.js) : la création finie, le livre ouvre la première page de la fiche du nouveau héros, et plus son inventaire.
+- **L'arme de départ** : « Magie : bague de soin » (`Magie Soins`, la bague de Sagesse) ou « Magie : bague de dégâts » (`Magie DPS`, la bague d'Intelligence) remplacent « Magie (bague) » (objets.js, `CHOIX_BAGUE`). « Magie » seul, d'une fiche d'avant, tire toujours l'une des deux.
+- **Un seul héros coché** (app.js, `sauvegarderFichePersonnage`) : à la naissance d'un héros, les autres héros du même joueur dans la partie passent au repos (`basculerActivationPersonnage`). Le nouveau est le seul coché ; ceux des autres joueurs ne bougent pas.
+- **Un seul soin par technique** (competences.js) : un soin posé grise les autres soins du codex et masque les sous-effets de soin. LIA suit la même règle (lia_forge.js).
+- **L'Ondari** : la règle ne change pas (Nico) : +1 case seulement sur les sorts magiques à distance. La Forge l'affiche déjà.
+- **Les papiers des avatars** perdent les deux petites taches ajoutées en v387 : Nico ne veut pas de taches sur ces papiers depuis la v324.
+
+corrections_v391.mjs le vérifie dans le livre : la fiche après la création, les deux bagues (choix, tirages, la bague portée à la naissance), les autres héros au repos (en mémoire et dans la base, pas ceux des autres joueurs), le soin unique (codex, sous-effet, LIA), le +1 de l'Ondari sur un soin à distance, les versions. Mis à jour : corrections_v319 (la première page de la fiche), equipement_depart (les deux bagues). Échecs déjà présents, sans lien : v339, v341, v342 ; v240, v260, deux_attaques_magiques, forge_bulles, forge_bulle_ipad, forge_design et persistance_soin ne tournent pas, faute de tests_monstres/effets_reels.json (absent du dépôt).

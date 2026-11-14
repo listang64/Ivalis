@@ -60,7 +60,8 @@ console.log("1. LE FORMULAIRE PROPOSE LES BONNES FAMILLES");
     const w = {};
     new Function('window', SRC_OBJETS)(w);
     const typesReels = new Set((w.MODELES_OBJETS || []).map(m => m.type));
-    const inconnus = valeurs.filter(v => !/\+ Bouclier$/.test(v) && !typesReels.has(v));
+    // (v391) « Magie Soins » et « Magie DPS » : la bague de soin ou de dégâts, de la famille Magie.
+    const inconnus = valeurs.filter(v => !/\+ Bouclier$/.test(v) && !/^Magie (Soins|DPS)$/.test(v) && !typesReels.has(v));
     verifier("chaque famille proposée existe dans le catalogue",
              inconnus.length === 0, `(${inconnus.join(", ") || "aucune inconnue"})`);
     verifier("le bouclier n'est pas proposé seul : ce n'est pas une arme",
@@ -74,7 +75,7 @@ console.log("1. LE FORMULAIRE PROPOSE LES BONNES FAMILLES");
 
     // Et inversement : aucune famille d'arme du jeu ne doit manquer.
     const armesDuJeu = w.TYPES_ARMES_FORGE;
-    const manquantes = armesDuJeu.filter(t => !valeurs.includes(t));
+    const manquantes = armesDuJeu.filter(t => !valeurs.includes(t) && !(t === "Magie" && valeurs.includes("Magie Soins") && valeurs.includes("Magie DPS")));
     verifier("aucun type d'arme de la Forge ne manque à l'appel",
              manquantes.length === 0, `(${manquantes.join(", ") || "aucun"})`);
 

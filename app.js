@@ -2392,6 +2392,18 @@ async function sauvegarderFichePersonnage(donnees, skipImage = false) {
   }
   // =========================================================
 
+  // (v391) Nico : « quand on crée un nouveau perso, dans la liste des persos j'ai deux
+  // personnages de cochés : que le dernier soit celui de coché ». Le nouveau héros est
+  // actif ; les autres héros du même joueur, dans cette partie, passent au repos.
+  if (estNouveau && donnees.idPartie && donnees.idJoueur && typeof window.basculerActivationPersonnage === "function") {
+      const autres = (window.PERSOS_JOUEURS_PARTIE || []).filter(h => h && h.idJoueur === donnees.idJoueur && h.idPersonnage !== idPersonnage && h.actif !== false);
+      for (const h of autres) {
+          try { await window.basculerActivationPersonnage(h.idPersonnage, false); }
+          catch (e) { console.error("Mise au repos des autres héros :", e); }
+      }
+      [window.PERSOS_PARTIE].forEach(l => (l || []).forEach(x => { if (x && autres.some(h => h.idPersonnage === x.idPersonnage)) x.actif = false; }));
+  }
+
   // 🔻 NOUVEAU : On lance la génération du token top-down en arrière-plan ! 🔻
   // Note : On ne met pas de "await" devant, pour libérer l'écran du joueur tout de suite.
   // LE COMPAGNON DU PISTEUR : son image, puis son pion, en arrière-plan aussi.
