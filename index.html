@@ -25,6 +25,7 @@
   <link rel="stylesheet" href="grimoire_creation.css?v=9">
   <link rel="stylesheet" href="grimoire_combats.css?v=1">
   <link rel="stylesheet" href="grimoire_parametres.css?v=1">
+  <link rel="stylesheet" href="vocal.css?v=1">
 
  
   <!-- ===================================================================== -->
@@ -2185,7 +2186,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=285"></script>
+<script src="trace_combat.js?v=286"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2195,7 +2196,7 @@
 <!-- LE GRIMOIRE (v297) : StPageFlip 2.0.7 (MIT, dans vendor/), puis le livre -->
 <script src="vendor/page-flip/page-flip.browser.js?v=2.0.7"></script>
 <script src="police_titres.js?v=2"></script>
-<script src="grimoire.js?v=29"></script>
+<script src="grimoire.js?v=30"></script>
 <script src="grimoire_parametres.js?v=1"></script>
 <!-- LES DÉPENSES DU MJ (v293) : tokens et coût en euros de chaque réponse -->
 <script src="depenses_ia.js?v=4"></script>
@@ -2257,7 +2258,9 @@
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=5"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
-<script type="module" src="grimoire_recit.js?v=25"></script>
+<script type="module" src="grimoire_recit.js?v=26"></script>
+<!-- v396 : le chat vocal de la table (WebRTC, signalé par Firestore). -->
+<script type="module" src="vocal.js?v=1"></script>
 <!-- LA CARTE DU MONDE DANS LE GRIMOIRE (v302) : sa double page, ses zones (DEV). -->
 <script type="module" src="grimoire_carte.js?v=6"></script>
 <script src="grimoire_regions.js?v=15"></script>

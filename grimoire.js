@@ -953,6 +953,9 @@
         try { if (window.GRIMOIRE_CARTE) window.GRIMOIRE_CARTE.entrer(); } catch (e) { console.error("Grimoire : la carte", e); }
         try { if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.entrer(id || window.ID_PARTIE_COURANTE); }
         catch (e) { console.error("Grimoire : le récit", e); }
+        // (v396) Le papier du chat vocal, en bas à gauche du livre (vocal.js).
+        try { if (window.GRIMOIRE_VOCAL) window.GRIMOIRE_VOCAL.entrer(id || window.ID_PARTIE_COURANTE); }
+        catch (e) { console.error("Grimoire : le vocal", e); }
         if (!pageFlip) return;
         if (!ouvert) etatOuvert(true);
         // v304 : Nico, « après avoir chargé la partie, ouvre sur la page de la map globale ».
@@ -987,6 +990,7 @@
         const etait = enPartie;
         enPartie = false;
         if (etait) { try { if (window.GRIMOIRE_RECIT) window.GRIMOIRE_RECIT.sortir(); } catch (e) { console.error("Grimoire : le récit", e); } }
+        if (etait) { try { if (window.GRIMOIRE_VOCAL) window.GRIMOIRE_VOCAL.sortir(); } catch (e) { console.error("Grimoire : le vocal", e); } }
         if (suite.length || nbPages !== 6 + NB_VIERGES) definirSuite([]);
         if (origine && origine.parent && ecran.parentNode !== origine.parent) {
             const suivant = origine.suivant && origine.suivant.parentNode === origine.parent ? origine.suivant : null;

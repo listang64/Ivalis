@@ -843,7 +843,14 @@ function creerElements() {
 // d'avant, chaque phrase finie, et celle qu'on dit encore. Si le navigateur coupe
 // l'écoute sur un silence, elle reprend toute seule, à la suite, jusqu'au
 // prochain toucher.
-const dictee = { reco: null, voulue: false, base: "", finies: "" };
+const dictee = { reco: null, voulue: false, base: "", finies: "", annoncee: false };
+// (v396) Le chat vocal (vocal.js) ferme son micro pendant la dictée : les autres
+// n'entendent pas ce qu'on écrit (un point violet), et la dictée a le micro.
+function annoncerDictee(active) {
+    if (dictee.annoncee === active) return;
+    dictee.annoncee = active;
+    try { window.dispatchEvent(new CustomEvent("ivalis-dictee", { detail: { active } })); } catch (e) {}
+}
 const joindre = (a, b) => { a = a || ""; b = (b || "").trim(); if (!b) return a; return a + (a && !/\s$/.test(a) ? " " : "") + b; };
 function basculerDictee() {
     if (!elts) return;
@@ -853,6 +860,7 @@ function basculerDictee() {
     dictee.voulue = true;
     dictee.base = elts.saisie.value;
     dictee.finies = "";
+    annoncerDictee(true);
     demarrerDictee(SR);
     elts.micro.classList.add("ecoute");
     son("page-prise", 0.4);
@@ -889,7 +897,7 @@ function arreterDictee() {
 }
 function finirDictee() {
     if (elts && elts.micro) elts.micro.classList.remove("ecoute");
-    if (!dictee.voulue) dictee.reco = null;
+    if (!dictee.voulue) { dictee.reco = null; annoncerDictee(false); }
     // (comme l'ancien bouton) l'iPad rend le volume du jeu une fois le micro fermé
     setTimeout(() => { if (typeof window.appliquerVolumesAudio === "function") window.appliquerVolumesAudio(); }, 500);
 }
@@ -1037,6 +1045,9 @@ function majInterface() {
     const lecture = etatLecture();
     const ouvrir = recit && posee && !bloque && !ecrit && !!heros && !lecture.enAttente;
     majLecture(lecture, recit && posee && !ecrit && !combat && lecture.enAttente, fige);
+    // (v396) Le Narrateur écrit, ou sa page attend encore ma « Lecture terminée » :
+    // le chat vocal (vocal.js) baisse la voix des autres.
+    annoncerLecture(!!ecrit || (lecture.enAttente && lecture.attenduMoi && !lecture.luMoi));
     // (v387) Un autre joueur a pris la plume : le papier se grise, le temps qu'il envoie.
     const autre = plumeDUnAutre();
     elts.ecriture.classList.toggle("grise", !!autre);
@@ -1124,6 +1135,12 @@ function etatLecture() {
     clearTimeout(etat.revoirLecture);
     if (manquants.length && !expire) etat.revoirLecture = setTimeout(() => majInterface(), Math.min(echeance - Date.now() + 200, 60000));
     return { enAttente: manquants.length > 0 && !expire, message: m, id, manquants, attenduMoi: attendus.includes(moi()), luMoi: !!lus[moi()] };
+}
+let lectureAnnoncee = false;
+function annoncerLecture(active) {
+    if (lectureAnnoncee === active) return;
+    lectureAnnoncee = active;
+    try { window.dispatchEvent(new CustomEvent("ivalis-lecture", { detail: { active } })); } catch (e) {}
 }
 function majLecture(lecture, voulu, fige) {
     if (!elts || !elts.lecture) return;
@@ -1636,6 +1653,7 @@ function entrer(idPartie) {
 function sortir() {
     if (!etat.actif) return;
     rendrePlume();
+    annoncerLecture(false);
     etat.actif = false;
     clearInterval(etat.minuteur); etat.minuteur = null;
     const g = G();

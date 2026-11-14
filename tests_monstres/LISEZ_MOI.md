@@ -11862,3 +11862,13 @@ corrections_v394.mjs le vérifie dans la page : la coche (sous le lanceur, à ga
 - **La piste d'initiative** : plus de bulle avec le chiffre d'initiative (ni sa couleur de palier) ; les coches vertes et le sablier restent. piste_initiative.mjs suit.
 
 corrections_v395.mjs le vérifie dans la page (captures : V395_CAPTURES=dossier).
+
+## v396 — Le chat vocal de la table
+
+- **Le papier du vocal** (vocal.js, vocal.css) : en partie, un papier glisse de sous la page de gauche, en bas (sous celui de l'avatar). Les joueurs de la table (ceux qui ont un héros actif, et ceux qui sont dans le vocal), chacun avec un point magique : rouge (pas de micro, micro coupé ou refusé, pas dans le vocal), vert (micro ouvert), plus vert et plus vif quand il parle, violet pendant la dictée du RP. « Rejoindre » ; une fois dedans : couper son micro, couper le son des autres, Quitter. Un toucher sur le nom d'un joueur coupe (ou rend) sa voix seule.
+- **WebRTC de poste à poste** (gratuit, sans serveur de son) : la présence et les offres passent par Firestore, `Vocal/{partie}/Presents/{joueur}` (un battement toutes les 15 s ; sans nouvelles depuis 50 s, parti) et `Vocal/{partie}/Signaux` (lus puis effacés). Le plus petit identifiant appelle. 4 voix au plus. STUN de Google ; un relais TURN peut s'ajouter dans `Vocal_Config/ice` ({ Serveurs: [...] }). Les règles Firestore actuelles couvrent déjà ces collections (comptes validés).
+- **La lecture** (grimoire_recit.js, événement `ivalis-lecture`) : le Narrateur écrit, ou sa page attend encore ma « Lecture terminée » : les voix des autres baissent à 35 %, en douceur ; elles reviennent dès que j'ai cliqué.
+- **La dictée** (événement `ivalis-dictee`) : le micro du vocal se ferme (la dictée a le micro pour elle, les autres n'entendent pas ce qu'on écrit), le point devient violet chez tous ; il se rouvre après.
+- Le micro demande le site en **https** (GitHub Pages l'est).
+
+corrections_v396.mjs le vérifie avec deux vraies pages reliées en WebRTC (faux micro de Chromium, base partagée par Node) ; captures : V396_CAPTURES=dossier.
