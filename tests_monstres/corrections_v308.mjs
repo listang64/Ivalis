@@ -181,7 +181,8 @@ await section(async () => {
   verifier("quatre régions, rangées dans l'ordre des boîtes (1, 3, 7, 8), à partir de la page 7", JSON.stringify(r.regions.map(x => [x.zone, x.numero, x.page])) === "[[1,1,7],[3,5,9],[7,3,11],[8,7,13]]", JSON.stringify(r.regions.map(x => [x.zone, x.numero, x.page])));
   verifier("le nom de chaque région, à la plume, sur sa page de gauche", r.pages.filter(x => x.cote === "g").map(x => x.nom).join(" | ") === "La forêt des murmures | Le désert d'Etheria | Le mont Pletia | L'île aux marchés", r.pages.filter(x => x.cote === "g").map(x => x.nom).join(" | "));
   // (v322 : les aventuriers viennent entre les régions et le récit.)
-  verifier("le récit vient après elles, les aventuriers et (v388) les combats (le sommaire page 15 + les fiches + 2)", r.suite === 15 + r.fiches + r.combats && r.combats === 2, `sommaire ${r.suite}, ${r.fiches} pages d'aventuriers, ${r.combats} de combats, ${r.n} pages`);
+  // (v398 : puis la double page du village, avant le récit.)
+  verifier("le récit vient après elles, les aventuriers, (v388) les combats et (v398) le village (le sommaire page 15 + les fiches + 2 + 2)", r.suite === 15 + r.fiches + r.combats + 2 && r.combats === 2, `sommaire ${r.suite}, ${r.fiches} pages d'aventuriers, ${r.combats} de combats, ${r.n} pages`);
   // (v331, Nico : « les maps régionales en pleine page de droite ») : plus de double page, même en paysage.
   verifier("v331 : toutes les cartes sur la page de droite, même en paysage (le désert, l'île)", r.regions.every(x => !x.paysage), r.regions.map(x => x.paysage).join(","));
 });
