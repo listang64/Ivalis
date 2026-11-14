@@ -303,6 +303,9 @@
 .page-carte .contenu-carte { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 1; }
 .page-carte .image-carte { width: 100%; height: 100%; object-fit: contain; object-position: center; pointer-events: none;
   -webkit-user-drag: none; user-select: none; }
+/* LE VILLAGE (v398) : un seul dessin sur les deux pages, coupé à la reliure (grimoire.js, boiteVillage). */
+.page-village .contenu-village { position: absolute; inset: 0; overflow: hidden; z-index: 1; pointer-events: none; }
+.page-village .image-village { position: absolute; max-width: none; object-fit: fill; pointer-events: none; -webkit-user-drag: none; user-select: none; }
 /* LE MARQUE-PAGE DE LA MARCHE (v310), en haut à droite du livre : rangé sous
    les pages tant qu'on ne peut pas voyager ; il sort sur les cartes du livre. */
 .marque-page.marque-marche { left: calc(1636px * var(--s, 1)); top: calc(-22px * var(--s, 1)); width: calc(62px * var(--s, 1)); height: calc(190px * var(--s, 1)); transform: rotate(-8deg); }

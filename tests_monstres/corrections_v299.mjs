@@ -410,10 +410,12 @@ await section(async () => {
     verifier("« combats » : la double page des combats, dans le livre (plus de popup)", a.appels.length === 0 && Math.abs(a.page - a.combats) <= 1, JSON.stringify(a));
     await p.evaluate(() => window.grimoireAllerIndex()); await p.waitForTimeout(2600);
   }
+  // (v398) « Le village » a sa double page : le livre y va (plus de note « bientôt »).
   await cliquer("#grimoire-index-village");
-  await p.waitForTimeout(300);
-  const v = await p.evaluate(() => ({ note: document.getElementById("grimoire-note-index").textContent, vue: document.getElementById("grimoire-note-index").classList.contains("visible"), range: window.grimoireEtat().range }));
-  verifier("« Le village » : pas encore écrit — une note à la plume, le livre reste", v.vue && /bientôt/.test(v.note) && !v.range, JSON.stringify(v));
+  await p.waitForTimeout(2600);
+  const v = await p.evaluate(() => ({ vue: document.getElementById("grimoire-note-index").classList.contains("visible"), page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), village: window.GRIMOIRE.indexDe(window.GRIMOIRE.pagesVillage()[0]) }));
+  verifier("« Le village » : sa double page, dans le livre (v398)", !v.vue && v.village > 0 && Math.abs(v.page - v.village) <= 1, JSON.stringify(v));
+  await p.evaluate(() => window.grimoireAllerIndex()); await p.waitForTimeout(2600);
   // Depuis le journal (on a tourné en arrière), puis depuis « Compte » : le marque-page ramène à l'index.
   await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipPrev("top"));
   await p.waitForTimeout(900);

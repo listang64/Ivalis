@@ -264,10 +264,10 @@ await section(async () => {
 titre("5. LA VERSION");
 await section(async () => {
   const v = JSON.parse(lire("version.json")).version;
-  verifier("version.json et VERSION_IVALIS d'accord (397)", v === 397 && new RegExp("VERSION_IVALIS = " + v + ";").test(lire("trace_combat.js")), String(v));
+  verifier("version.json et VERSION_IVALIS d'accord (397 ou plus)", v >= 397 && new RegExp("VERSION_IVALIS = " + v + ";").test(lire("trace_combat.js")), String(v));
   const html = lire("index.html");
   verifier("index.html charge les nouvelles versions (app 177, combat_rp 19, loot 36, classes 48, grimoire 31, grimoire.css 21)",
-    /app\.js\?v=177/.test(html) && /combat_rp\.js\?v=19/.test(html) && /loot\.js\?v=36/.test(html) && /classes\.js\?v=48/.test(html) && /grimoire\.js\?v=31/.test(html) && /grimoire\.css\?v=21/.test(html));
+    /app\.js\?v=177/.test(html) && /combat_rp\.js\?v=19/.test(html) && /loot\.js\?v=36/.test(html) && /classes\.js\?v=48/.test(html) && /grimoire\.js\?v=(3[1-9]|[4-9]\d)"/.test(html) && /grimoire\.css\?v=(2[1-9]|[3-9]\d)"/.test(html));
   verifier("pas d'erreur dans la page", !erreurs.length, erreurs.slice(0, 3).join(" | "));
 });
 

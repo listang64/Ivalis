@@ -11881,3 +11881,11 @@ corrections_v396.mjs le vérifie avec deux vraies pages reliées en WebRTC (faux
 - **L'Inquisiteur et le Berserker** (classes.js) : leurs nouveaux fonds de double page ; l'ancien fond gardé en base est remplacé (`ANCIENS_FONDS_CLASSES`, comme le Protecteur en v339) ; leur carte de tarot ne change pas. corrections_v343 suit.
 
 corrections_v397.mjs le vérifie (captures : V397_CAPTURES=dossier).
+
+## v398 — Le village : sa double page
+
+- **« III- Le village » du sommaire** ouvre sa double page (grimoire.js, `pagesVillage`, `allerAuVillage`) : plus de note « ce chapitre s'écrira bientôt ». Le dessin de Nico (fond transparent, 1672 × 941) est posé en grand à même le papier, sur les deux pages : contenu dans la double page avec une petite marge, centré, la moitié gauche sur la page de gauche et l'autre sur celle de droite (`boiteVillage`).
+- **Sa place** : en partie, après les combats, juste avant le récit (`premiereDeLaSuite` en tient compte : le récit, ses marque-pages et ses liens suivent d'eux-mêmes).
+- corrections_v299 suit (le village ouvre sa double page) ; corrections_v397 accepte les versions suivantes.
+
+corrections_v398.mjs le vérifie (captures : V398_CAPTURES=dossier).

@@ -129,7 +129,9 @@
     let pagesFiches = [];
     // (v388) La double page des combats (grimoire_combats.js), après les Aventuriers.
     let pagesCombats = [];
-    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesFiches.length + pagesCombats.length : 0);
+    // (v398) La double page du village, après les combats (juste avant le récit).
+    let pagesVillage = [];
+    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesFiches.length + pagesCombats.length + pagesVillage.length : 0);
     // LA CARTE DU MONDE (v302) : sa double page vient juste après l'index (5-6),
     // en partie seulement ; la suite (le récit) commence alors à la page 7.
     // Nico : « page de gauche cette partie de la map, page de droite celle-là ;
@@ -143,6 +145,13 @@
     const reduite = (url, l) => /\/upload\/[a-z]_/.test(url) ? url : url.replace("/upload/", `/upload/w_${l},c_limit,q_auto,f_auto/`);
     const IMAGES_CARTE_PAGES = { gauche: reduite(IMAGES_CARTE.gauche, 1600), droite: reduite(IMAGES_CARTE.droite, 1600) };
     let pagesCarte = [];
+    // LE VILLAGE (v398). Nico : « mets cette image sur une nouvelle double page, quand
+    // on clique sur le village du sommaire ; en gros, sur les deux pages ». Un dessin
+    // à fond transparent (1672 × 941) posé à même le papier, à cheval sur la reliure :
+    // la moitié gauche sur la page de gauche, l'autre sur celle de droite.
+    const IMAGE_VILLAGE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794694918/IMG_2271_o16tpv.png";
+    const IMAGE_VILLAGE_PAGES = reduite(IMAGE_VILLAGE, 1600);
+    const ASPECT_VILLAGE = 1672 / 941;
     const pages = {};
 
     // ---------------------------------------------------------------------
@@ -350,6 +359,25 @@
         el.className = `page-grimoire page-papier ${cote} page-carte`;
         el.id = "grimoire-carte-" + cote;
         el.innerHTML = `<div class="contenu-carte"><img class="image-carte" src="${IMAGES_CARTE_PAGES[cote]}" alt="La carte du monde" draggable="false"></div>`;
+        return el;
+    }
+
+    // Le village sur la double page, « contenu » dans la place des deux pages (en
+    // largeurs de page : une page fait 1 de large, 984/757 de haut), centré, une
+    // petite marge autour ; chaque page en montre sa moitié.
+    function boiteVillage(cote) {
+        const H = 984 / 757, mx = 0.05, my = 0.06;
+        const L = 2 - 2 * mx, P = H * (1 - 2 * my);
+        let w = L, h = L / ASPECT_VILLAGE;
+        if (h > P) { h = P; w = P * ASPECT_VILLAGE; }
+        const x0 = (2 - w) / 2, y0 = (H - h) / 2;
+        return `left:${((cote === "gauche" ? x0 : x0 - 1) * 100).toFixed(3)}%;top:${(y0 / H * 100).toFixed(3)}%;width:${(w * 100).toFixed(3)}%;height:${(h / H * 100).toFixed(3)}%`;
+    }
+    function pageVillage(cote) {
+        const el = document.createElement("div");
+        el.className = `page-grimoire page-papier ${cote} page-village`;
+        el.id = "grimoire-village-" + cote;
+        el.innerHTML = `<div class="contenu-village"><img class="image-village" src="${IMAGE_VILLAGE_PAGES}" alt="${cote === "gauche" ? "Le village" : ""}" draggable="false" style="${boiteVillage(cote)}"></div>`;
         return el;
     }
 
@@ -570,6 +598,7 @@
         feuillets = Array.from({ length: NB_FEUILLETS }, (_, i) => pageManuscrite(i));
         listeActuelle = [pages[0], pages[1], pages[2], pages[3], pages[4], ...vierges, dos];
         pagesCarte = [pageCarte("gauche"), pageCarte("droite")];
+        pagesVillage = [pageVillage("gauche"), pageVillage("droite")];
         pages[1].innerHTML = pageTitre();
         // (v395) Nico : « les réglages du son, enlève-les des paramètres et mets-les en dessous
         // du titre de la première page » : les mêmes curseurs (index.html, app.js), déplacés.
@@ -1032,7 +1061,7 @@
     function definirSuite(elements) {
         suite = (elements || []).slice();
         if (!pageFlip) return;
-        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesFiches, ...pagesCombats] : []), ...suite, ...vierges, dos];
+        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesFiches, ...pagesCombats, ...pagesVillage] : []), ...suite, ...vierges, dos];
         const generation = ++definirSuite.generation;      // seule la dernière demande s'applique
         const appliquer = () => {
             if (generation !== definirSuite.generation) return;
@@ -1228,8 +1257,11 @@
     // autres ouvrent encore l'ancienne fenêtre, par-dessus le livre ; la
     // carte et le village viendront.
     function allerALaCarte() { if (enPartie) allerALaPage(PAGE_CARTE); }
+    // (v398) Le village : sa double page.
+    function allerAuVillage() { const i = listeActuelle.indexOf(pagesVillage[0]); if (enPartie && i > 0) allerALaPage(i); }
     const OUVRIR_INDEX = {
         carte: () => allerALaCarte(),
+        village: () => allerAuVillage(),
         // v313 : le sommaire des chapitres du récit (le marque-page plume, lui, mène à la page à lire).
         recit: () => window.GRIMOIRE_RECIT && (window.GRIMOIRE_RECIT.allerAuSommaireDuRecit || window.GRIMOIRE_RECIT.allerAuRecit)(),
         // v313 : les Aventuriers sont dans le livre (grimoire_fiches.js).
@@ -1238,7 +1270,7 @@
         combats: () => (window.GRIMOIRE_COMBATS && window.GRIMOIRE_COMBATS.ouvrir()) || (window.ouvrirPopupRencontre && window.ouvrirPopupRencontre()),
         parametres: () => window.ouvrirParametres && window.ouvrirParametres()
     };
-    const BIENTOT = { village: "Le village : ce chapitre s'écrira bientôt." };
+    const BIENTOT = {};                     // (v398 : le village a sa double page)
     function choisirIndex(id) {
         if (!enPartie) return;
         if (BIENTOT[id]) {
@@ -1409,6 +1441,8 @@
         // (v388) la double page des combats
         definirCombats: (els) => { pagesCombats = (els || []).slice(); if (enPartie) definirSuite(suite); },
         pagesCombats: () => pagesCombats.slice(),
+        // (v398) la double page du village
+        pagesVillage: () => pagesVillage.slice(), allerAuVillage, IMAGE_VILLAGE,
         // (v395) les Paramètres du livre (grimoire_parametres.js) : le chapitre des pages 3-4
         chapitre: () => chapitre, remplirChapitre, pageChapitre: (i) => pages[i],
         ouvrirChapitre: (nom) => { remplirChapitre(nom); partieChoisie = null; if (pageFlip) allerALaPage(3); },
