@@ -41,7 +41,7 @@
 //  venaient les dégâts comptés deux fois.
 // =========================================================================
 
-import { clonerEtat, combattant, creerDes, tomber, enSursis, reductionInertie, MANCHES_RETOUR_PASSE,
+import { clonerEtat, combattant, creerDes, tomber, enSursis, encaisserBouclier, reductionInertie, MANCHES_RETOUR_PASSE,
          leaderActuel, reglerLeader, LEADER_DEFAUT, recompenserLeTueur } from './combat_etat.js';
 
 const nombre = (v, defaut = 0) => {
@@ -1390,14 +1390,15 @@ export function chaineDeDegats(cible, attaque, options) {
     }
     compte.degats = degatsFinaux;
 
-    // 6. Le bouclier encaisse en premier, et ce qui le dépasse est perdu :
-    //    c'est la règle du jeu, un bouclier qui casse ne laisse pas passer le
-    //    surplus.
+    // 6. Le bouclier encaisse en premier ; (v395) brisé, ce qui le dépasse
+    //    passe sur la vie, divisé par deux (encaisserBouclier, combat_etat.js).
     const bouclier = Math.max(0, nombre(cible.bouclier));
     if (bouclier > 0) {
-        compte.versBouclier = Math.min(bouclier, degatsFinaux);
-        compte.bouclierApres = Math.max(0, bouclier - degatsFinaux);
-        compte.bouclierBrise = compte.bouclierApres === 0;
+        const part = encaisserBouclier(bouclier, degatsFinaux);
+        compte.versBouclier = part.surBouclier;
+        compte.bouclierApres = part.bouclierApres;
+        compte.bouclierBrise = part.brise;
+        compte.versPv = part.versPv;
     } else {
         compte.bouclierApres = 0;
         compte.versPv = degatsFinaux;
@@ -1506,9 +1507,11 @@ export function traverserZones(etat, id, hex, des, options = {}) {
             if (montant > 0) {
                 let surBouclier = 0;
                 if (cible.bouclier > 0) {
-                    // Le surplus part dans le vide, comme partout ailleurs.
-                    surBouclier = Math.min(cible.bouclier, montant);
-                    cible.bouclier = Math.max(0, cible.bouclier - montant);
+                    // (v395) Brisé, le surplus passe sur la vie, divisé par deux.
+                    const part = encaisserBouclier(cible.bouclier, montant);
+                    surBouclier = part.surBouclier;
+                    cible.bouclier = part.bouclierApres;
+                    cible.pv = Math.max(0, cible.pv - part.versPv);
                 } else {
                     cible.pv = Math.max(0, cible.pv - montant);
                 }
@@ -3005,10 +3008,11 @@ export function resoudreCarte(etat, action, plateau) {
                 if (nombre(compte.renvoi) > 0 && lanceur && !lanceur.aTerre && !enSursis(lanceur) && idCible !== idLanceur) {
                     const renvoi = nombre(compte.renvoi);
                     const bouclierAvant = nombre(lanceur.bouclier);
-                    const surBouclier = Math.min(bouclierAvant, renvoi);
-                    lanceur.bouclier = bouclierAvant - surBouclier;
+                    const part = encaisserBouclier(bouclierAvant, renvoi);   // (v395) brisé : le surplus / 2
+                    const surBouclier = part.surBouclier;
+                    lanceur.bouclier = part.bouclierApres;
                     if (lanceur.bouclier === 0) lanceur.bouclierMax = 0;
-                    lanceur.pv = Math.max(0, nombre(lanceur.pv) - (renvoi - surBouclier));
+                    lanceur.pv = Math.max(0, nombre(lanceur.pv) - part.versPv);
                     etapes.push({ type: "degats", cible: idLanceur, acteur: idCible, montant: renvoi,
                                   surBouclier, bouclierApres: lanceur.bouclier, pvApres: lanceur.pv,
                                   renvoi: true });
@@ -3157,10 +3161,11 @@ export function resoudreCarte(etat, action, plateau) {
                         const reduction = Math.min(1, Math.max(0, defPhysiqueDe(c)) / 100);
                         const montant = Math.max(0, Math.round(brut * (1 - reduction)));
                         if (montant <= 0) return;
-                        const surBouclier = Math.min(nombre(c.bouclier), montant);
-                        c.bouclier = nombre(c.bouclier) - surBouclier;
+                        const part = encaisserBouclier(c.bouclier, montant);   // (v395) brisé : le surplus / 2
+                        const surBouclier = part.surBouclier;
+                        c.bouclier = part.bouclierApres;
                         if (c.bouclier === 0) c.bouclierMax = 0;
-                        c.pv = Math.max(0, nombre(c.pv) - (montant - surBouclier));
+                        c.pv = Math.max(0, nombre(c.pv) - part.versPv);
                         etapes.push({ type: "degats", cible: id, acteur: idLanceur, montant, surBouclier,
                                       bouclierApres: c.bouclier, pvApres: c.pv, nature: "physique" });
                         etapes.push(...tomber(suivant, id, idLanceur));

@@ -166,7 +166,9 @@ await section(async () => {
   const r = await p.evaluate(() => {
     const pg = document.querySelector(".page-titre"), page = pg.closest(".page-grimoire").getBoundingClientRect();
     const t = pg.querySelector(".titre-ivalis").getBoundingClientRect(), s = pg.querySelector(".titre-sous").getBoundingClientRect();
-    const haut = Math.min(t.top, s.top), bas = pg.querySelector(".fleuron").getBoundingClientRect().bottom;
+    // (v395) le son est passé sous le titre : tout le bloc (titre, fleuron, son) reste centré.
+    const son = pg.querySelector(".place-son");
+    const haut = Math.min(t.top, s.top), bas = Math.max(pg.querySelector(".fleuron").getBoundingClientRect().bottom, son ? son.getBoundingClientRect().bottom : 0);
     return { texte: pg.textContent.replace(/\s+/g, " ").trim(), cx: Math.abs((t.left + t.right) / 2 - (page.left + page.right) / 2) / page.width,
              cy: Math.abs((haut + bas) / 2 - (page.top + page.bottom) / 2) / page.height };
   });

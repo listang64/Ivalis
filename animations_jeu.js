@@ -435,8 +435,10 @@
     // zoom, centrerMapSurToken), elle entre, deux secondes ; la file vide, la
     // caméra revient sur le héros de ce poste. Les héros et les illusions ne
     // font pas la queue.
-    window.PAUSE_APPARITION_MS = window.PAUSE_APPARITION_MS === undefined ? 2000 : window.PAUSE_APPARITION_MS;
-    const GLISSE_CAMERA_MS = 450;
+    // (v395) Nico : « accélère un peu l'animation des renforts, enfin le temps des caméras » :
+    // 1,2 s sur chaque créature (2 s avant), la caméra y glisse en 0,4 s (0,45 s avant).
+    window.PAUSE_APPARITION_MS = window.PAUSE_APPARITION_MS === undefined ? 1200 : window.PAUSE_APPARITION_MS;
+    const GLISSE_CAMERA_MS = 400;
     let fileApparitions = Promise.resolve();
     let apparitionsEnAttente = 0;
     const attendre = (ms) => new Promise(r => setTimeout(r, ms));

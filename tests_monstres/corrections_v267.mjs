@@ -669,7 +669,7 @@ titre("17. LES CRÉATURES APPARAISSENT UNE À UNE, LA CAMÉRA SUR ELLES, PUIS SU
   verifier("…les suivantes restent cachées en attendant leur tour", !!r && r.cache.every(Boolean), r ? JSON.stringify(r.cache) : "");
   verifier("…sans toucher au zoom ; à la fin, toutes sont là", !!r && r.memeZoom && r.visibles, r ? JSON.stringify({ z: r.memeZoom, v: r.visibles }) : "");
   const src = lire('animations_jeu.js');
-  verifier("la pause réglée : 2 secondes entre deux apparitions", /PAUSE_APPARITION_MS === undefined \? 2000/.test(src));
+  verifier("la pause réglée entre deux apparitions (2 s, 1,2 s depuis v395)", /PAUSE_APPARITION_MS === undefined \? (2000|1200)/.test(src));
 }
 
 titre("18. L'ARCANE A SON GESTE ; L'ÉLECTRIFIÉ NE TOUCHE PLUS À L'INITIATIVE");

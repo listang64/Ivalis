@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="style.css?v=147">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
-  <link rel="stylesheet" href="grimoire.css?v=19">
+  <link rel="stylesheet" href="grimoire.css?v=20">
   <link rel="stylesheet" href="grimoire_recit.css?v=22">
   <link rel="stylesheet" href="grimoire_carte.css?v=2">
   <link rel="stylesheet" href="grimoire_regions.css?v=7">
@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="grimoire_fiches.css?v=10">
   <link rel="stylesheet" href="grimoire_creation.css?v=9">
   <link rel="stylesheet" href="grimoire_combats.css?v=1">
+  <link rel="stylesheet" href="grimoire_parametres.css?v=1">
 
  
   <!-- ===================================================================== -->
@@ -1309,13 +1310,6 @@
              <input type="range" id="vol-interface" min="0" max="1" step="0.01" oninput="changerVolume('interface', this.value)" style="accent-color: #8c6a45;">
         </div>
       </div>
-      <!-- v313 : Nico, « dans Paramètres, fais-moi une page pour que je choisisse une
-           police : 25 propositions » (police_titres.js). -->
-      <div class="reglages-son reglage-ecriture">
-        <h3 class="titre-reglages-son">L'écriture</h3>
-        <p class="police-actuelle">Titres : <span id="police-titres-actuelle"></span></p>
-        <button type="button" class="btn-parametres" id="btn-choisir-police" onclick="jouerSonClic(); ouvrirPagePolices()">Choisir l'écriture</button>
-      </div>
       <h3 class="titre-acces-reserve">Accès Réservé</h3>
       <p>Le Savoir d'Ivalis est protégé.</p>
       <input type="password" id="input-secret-parametres" class="input-texte-parchemin" placeholder="Mot de passe" style="text-align: center;">
@@ -1341,38 +1335,13 @@
         Outils
       </button>
       <br><br>
-      <button id="btn-ouvrir-fabrique" class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.ouvrirFabrique()">
-        La Fabrique
-      </button>
-      <br><br>
       <!-- Le studio d'animation (studio_animation.js) : la carte du combat, son
            pion au centre, et les animations de combat à essayer. -->
       <button id="btn-ouvrir-studio" class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.ouvrirStudioAnimation()">
         Studio d'animation
       </button>
       <br><br>
-      <!-- La génération des images des cartes de compétence, à couper ou
-           rallumer (illustration_competence.js). -->
-      <label class="interrupteur-parametre" for="interrupteur-illustration-cartes">
-        <span class="interrupteur-libelle">Images des cartes de compétence<br><small id="etat-illustration-cartes">Activée</small></span>
-        <input type="checkbox" id="interrupteur-illustration-cartes" checked
-               onchange="jouerSonClic(); window.basculerIllustrationCartes(this.checked)">
-        <span class="interrupteur-glissiere"></span>
-      </label>
-      <br><br>
       <button class="btn-parametres" onclick="jouerSonClic(); fermerParametres()">Fermer</button>
-    </div>
-
-    <!-- LA FABRIQUE (fabrique_sons.js) : dix sons d'interface doux et légers,
-         fabriqués sur place, à écouter avant de choisir. Les boutons sont
-         construits par le script à partir de sa liste de sons. -->
-    <div id="etape-fabrique" class="fenetre-volante-parchemin fondu-interne fenetre-fabrique" style="display: none; opacity: 0;">
-      <h2>La Fabrique</h2>
-      <p style="font-size: 14px; margin-top: -10px; color: #5c3a21;">Dix sons doux et légers — certains s'effacent par paliers. Touche un bouton pour l'écouter.</p>
-      <p id="fabrique-muet" style="display: none; font-size: 13px; color: #8b1c1c; font-weight: bold;">Le volume de l'interface est à zéro : monte-le pour entendre les sons.</p>
-      <div id="grille-fabrique" class="grille-fabrique"></div>
-      <br>
-      <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-fabrique', 'etape-menu-parametres')">Retour</button>
     </div>
 
     <div id="etape-cles-api" class="fenetre-volante-parchemin fondu-interne" style="display: none; opacity: 0;">
@@ -1474,18 +1443,6 @@
       </button>
       <br><br>
 
-      <!-- LE NOUVEAU BOUTON DE RÉGÉNÉRATION -->
-      <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.regenererImagesLieuActuel()">
-        Régénérer Images du Lieu Actuel
-      </button>
-      <br><br>
-
-      <!-- 🔻 NOUVEAU : BOUTON RÉGÉNÉRER TOKEN 🔻 -->
-      <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.ouvrirRegenerationToken()">
-        Régénérer Pion Tactique (Token)
-      </button>
-      <br><br>
-
       <!-- NOUVEAU : BOUTON EFFETS DE COMBAT -->
       <button class="btn-parametres" style="width: 80%; padding: 15px;" onclick="jouerSonClic(); window.ouvrirGestionEffets()">
         Effets de Combat
@@ -1516,38 +1473,11 @@
       </button>
       <br><br>
 
-      <!-- NOUVEAU : BOUTON ARCHIVAGE -->
-      <button class="btn-parametres btn-supprimer" style="width: 80%; padding: 15px; border-color: #ff4c4c;" onclick="jouerSonClic(); window.archiverSessionEtViderChat()">
-        Clôturer & Vider le Chat
-      </button>
-      <br><br>
-      
-      <label class="afficher-cles" style="margin: 20px 0; display: block; font-family: 'Almendra', serif; font-size: 16px;">
-        <input type="checkbox" id="toggle-tokens" onchange="basculerAffichageTokens(this.checked)"> Afficher les Tokens
-      </label>
-
       <label class="afficher-cles" style="margin: 20px 0; display: block; font-family: 'Almendra', serif; font-size: 16px; color: #ff4c4c;">
         <input type="checkbox" id="toggle-dev-mode" onchange="window.basculerDevMode(this.checked)"> 🛠️ Mode Développeur (DEV)
       </label>
 
       <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-menu-outils', 'etape-menu-parametres')">Retour</button>
-    </div>
-
-    <!-- NOUVEAU : Fenêtre de sélection des Pions -->
-    <div id="etape-regeneration-token" class="fenetre-volante-parchemin fondu-interne" style="display: none; opacity: 0;">
-      <h2>Reforger un Pion</h2>
-      <p style="font-size: 14px; margin-top: -10px; color: #5c3a21;">Sélectionnez un héros pour recréer sa vue de dessus.</p>
-      
-      <div id="chargement-persos-token" style="font-style: italic;">Recherche des héros...</div>
-      
-      <!-- Conteneur de la liste des personnages -->
-      <div class="liste-persos" id="liste-html-persos-token" style="display:none; max-height: 250px; overflow-y: auto;"></div>
-      
-      <p id="msg-token-succes" style="color: #1b6e3a; font-weight: bold; opacity: 0; transition: opacity 0.3s; margin-top: 10px;">Pion forgé avec succès !</p>
-      
-      <div style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
-        <button class="btn-parametres" onclick="jouerSonClic(); naviguerFenetre('etape-regeneration-token', 'etape-menu-outils')">Retour</button>
-      </div>
     </div>
 
     <!-- LES DÉPENSES DU MJ (v293) : chaque réponse, ses tokens, son coût -->
@@ -2255,7 +2185,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=284"></script>
+<script src="trace_combat.js?v=285"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2265,7 +2195,8 @@
 <!-- LE GRIMOIRE (v297) : StPageFlip 2.0.7 (MIT, dans vendor/), puis le livre -->
 <script src="vendor/page-flip/page-flip.browser.js?v=2.0.7"></script>
 <script src="police_titres.js?v=2"></script>
-<script src="grimoire.js?v=28"></script>
+<script src="grimoire.js?v=29"></script>
+<script src="grimoire_parametres.js?v=1"></script>
 <!-- LES DÉPENSES DU MJ (v293) : tokens et coût en euros de chaque réponse -->
 <script src="depenses_ia.js?v=4"></script>
 <!-- LA CARTE DES IMPORTS : LE MÊME NUMÉRO DE VERSION POUR TOUT LE MONDE.
@@ -2280,11 +2211,11 @@
      vérifie qu'ils sont identiques. Elle doit précéder tout module. -->
 <script type="importmap">
 { "imports": {
-    "./combat_etat.js": "./combat_etat.js?v=61",
-    "./moteur_pur.js": "./moteur_pur.js?v=85",
-    "./mouvement_pur.js": "./mouvement_pur.js?v=27",
+    "./combat_etat.js": "./combat_etat.js?v=62",
+    "./moteur_pur.js": "./moteur_pur.js?v=86",
+    "./mouvement_pur.js": "./mouvement_pur.js?v=28",
     "./ia_pure.js": "./ia_pure.js?v=16",
-    "./cerveau_combat.js": "./cerveau_combat.js?v=80",
+    "./cerveau_combat.js": "./cerveau_combat.js?v=81",
     "./spectateur_combat.js": "./spectateur_combat.js?v=9",
     "./depot_firestore.js": "./depot_firestore.js?v=11",
     "./pont_combat.js": "./pont_combat.js?v=58",
@@ -2301,14 +2232,14 @@
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
-<script type="module" src="combat_etat.js?v=61"></script>
+<script type="module" src="combat_etat.js?v=62"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=85"></script>
-<script type="module" src="mouvement_pur.js?v=27"></script>
+<script type="module" src="moteur_pur.js?v=86"></script>
+<script type="module" src="mouvement_pur.js?v=28"></script>
 <script type="module" src="ia_pure.js?v=16"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
-<script type="module" src="cerveau_combat.js?v=80"></script>
+<script type="module" src="cerveau_combat.js?v=81"></script>
 <!-- LE SPECTATEUR : la boucle de rejeu. Elle lit le journal du cerveau, ouvre
      la fenêtre de tour, anime PUIS applique, et ne saute jamais un numéro. -->
 <script type="module" src="spectateur_combat.js?v=9"></script>
@@ -2322,7 +2253,7 @@
 <script type="module" src="regime_cerveau.js?v=56"></script>
 <script type="module" src="ia_master.js?v=27"></script>
 <script type="module" src="illustrations_recit.js?v=10"></script>
-<script type="module" src="app.js?v=175"></script>
+<script type="module" src="app.js?v=176"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=5"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
@@ -2361,7 +2292,7 @@
 <script src="animations_combat.js?v=12"></script>
 <script src="animations_catalogue.js?v=25"></script>
 <!-- …et leur branchement sur le vrai combat (les animations validées dans le Studio). -->
-<script src="animations_jeu.js?v=12"></script>
+<script src="animations_jeu.js?v=13"></script>
 <script src="experience.js?v=3"></script>
 <!-- La montée de niveau (v256) : la popup du héros qui prend un niveau. -->
 <script src="montee_niveau.js?v=1"></script>
@@ -2389,7 +2320,7 @@
 <script src="murs_terre.js?v=10"></script>
 <!-- (v368) Les totems du Chaman : la fenêtre des effets, la pose, le pion. -->
 <script type="module" src="totems.js?v=1"></script>
-<script type="module" src="combat.js?v=181"></script>
+<script type="module" src="combat.js?v=182"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=41"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->

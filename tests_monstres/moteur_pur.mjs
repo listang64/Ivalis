@@ -104,7 +104,8 @@ console.log("\n1. LA CHAÎNE DE DÉGÂTS, MAILLON PAR MAILLON");
              c.versBouclier === 5 && c.bouclierApres === 7 && c.versPv === 0);
     c = chaineDeDegats(protege, { valeurBrute: 30 }, {});
     verifier("un gros coup le brise", c.bouclierBrise === true && c.bouclierApres === 0);
-    verifier("et le surplus ne passe pas au travers", c.versPv === 0);
+    // (v395) Nico : brisé, les dégâts restants vont aux PV divisés par 2 (30 - 12 = 18 → 9).
+    verifier("et le surplus passe sur la vie, divisé par deux (v395)", c.versPv === 9, String(c.versPv));
 }
 
 // =========================================================================

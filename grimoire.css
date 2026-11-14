@@ -432,3 +432,55 @@ body > #conteneur-parametres { z-index: 95; }
   filter: drop-shadow(0 calc(var(--u) * 0.15) 0 rgba(0, 0, 0, 0.55)); }
 #grimoire-marque-menu .dessin-marque path, #grimoire-marque-page .dessin-marque path, #grimoire-marque-recit .dessin-marque path { stroke: var(--fil) !important; }
 #grimoire-marque-page .dessin-marque .feuille, #grimoire-marque-recit .dessin-marque path.plein { fill: rgba(233, 207, 142, 0.22) !important; }
+
+/* =========================================================================
+   v395 — LE PAPIER « QUITTER » (grimoire.js, papierQuitter). Nico : « enlève la
+   popup et fais un papier qui sort à droite du livre demandant si on veut
+   quitter ». Glissé sous la page de droite (sous les pages, sur le cuir), il en
+   sort vers la droite ; la part encore sous la page est dans l'ombre.
+   ========================================================================= */
+.papier-quitter {
+  position: absolute; left: calc(1445px * var(--s, 1)); top: calc(395px * var(--s, 1));
+  width: calc(290px * var(--s, 1)); height: calc(310px * var(--s, 1));
+  transform: translateX(0) rotate(0deg); transform-origin: 0 50%;
+  transition: transform 0.55s cubic-bezier(0.45, 0.05, 0.25, 1);
+  pointer-events: none;
+  filter: drop-shadow(calc(var(--u) * 0.4) calc(var(--u) * 0.5) calc(var(--u) * 0.8) rgba(40, 20, 6, 0.5));
+}
+.papier-quitter.sorti { transform: translateX(calc(290px * var(--s, 1))) rotate(2deg); pointer-events: auto; }
+.grimoire-scene.ferme .papier-quitter { display: none; }
+.papier-quitter-feuille {
+  position: absolute; inset: 0; box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--u) * 2.4);
+  padding: calc(var(--u) * 2.4) calc(var(--u) * 1.6) calc(var(--u) * 2.4) calc(var(--u) * 4);
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 46%, rgba(95, 55, 18, 0.4) 100%),
+    url('images/grimoire/page.webp?v=1') 40% 60% / 340% auto, #dcc394;
+  clip-path: polygon(0 2%, 18% 0, 39% 1.5%, 61% 0, 83% 1.8%, 98% 0.5%, 100% 12%, 98.5% 27%, 100% 43%, 98% 58%, 100% 74%, 98.4% 88%, 99.6% 99%, 80% 98.4%, 57% 100%, 35% 98.2%, 14% 100%, 0 98.5%);
+  box-shadow: inset 0 0 calc(var(--u) * 2.4) rgba(92, 52, 16, 0.75), inset 0 0 calc(var(--u) * 0.6) rgba(60, 30, 8, 0.6);
+}
+/* L'ombre de la page de droite sur la part du papier encore glissée dessous. */
+.papier-quitter-feuille::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to right, rgba(20, 10, 3, 0.55) 0, rgba(20, 10, 3, 0.3) calc(var(--u) * 2.2), transparent calc(var(--u) * 5)); }
+.question-quitter { margin: 0; position: relative; z-index: 1; text-align: center; line-height: 1.15; color: #1b1009;
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400);
+  font-size: calc(var(--u) * 5 * var(--echelle-titres, 1)); }
+.choix-quitter { position: relative; z-index: 1; display: flex; justify-content: center; gap: calc(var(--u) * 1.4); }
+.papier-quitter .bouton-grimoire { min-width: 0; font-size: calc(var(--u) * 4.2); padding: calc(var(--u) * 1) calc(var(--u) * 3); }
+@media (prefers-reduced-motion: reduce) { .papier-quitter { transition: none; } }
+
+/* v395 — LE SON SUR LA PREMIÈRE PAGE (Nico : « les réglages du son, mets-les en dessous
+   du titre de la première page »). Les curseurs d'index.html (app.js), sans boîte :
+   trois lignes à l'encre, le nom à gauche, la glissière à droite. */
+.place-son { width: 64%; margin-top: calc(var(--u) * 4); }
+.place-son .reglages-son { margin: 0; padding: 0; max-width: none; border: 0; background: none; display: flex; flex-direction: column; gap: calc(var(--u) * 1.6); }
+.place-son .titre-reglages-son { margin: 0 0 calc(var(--u) * 0.4); font-size: calc(var(--u) * 5 * var(--echelle-titres, 1)) !important; color: #24150a; }
+.place-son .ligne-volume { display: grid; grid-template-columns: 38% 1fr; align-items: center; gap: calc(var(--u) * 2.4); margin: 0; }
+.place-son .ligne-volume label { min-width: 0; margin: 0; text-align: right; font-size: calc(var(--u) * 3.2); font-weight: 400; letter-spacing: 0.06em; color: #3a2210; }
+.place-son .ligne-volume input[type=range] { width: 100%; min-width: 0; margin: 0; accent-color: #3a2210 !important; }
+
+/* v395 — LE SOMMAIRE À L'AQUARELLE : un lavis sous chaque entrée et sous le titre. */
+.entree-index, .entete-index { position: relative; isolation: isolate; }
+.entree-index > .lavis { left: -4%; top: -6%; width: 108%; height: 112%; }
+.entete-index > .lavis { left: -14%; top: -14%; width: 128%; height: 128%; }
+.entete-index > span { position: relative; }

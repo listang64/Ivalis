@@ -229,18 +229,23 @@ await section(async () => {
   await p.evaluate(() => { window.__appels = []; });
   await cliquer("#grimoire-btn-parametres");
   await p.waitForTimeout(500);
-  const son = await p.evaluate(() => { const el = document.getElementById("vol-general"); return { dans: !!el.closest("#etape-mdp-parametres"), avantMdp: !!(el.compareDocumentPosition(document.getElementById("input-secret-parametres")) & Node.DOCUMENT_POSITION_FOLLOWING),
-    appel: window.__appels.includes("ouvrirParametres"), corps: document.getElementById("conteneur-parametres").parentNode === document.body }; });
-  verifier("v312 : « Paramètres » (menu principal) les ouvre, par-dessus le livre ; le son y est, avant le mot de passe", son.dans && son.avantMdp && son.appel && son.corps, JSON.stringify(son));
-  await p.evaluate(() => window.fermerParametres && window.fermerParametres());
-  await p.waitForTimeout(400);
+  // (v395) Les Paramètres sont un chapitre du livre (grimoire_parametres.js) ; le son est
+  // sous le titre de la première page.
+  const son = await p.evaluate(() => { const el = document.getElementById("vol-general"); return { premierePage: !!el.closest("#grimoire-page-1"),
+    chapitre: window.grimoireEtat().chapitre, cadenas: !!document.getElementById("grimoire-mdp-param") }; });
+  verifier("v395 : « Paramètres » (menu principal) ouvre leur chapitre du livre, sous cadenas ; le son est sur la première page", son.premierePage && son.chapitre === "parametres" && son.cadenas, JSON.stringify(son));
+  await p.evaluate(() => document.getElementById("grimoire-marque-menu").click());
+  await p.waitForTimeout(1200);
   // La porte : le bouton « Quitter le jeu » du menu principal.
   await cliquer("#grimoire-btn-quitter");
-  await p.waitForTimeout(250);
-  const q = await p.evaluate(() => { const m = document.getElementById("modale-quitter-jeu"), r = m.getBoundingClientRect(), el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    return { vue: getComputedStyle(m).display !== "none", dessus: !!(el && el.closest("#modale-quitter-jeu")) }; });
-  verifier("« Quitter le jeu » (menu principal) demande s'il faut quitter, au-dessus du livre", q.vue && q.dessus, JSON.stringify(q));
-  await p.evaluate(() => window.fermerModalesJeu());
+  await p.waitForTimeout(800);
+  // (v395) plus de popup : un papier sort à droite du livre.
+  const q = await p.evaluate(() => { const m = document.getElementById("grimoire-papier-quitter"), b = document.getElementById("grimoire-quitter-oui").getBoundingClientRect(), el = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+    return { vue: m.classList.contains("sorti"), texte: document.getElementById("grimoire-question-quitter").textContent, dessus: !!(el && el.closest("#grimoire-quitter-oui")),
+             modale: getComputedStyle(document.getElementById("modale-quitter-jeu")).display }; });
+  verifier("v395 : « Quitter le jeu » (menu principal) : un papier sort à droite du livre, sans popup", q.vue && q.dessus && q.texte === "Quitter le jeu ?" && q.modale === "none", JSON.stringify(q));
+  await cliquer("#grimoire-quitter-non");
+  await p.waitForTimeout(600);
   await p.evaluate(() => { document.getElementById("conteneur-regions-dev").style.display = "none"; });
 });
 
@@ -352,7 +357,7 @@ await section(async () => {
                surligne: /data:image\/svg\+xml/.test(ts.backgroundImage) && /rgba\(20,12,6/.test(decodeURIComponent(ts.backgroundImage)) && !/236,190,60/.test(decodeURIComponent(ts.backgroundImage)), clone: ts.boxDecorationBreak || ts.webkitBoxDecorationBreak };
     });
     const u = parseFloat(document.getElementById("grimoire-scene").style.getPropertyValue("--u"));
-    return { g: lis(3), d: lis(4), u, entete: (document.querySelector("#grimoire-page-3 .entete-index") || {}).textContent };
+    return { g: lis(3), d: lis(4), u, entete: ((document.querySelector("#grimoire-page-3 .entete-index") || {}).textContent || "").trim() };
   });
   const tout = [...r.g, ...r.d];
   // v312 : « dans le sommaire, devant chaque titre le numéro en chiffres romains ; dans cet
@@ -429,11 +434,13 @@ await section(async () => {
   // En partie, le journal ne lance pas une autre partie : il demande d'abord s'il faut quitter celle-ci.
   await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipPrev("top"));
   await p.waitForTimeout(900);
+  // (v395) Nico : plus de question ; la partie se quitte d'elle-même (ici, le geste est noté).
+  await p.evaluate(() => { window.__vraiRetour = window.confirmerRetourMenu; window.__retour = 0; window.confirmerRetourMenu = () => { window.__retour++; }; });
   await cliquer("#grimoire-btn-nouvelle");
   await p.waitForTimeout(300);
-  const n = await p.evaluate(() => ({ modale: getComputedStyle(document.getElementById("modale-retour-menu")).display, chapitre: window.grimoireEtat().chapitre, entrees: window.__entrees.length }));
-  verifier("en partie, « Nouvelle partie » demande d'abord s'il faut quitter celle-ci", n.modale === "block" && n.chapitre !== "nouvelle" && n.entrees === 1, JSON.stringify(n));
-  await p.evaluate(() => window.fermerModalesJeu());
+  const n = await p.evaluate(() => ({ modale: getComputedStyle(document.getElementById("modale-retour-menu")).display, chapitre: window.grimoireEtat().chapitre, retour: window.__retour, entrees: window.__entrees.length }));
+  verifier("v395 : en partie, « Nouvelle partie » quitte celle-ci sans rien demander", n.modale === "none" && n.chapitre === "nouvelle" && n.retour === 1 && n.entrees === 1, JSON.stringify(n));
+  await p.evaluate(() => { window.confirmerRetourMenu = window.__vraiRetour; window.GRIMOIRE.remplirChapitre("index"); });
 });
 
 // =========================================================================
@@ -446,9 +453,12 @@ await section(async () => {
   await p.waitForTimeout(400);
   const texteQuitter = await p.evaluate(() => document.querySelector("#grimoire-btn-quitter span").textContent);
   await cliquer("#grimoire-btn-quitter");
-  await p.waitForTimeout(300);
-  const m = await p.evaluate(() => getComputedStyle(document.getElementById("modale-retour-menu")).display);
-  verifier("en partie, « Quitter la partie » demande d'abord s'il faut quitter la partie", m === "block" && texteQuitter === "Quitter la partie", `${m} / ${texteQuitter}`);
+  await p.waitForTimeout(800);
+  // (v395) le papier qui sort à droite du livre, plus la popup.
+  const m = await p.evaluate(() => ({ sorti: document.getElementById("grimoire-papier-quitter").classList.contains("sorti"), q: document.getElementById("grimoire-question-quitter").textContent,
+    modale: getComputedStyle(document.getElementById("modale-retour-menu")).display }));
+  verifier("v395 : en partie, « Quitter la partie » sort le papier « Quitter la partie ? »", m.sorti && m.q === "Quitter la partie ?" && m.modale === "none" && texteQuitter === "Quitter la partie", `${JSON.stringify(m)} / ${texteQuitter}`);
+  await cliquer("#grimoire-quitter-non");
   await p.evaluate(() => window.confirmerRetourMenu());
   await p.waitForTimeout(1300);
   const r = await p.evaluate(() => {

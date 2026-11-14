@@ -38,7 +38,7 @@
 // =========================================================================
 
 import { clonerEtat, combattant, creerDes, combattantIllusion,
-         verifierEtatCombat, compterPasMarche, reductionInertie, FORMAT_ETAT, tomber, enSursis,
+         verifierEtatCombat, compterPasMarche, reductionInertie, FORMAT_ETAT, tomber, enSursis, encaisserBouclier,
          reposDuRetourArriere, entreeDeFile, ZOMBIE, COMPAGNON, compagnonDe,
          placerCompagnons, MUR_TERRE, murEn, plateauDeCombat, franchissablePour, frapperMurs,
          cleGravats, APPLICATEURS, ETAT_PLAIE_ROUVERTE, gainReposLong, MAINTIEN_SURSIS,
@@ -881,10 +881,14 @@ function infligerTic(c, id, montant, nomDuTic, etat, idSource) {
     if (enSursis(c)) return etapes;             // en sursis : les coups sont ignorés
     const bouclierAvant = TICS_SOUS_LE_BOUCLIER.has(nomDuTic) ? 0 : nombre(c.bouclier);
     if (bouclierAvant > 0) {
-        c.bouclier = Math.max(0, bouclierAvant - montant);
+        // (v395) Brisé, le surplus passe sur la vie, divisé par deux.
+        const part = encaisserBouclier(bouclierAvant, montant);
+        c.bouclier = part.bouclierApres;
+        if (part.versPv > 0) c.pv = Math.max(0, nombre(c.pv) - part.versPv);
         etapes.push({ type: "degats", cible: id, montant,
-                      surBouclier: Math.min(bouclierAvant, montant),
+                      surBouclier: part.surBouclier,
                       bouclierApres: c.bouclier, pvApres: nombre(c.pv), tic: nomDuTic });
+        if (part.versPv > 0) etapes.push(...tomber(etat, id, idSource || id, { finDeManche: true }));
     } else {
         const pvApres = Math.max(0, nombre(c.pv) - montant);
         c.pv = pvApres;

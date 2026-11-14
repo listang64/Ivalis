@@ -311,7 +311,8 @@ console.log("\n8. LE COUP D'OPPORTUNITÉ FRAPPE VRAIMENT");
     protege.combattants.H1.bouclier = 4;
     const b = resoudreMouvement(protege, action, creerDes(7), null);
     verifier("le bouclier encaisse en premier", b.etat.combattants.H1.bouclier === 0);
-    verifier("et le surplus ne passe pas au travers", b.etat.combattants.H1.pv === 60);
+    // (v395) brisé, le surplus passe sur la vie divisé par deux : 8 - 4 = 4 → 2.
+    verifier("et le surplus passe sur la vie, divisé par deux (v395)", b.etat.combattants.H1.pv === 58, String(b.etat.combattants.H1.pv));
 
     // Un coup qui tue : la chute est une étape à part entière.
     const faible = clonerEtat(etat);

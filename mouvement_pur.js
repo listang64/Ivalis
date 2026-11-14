@@ -26,7 +26,7 @@
 //  lui passe en argument.
 // =========================================================================
 
-import { clonerEtat, combattant, tomber, franchissablePour, fuyardActif } from './combat_etat.js';
+import { clonerEtat, combattant, tomber, franchissablePour, fuyardActif, encaisserBouclier } from './combat_etat.js';
 import { esquiveDe, paradeDe, defPhysiqueDe, bonusDesEtats, aLEtat, traverserZones, protecteurRempart, reserveMaintenueDe, bonusContreRace, multiplicateurRage,
          ligneDeVue, caseLibre, destinationPoussee } from './moteur_pur.js';
 
@@ -269,7 +269,7 @@ export function ennemisAuContact(etat, id, hex) {
 // réflexe, pas une technique. Physiques : l'ARMURE de la cible les réduit,
 // exactement comme pour un coup physique ordinaire (résistance physique en %,
 // arrondie — voir chaineDeDegats, moteur_pur.js). Le bouclier encaisse ce qui
-// reste en premier, et le surplus part dans le vide.
+// reste en premier ; (v395) brisé, le surplus passe sur la vie, divisé par deux.
 export const DEGATS_OPPORTUNITE = 8;
 const reduireParArmure = (cible, brut) => {
     const reduction = Math.min(1, Math.max(0, defPhysiqueDe(cible)) / 100);
@@ -282,8 +282,8 @@ export const degatsOpportuniteBruts = (attaquant, cible) => Math.round((DEGATS_O
     + nombre(attaquant && attaquant.atouts && attaquant.atouts.degatsOpportunite) + bonusContreRace(attaquant, cible)) * multiplicateurRage(attaquant));
 export const degatsOpportuniteContre = (cible, attaquant) => reduireParArmure(cible, degatsOpportuniteBruts(attaquant, cible));
 
-// LE COUP D'OPPORTUNITÉ QUI PORTE : le bouclier d'abord (le surplus part dans
-// le vide), la vie ensuite, la chute éventuelle. Une seule écriture pour les
+// LE COUP D'OPPORTUNITÉ QUI PORTE : le bouclier d'abord (v395 : brisé, le surplus
+// passe sur la vie, divisé par deux), la vie ensuite, la chute éventuelle. Une seule écriture pour les
 // trois marches (déplacement, Peur, Repli), et le REMPART de l'Hoplite : si la
 // cible en a un actif, les 8 dégâts bruts sont partagés en deux attaques
 // indépendantes, chacun avec sa propre armure (moteur_pur.js, protecteurRempart).
@@ -294,7 +294,7 @@ export function infligerOpportunite(etat, idCible, ennemi, coup, hex) {
     const cible = combattant(etat, idCible);
     if (!cible) return etapes;
     const appliquer = (id, c, montant) => {
-        if (c.bouclier > 0) c.bouclier = Math.max(0, c.bouclier - montant);
+        if (c.bouclier > 0) { const part = encaisserBouclier(c.bouclier, montant); c.bouclier = part.bouclierApres; c.pv = Math.max(0, c.pv - part.versPv); }
         else c.pv = Math.max(0, c.pv - montant);
         etapes.push({ type: "degats", cible: id, acteur: ennemi, montant, opportunite: true,
                       bouclierApres: c.bouclier, pvApres: c.pv });
@@ -312,7 +312,7 @@ export function infligerOpportunite(etat, idCible, ennemi, coup, hex) {
         else appliquer(protecteur.id, protecteur, reduireParArmure(protecteur, partHoplite));
         return etapes;
     }
-    if (cible.bouclier > 0) cible.bouclier = Math.max(0, cible.bouclier - coup.montant);
+    if (cible.bouclier > 0) { const part = encaisserBouclier(cible.bouclier, coup.montant); cible.bouclier = part.bouclierApres; cible.pv = Math.max(0, cible.pv - part.versPv); }
     else cible.pv = Math.max(0, cible.pv - coup.montant);
     etapes.push({ type: "opportunite", ...coup, hex, bouclierApres: cible.bouclier, pvApres: cible.pv });
     etapes.push({ type: "degats", cible: idCible, acteur: ennemi, montant: coup.montant, opportunite: true,

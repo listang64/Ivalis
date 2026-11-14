@@ -142,21 +142,24 @@ await section(async () => {
     boutons: [...document.querySelectorAll(".page-journal .bouton-grimoire")].map(b => b.innerText.trim()),
     icones: [...document.querySelectorAll("#menu-navigation-bas .icone-nav")].map(i => i.getBoundingClientRect().width),
     dev: !!document.getElementById("conteneur-regions-dev"),
-    son: (() => { const v = document.getElementById("vol-general"); return !!(v && v.closest("#etape-mdp-parametres")) && !!(v.compareDocumentPosition(document.getElementById("input-secret-parametres")) & Node.DOCUMENT_POSITION_FOLLOWING); })()
+    son: (() => { const v = document.getElementById("vol-general"); return !!(v && v.closest("#grimoire-page-1 .place-son")); })()
   }));
   verifier("le menu principal : Nouvelle partie, Charger partie, Paramètres, Compte, Quitter le jeu", r.boutons.join(" | ") === "Nouvelle partie | Charger partie | Paramètres | Compte | Quitter le jeu", r.boutons.join(" | "));
   verifier("plus de boutons en haut à droite (volume, maison, porte) ; le DEV reste", r.icones.every(w => w === 0) && r.dev, JSON.stringify(r.icones));
-  verifier("le son est dans les Paramètres, avant le mot de passe (pour tous)", r.son);
+  verifier("(v395) le son est sous le titre de la première page (pour tous)", r.son);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v312_menu_principal.png" });
   await p.evaluate(() => { window.__appels = []; });
   await cliquer("#grimoire-btn-parametres");
   await p.waitForTimeout(500);
-  const par = await p.evaluate(() => ({ appel: window.__appels.includes("ouvrirParametres"), corps: document.getElementById("conteneur-parametres").parentNode === document.body }));
-  verifier("« Paramètres » ouvre les Paramètres, par-dessus le livre (même hors partie)", par.appel && par.corps, JSON.stringify(par));
+  const par = await p.evaluate(() => ({ chapitre: window.grimoireEtat().chapitre, cadenas: !!document.getElementById("grimoire-mdp-param") }));
+  verifier("(v395) « Paramètres » ouvre leur chapitre du livre, sous cadenas (même hors partie)", par.chapitre === "parametres" && par.cadenas, JSON.stringify(par));
+  await p.evaluate(() => document.getElementById("grimoire-marque-menu").click());
+  await p.waitForTimeout(1200);
   await cliquer("#grimoire-btn-quitter");
-  await p.waitForTimeout(250);
-  verifier("« Quitter le jeu » demande s'il faut quitter", await p.evaluate(() => getComputedStyle(document.getElementById("modale-quitter-jeu")).display !== "none"));
-  await p.evaluate(() => window.fermerModalesJeu && window.fermerModalesJeu());
+  await p.waitForTimeout(700);
+  verifier("(v395) « Quitter le jeu » sort le papier qui demande s'il faut quitter", await p.evaluate(() => document.getElementById("grimoire-papier-quitter").classList.contains("sorti") && document.getElementById("grimoire-question-quitter").textContent === "Quitter le jeu ?"));
+  await cliquer("#grimoire-quitter-non");
+  await p.waitForTimeout(600);
 });
 
 // =========================================================================

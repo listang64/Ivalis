@@ -342,7 +342,8 @@ titre("8. L'ÉCRITURE DES TITRES : 25 PROPOSITIONS DANS PARAMÈTRES");
 // =========================================================================
 await section(async () => {
   const r = await p.evaluate(() => {
-    const bouton = document.querySelector("#etape-mdp-parametres #btn-choisir-police");
+    // (v395) Nico a retiré « l'écriture » des Paramètres ; la page des 25 écritures reste dans le code.
+    const bouton = !document.getElementById("btn-choisir-police");
     window.ouvrirPagePolices();
     const cartes = [...document.querySelectorAll("#page-polices .carte-police")];
     cartes.find(c => c.dataset.police === "Caveat").click();
@@ -351,7 +352,7 @@ await section(async () => {
     return { bouton: !!bouton, n: cartes.length, uniques: new Set(cartes.map(c => c.dataset.police)).size, t, garde: localStorage.getItem("ivalis_police_titres"),
              sansBerkshire: !/Berkshire/.test(t) };
   });
-  verifier("dans Paramètres, « Choisir l'écriture » ouvre une page de 25 écritures manuscrites différentes", r.bouton && r.n === 25 && r.uniques === 25, `${r.n} / ${r.uniques}`);
+  verifier("(v395) plus de « Choisir l'écriture » dans Paramètres ; la page garde ses 25 écritures", r.bouton && r.n === 25 && r.uniques === 25, `${r.n} / ${r.uniques}`);
   verifier("un toucher : le sommaire et les titres la prennent, le choix est gardé", /Caveat/.test(r.t) && r.garde === "Caveat", r.t);
 });
 

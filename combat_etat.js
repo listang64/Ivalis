@@ -893,10 +893,11 @@ function briserIllusion(etat, illusion, idAuteur) {
     if (!illusion || !illusion.estIllusion || montant <= 0 || !auteur || auteur.aTerre) return [];
     if ((auteur.camp || "Allié") === (illusion.camp || "Allié")) return [];
     const bouclierAvant = nombre(auteur.bouclier);
-    const surBouclier = Math.min(bouclierAvant, montant);
-    auteur.bouclier = bouclierAvant - surBouclier;
+    const part = encaisserBouclier(bouclierAvant, montant);   // (v395) brisé : le surplus / 2
+    const surBouclier = part.surBouclier;
+    auteur.bouclier = part.bouclierApres;
     if (auteur.bouclier === 0) auteur.bouclierMax = 0;
-    auteur.pv = Math.max(0, nombre(auteur.pv) - (montant - surBouclier));
+    auteur.pv = Math.max(0, nombre(auteur.pv) - part.versPv);
     return [{ type: "message", cible: auteur.id, acteur: illusion.idCreateur || illusion.id, texte: "✨ Dégâts illusoires", couleur: "#c39bd3" },
             { type: "degats", cible: auteur.id, acteur: illusion.idCreateur || illusion.id, montant, surBouclier,
               bouclierApres: auteur.bouclier, pvApres: auteur.pv, brut: true },
@@ -999,6 +1000,17 @@ export function tomber(etat, id, acteur, options) {
 }
 
 // Un combattant en sursis : debout, la vie bloquée à zéro.
+// LE BOUCLIER MAGIQUE QUI SE BRISE (v395, Nico : « pour le bouclier magique, quand il
+// est brisé, les dégâts restants sont infligés aux points de vie / 2 »). Le bouclier
+// encaisse d'abord ; ce qui le dépasse passe, divisé par deux (arrondi en dessous),
+// sur la vie. Sans bouclier, tout va à la vie.
+export function encaisserBouclier(bouclier, montant) {
+    const b = Math.max(0, nombre(bouclier)), m = Math.max(0, nombre(montant));
+    if (b <= 0) return { surBouclier: 0, bouclierApres: 0, versPv: m, brise: false };
+    const surBouclier = Math.min(b, m);
+    const bouclierApres = b - surBouclier;
+    return { surBouclier, bouclierApres, versPv: m > b ? Math.floor((m - b) / 2) : 0, brise: bouclierApres === 0 };
+}
 export const enSursis = (c) => !!(c && c.sursis && nombre(c.sursis.tours) > 0);
 
 // =========================================================================

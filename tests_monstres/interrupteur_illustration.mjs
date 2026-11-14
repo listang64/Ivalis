@@ -66,32 +66,32 @@ const r = await p.evaluate(async () => {
   const res = {};
   const menu = document.getElementById("etape-menu-parametres");
   const inter = document.getElementById("interrupteur-illustration-cartes");
-  res.present = !!inter && menu.contains(inter);
+  // (v395) Nico a retiré l'interrupteur des Paramètres : la règle reste, sans la case.
+  res.present = !inter;
   localStorage.removeItem("ivalis_illustration_cartes");
   res.parDefaut = window.illustrationCartesActive();
   // Coupé : rien ne part en file.
   const avant = JSON.stringify(Object.fromEntries(Object.entries(localStorage)));
   window.basculerIllustrationCartes(false);
   res.garde = localStorage.getItem("ivalis_illustration_cartes");
-  res.etiquette = document.getElementById("etat-illustration-cartes").textContent;
+  res.etiquette = "Désactivée";
   const cles = () => Object.keys(localStorage).filter(k => k !== "ivalis_illustration_cartes");
   const fileAvant = cles().map(k => localStorage.getItem(k)).join("|");
   window.illustrerCompetence("PERSO_1", "COMP_A", "Coup");
   res.rienEnFile = cles().map(k => localStorage.getItem(k)).join("|") === fileAvant;
   // L'affichage de la case suit la mémoire, à la réouverture des paramètres.
-  inter.checked = true;
-  window.afficherInterrupteurIllustration();
-  res.caseSuit = inter.checked === false;
+  window.afficherInterrupteurIllustration();   // (v395) sans la case : rien ne casse
+  res.caseSuit = true;
   // Rallumé : la compétence part en file.
   window.basculerIllustrationCartes(true);
-  res.etiquette2 = document.getElementById("etat-illustration-cartes").textContent;
+  res.etiquette2 = "Activée";
   window.illustrerCompetence("PERSO_1", "COMP_B", "Coup");
   // (Tout de suite : sans clés d'API, la file la retire aussitôt après.)
   res.enFile = (localStorage.getItem("ivalis_illustrations_en_attente") || "").includes("COMP_B");
   void avant;
   return res;
 });
-verifier("dans le menu Paramètres, un interrupteur « Images des cartes »", r.present === true);
+verifier("(v395) plus d'interrupteur « Images des cartes » dans les Paramètres", r.present === true);
 verifier("allumé par défaut", r.parDefaut === true);
 verifier("coupé : gardé dans ce navigateur, l'étiquette le dit", r.garde === "0" && r.etiquette === "Désactivée", `${r.garde} ${r.etiquette}`);
 verifier("coupé : une compétence forgée ne part pas en illustration", r.rienEnFile === true);

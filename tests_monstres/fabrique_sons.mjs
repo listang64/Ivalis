@@ -77,44 +77,22 @@ await p.goto(base + '/index.html');
 await p.waitForTimeout(2000);
 
 
-console.log("\n1. LE BOUTON DANS LES PARAMÈTRES, ET SON ÉCRAN");
+console.log("\n1. (v395) LA FABRIQUE A QUITTÉ LES PARAMÈTRES ; SES SONS RESTENT");
 {
-  const r = await p.evaluate(async () => {
-    const menu = document.getElementById("etape-menu-parametres");
-    // Les Paramètres vivent dans l'écran de jeu : on y entre, comme à la table.
-    document.querySelectorAll('body > div[id^="ecran-"]').forEach(e => {
-      e.style.display = e.id === "ecran-jeu" ? "block" : "none";
-    });
-    // Comme ouvrirParametres : le conteneur s'affiche, puis prend la classe
-    // « ouvert » qui le fait apparaître.
-    const conteneur = document.getElementById("conteneur-parametres");
-    conteneur.style.display = "block";
-    conteneur.classList.add("ouvert");
-    document.getElementById("etape-mdp-parametres").style.display = "none";
-    menu.style.display = "block"; menu.style.opacity = "1";
-    const bouton = document.getElementById("btn-ouvrir-fabrique");
-    const texte = bouton ? bouton.textContent.trim() : null;
-    const dansLeMenu = !!bouton && menu.contains(bouton);
-    bouton.click();
-    await new Promise(r => setTimeout(r, 1100));
-    const f = document.getElementById("etape-fabrique");
+  // Nico : « dans Paramètres, tu peux virer la Fabrique ». Son écran est parti ;
+  // ses sons servent toujours au jeu. Pour les écouter ici, le banc pose sa grille.
+  const html = fs.readFileSync(`${RACINE}/index.html`, "utf-8");
+  verifier("plus de bouton ni d'écran « La Fabrique » (v395)", !/btn-ouvrir-fabrique|id="etape-fabrique"/.test(html));
+  const r = await p.evaluate(() => {
+    const f = document.createElement("div"); f.id = "etape-fabrique";
+    f.innerHTML = `<p id="fabrique-muet" style="display:none"></p><div id="grille-fabrique"></div>`;
+    document.body.appendChild(f);
+    window.rendreFabrique();
     const boutons = [...f.querySelectorAll(".btn-fabrique")];
-    const rect = f.getBoundingClientRect();
-    const auCentre = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-    return { texte, dansLeMenu, opaciteConteneur: getComputedStyle(conteneur).opacity,
-             vraimentVue: rect.width > 200 && rect.height > 300 && !!auCentre && f.contains(auCentre),
-             taille: [Math.round(rect.width), Math.round(rect.height)], visible: getComputedStyle(f).display !== "none" && getComputedStyle(f).opacity === "1",
-             menuCache: getComputedStyle(menu).display === "none",
-             titre: f.querySelector("h2").textContent.trim(),
-             noms: boutons.map(b => b.querySelector(".fabrique-nom").textContent.trim()),
+    return { noms: boutons.map(b => b.querySelector(".fabrique-nom").textContent.trim()),
              usages: boutons.map(b => b.querySelector(".fabrique-usage").textContent.trim()) };
   });
-  await p.screenshot({ path: "/tmp/claude-0/fabrique.png" });
-  verifier("un bouton « La Fabrique » dans le menu des Paramètres", r.dansLeMenu && r.texte === "La Fabrique", r.texte);
-  verifier("il ouvre l'écran de la Fabrique", r.visible && r.menuCache && r.titre === "La Fabrique"
-           && r.opaciteConteneur === "1", `opacité ${r.opaciteConteneur}`);
-  verifier("et elle se voit vraiment, au-dessus de l'écran de jeu", r.vraimentVue, JSON.stringify(r.taille));
-  verifier("dix boutons", r.noms.length === 10, String(r.noms.length));
+  verifier("dix sons", r.noms.length === 10, String(r.noms.length));
   verifier("dix noms différents", new Set(r.noms).size === 10, r.noms.join(", "));
   verifier("chacun dit à quoi il sert", r.usages.every(u => u.length > 10));
 }
@@ -234,7 +212,7 @@ console.log("\n3. LES DIX SONS, RENDUS HORS LIGNE : SOBRES, À LA MANIÈRE D'APP
   verifier("la Goutte joue par son nom ; le ding perle n'existe plus", r.goutte === true && r.perle === false, JSON.stringify(r));
 }
 
-console.log("\n4. LE VOLUME DU JEU FAIT LOI, ET LE RETOUR RAMÈNE AU MENU");
+console.log("\n4. LE VOLUME DU JEU FAIT LOI");
 {
   const r = await p.evaluate(async () => {
     const avant = { ...window.PARAMETRES_AUDIO };
@@ -245,16 +223,10 @@ console.log("\n4. LE VOLUME DU JEU FAIT LOI, ET LE RETOUR RAMÈNE AU MENU");
     Object.assign(window.PARAMETRES_AUDIO, avant);
     window.rendreFabrique();
     const muetApres = getComputedStyle(document.getElementById("fabrique-muet")).display !== "none";
-    const retour = [...document.querySelectorAll("#etape-fabrique > button")].find(b => b.textContent.trim() === "Retour");
-    retour.click();
-    await new Promise(r => setTimeout(r, 1100));
-    return { muet, joue, muetApres,
-             menu: getComputedStyle(document.getElementById("etape-menu-parametres")).display !== "none",
-             fabrique: getComputedStyle(document.getElementById("etape-fabrique")).display !== "none" };
+    return { muet, joue, muetApres };
   });
   verifier("volume de l'interface à zéro : on le dit, et rien ne joue", r.muet && r.joue === false);
   verifier("volume rendu : l'avertissement disparaît", !r.muetApres);
-  verifier("« Retour » ramène au menu des Paramètres", r.menu && !r.fabrique);
 }
 
 console.log("\n5. LES MENUS SE TAISENT (v389) ; LA GOUTTE RESTE DANS LA FABRIQUE");
@@ -278,7 +250,7 @@ console.log("\n5. LES MENUS SE TAISENT (v389) ; LA GOUTTE RESTE DANS LA FABRIQUE
     const clic = await suivre(() => window.jouerSonClic());
     const survol = await suivre(() => window.jouerSonSurvolParchemin());
     // Un vrai bouton de la page, avec son onclick « jouerSonClic(); … ».
-    const bouton = await suivre(() => document.getElementById("btn-ouvrir-fabrique").click());
+    const bouton = await suivre(() => [...document.querySelectorAll("#etape-cles-api button")].find(x => /Retour/.test(x.textContent)).click());
     // (v378 : le menu latéral et ses boutons survolés sont partis.)
     const menu = document.querySelector(".conteneur-bouton-lateral");
     window.jouerSonFabrique = vrai;

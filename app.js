@@ -2126,6 +2126,8 @@ async function verifierMdpParametresServeur(mdpSaisi) {
   const vrai = nettoyer(cfg.mdp_parametres);
   return nettoyer(mdpSaisi) === vrai && vrai !== "";
 }
+// (v395) Le mot de passe des Paramètres du livre (grimoire_parametres.js).
+window.verifierMdpParametres = verifierMdpParametresServeur;
 
 // --- Parties (ancien Systeme_Parties) ---
 async function creerNouvellePartie(nomGroupe, mdpGroupe) {
@@ -4664,6 +4666,8 @@ function fermerParametres(immediat) {
 }
 
 function naviguerFenetre(idFenetreSortante, idFenetreEntrante) {
+  // (v395) Les Paramètres sont dans le livre : leurs fenêtres y ont leur page (grimoire_parametres.js).
+  if (window.GRIMOIRE_PARAMETRES && window.GRIMOIRE_PARAMETRES.naviguer(idFenetreSortante, idFenetreEntrante)) return;
   const sortante = document.getElementById(idFenetreSortante);
   const entrante = document.getElementById(idFenetreEntrante);
 
@@ -5680,7 +5684,9 @@ document.addEventListener("DOMContentLoaded", function () {
       if (selModele) selModele.value = reglages.modele;
       if (selReflexion) selReflexion.value = reglages.reflexion;
   }
-  document.getElementById("toggle-tokens").checked = localStorage.getItem("ivalis_SHOW_TOKENS") === "on";
+  // (v395) « Afficher les tokens » a quitté les Paramètres (Nico) ; la case est partie.
+  const caseTokens = document.getElementById("toggle-tokens");
+  if (caseTokens) caseTokens.checked = localStorage.getItem("ivalis_SHOW_TOKENS") === "on";
   window.actualiserAffichageTokens();
 
   // Initialisation du Mode DEV
@@ -5769,6 +5775,8 @@ window.ouvrirMenuPersonnages = function() {
 
 // 4. Bouton Paramètres
 window.ouvrirParametres = function() {
+  // (v395) Les Paramètres sont des pages du livre (grimoire_parametres.js).
+  if (window.GRIMOIRE_PARAMETRES && window.GRIMOIRE_PARAMETRES.ouvrir()) return;
   if (typeof window.afficherInterrupteurIllustration === "function") window.afficherInterrupteurIllustration();
   const menuParam = document.getElementById('conteneur-parametres');
   const estDejaOuvert = (menuParam.style.display === 'block' || menuParam.classList.contains('ouvert'));

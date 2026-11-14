@@ -201,7 +201,8 @@ console.log("\n4. LE SOIN DU VAMPIRISME (moteur) : 70 % DE CE QUE LA CARTE INFLI
     verifier("une cible qui esquive ne nourrit rien (7 sur M1 seul)", soinDuVampire(esq) === 7, `${soinDuVampire(esq)}`);
     const bou = monde(5, { PV_Actuels: 40 }); bou.combattants.M1.bouclier = 4;
     const rb = resoudreCarte(bou, carte([sort(10, ["M1"])]));
-    verifier("le bouclier entamé compte (4 encaissés → 2)", soinDuVampire(rb) === 2, `${soinDuVampire(rb)}`);
+    // (v395) brisé, le surplus passe sur la vie / 2 : 4 + 3 encaissés → 4.
+    verifier("le bouclier entamé compte (4 + 3 encaissés → 4)", soinDuVampire(rb) === 4, `${soinDuVampire(rb)}`);
     const presque = monde(5, { PV_Actuels: 40 }); presque.combattants.M1.pv = 3;
     verifier("seuls les PV réellement perdus comptent (3 → 2)", soinDuVampire(resoudreCarte(presque, carte([sort(10, ["M1"])]))) === 2);
     const allie = resoudreCarte(monde(5, { PV_Actuels: 40 }), carte([sort(10, ["A"])]));
@@ -252,9 +253,9 @@ console.log("\n4 bis. LE BAISER DU VAMPIRE : 25 % DES PV MAX EN BRUT, 60 % EN SO
              return r.etat.combattants.M1.pv === 187 && r.etat.combattants.V.pv === 77; })());
     const bou = enTete(monde(5, { PV_Actuels: 40 }), "V", "CLASSE_BAISER_VAMPIRE"); bou.combattants.M1.bouclier = 10;
     const rb = appliquerIntention(bou, baiser());
-    // Règle du jeu : un bouclier qui casse arrête aussi le surplus.
-    verifier("le bouclier encaisse (10, le surplus est perdu) : soin sur les 10 → 6",
-             rb.etat.combattants.M1.bouclier === 0 && rb.etat.combattants.M1.pv === 100 && rb.etat.combattants.V.pv === 46,
+    // (v395) Un bouclier qui casse laisse passer le surplus divisé par deux : 25 - 10 = 15 → 7.
+    verifier("le bouclier encaisse 10, le surplus / 2 (7) passe : soin sur 17 → 10",
+             rb.etat.combattants.M1.bouclier === 0 && rb.etat.combattants.M1.pv === 93 && rb.etat.combattants.V.pv === 50,
              `🛡️${rb.etat.combattants.M1.bouclier} / ${rb.etat.combattants.V.pv}`);
     const br = enTete(monde(5, { PV_Actuels: 40 }), "V", "CLASSE_BAISER_VAMPIRE"); br.combattants.V.etats = [{ ...BRULE }];
     verifier("brûlé : 15 × 50 % → 8 (arrondi)", appliquerIntention(br, baiser()).etat.combattants.V.pv === 48);

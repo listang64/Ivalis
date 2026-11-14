@@ -216,6 +216,7 @@
             <svg class="fleuron" viewBox="0 0 200 24" aria-hidden="true">
               <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/>
               <circle cx="100" cy="12" r="2.2"/></svg>
+            <div class="place-son"></div>
           </div>`;
     }
 
@@ -248,11 +249,26 @@
         // (les apostrophes encodées aussi : l'attribut style est entre apostrophes)
         return `url("data:image/svg+xml,${encodeURIComponent(svg).replace(/'/g, "%27")}")`;
     }
+    // (v395) Nico : « dans le sommaire, mets des couleurs aquarelle sous les titres et sous
+    // le titre de la page » : un lavis (grimoire_fiches.js) sous chaque entrée, une couleur
+    // par chapitre, et l'or sous « Sommaire ».
+    const TEINTES_INDEX = {
+        fiches: { couleurs: ["#b3261e", "#c8402f", "#8f1d15"], opacite: 0.3, nom: "index-fiches" },
+        carte: { couleurs: ["#5f86b0", "#7fa2c4", "#4a6f98"], opacite: 0.3, nom: "index-carte" },
+        village: { couleurs: ["#6fa64f", "#8dbb6a", "#567f3c"], opacite: 0.3, nom: "index-village" },
+        combats: { couleurs: ["#9b2c22", "#7a1d14", "#c0503a"], opacite: 0.32, nom: "index-combats" },
+        recit: { couleurs: ["#8a5fb0", "#a37cc4", "#6d4890"], opacite: 0.26, nom: "index-recit" },
+        titre: { couleurs: ["#d9a93a", "#e8c25a", "#b8862a"], opacite: 0.46, nom: "index-titre" }
+    };
+    const lavisIndex = (cle) => {
+        const d = window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.dessins;
+        return d && d.lavis ? d.lavis(TEINTES_INDEX[cle] || TEINTES_INDEX.titre, "sommaire-" + cle) : "";
+    };
     function entreeIndex(id, texte, rang) {
         const r = hasard("index-" + id);
         const penche = ((r() * 2 - 1) * 3.4).toFixed(2), decale = ((r() * 2 - 1) * 7).toFixed(1);
         return `<button type="button" class="entree-index" id="grimoire-index-${id}" data-action="index" data-entree="${id}"
-                   style="--penche:${penche}deg; --decale:${decale}"><span class="entree-index-texte" style='background-image:${souligneFond("trait-" + id)}'><span class="numero-index">${ROMAINS[rang]}-</span> ${texte}</span></button>`;
+                   style="--penche:${penche}deg; --decale:${decale}">${lavisIndex(id)}<span class="entree-index-texte" style='background-image:${souligneFond("trait-" + id)}'><span class="numero-index">${ROMAINS[rang]}-</span> ${texte}</span></button>`;
     }
     // Le nom de la partie en cours (sous le titre du sommaire).
     const nomDeLaPartie = () => {
@@ -267,7 +283,7 @@
         const entrees = (a, b) => ENTREES_INDEX.slice(a, b).map(([id, t], i) => entreeIndex(id, t, a + i)).join("");
         return [
             `${fondSommaire("gauche")}<div class="contenu-page page-index">
-               <div class="entete-index">Sommaire</div>
+               <div class="entete-index">${lavisIndex("titre")}<span>Sommaire</span></div>
                <div class="nom-partie-index" id="grimoire-nom-partie">${echapper(nomDeLaPartie())}</div>
                <svg class="fleuron fleuron-index" viewBox="0 0 200 24" aria-hidden="true">
                  <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/>
@@ -339,6 +355,8 @@
     // La double page d'un chapitre : [gauche, droite].
     function chapitreHtml(nom) {
         if (nom === "index") return indexHtml();
+        // (v395) Les Paramètres, leurs catégories et leurs pages dédiées (grimoire_parametres.js).
+        if (nom === "parametres" && window.GRIMOIRE_PARAMETRES) return window.GRIMOIRE_PARAMETRES.html();
         const revenir = `<button type="button" class="lien-grimoire revenir" data-action="revenir">← Revenir au journal</button>`;
         if (nom === "nouvelle") return [
             `<div class="contenu-page page-chapitre">
@@ -493,6 +511,16 @@
             <img class="grimoire-table" id="grimoire-table" src="${IMAGES.table}" alt="" draggable="false">
             <img class="grimoire-ombre-couverture" id="grimoire-ombre-couverture" src="${IMAGES.couverture}" alt="" draggable="false">
             <img class="grimoire-fond-livre" src="${IMAGES.livre}" alt="" draggable="false">
+            <!-- (v395) Le papier qui sort à droite du livre pour demander si l'on quitte. -->
+            <div class="papier-quitter" id="grimoire-papier-quitter" aria-hidden="true">
+              <div class="papier-quitter-feuille">
+                <p class="question-quitter" id="grimoire-question-quitter">Quitter le jeu ?</p>
+                <div class="choix-quitter">
+                  ${bouton("grimoire-quitter-oui", "Oui", "quitter-oui")}
+                  ${bouton("grimoire-quitter-non", "Non", "quitter-non")}
+                </div>
+              </div>
+            </div>
             <button type="button" class="marque-page inactif" id="grimoire-marque-page" data-action="marque-page"
                     aria-label="Aller au sommaire" aria-disabled="true" title="Le sommaire (en partie)">
               <span class="marque-papier">${dessinMarque()}</span></button>
@@ -542,6 +570,11 @@
         listeActuelle = [pages[0], pages[1], pages[2], pages[3], pages[4], ...vierges, dos];
         pagesCarte = [pageCarte("gauche"), pageCarte("droite")];
         pages[1].innerHTML = pageTitre();
+        // (v395) Nico : « les réglages du son, enlève-les des paramètres et mets-les en dessous
+        // du titre de la première page » : les mêmes curseurs (index.html, app.js), déplacés.
+        const reglagesSon = document.getElementById("reglages-son");
+        const placeSon = pages[1].querySelector(".place-son");
+        if (reglagesSon && placeSon) placeSon.appendChild(reglagesSon);
         pages[2].innerHTML = pageJournal();
         remplirChapitre("");
         // AU DOIGT, TOUT DE SUITE (v298). Nico : « sur iPad le toucher ne se
@@ -657,6 +690,7 @@
             const etat = String(e.data);
             if (etat === "user_fold" && etatAvant !== "user_fold" && etatAvant !== "flipping") bruitPage("page-prise");
             etatAvant = etat;
+            if (window.GRIMOIRE_PARAMETRES) window.GRIMOIRE_PARAMETRES.surEtat(etat);
         });
         pageFlip.on("flip", () => bruitPage("page-tourne"));
         brancherPrise();
@@ -746,6 +780,8 @@
     }
     function surTourne(index) {
         if (defileEnCours) return;               // (v306) les feuillets qui passent ne comptent pas
+        if (papierQuitter.sorti && index !== 1 && index !== 2) papierQuitter(false);   // (v395)
+        if (window.GRIMOIRE_PARAMETRES) { try { window.GRIMOIRE_PARAMETRES.surTourne(index); } catch (e) { console.error("Grimoire : les paramètres", e); } }
         if (index >= nbPages - 1) {             // la quatrième de couverture : on revient à la dernière double page
             setTimeout(() => { try { pageFlip.flip(nbPages - 3, "top"); } catch (e) {} }, 60);
             return;
@@ -756,11 +792,13 @@
         else if (index > 0 && !ouvert) etatOuvert(true);
     }
     function remplirChapitre(nom) {
+        if (chapitre === "parametres" && window.GRIMOIRE_PARAMETRES) window.GRIMOIRE_PARAMETRES.ranger();
         chapitre = nom;
         const [g, d] = chapitreHtml(nom);
         pages[3].innerHTML = g;
         pages[4].innerHTML = d;
         if (nom === "charger") afficherParties(window.LISTE_PARTIES_CACHE || []);
+        if (nom === "parametres" && window.GRIMOIRE_PARAMETRES) window.GRIMOIRE_PARAMETRES.rempli(pages[3], pages[4]);
     }
     // Une entrée du journal : sa double page se remplit, et le livre y tourne.
     function allerAuChapitre(nom) {
@@ -1223,6 +1261,17 @@
         return true;
     };
 
+    // LE PAPIER « QUITTER » (v395) : il glisse de sous la page de droite.
+    function papierQuitter(sortir) {
+        const el = document.getElementById("grimoire-papier-quitter");
+        papierQuitter.sorti = !!sortir;
+        if (!el) return;
+        const q = document.getElementById("grimoire-question-quitter");
+        if (q && sortir) q.textContent = enPartie ? "Quitter la partie ?" : "Quitter le jeu ?";
+        el.classList.toggle("sorti", !!sortir);
+        el.setAttribute("aria-hidden", sortir ? "false" : "true");
+    }
+    papierQuitter.sorti = false;
     function agir(cible) {
         if (!cible || cible.disabled) return;
         const action = cible.dataset.action;
@@ -1238,21 +1287,31 @@
             return;
         }
         // (v312) Le menu principal : les Paramètres ; quitter la partie (en partie) ou le jeu.
+        // (v395) Nico : « tout le reste des paramètres, mets-le dans des pages du livre » :
+        // un chapitre du livre (grimoire_parametres.js), ses gestes `param-…`.
         if (action === "parametres") {
             son();
-            // Ses fenêtres vivaient dans l'écran de jeu, caché hors partie : elles
-            // passent sur la page entière, par-dessus le livre (grimoire.css).
+            papierQuitter(false);
+            if (window.GRIMOIRE_PARAMETRES) { window.GRIMOIRE_PARAMETRES.ouvrir(); return; }
             const conteneur = document.getElementById("conteneur-parametres");
             if (conteneur && conteneur.parentNode !== document.body) document.body.appendChild(conteneur);
             if (typeof window.ouvrirParametres === "function") window.ouvrirParametres();
             return;
         }
-        if (action === "quitter") {
+        if (action && action.indexOf("param-") === 0) { if (window.GRIMOIRE_PARAMETRES) window.GRIMOIRE_PARAMETRES.agir(cible); return; }
+        // (v395) Nico : « le bouton quitter la partie, enlève la popup et fais un papier qui
+        // sort à droite du livre demandant si on veut quitter ». Oui : on quitte la partie
+        // (en partie) ou le jeu ; Non (ou un autre geste) : le papier rentre.
+        if (action === "quitter") { son(); papierQuitter(!papierQuitter.sorti); return; }
+        if (action === "quitter-non") { son(); papierQuitter(false); return; }
+        if (action === "quitter-oui") {
             son();
-            if (enPartie) { if (typeof window.demanderRetourMenu === "function") window.demanderRetourMenu(); }
-            else if (typeof window.demanderQuitterJeu === "function") window.demanderQuitterJeu();
+            papierQuitter(false);
+            if (enPartie) { if (typeof window.confirmerRetourMenu === "function") window.confirmerRetourMenu(); }
+            else if (typeof window.confirmerQuitterJeu === "function") window.confirmerQuitterJeu();
             return;
         }
+        papierQuitter(false);
         if (action === "marque-page" || action === "marque-recit") {
             if (!enPartie) return;               // éteints hors partie : rien, pas même le clic
             // (v304 : « enlève le son quand on clique sur un marque-page ou un bouton de l'index » —
@@ -1271,9 +1330,14 @@
         }
         if (action === "index") { choisirIndex(cible.dataset.entree); return; }
         son();
-        // En partie, fonder ou réveiller un autre groupe, c'est d'abord quitter
-        // celle-ci : la question de la maison (app.js) est posée.
-        if (enPartie && (action === "nouvelle" || action === "charger")) { if (typeof window.demanderRetourMenu === "function") window.demanderRetourMenu(); }
+        // En partie, fonder ou réveiller un autre groupe, c'est d'abord quitter celle-ci.
+        // (v395) Nico : « quand j'appuie sur Charger, il m'ouvre une popup pour me demander
+        // si je veux retourner au menu principal : enlève ça, que ça charge juste la liste
+        // des parties ; même chose pour Nouvelle partie, ça quitte tout seul la partie ».
+        if (enPartie && (action === "nouvelle" || action === "charger")) {
+            if (typeof window.confirmerRetourMenu === "function") window.confirmerRetourMenu();
+            allerAuChapitre(action);
+        }
         else if (action === "nouvelle" || action === "charger" || action === "compte") allerAuChapitre(action);
         else if (action === "revenir") allerALaPage(1);
         else if (action === "valider-cle") validerCle();
@@ -1290,6 +1354,7 @@
         else if (form.id === "grimoire-form-groupe") creerGroupe();
         else if (form.id === "grimoire-form-partie") validerPartie();
         else if (form.id === "grimoire-form-mdp") changerMdp();
+        else if (form.id === "grimoire-form-param" && window.GRIMOIRE_PARAMETRES) window.GRIMOIRE_PARAMETRES.deverrouiller();
     }
 
     // ---------------------------------------------------------------------
@@ -1339,6 +1404,11 @@
         // (v388) la double page des combats
         definirCombats: (els) => { pagesCombats = (els || []).slice(); if (enPartie) definirSuite(suite); },
         pagesCombats: () => pagesCombats.slice(),
+        // (v395) les Paramètres du livre (grimoire_parametres.js) : le chapitre des pages 3-4
+        chapitre: () => chapitre, remplirChapitre, pageChapitre: (i) => pages[i],
+        ouvrirChapitre: (nom) => { remplirChapitre(nom); partieChoisie = null; if (pageFlip) allerALaPage(3); },
+        page: () => (pageFlip ? pageFlip.getCurrentPageIndex() : -1), etat: () => (pageFlip ? pageFlip.getState() : ""),
+        papierQuitter: (oui) => papierQuitter(oui),
         dessins: { cadreMain, bordurePlume, hasard, souligneFond },
         pagesRegions: () => pagesRegions.slice(), annulerPrise: () => { if (brancherPrise.annuler) brancherPrise.annuler(); },
         // (v313) Le livre s'ouvre sur le sommaire, une seule fois : les cartes régionales

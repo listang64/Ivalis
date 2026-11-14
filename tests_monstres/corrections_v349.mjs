@@ -120,7 +120,8 @@ console.log("\n2. LA NUÉE RENVOIE 33 % DES DÉGÂTS SUBIS");
              `${ra.etat.combattants.V.pv} / ${ra.etat.combattants.M1.pv}`);
     const bou = clonerEtat(base); bou.combattants.V.bouclier = 10;
     const rb = resoudreCarte(bou, coup("M1", "V", 30));
-    verifier("le bouclier entamé compte : 10 encaissés → 3", rb.etat.combattants.M1.pv === 97, String(rb.etat.combattants.M1.pv));
+    // (v395) brisé, le surplus passe sur la vie / 2 : 10 + 10 subis → 7 renvoyés.
+    verifier("le bouclier entamé compte : 10 + 10 subis → 7", rb.etat.combattants.M1.pv === 93, String(rb.etat.combattants.M1.pv));
     const esq = resoudreCarte(clonerEtat(base), coup("M1", "V", 30, { esquive: true }));
     verifier("esquivé : rien de subi, rien de renvoyé", esq.etat.combattants.V.pv === 100 && esq.etat.combattants.M1.pv === 100);
     const petit = resoudreCarte(clonerEtat(base), coup("M1", "V", 2));

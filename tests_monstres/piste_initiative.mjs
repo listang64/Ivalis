@@ -286,7 +286,8 @@ console.log("\n3. TOUT LE MONDE PORTE LE MÊME MÉDAILLON ROND, MÊME TAILLE, M�
   verifier("LE HÉROS AUSSI, DÉSORMAIS — plus d'hexagone", h1.rond === true);
   verifier("et les deux font la même taille", Math.abs(m1.largeur - h1.largeur) < 1,
            `(${Math.round(m1.largeur)} vs ${Math.round(h1.largeur)})`);
-  verifier("la créature a son chiffre d'initiative comme les autres", m1.initiative === "75", m1.initiative);
+  // v395 : Nico, « sur la piste d'initiative, enlève la bulle avec le chiffre d'initiative ».
+  verifier("plus de bulle d'initiative (v395)", m1.couleurFond === null && h1.couleurFond === null, String(m1.couleurFond));
   // v312 : Nico, « sur la piste d'initiative, retire les jauges de PV et de fatigue ».
   verifier("et plus de jauges sur la piste (v312)", m1.jauges === 0, String(m1.jauges));
   verifier("le héros non plus", h1.jauges === 0, String(h1.jauges));
@@ -362,9 +363,7 @@ console.log("\n6. NOUVELLE MANCHE : LES PORTRAITS GLISSENT, ILS NE RENAISSENT PA
   verifier("la transition est déclarée sur la position",
            (await p.evaluate(() => getComputedStyle(document.querySelector(".piste-tuile")).transitionProperty))
              .includes("left"));
-  verifier("les chiffres d'initiative sont ceux de la nouvelle manche",
-           v.ordre.map(x => x.initiative).join(",") === "80,60,40,10",
-           v.ordre.map(x => x.initiative).join(","));
+  verifier("toujours pas de bulle d'initiative (v395)", v.ordre.every(x => x.couleurFond === null));
 }
 
 // =========================================================================
@@ -722,15 +721,13 @@ console.log("\n13. L'OMBRE SOUS LE BANDEAU A VRAIMENT UN DÉGRADÉ DOUX");
 }
 
 // =========================================================================
-console.log("\n14. LE CERCLE D'INITIATIVE PREND LA COULEUR DU PALIER");
+console.log("\n14. (v395) PLUS DE CERCLE D'INITIATIVE SUR LA PISTE");
 // =========================================================================
 // Nico voulait repérer d'un coup d'œil un Boss qui s'apprête à jouer, sans
 // lire son nom : Petit en gris, Normal en blanc, Élite en jaune, Boss en
 // rouge. Un héros n'a pas de palier (voir combat_etat.js) et garde l'or
 // d'origine.
 {
-  const rgb = (hex) => { const n = parseInt(hex.slice(1), 16);
-    return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`; };
 
   await p.evaluate(() => {
     const fiche = (id, palier) => ({ idPersonnage: id, prenom: id, camp: "Ennemi", estMonstre: true,
@@ -756,42 +753,10 @@ console.log("\n14. LE CERCLE D'INITIATIVE PREND LA COULEUR DU PALIER");
   const v = await lirePiste();
   const parId = Object.fromEntries(v.ordre.map(x => [x.id, x]));
 
-  // LA COULEUR REMPLIT TOUT LE ROND (Nico : « plutôt que mettre la couleur
-  // sur le bord du rond, mettre la couleur partout dans le rond, et idem pour
-  // les joueurs »). Le chiffre se lit dessus : on prend, du noir ou du blanc,
-  // celui qui contraste le plus avec le fond (WCAG). Sur le rouge du Boss
-  // c'est encore le sombre : 4,5 contre 4,2 pour le blanc.
-  const SOMBRE = rgb("#1a0f08");
-  // (v262 : « Petit en blanc, Normal en or et Boss en rouge » ; une créature
-  // Élite d'avant garde son jaune.)
-  verifier("Petit : rond rempli de blanc", parId.M_PETIT.couleurFond === rgb("#ffffff"), parId.M_PETIT.couleurFond);
-  verifier("Normal : rond rempli d'or", parId.M_NORMAL.couleurFond === rgb("#d4a72c"), parId.M_NORMAL.couleurFond);
-  verifier("Élite : rond rempli de jaune", parId.M_ELITE.couleurFond === rgb("#f4c430"), parId.M_ELITE.couleurFond);
-  verifier("Boss : rond rempli de rouge", parId.M_BOSS.couleurFond === rgb("#e63946"), parId.M_BOSS.couleurFond);
-  verifier("UN HÉROS N'A PAS DE PALIER : SON ROND EST REMPLI DE L'OR D'ORIGINE",
-           parId.H1.couleurFond === rgb("#e8d5a5"), parId.H1.couleurFond);
-  verifier("le bord n'est plus la couleur du palier (Boss)",
-           parId.M_BOSS.couleurBordure !== rgb("#e63946"), parId.M_BOSS.couleurBordure);
-  verifier("chiffre sombre sur gris, blanc, jaune, rouge et or (le plus contrasté)",
-           Object.values(parId).every(x => x.couleurTexte === SOMBRE),
-           Object.values(parId).map(x => x.couleurTexte).join(" / "));
-  verifier("le chiffre n'est plus de la couleur du rond (il s'y fondrait)",
-           Object.values(parId).every(x => x.couleurTexte !== x.couleurFond));
-  verifier("le chiffre est toujours affiché", parId.M_BOSS.initiative === "50" && parId.M_PETIT.initiative === "80",
-           `${parId.M_BOSS.initiative} ${parId.M_PETIT.initiative}`);
-  // Le choix sombre / blanc est bien le plus contrasté, sur toutes les teintes.
-  const choix = await p.evaluate(() => ["#a8a8a8", "#ffffff", "#f4c430", "#e63946", "#e8d5a5", "#1a0f08", "#3050a0"]
-    .map(h => window.texteSurCouleur(h)));
-  verifier("sur une teinte foncée (bleu nuit, brun), le chiffre passe en blanc",
-           choix[5] === "#ffffff" && choix[6] === "#ffffff", choix.join(" "));
-  // Le contraste réel entre le chiffre et son fond (WCAG) : jamais sous 4.
-  const lum = (c) => { const [r, g, bl] = c.match(/\d+/g).map(Number).map(v => { v /= 255;
-    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
-    return 0.2126 * r + 0.7152 * g + 0.0722 * bl; };
-  const contraste = (a, z) => { const [x, y] = [lum(a), lum(z)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
-  const pires = Object.values(parId).map(x => contraste(x.couleurTexte, x.couleurFond));
-  verifier("contraste chiffre / fond d'au moins 4 partout", Math.min(...pires) >= 4,
-           pires.map(c => c.toFixed(1)).join(" / "));
+  // (v395) La bulle d'initiative (et sa couleur de palier) a quitté la piste.
+  verifier("PLUS DE BULLE D'INITIATIVE, QUEL QUE SOIT LE PALIER (v395)",
+           Object.values(parId).every(x => x.couleurFond === null && x.couleurBordure === null),
+           Object.values(parId).map(x => x.couleurFond).join(" / "));
   // La capture : la section 13 avait masqué les tuiles pour mesurer le voile.
   await p.evaluate(() => document.querySelectorAll(".piste-tuile").forEach(t => { t.style.visibility = ""; }));
   await p.waitForTimeout(300);

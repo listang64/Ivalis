@@ -5780,31 +5780,6 @@ window.afficherPisteInitiative = function(queue, phase) {
     if (typeof window.actualiserTitrePreparation === "function") window.actualiserTitrePreparation(queue, phase);
 };
 
-// LES TROIS STATURES, LES TROIS COULEURS (Nico, v262 : « change les couleurs
-// des ronds de monstre dans la piste d'initiative : Petit en blanc, Normal en
-// or et Boss en rouge »). Le rouge du Boss est celui de la jauge de vie. Une
-// créature Élite d'avant la v262 garde son jaune. Exposée sur window : le banc
-// de test la lit directement plutôt que de deviner les couleurs depuis le CSS
-// rendu.
-window.COULEURS_PALIER_INITIATIVE = {
-    "Petit": "#ffffff",
-    "Normal": "#d4a72c",
-    "Élite": "#f4c430",
-    "Boss": "#e63946"
-};
-// Le liseré du LEADER autour de sa couleur (v262).
-window.LISERE_LEADER_INITIATIVE = "#ff1f1f";
-
-// Le chiffre posé sur un fond plein : sombre sur une teinte claire, blanc sur
-// une teinte foncée (luminance relative, au sens du WCAG).
-window.texteSurCouleur = function(hex) {
-    const n = parseInt(String(hex).replace("#", ""), 16);
-    const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
-    const L = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
-    // Le seuil où le noir et le blanc offrent le même contraste.
-    return L > 0.179 ? "#1a0f08" : "#ffffff";
-};
-
 // Un JOUEUR sur la piste : un héros, ni créature (le compagnon et les zombies
 // sont des créatures de son camp), ni illusion. Lui seul choisit sa compétence.
 window.estJoueurDeLaPiste = (perso) => !!perso && !perso.estMonstre && !perso.estIllusion
@@ -5858,30 +5833,8 @@ function contenuTuilePiste(entree, cestSonTour, choix, choixNeuf) {
                <img src="${imgUrl}"${perso.zombie ? ' class="piste-zombie"' : ""} style="width: 100%; height: 100%; object-fit: contain;${filtrePion}">
            </div>`;
 
-    // Le chiffre d'initiative, dans le même petit encart pour tout le monde.
-    // Vide tant que la manche n'a pas ouvert (la piste montre alors l'ordre de
-    // la précédente, ou le simple ordre d'initiative au tout premier tour).
-    const affichageInit = entree.idCarte === "REPOS_LONG" ? "⏳"
-                        : (entree.initiative === null || entree.initiative === undefined ? "–" : entree.initiative);
-
-    // LA COULEUR DE L'ENCART SUIT LE PALIER DE LA CRÉATURE : d'un coup d'œil,
-    // sans lire son nom ni ouvrir sa fiche, on sait si c'est un Petit, un
-    // Normal ou un Boss qui va jouer. Un héros n'a pas de palier (voir
-    // combat_etat.js) : il garde le beige d'origine. Un LEADER (v262) porte un
-    // liseré rouge autour de sa couleur.
-    //
-    // LA COULEUR REMPLIT TOUT LE ROND, plus seulement son liseré : un fin
-    // cercle coloré se lisait mal à la taille de la piste, un disque plein se
-    // repère tout de suite. Le chiffre passe alors en sombre sur les teintes
-    // claires (gris, blanc, jaune, or), en blanc sur le rouge du Boss — sinon
-    // il disparaîtrait dans son propre fond.
-    const couleurInitiative = (perso.estMonstre && window.COULEURS_PALIER_INITIATIVE[perso.Palier])
-        || "#e8d5a5";
-    const texteInitiative = window.texteSurCouleur(couleurInitiative);
-    // Le liseré : un anneau d'ombre, pas une bordure — le rond garde sa taille.
-    const estLeader = !!(perso.estMonstre && perso.leader);
-    const lisereLeader = estLeader ? `, 0 0 0 2px ${window.LISERE_LEADER_INITIATIVE}, 0 0 7px 2px rgba(255, 31, 31, 0.8)` : "";
-
+    // (v395) Nico : « sur la piste d'initiative, enlève la bulle avec le chiffre
+    // d'initiative passé et actuel ; on garde les flèches vertes, le sablier… ».
     let etatsHtml = "";
     const etatsPiste = (window.etatsAffiches || ((l) => l || []))(perso.Etats_Alteres);
     if (etatsPiste.length > 0) {
@@ -5893,10 +5846,6 @@ function contenuTuilePiste(entree, cestSonTour, choix, choixNeuf) {
     return `
         ${cestSonTour ? '<div class="piste-scintillement"></div>' : ''}
         ${portrait}
-        <div class="rond-initiative${estLeader ? " rond-initiative-leader" : ""}" style="position: absolute; top: -3px; left: -5px; width: 23px; height: 23px; border-radius: 50%; border: 1px solid rgba(26, 15, 8, 0.85); background: ${couleurInitiative}; box-shadow: 0 2px 5px rgba(0,0,0,0.9), inset 0 -2px 3px rgba(0,0,0,0.25), inset 0 1px 2px rgba(255,255,255,0.45)${lisereLeader}; display: flex; align-items: center; justify-content: center; z-index: 3;">
-            <span style="color: ${texteInitiative}; font-family: 'Cinzel', serif; font-size: 12px; font-weight: bold; text-shadow: ${texteInitiative === "#ffffff" ? "1px 1px 2px rgba(0,0,0,0.8)" : "0 1px 0 rgba(255,255,255,0.35)"};">${affichageInit}</span>
-        </div>
-
         ${etatsHtml}
         ${badgeChoixPiste(choix, choixNeuf)}`;
 }

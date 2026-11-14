@@ -11847,3 +11847,18 @@ corrections_v393.mjs le vérifie : le bouton (Valider, Fin de tour en visant, gr
 - **Plus de boîte « Valider la Zone »** en haut de l'écran (iPad) : elle n'est plus créée. Sur ordinateur, un clic valide toujours la zone.
 
 corrections_v394.mjs le vérifie dans la page : la coche (sous le lanceur, à gauche, verte), son toucher, hors de portée et de retour, plus de boîte, le clic ignoré par la visée, la coche retirée à la fermeture, les versions. Les bancs du ciblage donnent les mêmes résultats qu'avant (armes_et_zones, assassin, aveuglement, v233, v235 : mêmes échecs déjà présents).
+
+## v395 — Les Paramètres dans le livre ; le son sur la première page ; le papier « Quitter » ; Charger et Nouvelle partie sans popup ; le sommaire à l'aquarelle ; le bouclier magique brisé ; renforts plus rapides ; plus de bulle d'initiative
+
+- **Les Paramètres, un chapitre du livre** (grimoire_parametres.js, .css) : le bouton du journal ouvre la double page des chapitres. Fermée, le mot de passe (`verifierMdpParametres`, app.js) ; ouverte, trois catégories en encarts aquarellés : *le Maître du Jeu* (Instructions de l'IA, Réglages du narrateur, Dépenses du MJ, Clés API), *le monde et ses règles* (Effets de combat, Races, Monstres, Apparitions, Butin), *l'atelier* (Studio d'animation, la case du mode DEV).
+- **Une page dédiée par sous-menu** : la fenêtre d'index.html est posée sur la page de droite (le titre et une ligne d'explication à gauche) ; les grands tableaux (Effets, Races, Monstres, Apparitions, Butin, Dépenses) prennent toute la double page. `naviguerFenetre` (app.js) passe par le livre : leurs « Retour » ramènent aux catégories. Ces pages ne sont jamais dans le fil du livre : quitter la double page range la fenêtre et remet le cadenas (en partie, le sommaire revient).
+- **Retirés des Paramètres** : l'écriture (choix de la police), la Fabrique, régénérer les images du lieu, régénérer le pion tactique, clôturer et vider le chat, afficher les tokens, les images des cartes de compétence.
+- **Le son sous le titre de la première page** : les trois curseurs (les mêmes, déplacés), à l'encre, sans boîte.
+- **Le papier « Quitter »** (grimoire.js, `papierQuitter`) : plus de popup ; un papier sort de sous la page de droite (« Quitter la partie ? » en partie, « Quitter le jeu ? » sinon), Oui / Non. Il rentre si l'on tourne la page.
+- **Charger / Nouvelle partie en partie** : plus de question ; la partie est quittée d'elle-même et le chapitre s'ouvre.
+- **Le sommaire à l'aquarelle** : un lavis sous chaque entrée (une couleur par chapitre) et l'or sous « Sommaire ».
+- **Le bouclier magique brisé** (combat_etat.js, `encaisserBouclier`) : ce qui le dépasse passe sur la vie, divisé par deux (arrondi en dessous) — coups, zones, tics, opportunités, renvois, contre, dégâts illusoires. Les bancs moteur_pur, mouvement_pur et vampire suivent la règle.
+- **Les renforts** : 1,2 s sur chaque créature (2 s avant), la caméra y glisse en 0,4 s.
+- **La piste d'initiative** : plus de bulle avec le chiffre d'initiative (ni sa couleur de palier) ; les coches vertes et le sablier restent. piste_initiative.mjs suit.
+
+corrections_v395.mjs le vérifie dans la page (captures : V395_CAPTURES=dossier).
