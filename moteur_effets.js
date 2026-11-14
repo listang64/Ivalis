@@ -984,7 +984,7 @@ window.VTT_CIBLAGE_CLICK = function(e) {
     // lanceur, donc DANS le plateau : sans cette ligne, ce guetteur — qui court
     // en phase de capture, avant tout le monde — avalerait son clic, et la
     // seule sortie d'un ciblage de zone resterait la fin du tour.
-    if (e.target && e.target.closest && e.target.closest(".croix-annuler-ciblage")) return;
+    if (e.target && e.target.closest && e.target.closest(".croix-annuler-ciblage, .coche-valider-zone")) return;
     const conteneur = document.getElementById("conteneur-plateau-vtt");
     if (!conteneur || !conteneur.contains(e.target)) return;
     e.stopPropagation(); 
@@ -2520,24 +2520,10 @@ window.demarrerCiblage = async function(idCarte, options) {
     if (isZone) {
         const estPC = window.matchMedia("(hover: hover)").matches;
 
-        let bulleZone = document.getElementById("bulle-validation-zone");
-        if (!bulleZone) {
-            bulleZone = document.createElement("div");
-            bulleZone.id = "bulle-validation-zone";
-            bulleZone.style.cssText = "position: fixed; top: 100px; left: 50%; transform: translateX(-50%); z-index: 10000; background: linear-gradient(180deg, #2a1a0f, #1a0f08); border: 2px solid #c2a878; border-radius: 30px; padding: 10px 25px; display: flex; align-items: center; gap: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.9);";
-            bulleZone.innerHTML = `
-                <div style="color: white; font-family: 'Cinzel', serif; font-size: 18px; font-weight: bold; text-shadow: 1px 1px 3px black;">Valider la Zone</div>
-                <div style="display:flex; gap: 15px;">
-                    <div id="btn-valider-zone-ok" style="width: 35px; height: 35px; background: #1b6e3a; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-weight: bold; font-size: 18px; border: 2px solid white; box-shadow: 0 0 10px #1b6e3a; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">✔️</div>
-                    <div id="btn-valider-zone-ko" style="width: 35px; height: 35px; background: #d32f2f; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-weight: bold; font-size: 18px; border: 2px solid white; box-shadow: 0 0 10px #d32f2f; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">✖</div>
-                </div>
-            `;
-            document.body.appendChild(bulleZone);
-        }
-        bulleZone.style.display = estPC ? "none" : "flex";
-        
-        document.getElementById("btn-valider-zone-ok").onclick = () => window.validerZoneAoE();
-        document.getElementById("btn-valider-zone-ko").onclick = () => window.nettoyerCiblage();
+        // (v393) Plus de boîte « Valider la Zone » en haut de l'écran : la coche verte sous
+        // le pion du lanceur valide (majCocheZone), sa croix rouge annule.
+        const bulleZone = document.getElementById("bulle-validation-zone");
+        if (bulleZone) bulleZone.remove();
 
         let msgZone = document.getElementById("msg-zone-ciblage");
         if (!msgZone) {
@@ -2616,6 +2602,7 @@ window.passerAuCiblageDuSoutien = function() {
         if (msgZone) msgZone.remove();
         const bulleZone = document.getElementById("bulle-validation-zone");
         if (bulleZone) bulleZone.style.display = "none";
+        document.querySelectorAll(".coche-valider-zone").forEach(el => el.remove());
         window.removeEventListener("mousemove", window.VTT_CIBLAGE_MOUSEMOVE, {capture: true});
         window.removeEventListener("wheel", window.VTT_CIBLAGE_WHEEL, {capture: true});
         window.removeEventListener("click", window.VTT_CIBLAGE_CLICK, {capture: true});
@@ -2744,6 +2731,29 @@ window.actualiserVisuelCiblage = function() {
     if (window.CALCUL_IA_SILENCIEUX) return;
     if (window.ETAT_CIBLAGE.isZone && window.ETAT_CIBLAGE.phaseCiblage !== "soutien") window.dessinerZoneAoE();
     else window.dessinerAnneauxCiblage();
+    window.majCocheZone();
+};
+
+// (v393) LA COCHE QUI VALIDE UNE ZONE. Nico : « pour la validation d'une zone, mets plutôt
+// la coche verte, comme pour valider un sort sur quelqu'un, et enlève la boîte en haut
+// Valider la zone ; sur le token, il y a déjà une croix rouge pour annuler ». La coche
+// se pose sous le pion du LANCEUR, à gauche, en miroir de sa croix (combat.js, poserCroix) ;
+// elle n'est là que si la zone peut se poser (hors de portée ou sans ligne de vue : rien).
+window.majCocheZone = function() {
+    const state = window.ETAT_CIBLAGE;
+    const voulue = !!(state && state.actif && state.isZone && state.phaseCiblage !== "soutien" && state.zoneCenterHex && !window.CALCUL_IA_SILENCIEUX);
+    const idLanceur = voulue && typeof window.lanceurDuCiblage === "function" ? window.lanceurDuCiblage() : null;
+    const divToken = idLanceur ? document.getElementById("token-" + idLanceur) : null;
+    const porteur = divToken ? (window.porteurAuDessus ? window.porteurAuDessus(divToken) : divToken) : null;
+    document.querySelectorAll(".coche-valider-zone").forEach(el => { if (!porteur || el.parentElement !== porteur) el.remove(); });
+    if (!porteur || porteur.querySelector(".coche-valider-zone")) return;
+    const coche = document.createElement("div");
+    coche.className = "coche-valider-zone";
+    coche.title = "Valider la zone";
+    coche.style.cssText = "position: absolute; bottom: -14px; left: -6px; width: 26px; height: 26px; background: #1b6e3a; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 2px solid #e8d5a5; box-shadow: 0 0 10px #1b6e3a, 0 4px 6px rgba(0,0,0,0.5); cursor: pointer; pointer-events: auto; z-index: 6;";
+    coche.innerText = "✔";
+    coche.onclick = (e) => { e.stopPropagation(); window.validerZoneAoE(); };
+    porteur.appendChild(coche);
 };
 
 window.dessinerZoneAoE = function() {
@@ -3402,6 +3412,7 @@ window.nettoyerCiblage = function() {
     if (msgSoutien) msgSoutien.remove();
     const bulleZone = document.getElementById("bulle-validation-zone");
     if (bulleZone) bulleZone.style.display = "none";
+    document.querySelectorAll(".coche-valider-zone").forEach(el => el.remove());
 
     window.removeEventListener("mousemove", window.VTT_CIBLAGE_MOUSEMOVE, {capture: true});
     window.removeEventListener("wheel", window.VTT_CIBLAGE_WHEEL, {capture: true});
@@ -3873,6 +3884,7 @@ window.declencherResolution = async function() {
     document.querySelectorAll(".bulle-validation-cible").forEach(el => el.style.display = "none");
     const bulleZone = document.getElementById("bulle-validation-zone");
     if (bulleZone) bulleZone.style.display = "none";
+    document.querySelectorAll(".coche-valider-zone").forEach(el => el.remove());
 
     const idLanceur = window.lanceurDuCiblage();
     if (!idLanceur) {

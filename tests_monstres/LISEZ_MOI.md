@@ -11840,3 +11840,10 @@ corrections_v392.mjs le vérifie dans le livre : la case du lanceur d'un soin (c
 - **Les dégâts des créatures** : vérifié, seule la triche du niveau du groupe s'applique (`bonusMonstreDe` → `tricheDuNiveau(NIVEAU_GROUPE)`, la même pour toutes les statures : +8 % au niveau 1, +17 % au niveau 6). L'ancienne table fixe par stature (+10 %, v255) ne se lit plus. Le chef garde son propre bonus (+15 %), et les sorts gardent leurs +20 % sur les seules chances d'état. Rien n'a changé dans le code.
 
 corrections_v393.mjs le vérifie : le bouton (Valider, Fin de tour en visant, grisé pendant l'animation, éteint au tour suivant ; le rafraîchissement), les jauges (sur un pion de 200 px et au plus petit cadrage), la triche (niveaux 1 et 6, toutes statures, un coup de Boss, le héros, le chef), les versions. Les bancs du combat donnent les mêmes résultats qu'avant (bouton_fintour, combat_complet, v233, v255, v339, deplacement_repris, pas_de_visionneuse, stats_fiche, volet_competences : mêmes échecs déjà présents).
+
+## v394 — La zone se valide par la coche verte sous le lanceur ; plus de boîte « Valider la zone »
+
+- **La coche verte** (moteur_effets.js, `majCocheZone`) : pendant le ciblage d'une zone, une coche ✔ verte (celle d'un sort sur une cible) se pose sous le pion du lanceur, à gauche, en miroir de sa croix rouge d'annulation. Elle n'est là que si la zone peut se poser (hors de portée ou sans ligne de vue, elle s'en va). La toucher valide la zone (`validerZoneAoE`), sans la déplacer : le guetteur de clic l'ignore, comme la croix. Elle suit les redessins du plateau (`actualiserVisuelCiblage`) et part avec le ciblage (annulé ou résolu).
+- **Plus de boîte « Valider la Zone »** en haut de l'écran (iPad) : elle n'est plus créée. Sur ordinateur, un clic valide toujours la zone.
+
+corrections_v394.mjs le vérifie dans la page : la coche (sous le lanceur, à gauche, verte), son toucher, hors de portée et de retour, plus de boîte, le clic ignoré par la visée, la coche retirée à la fermeture, les versions. Les bancs du ciblage donnent les mêmes résultats qu'avant (armes_et_zones, assassin, aveuglement, v233, v235 : mêmes échecs déjà présents).
