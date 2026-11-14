@@ -15,6 +15,8 @@
 //  s'échangent leurs « offres » par Firestore :
 //    Vocal/{partie}/Presents/{joueur} — qui est dans le vocal (Etat, Vu, Session)
 //    Vocal/{partie}/Signaux/{auto}    — offre / réponse / ice, lus puis effacés
+//    Vocal/{partie}/EnJeu/{joueur}    — (v396) qui a la partie ouverte : son nom
+//                                       en noir sur le papier, grisé sinon
 //  Des deux postes d'une paire, celui dont l'identifiant est le plus petit
 //  appelle l'autre (jamais deux appels croisés). Le son des autres passe par
 //  Web Audio : un volume par joueur (sourdine, lecture), et l'écoute du niveau
@@ -43,6 +45,8 @@ const frais = (p) => !!p && Date.now() - (Number(p.Vu) || 0) < ABSENT_MS;
 const v = {
     partie: null, el: null,
     presents: {},                        // idJoueur -> { Nom, Etat, Vu, Session }
+    enJeu: {},                           // idJoueur -> { Nom, Vu } : la partie ouverte
+    ecouteEnJeu: null, battementJeu: null,
     ecoutePresents: null, ecouteSignaux: null, lente: null, battement: null, boucle: null,
     rejoint: false, session: "", ice: ICE_PAR_DEFAUT,
     flux: null, piste: null, micro: "aucun",       // "ok" | "refuse" | "aucun"
@@ -107,6 +111,7 @@ function joueursDeLaTable() {
     ajouter(moi());
     const source = (window.PERSOS_JOUEURS_PARTIE && window.PERSOS_JOUEURS_PARTIE.length ? window.PERSOS_JOUEURS_PARTIE : window.PERSOS_PARTIE) || [];
     source.forEach(h => { if (h && h.idJoueur && !h.estMonstre && !h.estIllusion && h.actif !== false && h.statut !== "Mort") ajouter(h.idJoueur); });
+    Object.keys(v.enJeu).forEach(id => { if (frais(v.enJeu[id])) ajouter(id); });
     Object.keys(v.presents).forEach(id => { if (frais(v.presents[id])) ajouter(id); });
     return ids.slice(0, 8);
 }
@@ -118,6 +123,8 @@ function nomDe(id) {
     const source = window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || [];
     return source.filter(h => h && h.idJoueur === id && h.actif !== false).map(h => h.prenom).filter(Boolean).join(" / ") || id;
 }
+// Nico : « les noms des joueurs grisés s'ils ne sont pas connectés au jeu, en noir s'ils le sont ».
+const connecte = (id) => id === moi() || frais(v.enJeu[id]) || frais(v.presents[id]);
 // La couleur du point : rouge (pas de micro), vert (micro ouvert), violet (dictée).
 function couleurDe(id) {
     if (id === moi()) {
@@ -148,7 +155,7 @@ function maj() {
         const c = couleurDe(id), lui = id === moi();
         const muet = !lui && (v.muets.has(id) || v.sourdine);
         const titre = lui ? "" : v.muets.has(id) ? "Rendre la voix" : "Couper sa voix";
-        return `<li class="vocal-joueur${lui ? " moi" : ""}${muet ? " muet" : ""}" data-joueur="${echapper(id)}">
+        return `<li class="vocal-joueur${lui ? " moi" : ""}${muet ? " muet" : ""}${connecte(id) ? "" : " hors-jeu"}" data-joueur="${echapper(id)}">
             <span class="point-magique ${c}${parle(id) && c === "vert" ? " parle" : ""}" aria-hidden="true"><i></i></span>
             ${lui ? `<span class="nom-vocal">${echapper(nomDe(id))}</span>`
                   : `<button type="button" class="nom-vocal" data-vocal="muet" data-joueur="${echapper(id)}" title="${titre}">${echapper(nomDe(id))}</button>`}
@@ -184,7 +191,23 @@ function entrer(idPartie) {
     if (v.partie) sortir();
     v.partie = idPartie;
     v.presents = {};
+    v.enJeu = {};
     creerPapier();
+    // « Je suis dans la partie » : un battement, que les autres postes écoutent.
+    const signalerJeu = () => {
+        if (!v.partie || !moi()) return;
+        setDoc(doc(db, "Vocal", v.partie, "EnJeu", moi()), { Nom: nomDe(moi()), Vu: Date.now() }).catch(e => console.error("Vocal : en jeu", e));
+    };
+    signalerJeu();
+    v.battementJeu = setInterval(signalerJeu, BATTEMENT_MS);
+    try {
+        v.ecouteEnJeu = onSnapshot(collection(db, "Vocal", idPartie, "EnJeu"), (snap) => {
+            const enJeu = {};
+            snap.forEach(d => { enJeu[d.id] = d.data(); });
+            v.enJeu = enJeu;
+            maj();
+        }, (e) => console.error("Vocal : en jeu", e));
+    } catch (e) { console.error("Vocal : en jeu", e); }
     try {
         v.ecoutePresents = onSnapshot(collection(db, "Vocal", idPartie, "Presents"), (snap) => {
             const presents = {};
@@ -200,9 +223,12 @@ function entrer(idPartie) {
 function sortir() {
     quitter();
     if (v.ecoutePresents) { try { v.ecoutePresents(); } catch (e) {} v.ecoutePresents = null; }
+    if (v.ecouteEnJeu) { try { v.ecouteEnJeu(); } catch (e) {} v.ecouteEnJeu = null; }
     clearInterval(v.lente); v.lente = null;
+    clearInterval(v.battementJeu); v.battementJeu = null;
+    if (v.partie && moi()) deleteDoc(doc(db, "Vocal", v.partie, "EnJeu", moi())).catch(() => {});
     if (v.el) { v.el.remove(); v.el = null; }
-    v.partie = null; v.presents = {}; v.note = "";
+    v.partie = null; v.presents = {}; v.enJeu = {}; v.note = "";
 }
 
 // ---------------------------------------------------------------------
@@ -510,7 +536,9 @@ window.addEventListener("ivalis-lecture", (ev) => {
     maj();
 });
 window.addEventListener("pagehide", () => {
-    if (v.rejoint && v.partie && moi()) deleteDoc(doc(db, "Vocal", v.partie, "Presents", moi())).catch(() => {});
+    if (!v.partie || !moi()) return;
+    if (v.rejoint) deleteDoc(doc(db, "Vocal", v.partie, "Presents", moi())).catch(() => {});
+    deleteDoc(doc(db, "Vocal", v.partie, "EnJeu", moi())).catch(() => {});
 });
 
 window.GRIMOIRE_VOCAL = {
@@ -519,7 +547,7 @@ window.GRIMOIRE_VOCAL = {
                    lecture: v.lecture, parleMoi: v.parleMoi, muets: [...v.muets], session: v.session,
                    pairs: [...v.pairs.values()].map(p => ({ id: p.id, etat: p.pc.connectionState, parle: p.parle, volume: volumeDe(p.id),
                        gain: p.gain ? p.gain.gain.value : null })),
-                   joueurs: joueursDeLaTable().map(id => ({ id, nom: nomDe(id), couleur: couleurDe(id), parle: parle(id) })) })
+                   joueurs: joueursDeLaTable().map(id => ({ id, nom: nomDe(id), couleur: couleurDe(id), parle: parle(id), connecte: connecte(id) })) })
 };
 // Déjà en partie quand ce module arrive (il se charge après grimoire.js) : il entre.
 try {

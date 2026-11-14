@@ -37,6 +37,9 @@
 button.nom-vocal { border: 0; background: none; padding: 0; margin: 0; text-align: left; cursor: pointer;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .vocal-joueur.moi .nom-vocal { font-weight: 700; }
+/* Un joueur qui n'a pas la partie ouverte : son nom grisé (en noir s'il est là). */
+.vocal-joueur.hors-jeu .nom-vocal { color: #8f7d66; }
+.vocal-joueur.hors-jeu .point-magique { opacity: 0.6; }
 /* Un joueur dont on a coupé la voix : son nom barré à l'encre. */
 .vocal-joueur.muet .nom-vocal { text-decoration: line-through; text-decoration-thickness: 1.5px; color: #6b4a2b; }
 

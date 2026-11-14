@@ -117,7 +117,8 @@ async function poste(joueur, nomCompte) {
     window.COMPTE_JOUEUR = { nom: nomCompte, email: "", admin: false };
     window.LISTE_PARTIES_CACHE = [{ id: "P1", nom: "Les Lames d'Héra" }];
     const heros = [{ idPersonnage: "H1", idJoueur: "J1", prenom: "Thorin", nom: "Ironfoot", actif: true, urlCloudinary: "" },
-                   { idPersonnage: "H2", idJoueur: "J2", prenom: "Lyra", nom: "Sombreval", actif: true, urlCloudinary: "" }];
+                   { idPersonnage: "H2", idJoueur: "J2", prenom: "Lyra", nom: "Sombreval", actif: true, urlCloudinary: "" },
+                   { idPersonnage: "H3", idJoueur: "J3", prenom: "Kael", nom: "", actif: true, urlCloudinary: "" }];
     window.PERSOS_JOUEURS_PARTIE = heros; window.PERSOS_PARTIE = heros.slice();
     window.nomDuJoueurLivre = (id) => ({ J1: "Ben", J2: "Nico", J3: "Adrien" })[id] || id;
     window.PORTES_GRIMOIRE = {
@@ -174,7 +175,13 @@ await section(async () => {
   verifier("le papier est là, sorti", !!r && r.sorti, JSON.stringify(r));
   verifier("…à gauche du livre (il sort de sous la page de gauche)", r && r.droite <= r.gaucheLivre + 30 && r.droite > r.gaucheLivre - 200, JSON.stringify(r && { d: r.droite, g: r.gaucheLivre }));
   verifier("…en bas (sous la moitié du livre, dans le livre)", r && r.haut > r.milieuLivre && r.bas <= r.basLivre + 20, JSON.stringify(r && { h: r.haut, m: r.milieuLivre, b: r.bas, bl: r.basLivre }));
-  verifier("les joueurs de la table : moi d'abord (Ben), puis Nico", r && r.noms.join(",") === "Ben,Nico", r && r.noms.join(","));
+  verifier("les joueurs de la table (un héros actif) : moi d'abord (Ben), Nico, Adrien", r && r.noms.join(",") === "Ben,Nico,Adrien", r && r.noms.join(","));
+  // (v396) Nico : « les noms grisés si pas connectés au jeu, en noir si connectés ».
+  verifier("Ben et Nico ont la partie ouverte (Vocal/P1/EnJeu) : leurs noms en noir", await attendreQue(p1, () => p1.evaluate(() =>
+    ["J1", "J2"].every(j => !document.querySelector(`.vocal-joueur[data-joueur="${j}"]`).classList.contains("hors-jeu")))) && base_.has("Vocal/P1/EnJeu/J2"));
+  const gris = await p1.evaluate(() => { const li = document.querySelector('.vocal-joueur[data-joueur="J3"]'); return { classe: li && li.className, couleur: li && getComputedStyle(li.querySelector(".nom-vocal")).color,
+    noir: getComputedStyle(document.querySelector('.vocal-joueur[data-joueur="J2"] .nom-vocal')).color }; });
+  verifier("Adrien n'est pas connecté : son nom grisé", /hors-jeu/.test(gris.classe || "") && gris.couleur !== gris.noir, JSON.stringify(gris));
   verifier("un bouton « Rejoindre »", r && r.rejoindre);
   verifier("personne dans le vocal : deux points rouges", (await couleur(p1, "J1")) === "rouge" && (await couleur(p1, "J2")) === "rouge" && /rouge/.test(await pointDOM(p1, "J2")));
   await cap(p1, "v396_papier");
@@ -333,7 +340,8 @@ await section(async () => {
   await p2.evaluate(() => window.GRIMOIRE_VOCAL.sortir());
   const r = await p2.evaluate(() => ({ papier: !!document.getElementById("papier-vocal"), e: window.GRIMOIRE_VOCAL.etat() }));
   verifier("le papier s'en va, le vocal se ferme", !r.papier && !r.e.rejoint && !r.e.partie, JSON.stringify(r));
-  verifier("…la présence de Nico est effacée", !base_.has("Vocal/P1/Presents/J2"));
+  verifier("…la présence de Nico est effacée", !base_.has("Vocal/P1/Presents/J2") && !base_.has("Vocal/P1/EnJeu/J2"));
+  verifier("…chez Ben, le nom de Nico se grise", await attendreQue(p1, () => p1.evaluate(() => document.querySelector('.vocal-joueur[data-joueur="J2"]').classList.contains("hors-jeu"))));
   verifier("grimoire.js fait entrer et sortir le vocal avec la partie", /GRIMOIRE_VOCAL\.entrer\(/.test(lire("grimoire.js")) && /GRIMOIRE_VOCAL\.sortir\(\)/.test(lire("grimoire.js")));
 });
 
