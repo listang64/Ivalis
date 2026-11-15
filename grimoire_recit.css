@@ -28,7 +28,9 @@
 
 .para-recit { position: relative; margin: 0 0 calc(var(--u) * 1.6); text-indent: 1.3em; }
 .para-recit.suite { text-indent: 0; }
-.para-recit.type-temps, .para-recit.type-note { text-align: center; text-indent: 0; font-style: italic; color: #5c3a21; font-size: 0.92em; }
+/* v406 — Nico : les lignes du Destin et du temps (la fin d'un combat, la route, les heures
+   qui passent), récrites par la plume du Narrateur, s'écrivent comme le reste du récit. */
+.para-recit.type-note { text-align: center; text-indent: 0; font-style: italic; color: #5c3a21; font-size: 0.92em; }
 .para-recit.type-ancien { font-style: italic; }
 .page-blanche { margin: 0; }
 
