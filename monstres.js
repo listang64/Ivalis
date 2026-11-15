@@ -494,13 +494,17 @@ window.REGLAGES_MONSTRES_DEFAUT = Object.freeze({
     // niveau ; ça donne un % de dégâts et de soins qui se rajoute, et un nombre
     // de points de vie qui se rajoutent — au niveau 1, 8 % et 8 PV »). Elle
     // remplace la triche par stature (10 % chacune, v255).
-    tricheNiveau: { base14: 7, parNiveau14: 1, base510: 5, parNiveau510: 2 },
+    // (v402) Nico : « enlève les formules pour la triche selon le niveau du groupe ;
+    // qu'on puisse saisir à la main les valeurs de triche par niveau ». Une valeur
+    // par niveau, du 1 au 10 (la dernière vaut pour 10 et plus) ; au départ, ce que
+    // donnaient les formules (8, 9, 10, 11, puis 15 à 25).
+    tricheNiveau: Object.freeze([8, 9, 10, 11, 15, 17, 19, 21, 23, 25]),
     bonusSortsPct: 20,
     deplacement: { ...(noyauIA().PAS_PAR_PALIER_DEFAUT || { "Petit": 6, "Normal": 5, "Élite": 4, "Boss": 4 }) },
     leader: { ...(noyauMoteur().LEADER_DEFAUT || { degats: 15, resistances: 15, pv: 15 }) }
 });
 const BORNES_REGLAGES = { bonusDegats: [-50, 200], bonusSortsPct: [-50, 200], deplacement: [0, 15],
-                          tricheBase: [-50, 200], trichePente: [-20, 50],
+                          tricheValeur: [-50, 300],
                           leaderDegats: [-50, 200], leaderResistances: [-50, 70], leaderPv: [0, 300] };
 // Les trois chiffres du leader : leur nom en base, leur borne, leur libellé.
 // (La chance d'état en plus, 15 pts, est retirée en v267 — Nico : « on ne sait
@@ -513,19 +517,21 @@ const CHAMPS_LEADER = [
     { cle: "pv", champ: "PV", borne: "leaderPv", titre: "Points de vie en plus", unite: "PV",
       aide: "Ajoutés à son maximum de vie" }
 ];
-// Les quatre chiffres de la triche selon le niveau.
-const CHAMPS_TRICHE = [
-    { cle: "base14", champ: "Base_1_4", borne: "tricheBase" },
-    { cle: "parNiveau14", champ: "Par_Niveau_1_4", borne: "trichePente" },
-    { cle: "base510", champ: "Base_5_10", borne: "tricheBase" },
-    { cle: "parNiveau510", champ: "Par_Niveau_5_10", borne: "trichePente" }
-];
+// (v402) La triche par niveau : dix valeurs saisies à la main (niveaux 1 à 10).
+const NIVEAUX_TRICHE = 10;
 // Le % de dégâts et de soins (et les PV) que les créatures prennent en plus, à
-// ce niveau du groupe. Au-delà du niveau 10, la même pente.
+// ce niveau du groupe. Au-delà du niveau 10, la valeur du 10.
 window.tricheDuNiveau = function(niveau, t) {
     const r = t || (window.REGLAGES_MONSTRES || window.REGLAGES_MONSTRES_DEFAUT).tricheNiveau;
-    const n = Math.max(1, Math.round(Number(niveau) || 1));
-    return n <= 4 ? r.base14 + r.parNiveau14 * n : r.base510 + r.parNiveau510 * n;
+    const n = Math.min(NIVEAUX_TRICHE, Math.max(1, Math.round(Number(niveau) || 1)));
+    return r[n - 1];
+};
+// (v402) Les anciennes formules encore en base (Triche_Niveau, v263) : ce qu'elles
+// donnaient devient la valeur saisie de chaque niveau, tant qu'on n'a rien saisi.
+const tricheDesFormules = (f) => {
+    const nombre = (v, d) => (v === undefined || v === null || !Number.isFinite(Number(v)) ? d : Number(v));
+    const b14 = nombre(f.Base_1_4, 7), p14 = nombre(f.Par_Niveau_1_4, 1), b510 = nombre(f.Base_5_10, 5), p510 = nombre(f.Par_Niveau_5_10, 2);
+    return Array.from({ length: NIVEAUX_TRICHE }, (_, i) => { const n = i + 1; return n <= 4 ? b14 + p14 * n : b510 + p510 * n; });
 };
 // La triche du moment, au niveau du groupe d'aujourd'hui.
 window.tricheMonstresActuelle = () => window.tricheDuNiveau(window.NIVEAU_GROUPE || 1);
@@ -549,8 +555,11 @@ window.normaliserReglagesMonstres = function(brut) {
     };
     const leader = {};
     CHAMPS_LEADER.forEach(c => { leader[c.cle] = borner(c.borne, (src.Leader || {})[c.champ], d.leader[c.cle]); });
-    const tricheNiveau = {};
-    CHAMPS_TRICHE.forEach(c => { tricheNiveau[c.cle] = borner(c.borne, (src.Triche_Niveau || {})[c.champ], d.tricheNiveau[c.cle]); });
+    // (v402) Les valeurs saisies (Triche_Par_Niveau : { "1": …, "10": … }) ; sinon
+    // ce que donnaient les anciennes formules ; sinon les valeurs de départ.
+    const avant = src.Triche_Niveau ? tricheDesFormules(src.Triche_Niveau) : d.tricheNiveau;
+    const saisies = src.Triche_Par_Niveau || {};
+    const tricheNiveau = Array.from({ length: NIVEAUX_TRICHE }, (_, i) => borner("tricheValeur", saisies[String(i + 1)], borner("tricheValeur", avant[i], d.tricheNiveau[i])));
     // La triche par stature d'avant (Bonus_Degats_Pct, v255) ne se lit plus :
     // c'est le niveau du groupe qui la donne, la même pour toutes les statures.
     const pct = window.tricheDuNiveau(window.NIVEAU_GROUPE || 1, tricheNiveau);
@@ -562,8 +571,8 @@ window.normaliserReglagesMonstres = function(brut) {
         leader
     };
 };
-// La triche telle qu'on l'écrit en base.
-const tricheVersBase = (t) => Object.fromEntries(CHAMPS_TRICHE.map(c => [c.champ, t[c.cle]]));
+// La triche telle qu'on l'écrit en base (v402 : Triche_Par_Niveau, une valeur par niveau).
+const tricheVersBase = (t) => Object.fromEntries(t.map((v, i) => [String(i + 1), v]));
 // Le leader tel qu'on l'écrit en base.
 const leaderVersBase = (leader) => Object.fromEntries(CHAMPS_LEADER.map(c => [c.champ, leader[c.cle]]));
 // Les poser partout où le jeu les lit.
@@ -676,18 +685,16 @@ window.dessinerReglagesMonstres = function() {
     if (sorts) sorts.value = r.bonusSortsPct;
     const triche = document.getElementById("corps-triche-niveau");
     if (triche) {
-        const champ = (cle) => { const c = CHAMPS_TRICHE.find(x => x.cle === cle);
-            return `<input type="number" inputmode="numeric" class="reglage-monstres-valeur" data-famille="triche" data-cle="${cle}"
-                value="${r.tricheNiveau[cle]}" min="${BORNES_REGLAGES[c.borne][0]}" max="${BORNES_REGLAGES[c.borne][1]}"
-                onchange="window.modifierReglageMonstre('triche', '${cle}', this)">`; };
-        const niveaux = Array.from({ length: 10 }, (_, i) => i + 1);
-        triche.innerHTML = `<div class="triche-formules">
-              <label>Niveaux 1 à 4 : ${champ("base14")} + ${champ("parNiveau14")} × niveau</label>
-              <label>Niveaux 5 et plus : ${champ("base510")} + ${champ("parNiveau510")} × niveau</label>
-            </div>
-            <table class="table-reglages-monstres table-triche-niveau">
-              <thead><tr><th>Niveau</th>${niveaux.map(n => `<th class="${n === window.NIVEAU_GROUPE ? "niveau-actuel" : ""}">${n}</th>`).join("")}</tr></thead>
-              <tbody><tr><td class="reglage-monstres-titre">% et PV en plus</td>${niveaux.map(n => `<td class="${n === window.NIVEAU_GROUPE ? "niveau-actuel" : ""}">${window.tricheDuNiveau(n, r.tricheNiveau)}</td>`).join("")}</tr></tbody>
+        // (v402) Plus de formules : une case par niveau, saisie à la main (la dernière : 10 et plus).
+        const niveaux = Array.from({ length: NIVEAUX_TRICHE }, (_, i) => i + 1);
+        const actuel = Math.min(NIVEAUX_TRICHE, window.NIVEAU_GROUPE || 1);
+        const classe = (n) => (n === actuel ? "niveau-actuel" : "");
+        triche.innerHTML = `<table class="table-reglages-monstres table-triche-niveau">
+              <thead><tr><th>Niveau</th>${niveaux.map(n => `<th class="${classe(n)}">${n === NIVEAUX_TRICHE ? n + "+" : n}</th>`).join("")}</tr></thead>
+              <tbody><tr><td class="reglage-monstres-titre">% et PV en plus</td>${niveaux.map(n => `<td class="${classe(n)}"><input type="number" inputmode="numeric"
+                  class="reglage-monstres-valeur" data-famille="triche" data-niveau="${n}" value="${r.tricheNiveau[n - 1]}"
+                  min="${BORNES_REGLAGES.tricheValeur[0]}" max="${BORNES_REGLAGES.tricheValeur[1]}"
+                  onchange="window.modifierReglageMonstre('triche', '${n}', this)"></td>`).join("")}</tr></tbody>
             </table>`;
     }
     if (typeof window.afficherNiveauGroupe === "function") window.afficherNiveauGroupe();
@@ -705,23 +712,25 @@ window.dessinerReglagesMonstres = function() {
 window.modifierReglageMonstre = async function(famille, palier, input) {
     const actuels = window.REGLAGES_MONSTRES || window.normaliserReglagesMonstres(null);
     const champLeader = famille === "leader" ? CHAMPS_LEADER.find(c => c.cle === palier) : null;
-    const champTriche = famille === "triche" ? CHAMPS_TRICHE.find(c => c.cle === palier) : null;
+    // (v402) la triche : `palier` est le niveau (1 à 10)
+    const niveauTriche = famille === "triche" ? Math.round(Number(palier)) : 0;
+    const champTriche = famille === "triche" && niveauTriche >= 1 && niveauTriche <= NIVEAUX_TRICHE;
     if ((famille === "leader" && !champLeader) || (famille === "triche" && !champTriche)) return;
     const valeur = famille === "bonusSortsPct"
         ? borner(famille, input && input.value, actuels.bonusSortsPct)
         : champLeader ? borner(champLeader.borne, input && input.value, actuels.leader[palier])
-        : champTriche ? borner(champTriche.borne, input && input.value, actuels.tricheNiveau[palier])
+        : champTriche ? borner("tricheValeur", input && input.value, actuels.tricheNiveau[niveauTriche - 1])
         : borner(famille, input && input.value, actuels[famille][palier]);
     if (input) input.value = valeur;
     const etat = document.getElementById("reglages-monstres-etat");
     const maj = famille === "bonusSortsPct" ? { Bonus_Sorts_Pct: valeur }
         : champLeader ? { Leader: leaderVersBase({ ...actuels.leader, [palier]: valeur }) }
-        : champTriche ? { Triche_Niveau: tricheVersBase({ ...actuels.tricheNiveau, [palier]: valeur }) }
+        : champTriche ? { Triche_Par_Niveau: tricheVersBase(actuels.tricheNiveau.map((v, i) => (i === niveauTriche - 1 ? valeur : v))) }
         : { Deplacement: { ...actuels[famille], [palier]: valeur } };
     // Tout de suite sur ce poste ; la base le porte aux autres.
     const brut = {
         Bonus_Sorts_Pct: actuels.bonusSortsPct, Deplacement: actuels.deplacement,
-        Leader: leaderVersBase(actuels.leader), Triche_Niveau: tricheVersBase(actuels.tricheNiveau), ...maj
+        Leader: leaderVersBase(actuels.leader), Triche_Par_Niveau: tricheVersBase(actuels.tricheNiveau), ...maj
     };
     window.appliquerReglagesMonstres(brut);
     try {

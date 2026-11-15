@@ -244,8 +244,9 @@ console.log("\n4b. LE TABLEAU DES MONSTRES : LA TRICHE EN %");
     const champs = () => [...document.querySelectorAll("#corps-triche-niveau input")];
     const valeurs = champs().map(i => i.value).join("/");
     window.__ecrits = [];
-    const champ = champs().find(i => i.dataset.cle === "base14");
-    if (champ) { champ.value = "24"; champ.dispatchEvent(new Event("change")); }
+    // (v402) plus de formules : la case du niveau 1, saisie à la main
+    const champ = champs().find(i => i.dataset.niveau === "1");
+    if (champ) { champ.value = "25"; champ.dispatchEvent(new Event("change")); }
     await new Promise(res => setTimeout(res, 50));
     const ecrit = (window.__ecrits || []).filter(x => x.chemin === "Monstres_Modeles/_REGLAGES").map(x => JSON.stringify(x.data));
     const MP = await import('./moteur_pur.js');
@@ -257,9 +258,9 @@ console.log("\n4b. LE TABLEAU DES MONSTRES : LA TRICHE EN %");
     window.__ou(() => window.appliquerReglagesMonstres(null), null);
     return { titre, valeurs, ecrit, normal, ancien };
   });
-  verifier("l'encart dit « % de dégâts et de soins », 7 + 1 × niveau (8 % au niveau 1)", /% de dégâts et de soins/.test(r.titre) && r.valeurs === "7/1/5/2", `${r.titre} ${r.valeurs}`);
-  verifier("base à 24 : +25 % au niveau 1, le moteur le sait, la base l'écrit (Triche_Niveau)", r.normal === 25
-           && r.ecrit.some(x => /"Triche_Niveau":\{[^}]*"Base_1_4":24/.test(x)), JSON.stringify(r.ecrit));
+  verifier("l'encart dit « % de dégâts et de soins », une case par niveau (8 % au niveau 1)", /% de dégâts et de soins/.test(r.titre) && r.valeurs === "8/9/10/11/15/17/19/21/23/25", `${r.titre} ${r.valeurs}`);
+  verifier("niveau 1 saisi à 25 : +25 %, le moteur le sait, la base l'écrit (Triche_Par_Niveau, v402)", r.normal === 25
+           && r.ecrit.some(x => /"Triche_Par_Niveau":\{"1":25,/.test(x)), JSON.stringify(r.ecrit));
   verifier("les anciens réglages (Bonus_Degats, Bonus_Degats_Pct) ne sont plus relus", r.ancien === 8, `${r.ancien}`);
 }
 

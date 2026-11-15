@@ -276,42 +276,51 @@ titre("6. SON ENCART DANS PARAMÈTRES > MONSTRES");
     window.__ou(() => window.appliquerReglagesMonstres(null), null);
     window.__ou(() => window.dessinerReglagesMonstres(), null);
     const champs = () => [...document.querySelectorAll("#corps-triche-niveau input")];
-    res.champs = champs().map(i => i.dataset.cle + "=" + i.value).join(" ");
+    // (v402) plus de formules : une case par niveau, saisie à la main
+    res.champs = champs().map(i => i.dataset.niveau + "=" + i.value).join(" ");
     res.dansLeBloc = !!document.querySelector("#reglages-monstres #reglages-triche-niveau #corps-triche-niveau");
-    res.colonnes = [...document.querySelectorAll("#corps-triche-niveau .table-triche-niveau tbody td")].map(td => td.textContent.trim());
+    res.colonnes = [...document.querySelectorAll("#corps-triche-niveau .table-triche-niveau tbody td")].map(td => { const i = td.querySelector("input"); return i ? i.value : td.textContent.trim(); });
+    res.entetes = [...document.querySelectorAll("#corps-triche-niveau .table-triche-niveau thead th")].map(th => th.textContent.trim());
+    res.formules = !!document.querySelector("#corps-triche-niveau .triche-formules");
     res.actuel = [...document.querySelectorAll("#corps-triche-niveau .table-triche-niveau thead th.niveau-actuel")].map(th => th.textContent.trim());
     res.lignesStature = [...document.querySelectorAll("#tbody-reglages-monstres tr")].map(tr => tr.querySelector("td").textContent.trim());
     res.titreBloc = (document.querySelector("#reglages-monstres > .reglages-monstres-entete .reglages-monstres-nom") || {}).textContent;
     // Le MJ change la base des niveaux 1 à 4.
     window.__ecrits = [];
-    const changer = (cle, v) => { const i = champs().find(x => x.dataset.cle === cle); if (!i) return; i.value = String(v); i.dispatchEvent(new Event("change")); };
-    changer("base14", 12);
-    changer("parNiveau510", 999);
+    const changer = (n, v) => { const i = champs().find(x => x.dataset.niveau === String(n)); if (!i) return; i.value = String(v); i.dispatchEvent(new Event("change")); };
+    changer(1, 12);
+    changer(10, 999);
     await new Promise(res2 => setTimeout(res2, 50));
     const MP = window.moteurPur || {};
     res.apres = { bonus: window.__ou(() => MP.bonusMonstreDe({ estMonstre: true, palier: "Boss" }), null),
-                  pente: (champs().find(x => x.dataset.cle === "parNiveau510") || {}).value,
+                  pente: (champs().find(x => x.dataset.niveau === "10") || {}).value,
                   ecrit: (window.__ecrits || []).filter(e => e.chemin === "Monstres_Modeles/_REGLAGES").map(e => JSON.stringify(e.data) + (e.options && e.options.merge ? "+merge" : "")),
-                  colonne1: ((document.querySelector("#corps-triche-niveau .table-triche-niveau tbody td:nth-child(2)") || {}).textContent || "").trim() };
+                  colonne1: ((document.querySelector("#corps-triche-niveau .table-triche-niveau tbody td:nth-child(2) input") || {}).value || "").trim() };
     // Un autre poste : la base apporte ses chiffres ici.
+    window.__ou(() => window.appliquerReglagesMonstres({ Triche_Par_Niveau: { "1": 3, "2": 4, "3": 5, "4": 6, "5": 7, "6": 8, "7": 9, "8": 10, "9": 11, "10": 30 } }), null);
+    res.ailleurs = { champs: champs().map(i => i.value).join("/"), n1: window.__ou(() => window.tricheDuNiveau(1), null), n10: window.__ou(() => window.tricheDuNiveau(10), null),
+                     n14: window.__ou(() => window.tricheDuNiveau(14), null) };
+    // Les anciennes formules encore en base (avant la v402) : leurs résultats deviennent les cases.
     window.__ou(() => window.appliquerReglagesMonstres({ Triche_Niveau: { Base_1_4: 3, Par_Niveau_1_4: 2, Base_5_10: 0, Par_Niveau_5_10: 3 } }), null);
-    res.ailleurs = { champs: champs().map(i => i.value).join("/"), n1: window.__ou(() => window.tricheDuNiveau(1), null), n10: window.__ou(() => window.tricheDuNiveau(10), null) };
+    res.anciennes = champs().map(i => i.value).join("/");
     window.__ou(() => window.appliquerReglagesMonstres(null), null);
     res.retour = window.__ou(() => window.tricheDuNiveau(1), null);
     return res;
   });
-  verifier("quatre réglages : 7 + 1 × niveau, 5 + 2 × niveau", r.champs === "base14=7 parNiveau14=1 base510=5 parNiveau510=2", r.champs);
+  verifier("(v402) plus de formules : une case par niveau, de 1 à 10, saisie à la main", !r.formules && r.champs === "1=8 2=9 3=10 4=11 5=15 6=17 7=19 8=21 9=23 10=25", r.champs);
+  verifier("…la dernière vaut pour 10 et plus", JSON.stringify(r.entetes) === '["Niveau","1","2","3","4","5","6","7","8","9","10+"]', JSON.stringify(r.entetes));
   verifier("dans le bloc des réglages, en haut du tableau", r.dansLeBloc === true);
   verifier("la table des dix niveaux : 8 … 25", JSON.stringify(r.colonnes) === '["% et PV en plus","8","9","10","11","15","17","19","21","23","25"]', JSON.stringify(r.colonnes));
   verifier("le niveau du groupe y est surligné", JSON.stringify(r.actuel) === '["1"]', JSON.stringify(r.actuel));
   verifier("la ligne de triche par stature est partie : il reste la marche", JSON.stringify(r.lignesStature) === '["Déplacement (cases)"]', JSON.stringify(r.lignesStature));
   verifier("…et le bloc s'appelle « Déplacement des créatures »", r.titreBloc === "Déplacement des créatures", r.titreBloc);
-  verifier("base à 12 : le moteur frappe à +13 % au niveau 1, tout de suite", r.apres.bonus === 13 && r.apres.colonne1 === "13", `${r.apres.bonus} (table : ${r.apres.colonne1})`);
-  verifier("une saisie folle est bornée (999 → 50)", r.apres.pente === "50", r.apres.pente);
-  verifier("chaque changement s'écrit (Monstres_Modeles/_REGLAGES, champ Triche_Niveau, fusionné)",
-           r.apres.ecrit.length === 2 && r.apres.ecrit.every(x => /^\{"Triche_Niveau":\{/.test(x) && x.endsWith("+merge")) && /"Base_1_4":12/.test(r.apres.ecrit[0]),
+  verifier("niveau 1 saisi à 12 : le moteur frappe à +12 % au niveau 1, tout de suite", r.apres.bonus === 12 && r.apres.colonne1 === "12", `${r.apres.bonus} (table : ${r.apres.colonne1})`);
+  verifier("une saisie folle est bornée (999 → 300)", r.apres.pente === "300", r.apres.pente);
+  verifier("chaque changement s'écrit (Monstres_Modeles/_REGLAGES, champ Triche_Par_Niveau, fusionné)",
+           r.apres.ecrit.length === 2 && r.apres.ecrit.every(x => /^\{"Triche_Par_Niveau":\{/.test(x) && x.endsWith("+merge")) && /"1":12,/.test(r.apres.ecrit[0]),
            r.apres.ecrit.join(" | "));
-  verifier("un autre poste les change : l'encart et le calcul suivent", r.ailleurs.champs === "3/2/0/3" && r.ailleurs.n1 === 5 && r.ailleurs.n10 === 30, JSON.stringify(r.ailleurs));
+  verifier("un autre poste les change : l'encart et le calcul suivent (au-delà de 10 : la case du 10)", r.ailleurs.champs === "3/4/5/6/7/8/9/10/11/30" && r.ailleurs.n1 === 3 && r.ailleurs.n10 === 30 && r.ailleurs.n14 === 30, JSON.stringify(r.ailleurs));
+  verifier("les anciennes formules encore en base donnent leurs résultats aux cases", r.anciennes === "5/7/9/11/15/18/21/24/27/30", r.anciennes);
   verifier("sans réglage en base : les chiffres de Nico", r.retour === 8, `${r.retour}`);
 }
 

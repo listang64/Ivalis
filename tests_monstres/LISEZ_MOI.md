@@ -11904,3 +11904,9 @@ corrections_v398.mjs le vérifie (captures : V398_CAPTURES=dossier).
 - **Une voix s'en va** (ou n'a plus donné de nouvelles) : le même cor, plus loin et plus sourd, sonne la retraite (`cor-depart`) — sol puis ré, qui descend et s'éteint.
 - vocal.js (`annoncerMouvements`) : à chaque nouvelle de la présence et au contrôle des absents ; les voix déjà là quand on entre dans la partie ne sonnent pas ; plusieurs à la fois, un seul son. Tous les postes de la partie l'entendent (même ceux qui n'ont pas rejoint) ; il suit le volume « Interface » × « Général ».
 - corrections_v401.mjs rend les deux sons hors ligne et les écoute par le calcul (hauteurs, tenue, niveau, timbre ; V401_SONS=dossier : les .wav) ; corrections_v396 les entend entre deux vrais postes.
+
+## v402 — La triche des monstres, saisie à la main par niveau
+
+- **Paramètres > Monstres** (monstres.js, `dessinerReglagesMonstres`) : plus de formules (« base + pente × niveau ») pour la triche selon le niveau du groupe ; une case par niveau, du 1 au 10, saisie à la main (la dernière vaut pour 10 et plus). Le niveau du groupe y est surligné ; une case changée vaut tout de suite, sur tous les postes.
+- **Les valeurs** : au départ, ce que donnaient les formules (8, 9, 10, 11, 15, 17, 19, 21, 23, 25). En base : `Triche_Par_Niveau` ({ "1": …, "10": … }, dans Monstres_Modeles/_REGLAGES) ; tant qu'il n'existe pas, les anciennes formules encore en base (`Triche_Niveau`) donnent leurs résultats aux cases. Bornes : −50 à 300.
+- corrections_v252, v255 et v263 suivent (une case par niveau au lieu des quatre chiffres) ; corrections_v402.mjs le vérifie dans le livre (captures : V402_CAPTURES=dossier).

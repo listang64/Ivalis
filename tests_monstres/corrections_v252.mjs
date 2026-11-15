@@ -266,8 +266,9 @@ console.log("\n1b. EN HAUT DU TABLEAU DES MONSTRES : LA TRICHE ET LA MARCHE, À 
       if (!i) return false; i.value = String(v); i.dispatchEvent(new Event("change")); return true; };
     window.__setDocs = [];
     window.NIVEAU_GROUPE = 1;
-    const base14 = triche().find(i => i.dataset.cle === "base14");
-    if (base14) { base14.value = "3"; base14.dispatchEvent(new Event("change")); }
+    // (v402) plus de formules : la case du niveau 1, saisie à la main
+    const niveau1 = triche().find(i => i.dataset.niveau === "1");
+    if (niveau1) { niveau1.value = "4"; niveau1.dispatchEvent(new Event("change")); }
     changer("deplacement", "Boss", 7);
     changer("deplacement", "Petit", 999);
     if (sorts) { sorts.value = "35"; sorts.dispatchEvent(new Event("change")); }
@@ -293,18 +294,18 @@ console.log("\n1b. EN HAUT DU TABLEAU DES MONSTRES : LA TRICHE ET LA MARCHE, À 
   // (v262 : plus de colonne Élite — Petit, Normal, Boss. v263 : la triche
   // n'est plus par stature, mais selon le niveau du groupe, dans son encart.)
   verifier("trois cases : la marche, par stature", r.n === 3, `${r.n}`);
-  verifier("on y lit la triche d'aujourd'hui : 7 + 1 × niveau, 5 + 2 × niveau ; +8 % partout au niveau 1",
-           r.avant.degats === "7/1/5/2" && r.avant.bonusNormal === 8 && r.avant.bonusBoss === 8, `${r.avant.degats} → ${r.avant.bonusNormal} / ${r.avant.bonusBoss}`);
+  verifier("on y lit la triche d'aujourd'hui (v402 : une case par niveau) ; +8 % partout au niveau 1",
+           r.avant.degats === "8/9/10/11/15/17/19/21/23/25" && r.avant.bonusNormal === 8 && r.avant.bonusBoss === 8, `${r.avant.degats} → ${r.avant.bonusNormal} / ${r.avant.bonusBoss}`);
   verifier("la marche d'aujourd'hui : 6 / 5 / 4", r.avant.marche === "6/5/4", r.avant.marche);
   verifier("et le bonus des sorts : 20 %", r.avant.sorts === "20", String(r.avant.sorts));
-  verifier("base des niveaux 1 à 4 à 3 : le moteur frappe à +4 % tout de suite (3 + 1)", r.apres.bonusNormal === 4, `${r.apres.bonusNormal}`);
+  verifier("niveau 1 saisi à 4 : le moteur frappe à +4 % tout de suite", r.apres.bonusNormal === 4, `${r.apres.bonusNormal}`);
   verifier("Boss à 7 cases : le cerveau ET la préparation le savent", r.apres.pasBossCerveau === 7 && r.apres.pasBossPreparation === 7,
            `${r.apres.pasBossCerveau} / ${r.apres.pasBossPreparation}`);
   verifier("une saisie folle est bornée (999 → 15 cases)", r.apres.pasPetit === 15 && r.apres.champPetit === "15", `${r.apres.pasPetit} « ${r.apres.champPetit} »`);
   verifier("sorts à 35 % : leurs effets valent ×1,35", Math.abs(r.apres.sorts - 1.35) < 1e-9, `${r.apres.sorts}`);
   verifier("chaque changement s'écrit (Monstres_Modeles/_REGLAGES, fusionné)", r.apres.ecrit.length === 4 && r.apres.ecrit.every(x => x.endsWith("+merge")),
            r.apres.ecrit.join(" | "));
-  verifier("un autre poste change les chiffres : ce poste les suit (l'ancienne triche par stature n'est plus lue)", r.ailleurs.degats === "1/1/5/2" && r.ailleurs.marche === "3/3/3"
+  verifier("un autre poste change les chiffres : ce poste les suit (l'ancienne triche par stature n'est plus lue)", r.ailleurs.degats === "2/3/4/5/15/17/19/21/23/25" && r.ailleurs.marche === "3/3/3"
            && r.ailleurs.boss === 2 && r.ailleurs.pas === 3 && Math.abs(r.ailleurs.sorts - 1.1) < 1e-9, JSON.stringify(r.ailleurs));
   verifier("sans réglage en base : les chiffres d'origine", r.retour.bonus === 8 && r.retour.pas === 4 && Math.abs(r.retour.sorts - 1.2) < 1e-9,
            JSON.stringify(r.retour));
