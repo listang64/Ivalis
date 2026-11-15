@@ -11933,3 +11933,9 @@ corrections_v404.mjs le vérifie (le moteur et l'écran du bouclier ; la tirette
 - **L'arcane** : vérifié — une attaque magique d'Arcane est Magique (pas brute) et fait face à la résistance magique de la cible ; aucune résistance d'élément ne la réduit davantage. Seul le Briseur d'arcane (Chasseur de mages, v356) frappe brut, voulu.
 
 corrections_v405.mjs le vérifie (le moteur, l'écran, et la mise à terre rejouée sur le vrai plateau).
+
+## v406 (A) — La fin d'un combat, écrite comme le reste du récit
+
+- **Le texte en italique gris après un combat** : à la fin d'un combat du récit, combat_rp.js pose un message du Destin (« Le fracas des armes retombe… ») ; la plume du Narrateur le récrit en une ou deux phrases (`recrireAnnonce`, champ `Texte_Livre`) et le livre l'écrit en entrée « temps » (`construireEntrees`, grimoire_recit.js). grimoire_recit.css donnait à `.para-recit.type-temps` un style à part : centré, en italique, brun clair (#5c3a21), un peu plus petit. Cette règle ne vaut plus que pour `.type-note` : les lignes du Destin et du temps (la fin d'un combat, mais aussi la route et les heures qui passent, récrites de la même façon) s'écrivent désormais exactement comme un paragraphe du Narrateur (même police, couleur, taille, alinéa et marges). Les notes d'autres auteurs, les messages des héros et les dés de la marge ne changent pas.
+
+corrections_v406_recit.mjs le vérifie dans la vraie page (les styles calculés de la fin d'un combat comparés à ceux d'un paragraphe du Narrateur ; captures : V406_CAPTURES=dossier).
