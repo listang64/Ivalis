@@ -118,9 +118,10 @@ titre("1. LA STRUCTURE : SOUS LE PION DU LEADER, DES NAPPES DE FUMÉE QUI TOURNE
   verifier("un champ de turbulence tord la fumée (feTurbulence + feDisplacementMap)", r.turbulence === true);
   verifier("au moins trois nappes tournent, dans les deux sens", (r.nappesTournantes || []).length >= 3
            && r.nappesTournantes.some(v => Number(v) > 0) && r.nappesTournantes.some(v => Number(v) < 0), JSON.stringify(r.nappesTournantes));
-  verifier("…faites de langues de fumée (au moins 25), d'un dégradé rouge", r.langues >= 3 && r.remplissageRouge === true, `${r.langues} nappes`);
-  verifier("un anneau rouge vif collé au bord (rayon 51 pour 50), au cœur clair",
-           (r.anneau || []).length >= 3 && r.anneau.every(c => Math.abs(c.r - 51) < 1.5) && r.anneau.some(c => /^#ff[0-3]/i.test(c.stroke)) && r.anneau.some(c => /^#ffd/i.test(c.stroke)),
+  // (v403) Nico : « l'effet autour du token du leader, mets-le en orange plutôt que rouge ».
+  verifier("…faites de langues de fumée (au moins 25), d'un dégradé (v403 : orange)", r.langues >= 3 && r.remplissageRouge === true, `${r.langues} nappes`);
+  verifier("un anneau (v403 : orange) vif collé au bord (rayon 51 pour 50), au cœur clair",
+           (r.anneau || []).length >= 3 && r.anneau.every(c => Math.abs(c.r - 51) < 1.5) && r.anneau.some(c => /^#ff[67]/i.test(c.stroke)) && r.anneau.some(c => /^#ffe/i.test(c.stroke)),
            JSON.stringify(r.anneau));
   verifier("deux éclats de lumière sur l'anneau", r.eclats === 2);
   verifier("des gouttelettes éparses (au moins 20), dont certaines s'échappent", r.gouttes >= 20 && r.gouttesQuiFilent >= 8, `${r.gouttes} / ${r.gouttesQuiFilent}`);
@@ -142,7 +143,8 @@ titre("2. CE QUI SE VOIT, AUX PIXELS");
     const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0);
     const d = ctx.getImageData(0, 0, img.width, img.height).data;
     const px = (x, y) => { const i = (Math.round(y) * img.width + Math.round(x)) * 4; return [d[i], d[i + 1], d[i + 2]]; };
-    const rouge = ([r, g, b]) => r > 90 && r > 1.8 * g && r > 1.8 * b;
+    // (v403) l'aura est orange : une teinte chaude — du rouge, du vert, presque pas de bleu.
+    const rouge = ([r, g, b]) => r > 90 && r > 1.15 * g && g > 0.25 * r && g > 1.3 * b;
     return mesures.map(({ cx, cy, de, a, n }) => {
       let compte = 0, total = 0; const valeurs = [];
       for (let k = 0; k < n; k++) {
@@ -163,9 +165,9 @@ titre("2. CE QUI SE VOIT, AUX PIXELS");
   const [a1, f1, bout, loin, ordinaire] = await analyser(await photo(), zones);
   await p.waitForTimeout(900);
   const [, f2] = await analyser(await photo(), zones);
-  verifier("l'anneau est rouge tout autour du médaillon", a1.part > 0.85, `${(a1.part * 100).toFixed(0)} %`);
+  verifier("l'anneau est orange tout autour du médaillon (v403)", a1.part > 0.85, `${(a1.part * 100).toFixed(0)} %`);
   // v307 : Nico, « l'animation rouge sous les tokens leaders, réduis l'opacité à 60 % » — plus pâle, moins de pixels francs.
-  verifier("la fumée rouge emplit une bonne part de la couronne (1,1 à 1,45 rayon ; v307 : à 60 %)", f1.part > 0.2, `${(f1.part * 100).toFixed(0)} %`);
+  verifier("la fumée orange emplit une bonne part de la couronne (1,1 à 1,45 rayon ; v307 : à 60 %)", f1.part > 0.2, `${(f1.part * 100).toFixed(0)} %`);
   // (v287 : l'effet réduit — les langues s'arrêtent avant une fois et demie le rayon.)
   verifier("(v287) les langues, réduites, ne vont plus au-delà d'une fois et demie le rayon", bout.part < 0.05 && bout.part < f1.part, `${(bout.part * 100).toFixed(0)} %`);
   verifier("au-delà de deux rayons, plus rien", loin.part < 0.02, `${(loin.part * 100).toFixed(1)} %`);

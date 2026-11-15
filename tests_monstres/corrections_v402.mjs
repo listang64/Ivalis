@@ -197,9 +197,9 @@ await section(async () => {
 titre("2. LA VERSION");
 await section(async () => {
   const v = JSON.parse(lire("version.json")).version;
-  verifier("version.json et VERSION_IVALIS d'accord (402)", v === 402 && new RegExp("VERSION_IVALIS = " + v + ";").test(lire("trace_combat.js")), String(v));
+  verifier("version.json et VERSION_IVALIS d'accord (402 ou plus)", v >= 402 && new RegExp("VERSION_IVALIS = " + v + ";").test(lire("trace_combat.js")), String(v));
   const html = lire("index.html");
-  verifier("index.html charge les nouvelles versions (monstres.js 51, style.css 148)", /monstres\.js\?v=51"/.test(html) && /style\.css\?v=148"/.test(html));
+  verifier("index.html charge les nouvelles versions (monstres.js 51, style.css 148)", /monstres\.js\?v=(5[1-9]|[6-9]\d)"/.test(html) && /style\.css\?v=(14[89]|1[5-9]\d)"/.test(html));
   verifier("plus de trace des formules dans le code", !/base14|parNiveau510|CHAMPS_TRICHE|triche-formules/.test(lire("monstres.js") + lire("style.css")));
   verifier("pas d'erreur dans la page", !erreurs.length, erreurs.slice(0, 3).join(" | "));
 });

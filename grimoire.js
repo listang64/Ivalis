@@ -238,6 +238,11 @@
             <div class="journal-entrees">
               ${bouton("grimoire-btn-nouvelle", "Nouvelle partie", "nouvelle")}
               ${bouton("grimoire-btn-charger", "Charger partie", "charger")}
+              <!-- (v403) Nico : « sous Charger partie, une belle séparation, la même que sous
+                   « le jeu de rôle » » : le même fleuron à la plume. -->
+              <svg class="fleuron fleuron-journal" viewBox="0 0 200 24" aria-hidden="true">
+                <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/>
+                <circle cx="100" cy="12" r="2.2"/></svg>
               ${bouton("grimoire-btn-parametres", "Paramètres", "parametres")}
               ${bouton("grimoire-btn-compte", "Compte", "compte")}
               ${bouton("grimoire-btn-quitter", enPartie ? "Quitter la partie" : "Quitter le jeu", "quitter")}

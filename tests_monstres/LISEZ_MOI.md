@@ -11910,3 +11910,11 @@ corrections_v398.mjs le vérifie (captures : V398_CAPTURES=dossier).
 - **Paramètres > Monstres** (monstres.js, `dessinerReglagesMonstres`) : plus de formules (« base + pente × niveau ») pour la triche selon le niveau du groupe ; une case par niveau, du 1 au 10, saisie à la main (la dernière vaut pour 10 et plus). Le niveau du groupe y est surligné ; une case changée vaut tout de suite, sur tous les postes.
 - **Les valeurs** : au départ, ce que donnaient les formules (8, 9, 10, 11, 15, 17, 19, 21, 23, 25). En base : `Triche_Par_Niveau` ({ "1": …, "10": … }, dans Monstres_Modeles/_REGLAGES) ; tant qu'il n'existe pas, les anciennes formules encore en base (`Triche_Niveau`) donnent leurs résultats aux cases. Bornes : −50 à 300.
 - corrections_v252, v255 et v263 suivent (une case par niveau au lieu des quatre chiffres) ; corrections_v402.mjs le vérifie dans le livre (captures : V402_CAPTURES=dossier).
+
+## v403 — La lueur de la piste qui respire ; la séparation sous « Charger partie » ; l'aura du leader en orange
+
+- **La piste d'initiative** (combat.js, style.css) : la lueur dorée de celui qui joue ne clignote plus. La piste se redessine à chaque nouvelle et réécrivait la tuile, ce qui recréait la lueur et relançait son animation depuis le début : c'était le clignotement. La tuile ne se réécrit plus que si elle change, et une lueur recréée (un état qui arrive) reprend où en est la respiration (`RESPIRATION_PISTE_MS`, sa phase suit l'horloge). L'animation est une respiration de 3,2 s : elle naît presque de rien (0,08), s'épanouit (0,9) et s'efface en fondu, sans aller-retour sec.
+- **Le journal** (grimoire.js) : sous « Charger partie », le fleuron à la plume de la page de titre (celui sous « le jeu de rôle »).
+- **L'aura du leader** (combat.js) : les mêmes teintes, passées du rouge à l'orange (même clarté, même transparence, toujours à 60 %). corrections_v271 suit.
+
+corrections_v403.mjs le vérifie (la vraie piste, l'aura, le journal).

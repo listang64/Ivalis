@@ -167,6 +167,8 @@
 .nom-surligne { position: relative; display: inline-block; padding: 0 calc(var(--u) * 1.2); font-style: normal; }
 .nom-surligne b { position: relative; font-family: 'Almendra', serif; font-weight: 700; }
 .journal-entrees { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 5.5); margin-top: calc(var(--u) * 6); width: 100%; }
+/* (v403) Le fleuron sous « Charger partie » : celui de la page de titre, entre deux entrées (l'écart des entrées le borde déjà). */
+.fleuron-journal { width: calc(var(--u) * 40); margin: calc(var(--u) * -2.2) 0; flex-shrink: 0; }
 
 /* Les cadres tracés à la main : les entrées du journal et les boutons. */
 .bouton-grimoire {

@@ -3618,6 +3618,8 @@ window.fantomeAllieKO = function(idPerso, data, taille) {
 //  Le repère : le pion fait 100 unités (rayon 50), la boîte de l'aura 200
 //  (200 % du pion, style.css). Tout est tiré d'une graine fixe : chaque
 //  leader porte la même aura, et le dessin ne change pas d'un rendu à l'autre.
+// (v403) Nico : « l'effet autour du token du leader, mets-le en orange plutôt que rouge » :
+// les mêmes teintes, passées du rouge à l'orange (même clarté, même transparence).
 const RAYON_PION_AURA = 50;
 // v287 — Nico : « réduis en taille l'effet sous les tokens leaders ». L'anneau
 // reste collé au bord du médaillon ; tout ce qui déborde au-delà (langues de
@@ -3677,14 +3679,14 @@ function gouttesAura() {
     const fuyantes = Array.from({ length: 12 }, () => {
         const angle = h() * 360, dur = 2.6 + h() * 2.4, debut = -h() * dur, r = 0.9 + h() * 1.1;
         const depart = -auDelaAura(6 + h() * 8), arrivee = -auDelaAura(34 + h() * 14);
-        return `<g transform="rotate(${fAura(angle)})"><circle cx="0" cy="${fAura(depart)}" r="${fAura(r)}" fill="#ff1f1f" opacity="0">
+        return `<g transform="rotate(${fAura(angle)})"><circle cx="0" cy="${fAura(depart)}" r="${fAura(r)}" fill="#ff7a1a" opacity="0">
             <animate attributeName="cy" values="${fAura(depart)};${fAura(arrivee)}" dur="${fAura(dur)}s" begin="${fAura(debut)}s" repeatCount="indefinite"/>
             <animate attributeName="opacity" values="0;0.95;0.8;0" keyTimes="0;0.15;0.65;1" dur="${fAura(dur)}s" begin="${fAura(debut)}s" repeatCount="indefinite"/></circle></g>`;
     }).join("");
     const eparses = Array.from({ length: 10 }, () => {
         const [x, y] = polaireAura(auDelaAura(26 + h() * 22), h() * Math.PI * 2);
         const dur = 2 + h() * 3;
-        return `<circle cx="${fAura(x)}" cy="${fAura(y)}" r="${fAura(0.7 + h() * 1.2)}" fill="#e01010">
+        return `<circle cx="${fAura(x)}" cy="${fAura(y)}" r="${fAura(0.7 + h() * 1.2)}" fill="#e06010">
             <animate attributeName="opacity" values="0.25;0.9;0.25" dur="${fAura(dur)}s" begin="${fAura(-h() * dur)}s" repeatCount="indefinite"/></circle>`;
     }).join("");
     return eparses + fuyantes;
@@ -3692,17 +3694,17 @@ function gouttesAura() {
 const SVG_AURA = `<svg viewBox="-100 -100 200 200" aria-hidden="true">
     <defs>
       <radialGradient id="aura-feu" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="${auDelaAura(46)}">
-        <stop offset="${fAura((RAYON_PION_AURA - 2) / auDelaAura(46))}" stop-color="#ff1414" stop-opacity="0.95"/>
-        <stop offset="${fAura(auDelaAura(14) / auDelaAura(46))}" stop-color="#ff2020" stop-opacity="0.6"/>
-        <stop offset="${fAura(auDelaAura(30) / auDelaAura(46))}" stop-color="#ff4a4a" stop-opacity="0.25"/>
-        <stop offset="1" stop-color="#ff6b6b" stop-opacity="0"/></radialGradient>
+        <stop offset="${fAura((RAYON_PION_AURA - 2) / auDelaAura(46))}" stop-color="#ff7414" stop-opacity="0.95"/>
+        <stop offset="${fAura(auDelaAura(14) / auDelaAura(46))}" stop-color="#ff8420" stop-opacity="0.6"/>
+        <stop offset="${fAura(auDelaAura(30) / auDelaAura(46))}" stop-color="#ffa04a" stop-opacity="0.25"/>
+        <stop offset="1" stop-color="#ffb36b" stop-opacity="0"/></radialGradient>
       <radialGradient id="aura-halo-feu" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="${auDelaAura(30)}">
-        <stop offset="${fAura((RAYON_PION_AURA - 4) / auDelaAura(30))}" stop-color="#ff0000" stop-opacity="0.75"/>
-        <stop offset="${fAura(auDelaAura(8) / auDelaAura(30))}" stop-color="#ff1a1a" stop-opacity="0.3"/>
-        <stop offset="1" stop-color="#ff1a1a" stop-opacity="0"/></radialGradient>
+        <stop offset="${fAura((RAYON_PION_AURA - 4) / auDelaAura(30))}" stop-color="#ff6a00" stop-opacity="0.75"/>
+        <stop offset="${fAura(auDelaAura(8) / auDelaAura(30))}" stop-color="#ff7d1a" stop-opacity="0.3"/>
+        <stop offset="1" stop-color="#ff7d1a" stop-opacity="0"/></radialGradient>
       <radialGradient id="aura-eclat" cx="0.5" cy="0.5" r="0.5">
-        <stop offset="0" stop-color="#ffffff" stop-opacity="1"/><stop offset="0.35" stop-color="#ff8080" stop-opacity="0.8"/>
-        <stop offset="1" stop-color="#ff0000" stop-opacity="0"/></radialGradient>
+        <stop offset="0" stop-color="#ffffff" stop-opacity="1"/><stop offset="0.35" stop-color="#ffc080" stop-opacity="0.8"/>
+        <stop offset="1" stop-color="#ff6a00" stop-opacity="0"/></radialGradient>
       <filter id="aura-fumee" x="-10%" y="-10%" width="120%" height="120%">
         <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="7" result="bruit"/>
         <feDisplacementMap in="SourceGraphic" in2="bruit" scale="11" xChannelSelector="R" yChannelSelector="G" result="tordu"/>
@@ -3715,13 +3717,13 @@ const SVG_AURA = `<svg viewBox="-100 -100 200 200" aria-hidden="true">
       ${nappeTournante(nappeAura(11, 9, 50 * ETENDUE_AURA, 0.62, 0.95), "url(#aura-feu)", 0.45, 26, 1)}
       ${nappeTournante(nappeAura(23, 12, 34 * ETENDUE_AURA, 0.42, 0.75), "url(#aura-feu)", 0.65, 19, 1)}
       ${nappeTournante(nappeAura(37, 8, 28 * ETENDUE_AURA, 0.5, -0.6), "url(#aura-feu)", 0.4, 33, -1)}
-      ${filetsTournants(filetsAura(53, 12, 27 * ETENDUE_AURA, 0.8), "#c80000", 2.4, 0.32, 19, 1)}
+      ${filetsTournants(filetsAura(53, 12, 27 * ETENDUE_AURA, 0.8), "#c85000", 2.4, 0.32, 19, 1)}
     </g>
     <g>
       <animate attributeName="opacity" values="0.85;1;0.85" dur="2.4s" repeatCount="indefinite"/>
-      <circle r="${RAYON_PION_AURA + 1}" fill="none" stroke="#ff0000" stroke-width="6" stroke-opacity="0.7" filter="url(#aura-flou)"/>
-      <circle r="${RAYON_PION_AURA + 1}" fill="none" stroke="#ff1e1e" stroke-width="2.4"/>
-      <circle r="${RAYON_PION_AURA + 1}" fill="none" stroke="#ffd2d2" stroke-width="0.7" stroke-opacity="0.9"/>
+      <circle r="${RAYON_PION_AURA + 1}" fill="none" stroke="#ff6a00" stroke-width="6" stroke-opacity="0.7" filter="url(#aura-flou)"/>
+      <circle r="${RAYON_PION_AURA + 1}" fill="none" stroke="#ff7e1e" stroke-width="2.4"/>
+      <circle r="${RAYON_PION_AURA + 1}" fill="none" stroke="#ffe2c2" stroke-width="0.7" stroke-opacity="0.9"/>
     </g>
     ${[[0, -(RAYON_PION_AURA + 1)], [0, RAYON_PION_AURA + 1]].map(([x, y], i) => `<ellipse cx="${x}" cy="${y}" rx="3.2" ry="9" fill="url(#aura-eclat)">
       <animate attributeName="opacity" values="0.55;1;0.55" dur="${2.2 + i * 0.7}s" repeatCount="indefinite"/></ellipse>`).join("")}
@@ -5766,7 +5768,15 @@ window.afficherPisteInitiative = function(queue, phase) {
             ? (ontChoisi.has(e.id) ? "pret" : "attente") : null;
         const cocheNeuve = choix === "pret" && tuile.dataset.choix !== "pret";
         tuile.dataset.choix = choix || "";
-        tuile.innerHTML = contenuTuilePiste(e, e.id === idQuiJoue, choix, cocheNeuve);
+        // (v403) Nico : « celui à qui c'est de jouer, son token clignote en doré : fais que
+        // l'animation soit fluide, en fondu, comme si ça respirait ». La piste se redessine à
+        // chaque nouvelle : réécrire la tuile recréait sa lueur, qui repartait de zéro — d'où le
+        // clignotement. La tuile ne se réécrit plus que si elle change ; et une lueur recréée
+        // reprend là où en est la respiration (sa phase suit l'horloge).
+        const html = contenuTuilePiste(e, e.id === idQuiJoue, choix, cocheNeuve);
+        if (tuile.__html !== html) { tuile.innerHTML = html; tuile.__html = html; }
+        const lueur = tuile.querySelector(".piste-scintillement");
+        if (lueur && !lueur.style.animationDelay) lueur.style.animationDelay = "-" + ((performance.now() % RESPIRATION_PISTE_MS) / 1000).toFixed(3) + "s";
     });
 
     // Un combattant qui n'est plus sur la piste (tombé, retiré du combat)
@@ -5796,6 +5806,8 @@ function badgeChoixPiste(choix, neuf) {
 // Le contenu d'une tuile : le portrait (hexagone pour un héros, médaillon rond
 // pour une créature), l'encart d'initiative, les deux jauges penchées, et les
 // pastilles d'état sous le tout. `choix` (préparation) : "attente", "pret" ou rien.
+// (v403) La respiration de la lueur dorée (style.css, scintillementPiste) : sa durée.
+const RESPIRATION_PISTE_MS = 3200;
 function contenuTuilePiste(entree, cestSonTour, choix, choixNeuf) {
     const perso = entree.perso;
     const L = PISTE_LARGEUR_TUILE, H = PISTE_HAUTEUR_TUILE;
