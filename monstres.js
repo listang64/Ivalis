@@ -319,6 +319,8 @@ window.ecouterMonstresPartie = function(idPartie) {
             objet.releveEnLeader = !!brut.Releve_En_Leader && !brut.Leader;
             // Les résistances de son rang de leader, tirées d'avance (v263).
             if (Array.isArray(brut.Resistances_En_Leader)) objet.resistancesEnLeader = [...brut.Resistances_En_Leader];
+            // (v416) Son % de dégâts aléatoire, tiré à sa création (tirerAleaMonstre).
+            objet.aleaDegats    = Number(brut.Alea_Degats_Pct) || 0;
             // LES APPARITIONS (v268) : un fuyard (sa fuite, son esquive des
             // attaques d'opportunité, la manche où elle cesse), l'ancre dont la
             // vie appelle des renforts, une créature surgie d'un piège.
@@ -364,34 +366,9 @@ window.ecouterMonstresPartie = function(idPartie) {
 
 // Crée un monstre sur le plateau à partir d'un gabarit. Les chapitres suivants
 // (monstres nommés, compétences, IA) viendront enrichir ce socle.
-// CHAQUE CRÉATURE A SES PETITES DIFFÉRENCES (v270, Nico : « pour tous les
-// monstres, à leur création, un bonus / malus de + ou − 5 % dans toutes leurs
-// stats, de façon aléatoire »). Chaque stat tire son propre écart, entre −5 %
-// et +5 %, arrondi à l'unité : deux gobelins du même gabarit ne se valent
-// plus tout à fait. L'XP qu'elle rapporte et son nombre d'actions ne bougent
-// pas (ce ne sont pas des forces). Les écarts tirés restent sur la fiche
-// (Variation_Stats, en %), pour qu'on puisse les relire.
-window.VARIATION_STATS_MONSTRE_PCT = 5;
-window.STATS_VARIEES_MONSTRE = ["PV_Max", "Fatigue_Max", "Def_Physique", "Def_Magique", "Esquive", "Parade",
-                                "Regeneration", "Repos_Long", "Initiative", "Critique"];
-window.varierStatsMonstre = function(data, alea) {
-    const tirer = alea || Math.random;
-    const amplitude = window.VARIATION_STATS_MONSTRE_PCT;
-    // Elle entre en pleine forme : sa vie et son énergie suivent leur maximum.
-    const auPlein = { PV_Max: "PV_Actuels", Fatigue_Max: "Fatigue_Actuelle" };
-    const ecarts = {};
-    window.STATS_VARIEES_MONSTRE.forEach(cle => {
-        const v = Number(data[cle]);
-        if (!Number.isFinite(v)) return;
-        const pct = Math.round(((tirer() * 2 - 1) * amplitude) * 10) / 10;
-        ecarts[cle] = pct;
-        data[cle] = Math.max(0, Math.round(v * (1 + pct / 100)));
-        if (auPlein[cle]) data[auPlein[cle]] = data[cle];
-    });
-    data.Variation_Stats = ecarts;
-    return data;
-};
-
+// (v416) Plus de ±5 % sur toutes ses stats (Variation_Stats, v270) : Nico,
+// « retire la valeur aléatoire qui s'applique aux monstres ». À la place,
+// l'aléa réglé dans Paramètres › Monstres (tirerAleaMonstre, plus bas).
 window.creerMonstreDepuisGabarit = async function(idMonstre, gabarit, donneesSupplementaires = {}) {
     if (!gabarit) return null;
 
@@ -445,8 +422,8 @@ window.creerMonstreDepuisGabarit = async function(idMonstre, gabarit, donneesSup
         ...(releve ? { Resistances_En_Leader: tirees } : {}),
         ...donneesSupplementaires
     };
-    // Le leader compris : l'écart porte sur ce qu'elle est vraiment.
-    window.varierStatsMonstre(data);
+    // (v416) Son aléa, le leader compris : il porte sur ce qu'elle est vraiment.
+    window.tirerAleaMonstre(data);
 
     window.SOURCE_COMBATTANTS[idMonstre] = COLLECTION_MONSTRES;
     await setDoc(doc(db, COLLECTION_MONSTRES, idMonstre), data);
@@ -509,11 +486,15 @@ window.REGLAGES_MONSTRES_DEFAUT = Object.freeze({
     tricheSoins: Object.freeze([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
     bonusSortsPct: 20,
     deplacement: { ...(noyauIA().PAS_PAR_PALIER_DEFAUT || { "Petit": 6, "Normal": 5, "Élite": 4, "Boss": 4 }) },
-    leader: { ...(noyauMoteur().LEADER_DEFAUT || { degats: 15, resistances: 15, pv: 15 }) }
+    leader: { ...(noyauMoteur().LEADER_DEFAUT || { degats: 15, resistances: 15, pv: 15 }) },
+    // (v416) L'aléa des créatures : 0 / 0 partout au départ, aucun aléa tant
+    // que Nico n'a rien réglé (voir LIGNES_ALEA).
+    alea: { degats: { min: 0, max: 0 }, resMagique: { min: 0, max: 0 }, resPhysique: { min: 0, max: 0 } }
 });
 const BORNES_REGLAGES = { bonusDegats: [-50, 200], bonusSortsPct: [-50, 200], deplacement: [0, 15],
                           tricheValeur: [-50, 300], tricheFixe: [0, 500],
-                          leaderDegats: [-50, 200], leaderResistances: [-50, 70], leaderPv: [0, 300] };
+                          leaderDegats: [-50, 200], leaderResistances: [-50, 70], leaderPv: [0, 300],
+                          alea: [-100, 300] };
 // Les trois chiffres du leader : leur nom en base, leur borne, leur libellé.
 // (La chance d'état en plus, 15 pts, est retirée en v267 — Nico : « on ne sait
 // pas dans quoi, enlève-la de là et de la création des leaders ».)
@@ -536,6 +517,24 @@ const LIGNES_TRICHE = [
       aide: "Ajoutés aux PV de chaque créature créée" },
     { cle: "tricheSoins", sorte: "soins", champ: "Triche_Soins_Par_Niveau", borne: "tricheFixe", titre: "Soins en plus",
       aide: "Ajoutés à chaque soin lancé par une créature" }
+];
+// L'ALÉA DES CRÉATURES (v416). Nico : « retire la valeur aléatoire qui s'applique
+// aux monstres. Remplace-la par la possibilité, dans "Monstres", de définir la
+// variable aléatoire qui s'applique aux ennemis sous la forme d'une plage qui va
+// de tant à tant, par exemple dégâts −15 % à +20 % […] Fais en sorte qu'on puisse
+// choisir le bonus minimum et maximum, et qu'il puisse être négatif. Le % de
+// dégâts s'ajoute à celui existant en fonction du level et si c'est un leader.
+// Pour les résistances, la valeur en % s'ajoute à la valeur de résistance du
+// monstre. » Trois plages, en % entiers : la clé des réglages, les champs en base
+// (Alea_…_Min / _Max), le champ de la fiche où le tirage reste, et pour une
+// résistance la défense qu'il rehausse (en points : 10 % + 10 = 20 %).
+const LIGNES_ALEA = [
+    { cle: "degats", champ: "Alea_Degats", fiche: "Alea_Degats_Pct", titre: "Variable Dégâts % aléatoire",
+      aide: "Ajouté au % de dégâts du niveau du groupe (et du leader), tiré à la création de chaque créature" },
+    { cle: "resMagique", champ: "Alea_Res_Magique", fiche: "Alea_Res_Magique_Pct", stat: "Def_Magique", titre: "Variable Résistance magique % aléatoire",
+      aide: "Points ajoutés à sa résistance magique (10 % + 10 = 20 %), tirés à sa création" },
+    { cle: "resPhysique", champ: "Alea_Res_Physique", fiche: "Alea_Res_Physique_Pct", stat: "Def_Physique", titre: "Variable Résistance physique % aléatoire",
+      aide: "Points ajoutés à sa résistance physique (10 % + 10 = 20 %), tirés à sa création" }
 ];
 const niveauTriche = (niveau) => Math.min(NIVEAUX_TRICHE, Math.max(1, Math.round(Number(niveau) || 1)));
 // Le % de DÉGÂTS que les créatures prennent en plus, à ce niveau du groupe
@@ -597,6 +596,13 @@ window.normaliserReglagesMonstres = function(brut) {
             return borner(l.borne, saisies[String(i + 1)], repli);
         });
     });
+    // (v416) L'aléa : chaque plage bornée ; un mini au-dessus du maxi, échangés.
+    const alea = {};
+    LIGNES_ALEA.forEach(l => {
+        const a = borner("alea", src[l.champ + "_Min"], d.alea[l.cle].min);
+        const b = borner("alea", src[l.champ + "_Max"], d.alea[l.cle].max);
+        alea[l.cle] = { min: Math.min(a, b), max: Math.max(a, b) };
+    });
     // La triche par stature d'avant (Bonus_Degats_Pct, v255) ne se lit plus :
     // c'est le niveau du groupe qui la donne, la même pour toutes les statures.
     const pct = window.tricheDuNiveau(window.NIVEAU_GROUPE || 1, triche.tricheDegats);
@@ -607,8 +613,29 @@ window.normaliserReglagesMonstres = function(brut) {
         ...triche,
         bonusSortsPct: borner("bonusSortsPct", src.Bonus_Sorts_Pct, d.bonusSortsPct),
         deplacement: parPalier("deplacement", "Deplacement"),
-        leader
+        leader,
+        alea
     };
+};
+// (v416) L'aléa tel qu'on l'écrit en base.
+const aleaVersBase = (alea) => Object.fromEntries(LIGNES_ALEA.flatMap(l =>
+    [[l.champ + "_Min", alea[l.cle].min], [l.champ + "_Max", alea[l.cle].max]]));
+// (v416) À la création d'une créature (leader compris) : pour chaque plage, un
+// entier tiré au hasard entre le mini et le maxi, bornes comprises, gardé sur sa
+// fiche (Alea_Degats_Pct…). Celui des dégâts vaut au combat (bonusMonstreDe,
+// moteur_pur.js) ; ceux des résistances s'ajoutent tout de suite à ses défenses,
+// en points, entre 0 et 100 % (le noyau ne retire jamais plus que tout le coup).
+// Un tirage à 0 n'y touche pas. `alea` : un tirage entre 0 et 1 (Math.random).
+window.tirerAleaMonstre = function(data, alea) {
+    const tirer = alea || Math.random;
+    const r = (window.REGLAGES_MONSTRES || window.normaliserReglagesMonstres(null)).alea;
+    LIGNES_ALEA.forEach(l => {
+        const { min, max } = r[l.cle];
+        const pct = Math.min(max, min + Math.floor(tirer() * (max - min + 1)));
+        data[l.fiche] = pct;
+        if (l.stat && pct !== 0) data[l.stat] = Math.max(0, Math.min(100, (Number(data[l.stat]) || 0) + pct));
+    });
+    return data;
 };
 // Une ligne de triche telle qu'on l'écrit en base (une valeur par niveau).
 const tricheVersBase = (t) => Object.fromEntries(t.map((v, i) => [String(i + 1), v]));
@@ -747,6 +774,17 @@ window.dessinerReglagesMonstres = function() {
               min="${BORNES_REGLAGES[c.borne][0]}" max="${BORNES_REGLAGES[c.borne][1]}"
               onchange="window.modifierReglageMonstre('leader', '${c.cle}', this)"><span class="reglage-leader-unite">${c.unite}</span></span>
         </label>`).join("");
+    // (v416) L'aléa des créatures : un mini et un maxi par ligne.
+    const alea = document.getElementById("corps-reglages-alea");
+    const caseAlea = (l, borne) => `<input type="number" inputmode="numeric" class="reglage-monstres-valeur"
+              data-famille="alea" data-ligne="${l.cle}" data-borne="${borne}" value="${r.alea[l.cle][borne]}"
+              min="${BORNES_REGLAGES.alea[0]}" max="${BORNES_REGLAGES.alea[1]}"
+              onchange="window.modifierReglageMonstre('alea', '${l.cle}:${borne}', this)">`;
+    if (alea) alea.innerHTML = `<table class="table-reglages-monstres table-alea-monstres">
+          <thead><tr><th></th><th>Mini</th><th>Maxi</th></tr></thead>
+          <tbody>${LIGNES_ALEA.map(l => `<tr data-ligne="${l.cle}"><td class="reglage-monstres-titre" title="${l.aide}">${l.titre}</td>
+              <td>${caseAlea(l, "min")} %</td><td>${caseAlea(l, "max")} %</td></tr>`).join("")}</tbody>
+        </table>`;
 };
 
 // `palier` : la stature réglée — ou, pour le leader, lequel de ses chiffres.
@@ -758,23 +796,37 @@ window.modifierReglageMonstre = async function(famille, palier, input) {
     const ligneTriche = famille === "triche" ? LIGNES_TRICHE.find(l => l.sorte === sorteTriche) : null;
     const nivTriche = ligneTriche ? Number(nivTexte) : 0;
     const champTriche = !!ligneTriche && Number.isInteger(nivTriche) && nivTriche >= 1 && nivTriche <= NIVEAUX_TRICHE;
+    // (v416) l'aléa : `palier` est « ligne:min » ou « ligne:max »
+    const [cleAlea, borneAlea] = famille === "alea" ? String(palier).split(":") : [];
+    const ligneAlea = famille === "alea" && (borneAlea === "min" || borneAlea === "max") ? LIGNES_ALEA.find(l => l.cle === cleAlea) : null;
+    if (famille === "alea" && !ligneAlea) return;
     if ((famille === "leader" && !champLeader) || (famille === "triche" && !champTriche)) return;
     const valeur = famille === "bonusSortsPct"
         ? borner(famille, input && input.value, actuels.bonusSortsPct)
         : champLeader ? borner(champLeader.borne, input && input.value, actuels.leader[palier])
         : champTriche ? borner(ligneTriche.borne, input && input.value, actuels[ligneTriche.cle][nivTriche - 1])
+        : ligneAlea ? borner("alea", input && input.value, actuels.alea[cleAlea][borneAlea])
         : borner(famille, input && input.value, actuels[famille][palier]);
     if (input) input.value = valeur;
+    // (v416) Un mini au-dessus du maxi : les deux s'échangent, dans les cases aussi.
+    let plage = null;
+    if (ligneAlea) {
+        const p = { ...actuels.alea[cleAlea], [borneAlea]: valeur };
+        plage = { min: Math.min(p.min, p.max), max: Math.max(p.min, p.max) };
+        document.querySelectorAll(`input[data-famille="alea"][data-ligne="${cleAlea}"]`).forEach(c => { c.value = plage[c.dataset.borne]; });
+    }
     const etat = document.getElementById("reglages-monstres-etat");
     const maj = famille === "bonusSortsPct" ? { Bonus_Sorts_Pct: valeur }
         : champLeader ? { Leader: leaderVersBase({ ...actuels.leader, [palier]: valeur }) }
         : champTriche ? { [ligneTriche.champ]: tricheVersBase(actuels[ligneTriche.cle].map((v, i) => (i === nivTriche - 1 ? valeur : v))) }
+        : ligneAlea ? { [ligneAlea.champ + "_Min"]: plage.min, [ligneAlea.champ + "_Max"]: plage.max }
         : { Deplacement: { ...actuels[famille], [palier]: valeur } };
     // Tout de suite sur ce poste ; la base le porte aux autres.
     const brut = {
         Bonus_Sorts_Pct: actuels.bonusSortsPct, Deplacement: actuels.deplacement,
         Leader: leaderVersBase(actuels.leader),
-        ...Object.fromEntries(LIGNES_TRICHE.map(l => [l.champ, tricheVersBase(actuels[l.cle])])), ...maj
+        ...Object.fromEntries(LIGNES_TRICHE.map(l => [l.champ, tricheVersBase(actuels[l.cle])])),
+        ...aleaVersBase(actuels.alea), ...maj
     };
     window.appliquerReglagesMonstres(brut);
     try {

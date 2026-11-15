@@ -4614,6 +4614,9 @@ textarea.input-texte-parchemin {
 .reglage-leader-plus { font-weight: bold; color: #a52a2a; }
 .reglage-leader-unite { font-size: 13px; color: #7a5230; min-width: 22px; }
 
+/* L'ALÉATOIRE DES CRÉATURES (v416, Paramètres > Monstres) : mini / maxi en %. */
+.reglages-alea { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #8b5a2b; }
+
 /* LES APPARITIONS (v262, Paramètres > Outils) : ce que chacune fait entrer. */
 .corps-rencontres-monstres { display: flex; flex-wrap: wrap; gap: 14px; max-height: 70vh; overflow: auto; }
 .bloc-rencontre { flex: 1 1 300px; padding: 10px 12px; border: 2px solid #8b5a2b; border-radius: 8px;
