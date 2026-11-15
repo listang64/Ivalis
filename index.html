@@ -1630,12 +1630,12 @@
           <thead><tr><th></th><th>Petit</th><th>Normal</th><th>Boss</th></tr></thead>
           <tbody id="tbody-reglages-monstres"></tbody>
         </table>
-        <!-- LA TRICHE SELON LE NIVEAU DU GROUPE (v263) : % de dégâts et de soins,
-             et autant de PV, en plus (monstres.js). -->
+        <!-- LA TRICHE SELON LE NIVEAU DU GROUPE (v263 ; v406 : trois lignes
+             indépendantes — % de dégâts, PV en plus, soins en plus — monstres.js). -->
         <div id="reglages-triche-niveau" class="reglages-triche-niveau">
           <div class="reglages-monstres-entete">
             <span class="reglages-monstres-nom">Triche selon le niveau du groupe</span>
-            <span class="reglages-monstres-aide">% de dégâts et de soins, et autant de PV, en plus</span>
+            <span class="reglages-monstres-aide">% de dégâts, PV et soins en plus, par niveau</span>
           </div>
           <div class="niveau-groupe-texte niveau-groupe-reglages"></div>
           <div id="corps-triche-niveau"></div>
@@ -2213,7 +2213,7 @@
 <script type="importmap">
 { "imports": {
     "./combat_etat.js": "./combat_etat.js?v=63",
-    "./moteur_pur.js": "./moteur_pur.js?v=87",
+    "./moteur_pur.js": "./moteur_pur.js?v=88",
     "./mouvement_pur.js": "./mouvement_pur.js?v=29",
     "./ia_pure.js": "./ia_pure.js?v=16",
     "./cerveau_combat.js": "./cerveau_combat.js?v=81",
@@ -2236,7 +2236,7 @@
 <script type="module" src="combat_etat.js?v=63"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=87"></script>
+<script type="module" src="moteur_pur.js?v=88"></script>
 <script type="module" src="mouvement_pur.js?v=29"></script>
 <script type="module" src="ia_pure.js?v=16"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
@@ -2323,7 +2323,7 @@
 <script src="murs_terre.js?v=10"></script>
 <!-- (v368) Les totems du Chaman : la fenêtre des effets, la pose, le pion. -->
 <script type="module" src="totems.js?v=1"></script>
-<script type="module" src="combat.js?v=183"></script>
+<script type="module" src="combat.js?v=184"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=41"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
@@ -2331,7 +2331,7 @@
 <!-- LES APPARITIONS (v268) : le tableau de Nico, son tirage, sa fenêtre de
      réglage. Avant monstres.js, qui le lit dès son chargement. -->
 <script src="apparitions.js?v=4"></script>
-<script type="module" src="monstres.js?v=51"></script>
+<script type="module" src="monstres.js?v=52"></script>
 <script type="module" src="monstres_competences.js?v=30"></script>
 <script type="module" src="monstres_ia.js?v=44"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->

@@ -78,7 +78,9 @@ titre("2. LA TRICHE DU NIVEAU, LA MÊME POUR TOUTES LES STATURES");
            b({ estMonstre: true, palier: "Petit" }) === 8 && b({ estMonstre: true, palier: "Normal" }) === 8 && b({ estMonstre: true, palier: "Boss" }) === 8,
            `${b({ estMonstre: true, palier: "Petit" })} / ${b({ estMonstre: true, palier: "Normal" })} / ${b({ estMonstre: true, palier: "Boss" })}`);
   verifier("un leader y ajoute ses 15 : +23 %", b({ estMonstre: true, palier: "Normal", leader: true }) === 23, `${b({ estMonstre: true, palier: "Normal", leader: true })}`);
-  verifier("le soin d'une créature : 20 brut → 21,6 (×1,08, au centième)", essai(() => MP.appliquerBonusMonstre(20, 8), null) === 21.6);
+  verifier("un coup de créature : 20 brut → 21,6 (×1,08, au centième)", essai(() => MP.appliquerBonusMonstre(20, 8), null) === 21.6);
+  // (v406) Ses soins ne prennent plus ce % : une valeur fixe (0 à l'origine).
+  verifier("le soin d'une créature : 20 brut → 20 (le % des dégâts n'y touche plus, v406)", essai(() => MP.appliquerSoinMonstre(20, { estMonstre: true, palier: "Normal" }), null) === 20);
   essai(() => MP.reglerBonusMonstres(null));
 }
 
@@ -259,7 +261,7 @@ titre("5. LA TRICHE SELON LE NIVEAU : LE CALCUL, LE MOTEUR, LES PV");
   });
   verifier("le calcul : 8, 9, 10, 11 (7 + niveau) puis 15, 17, 19, 21, 23, 25 (5 + 2 × niveau)",
            JSON.stringify(r.table) === "[8,9,10,11,15,17,19,21,23,25]", JSON.stringify(r.table));
-  verifier("groupe niveau 1 : +8 % de dégâts et de soins, pour toutes les statures",
+  verifier("groupe niveau 1 : +8 % de dégâts, pour toutes les statures",
            r.niv1.petit === 8 && r.niv1.normal === 8 && r.niv1.boss === 8, JSON.stringify(r.niv1));
   verifier("…et un leader +23 % (8 + 15)", r.niv1.chef === 23, `${r.niv1.chef}`);
   verifier("le groupe passe niveau 5 : le moteur frappe à +15 %, tout de suite", r.niv5.petit === 15 && r.niv5.normal === 15 && r.niv5.boss === 15, JSON.stringify(r.niv5));
@@ -275,11 +277,12 @@ titre("6. SON ENCART DANS PARAMÈTRES > MONSTRES");
     window.NIVEAU_GROUPE = 1;
     window.__ou(() => window.appliquerReglagesMonstres(null), null);
     window.__ou(() => window.dessinerReglagesMonstres(), null);
-    const champs = () => [...document.querySelectorAll("#corps-triche-niveau input")];
+    // (v406) trois lignes : celle des dégâts (%) est l'ancienne ligne unique.
+    const champs = () => [...document.querySelectorAll('#corps-triche-niveau input[data-ligne="degats"]')];
     // (v402) plus de formules : une case par niveau, saisie à la main
     res.champs = champs().map(i => i.dataset.niveau + "=" + i.value).join(" ");
     res.dansLeBloc = !!document.querySelector("#reglages-monstres #reglages-triche-niveau #corps-triche-niveau");
-    res.colonnes = [...document.querySelectorAll("#corps-triche-niveau .table-triche-niveau tbody td")].map(td => { const i = td.querySelector("input"); return i ? i.value : td.textContent.trim(); });
+    res.colonnes = [...document.querySelectorAll('#corps-triche-niveau .table-triche-niveau tbody tr[data-ligne="degats"] td')].map(td => { const i = td.querySelector("input"); return i ? i.value : td.textContent.trim(); });
     res.entetes = [...document.querySelectorAll("#corps-triche-niveau .table-triche-niveau thead th")].map(th => th.textContent.trim());
     res.formules = !!document.querySelector("#corps-triche-niveau .triche-formules");
     res.actuel = [...document.querySelectorAll("#corps-triche-niveau .table-triche-niveau thead th.niveau-actuel")].map(th => th.textContent.trim());
@@ -295,11 +298,12 @@ titre("6. SON ENCART DANS PARAMÈTRES > MONSTRES");
     res.apres = { bonus: window.__ou(() => MP.bonusMonstreDe({ estMonstre: true, palier: "Boss" }), null),
                   pente: (champs().find(x => x.dataset.niveau === "10") || {}).value,
                   ecrit: (window.__ecrits || []).filter(e => e.chemin === "Monstres_Modeles/_REGLAGES").map(e => JSON.stringify(e.data) + (e.options && e.options.merge ? "+merge" : "")),
-                  colonne1: ((document.querySelector("#corps-triche-niveau .table-triche-niveau tbody td:nth-child(2) input") || {}).value || "").trim() };
+                  colonne1: ((document.querySelector('#corps-triche-niveau .table-triche-niveau tbody tr[data-ligne="degats"] td:nth-child(2) input') || {}).value || "").trim() };
     // Un autre poste : la base apporte ses chiffres ici.
     window.__ou(() => window.appliquerReglagesMonstres({ Triche_Par_Niveau: { "1": 3, "2": 4, "3": 5, "4": 6, "5": 7, "6": 8, "7": 9, "8": 10, "9": 11, "10": 30 } }), null);
     res.ailleurs = { champs: champs().map(i => i.value).join("/"), n1: window.__ou(() => window.tricheDuNiveau(1), null), n10: window.__ou(() => window.tricheDuNiveau(10), null),
                      n14: window.__ou(() => window.tricheDuNiveau(14), null) };
+    // (v406) La valeur unique de la v402 (Triche_Par_Niveau) devient la ligne des dégâts.
     // Les anciennes formules encore en base (avant la v402) : leurs résultats deviennent les cases.
     window.__ou(() => window.appliquerReglagesMonstres({ Triche_Niveau: { Base_1_4: 3, Par_Niveau_1_4: 2, Base_5_10: 0, Par_Niveau_5_10: 3 } }), null);
     res.anciennes = champs().map(i => i.value).join("/");
@@ -310,14 +314,14 @@ titre("6. SON ENCART DANS PARAMÈTRES > MONSTRES");
   verifier("(v402) plus de formules : une case par niveau, de 1 à 10, saisie à la main", !r.formules && r.champs === "1=8 2=9 3=10 4=11 5=15 6=17 7=19 8=21 9=23 10=25", r.champs);
   verifier("…la dernière vaut pour 10 et plus", JSON.stringify(r.entetes) === '["Niveau","1","2","3","4","5","6","7","8","9","10+"]', JSON.stringify(r.entetes));
   verifier("dans le bloc des réglages, en haut du tableau", r.dansLeBloc === true);
-  verifier("la table des dix niveaux : 8 … 25", JSON.stringify(r.colonnes) === '["% et PV en plus","8","9","10","11","15","17","19","21","23","25"]', JSON.stringify(r.colonnes));
+  verifier("la table des dix niveaux : 8 … 25", JSON.stringify(r.colonnes) === '["Dégâts en plus (%)","8","9","10","11","15","17","19","21","23","25"]', JSON.stringify(r.colonnes));
   verifier("le niveau du groupe y est surligné", JSON.stringify(r.actuel) === '["1"]', JSON.stringify(r.actuel));
   verifier("la ligne de triche par stature est partie : il reste la marche", JSON.stringify(r.lignesStature) === '["Déplacement (cases)"]', JSON.stringify(r.lignesStature));
   verifier("…et le bloc s'appelle « Déplacement des créatures »", r.titreBloc === "Déplacement des créatures", r.titreBloc);
   verifier("niveau 1 saisi à 12 : le moteur frappe à +12 % au niveau 1, tout de suite", r.apres.bonus === 12 && r.apres.colonne1 === "12", `${r.apres.bonus} (table : ${r.apres.colonne1})`);
   verifier("une saisie folle est bornée (999 → 300)", r.apres.pente === "300", r.apres.pente);
-  verifier("chaque changement s'écrit (Monstres_Modeles/_REGLAGES, champ Triche_Par_Niveau, fusionné)",
-           r.apres.ecrit.length === 2 && r.apres.ecrit.every(x => /^\{"Triche_Par_Niveau":\{/.test(x) && x.endsWith("+merge")) && /"1":12,/.test(r.apres.ecrit[0]),
+  verifier("chaque changement s'écrit (Monstres_Modeles/_REGLAGES, champ Triche_Degats_Par_Niveau, v406, fusionné)",
+           r.apres.ecrit.length === 2 && r.apres.ecrit.every(x => /^\{"Triche_Degats_Par_Niveau":\{/.test(x) && x.endsWith("+merge")) && /"1":12,/.test(r.apres.ecrit[0]),
            r.apres.ecrit.join(" | "));
   verifier("un autre poste les change : l'encart et le calcul suivent (au-delà de 10 : la case du 10)", r.ailleurs.champs === "3/4/5/6/7/8/9/10/11/30" && r.ailleurs.n1 === 3 && r.ailleurs.n10 === 30 && r.ailleurs.n14 === 30, JSON.stringify(r.ailleurs));
   verifier("les anciennes formules encore en base donnent leurs résultats aux cases", r.anciennes === "5/7/9/11/15/18/21/24/27/30", r.anciennes);

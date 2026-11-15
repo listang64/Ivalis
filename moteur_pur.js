@@ -862,13 +862,48 @@ export function reglerBonusMonstres(table) {
 }
 export const bonusMonstresActuels = () => ({ ...TABLE_BONUS_MONSTRE });
 
-// Le pourcentage de triche d'un combattant (0 pour un héros). Un LEADER
-// (v262) y ajoute le sien : +15 % de dégâts et de soins, à l'origine
-// (leaderActuel, combat_etat.js).
+// (v406) Nico : « Dégâts en pourcentage, Points de vie en valeur fixe et Soins
+// en valeur fixe, indépendants les uns des autres ». Le % de triche (la table
+// ci-dessus) ne vaut plus que pour les DÉGÂTS des créatures ; leurs SOINS
+// reçoivent une valeur FIXE, celle du niveau du groupe (Paramètres > Monstres,
+// réglée ici par monstres.js) ; les PV en plus sont posés sur la fiche à la
+// création (monstres.js). Le LEADER garde son % sur les dégâts ET les soins.
+export const SOIN_MONSTRE_DEFAUT = 0;
+let SOIN_FIXE_MONSTRE = SOIN_MONSTRE_DEFAUT;
+export function reglerSoinsMonstres(valeur) {
+    const v = valeur === undefined || valeur === null || valeur === "" ? NaN : Number(valeur);
+    SOIN_FIXE_MONSTRE = Number.isFinite(v) ? Math.max(0, v) : SOIN_MONSTRE_DEFAUT;
+    return SOIN_FIXE_MONSTRE;
+}
+export const soinsMonstresActuels = () => SOIN_FIXE_MONSTRE;
+
+// Le pourcentage de triche d'un combattant SUR SES DÉGÂTS (0 pour un héros) :
+// celui du niveau du groupe (v263/v402, posé par stature), plus, pour un
+// LEADER (v262), le sien : +15 % à l'origine (leaderActuel, combat_etat.js).
+// (v406) Il ne touche plus les soins : voir bonusSoinMonstreDe / soinFixeMonstreDe.
 export function bonusMonstreDe(c) {
     if (!c || !c.estMonstre) return 0;
     return (TABLE_BONUS_MONSTRE[c.palier === "Elite" ? "Élite" : c.palier] || 0)
          + (c.leader ? nombre(leaderActuel().degats) : 0);
+}
+// (v406) Le % sur les SOINS d'un combattant : le seul % du leader (comme avant
+// pour lui) ; 0 pour une créature ordinaire et pour un héros.
+export function bonusSoinMonstreDe(c) {
+    if (!c || !c.estMonstre) return 0;
+    return c.leader ? nombre(leaderActuel().degats) : 0;
+}
+// (v406) La valeur FIXE ajoutée à chaque soin d'une créature (0 pour un héros).
+export function soinFixeMonstreDe(c) {
+    if (!c || !c.estMonstre) return 0;
+    return SOIN_FIXE_MONSTRE;
+}
+// (v406) Un soin d'une créature, triche comprise : le % du leader sur le brut,
+// puis la valeur fixe du niveau du groupe — sur un vrai soin seulement (un brut
+// nul reste nul). Au centième près ; l'arrondi vient à la fin de la chaîne.
+export function appliquerSoinMonstre(valeur, c) {
+    const v = appliquerBonusMonstre(valeur, bonusSoinMonstreDe(c));
+    const fixe = soinFixeMonstreDe(c);
+    return v > 0 && fixe ? Math.round((v + fixe) * 100) / 100 : v;
 }
 // Une valeur de dégâts ou de soin, triche comprise (au centième près : le
 // demi-point se garde jusqu'à l'arrondi de la chaîne, comme partout).
@@ -2854,9 +2889,10 @@ export function resoudreCarte(etat, action, plateau) {
             }
 
             // --- SOIN ---------------------------------------------------
-            //  La triche des créatures (bonusMonstreDe) s'ajoute ici, sur le
-            //  soin lui-même — jamais sur un gain de bouclier, qui n'est ni un
-            //  dégât ni un soin.
+            //  La triche des créatures s'ajoute ici, sur le soin lui-même —
+            //  jamais sur un gain de bouclier, qui n'est ni un dégât ni un
+            //  soin. (v406) Plus le % des dégâts : la valeur fixe de soins du
+            //  niveau du groupe, et le % du leader (appliquerSoinMonstre).
             // (v368) UN TOTEM DU CHAMAN NE SE SOIGNE PAS (seul le Renforcement
             // chamanique le remet à neuf) ; un bouclier, lui, s'y pose.
             if (attaque.isHeal && cible.totem) {
@@ -2866,7 +2902,7 @@ export function resoudreCarte(etat, action, plateau) {
             if (attaque.isHeal) {
                 const avant = cible.pv;
                 // (Un soin étalé ne critique pas, v260.)
-                let soin = Math.max(0, appliquerBonusMonstre(attaque.valeurBrute, bonusMonstre)) * (critique && !attaque.estEtalement ? 2 : 1);
+                let soin = Math.max(0, appliquerSoinMonstre(attaque.valeurBrute, lanceur)) * (critique && !attaque.estEtalement ? 2 : 1);
                 // (v352) Le Pisteur de niveau 5 qui soigne SON compagnon : +2.
                 if (cible.compagnon && cible.compagnon.idMaitre === idLanceur && soin > 0) {
                     soin += nombre(lanceur && lanceur.atouts && lanceur.atouts.soinCompagnon);
@@ -2903,7 +2939,8 @@ export function resoudreCarte(etat, action, plateau) {
                         // Lumière : ce sort passe outre sa défense magique.
                         || (des.lumiere === true && attaque.typeRes === "Magique");
 
-            // La triche des créatures (un % du brut) s'applique AU BRUT, avant
+            // La triche des créatures (un % du brut, sur les seuls dégâts depuis
+            // la v406) s'applique AU BRUT, avant
             // la chaîne : elle traverse donc le malus à bout portant et les
             // résistances comme un dégât normal, plutôt que de passer en douce
             // derrière l'armure.
@@ -3529,6 +3566,8 @@ if (typeof window !== "undefined") {
         casesDansLeNoir, estDansLeNoir, ETAT_AVEUGLE,
         // La triche des créatures, réglée depuis le tableau des monstres (v252).
         bonusMonstreDe, appliquerBonusMonstre, reglerBonusMonstres, bonusMonstresActuels, BONUS_MONSTRE_DEFAUT,
+        // (v406) Ses soins : une valeur fixe (et le % du leader).
+        bonusSoinMonstreDe, soinFixeMonstreDe, appliquerSoinMonstre, reglerSoinsMonstres, soinsMonstresActuels,
         // Le leader (v262), réglé depuis le même tableau.
         reglerLeader, leaderActuel, LEADER_DEFAUT, chanceEtatDe,
         // La réserve maintenue (v347), lue par l'écran de préparation.

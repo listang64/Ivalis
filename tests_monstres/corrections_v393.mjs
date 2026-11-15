@@ -217,7 +217,9 @@ await section(async () => {
   verifier("niveau 6 : la triche suit le niveau (+17 %), la même pour toutes", r.n6.triche === 17 && r.n6.parStature.every(x => x === 17), JSON.stringify(r.n6));
   verifier("un coup de 20 d'un Boss au niveau 1 : 21,6 (20 + 8 %) ; un héros n'a rien", r.n1.coup === 21.6 && r.n1.heros === 0, JSON.stringify(r.n1));
   verifier("(le chef garde son bonus de chef, en plus : +15 %)", r.n1.chef === 8 + r.leader && r.leader === 15, JSON.stringify(r));
-  verifier("la chaîne de dégâts des créatures ne lit que ce bonus (bonusMonstreDe)", (lire("moteur_pur.js").match(/appliquerBonusMonstre\(attaque\.valeurBrute, bonusMonstre\)/g) || []).length === 2 && /const pct = window\.tricheDuNiveau\(window\.NIVEAU_GROUPE \|\| 1, tricheNiveau\);/.test(lire("monstres.js")));
+  // (v406) Les dégâts seuls lisent ce bonus ; les soins, la valeur fixe (appliquerSoinMonstre).
+  verifier("la chaîne de dégâts des créatures ne lit que ce bonus (bonusMonstreDe) ; les soins, leur valeur fixe (v406)", (lire("moteur_pur.js").match(/appliquerBonusMonstre\(attaque\.valeurBrute, bonusMonstre\)/g) || []).length === 1
+           && /appliquerSoinMonstre\(attaque\.valeurBrute, lanceur\)/.test(lire("moteur_pur.js")) && /const pct = window\.tricheDuNiveau\(window\.NIVEAU_GROUPE \|\| 1, triche\.tricheDegats\);/.test(lire("monstres.js")));
 });
 
 // =========================================================================

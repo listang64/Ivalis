@@ -413,7 +413,7 @@ titre("8. LA POSE : PV RÉDUITS, FUYARD, ANCRE, SURGIE D'UN PIÈGE AUTOUR DE SA 
     const d = ec ? ec.data : {};
     const t = id ? tokens[id] : null;
     const dist = t ? (Math.abs(t.q - 5) + Math.abs(t.q + t.r - 10) + Math.abs(t.r - 5)) / 2 : -1;
-    const triche = window.__ou(() => window.tricheMonstresActuelle(), 0);
+    const triche = window.__ou(() => window.tricheActuelle().pv, 0);   // (v406) la ligne des PV
     return { id: !!id, pv: d.PV_Max, attendu: 20 + triche, fuyard: d.Comportement_Fuyard, ancre: d.Ancre_Apparition, piege: d.Piege, dist };
   });
   verifier("−50 % de PV : 40 → 20 (+ la triche du niveau)", r.id && r.pv === r.attendu, `${r.pv} / ${r.attendu}`);

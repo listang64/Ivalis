@@ -259,7 +259,8 @@ console.log("\n1b. EN HAUT DU TABLEAU DES MONSTRES : LA TRICHE ET LA MARCHE, À 
     const auDessus = !!(bloc && table && (bloc.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING));
     // v263 : la triche ne se règle plus par stature, mais selon le niveau du
     // groupe (son propre encart, #corps-triche-niveau).
-    const triche = () => [...document.querySelectorAll("#corps-triche-niveau input")];
+    // (v406) trois lignes : on lit celle des dégâts (%).
+    const triche = () => [...document.querySelectorAll('#corps-triche-niveau input[data-ligne="degats"]')];
     const avant = { degats: triche().map(i => i.value).join("/"), marche: lire("deplacement"), sorts: sorts ? sorts.value : null,
                     bonusNormal: MP.bonusMonstreDe({ estMonstre: true, palier: "Normal" }), bonusBoss: MP.bonusMonstreDe({ estMonstre: true, palier: "Boss" }) };
     const changer = (famille, palier, v) => { const i = champs.find(x => x.dataset.famille === famille && x.dataset.palier === palier);

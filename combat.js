@@ -6187,6 +6187,8 @@ window.ligneEffetsCarte = function(dataCarte, lanceur, options) {
     // créature selon le niveau du groupe, leader compris (bonusMonstreDe,
     // moteur_pur.js). Les cartes des créatures ne sont pas forgées : jamais de
     // surpuissance pour elles. La surpuissance se dit d'un mot, en or.
+    // (v406) Le % de triche ne vaut que pour les DÉGÂTS ; un SOIN reçoit le %
+    // du leader puis la valeur fixe du niveau du groupe (appliquerSoinMonstre).
     const estCreature = !!(lanceur && (lanceur.estMonstre
         || (typeof window.estMonstre === "function" && window.estMonstre(lanceur.idPersonnage))));
     const multiplicateurSurpuissance = (lanceur && !estCreature && typeof window.multiplicateurSurpuissance === "function")
@@ -6195,14 +6197,19 @@ window.ligneEffetsCarte = function(dataCarte, lanceur, options) {
         : 1;
     const surpuissance = multiplicateurSurpuissance > 1;
     const noyau = window.moteurPur || {};
+    const commeLeNoyau = { estMonstre: true, palier: lanceur && (lanceur.Palier || lanceur.palier) || "", leader: !!(lanceur && lanceur.leader) };
     const triche = (estCreature && typeof noyau.bonusMonstreDe === "function")
-        ? Number(noyau.bonusMonstreDe({ estMonstre: true, palier: lanceur.Palier || lanceur.palier || "", leader: !!lanceur.leader })) || 0
+        ? Number(noyau.bonusMonstreDe(commeLeNoyau)) || 0
         : 0;
-    const montantReel = (texte) => {
-        if (!surpuissance && !triche) return texte;
+    const soinCreature = estCreature && typeof noyau.appliquerSoinMonstre === "function"
+        && !!(Number(noyau.bonusSoinMonstreDe(commeLeNoyau)) || Number(noyau.soinFixeMonstreDe(commeLeNoyau)));
+    const montantReel = (texte, nature) => {
+        const estSoin = nature === "soin";
+        if (!surpuissance && !(estSoin ? soinCreature : triche)) return texte;
         let v = parseFloat(String(texte).replace(",", ".")) || 0;
         if (surpuissance) v = Math.round(v * multiplicateurSurpuissance);
-        if (triche) v = v * (1 + triche / 100);
+        if (estSoin) { if (soinCreature) v = Number(noyau.appliquerSoinMonstre(v, commeLeNoyau)) || 0; }
+        else if (triche) v = v * (1 + triche / 100);
         return String(Math.round(v));
     };
 
@@ -6270,7 +6277,7 @@ window.ligneEffetsCarte = function(dataCarte, lanceur, options) {
         const nature = window.natureEffetEncart(eff.nom, sansBalises(eff.desc));
         const chiffre = nature ? sansBalises(eff.desc).match(/(\d+(?:[.,]\d+)?)/) : null;
         if (nature && chiffre) {
-            lignes.push(ligneMontant(nature, nom, montantReel(chiffre[1]).replace(".", ","), toursPour(i), !!eff.isMod));
+            lignes.push(ligneMontant(nature, nom, montantReel(chiffre[1], nature).replace(".", ","), toursPour(i), !!eff.isMod));
             // (v316) Ce que le montant porte en % (une chance, une part), écrit dessous.
             if (avecPourcentages) {
                 const pc = sansBalises(eff.desc).split(/(?<=[.;])\s+/).filter(x => /%/.test(x)).join(" ");

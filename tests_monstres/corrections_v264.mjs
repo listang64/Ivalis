@@ -138,24 +138,34 @@ titre("2. UNE CRÉATURE : SA TRICHE SELON LE NIVEAU DU GROUPE");
     const res = {};
     const normal = { idPersonnage: "M1", prenom: "Goule", camp: "Ennemi", estMonstre: true, Palier: "Normal" };
     const MP = window.moteurPur || {};
-    // Ce que le moteur fait tomber, arrondi à l'unité pour l'affichage.
-    const moteur = (v, c) => Math.round(MP.appliquerBonusMonstre(v, MP.bonusMonstreDe(c)));
+    // Ce que le moteur fait tomber, arrondi à l'unité pour l'affichage : (v406)
+    // le % sur les trois dégâts, le soin (le dernier) par appliquerSoinMonstre.
+    const moteur = (v, c, soin) => Math.round(soin ? MP.appliquerSoinMonstre(v, c) : MP.appliquerBonusMonstre(v, MP.bonusMonstreDe(c)));
+    const attendu = (c) => [12, 9, 5, 6].map((v, i) => window.__ou(() => moteur(v, c, i === 3), null)).join(" ");
     res.niveau1 = window.__niveau(0);
     res.n1 = window.__lire(80, normal);
-    res.attendu1 = [12, 9, 5, 6].map(v => window.__ou(() => moteur(v, { estMonstre: true, palier: "Normal" }), null)).join(" ");
+    res.attendu1 = attendu({ estMonstre: true, palier: "Normal" });
     res.chef = window.__lire(80, { ...normal, leader: true });
-    res.attenduChef = [12, 9, 5, 6].map(v => window.__ou(() => moteur(v, { estMonstre: true, palier: "Normal", leader: true }), null)).join(" ");
+    res.attenduChef = attendu({ estMonstre: true, palier: "Normal", leader: true });
+    // (v406) Les soins fixes du niveau 1 saisis à 4 : 6 soins → 10 (le leader : 6 × 1,15 + 4 → 11).
+    window.__ou(() => window.appliquerReglagesMonstres({ Triche_Soins_Par_Niveau: { "1": 4 } }), null);
+    res.soinFixe = window.__lire(80, normal);
+    res.attenduSoinFixe = attendu({ estMonstre: true, palier: "Normal" });
+    res.chefSoinFixe = window.__lire(80, { ...normal, leader: true });
+    window.__ou(() => window.appliquerReglagesMonstres(null), null);
     res.niveau5 = window.__niveau(2500);
     res.n5 = window.__lire(80, normal);
     res.zombie = window.__lire(80, { idPersonnage: "Z1", prenom: "Zombie", camp: "Allié", estMonstre: true, zombie: true });
     window.__niveau(0);
     return res;
   });
-  verifier("groupe niveau 1 (+8 %) : 13, 10, 5, 6 — ce que le moteur fera tomber", r.niveau1 === 1 && r.n1.chiffres === "13 10 5 6" && r.n1.chiffres === r.attendu1,
+  verifier("groupe niveau 1 (+8 % sur les dégâts, rien sur le soin, v406) : 13, 10, 5, 6 — ce que le moteur fera tomber", r.niveau1 === 1 && r.n1.chiffres === "13 10 5 6" && r.n1.chiffres === r.attendu1,
            `${r.n1.chiffres} (moteur : ${r.attendu1})`);
   verifier("une créature n'a jamais de surpuissance (80 de fatigue ou pas)", r.n1.surp === "|||" && !/Surpuissance/.test(r.n1.texte), r.n1.surp);
-  verifier("un leader (+8 + 15 = 23 %) : 15, 11, 6, 7", r.chef.chiffres === "15 11 6 7" && r.chef.chiffres === r.attenduChef, `${r.chef.chiffres} (moteur : ${r.attenduChef})`);
-  verifier("groupe niveau 5 (+15 %) : 14, 10, 6, 7", r.niveau5 === 5 && r.n5.chiffres === "14 10 6 7", `${r.n5.chiffres}`);
+  verifier("un leader (+8 + 15 = 23 % aux dégâts, ses 15 % au soin) : 15, 11, 6, 7", r.chef.chiffres === "15 11 6 7" && r.chef.chiffres === r.attenduChef, `${r.chef.chiffres} (moteur : ${r.attenduChef})`);
+  verifier("(v406) soins fixes du niveau à 4 : le soin passe à 10, les dégâts ne bougent pas", r.soinFixe.chiffres === "13 10 5 10" && r.soinFixe.chiffres === r.attenduSoinFixe, `${r.soinFixe.chiffres} (moteur : ${r.attenduSoinFixe})`);
+  verifier("…un leader : 6 × 1,15 + 4 → 11", r.chefSoinFixe.chiffres === "15 11 6 11", r.chefSoinFixe.chiffres);
+  verifier("groupe niveau 5 (+15 % sur les dégâts) : 14, 10, 6, 6", r.niveau5 === 5 && r.n5.chiffres === "14 10 6 6", `${r.n5.chiffres}`);
   verifier("un zombie (sans stature) : les chiffres de la carte", r.zombie.chiffres === "12 9 5 6", r.zombie.chiffres);
 }
 
