@@ -2,6 +2,12 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
+## Livraison
+
+Chaque changement fait monter la version (vNNN). Lancer les tests, commiter, puis pousser sur dev ET sur main. Donner le nouveau numéro de version à la fin.
+
+Le détail (partir de `origin/dev`, version = celle de `dev` + 1, bancs de `tests_monstres/`, `git push origin HEAD:dev`) est dans la section « Git » plus bas ; `main` reçoit la même livraison, par `git push origin HEAD:main` (avance rapide, jamais de `--force`).
+
 ## 1. Think Before Coding
 
 **Don’t assume. Don’t hide confusion. Surface tradeoffs.**
@@ -79,6 +85,18 @@ Le travail terminé se pousse TOUJOURS sur `dev`, sans attendre qu'on le redeman
 2. **Partir de `dev`** : travailler sur une branche créée depuis `origin/dev` à jour. Si on est parti d'ailleurs, rejouer ses commits dessus (`git cherry-pick` / `git rebase origin/dev`) et résoudre les conflits en gardant le travail de `dev` (numéros de version de `index.html` = ceux de `dev` + 1 pour les fichiers touchés).
 3. **Avant de pousser** : relancer les bancs touchés et ceux des dernières versions de `dev` (`tests_monstres/`).
 4. **Pousser** : `git push origin HEAD:dev` (une avance rapide, jamais de `--force` sur `dev`). Si `dev` a bougé entre-temps : `git fetch`, rejouer, retester, repousser. La branche de la session peut aussi être poussée, mais `dev` est la livraison.
+
+## Pièges connus
+
+### Règles du jeu / calculs de combat
+
+Pour corriger une logique de dégâts, d'armure, de bouclier ou de résistance, suivre tout le chemin du calcul, pas seulement l'affichage. Éviter parseInt sur des statistiques qui peuvent être décimales : utiliser Number() ou parseFloat, et n'arrondir qu'à la toute fin.
+
+## Tests
+
+### Vérification
+
+Avant de modifier le code des règles ou du combat, utiliser mcp__graphify__graphify_tests_for pour trouver les tests concernés. Après le changement, ajouter ou compléter un test qui couvre exactement la règle décrite par l'utilisateur.
 
 ---
 
