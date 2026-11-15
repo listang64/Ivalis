@@ -426,6 +426,9 @@ function combattantBrut(fiche, position, bornes) {
         // sont déjà sur sa fiche. Celle qui se relèvera en leader au premier
         // KO (Apparition 1) le porte aussi.
         ...(fiche.estMonstre && fiche.leader ? { leader: true } : {}),
+        // (v416) Son % de dégâts aléatoire, tiré à sa création (monstres.js) :
+        // il s'ajoute à sa triche (bonusMonstreDe, moteur_pur.js).
+        ...(fiche.estMonstre && nombre(fiche.aleaDegats) ? { aleaDegats: nombre(fiche.aleaDegats) } : {}),
         ...(fiche.estMonstre && fiche.releveEnLeader && !fiche.leader ? { releveEnLeader: true,
             // Les résistances de son rang de leader, tirées à sa création (v263).
             ...(Array.isArray(fiche.resistancesEnLeader) ? { resistancesEnLeader: [...fiche.resistancesEnLeader] } : {}) } : {}),

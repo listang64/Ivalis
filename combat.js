@@ -6197,7 +6197,9 @@ window.ligneEffetsCarte = function(dataCarte, lanceur, options) {
         : 1;
     const surpuissance = multiplicateurSurpuissance > 1;
     const noyau = window.moteurPur || {};
-    const commeLeNoyau = { estMonstre: true, palier: lanceur && (lanceur.Palier || lanceur.palier) || "", leader: !!(lanceur && lanceur.leader) };
+    // (v416) Son % de dégâts aléatoire compris (aleaDegats, monstres.js).
+    const commeLeNoyau = { estMonstre: true, palier: lanceur && (lanceur.Palier || lanceur.palier) || "", leader: !!(lanceur && lanceur.leader),
+                           aleaDegats: Number(lanceur && lanceur.aleaDegats) || 0 };
     const triche = (estCreature && typeof noyau.bonusMonstreDe === "function")
         ? Number(noyau.bonusMonstreDe(commeLeNoyau)) || 0
         : 0;
@@ -6209,7 +6211,8 @@ window.ligneEffetsCarte = function(dataCarte, lanceur, options) {
         let v = parseFloat(String(texte).replace(",", ".")) || 0;
         if (surpuissance) v = Math.round(v * multiplicateurSurpuissance);
         if (estSoin) { if (soinCreature) v = Number(noyau.appliquerSoinMonstre(v, commeLeNoyau)) || 0; }
-        else if (triche) v = v * (1 + triche / 100);
+        // (v416) jamais sous zéro, comme le noyau (appliquerBonusMonstre) : l'aléa peut être négatif
+        else if (triche) v = Math.max(0, v * (1 + triche / 100));
         return String(Math.round(v));
     };
 

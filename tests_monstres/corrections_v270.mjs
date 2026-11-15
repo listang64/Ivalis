@@ -259,7 +259,10 @@ titre("5. L'APPARITION 4 N'A PLUS DE « PAS DE PARTAGE »");
 }
 
 // =========================================================================
-titre("6. CHAQUE MONSTRE NAÎT AVEC ±5 % SUR CHACUNE DE SES STATS");
+// (v416) Nico : « retire la valeur aléatoire qui s'applique aux monstres » — les ±5 %
+// ne sont plus : chaque stat = celle du gabarit (l'aléa réglé par Nico, 0 / 0 au
+// départ, a son banc : corrections_v416_alea_monstres).
+titre("6. (v416) PLUS DE ±5 % : CHAQUE MONSTRE NAÎT AVEC LES STATS DE SON GABARIT");
 // =========================================================================
 {
   const r = await p.evaluate(async () => {
@@ -277,19 +280,13 @@ titre("6. CHAQUE MONSTRE NAÎT AVEC ±5 % SUR CHACUNE DE SES STATS");
   });
   const base = { PV_Max: 200 + r.triche, Fatigue_Max: 120, Def_Physique: 40, Def_Magique: 60, Esquive: 40, Parade: 40,
                  Regeneration: 30, Repos_Long: 90, Initiative: 100, Critique: 20 };
-  const dansLaFourchette = (v, b) => v >= Math.floor(b * 0.95) && v <= Math.ceil(b * 1.05);
-  const horsFourchette = [];
-  r.fiches.forEach(f => Object.keys(base).forEach(k => { if (!dansLaFourchette(f[k], base[k])) horsFourchette.push(`${k}=${f[k]}`); }));
-  verifier("60 créatures : chaque stat reste entre −5 % et +5 %", r.fiches.length === 60 && horsFourchette.length === 0, horsFourchette.slice(0, 4).join(" "));
-  const variees = Object.keys(base).filter(k => new Set(r.fiches.map(f => f[k])).size > 2);
-  verifier("…et chacune varie vraiment d'une créature à l'autre", variees.length === Object.keys(base).length, variees.join(","));
-  const independantes = r.fiches.filter(f => f.Def_Physique / 40 !== f.Def_Magique / 60).length;
-  verifier("…chaque stat tire son propre écart", independantes > 20, `(${independantes}/60)`);
+  const ecarts = [];
+  r.fiches.forEach(f => Object.keys(base).forEach(k => { if (f[k] !== base[k]) ecarts.push(`${k}=${f[k]}`); }));
+  verifier("60 créatures : chaque stat = celle du gabarit, à l'unité (v416)", r.fiches.length === 60 && ecarts.length === 0, ecarts.slice(0, 4).join(" "));
   verifier("elle entre en pleine forme (PV et énergie au plein)", r.fiches.every(f => f.PV_Actuels === f.PV_Max && f.Fatigue_Actuelle === f.Fatigue_Max));
   verifier("son XP et son nombre d'actions ne bougent pas", r.fiches.every(f => f.XP_Groupe === 100 && f.Nombre_Actions === 1));
-  verifier("les écarts tirés restent sur la fiche (Variation_Stats, en %)",
-           r.fiches.every(f => f.Variation_Stats && Object.values(f.Variation_Stats).every(v => Math.abs(v) <= 5)));
-  verifier("un leader aussi, sur ses PV de leader", !!r.leader && dansLaFourchette(r.leader.PV_Max, r.pvLeaderBase) && !!r.leader.Variation_Stats,
+  verifier("plus de Variation_Stats sur la fiche (v416)", r.fiches.every(f => !("Variation_Stats" in f)));
+  verifier("un leader aussi, ses PV de leader tels quels", !!r.leader && r.leader.PV_Max === r.pvLeaderBase && !("Variation_Stats" in r.leader),
            r.leader ? `${r.leader.PV_Max} pour ${r.pvLeaderBase}` : "");
 }
 

@@ -881,10 +881,14 @@ export const soinsMonstresActuels = () => SOIN_FIXE_MONSTRE;
 // celui du niveau du groupe (v263/v402, posé par stature), plus, pour un
 // LEADER (v262), le sien : +15 % à l'origine (leaderActuel, combat_etat.js).
 // (v406) Il ne touche plus les soins : voir bonusSoinMonstreDe / soinFixeMonstreDe.
+// (v416) Plus son % de dégâts aléatoire, tiré à sa création dans la plage de
+// Paramètres › Monstres (aleaDegats, négatif permis) : Nico, « le % de dégâts
+// s'ajoute à celui existant en fonction du level et si c'est un leader ».
 export function bonusMonstreDe(c) {
     if (!c || !c.estMonstre) return 0;
     return (TABLE_BONUS_MONSTRE[c.palier === "Elite" ? "Élite" : c.palier] || 0)
-         + (c.leader ? nombre(leaderActuel().degats) : 0);
+         + (c.leader ? nombre(leaderActuel().degats) : 0)
+         + nombre(c.aleaDegats);
 }
 // (v406) Le % sur les SOINS d'un combattant : le seul % du leader (comme avant
 // pour lui) ; 0 pour une créature ordinaire et pour un héros.
