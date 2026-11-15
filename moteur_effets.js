@@ -3752,17 +3752,19 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
     };
     pousserEtats((window.ELEMENTS_MAGIQUES || []).map(e => e.etat), Number(atouts.chanceElementaire) || 0);
     pousserEtats(window.ETATS_CHARISME_TALENT || ["Confusion", "Peur", "Immobilisation"], Number(atouts.chanceEtatsCharisme) || 0);
-    // LE PUGILISTE VARGEN : +15 % d'empoisonner sur ses coups physiques — en
-    // plus du poison de la carte, ou un poison à lui s'il n'y en a pas.
-    const poisonTalent = Number(atouts.chancePoisonPhysique) || 0;
-    const frappesPhysiques = poisonTalent > 0 ? attaquesFrappantes(state).filter(a => a.typeRes !== "Magique") : [];
+    // LE PUGILISTE VARGEN : +15 % de faire saigner sur ses coups physiques —
+    // en plus du Saignement de la carte, ou un Saignement à lui s'il n'y en a
+    // pas. Nico : « Pour la race Vargen > le boost qui leur boost
+    // l'empoisonnement, mettre plutôt le même boost pour le saignement. »
+    const saignementTalent = Number(atouts.chanceSaignementPhysique) || 0;
+    const frappesPhysiques = saignementTalent > 0 ? attaquesFrappantes(state).filter(a => a.typeRes !== "Magique") : [];
     if (frappesPhysiques.length > 0) {
         state.alterations = state.alterations || [];
-        const poison = state.alterations.find(a => a.nom === "Empoisonnement");
+        const saignement = state.alterations.find(a => a.nom === "Saignement");
         const visees = [...new Set(frappesPhysiques.flatMap(a => a.cibles || []))];
-        if (poison) poison.chance = Math.min(100, (poison.chance || 0) + poisonTalent);
-        else if (visees.length > 0 && GABARITS_ETATS_EQUIPEMENT["Empoisonnement"]) {
-            state.alterations.push({ nom: "Empoisonnement", ...GABARITS_ETATS_EQUIPEMENT["Empoisonnement"], chance: poisonTalent,
+        if (saignement) saignement.chance = Math.min(100, (saignement.chance || 0) + saignementTalent);
+        else if (visees.length > 0 && GABARITS_ETATS_EQUIPEMENT["Saignement"]) {
+            state.alterations.push({ nom: "Saignement", ...GABARITS_ETATS_EQUIPEMENT["Saignement"], chance: saignementTalent,
                 venuDuTalent: true, isRanged: false, rangeMax: 1, cibles: visees });
         }
     }

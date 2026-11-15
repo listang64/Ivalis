@@ -21,7 +21,7 @@
 //    degatsPhysiques / degatsMagiques / degatsMotsPouvoir (la Distorsion
 //    mentale, ex-Mots de pouvoir — la clé garde l'ancien nom)   dégâts plats sur
 //        la carte (appliquerEquipementALaCarte, moteur_effets.js)
-//    chanceElementaire / chanceEtatsCharisme / chancePoisonPhysique   chance
+//    chanceElementaire / chanceEtatsCharisme / chanceSaignementPhysique   chance
 //        en plus sur les états de la carte (idem), au-delà du plafond
 //    testsCarac { cle: n }   jets de carac au d20 (lancerJetDeCaracteristique)
 //    fatigueSurKO, inertieMartiale, impactCinetique, elanPartage,
@@ -82,19 +82,19 @@
           resume: (m, p, n, choix) => choix ? `+2 aux tests de ${NOM_CARAC[choix] || choix}` : "+2 aux tests (carac à choisir)" },
         { id: "TAL_PUGILISTE", nom: "Pugiliste", carac: null, min: null, max: 1,
           texte: "Sans arme équipée (ou seulement des bagues) : +1 dégât physique, +5 % d'esquive. "
-               + "Vampire : en plus +5 d'initiative et +2 dégâts physiques. Vargen : en plus +15 % de chance d'empoisonner et +6 % de critique.",
+               + "Vampire : en plus +5 d'initiative et +2 dégâts physiques. Vargen : en plus +15 % de chance de faire saigner et +6 % de critique.",
           effet: (m, p) => {
               if (!sansArme(p)) return {};
               const a = { degatsPhysiques: 1, esquive: 5 };
               if (estVampire(p)) { a.initiative = 5; a.degatsPhysiques += 2; }
-              if (estVargen(p)) { a.chancePoisonPhysique = 15; a.critique = 6; }
+              if (estVargen(p)) { a.chanceSaignementPhysique = 15; a.critique = 6; }
               return a;
           },
           resume: (m, p) => {
               if (!sansArme(p)) return "Inactif : une arme est en main";
               const morceaux = [`+${1 + (estVampire(p) ? 2 : 0)} dégât(s) physique(s)`, "+5 % d'esquive"];
               if (estVampire(p)) morceaux.push("+5 d'initiative");
-              if (estVargen(p)) morceaux.push("+15 % d'empoisonner", "+6 % de critique");
+              if (estVargen(p)) morceaux.push("+15 % de faire saigner", "+6 % de critique");
               return morceaux.join(", ");
           } },
         { id: "TAL_ADRENALINE", nom: "Adrénaline du Bourreau", carac: null, min: null, max: 1,
