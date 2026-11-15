@@ -132,8 +132,13 @@ function medaillon(id, classe) {
 // ---------------------------------------------------------------------
 function htmlGauche() {
     const P = S(), id = vue.centre, a = ames()[id];
-    const liste = Object.values(ames()).sort((x, y) => (x.type === y.type ? String(x.nom).localeCompare(String(y.nom)) : x.type === "heros" ? -1 : 1));
-    const index = `<div class="index-liens">${liste.map(x => `<button type="button" class="ame-index-liens${x.id === id ? " active" : ""}${x.statut === "mort" ? " mort" : ""}" data-action="liens" data-cb="centrer" data-id="${echapper(x.id)}">${echapper(x.nom)}</button>`).join("")}</div>`;
+    // (v415) Nico : « les âmes de la partie, mets-les dans une liste déroulante, sinon il y en
+    // aura trop ; et classe-les par ordre alphabétique ». Un choix : elle passe au centre.
+    const liste = Object.values(ames()).sort((x, y) => String(x.nom).localeCompare(String(y.nom), "fr", { sensitivity: "base" }));
+    const index = `<select class="index-liens" aria-label="Les âmes de la partie">
+        ${a ? "" : `<option value="" selected>Choisir une âme…</option>`}
+        ${liste.map(x => `<option value="${echapper(x.id)}"${x.id === id ? " selected" : ""}>${echapper(x.nom)}${x.type === "heros" ? " (héros)" : ""}${x.statut === "mort" ? " †" : ""}</option>`).join("")}
+      </select>`;
     const retour = vue.retourRecit ? `<button type="button" class="lien-fiche retour-liens" data-action="liens" data-cb="recit">← Revenir au récit</button>` : "";
     if (!P || !a) return `<div class="contenu-page page-liens-gauche">
         <div class="entete-liens">${lavis(TEINTE_LIENS, "liens-titre")}<span class="titre-page-fiche">Les fils invisibles</span></div>${FLEURON}
@@ -235,6 +240,8 @@ function rendre() {
     if (champ) champ.addEventListener("change", () => chercher(champ.value));
     const filtre = pages.d.querySelector(".filtre-liens");
     if (filtre) filtre.addEventListener("change", () => { vue.filtre = filtre.value; vue.selection = ""; rendre(); });
+    const choixAme = pages.g.querySelector("select.index-liens");
+    if (choixAme) choixAme.addEventListener("change", () => { if (choixAme.value) { son(); centrer(choixAme.value); } });
 }
 async function charger(garderSelection) {
     const P = S(), p = window.ID_PARTIE_COURANTE;

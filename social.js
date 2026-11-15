@@ -25,7 +25,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { collection, query, where, getDocs, doc, getDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as P from "./social_pur.js?v=3";
+import * as P from "./social_pur.js?v=4";
 
 const PARTIES = "Systeme_Parties";
 const refAme = (p, id) => doc(db, PARTIES, p, "Ames", id);
@@ -550,6 +550,27 @@ export async function contexteDuMJ(o) {
 }
 
 // -------------------------------------------------------------------------
+//  L'ÉLAGAGE DES SOUVENIRS (v415, à la clôture de session)
+// -------------------------------------------------------------------------
+// Une âme garde au plus `max` souvenirs : les plus importants, puis les plus
+// récents ; les autres (petits et anciens) s'effacent. Le MJ n'en lit que huit.
+export const MAX_SOUVENIRS = 30;
+export async function elaguerSouvenirs(p, max = MAX_SOUVENIRS) {
+    if (!p) return 0;
+    const parAme = new Map();
+    (await getDocs(collection(db, PARTIES, p, "Souvenirs"))).forEach(d => {
+        const x = d.data() || {};
+        if (!parAme.has(x.ame)) parAme.set(x.ame, []);
+        parAme.get(x.ame).push({ id: d.id, ref: d.ref, score: P.nombre(x.importance, 1) * 1000 + P.nombre(x.tour) });
+    });
+    const lot = writeBatch(db);
+    let effaces = 0;
+    parAme.forEach(liste => liste.sort((a, b) => b.score - a.score).slice(max).forEach(x => { lot.delete(x.ref || refSouvenir(p, x.id)); effaces++; }));
+    if (effaces) { await lot.commit(); journal(`${effaces} vieux souvenir(s) oublié(s) (au plus ${max} par âme).`); }
+    return effaces;
+}
+
+// -------------------------------------------------------------------------
 //  APRÈS UN TOUR DU MJ (ia_master.js, en arrière-plan)
 // -------------------------------------------------------------------------
 // `o` : { idPartie, pnjs: [{ id, fiche }] (ceux de la scène), heros, reputation,
@@ -559,5 +580,5 @@ export async function apresLeTour(o) {
     catch (e) { console.error("[Fils invisibles] Le tour social :", e); return null; }
 }
 
-window.SOCIAL = { ...P, contexteDuMJ, caractere, lireReseau, lireSouvenirsDe, annulerEvenement, ajusterLien, estAdminSocial, lireAmes, lireLiens, lireLiensVers, naissancePnj, assurerAmes, marquerMort, oublierAme, apresLeTour, tourSocial, paragrapheDe, lignesDeMarge,
+window.SOCIAL = { ...P, elaguerSouvenirs, MAX_SOUVENIRS, contexteDuMJ, caractere, lireReseau, lireSouvenirsDe, annulerEvenement, ajusterLien, estAdminSocial, lireAmes, lireLiens, lireLiensVers, naissancePnj, assurerAmes, marquerMort, oublierAme, apresLeTour, tourSocial, paragrapheDe, lignesDeMarge,
                   schemaPsyche, schemaLiens, consigneCreation, psycheDeLIA, LIENS_IA };

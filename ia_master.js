@@ -2665,6 +2665,10 @@ Ne mentionne JAMAIS les mécaniques de jeu (jets de dés, tours de parole). Écr
             // 2-4. (v413) MIA_SOUVENIR n'écrit plus un paragraphe par PNJ à la clôture :
             // les souvenirs se gardent à chaque réponse du MJ, datés, avec leurs témoins
             // (social.js, Systeme_Parties/{partie}/Souvenirs) ; le MJ les lit (contexteDuMJ).
+            // (v415) Chaque âme garde au plus trente souvenirs : les petits et les vieux s'effacent.
+            if (window.SOCIAL && typeof window.SOCIAL.elaguerSouvenirs === "function") {
+                try { await window.SOCIAL.elaguerSouvenirs(window.ID_PARTIE_COURANTE); } catch (e) { console.warn("[Fils invisibles] L'élagage des souvenirs :", e); }
+            }
         }
 
         // 4 bis. LE CHAPITRE SE RANGE DANS LE LIVRE (v300, grimoire_recit.js) :

@@ -278,8 +278,16 @@ await section(async () => {
   verifier("…ses six traits chiffrés, ses valeurs, son objectif, sa faille, son masque, sa parole, son secret",
            ["Prudence", "Impulsivité", "Loyauté", "Empathie", "Orgueil", "Sociabilité"].every(t => g.includes(t)) && /Valeurs : l'honneur/.test(g) && /Venger son honneur/.test(g) && /Faille : Il ne pardonne pas/.test(g) && /Masque : Bourru/.test(g) && /Parole : Rauque/.test(g) && /Secret : Il vole la recette/.test(g));
   verifier("…ses souvenirs, datés", /Jour 2 de l'an 1000/.test(g) && /humilié au marché/.test(g));
-  const index = await G(() => [...document.querySelectorAll("#grimoire-liens-g .ame-index-liens")].map(b => ({ t: b.textContent, mort: b.classList.contains("mort"), active: b.classList.contains("active") })));
-  verifier("en bas, toutes les âmes de la partie (les héros d'abord) ; Myrto, morte, barrée", index.length === 19 && index[0].t === "Lyra" && index.find(x => x.t === "Myrto").mort && index.find(x => x.t === "Doros").active, index.slice(0, 4).map(x => x.t).join(", "));
+  // (v415) Nico : « une liste déroulante, par ordre alphabétique ».
+  const index = await G(() => [...document.querySelectorAll("#grimoire-liens-g select.index-liens option")].map(o => ({ t: o.textContent.trim(), v: o.value, choisi: o.selected })));
+  const noms = index.map(x => x.t);
+  verifier("en bas, toutes les âmes de la partie dans une liste déroulante, par ordre alphabétique ; Myrto, morte, marquée †", index.length === 19 && JSON.stringify(noms) === JSON.stringify(noms.slice().sort((x, y) => x.localeCompare(y, "fr", { sensitivity: "base" })))
+           && noms[0] === "Dame Koré" && noms.includes("Myrto †") && noms.includes("Thorin (héros)") && index.find(x => x.v === "PNJ_DOROS").choisi, noms.slice(0, 5).join(", "));
+  await G(() => { const s = document.querySelector("#grimoire-liens-g select.index-liens"); s.value = "PNJ_KORE"; s.dispatchEvent(new Event("change")); });
+  await attendreQue(() => G(() => window.GRIMOIRE_LIENS.vue().centre === "PNJ_KORE"), 3000);
+  verifier("choisir une âme dans la liste la met au centre", (await G(() => window.GRIMOIRE_LIENS.vue().centre)) === "PNJ_KORE");
+  await G(() => window.GRIMOIRE_LIENS.centrer("PNJ_DOROS"));
+  await p.waitForTimeout(200);
   const portrait = await G(() => (document.querySelector("#grimoire-liens-g .medaillon-liens.grand img") || {}).src || "");
   verifier("son portrait (celui de sa fiche)", /PNJ\/doros\.png/.test(portrait));
 });

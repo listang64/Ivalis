@@ -29,7 +29,9 @@
 .souvenirs-liens { margin: 0; padding-left: calc(var(--u) * 3); font-size: calc(var(--u) * 2.9); }
 .souvenirs-liens li + li { margin-top: calc(var(--u) * 0.6); }
 .date-liens { font-size: 0.8em; color: #7a5a36; }
-.index-liens { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 0.8) calc(var(--u) * 1.6); }
+/* (v415) les âmes de la partie : une liste déroulante, par ordre alphabétique */
+.index-liens { align-self: stretch; font-size: calc(var(--u) * 3); padding: calc(var(--u) * 0.8) calc(var(--u) * 1.2); border: 1px solid #bba076; border-radius: 6px;
+  background: rgba(249, 239, 217, 0.85); color: #3a2210; font-family: 'IM Fell English', 'Almendra', serif; }
 .ame-index-liens { font-size: calc(var(--u) * 2.9) !important; text-decoration: underline; text-decoration-color: rgba(94, 42, 68, 0.4); text-underline-offset: 0.18em; }
 .ame-index-liens.active { font-weight: 700; color: #5e2a44 !important; }
 .ame-index-liens.mort { opacity: 0.55; text-decoration: line-through; }

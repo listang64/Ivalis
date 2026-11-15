@@ -61,6 +61,11 @@ export const EXPRESSION = { heros: 1, pnj: 0.3 };
 // La même action (même acteur, même cible) répétée récemment : ½, puis ¼…
 export const LASSITUDE = 0.5;
 export const DUREE_HUMEUR = 3;   // en réponses du MJ
+// (v415) LA RANCUNE : la confiance perdue par une action hostile laisse une
+// rancune sur le lien (×1,5 de la perte, jusqu'à 100) ; tant qu'elle dure, la
+// confiance se regagne plus lentement (×(1 − rancune/60), au moins ×0,2), et
+// chaque point regagné l'use d'autant. Une vie sauvée n'efface pas une trahison.
+export const RANCUNE_PAR_PERTE = 1.5, RANCUNE_FREIN = 60, RANCUNE_MIN = 0.2;
 
 // -------------------------------------------------------------------------
 //  LE CATALOGUE DES ACTIONS
@@ -74,7 +79,7 @@ export const DUREE_HUMEUR = 3;   // en réponses du MJ
 export const ACTIONS = {
     echanger:           { nom: "a parlé avec",            cible: { familiarite: 2 },                                   acteur: { familiarite: 2 }, gmax: 1 },
     aider:              { nom: "a aidé",                  cible: { confiance: 4, attachement: 3, dette: 4 },          acteur: { attachement: 2 }, gmax: 2, emotion: "gratitude", valeur: "compassion" },
-    sauver:             { nom: "a sauvé",                 cible: { confiance: 5, attachement: 4, dette: 7, respect: 3 }, acteur: { attachement: 3 }, gmax: 3, emotion: "gratitude" },
+    sauver:             { nom: "a sauvé",                 cible: { confiance: 3, attachement: 4, dette: 7, respect: 3 }, acteur: { attachement: 3 }, gmax: 3, emotion: "gratitude" },
     soigner:            { nom: "a soigné",                cible: { confiance: 3, attachement: 3, dette: 5 },          acteur: { attachement: 2 }, gmax: 2, emotion: "gratitude", valeur: "compassion" },
     offrir:             { nom: "a offert un présent à",   cible: { attachement: 3, dette: 2 },                        acteur: { attachement: 2 }, gmax: 2, emotion: "joie", valeur: "richesse" },
     tenir_promesse:     { nom: "a tenu sa promesse envers", cible: { confiance: 5, respect: 3 },                      acteur: { respect: 1 }, gmax: 2, valeur: "honneur" },
@@ -165,13 +170,13 @@ export function motAffinite(a) {
 export function resumeLien(axes) {
     const a = axes || {};
     const pos = [], neg = [];
-    const marque = (axe, seuil = 25) => Math.abs(nombre(a[axe])) >= seuil;
+    const marque = (axe, seuil = 12) => Math.abs(nombre(a[axe])) >= seuil;   // (v415 : 12 au lieu de 25)
     if (marque("confiance")) (a.confiance > 0 ? pos : neg).push(a.confiance > 0 ? "lui fait confiance" : "ne lui fait pas confiance");
     if (marque("respect")) (a.respect > 0 ? pos : neg).push(a.respect > 0 ? "le respecte" : "le méprise");
     if (marque("attachement")) (a.attachement > 0 ? pos : neg).push(a.attachement > 0 ? "tient à lui" : "ne le supporte pas");
-    if (marque("dette")) pos.push(a.dette > 0 ? "se sent redevable" : "estime qu'on lui doit quelque chose");
+    if (marque("dette", 20)) pos.push(a.dette > 0 ? "se sent redevable" : "estime qu'on lui doit quelque chose");
     if (nombre(a.crainte) >= 40) neg.push("le craint");
-    if (nombre(a.familiarite) < 15) neg.push("le connaît à peine");
+    if (nombre(a.familiarite) < 10) neg.push("le connaît à peine");
     if (!pos.length && !neg.length) return "n'a pas d'avis tranché";
     if (pos.length && neg.length) return `${pos.join(", ")} mais ${neg.join(", ")}`;
     return [...pos, ...neg].join(", ");
@@ -254,11 +259,17 @@ export function appliquerEvenements(etatAvant, evenements, ctx) {
         if (c.sansLienEntreHeros && ame.type === "heros" && (etat.ames[vers] || {}).type === "heros") return;
         const l = lien(de, vers), avant = nombre(l.axes[axe]);
         let d = brut * sensibilite(ame.psyche, valides[n].type, axe, brut) * saturation(axe, avant, brut);
+        if (axe === "confiance" && d > 0 && nombre(l.rancune) > 0) d *= Math.max(RANCUNE_MIN, 1 - nombre(l.rancune) / RANCUNE_FREIN);
         const plafond = PLAFOND_GRAVITE[gravite];
         d = Math.max(-plafond, Math.min(plafond, d));
         const apres = borner(axe, avant + d);
         if (Math.abs(apres - avant) < 0.01) return;
         l.axes[axe] = Math.round(apres * 100) / 100;
+        if (axe === "confiance") {
+            const reel = l.axes[axe] - avant;
+            if (reel < 0 && ACTIONS[valides[n].type].hostile) l.rancune = Math.min(100, Math.round((nombre(l.rancune) + -reel * RANCUNE_PAR_PERTE) * 100) / 100);
+            else if (reel > 0 && nombre(l.rancune) > 0) l.rancune = Math.max(0, Math.round((nombre(l.rancune) - reel) * 100) / 100);
+        }
         changements.push({ evenement: n, de, vers, axe, avant, apres: l.axes[axe] });
     };
 
@@ -287,9 +298,9 @@ export function appliquerEvenements(etatAvant, evenements, ctx) {
                 changer(n, t, ev.acteur, axe, v * k * ROLE.temoin * sens, ev.gravite);
             });
         });
-        // 4. Se côtoyer : un peu de familiarité, des deux côtés.
-        changer(n, ev.cible, ev.acteur, "familiarite", 1, ev.gravite);
-        changer(n, ev.acteur, ev.cible, "familiarite", 1, ev.gravite);
+        // 4. Se côtoyer : un peu de familiarité, des deux côtés (v415 : 2 par événement).
+        changer(n, ev.cible, ev.acteur, "familiarite", 2, ev.gravite);
+        changer(n, ev.acteur, ev.cible, "familiarite", 2, ev.gravite);
         // 5. L'humeur de la cible.
         if (act.emotion && etat.ames[ev.cible] && etat.ames[ev.cible].statut !== "mort") {
             const t = psycheValide(etat.ames[ev.cible].psyche).traits;
