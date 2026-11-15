@@ -162,11 +162,14 @@
 .bordure-plume .trait-1 { stroke-width: calc(var(--u) * 0.55); opacity: 0.9; }
 .bordure-plume .trait-2 { stroke-width: calc(var(--u) * 0.25); opacity: 0.55; }
 .bordure-plume .trait-coin { stroke-width: calc(var(--u) * 0.3); opacity: 0.7; }
-.page-journal { padding-top: calc(var(--u) * 16); gap: calc(var(--u) * 5); }
+/* (v416) Nico : « "Quitter le jeu" chevauche la bordure de page ; remonte tout dans la page ».
+   Le menu monte (16 → 12) et se resserre un peu (sous le titre 6 → 3, entre les entrées 5,5 → 5) :
+   « Quitter » tient au-dessus du trait du bas, même avec l'écriture des titres la plus grande. */
+.page-journal { padding-top: calc(var(--u) * 12); gap: calc(var(--u) * 5); }
 .journal-entete { font-size: calc(var(--u) * 6.6); font-style: italic; color: #2b1a0e; text-align: center; line-height: 1.2; }
 .nom-surligne { position: relative; display: inline-block; padding: 0 calc(var(--u) * 1.2); font-style: normal; }
 .nom-surligne b { position: relative; font-family: 'Almendra', serif; font-weight: 700; }
-.journal-entrees { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 5.5); margin-top: calc(var(--u) * 6); width: 100%; }
+.journal-entrees { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 5); margin-top: calc(var(--u) * 3); width: 100%; }
 /* (v403) Le fleuron sous « Charger partie » : celui de la page de titre, entre deux entrées (l'écart des entrées le borde déjà). */
 .fleuron-journal { width: calc(var(--u) * 40); margin: calc(var(--u) * -2.2) 0; flex-shrink: 0; }
 
