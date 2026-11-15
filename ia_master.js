@@ -805,7 +805,8 @@ function contexteFichesPreparees(fiches) {
     let t = `\n--- PERSONNAGES PRÊTS À ENTRER EN SCÈNE ---\n`;
     t += `Si la scène en a besoin, fais-les apparaître avec CE nom exact, ce physique, ce métier et cette façon de parler. N'invente pas un autre nom pour le même rôle. Leur secret guide leur comportement : ne le révèle pas.\n`;
     fiches.forEach(f => {
-        t += `- ${f.nom} (${f.race}, ${f.occupation}) — Apparence : ${f.physique} — Parole : ${f.style_parole} — Secret : ${f.secret}\n`;
+        const ame = (window.SOCIAL && f.psyche) ? window.SOCIAL.psycheDeLIA(f.psyche) : null;   // (v413) son âme, s'il en a une
+        t += `- ${f.nom} (${f.race}, ${f.occupation}) — Apparence : ${f.physique} — Parole : ${f.style_parole} — Secret : ${f.secret}${ame ? ` — Caractère : ${window.SOCIAL.caractere(ame)}${ame.objectifs.length ? ` ; objectif : ${ame.objectifs[0]}` : ""}` : ""}\n`;
     });
     return t;
 }
@@ -2294,6 +2295,13 @@ window.declencherTourIA = async function(options) {
         // une fois la scène décrite (v292) : on les attend ensemble.
         const promessePnjCibles = nomsPnjPresents.length > 0
             ? filtrerPNJAvecMia(historique4, nomsPnjPresents).catch(() => []) : Promise.resolve([]);
+        // (v413) LES FILS INVISIBLES : les âmes présentes, lues une fois Mia revenue (elle dit qui est sollicité).
+        const lireAmesPresentes = (sollicites) => (window.SOCIAL && typeof window.SOCIAL.contexteDuMJ === "function" && nomsPnjPresents.length > 0)
+            ? window.SOCIAL.contexteDuMJ({ idPartie: window.ID_PARTIE_COURANTE,
+                pnjs: Object.values(env.pnjsPresents).filter(f => f && f.idDoc).map(f => ({ id: f.idDoc, fiche: f })),
+                heros: ((window.PERSOS_JOUEURS_PARTIE && window.PERSOS_JOUEURS_PARTIE.length ? window.PERSOS_JOUEURS_PARTIE : window.PERSOS_PARTIE) || []).filter(h => h && h.idPersonnage && h.actif !== false && !h.estMonstre && !h.estIllusion),
+                sollicites }).catch(e => { console.warn("[Fils invisibles] Le contexte du MJ :", e); return ""; })
+            : Promise.resolve("");
         const nomsHeros = window.PERSOS_PARTIE ? window.PERSOS_PARTIE.map(p => p.prenom) : [];
 
         // NOUVEAU : Récupération de la date in-game
@@ -2369,6 +2377,7 @@ window.declencherTourIA = async function(options) {
             });
         }
 
+        contexte += await lireAmesPresentes(pnjCibles);
         contexte += contexteFichesPreparees(fichesPreparees);
 
         if (issueCombat) contexte += `\n${issueCombat}\n`;
@@ -2653,88 +2662,9 @@ Ne mentionne JAMAIS les mécaniques de jeu (jets de dés, tours de parole). Écr
             }
             // =========================================================================
 
-            // 2. Détection des PNJ présents (Cible le lieu que l'on quitte !)
-            let lieuActuel = opts.lieu;
-            if (lieuActuel === undefined) {
-                const snapPartie = await getDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE));
-                lieuActuel = snapPartie.exists() ? snapPartie.data().Lieu_Actuel : null;
-            }
-            const env = await preparerEnvironnement(lieuActuel); 
-            const nomsPnj = Object.keys(env.pnjsPresents);
-
-            // 3. Invocation de MIA_SOUVENIR s'il y a des PNJ dans la zone
-            if (nomsPnj.length > 0) {
-                const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
-                const jourEnJeu = window.DATE_EN_JEU_ACTUELLE?.jour || "?";
-                const anEnJeu = window.DATE_EN_JEU_ACTUELLE?.annee || "?";
-                const dateTag = `[Jour ${jourEnJeu} de l'an ${anEnJeu}]`;
-
-                const promptSysteme = `Tu es MIA_SOUVENIR, l'IA qui gère la mémoire des habitants d'Ivalis.
-Voici l'historique complet du chat d'aujourd'hui.
-Voici les PNJ qui se trouvaient dans la même zone que les joueurs : ${nomsPnj.join(", ")}.
-
-Ta mission : Lis le chat. Pour CHAQUE PNJ de cette liste, génère UN SEUL SOUVENIR marquant (une ou deux phrases maximum, écrites à la PREMIÈRE PERSONNE). Ce souvenir doit résumer l'interaction ou l'impression qu'ont laissée les joueurs au PNJ aujourd'hui.
-Si un PNJ n'a absolument pas interagi ou n'a pas du tout été concerné par les actes des joueurs aujourd'hui, ne lui crée pas de souvenir.`;
-
-                const outils = [{
-                    functionDeclarations: [{
-                        name: "archiverSouvenirs",
-                        description: "Enregistre les souvenirs dans le cerveau des PNJ.",
-                        parameters: {
-                            type: "OBJECT",
-                            properties: {
-                                souvenirs: {
-                                    type: "ARRAY",
-                                    items: {
-                                        type: "OBJECT",
-                                        properties: {
-                                            nom_pnj: { type: "STRING", description: "Le nom exact du PNJ." },
-                                            texte_souvenir: { type: "STRING", description: "La phrase de souvenir à la 1ere personne." }
-                                        }
-                                    }
-                                }
-                            }, required: ["souvenirs"]
-                        }
-                    }]
-                }];
-
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cleGemini}`, {
-                    method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        systemInstruction: { parts: [{ text: promptSysteme }] },
-                        contents: [{ role: "user", parts: [{ text: historiqueComplet }] }],
-                        tools: outils, 
-                        toolConfig: { functionCallingConfig: { mode: "AUTO" } }
-                    })
-                });
-
-                const data = await res.json();
-                const appelsOutils = data.candidates?.[0]?.content?.parts?.filter(p => p.functionCall).map(p => p.functionCall);
-                
-                // 4. Écriture dans les cerveaux des PNJ
-                if (appelsOutils && appelsOutils.length > 0 && appelsOutils[0].name === "archiverSouvenirs") {
-                    const souvenirsCrees = appelsOutils[0].args.souvenirs || [];
-                    
-                    for (const souv of souvenirsCrees) {
-                        const pnjData = env.pnjsPresents[souv.nom_pnj];
-                        if (!pnjData || !pnjData.idDoc) continue;
-
-                        console.log(`🧠 [MIA_Souvenir] Mémoire implantée pour ${souv.nom_pnj}`);
-                        
-                        // On récupère la mémoire qu'on a filtrée à l'étape 1
-                        const ancienneMemoire = (pnjData.Memoires === "Aucun souvenir de ce groupe.") ? "" : pnjData.Memoires;
-                        const nouvelleMemoire = ancienneMemoire ? `${ancienneMemoire}\n${dateTag} ${souv.texte_souvenir}` : `${dateTag} ${souv.texte_souvenir}`;
-
-                        // NOUVEAU : On utilise setDoc avec merge: true pour mettre à jour
-                        // UNIQUEMENT la case du groupe actuel sans écraser les autres !
-                        await setDoc(doc(db, "Monde_PNJ", pnjData.idDoc), {
-                            Memoires_Groupes: {
-                                [window.ID_PARTIE_COURANTE]: nouvelleMemoire
-                            }
-                        }, { merge: true });
-                    }
-                }
-            }
+            // 2-4. (v413) MIA_SOUVENIR n'écrit plus un paragraphe par PNJ à la clôture :
+            // les souvenirs se gardent à chaque réponse du MJ, datés, avec leurs témoins
+            // (social.js, Systeme_Parties/{partie}/Souvenirs) ; le MJ les lit (contexteDuMJ).
         }
 
         // 4 bis. LE CHAPITRE SE RANGE DANS LE LIVRE (v300, grimoire_recit.js) :

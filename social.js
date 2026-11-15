@@ -408,6 +408,73 @@ export async function tourSocial(o) {
 }
 
 // -------------------------------------------------------------------------
+//  LE MJ JOUE LES ÂMES (v413) : ce qu'il lit avant d'écrire
+// -------------------------------------------------------------------------
+const ADJ_TRAITS = { prudence: "prudent", impulsivite: "impulsif", loyaute: "loyal", empathie: "empathique", orgueil: "orgueilleux", sociabilite: "sociable" };
+export function caractere(psyche) {
+    const t = P.psycheValide(psyche).traits;
+    const forts = P.TRAITS.filter(x => t[x] >= 70).map(x => (t[x] >= 85 ? "très " : "") + ADJ_TRAITS[x]);
+    const faibles = P.TRAITS.filter(x => t[x] <= 30).map(x => (t[x] <= 15 ? "pas du tout " : "peu ") + ADJ_TRAITS[x]);
+    return [...forts, ...faibles].join(", ") || "tempérament mesuré";
+}
+const signeNb = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(Math.round(v));
+// Les souvenirs d'une âme, les plus parlants d'abord : importance, présents
+// concernés, fraîcheur.
+function meilleursSouvenirs(liste, idsPresents, n) {
+    const ici = new Set(idsPresents);
+    return liste.slice().sort((a, b) => {
+        const score = (x) => P.nombre(x.importance, 1) * 2 + ((x.sujets || []).some(s => ici.has(s)) ? 3 : 0) + P.nombre(x.tour) * 0.05;
+        return score(b) - score(a);
+    }).slice(0, n);
+}
+// `o` : { idPartie, pnjs: [{ id, fiche }] (présents), heros, sollicites: [noms] }.
+// Rend le texte des sections « LES ÂMES PRÉSENTES » et « TENSIONS ET ENVIES ».
+export async function contexteDuMJ(o) {
+    const p = o && o.idPartie;
+    if (!p) return "";
+    const pnjs = (o.pnjs || []).filter(x => x && x.id);
+    const heros = (o.heros || []).filter(h => h && h.idPersonnage);
+    if (!pnjs.length) return "";
+    const idsPnj = pnjs.map(x => x.id), ids = [...idsPnj, ...heros.map(h => h.idPersonnage)];
+    const [ames, liens, etatSnap] = await Promise.all([lireAmes(p, ids), lireLiens(p, idsPnj), getDoc(refEtat(p))]);
+    const etatSocial = etatSnap.exists() ? etatSnap.data() : {};
+    const tour = P.nombre(etatSocial.tour) + 1;
+    const souvenirs = {};
+    for (const bloc of par(idsPnj, 30)) {
+        (await getDocs(query(collection(db, PARTIES, p, "Souvenirs"), where("ame", "in", bloc)))).forEach(d => { const x = d.data(); (souvenirs[x.ame] = souvenirs[x.ame] || []).push(x); });
+    }
+    const nom = (id) => (ames[id] && ames[id].nom) || (pnjs.find(x => x.id === id) || { fiche: {} }).fiche.Nom_PNJ || (heros.find(h => h.idPersonnage === id) || {}).prenom || id;
+    const sollicites = (o.sollicites || []).map(sansAccent);
+    const avecAme = pnjs.filter(x => ames[x.id] && ames[x.id].statut !== "mort");
+    if (!avecAme.length) return "";
+    let t = `\n--- LES ÂMES PRÉSENTES (les fils invisibles) ---\n`;
+    t += `Joue chaque PNJ ci-dessous fidèlement : sa voix, son caractère, son humeur et ce qu'il ressent pour chacun (chiffres de −100 à +100). Ses sentiments viennent de ce qu'il a vécu : ne les contredis pas sans raison. Il ne se souvient QUE de ce qu'il a vécu ou vu. Son masque public peut cacher ce qu'il ressent devant les autres.\n`;
+    let total = 0;
+    avecAme.slice(0, 8).forEach(x => {
+        const a = ames[x.id], ps = P.psycheValide(a.psyche), f = x.fiche || {};
+        const detail = sollicites.some(n => sansAccent(nom(x.id)).includes(n) || n.includes(sansAccent(nom(x.id)))) || avecAme.length <= 3;
+        const h = P.humeurActive(a, tour);
+        t += `• ${nom(x.id)}${f.Occupation ? ` (${f.Occupation})` : ""}${h ? ` — humeur : ${P.NOMS_EMOTIONS[h.emotion] || h.emotion}${h.cause ? ` (${h.cause})` : ""}` : ""}.\n`;
+        if (detail) {
+            t += `  Caractère : ${caractere(ps)}.${ps.valeurs.length ? ` Valeurs : ${ps.valeurs.map(v => P.NOMS_VALEURS[v]).join(", ")}.` : ""}${ps.objectifs.length ? ` Objectif : ${ps.objectifs.join(" ; ")}.` : ""}${ps.faille ? ` Faille : ${ps.faille}.` : ""}${ps.masque ? ` Masque public : ${ps.masque}.` : ""}\n`;
+        }
+        const avis = ids.filter(y => y !== x.id).map(y => ({ y, l: liens[P.cleLien(x.id, y)] })).filter(v => v.l)
+            .sort((u, v) => Math.abs(P.affinite(v.l.axes)) - Math.abs(P.affinite(u.l.axes))).slice(0, detail ? 5 : 3);
+        if (avis.length) t += `  Ce qu'il pense des présents : ${avis.map(v => `${nom(v.y)}${v.l.etiquette ? ` (${v.l.etiquette})` : ""} — ${P.motAffinite(P.affinite(v.l.axes))} (${signeNb(P.affinite(v.l.axes))}) : ${P.resumeLien(v.l.axes)}`).join(" ; ")}.\n`;
+        const sv = meilleursSouvenirs(souvenirs[x.id] || [], ids, detail ? 5 : 2).filter(() => total < 8);
+        if (sv.length) { total += sv.length; t += `  Ses souvenirs : ${sv.map(z => `${z.dateJeu ? `[${z.dateJeu}] ` : ""}« ${z.texte} »`).join(" ")}\n`; }
+    });
+    // LES ENVIES : au plus deux, le MJ en joue au plus une ; jamais le même PNJ deux tours de suite.
+    const envies = P.initiatives({ ames, liens }, ids, { tour, max: 2, dernieres: etatSocial.dernieresInitiatives || [] });
+    if (envies.length) {
+        t += `\n--- TENSIONS ET ENVIES ---\nSi la scène s'y prête, UNE de ces envies au plus peut pousser un PNJ à agir de lui-même (aller vers quelqu'un, demander, avertir, provoquer), sans voler la vedette aux héros ; sinon, ignore-les.\n`;
+        t += envies.map(e => `- ${e.texte}`).join("\n") + "\n";
+    }
+    try { await setDoc(refEtat(p), { dernieresInitiatives: envies.map(e => e.ame) }, { merge: true }); } catch (e) {}
+    return t;
+}
+
+// -------------------------------------------------------------------------
 //  APRÈS UN TOUR DU MJ (ia_master.js, en arrière-plan)
 // -------------------------------------------------------------------------
 // `o` : { idPartie, pnjs: [{ id, fiche }] (ceux de la scène), heros, reputation,
@@ -417,5 +484,5 @@ export async function apresLeTour(o) {
     catch (e) { console.error("[Fils invisibles] Le tour social :", e); return null; }
 }
 
-window.SOCIAL = { ...P, lireAmes, lireLiens, lireLiensVers, naissancePnj, assurerAmes, marquerMort, oublierAme, apresLeTour, tourSocial, paragrapheDe, lignesDeMarge,
+window.SOCIAL = { ...P, contexteDuMJ, caractere, lireAmes, lireLiens, lireLiensVers, naissancePnj, assurerAmes, marquerMort, oublierAme, apresLeTour, tourSocial, paragrapheDe, lignesDeMarge,
                   schemaPsyche, schemaLiens, consigneCreation, psycheDeLIA, LIENS_IA };
