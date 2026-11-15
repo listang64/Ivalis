@@ -425,14 +425,17 @@ await section(async () => {
 });
 await section(async () => {
   // Le vrai procédé de l'avatar, malgré la pause des portraits de PNJ (v300) : le fond magenta, 1024 × 1792.
+  // (v408) La pause est levée par défaut : le banc la remet le temps de l'appel.
   const n0 = imagesIA.length;
+  const pauseParDefaut = await p.evaluate(() => { const avant = window.PORTRAITS_PNJ_EN_PAUSE; window.PORTRAITS_PNJ_EN_PAUSE = true; return avant; });
   const pause = await p.evaluate(() => window.PORTRAITS_PNJ_EN_PAUSE);
   await p.evaluate(() => window.__vraiPortrait("Un aubergiste ventru à la barbe grise.", "Humain").catch(() => ""));
+  await p.evaluate((v) => { window.PORTRAITS_PNJ_EN_PAUSE = v; }, pauseParDefaut);
   const req = imagesIA.slice(n0).find(x => /images\/generations/.test(x.url));
   const corps = req ? JSON.parse(req.corps) : {};
   verifier("portraitPnjFaconAvatar : le procédé de l'avatar (style de la base, fond magenta, 1024 × 1792), même en pause", pause === true && !!req && corps.size === "1024x1792"
     && /MAGENTA/.test(corps.prompt) && /STYLE_DE_LA_BASE|Directives de style/.test(corps.prompt) && /aubergiste ventru/.test(corps.prompt), JSON.stringify({ pause, size: corps.size }));
-  verifier("…les autres portraits de PNJ restent en pause", await p.evaluate(() => typeof window.portraitPnjFaconAvatar === "function") && /if \(!malgreLaPause && window\.PORTRAITS_PNJ_EN_PAUSE !== false\) return "";/.test(lire("ia_master.js")));
+  verifier("…la pause des autres portraits reste possible (levée par défaut en v408)", pauseParDefaut === false && await p.evaluate(() => typeof window.portraitPnjFaconAvatar === "function") && /if \(!malgreLaPause && window\.PORTRAITS_PNJ_EN_PAUSE !== false\) return "";/.test(lire("ia_master.js")));
 });
 
 {

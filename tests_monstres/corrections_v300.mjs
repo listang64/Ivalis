@@ -549,7 +549,8 @@ await section(async () => {
   const ia = lire("ia_master.js"), app = lire("app.js"), index = lire("index.html");
   verifier("le cerveau du Narrateur par défaut : témoin du groupe, « je », drôle et sombre à la fois", /const PROMPT_NARRATEUR_LIVRE = `Tu es le Narrateur d'Ivalis/.test(ia) && /dis « je »/i.test(ia) && /humour léger/.test(ia) && /sombre et de l'épique/.test(ia) && /let instructionMJ = PROMPT_NARRATEUR_LIVRE;/.test(ia));
   verifier("le Narrateur ne lit que le livre (les lignes récrites des joueurs)", /function ligneDuLivre\(m\)/.test(ia) && /historiqueReduit\.map\(ligneDuLivre\)/.test(ia));
-  verifier("les portraits des PNJ en pause (les fiches se créent toujours)", /window\.PORTRAITS_PNJ_EN_PAUSE = true;/.test(ia) && /if \(window\.PORTRAITS_PNJ_EN_PAUSE !== false\) return "";/.test(ia));
+  // (v408) La pause est levée (« remets en marche les portraits des PNJ nommés ») ; la garde reste.
+  verifier("les portraits des PNJ : la pause (v300) est levée en v408, sa garde reste", /window\.PORTRAITS_PNJ_EN_PAUSE = false;/.test(ia) && /if \(!malgreLaPause && window\.PORTRAITS_PNJ_EN_PAUSE !== false\) return "";/.test(ia));
   verifier("l'archivage range le chapitre dans le livre avant de vider le chat", ia.indexOf("GRIMOIRE_RECIT.archiverChapitre(messages)") > 0 && ia.indexOf("GRIMOIRE_RECIT.archiverChapitre(messages)") < ia.indexOf("// 5. Autodestruction du chat"));
   verifier("app.js relaie les messages et l'état de la partie au livre, et lance un dé sans la fiche", /window\.livreRecitMessages\(snap\.docs/.test(app) && /window\.livreRecitPartie\(dataPartie\)/.test(app) && /window\.lancerJetPourHeros = async function/.test(app));
   const v = (re) => Number((index.match(re) || [])[1] || 0);

@@ -441,7 +441,9 @@ async function detourerFondMagentaPNJ(imageSource) {
 // LES PORTRAITS DES PNJ EN PAUSE (v300). Nico : « mets en stand-by les
 // créations d'images de PNJ pour le moment, ça va revenir après ». Les fiches
 // des PNJ se créent toujours ; seul le portrait attend (false le rallume).
-window.PORTRAITS_PNJ_EN_PAUSE = true;
+// (v408) Nico : « remets en marche les portraits des PNJ nommés » : la pause
+// est levée. Chaque PNJ nommé qui entre dans le récit est peint (true la remet).
+window.PORTRAITS_PNJ_EN_PAUSE = false;
 // (v346) Nico : « pour les nouveaux PNJ, utilise le même procédé que pour créer l'avatar
 // des personnages joueurs, et affiche-les en pleine page de droite ». MIA_ILLUSTRATEUR
 // (illustrations_recit.js) passe outre la pause pour les PNJ présents dans la scène.
@@ -2398,6 +2400,9 @@ window.declencherTourIA = async function(options) {
         let resoudreLieu = () => {};
         const lieuDuRecit = new Promise(r => { resoudreLieu = r; });
         const adoptes = [];
+        // (v408) Les portraits peints pendant ce tour (visages préparés et
+        // rattrapés) : le livre les pose en pleine page de droite (v346).
+        const portraitsPeints = [];
         const adopterCites = (texte) => {
             let nouveau = false;
             fichesPreparees.forEach(f => {
@@ -2425,6 +2430,7 @@ window.declencherTourIA = async function(options) {
                     const url = await promesseUrl;
                     if (url && docId) await updateDoc(doc(db, "Monde_PNJ", docId), { URL_Cloudinary: url });
                     const cree = { Nom_PNJ: f.nom, URL_Cloudinary: url || "" };
+                    if (url && docId) portraitsPeints.push(cree);
                     if (url) { pnjAffiches[cle] = cree; await ecrireMessage(null, {}); }
                     return docId ? cree : null;
                 })().catch(e => { console.error("[MIA_CASTING] Adoption :", e); return null; });
@@ -2479,17 +2485,21 @@ window.declencherTourIA = async function(options) {
                 const contexteEtNarration = historique4 + "\n\n--- SUITE DE L'HISTOIRE (MJ) ---\n" + reponseTexte;
                 rattrapes = await analyserNouveauxPNJ(promesseLieu, nomsConnus, nomsHeros, contexteEtNarration, {
                     surNoms: (noms) => ecrireMessage(null, { PNJ_Attendus: [...new Set([...nomsAnnonces, ...noms])] }),
-                    surPortrait: (pnj) => { pnjAffiches[pnj.Nom_PNJ] = pnj; return ecrireMessage(null, {}); }
+                    surPortrait: (pnj) => { pnjAffiches[pnj.Nom_PNJ] = pnj; portraitsPeints.push(pnj); return ecrireMessage(null, {}); }
                 }).catch(e => { console.error("[MIA_PNJ] Erreur :", e); return []; }) || [];
             }
             const nouveauxPnj = [...(await promesseAdoptes).filter(Boolean), ...rattrapes];
-            await ecrireMessage(null, { PNJ_Prets: true });
+            // (v408) Les nouveaux visages en pleine page de droite, comme ceux de
+            // MIA_ILLUSTRATEUR (format « avatar », 1024 × 1792 ; jamais une image brute en data:).
+            const portraitsPoses = portraitsPeints.filter(p => p.URL_Cloudinary && !String(p.URL_Cloudinary).startsWith("data:"))
+                .map(p => ({ Nom: p.Nom_PNJ, Url: p.URL_Cloudinary, Ratio: +(1024 / 1792).toFixed(4), Format: "avatar" }));
+            await ecrireMessage(null, { PNJ_Prets: true, ...(portraitsPoses.length ? { Portraits_PNJ: portraitsPoses } : {}) });
 
             // MIA_ILLUSTRATEUR (v314, illustrations_recit.js) : un croquis à la plume
             // quand le moment le mérite, et le portrait en pied des PNJ nommés qui
             // n'en ont pas. Pendant la lecture, sans rien retenir.
             if (typeof window.illustrerLeRecit === "function" && idMessage) {
-                window.illustrerLeRecit({ idMessage, texteMJ: reponseTexte, texteJoueurs: historique4, narrationsSansCroquis,
+                window.illustrerLeRecit({ idMessage, texteMJ: reponseTexte, texteJoueurs: historique4, narrationsSansCroquis, portraitsPoses,
                                           pnjConnus: { ...pnjAffiches, ...Object.fromEntries(nouveauxPnj.map(p => [p.Nom_PNJ, p])) } })
                     .catch(e => console.error("[MIA_ILLUSTRATEUR] :", e));
             }

@@ -11958,3 +11958,12 @@ Nico : « Dans Paramètres > Monstres, je veux que Dégâts en pourcentage, Poin
 ## v407 — CLAUDE.md : la section Git alignée sur la Livraison
 
 - L'étape 4 de la section « Git : toujours livrer sur la branche `dev` » dit maintenant comme la section « Livraison » : on pousse sur `dev` PUIS sur `main` (`git push origin HEAD:main`), en avance rapide, jamais de `--force` sur l'une ni sur l'autre ; si l'une a bougé entre-temps, on rejoue, on reteste, on repousse. Aucun code du jeu ne change.
+
+## v408 — Les portraits des PNJ nommés, remis en marche
+
+Nico : « avant toute chose, remets en marche les portraits des PNJ nommés ».
+
+- **La pause est levée** (ia_master.js) : `PORTRAITS_PNJ_EN_PAUSE` (v300) vaut `false`. Un visage préparé que le MJ fait entrer (MIA_CASTING) et les noms rattrapés après son texte (MIA_PNJ, trois au plus) sont peints par le procédé de l'avatar (style de la base, fond magenta détouré, 1024 × 1792), et l'URL va dans leur fiche (Monde_PNJ). La garde reste : `true` remet la pause. Rien ne change pour un PNJ que le MJ ne cite pas (ni fiche ni portrait, v292) ni pour un PNJ déjà connu (pas repeint).
+- **En pleine page de droite** : les portraits peints pendant le tour se posent sur le message du Narrateur (`Portraits_PNJ`, format « avatar »), avec `PNJ_Prets` ; le livre en fait des pages « portrait » comme pour ceux de MIA_ILLUSTRATEUR (v346). Jamais une image brute en `data:`.
+- **MIA_ILLUSTRATEUR** (illustrations_recit.js) reçoit ces portraits (`portraitsPoses`) et ajoute les siens après eux, sans les effacer. Il ne repeint pas un PNJ que le tour vient de peindre (sa fiche a déjà son URL).
+- corrections_v300 et v346 suivent (la pause levée par défaut ; le procédé de l'avatar passe toujours outre quand on la remet). corrections_v408.mjs le vérifie sur la vraie page avec le harnais du banc v292, sans lever la pause à la main : un tour complet du Narrateur, le livre, MIA_ILLUSTRATEUR, puis le tour suivant. Sur le code de la v407, il échoue (13 contrôles).

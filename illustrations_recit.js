@@ -411,7 +411,7 @@ async function portraitDuPnj(p, fiche) {
 // ---------------------------------------------------------------------
 //  L'APPEL (ia_master.js, après la réponse du Narrateur)
 // ---------------------------------------------------------------------
-// `options` : { idMessage, texteMJ, texteJoueurs, pnjConnus }.
+// `options` : { idMessage, texteMJ, texteJoueurs, pnjConnus, portraitsPoses }.
 window.illustrerLeRecit = async function (options) {
     const o = options || {};
     if (!R.actif || !o.idMessage || !o.texteMJ || !aLesCles()) return null;
@@ -514,7 +514,9 @@ window.illustrerLeRecit = async function (options) {
     }
     resultat.portraits = (await Promise.all(promessesPortraits)).filter(Boolean);
     if (resultat.portraits.length) {
-        try { await updateDoc(ref, { Portraits_PNJ: resultat.portraits }); } catch (e) { console.error("[MIA_ILLUSTRATEUR] Les portraits :", e); }
+        // (v408) Après ceux que le tour du Narrateur a déjà posés (ia_master.js), sans les effacer.
+        const poses = Array.isArray(o.portraitsPoses) ? o.portraitsPoses : [];
+        try { await updateDoc(ref, { Portraits_PNJ: [...poses, ...resultat.portraits] }); } catch (e) { console.error("[MIA_ILLUSTRATEUR] Les portraits :", e); }
         console.log(`🖋️ [MIA_ILLUSTRATEUR] ${resultat.portraits.length} portrait(s) en pleine page : ${resultat.portraits.map(p => p.Nom).join(", ")}`);
     }
     return resultat;
