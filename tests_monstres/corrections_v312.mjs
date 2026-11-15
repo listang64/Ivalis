@@ -213,9 +213,9 @@ await section(async () => {
              etoile: !!document.querySelector("#grimoire-marque-page svg.dessin-etoile"), plume: !!document.querySelector("#grimoire-marque-recit svg.dessin-plume") };
   });
   verifier("« Sommaire » (plus « Index »), et sous lui le titre de la partie", r.titre === "Sommaire" && r.partie === "Les Lames d'Héra", `${r.titre} / ${r.partie}`);
-  // (v414) « Les fils invisibles » prend la cinquième place, avant le récit.
-  verifier("I- Aventuriers, II- Carte du monde, III- Le village | IV- Les combats, V- Les fils invisibles, VI- Le récit (plus de Paramètres)",
-           r.gauche.join(" | ") === "I- Aventuriers | II- Carte du monde | III- Le village" && r.droite.join(" | ") === "IV- Les combats | V- Les fils invisibles | VI- Le récit", r.gauche.concat(r.droite).join(" | "));
+  // (v416) « Les fils invisibles » quittent le sommaire pour les Paramètres : cinq entrées, comme avant la v414.
+  verifier("I- Aventuriers, II- Carte du monde, III- Le village | IV- Les combats, V- Le récit (plus de Paramètres)",
+           r.gauche.join(" | ") === "I- Aventuriers | II- Carte du monde | III- Le village" && r.droite.join(" | ") === "IV- Les combats | V- Le récit", r.gauche.concat(r.droite).join(" | "));
   verifier("le fond du sommaire : (v397) la nouvelle image de Nico, à 30 %, étirée sur la double page (une moitié par page)",
            r.fonds.length === 2 && r.fonds.every(f => /bxp3xw\.png/.test(f.img) && f.op === "0.3" && f.taille === "200% 100%") && r.fonds[0].pos !== r.fonds[1].pos, JSON.stringify(r.fonds.map(f => [f.op, f.taille, f.pos])));
   verifier("une écriture manuscrite (v313 : celle choisie dans Paramètres, Shadows Into Light par défaut depuis v340)", /Shadows Into Light/.test(r.police) && /Shadows Into Light/.test(r.policeEntree), `${r.police}`);

@@ -22,6 +22,12 @@
 //
 //  Les données : social.js (lireReseau) ; le calcul de la disposition est pur
 //  (disposerRadar) et se vérifie au banc.
+//
+//  (v416) Nico : « vire les fils invisibles du sommaire et mets-les dans les
+//  paramètres ». Plus d'entrée au sommaire : la double page s'ouvre depuis les
+//  Paramètres (le Maître du Jeu) ou le portrait d'un PNJ dans le récit ; elle
+//  n'entre dans le livre que le temps qu'on la lit, et en ressort quand on la
+//  quitte (on ne l'atteint plus en tournant les pages depuis les Aventuriers).
 // =========================================================================
 
 const G = () => window.GRIMOIRE;
@@ -92,7 +98,7 @@ export function liensDuRegard(reseau, centre, regard, filtre, P) {
 //  L'ÉTAT DE LA DOUBLE PAGE
 // ---------------------------------------------------------------------
 let pages = null;
-const vue = { centre: "", regard: "out", filtre: "tous", selection: "", recherche: "", ajuste: false, reseau: null, souvenirs: [], charge: 0, retourRecit: false, dernierToucher: null };
+const vue = { centre: "", regard: "out", filtre: "tous", selection: "", recherche: "", ajuste: false, reseau: null, souvenirs: [], charge: 0, retourRecit: false, retourParametres: false, dernierToucher: null };
 
 function creer() {
     if (pages) return pages;
@@ -139,7 +145,8 @@ function htmlGauche() {
         ${a ? "" : `<option value="" selected>Choisir une âme…</option>`}
         ${liste.map(x => `<option value="${echapper(x.id)}"${x.id === id ? " selected" : ""}>${echapper(x.nom)}${x.type === "heros" ? " (héros)" : ""}${x.statut === "mort" ? " †" : ""}</option>`).join("")}
       </select>`;
-    const retour = vue.retourRecit ? `<button type="button" class="lien-fiche retour-liens" data-action="liens" data-cb="recit">← Revenir au récit</button>` : "";
+    const retour = vue.retourRecit ? `<button type="button" class="lien-fiche retour-liens" data-action="liens" data-cb="recit">← Revenir au récit</button>`
+        : vue.retourParametres ? `<button type="button" class="lien-fiche retour-liens" data-action="liens" data-cb="parametres">← Revenir aux paramètres</button>` : "";
     if (!P || !a) return `<div class="contenu-page page-liens-gauche">
         <div class="entete-liens">${lavis(TEINTE_LIENS, "liens-titre")}<span class="titre-page-fiche">Les fils invisibles</span></div>${FLEURON}
         <p class="fiche-attente">${vue.charge === 1 ? "Le livre cherche les âmes de la partie…" : "Aucune âme n'est encore connue dans cette partie : elles naissent avec les personnages nommés du récit."}</p>${retour}${liste.length ? index : ""}</div>`;
@@ -288,6 +295,7 @@ async function agir(cible) {
     if (cb === "regard") { son(); vue.regard = cible.dataset.regard === "in" ? "in" : "out"; vue.selection = ""; rendre(); return; }
     if (cb === "fermer") { vue.selection = ""; vue.ajuste = false; rendre(); return; }
     if (cb === "recit") { son(); vue.retourRecit = false; if (window.GRIMOIRE_RECIT && window.GRIMOIRE_RECIT.allerAuRecit) window.GRIMOIRE_RECIT.allerAuRecit(); return; }
+    if (cb === "parametres") { son(); vue.retourParametres = false; if (window.GRIMOIRE_PARAMETRES) window.GRIMOIRE_PARAMETRES.revenirDesLiens(); return; }
     if (cb === "ajuster") { vue.ajuste = true; rendre(); return; }
     const lien = () => { const de = vue.regard === "in" ? vue.selection : vue.centre, vers = vue.regard === "in" ? vue.centre : vue.selection; return { de, vers }; };
     if (cb === "enregistrer") {
@@ -308,12 +316,19 @@ async function agir(cible) {
 // ---------------------------------------------------------------------
 //  ALLER AUX FILS INVISIBLES
 // ---------------------------------------------------------------------
-// `options` : { id } ou { nom } (l'âme à placer au centre), { depuisRecit }.
+// `options` : { id } ou { nom } (l'âme à placer au centre), { depuisRecit }, { depuisParametres } (v416).
 async function ouvrir(options) {
     const o = options || {}, g = G();
     if (!g || !g.enPartie || !g.enPartie() || typeof g.definirLiens !== "function") return false;
+    enRoute = Date.now();
+    // (v416) arrivé sur la double page, on n'est plus en route : la quitter la fait ressortir.
+    if (!ouvrir.ecoute && g.ecran && g.ecran()) {
+        ouvrir.ecoute = true;
+        g.ecran().addEventListener("grimoire-page", () => { if (ouverte()) enRoute = 0; });
+    }
     poser();
     vue.retourRecit = !!o.depuisRecit;
+    vue.retourParametres = !!o.depuisParametres;
     await charger();
     if (o.id && ames()[o.id]) await centrer(o.id);
     else if (o.nom) {
@@ -326,6 +341,7 @@ async function ouvrir(options) {
         if (i < 0) { if (essai < 30) setTimeout(() => aller(essai + 1), 100); return; }
         g.allerALaPage(i);
     };
+    enRoute = Date.now();
     aller(0);
     return true;
 }
@@ -335,15 +351,18 @@ function ouverte() {
     const i = g.indexDe(pages.g), ici = pf.getCurrentPageIndex();
     return i >= 0 && (ici === i || ici === i + 1);
 }
-// En partie, la double page est dans le livre ; ouverte, elle se relit toutes les 20 secondes.
-let derniereLecture = 0;
+// Ouverte, la double page se relit toutes les 20 secondes. (v416) Quittée, elle sort du
+// livre ; pendant qu'on y va (`enRoute`, 8 secondes au plus), elle reste.
+let derniereLecture = 0, enRoute = 0;
 setInterval(() => {
     if (document.hidden) return;
     try {
         const g = G();
-        if (!g || !g.enPartie || !g.enPartie()) return;
-        poser();
-        if (ouverte() && !vue.ajuste && Date.now() - derniereLecture > 20000) { derniereLecture = Date.now(); charger(true); }
+        if (!g || typeof g.pagesLiens !== "function") return;
+        if (ouverte()) {
+            enRoute = 0;
+            if (!vue.ajuste && Date.now() - derniereLecture > 20000) { derniereLecture = Date.now(); charger(true); }
+        } else if (g.pagesLiens().length && Date.now() - enRoute > 8000) g.definirLiens([]);
     } catch (e) { console.warn("Le livre : les fils invisibles", e); }
 }, 1000);
 

@@ -38,7 +38,10 @@
               ["instructions", "Instructions de l'IA", () => window.ouvrirListeInstructions && window.ouvrirListeInstructions("etape-menu-parametres")],
               ["narrateur", "Réglages du narrateur", () => window.naviguerFenetre && window.naviguerFenetre("etape-menu-outils", "etape-ia-parametre")],
               ["depenses", "Dépenses du MJ", () => window.ouvrirDepensesMJ && window.ouvrirDepensesMJ()],
-              ["cles", "Clés API", () => window.ouvrirClesApi && window.ouvrirClesApi("etape-menu-parametres")]
+              ["cles", "Clés API", () => window.ouvrirClesApi && window.ouvrirClesApi("etape-menu-parametres")],
+              // (v416) Nico : « vire les fils invisibles du sommaire et mets-les dans les paramètres » :
+              // l'outil de Nico et Ben pour lire et corriger les relations des PNJ (grimoire_liens.js).
+              ["liens", "Les fils invisibles", () => ouvrirLesLiens()]
           ] },
         { id: "monde", titre: "Le monde et ses règles", teinte: "vert", cote: "droite",
           texte: "Les effets, les peuples, les créatures et ce qu'elles laissent.",
@@ -84,6 +87,7 @@
     let deplace = null;                 // { el, parent, suivant } : la fenêtre posée dans le livre
     let calqueLarge = null;             // la double page des grands tableaux (dans la scène)
     let attente = false;
+    let retourDesLiens = false;         // (v416) les fils invisibles ouverts d'ici : « ← Revenir aux paramètres »
 
     const actif = () => !!G() && G().chapitre() === "parametres";
 
@@ -237,7 +241,27 @@
         if (!g || typeof g.ouvrirChapitre !== "function") return false;
         if (typeof window.fermerParametres === "function") { try { window.fermerParametres(true); } catch (e) {} }
         if (!actif()) vue = "verrou";
+        retourDesLiens = false;
         g.ouvrirChapitre("parametres");
+        return true;
+    }
+    // (v416) Les fils invisibles : leur double page entre dans le livre le temps qu'on la lit.
+    // Hors d'une partie, il n'y a personne à lire.
+    function ouvrirLesLiens() {
+        if (!window.GRIMOIRE_LIENS || !G().enPartie()) {
+            const t = document.querySelector('.encart-parametres[data-cat="mj"] .texte-parametres');
+            if (t) t.textContent = "Les fils invisibles se lisent en partie : ouvre d'abord une partie.";
+            return;
+        }
+        retourDesLiens = true;
+        window.GRIMOIRE_LIENS.ouvrir({ depuisParametres: true });
+    }
+    // « ← Revenir aux paramètres » (grimoire_liens.js) : les catégories reviennent sans
+    // le mot de passe, une seule fois, et seulement si l'on est parti d'ici.
+    function revenirDesLiens() {
+        if (!retourDesLiens) return false;
+        retourDesLiens = false;
+        montrer("menu");
         return true;
     }
     async function deverrouiller() {
@@ -301,6 +325,6 @@
         else if (actif() && deplace && SOUS_PAGES[vue] && SOUS_PAGES[vue].large && [3, 4].includes(G().page())) calqueLarge.classList.add("visible");
     }
 
-    window.GRIMOIRE_PARAMETRES = { html, rempli, ranger, ouvrir, agir, deverrouiller, naviguer, surTourne, surEtat,
+    window.GRIMOIRE_PARAMETRES = { html, rempli, ranger, ouvrir, agir, deverrouiller, naviguer, surTourne, surEtat, revenirDesLiens,
                                    vue: () => vue, CATEGORIES, SOUS_PAGES };
 })();
