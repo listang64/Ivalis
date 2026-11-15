@@ -623,7 +623,7 @@ function memeNomPNJ(a, b) {
 window.memeNomPNJIvalis = memeNomPNJ;   // (pour les bancs)
 // UN PNJ DE CETTE PARTIE (v409) : les PNJ n'existent que dans la partie qui les a
 // vus naître (Nico : « ses PNJ n'existeront pas dans les autres parties »). Une
-// fiche sans ID_Partie (d'avant la v330) passe encore, jusqu'à la purge.
+// fiche sans ID_Partie (d'avant la v330) passe encore.
 function estDeLaPartiePNJ(fiche) {
     const p = window.ID_PARTIE_COURANTE || "";
     return !!fiche && (!fiche.ID_Partie || !p || fiche.ID_Partie === p);
@@ -707,7 +707,7 @@ async function enregistrerFichePNJ(pnj, idLieuActuel) {
         Nom_PNJ: pnj.nom, Occupation: pnj.occupation || "", Race: pnj.race || "Humain", Secret_Mental: pnj.secret || "",
         Statut: "Vivant", Style_De_Parole: pnj.style_parole || "", URL_Cloudinary: "",
         ID_Partie: window.ID_PARTIE_COURANTE || "",    // (v330 : pour le retrouver, où qu'il aille)
-        Version_Creation: Number(window.VERSION_IVALIS) || 0   // (v409) né avec la refonte des PNJ : la purge le garde
+        Version_Creation: Number(window.VERSION_IVALIS) || 0   // (v409) sa marque de naissance (la version du jeu)
     });
     retenirPnjDeLaPartie({ Nom_PNJ: pnj.nom, URL_Cloudinary: "", __id: docId });
     // (v411) Son âme : sa personnalité et ses liens d'avant (PNJ déjà créés dans ce lieu).

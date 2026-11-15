@@ -217,8 +217,7 @@ export async function marquerMort(p, id) {
     const s = await getDoc(refAme(p, id));
     if (s.exists()) await setDoc(refAme(p, id), { statut: "mort", humeur: null }, { merge: true });
 }
-// Efface une âme, ses liens (dans les deux sens) et ses souvenirs (la purge des
-// anciens PNJ, un lieu effacé).
+// Efface une âme, ses liens (dans les deux sens) et ses souvenirs.
 export async function oublierAme(p, id) {
     if (!p || !id) return;
     const lot = writeBatch(db);
