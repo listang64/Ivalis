@@ -11954,3 +11954,7 @@ Nico : « Dans Paramètres > Monstres, je veux que Dégâts en pourcentage, Poin
 ## v406 — La livraison
 
 - Trois chantiers menés en parallèle (chacun dans son worktree), puis fusionnés dans dev un par un avec les bancs relancés après chaque fusion : (A) la fin d'un combat écrite comme le reste du récit ; (B) la triche des monstres en trois lignes indépendantes par niveau ; (C) CLAUDE.md (Livraison, Pièges connus — calculs de combat, Tests — vérification). Le seul conflit (les deux notes ci-dessus, ajoutées au même endroit de ce fichier) est résolu en gardant les deux. corrections_v405 accepte les versions suivantes.
+
+## v407 — CLAUDE.md : la section Git alignée sur la Livraison
+
+- L'étape 4 de la section « Git : toujours livrer sur la branche `dev` » dit maintenant comme la section « Livraison » : on pousse sur `dev` PUIS sur `main` (`git push origin HEAD:main`), en avance rapide, jamais de `--force` sur l'une ni sur l'autre ; si l'une a bougé entre-temps, on rejoue, on reteste, on repousse. Aucun code du jeu ne change.

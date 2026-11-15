@@ -84,7 +84,7 @@ Le travail terminé se pousse TOUJOURS sur `dev`, sans attendre qu'on le redeman
 1. **Au début du travail** : `git fetch origin dev`, puis lire la dernière version dans `origin/dev` (`version.json`). La nouvelle version est celle-ci + 1 : jamais un numéro déjà pris sur `dev`.
 2. **Partir de `dev`** : travailler sur une branche créée depuis `origin/dev` à jour. Si on est parti d'ailleurs, rejouer ses commits dessus (`git cherry-pick` / `git rebase origin/dev`) et résoudre les conflits en gardant le travail de `dev` (numéros de version de `index.html` = ceux de `dev` + 1 pour les fichiers touchés).
 3. **Avant de pousser** : relancer les bancs touchés et ceux des dernières versions de `dev` (`tests_monstres/`).
-4. **Pousser** : `git push origin HEAD:dev` (une avance rapide, jamais de `--force` sur `dev`). Si `dev` a bougé entre-temps : `git fetch`, rejouer, retester, repousser. La branche de la session peut aussi être poussée, mais `dev` est la livraison.
+4. **Pousser** : `git push origin HEAD:dev`, puis `git push origin HEAD:main` (des avances rapides, jamais de `--force` sur `dev` ni sur `main`). Si `dev` ou `main` a bougé entre-temps : `git fetch`, rejouer, retester, repousser. La branche de la session peut aussi être poussée, mais `dev` et `main` sont la livraison.
 
 ## Pièges connus
 
