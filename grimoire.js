@@ -94,7 +94,7 @@
     // récit » ; les Paramètres passent au menu principal). Trois puis deux.
     const ENTREES_INDEX = [
         ["fiches", "Aventuriers"], ["carte", "Carte du monde"], ["village", "Le village"],
-        ["combats", "Les combats"], ["liens", "Les fils invisibles"], ["recit", "Le récit"]
+        ["combats", "Les combats"], ["recit", "Le récit"]
     ];
     const ROMAINS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
 
@@ -132,6 +132,9 @@
     // (v398) La double page du village, après les combats (juste avant le récit).
     let pagesVillage = [];
     // (v414) La double page des fils invisibles (grimoire_liens.js), juste après les Aventuriers.
+    // (v416) Nico : « vire les fils invisibles du sommaire et mets-les dans les paramètres » :
+    // elle n'est dans le livre que le temps qu'on la lit (ouverte des Paramètres ou du
+    // portrait d'un PNJ dans le récit), et en ressort quand on la quitte.
     let pagesLiens = [];
     const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesFiches.length + pagesLiens.length + pagesCombats.length + pagesVillage.length : 0);
     // LA CARTE DU MONDE (v302) : sa double page vient juste après l'index (5-6),
@@ -275,7 +278,6 @@
         carte: { couleurs: ["#5f86b0", "#7fa2c4", "#4a6f98"], opacite: 0.3, nom: "index-carte" },
         village: { couleurs: ["#6fa64f", "#8dbb6a", "#567f3c"], opacite: 0.3, nom: "index-village" },
         combats: { couleurs: ["#9b2c22", "#7a1d14", "#c0503a"], opacite: 0.32, nom: "index-combats" },
-        liens: { couleurs: ["#7a3b5a", "#9a5576", "#5e2a44"], opacite: 0.28, nom: "index-liens" },
         recit: { couleurs: ["#8a5fb0", "#a37cc4", "#6d4890"], opacite: 0.26, nom: "index-recit" },
         titre: { couleurs: ["#d9a93a", "#e8c25a", "#b8862a"], opacite: 0.46, nom: "index-titre" }
     };
@@ -310,7 +312,7 @@
                <div class="entrees-index">${entrees(0, 3)}</div>
              </div>`,
             `${fondSommaire("droite")}<div class="contenu-page page-index droite">
-               <div class="entrees-index">${entrees(3, 6)}</div>
+               <div class="entrees-index">${entrees(3, 5)}</div>
                <p class="note-index" id="grimoire-note-index" aria-live="polite"></p>
              </div>`
         ];
@@ -1277,8 +1279,6 @@
         fiches: () => (window.GRIMOIRE_FICHES ? window.GRIMOIRE_FICHES.allerAuxAventuriers() : (window.ouvrirMenuPersonnages && window.ouvrirMenuPersonnages())),
         // (v388) Les combats ont leur double page (grimoire_combats.js) ; la popup en secours.
         combats: () => (window.GRIMOIRE_COMBATS && window.GRIMOIRE_COMBATS.ouvrir()) || (window.ouvrirPopupRencontre && window.ouvrirPopupRencontre()),
-        // (v414) Les fils invisibles : leur double page (grimoire_liens.js).
-        liens: () => window.GRIMOIRE_LIENS && window.GRIMOIRE_LIENS.ouvrir(),
         parametres: () => window.ouvrirParametres && window.ouvrirParametres()
     };
     const BIENTOT = {};                     // (v398 : le village a sa double page)

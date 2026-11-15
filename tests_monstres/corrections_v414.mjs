@@ -255,12 +255,19 @@ const noeuds = () => G(() => [...document.querySelectorAll("#grimoire-liens-d .n
 const toucher = (sel) => G((sel) => { const el = document.querySelector(sel); if (!el) return false; el.click(); return true; }, sel);
 
 // =========================================================================
-titre("1. LE SOMMAIRE : « LES FILS INVISIBLES » OUVRE LEUR DOUBLE PAGE");
+titre("1. LES PARAMÈTRES : « LES FILS INVISIBLES » OUVRENT LEUR DOUBLE PAGE (v416 : PLUS AU SOMMAIRE)");
 // =========================================================================
 await section(async () => {
-  const e = await G(() => { const el = document.getElementById("grimoire-index-liens"); return el ? el.textContent.replace(/\s+/g, " ").trim() : ""; });
-  verifier("le sommaire a son entrée : « V- Les fils invisibles », avant le récit", /^V- Les fils invisibles$/.test(e) && !!(await G(() => document.getElementById("grimoire-index-recit"))), e);
-  await cliquer("#grimoire-index-liens");
+  // (v416) Nico : « vire les fils invisibles du sommaire et mets-les dans les paramètres ».
+  verifier("(v416) le sommaire n'a plus d'entrée « Les fils invisibles »", !(await G(() => document.getElementById("grimoire-index-liens"))) && !!(await G(() => document.getElementById("grimoire-index-recit"))));
+  await G(() => window.GRIMOIRE_PARAMETRES.ouvrir());
+  await pose();
+  await p.fill("#grimoire-mdp-param", "rune");
+  await cliquer("#grimoire-param-deverrouiller");
+  await attendreQue(() => G(() => !!document.getElementById("grimoire-param-liens")), 4000);
+  const e = await G(() => { const el = document.getElementById("grimoire-param-liens"); return el ? el.textContent.trim() + " / " + el.closest(".encart-parametres").dataset.cat : ""; });
+  verifier("les Paramètres ont leur entrée, chez le Maître du Jeu", e === "Les fils invisibles / mj", e);
+  await cliquer("#grimoire-param-liens");
   verifier("le livre tourne jusqu'à leur double page (après les Aventuriers)", await attendreQue(surLaDoublePage, 8000)
            && await G(() => window.GRIMOIRE.indexDe(window.GRIMOIRE.pagesLiens()[0]) > window.GRIMOIRE.indexDe(window.GRIMOIRE.pagesFiches().slice(-1)[0] || null)));
   await attendreQue(() => G(() => !!document.querySelector("#grimoire-liens-g .nom-liens")), 5000);
