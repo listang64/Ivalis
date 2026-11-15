@@ -11893,3 +11893,7 @@ corrections_v398.mjs le vérifie (captures : V398_CAPTURES=dossier).
 ## v399 — La nouvelle image du village
 
 - La double page du village (v398) montre la nouvelle image de Nico (IMG_2272, même taille, même fond transparent) ; plus l'ancienne. corrections_v398 la vérifie (et accepte les versions suivantes).
+
+## v400 — Le village sans l'ombre de la reliure
+
+- Sur la double page du village, et seulement elle, l'ombre de la pliure (le `::after` des pages, v298) est retirée : le dessin traverse la reliure à plat. Les autres pages la gardent. corrections_v398 (section 2 bis) le vérifie.

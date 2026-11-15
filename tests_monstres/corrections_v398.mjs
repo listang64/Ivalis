@@ -207,6 +207,19 @@ await section(async () => {
   verifier("le bord gauche du dessin est sur la page de gauche, le bord droit sur celle de droite", vu.gauche === "grimoire-village-gauche" && vu.droite === "grimoire-village-droite", JSON.stringify(vu));
 });
 
+titre("2 bis. (v400) PAS D'OMBRE AU MILIEU DE LA DOUBLE PAGE DU VILLAGE — ET SEULEMENT LÀ");
+await section(async () => {
+  const r = await p.evaluate(() => {
+    const ombre = (el) => el ? getComputedStyle(el, "::after").display : "absente";
+    const [g, d] = window.GRIMOIRE.pagesVillage();
+    const autre = document.querySelector("#grimoire-livre .page-papier.gauche:not(.page-village)");
+    return { g: ombre(g), d: ombre(d), autre: ombre(autre), fondAutre: autre ? getComputedStyle(autre, "::after").backgroundImage.slice(0, 30) : "" };
+  });
+  verifier("la pliure ne s'assombrit plus sur les deux pages du village", r.g === "none" && r.d === "none", JSON.stringify(r));
+  verifier("…les autres pages gardent leur ombre de reliure", r.autre === "block" && /gradient/.test(r.fondAutre), JSON.stringify(r));
+  await cap("v400_village_sans_ombre");
+});
+
 titre("3. SA PLACE DANS LE LIVRE : APRÈS LES COMBATS, AVANT LE RÉCIT");
 await section(async () => {
   const r = await p.evaluate(() => ({ village: window.GRIMOIRE.indexDe(window.GRIMOIRE.pagesVillage()[0]), combats: window.GRIMOIRE.indexDe((window.GRIMOIRE.pagesCombats() || [])[0]),
