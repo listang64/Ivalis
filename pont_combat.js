@@ -1192,7 +1192,14 @@ const CHAMPS_COMBAT_PROTEGES = [
     // le ferait passer pour tombé.
     "sursis", "techniquesUtilisees",
     // Le leader relevé (v262) : sa fiche de base ne le sait qu'après coup.
-    "leader"
+    "leader",
+    // (v405) Nico : « quand un token ennemi est mort, il n'a pas l'animation de chute
+    // (KO) comme les joueurs ». Le cerveau marque la créature tombée « Mort » dans son
+    // document dès qu'il publie (marquerMonstreMort, regime_cerveau.js) : chaque écran
+    // recevait ce statut AVANT d'avoir rejoué le coup, retirait le pion (estCombattantMort)
+    // et la mise à terre n'avait plus rien à faire tomber. Un héros, lui, n'est jamais
+    // marqué « Mort » en base. Le statut suit désormais l'état rejoué, comme la vie.
+    "statut"
 ];
 
 export function fusionnerFichesCombat(fichesFraiches, fichesActuelles, combattantsDuCerveau) {

@@ -1392,9 +1392,17 @@ export function chaineDeDegats(cible, attaque, options) {
 
     // 6. Le bouclier encaisse en premier ; (v395) brisé, ce qui le dépasse
     //    passe sur la vie, divisé par deux (encaisserBouclier, combat_etat.js).
+    //    (v405) Nico : « quand un ennemi attaque un bouclier magique, la résistance
+    //    physique et magique ne s'applique pas » : le bouclier prend le coup AVANT
+    //    l'armure (`degats`) ; l'armure ne joue que sur le surplus qui passe sur la
+    //    vie. Le coup se dit alors à sa taille avant l'armure. Deux coups gardent la
+    //    règle d'avant : l'étalement (ses parts tombent en fin de manche) et Ténèbres
+    //    (l'énergie boit d'abord ; le bouclier n'encaisse que le surplus).
     const bouclier = Math.max(0, nombre(cible.bouclier));
+    const avantArmure = bouclier > 0 && !attaque.estEtalement && !compte.tenebres;
+    if (avantArmure) compte.degats = degats;
     if (bouclier > 0) {
-        const part = encaisserBouclier(bouclier, degatsFinaux);
+        const part = avantArmure ? encaisserBouclier(bouclier, degats, reduction) : encaisserBouclier(bouclier, degatsFinaux);
         compte.versBouclier = part.surBouclier;
         compte.bouclierApres = part.bouclierApres;
         compte.bouclierBrise = part.brise;
@@ -1503,15 +1511,17 @@ export function traverserZones(etat, id, hex, des, options = {}) {
             const base = nombre(zone.degats.pourcentPvMax) > 0
                 ? Math.max(1, Math.round(nombre(cible.pvMax) * nombre(zone.degats.pourcentPvMax) / 100))
                 : decimal(zone.degats.valeurBrute);
-            const montant = Math.max(0, Math.round(base * (1 - part)));
+            // (v405) Sur un bouclier, le coup entier (avant l'armure) ; l'armure ne joue que sur le surplus.
+            const surLeBouclier = cible.bouclier > 0;
+            const montant = surLeBouclier ? Math.max(0, Math.round(base)) : Math.max(0, Math.round(base * (1 - part)));
             if (montant > 0) {
                 let surBouclier = 0;
-                if (cible.bouclier > 0) {
+                if (surLeBouclier) {
                     // (v395) Brisé, le surplus passe sur la vie, divisé par deux.
-                    const part = encaisserBouclier(cible.bouclier, montant);
-                    surBouclier = part.surBouclier;
-                    cible.bouclier = part.bouclierApres;
-                    cible.pv = Math.max(0, cible.pv - part.versPv);
+                    const enc = encaisserBouclier(cible.bouclier, montant, part);
+                    surBouclier = enc.surBouclier;
+                    cible.bouclier = enc.bouclierApres;
+                    cible.pv = Math.max(0, cible.pv - enc.versPv);
                 } else {
                     cible.pv = Math.max(0, cible.pv - montant);
                 }
@@ -3159,9 +3169,12 @@ export function resoudreCarte(etat, action, plateau) {
                     const frapperPhysique = (id, c, brut) => {
                         if (!c || c.aTerre || brut <= 0) return;
                         const reduction = Math.min(1, Math.max(0, defPhysiqueDe(c)) / 100);
-                        const montant = Math.max(0, Math.round(brut * (1 - reduction)));
+                        // (v405) sur un bouclier : le coup entier, l'armure sur le seul surplus
+                        const surLeBouclier = nombre(c.bouclier) > 0;
+                        const montant = surLeBouclier ? Math.max(0, Math.round(brut)) : Math.max(0, Math.round(brut * (1 - reduction)));
                         if (montant <= 0) return;
-                        const part = encaisserBouclier(c.bouclier, montant);   // (v395) brisé : le surplus / 2
+                        const part = surLeBouclier ? encaisserBouclier(c.bouclier, montant, reduction)
+                                                   : encaisserBouclier(c.bouclier, montant);   // (v395) brisé : le surplus / 2
                         const surBouclier = part.surBouclier;
                         c.bouclier = part.bouclierApres;
                         if (c.bouclier === 0) c.bouclierMax = 0;

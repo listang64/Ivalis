@@ -256,9 +256,9 @@ await section(async () => {
 titre("3. LA VERSION");
 await section(async () => {
   const v = JSON.parse(lire("version.json")).version;
-  verifier("version.json et VERSION_IVALIS d'accord (404)", v === 404 && new RegExp("VERSION_IVALIS = " + v + ";").test(lire("trace_combat.js")), String(v));
+  verifier("version.json et VERSION_IVALIS d'accord (404 ou plus)", v >= 404 && new RegExp("VERSION_IVALIS = " + v + ";").test(lire("trace_combat.js")), String(v));
   const html = lire("index.html");
-  verifier("index.html charge les nouvelles versions (pont_combat 59 ×2, animations_catalogue 26, vocal 3)", (html.match(/pont_combat\.js\?v=59/g) || []).length === 2 && /animations_catalogue\.js\?v=26"/.test(html) && /vocal\.js\?v=3"/.test(html) && /vocal\.css\?v=2"/.test(html));
+  verifier("index.html charge les nouvelles versions (pont_combat 59 ×2, animations_catalogue 26, vocal 3)", (html.match(/pont_combat\.js\?v=(5[89]|[6-9]\d)/g) || []).length === 2 && /animations_catalogue\.js\?v=26"/.test(html) && /vocal\.js\?v=3"/.test(html) && /vocal\.css\?v=2"/.test(html));
   verifier("pas d'erreur dans les pages", !erreurs.length, erreurs.slice(0, 3).join(" | "));
 });
 

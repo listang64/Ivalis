@@ -293,10 +293,15 @@ export function infligerOpportunite(etat, idCible, ennemi, coup, hex) {
     const etapes = [];
     const cible = combattant(etat, idCible);
     if (!cible) return etapes;
-    const appliquer = (id, c, montant) => {
-        if (c.bouclier > 0) { const part = encaisserBouclier(c.bouclier, montant); c.bouclier = part.bouclierApres; c.pv = Math.max(0, c.pv - part.versPv); }
-        else c.pv = Math.max(0, c.pv - montant);
-        etapes.push({ type: "degats", cible: id, acteur: ennemi, montant, opportunite: true,
+    // (v405) Sur un bouclier, le coup entier (avant l'armure) ; l'armure ne joue que sur le
+    // surplus qui passe sur la vie. `brut` : le coup avant l'armure.
+    const reductionArmure = (c) => Math.min(1, Math.max(0, defPhysiqueDe(c)) / 100);
+    const appliquer = (id, c, brut) => {
+        let montant, bouclier = {};
+        if (c.bouclier > 0) { montant = Math.max(0, Math.round(nombre(brut))); const part = encaisserBouclier(c.bouclier, montant, reductionArmure(c)); c.bouclier = part.bouclierApres; c.pv = Math.max(0, c.pv - part.versPv);
+                              bouclier = { surBouclier: part.surBouclier, ...(part.brise ? { bouclierBrise: true } : {}) }; }
+        else { montant = reduireParArmure(c, nombre(brut)); c.pv = Math.max(0, c.pv - montant); }
+        etapes.push({ type: "degats", cible: id, acteur: ennemi, montant, opportunite: true, ...bouclier,
                       bouclierApres: c.bouclier, pvApres: c.pv });
         etapes.push(...tomber(etat, id, ennemi));
     };
@@ -307,15 +312,22 @@ export function infligerOpportunite(etat, idCible, ennemi, coup, hex) {
         const jetP = (coup.rempart && coup.rempart.id === protecteur.id) ? coup.rempart : null;
         etapes.push({ type: "opportunite", ...coup, ...(coup.cibleEvitee ? { evitee: true, mot: coup.motCible, montant: 0 } : {}), hex });
         etapes.push({ type: "message", cible: protecteur.id, acteur: ennemi, texte: "🛡️ Rempart", couleur: "#e8c46a" });
-        if (!coup.cibleEvitee) appliquer(idCible, cible, reduireParArmure(cible, brut - partHoplite));
+        if (!coup.cibleEvitee) appliquer(idCible, cible, brut - partHoplite);
         if (jetP && jetP.evitee) etapes.push({ type: "message", cible: protecteur.id, acteur: ennemi, texte: jetP.mot });
-        else appliquer(protecteur.id, protecteur, reduireParArmure(protecteur, partHoplite));
+        else appliquer(protecteur.id, protecteur, partHoplite);
         return etapes;
     }
-    if (cible.bouclier > 0) { const part = encaisserBouclier(cible.bouclier, coup.montant); cible.bouclier = part.bouclierApres; cible.pv = Math.max(0, cible.pv - part.versPv); }
-    else cible.pv = Math.max(0, cible.pv - coup.montant);
-    etapes.push({ type: "opportunite", ...coup, hex, bouclierApres: cible.bouclier, pvApres: cible.pv });
-    etapes.push({ type: "degats", cible: idCible, acteur: ennemi, montant: coup.montant, opportunite: true,
+    // (v405) Sur un bouclier : le coup entier (coup.brut, avant l'armure) ; l'armure sur le seul surplus.
+    let montant = nombre(coup.montant), bouclier = {};
+    if (cible.bouclier > 0) {
+        montant = Math.max(0, Math.round(nombre(coup.brut, coup.montant)));
+        const part = encaisserBouclier(cible.bouclier, montant, coup.brut !== undefined ? reductionArmure(cible) : 0);
+        cible.bouclier = part.bouclierApres; cible.pv = Math.max(0, cible.pv - part.versPv);
+        bouclier = { surBouclier: part.surBouclier, ...(part.brise ? { bouclierBrise: true } : {}) };   // (l'écran dit ce que le bouclier encaisse)
+    }
+    else cible.pv = Math.max(0, cible.pv - montant);
+    etapes.push({ type: "opportunite", ...coup, montant, hex, bouclierApres: cible.bouclier, pvApres: cible.pv });
+    etapes.push({ type: "degats", cible: idCible, acteur: ennemi, montant, opportunite: true, ...bouclier,
                   bouclierApres: cible.bouclier, pvApres: cible.pv });
     etapes.push(...tomber(etat, idCible, ennemi));
     return etapes;

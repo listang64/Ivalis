@@ -1004,12 +1004,19 @@ export function tomber(etat, id, acteur, options) {
 // est brisé, les dégâts restants sont infligés aux points de vie / 2 »). Le bouclier
 // encaisse d'abord ; ce qui le dépasse passe, divisé par deux (arrondi en dessous),
 // sur la vie. Sans bouclier, tout va à la vie.
-export function encaisserBouclier(bouclier, montant) {
+// (v405) Nico : « quand un ennemi attaque un bouclier magique, la résistance physique et
+// magique ne s'applique pas » : le bouclier prend le coup ENTIER, avant l'armure de la
+// cible. `reduction` (0 à 1) : cette armure — elle ne joue que sur ce qui passe sur la
+// vie (le surplus, réduit par l'armure, puis divisé par deux). Sans `reduction` (0), le
+// montant donné est déjà ce qui reste après l'armure : la règle d'avant.
+export function encaisserBouclier(bouclier, montant, reduction) {
     const b = Math.max(0, nombre(bouclier)), m = Math.max(0, nombre(montant));
-    if (b <= 0) return { surBouclier: 0, bouclierApres: 0, versPv: m, brise: false };
+    const r = Math.min(1, Math.max(0, Number(reduction) || 0));   // (une fraction : pas `nombre`, qui garde l'entier)
+    const arme = (x) => (r > 0 ? Math.max(0, Math.round(x * (1 - r))) : x);
+    if (b <= 0) return { surBouclier: 0, bouclierApres: 0, versPv: arme(m), brise: false };
     const surBouclier = Math.min(b, m);
     const bouclierApres = b - surBouclier;
-    return { surBouclier, bouclierApres, versPv: m > b ? Math.floor((m - b) / 2) : 0, brise: bouclierApres === 0 };
+    return { surBouclier, bouclierApres, versPv: m > b ? Math.floor(arme(m - b) / 2) : 0, brise: bouclierApres === 0 };
 }
 export const enSursis = (c) => !!(c && c.sursis && nombre(c.sursis.tours) > 0);
 

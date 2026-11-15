@@ -2186,7 +2186,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=294"></script>
+<script src="trace_combat.js?v=295"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2212,14 +2212,14 @@
      vérifie qu'ils sont identiques. Elle doit précéder tout module. -->
 <script type="importmap">
 { "imports": {
-    "./combat_etat.js": "./combat_etat.js?v=62",
-    "./moteur_pur.js": "./moteur_pur.js?v=86",
-    "./mouvement_pur.js": "./mouvement_pur.js?v=28",
+    "./combat_etat.js": "./combat_etat.js?v=63",
+    "./moteur_pur.js": "./moteur_pur.js?v=87",
+    "./mouvement_pur.js": "./mouvement_pur.js?v=29",
     "./ia_pure.js": "./ia_pure.js?v=16",
     "./cerveau_combat.js": "./cerveau_combat.js?v=81",
     "./spectateur_combat.js": "./spectateur_combat.js?v=9",
     "./depot_firestore.js": "./depot_firestore.js?v=11",
-    "./pont_combat.js": "./pont_combat.js?v=59",
+    "./pont_combat.js": "./pont_combat.js?v=60",
     "./totems_pur.js": "./totems_pur.js?v=1",
     "./playlist.js": "./playlist.js?v=1"
 } }
@@ -2233,11 +2233,11 @@
 <!-- LE NOYAU PUR DU COMBAT : la forme de l'état, les dés à graine et les
      invariants. Il ne connaît ni Firebase ni le navigateur, et c'est le socle
      de la nouvelle architecture. `voirEtat()` dans la console. -->
-<script type="module" src="combat_etat.js?v=62"></script>
+<script type="module" src="combat_etat.js?v=63"></script>
 <!-- LE MOTEUR PUR : la chaîne de dégâts et le mouvement, extraits des 5 000
      lignes du moteur actuel et testables sans réseau ni navigateur. -->
-<script type="module" src="moteur_pur.js?v=86"></script>
-<script type="module" src="mouvement_pur.js?v=28"></script>
+<script type="module" src="moteur_pur.js?v=87"></script>
+<script type="module" src="mouvement_pur.js?v=29"></script>
 <script type="module" src="ia_pure.js?v=16"></script>
 <!-- LE CERVEAU : un seul poste écrit, les autres lisent et animent. -->
 <script type="module" src="cerveau_combat.js?v=81"></script>
@@ -2249,7 +2249,7 @@
 <script type="module" src="depot_firestore.js?v=11"></script>
 <!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
      vers les animations existantes — il ne recalcule jamais rien. -->
-<script type="module" src="pont_combat.js?v=59"></script>
+<script type="module" src="pont_combat.js?v=60"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=56"></script>
 <script type="module" src="ia_master.js?v=27"></script>
