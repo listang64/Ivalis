@@ -11897,3 +11897,10 @@ corrections_v398.mjs le vérifie (captures : V398_CAPTURES=dossier).
 ## v400 — Le village sans l'ombre de la reliure
 
 - Sur la double page du village, et seulement elle, l'ombre de la pliure (le `::after` des pages, v298) est retirée : le dessin traverse la reliure à plat. Les autres pages la gardent. corrections_v398 (section 2 bis) le vérifie.
+
+## v401 — Les sons du chat vocal
+
+- **Une voix arrive dans le vocal** (la sienne aussi) : un cor de guerre appelle (fabrique_sons.js, `cor-arrivee`) — une brève sur le ré, puis la longue une quinte au-dessus (la), une note de cuivre TENUE qui enfle (deux scies désaccordées et leur octave du dessous dans un filtre qui s'ouvre, la lèvre qui cherche la note, un vibrato tardif, le souffle de l'attaque), et l'écho du champ de bataille (`echo`).
+- **Une voix s'en va** (ou n'a plus donné de nouvelles) : le même cor, plus loin et plus sourd, sonne la retraite (`cor-depart`) — sol puis ré, qui descend et s'éteint.
+- vocal.js (`annoncerMouvements`) : à chaque nouvelle de la présence et au contrôle des absents ; les voix déjà là quand on entre dans la partie ne sonnent pas ; plusieurs à la fois, un seul son. Tous les postes de la partie l'entendent (même ceux qui n'ont pas rejoint) ; il suit le volume « Interface » × « Général ».
+- corrections_v401.mjs rend les deux sons hors ligne et les écoute par le calcul (hauteurs, tenue, niveau, timbre ; V401_SONS=dossier : les .wav) ; corrections_v396 les entend entre deux vrais postes.

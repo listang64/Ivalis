@@ -75,6 +75,64 @@
         src.start(t);
     }
 
+    // --- LE COR DE GUERRE (v401) -------------------------------------------
+    //  Pour le chat vocal (vocal.js) : une note de cuivre TENUE, qui enfle au
+    //  lieu de s'éteindre — deux scies désaccordées et leur octave du dessous,
+    //  dans un filtre qui s'ouvre avec le souffle (le cuivre qui « crache ») ;
+    //  la lèvre qui cherche la note (on part un peu en dessous), un vibrato qui
+    //  vient tard, et le souffle de l'attaque.
+    function cor(ctx, sortie, o) {
+        const t = ctx.currentTime + (o.debut || 0);
+        const d = o.duree, f = o.freq, gain = o.gain || 0.1, eclat = o.eclat || 1500;
+        const filtre = ctx.createBiquadFilter();
+        filtre.type = "lowpass"; filtre.Q.value = 1.3;
+        filtre.frequency.setValueAtTime(200, t);
+        filtre.frequency.linearRampToValueAtTime(eclat, t + 0.16);
+        filtre.frequency.setValueAtTime(eclat, t + d * 0.62);
+        filtre.frequency.linearRampToValueAtTime(eclat * 0.35, t + d);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(gain * 0.85, t + 0.13);
+        g.gain.linearRampToValueAtTime(gain, t + d * 0.55);                  // la note enfle
+        g.gain.setValueAtTime(gain, t + Math.max(0.2, d - 0.42));
+        g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+        filtre.connect(g).connect(sortie);
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = o.vibrato || 5.2;
+        const ampleur = ctx.createGain();
+        ampleur.gain.setValueAtTime(0, t);
+        ampleur.gain.linearRampToValueAtTime(f * 0.007, t + d * 0.6);
+        lfo.connect(ampleur);
+        [[1, "sawtooth", -5, 1], [1, "sawtooth", 8, 0.7], [0.5, "triangle", 0, 0.55]].forEach(([k, type, cents, part]) => {
+            const osc = ctx.createOscillator();
+            osc.type = type;
+            osc.frequency.setValueAtTime(f * k * 0.93, t);
+            osc.frequency.exponentialRampToValueAtTime(f * k, t + 0.09);
+            osc.detune.value = cents;
+            ampleur.connect(osc.frequency);
+            const pg = ctx.createGain();
+            pg.gain.value = part;
+            osc.connect(pg).connect(filtre);
+            osc.start(t); osc.stop(t + d + 0.05);
+        });
+        lfo.start(t); lfo.stop(t + d + 0.05);
+        bruit(ctx, sortie, { debut: o.debut || 0, duree: 0.2, filtre: "bandpass", freq: 1100, q: 1.4, gain: gain * 0.5, forme: "cloche" });
+    }
+    // L'écho du champ de bataille : ce qui entre ressort, puis revient, plus
+    // sourd, de plus en plus loin (une boucle de retard filtrée).
+    function echo(ctx, sortie, retard, retour, ton) {
+        const entree = ctx.createGain();
+        const delai = ctx.createDelay(2);
+        delai.delayTime.value = retard;
+        const f = ctx.createBiquadFilter();
+        f.type = "lowpass"; f.frequency.value = ton;
+        const boucle = ctx.createGain();
+        boucle.gain.value = retour;
+        entree.connect(sortie);
+        entree.connect(delai); delai.connect(f); f.connect(boucle); boucle.connect(delai); f.connect(sortie);
+        return entree;
+    }
+
     // --- UN DING, ET SES DIX VARIATIONS ---------------------------------
     //  Nico : « remplace tous ces sons par des exemples de clic de menu sur un
     //  bouton — un léger ding, et des variations pour les dix boutons ». Un
@@ -518,6 +576,21 @@
             g2.gain.value = 0.05;
             src2.connect(f2).connect(g2).connect(s);
             src2.start(t);
+        },
+        // (v401) LE CHAT VOCAL. Une voix arrive : le cor de guerre appelle —
+        // une brève (ré), puis la longue, une quinte au-dessus (la), qui enfle
+        // et résonne au loin.
+        "cor-arrivee"(ctx, s) {
+            const bus = echo(ctx, s, 0.3, 0.34, 1300);
+            cor(ctx, bus, { freq: 146.83, duree: 0.55, gain: 0.1, eclat: 1250 });
+            cor(ctx, bus, { debut: 0.48, freq: 220, duree: 2.1, gain: 0.12, eclat: 1700 });
+        },
+        // Une voix s'en va : le même cor, plus loin et plus sourd, qui sonne la
+        // retraite — il descend (sol, puis ré) et s'éteint dans l'écho.
+        "cor-depart"(ctx, s) {
+            const bus = echo(ctx, s, 0.38, 0.32, 850);
+            cor(ctx, bus, { freq: 196, duree: 0.6, gain: 0.065, eclat: 800 });
+            cor(ctx, bus, { debut: 0.52, freq: 146.83, duree: 1.7, gain: 0.075, eclat: 620 });
         },
         // La défaite : deux notes graves qui descendent, étouffées.
         "defaite"(ctx, s) {

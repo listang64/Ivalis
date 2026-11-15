@@ -112,7 +112,8 @@ async function poste(joueur, nomCompte) {
   await p.goto(base + '/index.html'); await p.waitForTimeout(1200);
   await p.evaluate(([joueur, nomCompte]) => {
     localStorage.setItem("ID_JOUEUR_COURANT", joueur);
-    window.jouerSonEvenement = () => true; window.jouerSonClic = () => {};
+    // (v401) les sons du vocal sont retenus : le cor quand une voix arrive, la retraite quand elle part
+    window.__sonsVocal = []; window.jouerSonEvenement = (id) => { if (/^cor-/.test(id)) window.__sonsVocal.push(id); return true; }; window.jouerSonClic = () => {};
     window.fermerToutesLesFenetres = () => {};
     window.COMPTE_JOUEUR = { nom: nomCompte, email: "", admin: false };
     window.LISTE_PARTIES_CACHE = [{ id: "P1", nom: "Les Lames d'Héra" }];
@@ -185,6 +186,12 @@ await section(async () => {
   verifier("un bouton « Rejoindre »", r && r.rejoindre);
   verifier("personne dans le vocal : deux points rouges", (await couleur(p1, "J1")) === "rouge" && (await couleur(p1, "J2")) === "rouge" && /rouge/.test(await pointDOM(p1, "J2")));
   await cap(p1, "v396_papier");
+});
+
+const sonsVocal = (p) => p.evaluate(() => window.__sonsVocal.slice());
+titre("1 bis. (v401) EN ENTRANT DANS LA PARTIE, PERSONNE NE SONNE");
+await section(async () => {
+  verifier("aucun cor tant que personne ne rejoint le vocal", !(await sonsVocal(p1)).length && !(await sonsVocal(p2)).length);
 });
 
 titre("2. REJOINDRE : LE MICRO, LA PRÉSENCE, LE POINT VERT");
@@ -298,6 +305,13 @@ await section(async () => {
   void pistes;
 });
 
+titre("7 bis. (v401) LE COR A SONNÉ À CHAQUE ARRIVÉE, SUR LES DEUX POSTES");
+await section(async () => {
+  const a = await sonsVocal(p1), c = await sonsVocal(p2);
+  verifier("Ben, puis Nico rejoignent : deux « cor-arrivee » chez Ben, et chez Nico", a.filter(x => x === "cor-arrivee").length === 2 && c.filter(x => x === "cor-arrivee").length === 2, JSON.stringify({ a, c }));
+  verifier("…et pas de retraite (la dictée, la sourdine, le micro coupé ne font pas partir)", !a.includes("cor-depart") && !c.includes("cor-depart"), JSON.stringify({ a, c }));
+});
+
 titre("8. QUITTER LE VOCAL");
 await section(async () => {
   await toucher(p1, '[data-vocal="quitter"]');
@@ -307,6 +321,13 @@ await section(async () => {
   verifier("…sa présence est effacée", !base_.has("Vocal/P1/Presents/J1"));
   verifier("…chez Nico : la connexion fermée, le point de Ben rouge", await attendreQue(p2, async () => { const x = await vocal(p2); return !x.pairs.length && (await couleur(p2, "J1")) === "rouge"; }));
   verifier("…« Rejoindre » revient", await p1.evaluate(() => !!document.querySelector('[data-vocal="rejoindre"]')));
+});
+
+titre("8 bis. (v401) BEN EST PARTI : LA RETRAITE SONNE");
+await section(async () => {
+  const a = await sonsVocal(p1), c = await sonsVocal(p2);
+  verifier("chez Nico : « cor-depart »", c[c.length - 1] === "cor-depart", JSON.stringify(c));
+  verifier("…et chez Ben aussi (il s'entend partir)", a[a.length - 1] === "cor-depart", JSON.stringify(a));
 });
 
 titre("9. QUATRE VOIX AU PLUS");

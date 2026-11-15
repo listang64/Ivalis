@@ -46,6 +46,7 @@ const v = {
     partie: null, el: null,
     presents: {},                        // idJoueur -> { Nom, Etat, Vu, Session }
     enJeu: {},                           // idJoueur -> { Nom, Vu } : la partie ouverte
+    voixConnues: null,                   // (v401) les voix déjà là : qui arrive, qui part
     ecouteEnJeu: null, battementJeu: null,
     ecoutePresents: null, ecouteSignaux: null, lente: null, battement: null, boucle: null,
     rejoint: false, session: "", ice: ICE_PAR_DEFAUT,
@@ -192,6 +193,7 @@ function entrer(idPartie) {
     v.partie = idPartie;
     v.presents = {};
     v.enJeu = {};
+    v.voixConnues = null;
     creerPapier();
     // « Je suis dans la partie » : un battement, que les autres postes écoutent.
     const signalerJeu = () => {
@@ -214,11 +216,29 @@ function entrer(idPartie) {
             snap.forEach(d => { presents[d.id] = d.data(); });
             v.presents = presents;
             synchroniserPairs();
+            annoncerMouvements();
             maj();
         }, (e) => console.error("Vocal : présents", e));
     } catch (e) { console.error("Vocal : présents", e); }
     // Les absents s'effacent d'eux-mêmes (plus de battement).
-    v.lente = setInterval(() => { synchroniserPairs(); maj(); }, 5000);
+    v.lente = setInterval(() => { synchroniserPairs(); annoncerMouvements(); maj(); }, 5000);
+}
+// (v401) LES SONS DU VOCAL. Nico : « mets un son quand un joueur se connecte sur le
+// vocal, et quand l'un des joueurs quitte le vocal ; un son de cor pour l'arrivée,
+// comme ceux des batailles de l'époque ». Un cor de guerre qui appelle quand une
+// voix arrive (la sienne aussi) ; le même cor, plus loin, qui sonne la retraite
+// quand une voix s'en va (ou n'a plus donné de nouvelles). Les voix déjà là quand
+// on entre dans la partie ne sonnent pas ; plusieurs à la fois : un seul son.
+// (fabrique_sons.js, SONS_EVENEMENTS : « cor-arrivee », « cor-depart ».)
+function annoncerMouvements() {
+    const dedans = new Set(Object.keys(v.presents).filter(id => frais(v.presents[id])));
+    if (v.voixConnues) {
+        const arrive = [...dedans].some(id => !v.voixConnues.has(id));
+        const part = [...v.voixConnues].some(id => !dedans.has(id));
+        const son = arrive ? "cor-arrivee" : part ? "cor-depart" : "";
+        if (son) { try { if (typeof window.jouerSonEvenement === "function") window.jouerSonEvenement(son); } catch (e) {} }
+    }
+    v.voixConnues = dedans;
 }
 function sortir() {
     quitter();
@@ -228,7 +248,7 @@ function sortir() {
     clearInterval(v.battementJeu); v.battementJeu = null;
     if (v.partie && moi()) deleteDoc(doc(db, "Vocal", v.partie, "EnJeu", moi())).catch(() => {});
     if (v.el) { v.el.remove(); v.el = null; }
-    v.partie = null; v.presents = {}; v.enJeu = {}; v.note = "";
+    v.partie = null; v.presents = {}; v.enJeu = {}; v.note = ""; v.voixConnues = null;
 }
 
 // ---------------------------------------------------------------------
