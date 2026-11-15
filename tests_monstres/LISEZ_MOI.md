@@ -11950,3 +11950,7 @@ Nico : « Dans Paramètres > Monstres, je veux que Dégâts en pourcentage, Poin
 - **Les noms gardés** : `tricheDuNiveau(n, t)` et `tricheMonstresActuelle()` rendent le % de DÉGÂTS ; `tricheDeNiveau(n)` et `tricheActuelle()` les trois ({ degats, pv, soins }). `REGLAGES_MONSTRES.tricheNiveau` devient `tricheDegats`, `trichePV`, `tricheSoins` (et `soinsFixes`, la valeur du niveau d'aujourd'hui).
 - **L'aperçu des cartes** (combat.js, `montantReel`) : % sur les dégâts, valeur fixe (et % du leader) sur les soins.
 - moteur_pur, corrections_v252, v255, v262, v263, v264, v268, v270, v393 et v402 suivent. corrections_v406_triche.mjs le vérifie dans le livre (captures : V406_CAPTURES=dossier).
+
+## v406 — La livraison
+
+- Trois chantiers menés en parallèle (chacun dans son worktree), puis fusionnés dans dev un par un avec les bancs relancés après chaque fusion : (A) la fin d'un combat écrite comme le reste du récit ; (B) la triche des monstres en trois lignes indépendantes par niveau ; (C) CLAUDE.md (Livraison, Pièges connus — calculs de combat, Tests — vérification). Le seul conflit (les deux notes ci-dessus, ajoutées au même endroit de ce fichier) est résolu en gardant les deux. corrections_v405 accepte les versions suivantes.

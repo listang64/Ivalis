@@ -322,10 +322,10 @@ await section(async () => {
 console.log("\n4. LA VERSION");
 await section(async () => {
   const v = JSON.parse(lire("version.json")).version;
-  verifier("version.json et VERSION_IVALIS d'accord (405)", v === 405 && new RegExp("VERSION_IVALIS = " + v + ";").test(lire("trace_combat.js")), String(v));
+  verifier("version.json et VERSION_IVALIS d'accord (405 ou plus)", v >= 405 && new RegExp("VERSION_IVALIS = " + v + ";").test(lire("trace_combat.js")), String(v));
   const html = lire("index.html");
   verifier("index.html charge les nouvelles versions (combat_etat 63, moteur_pur 87, mouvement_pur 29, pont_combat 60 — table d'import comprise)",
-    (html.match(/combat_etat\.js\?v=63/g) || []).length === 2 && (html.match(/moteur_pur\.js\?v=87/g) || []).length === 2
+    (html.match(/combat_etat\.js\?v=63/g) || []).length === 2 && (html.match(/moteur_pur\.js\?v=(8[7-9]|9\d)/g) || []).length === 2
     && (html.match(/mouvement_pur\.js\?v=29/g) || []).length === 2 && (html.match(/pont_combat\.js\?v=60/g) || []).length === 2);
   verifier("pas d'erreur dans la page", !erreurs.length, erreurs.slice(0, 3).join(" | "));
 });
