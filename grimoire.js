@@ -94,7 +94,7 @@
     // récit » ; les Paramètres passent au menu principal). Trois puis deux.
     const ENTREES_INDEX = [
         ["fiches", "Aventuriers"], ["carte", "Carte du monde"], ["village", "Le village"],
-        ["combats", "Les combats"], ["recit", "Le récit"]
+        ["combats", "Les combats"], ["liens", "Les fils invisibles"], ["recit", "Le récit"]
     ];
     const ROMAINS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
 
@@ -131,7 +131,9 @@
     let pagesCombats = [];
     // (v398) La double page du village, après les combats (juste avant le récit).
     let pagesVillage = [];
-    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesFiches.length + pagesCombats.length + pagesVillage.length : 0);
+    // (v414) La double page des fils invisibles (grimoire_liens.js), juste après les Aventuriers.
+    let pagesLiens = [];
+    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesFiches.length + pagesLiens.length + pagesCombats.length + pagesVillage.length : 0);
     // LA CARTE DU MONDE (v302) : sa double page vient juste après l'index (5-6),
     // en partie seulement ; la suite (le récit) commence alors à la page 7.
     // Nico : « page de gauche cette partie de la map, page de droite celle-là ;
@@ -273,6 +275,7 @@
         carte: { couleurs: ["#5f86b0", "#7fa2c4", "#4a6f98"], opacite: 0.3, nom: "index-carte" },
         village: { couleurs: ["#6fa64f", "#8dbb6a", "#567f3c"], opacite: 0.3, nom: "index-village" },
         combats: { couleurs: ["#9b2c22", "#7a1d14", "#c0503a"], opacite: 0.32, nom: "index-combats" },
+        liens: { couleurs: ["#7a3b5a", "#9a5576", "#5e2a44"], opacite: 0.28, nom: "index-liens" },
         recit: { couleurs: ["#8a5fb0", "#a37cc4", "#6d4890"], opacite: 0.26, nom: "index-recit" },
         titre: { couleurs: ["#d9a93a", "#e8c25a", "#b8862a"], opacite: 0.46, nom: "index-titre" }
     };
@@ -307,7 +310,7 @@
                <div class="entrees-index">${entrees(0, 3)}</div>
              </div>`,
             `${fondSommaire("droite")}<div class="contenu-page page-index droite">
-               <div class="entrees-index">${entrees(3, 5)}</div>
+               <div class="entrees-index">${entrees(3, 6)}</div>
                <p class="note-index" id="grimoire-note-index" aria-live="polite"></p>
              </div>`
         ];
@@ -1067,7 +1070,7 @@
     function definirSuite(elements) {
         suite = (elements || []).slice();
         if (!pageFlip) return;
-        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesFiches, ...pagesCombats, ...pagesVillage] : []), ...suite, ...vierges, dos];
+        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesFiches, ...pagesLiens, ...pagesCombats, ...pagesVillage] : []), ...suite, ...vierges, dos];
         const generation = ++definirSuite.generation;      // seule la dernière demande s'applique
         const appliquer = () => {
             if (generation !== definirSuite.generation) return;
@@ -1274,6 +1277,8 @@
         fiches: () => (window.GRIMOIRE_FICHES ? window.GRIMOIRE_FICHES.allerAuxAventuriers() : (window.ouvrirMenuPersonnages && window.ouvrirMenuPersonnages())),
         // (v388) Les combats ont leur double page (grimoire_combats.js) ; la popup en secours.
         combats: () => (window.GRIMOIRE_COMBATS && window.GRIMOIRE_COMBATS.ouvrir()) || (window.ouvrirPopupRencontre && window.ouvrirPopupRencontre()),
+        // (v414) Les fils invisibles : leur double page (grimoire_liens.js).
+        liens: () => window.GRIMOIRE_LIENS && window.GRIMOIRE_LIENS.ouvrir(),
         parametres: () => window.ouvrirParametres && window.ouvrirParametres()
     };
     const BIENTOT = {};                     // (v398 : le village a sa double page)
@@ -1322,6 +1327,7 @@
         if (action === "fiches") { if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.agir(cible); return; }
         if (action === "creation") { if (window.GRIMOIRE_CREATION) window.GRIMOIRE_CREATION.agir(cible); return; }
         if (action === "combats") { if (window.GRIMOIRE_COMBATS) window.GRIMOIRE_COMBATS.agir(cible); return; }
+        if (action === "liens") { if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.agir(cible); return; }
         // (v312) Le marque-page du menu : la page principale (le journal), en partie ou non.
         if (action === "marque-menu") {
             if (!pageFlip || !ouvert) return;
@@ -1447,6 +1453,9 @@
         // (v388) la double page des combats
         definirCombats: (els) => { pagesCombats = (els || []).slice(); if (enPartie) definirSuite(suite); },
         pagesCombats: () => pagesCombats.slice(),
+        // (v414) la double page des fils invisibles
+        definirLiens: (els) => { pagesLiens = (els || []).slice(); if (enPartie) definirSuite(suite); },
+        pagesLiens: () => pagesLiens.slice(),
         // (v398) la double page du village
         pagesVillage: () => pagesVillage.slice(), allerAuVillage, IMAGE_VILLAGE,
         // (v395) les Paramètres du livre (grimoire_parametres.js) : le chapitre des pages 3-4

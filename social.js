@@ -408,6 +408,81 @@ export async function tourSocial(o) {
 }
 
 // -------------------------------------------------------------------------
+//  LE LIVRE (v414) : tout le réseau de la partie, et ce que Nico et Ben corrigent
+// -------------------------------------------------------------------------
+// { ames, liens, fiches (Monde_PNJ de la partie, par id), etat (Social/etat) }.
+export async function lireReseau(p) {
+    const ames = {}, liens = {}, fiches = {};
+    if (!p) return { ames, liens, fiches, etat: {} };
+    const [sa, sl, sf, se] = await Promise.all([getDocs(collection(db, PARTIES, p, "Ames")), getDocs(colLiens(p)),
+        getDocs(query(collection(db, "Monde_PNJ"), where("ID_Partie", "==", p))), getDoc(refEtat(p))]);
+    sa.forEach(d => { ames[d.id] = { ...d.data(), id: d.id }; });
+    sl.forEach(d => { const x = d.data(); liens[P.cleLien(x.de, x.vers)] = x; });
+    sf.forEach(d => { fiches[d.id] = { ...d.data(), id: d.id }; });
+    return { ames, liens, fiches, etat: se.exists() ? se.data() : {} };
+}
+export async function lireSouvenirsDe(p, id) {
+    const liste = [];
+    if (!p || !id) return liste;
+    (await getDocs(query(collection(db, PARTIES, p, "Souvenirs"), where("ame", "==", id)))).forEach(d => liste.push({ ...d.data(), id: d.id }));
+    return liste.sort((a, b) => P.nombre(b.tour) - P.nombre(a.tour) || P.nombre(b.Le) - P.nombre(a.Le));
+}
+const quiCorrige = () => (window.COMPTE_JOUEUR && (window.COMPTE_JOUEUR.nom || window.COMPTE_JOUEUR.idJoueur)) || (() => { try { return localStorage.getItem("ID_JOUEUR_COURANT") || ""; } catch (e) { return ""; } })();
+export const estAdminSocial = () => !!(window.COMPTE_JOUEUR && window.COMPTE_JOUEUR.admin);
+// ANNULER un événement : ses écarts sont retirés des liens (ce qui est venu
+// après reste), et il est marqué annulé, avec qui l'a annulé.
+export async function annulerEvenement(p, numero) {
+    if (!estAdminSocial()) throw new Error("Réservé à Nico et Ben.");
+    const ref = refEvenement(p, numero), s = await getDoc(ref);
+    if (!s.exists()) throw new Error("Événement introuvable.");
+    const ev = s.data();
+    if (ev.annule) return { deja: true };
+    const parLien = new Map();
+    (ev.changements || []).forEach(c => { const k = P.cleLien(c.de, c.vers); if (!parLien.has(k)) parLien.set(k, []); parLien.get(k).push(c); });
+    const lot = writeBatch(db);
+    for (const [k, chg] of parLien) {
+        const sl = await getDoc(doc(db, PARTIES, p, "Liens", k));
+        if (!sl.exists()) continue;
+        const l = sl.data(), axes = { ...P.axesVides(), ...(l.axes || {}) };
+        chg.forEach(c => { axes[c.axe] = Math.round(P.borner(c.axe, P.nombre(axes[c.axe]) - (c.apres - c.avant)) * 100) / 100; });
+        const derniers = (l.derniers || []).map(d => d.n === numero ? { ...d, annule: true } : d);
+        lot.set(doc(db, PARTIES, p, "Liens", k), { ...l, axes, derniers, majLe: Date.now() });
+    }
+    lot.set(ref, { annule: true, annulePar: quiCorrige(), annuleLe: Date.now() }, { merge: true });
+    await lot.commit();
+    journal(`Événement n° ${numero} annulé par ${quiCorrige()}.`);
+    return { annule: true };
+}
+// AJUSTER un lien à la main : chaque axe changé devient un événement
+// « ajustement » du journal (qui, quand, avant, après).
+export async function ajusterLien(p, de, vers, valeurs) {
+    if (!estAdminSocial()) throw new Error("Réservé à Nico et Ben.");
+    const refL = refLien(p, de, vers), sl = await getDoc(refL);
+    const l = sl.exists() ? sl.data() : { de, vers, axes: P.axesVides(), origine: "rencontre", etiquette: "", histoire: "", derniers: [] };
+    const axes = { ...P.axesVides(), ...(l.axes || {}) };
+    const changements = [];
+    Object.entries(valeurs || {}).forEach(([axe, v]) => {
+        if (!P.AXES.includes(axe) || v === "" || v == null || !Number.isFinite(Number(v))) return;
+        const apres = P.borner(axe, Number(v)), avant = P.nombre(axes[axe]);
+        if (Math.abs(apres - avant) < 0.01) return;
+        axes[axe] = apres;
+        changements.push({ de, vers, axe, avant, apres });
+    });
+    if (!changements.length) return { rien: true };
+    const etatSnap = await getDoc(refEtat(p));
+    const e = etatSnap.exists() ? etatSnap.data() : {};
+    const numero = P.nombre(e.compteur) + 1, qui = quiCorrige();
+    const resume = `Ajusté à la main par ${qui}.`;
+    const lot = writeBatch(db);
+    lot.set(refEvenement(p, numero), { numero, tour: P.nombre(e.tour), message: "", type: "ajustement", acteur: "", cible: "", gravite: 0, discret: true, resume, temoins: [], changements, annule: false, par: qui, Le: Date.now() });
+    lot.set(refL, { ...l, axes, majLe: Date.now(), derniers: [...(l.derniers || []), { n: numero, tour: P.nombre(e.tour), resume, ecarts: Object.fromEntries(changements.map(c => [c.axe, Math.round((c.apres - c.avant) * 100) / 100])) }].slice(-5) });
+    lot.set(refEtat(p), { compteur: numero }, { merge: true });
+    await lot.commit();
+    journal(`${resume} (${de} → ${vers})`);
+    return { numero, changements };
+}
+
+// -------------------------------------------------------------------------
 //  LE MJ JOUE LES ÂMES (v413) : ce qu'il lit avant d'écrire
 // -------------------------------------------------------------------------
 const ADJ_TRAITS = { prudence: "prudent", impulsivite: "impulsif", loyaute: "loyal", empathie: "empathique", orgueil: "orgueilleux", sociabilite: "sociable" };
@@ -484,5 +559,5 @@ export async function apresLeTour(o) {
     catch (e) { console.error("[Fils invisibles] Le tour social :", e); return null; }
 }
 
-window.SOCIAL = { ...P, contexteDuMJ, caractere, lireAmes, lireLiens, lireLiensVers, naissancePnj, assurerAmes, marquerMort, oublierAme, apresLeTour, tourSocial, paragrapheDe, lignesDeMarge,
+window.SOCIAL = { ...P, contexteDuMJ, caractere, lireReseau, lireSouvenirsDe, annulerEvenement, ajusterLien, estAdminSocial, lireAmes, lireLiens, lireLiensVers, naissancePnj, assurerAmes, marquerMort, oublierAme, apresLeTour, tourSocial, paragrapheDe, lignesDeMarge,
                   schemaPsyche, schemaLiens, consigneCreation, psycheDeLIA, LIENS_IA };

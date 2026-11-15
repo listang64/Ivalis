@@ -973,6 +973,8 @@ function remplirPapier(idImage, idNom, nom, h) {
     // (v312) un héros : un toucher sur son papier ouvre sa fiche
     const papier = cadre.closest(".papier-avatar");
     if (papier) papier.dataset.heros = h ? h.idPersonnage : "";
+    // (v414) un PNJ : un toucher sur son papier ouvre sa fiche (les fils invisibles)
+    if (papier) papier.dataset.pnj = h ? "" : nom;
 }
 // LE NOM SUR UNE LIGNE (v312) : sa taille se règle sur la largeur du papier.
 function ajusterNom(el) {
@@ -985,6 +987,13 @@ function ajusterNom(el) {
 }
 window.addEventListener("resize", () => setTimeout(() => document.querySelectorAll(".papier-avatar .nom-portrait").forEach(ajusterNom), 300));
 function ouvrirFicheDuPapier(papier) {
+    // (v414) Nico : « un clic sur cette image fait apparaître sa fiche » — celle d'un PNJ aussi.
+    if (papier && !papier.dataset.heros && papier.dataset.pnj && window.GRIMOIRE_LIENS) {
+        son("page-prise", 0.5);
+        papier.classList.remove("sortie");
+        window.GRIMOIRE_LIENS.ouvrir({ nom: papier.dataset.pnj, depuisRecit: true });
+        return;
+    }
     const id = papier && papier.dataset.heros;
     const h = id && herosDeLaPartie().find(p => p.idPersonnage === id);
     if (!h || typeof window.ouvrirFichePerso !== "function") return;

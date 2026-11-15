@@ -163,7 +163,7 @@ await section(async () => {
   await pose();
   const r = await p.evaluate(() => ({ entrees: [...document.querySelectorAll(".entree-index")].map(e => !!e.querySelector(":scope > svg.lavis")),
     titre: !!document.querySelector(".entete-index > svg.lavis"), texte: (document.querySelector(".entete-index") || {}).textContent }));
-  verifier("un lavis sous chaque entrée du sommaire", r.entrees.length === 5 && r.entrees.every(Boolean), JSON.stringify(r.entrees));
+  verifier("un lavis sous chaque entrée du sommaire", r.entrees.length === 6 && r.entrees.every(Boolean), JSON.stringify(r.entrees));
   verifier("et sous le titre « Sommaire »", r.titre && /Sommaire/.test(r.texte || ""));
   await cap("sommaire");
 });

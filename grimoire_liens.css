@@ -1,0 +1,90 @@
+/* =========================================================================
+   v414 — LES FILS INVISIBLES DANS LE LIVRE (grimoire_liens.js)
+   À gauche la fiche de l'âme au centre ; à droite le radar et l'encart.
+   --u : 1 % d'une page (comme les autres pages du livre).
+   ========================================================================= */
+.page-liens .contenu-page { gap: calc(var(--u) * 1.1); }
+.entete-liens { position: relative; align-self: center; padding: calc(var(--u) * 0.6) calc(var(--u) * 4); }
+.entete-liens .titre-page-fiche { position: relative; font-size: calc(var(--u) * 6.4 * var(--echelle-titres, 1)); color: #24150a; }
+.entete-liens .lavis { left: -4%; top: -10%; width: 108%; height: 120%; }
+.fleuron-liens { width: 40%; height: auto; align-self: center; margin: 0 0 calc(var(--u) * 0.6); fill: none; stroke: #5e2a44; stroke-width: 1.2; }
+.fleuron-liens circle { fill: #5e2a44; }
+.retour-liens { align-self: flex-start; }
+
+/* LA FICHE (page de gauche) */
+.identite-liens { display: flex; align-items: center; gap: calc(var(--u) * 3); }
+.nom-liens { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 5.4); color: #24150a; line-height: 1.05; }
+.mort-liens { font-size: 0.6em; color: #6b1a10; }
+.qui-liens { font-size: calc(var(--u) * 3.1); color: #6b4a2b; font-style: italic; }
+.humeur-liens { font-size: calc(var(--u) * 3); color: #6b2a3a; margin-top: calc(var(--u) * 0.5); }
+.caractere-liens { font-size: calc(var(--u) * 3.1); font-style: italic; color: #3a2210; }
+.traits-liens { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 0.6) calc(var(--u) * 3); }
+.trait-liens { display: grid; grid-template-columns: calc(var(--u) * 15) 1fr calc(var(--u) * 4.5); align-items: center; gap: calc(var(--u) * 1); font-size: calc(var(--u) * 2.7); }
+.trait-liens b { text-align: right; font-size: calc(var(--u) * 2.6); }
+.jauge-liens { height: calc(var(--u) * 1.1); background: rgba(120, 90, 50, 0.22); border-radius: 9px; overflow: hidden; }
+.jauge-liens i { display: block; height: 100%; background: #7a5a36; border-radius: 9px; }
+.ligne-liens { margin: 0; font-size: calc(var(--u) * 3); line-height: 1.3; }
+.sous-titre-liens { margin-top: calc(var(--u) * 1.2); font-family: 'Cinzel', serif !important; font-size: calc(var(--u) * 2.7); letter-spacing: 0.12em; text-transform: uppercase; color: #5e2a44; }
+.sous-titre-liens.petit { font-size: calc(var(--u) * 2.3); margin-top: calc(var(--u) * 1); }
+.souvenirs-liens { margin: 0; padding-left: calc(var(--u) * 3); font-size: calc(var(--u) * 2.9); }
+.souvenirs-liens li + li { margin-top: calc(var(--u) * 0.6); }
+.date-liens { font-size: 0.8em; color: #7a5a36; }
+.index-liens { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 0.8) calc(var(--u) * 1.6); }
+.ame-index-liens { font-size: calc(var(--u) * 2.9) !important; text-decoration: underline; text-decoration-color: rgba(94, 42, 68, 0.4); text-underline-offset: 0.18em; }
+.ame-index-liens.active { font-weight: 700; color: #5e2a44 !important; }
+.ame-index-liens.mort { opacity: 0.55; text-decoration: line-through; }
+
+/* LES MÉDAILLONS */
+.medaillon-liens { display: inline-grid; place-items: center; width: calc(var(--u) * 9.5); height: calc(var(--u) * 9.5); border-radius: 50%; overflow: hidden;
+  background: #e1caa3; border: calc(var(--u) * 0.55) solid #d7b781; box-shadow: 0 0 0 calc(var(--u) * 0.25) #8b6846, 0 calc(var(--u) * 0.4) calc(var(--u) * 1.4) rgba(80, 55, 30, 0.45); }
+.medaillon-liens { position: relative; }
+.medaillon-liens img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
+.noeud-liens:not(.centre) .medaillon-liens { width: calc(var(--u) * 8.2); height: calc(var(--u) * 8.2); }
+.medaillon-liens.heros { border-color: #c9a85a; }
+.medaillon-liens.centre { width: calc(var(--u) * 13.5); height: calc(var(--u) * 13.5); border-color: #a1804b; box-shadow: 0 0 0 calc(var(--u) * 0.4) #725337, 0 0 0 calc(var(--u) * 1.2) #e5d1ac; }
+.medaillon-liens.grand { width: calc(var(--u) * 17); height: calc(var(--u) * 17); flex: none; }
+.medaillon-liens.mort { filter: grayscale(1); opacity: 0.6; }
+.initiales-liens { position: absolute; inset: 0; font-family: 'Cinzel', serif !important; font-size: calc(var(--u) * 3.2); color: #f8e6c8; background: #72523a; display: grid; place-items: center; }
+
+/* LE RADAR (page de droite) */
+.outils-liens { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: calc(var(--u) * 1); }
+.regard-liens { font-size: calc(var(--u) * 2.6) !important; padding: calc(var(--u) * 0.6) calc(var(--u) * 1.6) !important; border: 1px solid #bba076 !important; border-radius: 6px; background: rgba(249, 239, 217, 0.7) !important; }
+.regard-liens.actif { background: #554d36 !important; color: #fff2d7 !important; }
+.filtre-liens, .recherche-liens { font-size: calc(var(--u) * 2.6); padding: calc(var(--u) * 0.5) calc(var(--u) * 1); border: 1px solid #bba076; border-radius: 6px; background: rgba(249, 239, 217, 0.8); color: #3a2210; }
+.recherche-liens { width: calc(var(--u) * 24); }
+.radar-liens { position: relative; flex: 1 1 auto; min-height: calc(var(--u) * 70); }
+.fils-liens { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.anneau-liens { fill: none; stroke: #cbb58f; stroke-width: 0.25; stroke-dasharray: 1 1.5; }
+.noeud-liens { position: absolute; transform: translate(-50%, -50%); transition: left 0.45s ease, top 0.45s ease; z-index: 2; }
+.noeud-liens.centre { z-index: 3; }
+.noeud-liens.choisi .medaillon-liens { box-shadow: 0 0 0 calc(var(--u) * 0.4) #62462b, 0 0 0 calc(var(--u) * 1.2) #ccb16a; }
+.vide-liens { position: absolute; left: 10%; right: 10%; top: 64%; text-align: center; font-style: italic; color: #6b4a2b; font-size: calc(var(--u) * 3); }
+.legende-liens { display: flex; justify-content: center; flex-wrap: wrap; gap: calc(var(--u) * 2.5); font-size: calc(var(--u) * 2.4); color: #6e5943; }
+.legende-liens .fil { display: inline-block; width: calc(var(--u) * 4); height: 3px; vertical-align: middle; margin-right: calc(var(--u) * 0.8); }
+.legende-liens .fil.pos { background: #5e7f59; } .legende-liens .fil.neg { background: #ab514d; } .legende-liens .fil.neu { background: #99856a; }
+.legende-liens .fil.pale { background: repeating-linear-gradient(90deg, #99856a 0 5px, transparent 5px 9px); opacity: 0.6; }
+.reste-liens { font-size: calc(var(--u) * 2.6); text-align: center; color: #6b4a2b; }
+
+/* L'ENCART D'UN LIEN (un toucher sur un portrait) */
+.encart-liens { position: absolute; left: calc(var(--u) * 5); right: calc(var(--u) * 6); bottom: calc(var(--u) * 5); z-index: 6; max-height: 62%; overflow-y: auto;
+  padding: calc(var(--u) * 2.2) calc(var(--u) * 3); background: #f3e3c0; border: 1px solid #a07a46; border-radius: 6px;
+  box-shadow: 0 calc(var(--u) * 1) calc(var(--u) * 3) rgba(40, 25, 10, 0.4); }
+.fermer-encart-liens { position: absolute; right: calc(var(--u) * 1.6); top: calc(var(--u) * 0.6); font-size: calc(var(--u) * 5) !important; line-height: 1; color: #5e2a44 !important; }
+.titre-encart-liens { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 4.2); color: #24150a; }
+.affinite-liens { font-family: 'Cinzel', serif !important; font-size: calc(var(--u) * 6); font-weight: 700; color: #6b5a40; }
+.affinite-liens.pos { color: #4d6b48; } .affinite-liens.neg { color: #9d4542; }
+.affinite-liens small { font-family: 'IM Fell English', serif !important; font-size: 0.45em; font-weight: 400; font-style: italic; }
+.mots-liens, .histoire-liens { font-size: calc(var(--u) * 2.9); line-height: 1.3; }
+.histoire-liens { font-style: italic; color: #6b4a2b; }
+.axes-liens { display: grid; gap: calc(var(--u) * 0.7); margin-top: calc(var(--u) * 1); }
+.axe-liens { display: grid; grid-template-columns: calc(var(--u) * 17) calc(var(--u) * 6) 1fr auto; align-items: center; gap: calc(var(--u) * 1); font-size: calc(var(--u) * 2.7); }
+.axe-liens b { text-align: right; }
+.barre-liens { height: calc(var(--u) * 1.2); background: #d9c29a; border-radius: 9px; overflow: hidden; }
+.barre-liens i { display: block; height: 100%; background: #597358; border-radius: 9px; }
+.barre-liens i.neg { background: #a65c55; }
+.ajuste-liens { width: calc(var(--u) * 10); font-size: calc(var(--u) * 2.6); }
+.derniers-liens { margin: 0; padding-left: calc(var(--u) * 3); font-size: calc(var(--u) * 2.6); }
+.derniers-liens li.annule { opacity: 0.55; text-decoration: line-through; }
+.ecarts-liens { color: #6b4a2b; font-size: 0.92em; }
+.annuler-liens { font-size: 0.9em !important; color: #9d4542 !important; text-decoration: underline; }
+.boutons-encart-liens { display: flex; gap: calc(var(--u) * 3); margin-top: calc(var(--u) * 1.4); }

@@ -196,7 +196,7 @@ await section(async () => {
   await p.evaluate(() => window.grimoireAllerIndex());
   await p.waitForTimeout(900);
   const sou = await p.evaluate(() => [...document.querySelectorAll(".entree-index-texte")].map(t => decodeURIComponent(getComputedStyle(t).backgroundImage)));
-  verifier("l'index souligné à la plume : un trait d'encre sous chaque ligne, plus de jaune", sou.length === 5 && sou.every(s => /rgba\(20,12,6/.test(s) && !/236,190,60/.test(s)), sou.length);
+  verifier("l'index souligné à la plume : un trait d'encre sous chaque ligne, plus de jaune", sou.length === 6 && sou.every(s => /rgba\(20,12,6/.test(s) && !/236,190,60/.test(s)), sou.length);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v300_index.png" });
 });
 
