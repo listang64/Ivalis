@@ -126,6 +126,8 @@ async function preparerEnvironnement(lieuActuelId) {
     return env;
 }
 
+window.preparerEnvironnementIvalis = preparerEnvironnement;   // (v411, social.js et les bancs)
+
 // --- 2. LE CERVEAU DE MIA (Filtre les interactions avec les PNJ) ---
 
 async function filtrerPNJAvecMia(historique4Messages, listeNomsPNJ) {
@@ -708,6 +710,11 @@ async function enregistrerFichePNJ(pnj, idLieuActuel) {
         Version_Creation: Number(window.VERSION_IVALIS) || 0   // (v409) né avec la refonte des PNJ : la purge le garde
     });
     retenirPnjDeLaPartie({ Nom_PNJ: pnj.nom, URL_Cloudinary: "", __id: docId });
+    // (v411) Son âme : sa personnalité et ses liens d'avant (PNJ déjà créés dans ce lieu).
+    if (window.SOCIAL && typeof window.SOCIAL.naissancePnj === "function") {
+        try { await window.SOCIAL.naissancePnj(window.ID_PARTIE_COURANTE || "", docId, pnj, { idLieu: idLieuGlobal }); }
+        catch (e) { console.warn("[Fils invisibles] La naissance de " + pnj.nom + " :", e); }
+    }
     return docId;
 }
 
@@ -735,7 +742,7 @@ Chaque personnage a un VRAI nom propre, court, antique (un prénom, éventuellem
 RACES OBLIGATOIRES : ${racesConnues.join(", ")}.
 
 Personnages DÉJÀ connus : ${JSON.stringify(nomsPnjExistants)}.
-Héros : ${JSON.stringify(nomsHeros)}.
+Héros : ${JSON.stringify(nomsHeros)}.${window.SOCIAL ? window.SOCIAL.consigneCreation(nomsPnjExistants) : ""}
 
 ${contexteScene}`;
     const outils = [{
@@ -756,7 +763,8 @@ ${contexteScene}`;
                                 race: { type: "STRING" },
                                 secret: { type: "STRING" },
                                 style_parole: { type: "STRING" },
-                                raison: { type: "STRING", description: "Pourquoi les joueurs vont l'aborder maintenant." }
+                                raison: { type: "STRING", description: "Pourquoi les joueurs vont l'aborder maintenant." },
+                                ...(window.SOCIAL ? { psyche: window.SOCIAL.schemaPsyche(), liens: window.SOCIAL.schemaLiens() } : {})
                             }, required: ["nom", "physique", "occupation", "race", "secret", "style_parole"]
                         }
                     }
@@ -894,7 +902,7 @@ Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste 
 Tu dois inventer les fiches détaillées de ces nouveaux personnages : ${JSON.stringify(nouveauxNomsDetectes)}.
 RACES OBLIGATOIRES À UTILISER DANS CET UNIVERS : ${racesConnues.join(", ")}. Tu dois choisir l'une de ces races pour chaque personnage.
 Assure-toi que tous les éléments de la fiche sont cohérents entre eux et adaptés à l'univers Antique Fantastique (Antiquité magique, mythologie).
-ÉQUIPEMENT DE L'ANTIQUITÉ SEULEMENT (v312) : lances, glaives, épées courtes, haches, arcs, frondes, javelots, boucliers, cuirasses de bronze ou de lin, tuniques, capes. JAMAIS d'arbalète, d'arme à feu, d'armure de plaques, de heaume médiéval.
+ÉQUIPEMENT DE L'ANTIQUITÉ SEULEMENT (v312) : lances, glaives, épées courtes, haches, arcs, frondes, javelots, boucliers, cuirasses de bronze ou de lin, tuniques, capes. JAMAIS d'arbalète, d'arme à feu, d'armure de plaques, de heaume médiéval.${window.SOCIAL ? window.SOCIAL.consigneCreation(nomsPnjExistants) : ""}
 Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
 
     const outilsCreation = [{
@@ -917,7 +925,8 @@ Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
                                 occupation: { type: "STRING" },
                                 race: { type: "STRING" },
                                 secret: { type: "STRING" },
-                                style_parole: { type: "STRING" }
+                                style_parole: { type: "STRING" },
+                                ...(window.SOCIAL ? { psyche: window.SOCIAL.schemaPsyche(), liens: window.SOCIAL.schemaLiens() } : {})
                             }, required: ["nom", "physique", "occupation", "race", "secret", "style_parole"]
                         }
                     }
@@ -1384,6 +1393,8 @@ Sinon, ne fais rien.`;
                     await updateDoc(doc(db, "Monde_PNJ", docPnj.id), {
                         Statut: "Mort"
                     });
+                    // (v411) Son âme aussi : elle garde ses liens, elle n'agit plus.
+                    if (window.SOCIAL && window.ID_PARTIE_COURANTE) await window.SOCIAL.marquerMort(window.ID_PARTIE_COURANTE, docPnj.id).catch(e => console.warn("[MIA_MORT] Âme :", e));
                     console.log(`[MIA_MORT] 🪦 Statut de '${nom}' passé sur "Mort". Il n'agira plus.`);
                 });
             }
@@ -2531,6 +2542,18 @@ window.declencherTourIA = async function(options) {
                         await analyserMortsPNJ(nomsPnjPresents, reponseTexte);
                         await analyserStigmates(lieuFinal, reponseTexte);
                         await analyserReputation(window.ID_PARTIE_COURANTE, lieuFinal, reponseTexte);
+                        // (v411) LES FILS INVISIBLES : les âmes de la scène (ceux qui y étaient au
+                        // début, ceux qui y sont à la fin, et chaque héros).
+                        if (window.SOCIAL && typeof window.SOCIAL.apresLeTour === "function") {
+                            const envFin = await preparerEnvironnement(lieuFinal).catch(() => ({ pnjsPresents: {} }));
+                            const vus = new Map();
+                            [...Object.values(env.pnjsPresents || {}), ...Object.values(envFin.pnjsPresents || {})].forEach(f => { if (f && f.idDoc && !vus.has(f.idDoc)) vus.set(f.idDoc, { id: f.idDoc, fiche: f }); });
+                            // (la liste des joueurs peut être vide : celle de la partie prend le relais, comme en v315)
+                            const listeHeros = (window.PERSOS_JOUEURS_PARTIE && window.PERSOS_JOUEURS_PARTIE.length ? window.PERSOS_JOUEURS_PARTIE : window.PERSOS_PARTIE) || [];
+                            const herosSociaux = listeHeros.filter(h => h && !h.estMonstre && !h.estIllusion && h.actif !== false && h.prenom && h.idPersonnage);
+                            await window.SOCIAL.apresLeTour({ idPartie: window.ID_PARTIE_COURANTE, pnjs: [...vus.values()], heros: herosSociaux,
+                                reputation: envFin.reputationScore || env.reputationScore || 0, texteJoueurs: historique4, texteMJ: reponseTexte, idMessage });
+                        }
                     }
                 } finally { fermerDepenses(); }
             }, 0);

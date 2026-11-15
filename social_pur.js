@@ -338,7 +338,7 @@ export function premiereImpression(psyche, reputation) {
 // Ce qu'un héros pense d'un PNJ qu'il découvre : rien encore, sinon l'avoir vu.
 export const impressionHeros = () => ({ ...axesVides(), familiarite: 5 });
 
-// Deux âmes liées avant la rencontre : { ab, ba } selon le type, nuancés de ±10 %
+// Deux âmes liées avant la rencontre (« A est le patron de B ») : { ab, ba } selon le type, nuancés de ±10 %
 // (le même couple donne toujours la même nuance) et par leur personnalité.
 export function liensPreexistants(type, idA, idB) {
     const modele = LIENS_PREEXISTANTS[type];
@@ -347,8 +347,10 @@ export function liensPreexistants(type, idA, idB) {
         const base = nombre(axes[a]);
         return [a, borner(a, Math.round(base * (0.9 + 0.2 * graine(cle + a)) * 100) / 100)];
     }));
+    // L'étiquette d'un lien « de → vers » dit ce que `vers` est pour `de` :
+    // « Myrto → Koré : patron » (Koré est sa patronne).
     return { ab: nuance(modele.ab, idA + idB), ba: nuance(modele.ba, idB + idA),
-             etiquetteAB: modele.nom, etiquetteBA: ETIQUETTE_INVERSE[type] || modele.nom };
+             etiquetteAB: ETIQUETTE_INVERSE[type] || modele.nom, etiquetteBA: modele.nom };
 }
 
 // -------------------------------------------------------------------------

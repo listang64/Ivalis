@@ -161,7 +161,7 @@ section(() => {
     const prudent = premiereImpression(psy({ ...MOYEN, prudence: 95 }), 10);
     verifier("…le prudent accorde moins vite sa confiance", prudent.confiance < ami.confiance);
     const l = liensPreexistants("patron", "PNJ_A", "PNJ_B"), l2 = liensPreexistants("patron", "PNJ_A", "PNJ_B");
-    verifier("« A est le patron de B » : étiquettes patron / employé, B respecte et craint A", l.etiquetteAB === "patron" && l.etiquetteBA === "employé" && l.ba.respect > l.ab.respect && l.ba.crainte > 0);
+    verifier("« A est le patron de B » : A → B « employé », B → A « patron » ; B respecte et craint A", l.etiquetteAB === "employé" && l.etiquetteBA === "patron" && l.ba.respect > l.ab.respect && l.ba.crainte > 0);
     verifier("…le même couple donne toujours la même nuance", JSON.stringify(l) === JSON.stringify(l2));
     verifier("…un type inconnu ne crée rien", liensPreexistants("cousin_eloigne", "A", "B") === null);
 });
