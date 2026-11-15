@@ -296,14 +296,16 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("4. L'OUBLI : UNE ÂME EFFACÉE EMPORTE SES LIENS ; LA PURGE AUSSI");
+titre("4. L'OUBLI : UNE ÂME EFFACÉE EMPORTE SES LIENS ; LA PURGE N'EST PLUS (v416)");
 // =========================================================================
 await section(async () => {
   await p.evaluate(() => window.SOCIAL.oublierAme("P1", "PNJ_DOROS"));
   verifier("Doros oublié : son âme et ses liens (dans les deux sens) disparaissent", !(await ame("PNJ_DOROS")) && !(await lien("PNJ_DOROS", "H1")) && !(await lien("H1", "PNJ_DOROS")));
-  await p.evaluate(() => window.purgerAnciensPnj({ sansConfirmation: true, silencieux: true }));
-  verifier("la purge (Koré, d'avant la refonte) efface aussi son âme et ses liens", !(await ame("PNJ_KORE")) && !(await lien(idMyrto, "PNJ_KORE")) && !(await lien("H1", "PNJ_KORE")));
-  verifier("…Myrto (née avec la refonte) reste", !!(await ame(idMyrto)));
+  // (v416) Nico : « Tu peux supprimer du code le bouton pour supprimer les
+  // anciens PNJ, c'est bon. » La purge n'existe plus : Koré, d'avant la refonte, garde tout.
+  verifier("la purge des anciens PNJ n'existe plus", await p.evaluate(() => typeof window.purgerAnciensPnj === "undefined" && !("PURGE_PNJ_FAITE" in window)));
+  verifier("…Koré (d'avant la refonte) garde son âme et ses liens", !!(await ame("PNJ_KORE")) && !!(await lien(idMyrto, "PNJ_KORE")) && !!(await lien("H1", "PNJ_KORE")));
+  verifier("…Myrto (née avec la refonte) aussi", !!(await ame(idMyrto)));
 });
 
 await section(async () => {

@@ -6,7 +6,9 @@
 //
 // Sur la VRAIE page (le harnais du banc v292) : un tour complet du MJ avec des
 // PNJ de deux parties dans le même lieu, un déplacement, une mort, le cimetière,
-// puis la purge et son bouton.
+// puis la purge et son bouton — retirés en v416 (Nico : « Tu peux supprimer du
+// code le bouton pour supprimer les anciens PNJ, c'est bon. ») : la section 5
+// vérifie désormais qu'ils n'existent plus.
 // Lancer : node tests_monstres/corrections_v409.mjs
 import fs from 'fs';
 import http from 'http';
@@ -292,23 +294,22 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("5. LA PURGE DES ANCIENS PNJ, UNE SEULE FOIS, PUIS LE BOUTON DISPARAÎT");
+titre("5. LA PURGE DES ANCIENS PNJ A FAIT SON TEMPS : NI BOUTON NI FONCTION (v416)");
 // =========================================================================
+// Nico (v416) : « Tu peux supprimer du code le bouton pour supprimer les
+// anciens PNJ, c'est bon. »
 await section(async () => {
-  const entree = () => p.evaluate(() => { const c = window.GRIMOIRE_PARAMETRES.CATEGORIES.find(x => x.id === "atelier"); const e = c.entrees.find(x => x[0] === "purge-pnj"); return e ? { titre: e[1], visible: typeof e[3] === "function" ? e[3]() : true } : null; });
-  const avant = await entree();
-  verifier("l'atelier des Paramètres propose « Effacer les anciens PNJ »", !!avant && avant.visible === true, JSON.stringify(avant));
-  const r = await p.evaluate(async () => {
-    const res = await window.purgerAnciensPnj({ sansConfirmation: true, silencieux: true });
-    return { res, restants: Object.entries(window.__docs).filter(([k]) => k.startsWith("Monde_PNJ/")).map(([, v]) => v.Nom_PNJ), reglage: window.__docs["Reglages/Refonte_PNJ"] };
+  const r = await p.evaluate(() => {
+    const c = window.GRIMOIRE_PARAMETRES.CATEGORIES.find(x => x.id === "atelier");
+    return { entree: c.entrees.some(x => x[0] === "purge-pnj"), fonction: typeof window.purgerAnciensPnj, drapeau: "PURGE_PNJ_FAITE" in window,
+             restants: Object.keys(window.__docs).filter(k => k.startsWith("Monde_PNJ/")).length };
   });
-  verifier("les PNJ d'avant la refonte sont effacés (toutes parties) ; Myrto reste", r.restants.length === 1 && r.restants[0] === "Myrto", JSON.stringify(r.restants));
-  verifier("…leurs portraits Cloudinary aussi (Hermia, Dame Koré)", destructions.length >= 2, `${destructions.length} suppression(s)`);
-  verifier("…la purge est notée faite (Reglages/Refonte_PNJ)", !!r.reglage && r.reglage.Purge_Faite === true && r.reglage.Effaces === 6, JSON.stringify(r.reglage));
-  const apres = await entree();
-  verifier("le bouton disparaît", !!apres && apres.visible === false);
-  const encore = await p.evaluate(async () => { window.PURGE_PNJ_FAITE = false; return window.purgerAnciensPnj({ sansConfirmation: true, silencieux: true }); });
-  verifier("sur un autre poste, un second clic ne refait rien (et le bouton s'en va)", encore.deja === true && (await p.evaluate(() => window.PURGE_PNJ_FAITE)) === true);
+  verifier("l'atelier des Paramètres ne propose plus « Effacer les anciens PNJ »", r.entree === false);
+  verifier("…window.purgerAnciensPnj et window.PURGE_PNJ_FAITE n'existent plus", r.fonction === "undefined" && r.drapeau === false, JSON.stringify(r));
+  verifier("plus rien n'efface les anciens PNJ : leurs fiches et leurs portraits restent", r.restants === 7 && destructions.length === 0, `${r.restants} fiche(s), ${destructions.length} suppression(s)`);
+  const ia = lire("ia_master.js"), gp = lire("grimoire_parametres.js");
+  verifier("…ni dans le code (ia_master.js, grimoire_parametres.js)", !/purgerAnciensPnj|PURGE_PNJ_FAITE|VERSION_REFONTE_PNJ|estAncienPnj|Refonte_PNJ/.test(ia) && !/purge-pnj|PURGE_PNJ_FAITE/.test(gp));
+  verifier("…mais la marque de naissance reste écrite (Version_Creation)", /Version_Creation: Number\(window\.VERSION_IVALIS\)/.test(ia));
 });
 
 await section(async () => {

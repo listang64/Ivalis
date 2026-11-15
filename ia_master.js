@@ -2708,53 +2708,6 @@ window.incinererPnjMorts = async function() {
 };
 
 // =========================================================================
-// --- LA PURGE DES ANCIENS PNJ (v409, une seule fois) ---
-// =========================================================================
-// Nico : « on va les supprimer » ; « fais le bouton, et ensuite fais-le
-// disparaître ». Un bouton des Paramètres (l'atelier) efface les PNJ nés avant
-// la refonte (sans Version_Creation ≥ 409), toutes parties confondues : leur
-// fiche, leur portrait Cloudinary et, s'ils en ont, leur âme et leurs liens.
-// Fait une fois (Reglages/Refonte_PNJ), le bouton ne s'affiche plus.
-const VERSION_REFONTE_PNJ = 409;
-const estAncienPnj = (d) => !(Number(d && d.Version_Creation) >= VERSION_REFONTE_PNJ);
-window.PURGE_PNJ_FAITE = window.PURGE_PNJ_FAITE || false;
-window.purgerAnciensPnj = async function (options) {
-    const o = options || {};
-    try {
-        const reglage = await getDoc(doc(db, "Reglages", "Refonte_PNJ"));
-        if (reglage.exists() && reglage.data().Purge_Faite) {
-            window.PURGE_PNJ_FAITE = true;
-            if (!o.silencieux) alert("Les anciens PNJ ont déjà été effacés.");
-            return { deja: true, effaces: 0 };
-        }
-        const snap = await getDocs(query(collection(db, "Monde_PNJ")));
-        const anciens = snap.docs.filter(d => estAncienPnj(d.data()));
-        if (!o.sansConfirmation && !confirm(`Effacer les ${anciens.length} PNJ d'avant la refonte (fiches et portraits), dans toutes les parties ? C'est définitif.`)) return { annule: true, effaces: 0 };
-        let effaces = 0;
-        for (const d of anciens) {
-            const x = d.data() || {};
-            if (x.URL_Cloudinary) { try { await supprimerImageCloudinary(x.URL_Cloudinary); } catch (e) { console.warn("[Purge PNJ] Portrait :", e); } }
-            if (x.ID_Partie && window.SOCIAL && typeof window.SOCIAL.oublierAme === "function") {
-                try { await window.SOCIAL.oublierAme(x.ID_Partie, d.id); } catch (e) { console.warn("[Purge PNJ] Âme :", e); }
-            }
-            await deleteDoc(doc(db, "Monde_PNJ", d.id));
-            effaces++;
-        }
-        await setDoc(doc(db, "Reglages", "Refonte_PNJ"), { Purge_Faite: true, Le: Date.now(), Effaces: effaces,
-            Par: (window.COMPTE_JOUEUR && window.COMPTE_JOUEUR.idJoueur) || localStorage.getItem("ID_JOUEUR_COURANT") || "" }, { merge: true });
-        window.PURGE_PNJ_FAITE = true;
-        pnjDeLaPartie = null;
-        console.log(`🧹 [Purge PNJ] ${effaces} ancien(s) PNJ effacé(s).`);
-        if (!o.silencieux) alert(`${effaces} ancien(s) PNJ effacé(s).`);
-        return { effaces };
-    } catch (e) {
-        console.error("[Purge PNJ] :", e);
-        if (!o.silencieux) alert("La purge des anciens PNJ a échoué : " + (e && e.message || e));
-        return { erreur: true, effaces: 0 };
-    }
-};
-
-// =========================================================================
 // --- LE CHAT DES VOYAGES (v275, voyage_groupe.js) ---
 // =========================================================================
 // Nico : au départ de chaque voyage et à chaque « Repartir », le chat est
