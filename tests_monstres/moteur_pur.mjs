@@ -12,7 +12,7 @@
 // jeu — et sans ce banc, personne ne s'en apercevrait.
 import {
     jouer, resoudreCarte, chaineDeDegats, tirerDesCarte, tirerCritique,
-    esquiveDe, paradeDe, defPhysiqueDe, distanceHex, bonusMonstreDe, chanceEtatDe, creerZonePure,
+    esquiveDe, paradeDe, defPhysiqueDe, distanceHex, bonusMonstreDe, chanceEtatDe, creerZonePure, reglerSoinsMonstres,
     REGLES_ETATS, CHANCE_BOUSCULADE_POUSSEE, FATIGUE_BOUSCULADE_POUSSEE
 } from '../moteur_pur.js';
 import { construireEtatCombat, creerDes, verifierEtatCombat, clonerEtat } from '../combat_etat.js';
@@ -518,6 +518,8 @@ console.log("\n14. LA TRICHE DES CRÉATURES : UN BONUS SELON LA STATURE");
 //  sur ce qu'elle soigne — jamais sur un héros, jamais sur un gain de
 //  bouclier. C'est un réglage brut, posé comme tel : le tableau est le seul
 //  endroit à toucher s'il change.
+//  (v406) Le % ne vaut plus que pour les DÉGÂTS ; un soin de créature reçoit
+//  une valeur FIXE (reglerSoinsMonstres, 0 à l'origine).
 {
     verifier("un héros n'a droit à rien", bonusMonstreDe({ estMonstre: false, palier: "Boss" }) === 0);
     verifier("une créature sans palier connu non plus",
@@ -542,16 +544,23 @@ console.log("\n14. LA TRICHE DES CRÉATURES : UN BONUS SELON LA STATURE");
     verifier("il n'ignore pas l'armure pour autant",
              coupBlinde.etat.combattants.H2.pv === 33, `(${coupBlinde.etat.combattants.H2.pv})`);
 
-    // SOIN : une Élite qui soigne un allié ajoute aussi ses 10 % (10 → 11). Elle part de
-    // 40 PV : assez loin de son maximum pour que le plafond ne cache rien.
+    // SOIN (v406) : le % de triche n'y touche plus (10 → 10) ; la valeur fixe
+    // du niveau du groupe s'y ajoute (10 + 3 → 13). Elle part de 40 PV : assez
+    // loin de son maximum pour que le plafond ne cache rien.
     etat.combattants.M1.pv = 40;
-    const soigneuse = resoudreCarte(etat, {
+    const carteSoin = {
         type: "carte", idLanceur: "M1", idCarte: "CS",
         attaques: [{ valeurBrute: 10, isHeal: true, cibles: ["M1"] }], alterations: [],
         jets: { parCible: { M1: { esquive: false, etats: {} } } }
-    });
-    verifier("le soin d'une créature profite aussi du bonus",
-             soigneuse.etat.combattants.M1.pv === 51, `(${soigneuse.etat.combattants.M1.pv})`);
+    };
+    const soigneuse = resoudreCarte(etat, carteSoin);
+    verifier("le soin d'une créature ne prend plus le % des dégâts (v406)",
+             soigneuse.etat.combattants.M1.pv === 50, `(${soigneuse.etat.combattants.M1.pv})`);
+    reglerSoinsMonstres(3);
+    const soigneuseFixe = resoudreCarte(etat, carteSoin);
+    reglerSoinsMonstres(0);
+    verifier("…mais la valeur fixe de soins : 10 + 3",
+             soigneuseFixe.etat.combattants.M1.pv === 53, `(${soigneuseFixe.etat.combattants.M1.pv})`);
 
     // BOUCLIER : ni dégât ni soin — pas de triche dessus.
     const bouclier = resoudreCarte(etat, {

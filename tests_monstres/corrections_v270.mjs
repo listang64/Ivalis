@@ -273,7 +273,7 @@ titre("6. CHAQUE MONSTRE NAÎT AVEC ±5 % SUR CHACUNE DE SES STATS");
       if (d) fiches.push(d);
     }
     const leader = await window.creerMonstreDepuisGabarit("MONSTRE_L", gabarit, { ...window.champsLeader(gabarit), Initiative: 100, Critique: 20 });
-    return { fiches, leader, triche: window.tricheMonstresActuelle(), pvLeaderBase: window.champsLeader(gabarit).PV_Max };
+    return { fiches, leader, triche: window.tricheActuelle().pv, pvLeaderBase: window.champsLeader(gabarit).PV_Max };
   });
   const base = { PV_Max: 200 + r.triche, Fatigue_Max: 120, Def_Physique: 40, Def_Magique: 60, Esquive: 40, Parade: 40,
                  Regeneration: 30, Repos_Long: 90, Initiative: 100, Critique: 20 };

@@ -76,7 +76,8 @@ titre("1. LE LEADER AU COMBAT : DÉGÂTS, SOINS, CHANCES D'ÉTAT");
   verifier("un Normal : +10 % (sa stature) ; leader : +25 % (10 + 15)", b(normal) === 10 && b(chef) === 25, `${b(normal)} / ${b(chef)}`);
   verifier("un Petit leader : +25 % aussi", b({ estMonstre: true, palier: "Petit", leader: true }) === 25, `${b({ estMonstre: true, palier: "Petit", leader: true })}`);
   verifier("un héros n'est jamais leader de rien", b({ estMonstre: false, leader: true }) === 0, `${b({ estMonstre: false, leader: true })}`);
-  verifier("le soin d'un leader : 20 brut → 25 (×1,25)", essai(() => MP.appliquerBonusMonstre(20, b(chef)), null) === 25);
+  // (v406) Le % des dégâts ne touche plus les soins : seul celui du leader (+15 %), puis la valeur fixe (0 à l'origine).
+  verifier("le soin d'un leader : 20 brut → 23 (×1,15, v406)", essai(() => MP.appliquerSoinMonstre(20, chef), null) === 23, `${essai(() => MP.appliquerSoinMonstre(20, chef), null)}`);
   const ch = (lanceur, chance, nom = "Brûlé") => essai(() => MP.chanceEtatDe(lanceur, { nom, chance }, { atouts: {} }), null);
   // v267 : le leader n'ajoute plus de chance d'état (Nico a retiré la colonne des 15 pts).
   verifier("chance d'état : la même pour un leader (30 %, v267)", ch(normal, 30) === 30 && ch(chef, 30) === 30, `${ch(normal, 30)} / ${ch(chef, 30)}`);
@@ -547,14 +548,14 @@ titre("9. LA GÉNÉRATION : TOUT LE DÉPART ENTRE, SUR LES CASES PEINTES, AVEC S
     out.a4 = { n: g4.docs.length, cases: g4.cases, surPeintes: g4.cases.every(c => CASES.includes(c)), distinctes: new Set(g4.cases).size === g4.cases.length,
                leaders: chef.length, pvChef: chef[0] ? chef[0].PV_Max - gab(chef[0]).PV : null, defChef: chef[0] ? chef[0].Def_Physique - gab(chef[0]).Res_Physique : null,
                reserve: g4.reserve, maj: g4.maj, ordre: g4.ordre.length, paliers: g4.docs.map(d => d.Palier),
-               triche: window.__ou(() => window.tricheMonstresActuelle(), 0) };
+               triche: window.__ou(() => window.tricheActuelle().pv, 0) };
     // L'Apparition 1, jusqu'à voir ses deux cas.
     out.a1 = {};
     for (let k = 0; k < 30 && !(out.a1.chef && out.a1.releve); k++) {
       const g = await generer(1);
       if (!g.res) break;
       if (g.res.cas === 1) out.a1.chef = { leader: g.docs.length === 1 && g.docs[0].Leader === true, reserve: (g.reserve || []).map(m => `${m.palier}@${m.entreeManche}${m.leader ? "*" : ""}`) };
-      else out.a1.releve = { releve: g.docs.length === 1 && g.docs[0].Releve_En_Leader === true && !g.docs[0].Leader, pv: g.docs[0] && g.docs[0].PV_Max === gab(g.docs[0]).PV + window.__ou(() => window.tricheMonstresActuelle(), 0),
+      else out.a1.releve = { releve: g.docs.length === 1 && g.docs[0].Releve_En_Leader === true && !g.docs[0].Leader, pv: g.docs[0] && g.docs[0].PV_Max === gab(g.docs[0]).PV + window.__ou(() => window.tricheActuelle().pv, 0),
                              reserve: (g.reserve || []).map(m => (m.surReleve ? "relève" : "?") + (m.entreeManche ? "@" + m.entreeManche : "")) };
     }
     const g2 = await generer(2);

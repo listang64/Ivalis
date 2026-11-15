@@ -169,7 +169,8 @@ await section(async () => {
   await p.waitForTimeout(200);
   const r = await p.evaluate(() => {
     const bloc = document.getElementById("corps-triche-niveau");
-    const cases = [...bloc.querySelectorAll("input[data-niveau]")];
+    // (v406) trois lignes : la première (dégâts, %) est l'ancienne ligne unique.
+    const cases = [...bloc.querySelectorAll('input[data-ligne="degats"][data-niveau]')];
     const calque = document.getElementById("grimoire-param-large").getBoundingClientRect();
     const rects = cases.map(i => i.getBoundingClientRect());
     return { dansLeLivre: !!document.querySelector("#grimoire-param-large #corps-triche-niveau"), formules: !!bloc.querySelector(".triche-formules") || /× niveau/.test(bloc.textContent),
@@ -183,13 +184,13 @@ await section(async () => {
   verifier("…toutes lisibles et dans la double page", r.visibles && r.dedans, JSON.stringify(r));
   verifier("le niveau du groupe (3) est surligné", r.surligne === "3", r.surligne);
   // On tape une valeur à la main : le niveau du groupe la prend tout de suite.
-  await p.fill('#corps-triche-niveau input[data-niveau="3"]', "42");
-  await p.press('#corps-triche-niveau input[data-niveau="3"]', "Tab");
+  await p.fill('#corps-triche-niveau input[data-ligne="degats"][data-niveau="3"]', "42");
+  await p.press('#corps-triche-niveau input[data-ligne="degats"][data-niveau="3"]', "Tab");
   await p.waitForTimeout(200);
   const apres = await p.evaluate(() => ({ actuelle: window.tricheMonstresActuelle(), texte: (document.querySelector(".niveau-groupe-reglages") || {}).textContent || "",
     ecrit: (window.__sets || []).filter(x => x.chemin === "Monstres_Modeles/_REGLAGES").map(x => JSON.stringify(x.data)).pop() || "" }));
-  verifier("le niveau 3 saisi à 42 : les créatures prennent +42 % et +42 PV, tout de suite", apres.actuelle === 42 && /\+42 %/.test(apres.texte), JSON.stringify(apres));
-  verifier("…et la base l'enregistre (Triche_Par_Niveau)", /"Triche_Par_Niveau":\{"1":8,"2":9,"3":42,/.test(apres.ecrit), apres.ecrit);
+  verifier("le niveau 3 saisi à 42 : les créatures prennent +42 % de dégâts, tout de suite (v406 : les PV ne suivent plus)", apres.actuelle === 42 && /\+42 %/.test(apres.texte) && /\+10 PV/.test(apres.texte), JSON.stringify(apres));
+  verifier("…et la base l'enregistre (Triche_Degats_Par_Niveau, v406)", /"Triche_Degats_Par_Niveau":\{"1":8,"2":9,"3":42,/.test(apres.ecrit), apres.ecrit);
   await p.evaluate(() => document.getElementById("reglages-triche-niveau").scrollIntoView({ block: "center" })); await p.waitForTimeout(200);
   await cap("v402_triche_par_niveau");
 });

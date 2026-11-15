@@ -45,7 +45,8 @@ console.log("\n4a. LA TRICHE DES CRÉATURES : UN POURCENTAGE DE LEURS DÉGÂTS E
              JSON.stringify(MP.bonusMonstresActuels()));
     verifier("une créature Normale tape 20 → 22", frappe("M1", "H1", 20) === -22, `${frappe("M1", "H1", 20)}`);
     verifier("…et 40 → 44 : le bonus suit le coup (ce n'est plus +1 fixe)", frappe("M1", "H1", 40) === -44, `${frappe("M1", "H1", 40)}`);
-    verifier("son soin aussi : 10 → 11", frappe("M1", "M2", 10, true) === 11, `${frappe("M1", "M2", 10, true)}`);
+    // (v406) Plus son soin : le % ne vaut que pour les dégâts ; un soin prend la valeur fixe du niveau (0 à l'origine).
+    verifier("son soin, non (v406) : 10 → 10", frappe("M1", "M2", 10, true) === 10, `${frappe("M1", "M2", 10, true)}`);
     verifier("un héros frappe comme sa carte (20)", frappe("H1", "M1", 20) === -20, `${frappe("H1", "M1", 20)}`);
     MP.reglerBonusMonstres({ Petit: 10, Normal: 50, "Élite": 10, Boss: 10 });
     verifier("Normale réglée à 50 % : 20 → 30", frappe("M1", "H1", 20) === -30, `${frappe("M1", "H1", 20)}`);
@@ -241,7 +242,8 @@ console.log("\n4b. LE TABLEAU DES MONSTRES : LA TRICHE EN %");
     window.__ou(() => window.appliquerReglagesMonstres(null), null);
     window.__ou(() => window.dessinerReglagesMonstres(), null);
     const titre = (document.querySelector("#reglages-triche-niveau .reglages-monstres-aide") || {}).textContent || "";
-    const champs = () => [...document.querySelectorAll("#corps-triche-niveau input")];
+    // (v406) trois lignes : celle des dégâts (%).
+    const champs = () => [...document.querySelectorAll('#corps-triche-niveau input[data-ligne="degats"]')];
     const valeurs = champs().map(i => i.value).join("/");
     window.__ecrits = [];
     // (v402) plus de formules : la case du niveau 1, saisie à la main
@@ -258,9 +260,9 @@ console.log("\n4b. LE TABLEAU DES MONSTRES : LA TRICHE EN %");
     window.__ou(() => window.appliquerReglagesMonstres(null), null);
     return { titre, valeurs, ecrit, normal, ancien };
   });
-  verifier("l'encart dit « % de dégâts et de soins », une case par niveau (8 % au niveau 1)", /% de dégâts et de soins/.test(r.titre) && r.valeurs === "8/9/10/11/15/17/19/21/23/25", `${r.titre} ${r.valeurs}`);
-  verifier("niveau 1 saisi à 25 : +25 %, le moteur le sait, la base l'écrit (Triche_Par_Niveau, v402)", r.normal === 25
-           && r.ecrit.some(x => /"Triche_Par_Niveau":\{"1":25,/.test(x)), JSON.stringify(r.ecrit));
+  verifier("l'encart dit « % de dégâts, PV et soins » (v406), une case par niveau (8 % au niveau 1)", /% de dégâts, PV et soins/.test(r.titre) && r.valeurs === "8/9/10/11/15/17/19/21/23/25", `${r.titre} ${r.valeurs}`);
+  verifier("niveau 1 saisi à 25 : +25 %, le moteur le sait, la base l'écrit (Triche_Degats_Par_Niveau, v406)", r.normal === 25
+           && r.ecrit.some(x => /"Triche_Degats_Par_Niveau":\{"1":25,/.test(x)), JSON.stringify(r.ecrit));
   verifier("les anciens réglages (Bonus_Degats, Bonus_Degats_Pct) ne sont plus relus", r.ancien === 8, `${r.ancien}`);
 }
 
