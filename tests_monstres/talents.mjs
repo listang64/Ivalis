@@ -124,7 +124,7 @@ console.log("\n2. CE QU'ILS DONNENT (atoutRace, les stats du jeu)");
              && !pug({ equipMainDroite: epee }).degatsPhysiques);
     const vamp = pug({ classe: "Vampire" }), varg = pug({ race: "Vargen" });
     verifier("Vampire : +5 d'initiative, +3 dégâts physiques en tout", vamp.initiative === 5 && vamp.degatsPhysiques === 3, JSON.stringify(vamp));
-    verifier("Vargen : +15 % d'empoisonner, +6 % de critique (en plus)", varg.chancePoisonPhysique === 15 && varg.critique === 6);
+    verifier("Vargen : +15 % de faire saigner, +6 % de critique (en plus, v416)", varg.chanceSaignementPhysique === 15 && !varg.chancePoisonPhysique && varg.critique === 6);
     const bouclier = { nom: "Bouclier", modele: "Bouclier léger", type: "Bouclier" };
     verifier("Art de la parade : seulement bouclier en main (2 × 3 = +6)",
              !w.atoutRace(heros({ talents: { TAL_ART_PARADE: 1 } })).parade
@@ -440,11 +440,12 @@ console.log("\n9. CE QUE LA CARTE EMPORTE (appliquerEquipementALaCarte)");
     window.appliquerEquipementALaCarte(s2, lanceur, "Magie");
     const s3 = etat([{ nom: "Mots de pouvoirs", typeRes: "Magique", valeurBrute: 2, cibles: ["M"] }], []);
     window.appliquerEquipementALaCarte(s3, lanceur, "Magie");
-    return { phys: s1.attaques[0].valeurBrute, poison: (s1.alterations.find(a => a.nom === "Empoisonnement") || {}).chance,
+    return { phys: s1.attaques[0].valeurBrute, saignement: (s1.alterations.find(a => a.nom === "Saignement") || {}).chance,
+             poison: s1.alterations.some(a => a.nom === "Empoisonnement"),
              mag: s2.attaques[0].valeurBrute, brule: s2.alterations[0].chance, confusion: s2.alterations[1].chance, mot: s3.attaques[0].valeurBrute };
   });
   // FOR 14 / INT 15 / CHA 14 → mods 2 / 2 / 2.
-  verifier("physique : +1 Taillé +1 Pugiliste (mains nues) = 12 ; Vargen : poison 15 %", r.phys === 12 && r.poison === 15, JSON.stringify(r));
+  verifier("physique : +1 Taillé +1 Pugiliste (mains nues) = 12 ; Vargen : Saignement 15 % (v416)", r.phys === 12 && r.saignement === 15 && !r.poison, JSON.stringify(r));
   verifier("magique : +1 Archimage = 11 ; Brûlé 75 + 8 = 83 (au-delà du plafond) ; Confusion 20 + 6", r.mag === 11 && r.brule === 83 && r.confusion === 26);
   verifier("Mot de pouvoir : +1 Langage, pas l'Archimage (2 → 3)", r.mot === 3);
 }

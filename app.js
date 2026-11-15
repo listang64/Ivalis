@@ -1778,7 +1778,7 @@ window.texteAtout = function(cle, valeur) {
         case "degatsMotsPouvoir": return `${plus(n)} dégât à la Distorsion mentale`;
         case "chanceElementaire": return `${plus(n)} % de chance sur Brûlé, Électrifié et Glacé`;
         case "chanceEtatsCharisme": return `${plus(n)} % de chance sur Confusion, Peur et Immobilisation`;
-        case "chancePoisonPhysique": return `${plus(n)} % de chance d'empoisonner`;
+        case "chanceSaignementPhysique": return `${plus(n)} % de chance de faire saigner`;
         case "testsCarac":      return Object.keys(valeur || {}).map(c => `${plus(Number(valeur[c]) || 0)} aux tests de ${NOMS_CARACS_ATOUT[c] || c}`).join(" · ");
         case "fatigueSurKO":    return `${plus(n)} de fatigue à chaque ennemi abattu`;
         case "inertieMartiale": return `−${n} de fatigue sur la mêlée après 4 cases en ligne droite`;
