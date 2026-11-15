@@ -295,7 +295,9 @@ function construireEntrees(messages) {
         }
         if (m.Est_Narration_IA) {
             const textes = parasDeNarration(m.Texte);
-            if (textes.length) entrees.push({ id, type: "narration", auteurId: "MJ", textes, jets: [], enCours: m.Recit_En_Cours === true });
+            // (v412) Les fils invisibles : les liens que ce paragraphe a fait bouger (social.js).
+            if (textes.length) entrees.push({ id, type: "narration", auteurId: "MJ", textes, jets: [], enCours: m.Recit_En_Cours === true,
+                                              cerveaux: Array.isArray(m.Social) ? m.Social : [] });
             // (v314) Le croquis de MIA_ILLUSTRATEUR, après les paragraphes ; les PNJ nouveaux, en pleine page.
             const ill = m.Illustration;
             if (ill && ill.Url) entrees.push({ id: id + "-croquis", type: "illustration", image: ill, textes: [], jets: [] });
@@ -371,6 +373,35 @@ function deDeMarge(jets, id) {
         return `<span class="de-marge${classe}" data-e="${echapper(id || "")}" title="Jet de ${echapper(nomCaracJoli(j.carac))} : ${j.de} ${echapper(j.mod)} = ${j.total}">${SVG_DE("de-marge-svg", j.total)}</span>`;
     }).join("");
 }
+// LE CERVEAU À ENGRENAGE DE LA MARGE (v412). Nico : « un petit icône d'un cerveau
+// avec dedans un engrenage, en petit, dans la marge ». Un toucher : ce qui a changé.
+const SVG_CERVEAU = `<svg class="cerveau-marge-svg" viewBox="0 0 40 40" aria-hidden="true">`
+    + `<path class="lobe" d="M20 7.5 C14 5 7.5 8.5 8 14.5 C4.5 16.5 4.5 23.5 8.5 25.5 C8.5 30.5 13.5 33.5 18 31.8 C19 32.6 21 32.6 22 31.8 C26.5 33.5 31.5 30.5 31.5 25.5 C35.5 23.5 35.5 16.5 32 14.5 C32.5 8.5 26 5 20 7.5 Z"/>`
+    + `<path class="sillon" d="M12 13.5 C14 15 13 18 15.5 18.5 M28 13.5 C26 15 27 18 24.5 18.5 M11 24 C13 23 14.5 25 16 24 M29 24 C27 23 25.5 25 24 24"/>`
+    + `<g class="engrenage"><path d="M20 15.2 L21.3 15.4 L21.7 16.9 L23.1 17.5 L24.4 16.7 L25.3 17.6 L24.5 18.9 L25.1 20.3 L26.6 20.7 L26.6 22 L25.1 22.4 L24.5 23.8 L25.3 25.1 L24.4 26 L23.1 25.2 L21.7 25.8 L21.3 27.3 L20 27.3 L18.7 27.3 L18.3 25.8 L16.9 25.2 L15.6 26 L14.7 25.1 L15.5 23.8 L14.9 22.4 L13.4 22 L13.4 20.7 L14.9 20.3 L15.5 18.9 L14.7 17.6 L15.6 16.7 L16.9 17.5 L18.3 16.9 L18.7 15.4 Z"/>`
+    + `<circle cx="20" cy="21.3" r="2.2"/></g></svg>`;
+function cerveauDeMarge(cerveaux, id) {
+    const lignes = cerveaux.flatMap(c => c.lignes || []);
+    return `<span class="cerveau-marge" data-e="${echapper(id || "")}" data-social="${echapper(JSON.stringify(lignes))}" title="${echapper(lignes.join(" — "))}">${SVG_CERVEAU}</span>`;
+}
+// La bulle d'un cerveau touché : les liens qui ont bougé.
+function montrerSocial(el) {
+    let lignes = [];
+    try { lignes = JSON.parse(el.dataset.social || "[]"); } catch (e) {}
+    let bulle = document.getElementById("bulle-social");
+    if (!bulle) { bulle = document.createElement("div"); bulle.id = "bulle-social"; document.body.appendChild(bulle); }
+    bulle.innerHTML = `<div class="titre-bulle-social">Les fils invisibles</div>` + lignes.map(l => `<div class="ligne-bulle-social">${echapper(l)}</div>`).join("");
+    const r = el.getBoundingClientRect();
+    bulle.style.left = Math.max(8, Math.min(window.innerWidth - 300, r.right + 8)) + "px";
+    bulle.style.top = Math.max(8, Math.min(window.innerHeight - 40 - 22 * lignes.length, r.top - 6)) + "px";
+    bulle.classList.add("visible");
+    son("page-prise", 0.4);
+}
+document.addEventListener("pointerdown", (ev) => {
+    const b = document.getElementById("bulle-social");
+    if (b && b.classList.contains("visible") && !(ev.target.closest && (ev.target.closest("#bulle-social") || ev.target.closest(".cerveau-marge")))) b.classList.remove("visible");
+}, true);
+window.montrerSocialIvalis = montrerSocial;
 const FLECHE_SUITE = `<span class="fleche-suite" title="La suite, page suivante" aria-label="La suite, page suivante"><svg viewBox="0 0 30 16" aria-hidden="true">`
     + `<path d="M 2 8.6 C 9 7.4 16 8.8 25 7.9"/><path d="M 19.5 3.2 C 22 5.2 24 6.6 26.6 7.9 C 24 9.4 22.2 10.9 20 13"/></svg></span>`;
 function enteteChapitre() {
@@ -406,6 +437,9 @@ function paragraphesDuChapitre(entrees) {
         blocs.forEach((jetons, k) => {
             const mots = jetons.map((h, x) => ({ h, e: e.id, i: i0 + x }));
             if (k === 0 && e.jets.length && mots.length) mots[0].de = e.jets;
+            // (v412) le petit cerveau à engrenage se pose en marge du paragraphe qui a fait bouger un lien
+            const cerveaux = (e.cerveaux || []).filter(c => c && Number(c.para) === k);
+            if (cerveaux.length && mots.length) mots[0].cerveau = cerveaux;
             // v307 : Nico, « quand les joueurs écrivent leur texte, fais que l'IA saute
             // quand même une ligne pour aérer le texte » — la ligne d'un joueur ouvre
             // son paragraphe (la plume l'écrit toujours dans la continuité du récit).
@@ -528,7 +562,7 @@ function paginer(entrees) {
         let debut = 0, premier = true;
         // (le petit dé de la marge se pose sur la ligne du premier mot de son action)
         const remplir = (p, a, b) => {
-            p.innerHTML = mots.slice(a, b).map(m => (m.de ? deDeMarge(m.de, m.e) : "")
+            p.innerHTML = mots.slice(a, b).map(m => (m.de ? deDeMarge(m.de, m.e) : "") + (m.cerveau ? cerveauDeMarge(m.cerveau, m.e) : "")
                 + `<span class="mot" data-e="${echapper(m.e)}" data-i="${m.i}">${m.h}</span>`).join(" ");
         };
         while (debut < mots.length) {
@@ -829,6 +863,8 @@ function creerElements() {
         if (!etat.actif) return false;
         const nom = cible.closest(".nom-livre");
         if (nom) { montrerPortrait(nom.dataset.nom); return true; }
+        const cerveau = cible.closest(".cerveau-marge");
+        if (cerveau) { montrerSocial(cerveau); return true; }
         const r = cible.closest("[data-recit]");
         if (r) { choisirDansLeSommaire(r.dataset.recit); return true; }
         const h = cible.closest("[data-heros]");
@@ -977,7 +1013,7 @@ async function choisirDansLeSommaire(cle) {
         const snap = await getDoc(doc(db, "Recits_Textes", id));
         const data = snap.exists() ? snap.data() : {};
         const entrees = (data.Entrees || []).map(e => ({ id: e.id, type: e.type || "narration", auteurId: e.auteurId || "",
-            textes: (e.textes || []).slice(), jets: (e.jets || []).slice() }));
+            textes: (e.textes || []).slice(), jets: (e.jets || []).slice(), cerveaux: (e.cerveaux || []).slice() }));
         etat.lecture = { id, numero: fiche.Numero, titre: fiche.Titre, entrees };
         rendre();
         G().allerALaPage(premiereRecit());
@@ -1499,7 +1535,7 @@ async function archiverChapitre(messages) {
     });
     await setDoc(doc(db, "Recits_Textes", fiche.id), {
         ID_Partie: idPartie,
-        Entrees: entrees.map(e => ({ id: e.id, type: e.type, auteurId: e.auteurId || "", textes: e.textes, jets: e.jets }))
+        Entrees: entrees.map(e => ({ id: e.id, type: e.type, auteurId: e.auteurId || "", textes: e.textes, jets: e.jets, cerveaux: e.cerveaux || [] }))
     });
     console.log(`📖 [Le livre] Chapitre ${numero} rangé : « ${titre} ».`);
     if (etat.idPartie === idPartie) {

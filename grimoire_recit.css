@@ -55,6 +55,20 @@
 .de-marge-svg text { font-family: 'Cinzel', serif; font-weight: 700; font-size: 15px; text-anchor: middle; fill: #2a170b; }
 .de-marge.critique .de-marge-svg path { stroke: #5b2a86; } .de-marge.critique .de-marge-svg text { fill: #5b2a86; }
 .de-marge.fumble .de-marge-svg path { stroke: #8b1a10; } .de-marge.fumble .de-marge-svg text { fill: #8b1a10; }
+/* v412 — Le cerveau à engrenage des fils invisibles : en marge du paragraphe qui a fait bouger un lien. */
+.cerveau-marge { position: absolute; left: calc(var(--u) * -8.4); margin-top: calc(var(--u) * -0.6); width: calc(var(--u) * 6.4); height: calc(var(--u) * 6.4); text-indent: 0; cursor: pointer; }
+.de-marge + .cerveau-marge { margin-top: calc(var(--u) * 6); }
+.cerveau-marge-svg { width: 100%; height: 100%; overflow: visible; }
+.cerveau-marge-svg .lobe { fill: rgba(255, 238, 230, 0.55); stroke: #6b2a3a; stroke-width: 1.8; stroke-linejoin: round; }
+.cerveau-marge-svg .sillon { fill: none; stroke: #6b2a3a; stroke-width: 1.1; stroke-linecap: round; opacity: 0.6; }
+.cerveau-marge-svg .engrenage path { fill: rgba(196, 160, 90, 0.85); stroke: #3b2410; stroke-width: 0.9; stroke-linejoin: round; }
+.cerveau-marge-svg .engrenage circle { fill: #fff3dc; stroke: #3b2410; stroke-width: 0.9; }
+#bulle-social { position: fixed; z-index: 5000; max-width: 290px; padding: 10px 13px; background: #f6e8c8; color: #2a170b; border: 1px solid #a07a46;
+  border-radius: 5px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); font-family: 'EB Garamond', Georgia, serif; font-size: 15px; line-height: 1.35;
+  opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 0.18s, transform 0.18s; }
+#bulle-social.visible { opacity: 1; pointer-events: auto; transform: none; }
+.titre-bulle-social { font-family: 'Cinzel', serif; font-size: 12px; letter-spacing: 1.5px; color: #6b2a3a; margin-bottom: 5px; text-transform: uppercase; }
+.ligne-bulle-social + .ligne-bulle-social { margin-top: 3px; }
 
 /* LE SOMMAIRE DU RÉCIT */
 .page-sommaire { justify-content: flex-start; padding-top: calc(var(--u) * 12); }

@@ -2552,7 +2552,8 @@ window.declencherTourIA = async function(options) {
                             const listeHeros = (window.PERSOS_JOUEURS_PARTIE && window.PERSOS_JOUEURS_PARTIE.length ? window.PERSOS_JOUEURS_PARTIE : window.PERSOS_PARTIE) || [];
                             const herosSociaux = listeHeros.filter(h => h && !h.estMonstre && !h.estIllusion && h.actif !== false && h.prenom && h.idPersonnage);
                             await window.SOCIAL.apresLeTour({ idPartie: window.ID_PARTIE_COURANTE, pnjs: [...vus.values()], heros: herosSociaux,
-                                reputation: envFin.reputationScore || env.reputationScore || 0, texteJoueurs: historique4, texteMJ: reponseTexte, idMessage });
+                                reputation: envFin.reputationScore || env.reputationScore || 0, texteJoueurs: historique4, texteMJ: reponseTexte, idMessage,
+                                dateJeu: `Jour ${window.DATE_EN_JEU_ACTUELLE?.jour || "?"} de l'an ${window.DATE_EN_JEU_ACTUELLE?.annee || "?"}` });
                         }
                     }
                 } finally { fermerDepenses(); }

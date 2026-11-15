@@ -179,6 +179,8 @@ section(() => {
     const e2 = initiatives(m, ["kaya", "varos", "doros", "garrik"], { tour: 2, dernieres: ["doros"] });
     verifier("…Doros, qui a eu son initiative au tour d'avant, laisse la place", !e2.some(x => x.ame === "doros"));
     verifier("…personne de présent, aucune envie", initiatives(m, ["varos"], {}).length === 0);
+    const hh = appliquerEvenements(monde(), [{ type: "menacer", acteur: "kaya", cible: "varos", gravite: 2 }], { presents: ["kaya", "brann", "varos"], sansLienEntreHeros: true });
+    verifier("(v412) un héros témoin d'un autre héros ne lui fait pas de lien chiffré", !hh.changements.some(c => c.de === "brann" && c.vers === "kaya") && hh.changements.some(c => c.de === "varos"));
     verifier("l'humeur s'efface au bout de 3 réponses du MJ", !!humeurActive({ humeur: { emotion: "peur", jusquA: 3 } }, 3) && !humeurActive({ humeur: { emotion: "peur", jusquA: 3 } }, 4));
 });
 

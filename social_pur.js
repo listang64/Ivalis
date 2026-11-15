@@ -230,7 +230,8 @@ export function validerEvenement(ev, presents, ames) {
 // `etat` : { ames: { id: { id, type: "pnj"|"heros", nom, psyche, humeur, statut } },
 //            liens: { "a~b": { de, vers, axes, origine, etiquette } } }.
 // `evenements` : ce que l'IA a proposé (validés ici). `ctx` : { presents, tour,
-// historique: [{ acteur, cible, type }] (les événements récents, pour la lassitude) }.
+// historique: [{ acteur, cible, type }] (les événements récents, pour la lassitude),
+// sansLienEntreHeros (v412 : jamais de lien chiffré d'un héros à un autre) }.
 // Rend { etat, evenements (validés), changements, humeurs, derives, rejets }.
 export function appliquerEvenements(etatAvant, evenements, ctx) {
     const etat = cloner(etatAvant || { ames: {}, liens: {} });
@@ -250,6 +251,7 @@ export function appliquerEvenements(etatAvant, evenements, ctx) {
     const changer = (n, de, vers, axe, brut, gravite) => {
         const ame = etat.ames[de];
         if (!ame || ame.statut === "mort" || !brut) return;
+        if (c.sansLienEntreHeros && ame.type === "heros" && (etat.ames[vers] || {}).type === "heros") return;
         const l = lien(de, vers), avant = nombre(l.axes[axe]);
         let d = brut * sensibilite(ame.psyche, valides[n].type, axe, brut) * saturation(axe, avant, brut);
         const plafond = PLAFOND_GRAVITE[gravite];
