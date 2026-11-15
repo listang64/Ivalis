@@ -277,9 +277,9 @@ await section(async () => {
 console.log("\n4. LA VERSION");
 await section(async () => {
   const v = JSON.parse(lire("version.json")).version;
-  verifier("version.json et VERSION_IVALIS d'accord (403)", v === 403 && new RegExp("VERSION_IVALIS = " + v + ";").test(lire("trace_combat.js")), String(v));
+  verifier("version.json et VERSION_IVALIS d'accord (403 ou plus)", v >= 403 && new RegExp("VERSION_IVALIS = " + v + ";").test(lire("trace_combat.js")), String(v));
   const html = lire("index.html");
-  verifier("index.html charge les nouvelles versions", /src="combat\.js\?v=183"/.test(html) && /grimoire\.js\?v=34"/.test(html) && /grimoire\.css\?v=24"/.test(html) && /style\.css\?v=149"/.test(html));
+  verifier("index.html charge les nouvelles versions", /src="combat\.js\?v=(18[3-9]|19\d)"/.test(html) && /grimoire\.js\?v=(3[4-9]|[4-9]\d)"/.test(html) && /grimoire\.css\?v=(2[4-9]|[3-9]\d)"/.test(html) && /style\.css\?v=(149|1[5-9]\d)"/.test(html));
   verifier("pas d'erreur dans la page", !erreurs.length, erreurs.slice(0, 3).join(" | "));
 });
 

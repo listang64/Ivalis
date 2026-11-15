@@ -41,12 +41,24 @@ const ICE_PAR_DEFAUT = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.g
 const moi = () => { try { return localStorage.getItem("ID_JOUEUR_COURANT") || ""; } catch (e) { return ""; } };
 const echapper = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const frais = (p) => !!p && Date.now() - (Number(p.Vu) || 0) < ABSENT_MS;
+// (v404) LE VOLUME DE CHAQUE JOUEUR. Nico : « à côté des noms des joueurs, un petit
+// bouton : quand on clique, s'ouvre, fluide, une tirette pour régler le volume de ce
+// joueur précisément ». De 0 à 150 %, par-dessus la sourdine et la lecture ; il est
+// propre à ce poste (le navigateur s'en souvient : rien ne passe par la base).
+const CLE_VOLUMES = "ivalis_vocal_volumes";
+function lireVolumesVoix() {
+    try { const o = JSON.parse(localStorage.getItem(CLE_VOLUMES) || "{}"); return o && typeof o === "object" ? o : {}; } catch (e) { return {}; }
+}
+function garderVolumesVoix() { try { localStorage.setItem(CLE_VOLUMES, JSON.stringify(v.volumesVoix)); } catch (e) {} }
+const volumeReglé = (id) => { const x = Number(v.volumesVoix[id]); return Number.isFinite(x) ? Math.max(0, Math.min(1.5, x)) : 1; };
 
 const v = {
     partie: null, el: null,
     presents: {},                        // idJoueur -> { Nom, Etat, Vu, Session }
     enJeu: {},                           // idJoueur -> { Nom, Vu } : la partie ouverte
     voixConnues: null,                   // (v401) les voix déjà là : qui arrive, qui part
+    volumesVoix: lireVolumesVoix(),      // (v404) le volume de chaque joueur, réglé ici (1 = 100 %)
+    reglageOuvert: null,                 // (v404) le joueur dont la tirette est sortie
     ecouteEnJeu: null, battementJeu: null,
     ecoutePresents: null, ecouteSignaux: null, lente: null, battement: null, boucle: null,
     rejoint: false, session: "", ice: ICE_PAR_DEFAUT,
@@ -61,6 +73,7 @@ const v = {
 //  LE PAPIER
 // ---------------------------------------------------------------------
 const SVG_MICRO = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2c-1.7 0-2.9 1.3-2.9 2.9v5.6c0 1.7 1.3 2.9 2.9 2.9s2.9-1.3 2.9-2.9V6.1c0-1.6-1.2-2.9-2.9-2.9z"/><path d="M6.2 10.9c0 3.4 2.6 6 5.8 6s5.8-2.6 5.8-6M12 17v3.6M8.8 20.7h6.5"/><path class="barre" d="M4.5 3.8l15 16.6"/></svg>`;
+const SVG_HAUT_PARLEUR = `<svg viewBox="0 0 24 24" aria-hidden="true"><path class="plein" d="M3.6 9.4h3.6l4.6-4v13.2l-4.6-4H3.6z"/><path d="M15.2 9.1c1.6 1.6 1.6 4.2 0 5.8M17.9 6.6c3 3 3 7.8 0 10.8"/></svg>`;
 const SVG_CASQUE = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.2 15.4v-3.2c0-4.4 3.5-7.9 7.8-7.9s7.8 3.5 7.8 7.9v3.2"/><path d="M4.2 14.2h2.6c.6 0 1 .4 1 1v4c0 .6-.4 1-1 1H5.2c-.6 0-1-.4-1-1zM19.8 14.2h-2.6c-.6 0-1 .4-1 1v4c0 .6.4 1 1 1h1.6c.6 0 1-.4 1-1z"/><path class="barre" d="M4.5 3.8l15 16.6"/></svg>`;
 
 function creerPapier() {
@@ -89,7 +102,20 @@ function creerPapier() {
         else if (a === "micro") couperMicro();
         else if (a === "casque") basculerSourdine();
         else if (a === "muet") basculerMuet(b.dataset.joueur);
+        else if (a === "reglage") basculerReglage(b.dataset.joueur);
     });
+    // (v404) La tirette : le volume suit le doigt, tout de suite.
+    bord.addEventListener("input", (ev) => {
+        const t = ev.target;
+        if (!t || !t.classList || !t.classList.contains("tirette-voix")) return;
+        const id = t.dataset.joueur, pct = Math.max(0, Math.min(150, Math.round(Number(t.value) || 0)));
+        v.volumesVoix[id] = pct / 100;
+        garderVolumesVoix();
+        const valeur = t.parentNode.querySelector(".valeur-voix");
+        if (valeur) valeur.textContent = pct + " %";
+        appliquerVolumes();
+    });
+    bord.addEventListener("change", () => maj());
     requestAnimationFrame(() => requestAnimationFrame(() => { if (v.el) v.el.querySelector(".papier-vocal").classList.add("sortie"); }));
     maj();
 }
@@ -156,13 +182,22 @@ function maj() {
         const c = couleurDe(id), lui = id === moi();
         const muet = !lui && (v.muets.has(id) || v.sourdine);
         const titre = lui ? "" : v.muets.has(id) ? "Rendre la voix" : "Couper sa voix";
+        // (v404) le bouton du volume, et sa tirette (sortie ou rangée)
+        const ouvert = v.reglageOuvert === id, pct = Math.round(volumeReglé(id) * 100);
+        const reglage = lui ? "" : `<button type="button" class="reglage-voix-bouton${ouvert ? " ouvert" : ""}" data-vocal="reglage" data-joueur="${echapper(id)}"
+                aria-label="Volume de ${echapper(nomDe(id))}" aria-expanded="${ouvert}" title="Volume de ${echapper(nomDe(id))}">${SVG_HAUT_PARLEUR}</button>
+            <div class="reglage-voix${ouvert ? " ouvert" : ""}"><input type="range" class="tirette-voix" min="0" max="150" step="5" value="${pct}"
+                data-joueur="${echapper(id)}" aria-label="Volume de ${echapper(nomDe(id))}"${ouvert ? "" : ' tabindex="-1"'}><span class="valeur-voix">${pct} %</span></div>`;
         return `<li class="vocal-joueur${lui ? " moi" : ""}${muet ? " muet" : ""}${connecte(id) ? "" : " hors-jeu"}" data-joueur="${echapper(id)}">
             <span class="point-magique ${c}${parle(id) && c === "vert" ? " parle" : ""}" aria-hidden="true"><i></i></span>
             ${lui ? `<span class="nom-vocal">${echapper(nomDe(id))}</span>`
                   : `<button type="button" class="nom-vocal" data-vocal="muet" data-joueur="${echapper(id)}" title="${titre}">${echapper(nomDe(id))}</button>`}
+            ${reglage}
           </li>`;
     }).join("");
-    if (liste.__html !== html) { liste.innerHTML = html; liste.__html = html; }
+    // (pas pendant qu'on tire la tirette : elle reviendrait sous le doigt)
+    const tire = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("tirette-voix") && liste.contains(document.activeElement);
+    if (liste.__html !== html && !tire) { liste.innerHTML = html; liste.__html = html; }
     const actions = v.el.querySelector("#vocal-actions");
     const voulu = !v.rejoint
         ? `<button type="button" class="bouton-vocal rejoindre" data-vocal="rejoindre">Rejoindre</button>`
@@ -360,6 +395,19 @@ function basculerSourdine() {
     appliquerVolumes();
     maj();
 }
+// (v404) La tirette sort (ou rentre) en glissant : la classe change sur la ligne en
+// place (la liste n'est pas redessinée, sinon pas de glissé). Une seule à la fois.
+function basculerReglage(id) {
+    if (!id || id === moi() || !v.el) return;
+    v.reglageOuvert = v.reglageOuvert === id ? null : id;
+    v.el.querySelectorAll(".vocal-joueur").forEach(li => {
+        const ouvert = li.dataset.joueur === v.reglageOuvert;
+        const b = li.querySelector(".reglage-voix-bouton"), r = li.querySelector(".reglage-voix"), t = li.querySelector(".tirette-voix");
+        if (b) { b.classList.toggle("ouvert", ouvert); b.setAttribute("aria-expanded", String(ouvert)); }
+        if (r) r.classList.toggle("ouvert", ouvert);
+        if (t) { if (ouvert) t.removeAttribute("tabindex"); else t.setAttribute("tabindex", "-1"); }
+    });
+}
 function basculerMuet(id) {
     if (!id || id === moi()) return;
     if (v.muets.has(id)) v.muets.delete(id); else v.muets.add(id);
@@ -497,7 +545,7 @@ function brancherSon(pair, flux) {
 }
 function volumeDe(id) {
     if (v.sourdine || v.muets.has(id)) return 0;
-    return v.lecture ? VOLUME_LECTURE : 1;
+    return (v.lecture ? VOLUME_LECTURE : 1) * volumeReglé(id);   // (v404) × le volume réglé de ce joueur
 }
 function appliquerVolumes(net) {
     v.pairs.forEach((pair, id) => {
@@ -505,7 +553,7 @@ function appliquerVolumes(net) {
         if (pair.gain && v.ctx) {
             if (net) pair.gain.gain.value = cible;
             else pair.gain.gain.setTargetAtTime(cible, v.ctx.currentTime, 0.25);   // en douceur
-        } else if (pair.audio && !pair.audio.muted) pair.audio.volume = cible;
+        } else if (pair.audio && !pair.audio.muted) pair.audio.volume = Math.min(1, cible);   // (un élément audio ne dépasse pas 100 %)
     });
 }
 const tampon = new Float32Array(512);
@@ -562,9 +610,9 @@ window.addEventListener("pagehide", () => {
 });
 
 window.GRIMOIRE_VOCAL = {
-    entrer, sortir, rejoindre, quitter, couperMicro, basculerSourdine, basculerMuet,
+    entrer, sortir, rejoindre, quitter, couperMicro, basculerSourdine, basculerMuet, basculerReglage,
     etat: () => ({ partie: v.partie, rejoint: v.rejoint, micro: v.micro, coupe: v.coupe, sourdine: v.sourdine, dictee: v.dictee,
-                   lecture: v.lecture, parleMoi: v.parleMoi, muets: [...v.muets], session: v.session,
+                   lecture: v.lecture, parleMoi: v.parleMoi, muets: [...v.muets], session: v.session, volumesVoix: { ...v.volumesVoix }, reglageOuvert: v.reglageOuvert,
                    pairs: [...v.pairs.values()].map(p => ({ id: p.id, etat: p.pc.connectionState, parle: p.parle, volume: volumeDe(p.id),
                        gain: p.gain ? p.gain.gain.value : null })),
                    joueurs: joueursDeLaTable().map(id => ({ id, nom: nomDe(id), couleur: couleurDe(id), parle: parle(id), connecte: connecte(id) })) })

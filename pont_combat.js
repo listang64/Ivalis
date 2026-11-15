@@ -376,7 +376,14 @@ const SCENES = {
         const surBouclier = nombre(e.surBouclier) > 0 || nombre(e.bouclierApres) < nombre(c.bouclier);
         const champ = (surBouclier && nombre(e.pvApres, nombre(c.pv)) === nombre(c.pv)) ? "bouclier" : "pv";
 
-        const montant = nombre(e.montant);
+        // (v404) LE BOUCLIER BRISÉ, ET LE SURPLUS SUR LA VIE. Nico : « le bouclier prend
+        // les dégâts ; le surplus passe sur la vie, divisé par deux ». Le calcul l'a
+        // toujours fait (encaisserBouclier, combat_etat.js), mais l'écran disait le coup
+        // ENTIER sur la barre de vie (« −30 » pour une vie qui ne perd que 10) : on
+        // croyait le coup réduit. Désormais le bouclier dit ce qu'il a encaissé (« Bouclier
+        // brisé ! −10 🛡️ », sur son dôme qui vole en éclats), et la vie ce qu'elle perd.
+        const brisePuisVie = champ === "pv" && nombre(e.surBouclier) > 0;
+        const montant = brisePuisVie ? Math.max(0, nombre(c.pv) - nombre(e.pvApres, c.pv)) : nombre(e.montant);
         // Le Contre rend le coup : son chiffre, sans émoticône (Nico, v251 :
         // « animation de contre, enlève les émoticônes »).
         const texte = e.opportunite ? `-${montant} ⚔️`
@@ -385,6 +392,10 @@ const SCENES = {
                     : e.tenebres ? `-${montant} 🌑`   // le surplus de Ténèbres, ×1,5
                     : `-${montant}`;
 
+        const reaction = reactionAuCoup(e, champ);
+        if (brisePuisVie && reaction.reaction && reaction.reaction.sorte === "bouclier-brise") {
+            reaction.reaction.texte = `Bouclier brisé ! -${nombre(e.surBouclier)} 🛡️`;
+        }
         return { geste: "jauge", pion: e.cible, champ,
                  de: champ === "pv" ? nombre(c.pv) : nombre(c.bouclier),
                  vers: champ === "pv" ? nombre(e.pvApres, c.pv) : nombre(e.bouclierApres, c.bouclier),
@@ -401,7 +412,7 @@ const SCENES = {
                  // réagit (le feu, la glace, la décharge) avant le chiffre.
                  ...zoneDe(e, etat),
                  duree: RYTHME.jauge,
-                 ...reactionAuCoup(e, champ) };
+                 ...reaction };
     },
 
     soin(e, etat) {

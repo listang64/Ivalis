@@ -103,7 +103,7 @@ await section(async () => {
   const v = JSON.parse(lire("version.json")).version;
   verifier("version.json et VERSION_IVALIS d'accord (401 ou plus)", v >= 401 && new RegExp("VERSION_IVALIS = " + v + ";").test(lire("trace_combat.js")), String(v));
   const html = lire("index.html");
-  verifier("index.html charge les nouvelles versions (vocal.js 2, fabrique_sons.js 23)", /vocal\.js\?v=2"/.test(html) && /fabrique_sons\.js\?v=23"/.test(html));
+  verifier("index.html charge les nouvelles versions (vocal.js 2, fabrique_sons.js 23)", /vocal\.js\?v=([2-9]|\d\d)"/.test(html) && /fabrique_sons\.js\?v=(2[3-9]|[3-9]\d)"/.test(html));
   verifier("pas d'erreur dans la page", !erreurs.length, erreurs.slice(0, 3).join(" | "));
 });
 

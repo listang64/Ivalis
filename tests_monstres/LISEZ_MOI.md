@@ -11918,3 +11918,10 @@ corrections_v398.mjs le vérifie (captures : V398_CAPTURES=dossier).
 - **L'aura du leader** (combat.js) : les mêmes teintes, passées du rouge à l'orange (même clarté, même transparence, toujours à 60 %). corrections_v271 suit.
 
 corrections_v403.mjs le vérifie (la vraie piste, l'aura, le journal).
+
+## v404 — Le bouclier magique brisé, montré juste ; le volume de chaque joueur
+
+- **Le bouclier magique** : la règle (le bouclier prend les dégâts ; le surplus passe sur la vie, divisé par deux) était bien calculée (`encaisserBouclier`), mais l'écran affichait le coup ENTIER sur la barre de vie (« −30 » pour une vie qui ne perd que 10) — on croyait le coup réduit. pont_combat.js (`degats`) : quand le coup traverse un bouclier qui se brise, la barre de vie dit ce qu'elle perd (« −10 », « −10 ! » en critique), et le dôme qui vole en éclats ce qu'il a encaissé (« Bouclier brisé ! −10 🛡️ », animations_catalogue.js, `jeu-bouclier-brise`). Un coup tout entier sur le bouclier, ou sans bouclier : inchangé.
+- **Le volume de chaque joueur** (vocal.js, vocal.css) : un petit haut-parleur à l'encre au bout de la ligne de chaque autre joueur ; touché, une tirette glisse dessous (hauteur et fondu ; une seule à la fois), de 0 à 150 %, appliquée tout de suite et en douceur, multipliée par la lecture (35 %), coupée par la sourdine ou un nom barré. Retenue par ce poste (localStorage `ivalis_vocal_volumes`). Tenue au doigt, la liste ne se redessine pas sous elle. Le papier est désormais calé par le bas : une tirette qui sort le fait grandir vers le haut, jamais sous le livre.
+
+corrections_v404.mjs le vérifie (le moteur et l'écran du bouclier ; la tirette entre deux vrais postes en WebRTC ; captures : V404_CAPTURES=dossier).

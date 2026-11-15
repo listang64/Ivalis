@@ -4887,7 +4887,8 @@
             await o.teinter(d.querySelector(".fissures"), [{ opacity: 0 }, { opacity: 1 }], { duration: 250, fill: "forwards" });
             await o.attendre(120);
             o.son("bris-verre");
-            o.texte(sc.calque, sc.lanceur, "Bouclier brisé !", COULEURS.bouclier);
+            // (v404) ce que le bouclier a encaissé avant de céder, quand le coup passe ensuite sur la vie
+            o.texte(sc.calque, sc.lanceur, sc.texte || "Bouclier brisé !", COULEURS.bouclier);
             d.remove();
             await Promise.all([o.gerbe(sc.calque, a.x, a.y, { nombre: 22, dist: a.t * 1.3, couleurs: ["#e8ffff", "#5be8ff", "#a0f5ff"], taille: 9, tailleMin: 4, carre: true, duree: 800 }),
                 o.secouer(sc.lanceur, a.t * 0.06, 300, axe(D, a))]);

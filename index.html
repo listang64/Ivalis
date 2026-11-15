@@ -25,7 +25,7 @@
   <link rel="stylesheet" href="grimoire_creation.css?v=9">
   <link rel="stylesheet" href="grimoire_combats.css?v=1">
   <link rel="stylesheet" href="grimoire_parametres.css?v=1">
-  <link rel="stylesheet" href="vocal.css?v=1">
+  <link rel="stylesheet" href="vocal.css?v=2">
 
  
   <!-- ===================================================================== -->
@@ -2186,7 +2186,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=293"></script>
+<script src="trace_combat.js?v=294"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2219,7 +2219,7 @@
     "./cerveau_combat.js": "./cerveau_combat.js?v=81",
     "./spectateur_combat.js": "./spectateur_combat.js?v=9",
     "./depot_firestore.js": "./depot_firestore.js?v=11",
-    "./pont_combat.js": "./pont_combat.js?v=58",
+    "./pont_combat.js": "./pont_combat.js?v=59",
     "./totems_pur.js": "./totems_pur.js?v=1",
     "./playlist.js": "./playlist.js?v=1"
 } }
@@ -2249,7 +2249,7 @@
 <script type="module" src="depot_firestore.js?v=11"></script>
 <!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
      vers les animations existantes — il ne recalcule jamais rien. -->
-<script type="module" src="pont_combat.js?v=58"></script>
+<script type="module" src="pont_combat.js?v=59"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=56"></script>
 <script type="module" src="ia_master.js?v=27"></script>
@@ -2260,7 +2260,7 @@
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
 <script type="module" src="grimoire_recit.js?v=26"></script>
 <!-- v396 : le chat vocal de la table (WebRTC, signalé par Firestore). -->
-<script type="module" src="vocal.js?v=2"></script>
+<script type="module" src="vocal.js?v=3"></script>
 <!-- LA CARTE DU MONDE DANS LE GRIMOIRE (v302) : sa double page, ses zones (DEV). -->
 <script type="module" src="grimoire_carte.js?v=6"></script>
 <script src="grimoire_regions.js?v=15"></script>
@@ -2293,7 +2293,7 @@
 <script src="fabrique_sons.js?v=23"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->
 <script src="animations_combat.js?v=12"></script>
-<script src="animations_catalogue.js?v=25"></script>
+<script src="animations_catalogue.js?v=26"></script>
 <!-- …et leur branchement sur le vrai combat (les animations validées dans le Studio). -->
 <script src="animations_jeu.js?v=13"></script>
 <script src="experience.js?v=3"></script>
