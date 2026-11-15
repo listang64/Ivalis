@@ -264,7 +264,7 @@ await section(async () => {
   verifier("MIA_PNJ : seulement les personnages PRÉSENTS, pas un nom lu sur un parchemin ; pas un connu sous un autre titre", /PRÉSENTS \(v330\)/.test(ia) && /lu sur un parchemin/.test(ia) && /« Maître Valerius » pour « Valerius »/.test(ia));
   verifier("MIA_PNJ : avant de créer, cherche s'il existe déjà (pas de double)", /const retrouves = await Promise\.all\(nouveauxNomsDetectes\.map\(n => pnjExistant\(n\)/.test(ia));
   verifier("MIA_CASTING : un visage préparé qui est un PNJ connu garde le sien", /const connu = await pnjExistant\(f\.nom\)/.test(ia));
-  verifier("la fiche d'un PNJ garde sa partie (pour le retrouver)", /ID_Partie: window\.ID_PARTIE_COURANTE \|\| ""     \/\/ \(v330/.test(ia));
+  verifier("la fiche d'un PNJ garde sa partie (pour le retrouver)", /ID_Partie: window\.ID_PARTIE_COURANTE \|\| "",?\s+\/\/ \(v330/.test(ia));
   verifier("l'illustrateur : « present » dans ses consignes", /"present": true/.test(il) && /p\.present === true/.test(il));
 });
 

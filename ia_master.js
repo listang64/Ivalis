@@ -79,7 +79,7 @@ async function preparerEnvironnement(lieuActuelId) {
         snapPnj.forEach(doc => { 
             const pnjData = doc.data();
             pnjData.idDoc = doc.id;
-            if (pnjData.Statut !== "Mort") {
+            if (pnjData.Statut !== "Mort" && estDeLaPartiePNJ(pnjData)) {
                 // NOUVEAU : On filtre la mémoire en fonction du groupe actuel
                 const mapMemoires = pnjData.Memoires_Groupes || {};
                 pnjData.Memoires = mapMemoires[idPartieCourante] || "Aucun souvenir de ce groupe.";
@@ -112,7 +112,7 @@ async function preparerEnvironnement(lieuActuelId) {
         snapPnj.forEach(doc => { 
             const pnjData = doc.data();
             pnjData.idDoc = doc.id;
-            if (pnjData.Statut !== "Mort") {
+            if (pnjData.Statut !== "Mort" && estDeLaPartiePNJ(pnjData)) {
                 // NOUVEAU : Pareil pour les bâtiments
                 const mapMemoires = pnjData.Memoires_Groupes || {};
                 pnjData.Memoires = mapMemoires[idPartieCourante] || "Aucun souvenir de ce groupe.";
@@ -619,6 +619,14 @@ function memeNomPNJ(a, b) {
     return coeurDuNom(a).some(m => cy.has(m));
 }
 window.memeNomPNJIvalis = memeNomPNJ;   // (pour les bancs)
+// UN PNJ DE CETTE PARTIE (v409) : les PNJ n'existent que dans la partie qui les a
+// vus naître (Nico : « ses PNJ n'existeront pas dans les autres parties »). Une
+// fiche sans ID_Partie (d'avant la v330) passe encore, jusqu'à la purge.
+function estDeLaPartiePNJ(fiche) {
+    const p = window.ID_PARTIE_COURANTE || "";
+    return !!fiche && (!fiche.ID_Partie || !p || fiche.ID_Partie === p);
+}
+window.estDeLaPartiePNJ = estDeLaPartiePNJ;
 // UN PNJ DÉJÀ CONNU, OÙ QU'IL SOIT (v330) : les PNJ de cette partie (lus une
 // fois, puis gardés), et ceux du monde qui portent ce nom, son cœur ou un de ses
 // mots (« Maître Valerius » → « Valerius »). Rend sa fiche, ou null.
@@ -642,7 +650,8 @@ async function pnjExistant(nom) {
     try {
         const snap = await getDocs(query(collection(db, "Monde_PNJ"), where("Nom_PNJ", "in", variantes)));
         let trouve = null;
-        snap.forEach(d => { const x = d.data() || {}; if (!trouve && memeNomPNJ(nom, x.Nom_PNJ)) trouve = { ...x, __id: d.id }; });
+        // (v409) Seulement un PNJ de cette partie : celui d'une autre partie n'existe pas ici.
+        snap.forEach(d => { const x = d.data() || {}; if (!trouve && estDeLaPartiePNJ(x) && memeNomPNJ(nom, x.Nom_PNJ)) trouve = { ...x, __id: d.id }; });
         return trouve;
     } catch (e) { console.warn("[MIA_PNJ] Recherche de " + nom + " :", e); return null; }
 }
@@ -695,7 +704,8 @@ async function enregistrerFichePNJ(pnj, idLieuActuel) {
         Description_Physique: pnj.physique || "", ID_Batiment: idBatimentGlobal, ID_Lieu: idLieuGlobal,
         Nom_PNJ: pnj.nom, Occupation: pnj.occupation || "", Race: pnj.race || "Humain", Secret_Mental: pnj.secret || "",
         Statut: "Vivant", Style_De_Parole: pnj.style_parole || "", URL_Cloudinary: "",
-        ID_Partie: window.ID_PARTIE_COURANTE || ""     // (v330 : pour le retrouver, où qu'il aille)
+        ID_Partie: window.ID_PARTIE_COURANTE || "",    // (v330 : pour le retrouver, où qu'il aille)
+        Version_Creation: Number(window.VERSION_IVALIS) || 0   // (v409) né avec la refonte des PNJ : la purge le garde
     });
     retenirPnjDeLaPartie({ Nom_PNJ: pnj.nom, URL_Cloudinary: "", __id: docId });
     return docId;
@@ -1039,6 +1049,7 @@ Utilise l'outil 'deplacerPNJ' pour lister les noms exacts de ceux qui partagent 
 
                 snapPnj.forEach(async (docPnj) => {
                     const dataPnj = docPnj.data();
+                    if (!estDeLaPartiePNJ(dataPnj)) return;   // (v409) le même nom, dans une autre partie
                     
                     // Si sa position est déjà la bonne, on ne fait rien pour économiser Firebase
                     if (dataPnj.ID_Lieu === idLieuCible && dataPnj.ID_Batiment === idBatimentCible) return;
@@ -1368,6 +1379,7 @@ Sinon, ne fais rien.`;
                 const snapPnj = await getDocs(qPnj);
 
                 snapPnj.forEach(async (docPnj) => {
+                    if (!estDeLaPartiePNJ(docPnj.data())) return;   // (v409) le même nom, dans une autre partie
                     // NOUVEAU : On se contente de modifier le statut en "Mort"
                     await updateDoc(doc(db, "Monde_PNJ", docPnj.id), {
                         Statut: "Mort"
@@ -2729,39 +2741,58 @@ Si un PNJ n'a absolument pas interagi ou n'a pas du tout été concerné par les
 // =========================================================================
 // --- LE CIMETIÈRE (Nettoyage des PNJ morts EN LOT) ---
 // =========================================================================
+// (v409) LES MORTS RESTENT. Nico : un PNJ mort garde sa fiche, ses liens et son
+// portrait (grisé dans le livre) : le cimetière n'efface plus rien. Ses appels
+// (archivage, voyages) restent en place.
 window.incinererPnjMorts = async function() {
+    console.log("💀 [Cimetière] Les PNJ morts restent dans la partie (v409) : rien n'est effacé.");
+    return true;
+};
+
+// =========================================================================
+// --- LA PURGE DES ANCIENS PNJ (v409, une seule fois) ---
+// =========================================================================
+// Nico : « on va les supprimer » ; « fais le bouton, et ensuite fais-le
+// disparaître ». Un bouton des Paramètres (l'atelier) efface les PNJ nés avant
+// la refonte (sans Version_Creation ≥ 409), toutes parties confondues : leur
+// fiche, leur portrait Cloudinary et, s'ils en ont, leur âme et leurs liens.
+// Fait une fois (Reglages/Refonte_PNJ), le bouton ne s'affiche plus.
+const VERSION_REFONTE_PNJ = 409;
+const estAncienPnj = (d) => !(Number(d && d.Version_Creation) >= VERSION_REFONTE_PNJ);
+window.PURGE_PNJ_FAITE = window.PURGE_PNJ_FAITE || false;
+window.purgerAnciensPnj = async function (options) {
+    const o = options || {};
     try {
-        console.log("💀 [Cimetière] Recherche des corps à incinérer...");
-        
-        const qTousLesPnj = query(collection(db, "Monde_PNJ"));
-        const snapTousLesPnj = await getDocs(qTousLesPnj);
-        const batchCimetiere = writeBatch(db);
-        let aIncinere = false;
-        
-        for (const docPnj of snapTousLesPnj.docs) {
-            const dataPnj = docPnj.data();
-            
-            if (dataPnj.Statut !== "Vivant") {
-                console.log(`[Cimetière] Effacement total de : ${dataPnj.Nom_PNJ}`);
-                
-                // L'image doit toujours être supprimée une par une car Cloudinary ne prend pas de lot
-                if (dataPnj.URL_Cloudinary && dataPnj.URL_Cloudinary !== "") {
-                    await supprimerImageCloudinary(dataPnj.URL_Cloudinary);
-                }
-                
-                batchCimetiere.delete(doc(db, "Monde_PNJ", docPnj.id)); // On ajoute au lot
-                aIncinere = true;
+        const reglage = await getDoc(doc(db, "Reglages", "Refonte_PNJ"));
+        if (reglage.exists() && reglage.data().Purge_Faite) {
+            window.PURGE_PNJ_FAITE = true;
+            if (!o.silencieux) alert("Les anciens PNJ ont déjà été effacés.");
+            return { deja: true, effaces: 0 };
+        }
+        const snap = await getDocs(query(collection(db, "Monde_PNJ")));
+        const anciens = snap.docs.filter(d => estAncienPnj(d.data()));
+        if (!o.sansConfirmation && !confirm(`Effacer les ${anciens.length} PNJ d'avant la refonte (fiches et portraits), dans toutes les parties ? C'est définitif.`)) return { annule: true, effaces: 0 };
+        let effaces = 0;
+        for (const d of anciens) {
+            const x = d.data() || {};
+            if (x.URL_Cloudinary) { try { await supprimerImageCloudinary(x.URL_Cloudinary); } catch (e) { console.warn("[Purge PNJ] Portrait :", e); } }
+            if (x.ID_Partie && window.SOCIAL && typeof window.SOCIAL.oublierAme === "function") {
+                try { await window.SOCIAL.oublierAme(x.ID_Partie, d.id); } catch (e) { console.warn("[Purge PNJ] Âme :", e); }
             }
+            await deleteDoc(doc(db, "Monde_PNJ", d.id));
+            effaces++;
         }
-        
-        if (aIncinere) {
-            await batchCimetiere.commit(); // On purge toute la base d'un coup
-            console.log("💀 [Cimetière] Incinération terminée.");
-        }
-        return true;
+        await setDoc(doc(db, "Reglages", "Refonte_PNJ"), { Purge_Faite: true, Le: Date.now(), Effaces: effaces,
+            Par: (window.COMPTE_JOUEUR && window.COMPTE_JOUEUR.idJoueur) || localStorage.getItem("ID_JOUEUR_COURANT") || "" }, { merge: true });
+        window.PURGE_PNJ_FAITE = true;
+        pnjDeLaPartie = null;
+        console.log(`🧹 [Purge PNJ] ${effaces} ancien(s) PNJ effacé(s).`);
+        if (!o.silencieux) alert(`${effaces} ancien(s) PNJ effacé(s).`);
+        return { effaces };
     } catch (e) {
-        console.error("Cimetière des PNJ :", e);
-        return false;
+        console.error("[Purge PNJ] :", e);
+        if (!o.silencieux) alert("La purge des anciens PNJ a échoué : " + (e && e.message || e));
+        return { erreur: true, effaces: 0 };
     }
 };
 

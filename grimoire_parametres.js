@@ -52,7 +52,13 @@
         { id: "atelier", titre: "L'atelier", teinte: "beige", cote: "droite",
           texte: "Les outils de ceux qui construisent Ivalis.",
           entrees: [
-              ["studio", "Studio d'animation", () => window.ouvrirStudioAnimation && window.ouvrirStudioAnimation()]
+              ["studio", "Studio d'animation", () => window.ouvrirStudioAnimation && window.ouvrirStudioAnimation()],
+              // (v409) Une seule fois : effacer les PNJ d'avant la refonte ; fait, le bouton disparaît.
+              ["purge-pnj", "Effacer les anciens PNJ", async () => {
+                  if (typeof window.purgerAnciensPnj !== "function") return;
+                  await window.purgerAnciensPnj();
+                  if (window.PURGE_PNJ_FAITE) montrer("menu");
+              }, () => !window.PURGE_PNJ_FAITE]
           ] }
     ];
     // LES PAGES DÉDIÉES : chaque fenêtre de sous-menu (index.html), son titre, sa
@@ -111,7 +117,7 @@
         return `<button type="button" class="bouton-grimoire" id="${id}" data-action="${action}">${cadreMain}<span>${texte}</span></button>`;
     }
     function encart(cat) {
-        const entrees = cat.entrees.map(([id, texte]) =>
+        const entrees = cat.entrees.filter(e => typeof e[3] !== "function" || e[3]()).map(([id, texte]) =>
             `<button type="button" class="entree-parametre" id="grimoire-param-${id}" data-action="param-ouvrir" data-cle="${id}">${cadre("param-" + id, 1.1)}<span>${texte}</span></button>`).join("");
         const dev = cat.id === "atelier"
             ? `<button type="button" class="case-parametre${modeDev() ? " coche" : ""}" id="grimoire-param-dev" data-action="param-dev" aria-pressed="${modeDev()}">

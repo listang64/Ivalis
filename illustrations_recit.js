@@ -378,7 +378,9 @@ async function fichesPnj(noms, connus) {
         try {
             // (le nom exact ; les PNJ de la scène, eux, arrivent par `connus`)
             const snap = await getDocs(query(collection(db, "Monde_PNJ"), where("Nom_PNJ", "in", restent.slice(0, 10))));
-            snap.forEach(d => { const x = d.data() || {}; restent.forEach(n => { if (memeNom(n, x.Nom_PNJ)) trouves[n] = { ...x, __id: d.id }; }); });
+            // (v409) Seulement les PNJ de cette partie.
+            const deLaPartie = (x) => (typeof window.estDeLaPartiePNJ === "function" ? window.estDeLaPartiePNJ(x) : true);
+            snap.forEach(d => { const x = d.data() || {}; if (!deLaPartie(x)) return; restent.forEach(n => { if (memeNom(n, x.Nom_PNJ)) trouves[n] = { ...x, __id: d.id }; }); });
         } catch (e) { console.warn("[MIA_ILLUSTRATEUR] Lecture des PNJ :", e); }
     }
     return trouves;
@@ -401,7 +403,8 @@ async function portraitDuPnj(p, fiche) {
             await setDoc(doc(db, "Monde_PNJ", id), {
                 Nom_PNJ: p.nom, Race: race, Description_Physique: description, URL_Cloudinary: img.url,
                 Statut: "Vivant", Occupation: "", Secret_Mental: "", Style_De_Parole: "", ID_Lieu: "", ID_Batiment: "",
-                Origine: "MIA_ILLUSTRATEUR", ID_Partie: window.ID_PARTIE_COURANTE || "", Cree_Le: Date.now()
+                Origine: "MIA_ILLUSTRATEUR", ID_Partie: window.ID_PARTIE_COURANTE || "", Cree_Le: Date.now(),
+                Version_Creation: Number(window.VERSION_IVALIS) || 0   // (v409) né avec la refonte des PNJ
             });
         }
     } catch (e) { console.error("[MIA_ILLUSTRATEUR] La fiche du PNJ :", e); }
