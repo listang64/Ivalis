@@ -12071,3 +12071,8 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - **La double flèche** (Nico : « le menu pour changer de héros, c'est dans la page du groupe : un petit symbole de double flèche à côté du nom de notre personnage ouvre la page Aventuriers avec la liste de ses personnages ») : sur la double page du Groupe, un ⇄ à côté du nom de NOS héros (pas ceux des autres joueurs) mène à notre clan dans les Aventuriers, où l'on coche celui qu'on joue. Le nom et le portrait ouvrent toujours la fiche.
 - Le toucher sur le nom du papier de l'avatar, dans le récit (v418, un malentendu), est retiré : le papier ouvre la fiche, comme en v417.
 - corrections_v418_livre.mjs (section 5) le vérifie.
+
+## v420 — La compagnie entend toutes les façons de le dire
+
+- **Le filtre des mots** (Nico : « mets plein de mots différents, pas que suivre : suis, viens, rejoins… pour ne pas passer à côté de la façon dont on l'a écrit ») : groupe_pur.js lit l'action sans accents, traits d'union ni apostrophes, et reconnaît des dizaines de tournures — venir, suivre (suis, suit, suivez…), rejoindre (et ses fautes : « rejoind », « rejouins »), joindre, accompagner, emmener, faire route, faire partie, compagnon, engager ; attendre, rester là, ne bouge pas, on revient, je te laisse ; partir, va-t'en, nos chemins se séparent, plus besoin de toi, tu es libre, rentre chez toi, renvoyer. Il ratisse large : MIA_GROUPE tranche ensuite, et sa consigne donne maintenant ces exemples (« lis l'intention, pas le mot exact »).
+- corrections_v418_moteur.mjs (section 1) le vérifie : 36 tournures attrapées, aucune action ordinaire.

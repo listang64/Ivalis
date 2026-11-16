@@ -95,8 +95,36 @@ export function verdictDepart(o) {
 
 // LE FILTRE DES MOTS : une action de héros qui PARLE de suivre, rejoindre,
 // attendre, renvoyer… mérite qu'on la lise (sinon, pas d'appel à l'IA).
-const MOTS_GROUPE = /\b(rejoin\w*|suivr\w*|suis[- ]nous|suivez[- ]nous|accompagn\w*|viens avec|venez avec|venir avec|avec nous|parmi nous|compagnie|notre groupe|le groupe|attends[- ]nous|attendez[- ]nous|nous attendre|attendre ici|reste ici|restez ici|rester ici|renvo\w*|congedi\w*|separ\w*|quitt\w*|adieu|va[- ]t'en|allez[- ]vous[- ]en|pars\b|partez\b|engag\w*|recrut\w*)/;
-const sansAccent = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[’`]/g, "'");
+// (v420) Nico : « mets plein de mots différents, pas que suivre : suis, viens,
+// rejoins… pour ne pas passer à côté de la façon dont on l'a écrit ». Le texte
+// est lu sans accents, en minuscules, les traits d'union et apostrophes comme
+// des espaces ; le filtre ratisse large (MIA_GROUPE tranche ensuite).
+const MOTS_GROUPE = new RegExp("\\b(" + [
+    // — VENIR AVEC NOUS, SUIVRE, REJOINDRE —
+    "suivr\\w*", "sui[st]\\b", "suiv(e|es|ent|ez|ons|ions|iez|rai\\w*|ra\\w*)\\b", "suiveur\\w*", "suis moi", "suis nous", "suivez (moi|nous)",
+    "vien(s|t|nent|ne|nes|drai\\w*|dra\\w*|dr\\w*)\\b", "venez\\b", "venons\\b", "venir\\b", "veni\\w*", "ramene\\w* avec", "amene\\w* avec",
+    "rejo[iu]\\w*", "rejoign\\w*", "rejoind\\w*", "rejoint\\w*", "rjoin\\w*", "joindr\\w*", "join[st]\\b", "joign\\w*", "se joindre",
+    "accompagn\\w*", "acompagn\\w*", "escort\\w*", "emmen\\w*", "emmene\\w*", "embarqu\\w*", "on t emmene", "on te prend", "te prendre avec",
+    "avec nous", "avec moi", "parmi nous", "des notres", "l un des notres", "l une des notres", "un des notres", "une des notres",
+    "fai(s|re|tes) partie", "fais en partie", "faire route", "fai(s|tes) route", "fais la route", "en route avec", "prendre la route avec",
+    "voyag\\w* avec", "partir avec", "pars avec", "partez avec", "aventure avec", "l aventure", "nos aventures", "chemin avec", "nous suivre",
+    "compagn(e|on|ons|ie|ies|onne|onnes)\\b", "compagnie", "notre groupe", "le groupe", "du groupe", "au groupe", "la troupe", "notre bande", "l equipe", "notre equipe",
+    "engag\\w*", "recrut\\w*", "enrol\\w*", "embauch\\w*", "a notre service", "a nos cotes", "a mes cotes", "a nos services", "allie\\w*", "rallie\\w*", "s unir", "unir nos",
+    "tu viens", "vous venez", "tu nous suis", "vous nous suivez", "on y va ensemble", "ensemble",
+    // — ATTENDRE ICI, RESTER EN ARRIÈRE —
+    "attend\\w*", "patiente\\w*", "reste ici", "reste la", "reste en arriere", "reste derriere", "reste avec", "restez\\b", "rester ici", "rester la", "rester en arriere", "restes ici",
+    "ne bouge pas", "bouge pas", "ne bougez pas", "garde (la|le|les|ce|cette|l endroit|la place|le camp)", "surveille\\w*", "monte la garde",
+    "on revient", "on reviendra", "nous reviendrons", "je reviens", "je reviendrai", "reviens", "revenons", "on se retrouve", "retrouv\\w*", "rendez vous",
+    "on te laisse", "je te laisse", "nous te laissons", "on vous laisse", "je vous laisse", "te laisser", "vous laisser", "laisse nous", "laissons (le|la|les)\\b",
+    // — PARTIR, RENVOYER, SE SÉPARER —
+    "renvo\\w*", "congedi\\w*", "separ\\w*", "quitt\\w*", "quite\\w*", "adieu\\w*", "au revoir", "a la prochaine", "bonne route", "bon vent",
+    "va t en", "vas t en", "va ten", "allez vous en", "allez ven", "pars\\b", "partez\\b", "partir\\b", "part\\b", "s en aller", "t en aller", "va t en",
+    "degag\\w*", "fiche le camp", "fous le camp", "foutez le camp", "file\\b", "filez\\b", "ouste", "dehors", "du balai", "disparai\\w*", "disparais",
+    "plus besoin", "n avons plus besoin", "n ai plus besoin", "plus de toi", "plus de vous", "nos (chemins|routes)", "chemins se separent", "routes se separent",
+    "tu es libre", "vous etes libre", "libre de partir", "libere\\w*", "liberer", "rentre chez", "rentrez chez", "retourne\\w* chez", "rentre\\w* (a|au|dans)",
+    "chass\\w*", "vire\\w*", "exclu\\w*", "banni\\w*", "abandonn\\w*", "lach\\w*", "fin de (la )?route", "ici que (nos|ton|votre)", "s arrete ici", "s arrete la"
+].join("|") + ")");
+const sansAccent = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[’`'\-]/g, " ").replace(/\s+/g, " ");
 export const parleDuGroupe = (texte) => MOTS_GROUPE.test(" " + sansAccent(texte) + " ");
 
 // UN JET DE DÉ DU CHAT : « 🎲 Jet de **Charisme** pour **Lyra** : Résultat : 14 +2 = **16** ».

@@ -215,6 +215,13 @@ await section(async () => {
       depart: [GR.verdictDepart({ loyaute: 10 }), GR.verdictDepart({ loyaute: -8 }), GR.verdictDepart({ loyaute: -30 }), GR.verdictDepart({ loyaute: -30, averti: true }), GR.verdictDepart({ loyaute: 5, averti: true })],
       jet: GR.lireJet("🎲 Jet de **CHARISME** pour **Lyra** : Résultat : 14 +2 = **16**"),
       mots: [GR.parleDuGroupe("Doros, rejoins-nous !"), GR.parleDuGroupe("Attends-nous ici, veux-tu ?"), GR.parleDuGroupe("Je commande une bière.")],
+      // (v420) Nico : « plein de mots différents, pas que suivre : suis, viens, rejoins… »
+      motsOui: ["Rejoind nous", "rejouins nous stp", "Tu viens avec nous ?", "Viens !", "Suis-moi.", "suis moi", "Suivez-nous", "Veux-tu nous suivre", "Accompagne-nous",
+        "Tu veux faire partie de la compagnie ?", "On t’emmène", "Viendras-tu ?", "Venez avec moi", "Fais route avec nous", "Deviens notre compagnon", "Je t’engage",
+        "Joins-toi à nous", "Rejoignez-nous", "Pars avec nous", "On y va ensemble", "Attends-nous ici", "Reste là", "Ne bouge pas, on revient", "Garde le camp",
+        "Je te laisse ici", "Va-t’en", "Vas t en", "Tu peux partir", "Nos chemins se séparent", "Adieu l’ami", "Dégage !", "On n’a plus besoin de toi",
+        "Tu es libre", "Rentre chez toi", "Je te renvoie", "On se quitte ici"].filter(t => !GR.parleDuGroupe(t)),
+      motsNon: ["Je commande une bière.", "Je contemple la mer.", "Je bois mon vin en silence.", "Thorin examine la carte."].filter(t => GR.parleDuGroupe(t)),
       loyaute: GR.loyaute([A(60, 40, 50), A(-20, -20, -20)]),
       max: GR.MAX_SUIVEURS
     };
@@ -231,6 +238,8 @@ await section(async () => {
   verifier("le départ : rester, prévenir, prévenir d'abord, partir après avoir prévenu, s'apaiser", JSON.stringify(r.depart) === '["rester","avertir","avertir","partir","apaise"]', JSON.stringify(r.depart));
   verifier("un jet du chat se lit (Charisme, Lyra, 16)", r.jet && r.jet.carac === "CHARISME" && r.jet.nom === "Lyra" && r.jet.total === 16);
   verifier("le filtre des mots : rejoindre, attendre ici — pas une bière", JSON.stringify(r.mots) === "[true,true,false]");
+  verifier("(v420) …et 36 autres tournures (suis, viens, rejoins, fautes, partir, rester…)", r.motsOui.length === 0, JSON.stringify(r.motsOui));
+  verifier("(v420) …sans attraper une action ordinaire", r.motsNon.length === 0, JSON.stringify(r.motsNon));
   verifier("la loyauté : la moyenne des affinités envers les héros", r.loyaute === Math.round((51.5 - 20) / 2), String(r.loyaute));
 });
 

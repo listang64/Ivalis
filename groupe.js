@@ -22,7 +22,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as GP from "./groupe_pur.js?v=1";
+import * as GP from "./groupe_pur.js?v=2";
 
 const PARTIES = "Systeme_Parties";
 const sansAccent = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -109,6 +109,7 @@ Lis les dernières actions des héros. Relève seulement les DEMANDES EXPLICITES
 - "recruter" : un héros demande à un PNJ de rejoindre le groupe, de les suivre, de les accompagner (ou accepte clairement l'offre d'un PNJ qui propose de venir) ;
 - "renvoyer" : un héros dit à un suiveur de partir, qu'il ne fait plus partie du groupe ;
 - "laisser" : un héros demande à un suiveur de rester ici, de les attendre ici.
+Les joueurs l'écrivent de mille façons, au tutoiement ou au vouvoiement, parfois avec des fautes : « rejoins-nous », « viens avec nous », « suis-moi », « tu nous accompagnes ? », « fais route avec nous », « deviens notre compagnon », « je t'engage », « on t'emmène » (recruter) ; « tu peux partir », « va-t'en », « nos chemins se séparent », « on n'a plus besoin de toi », « tu es libre », « rentre chez toi » (renvoyer) ; « attends-nous ici », « reste là », « garde le camp, on revient », « je te laisse ici » (laisser). Lis l'intention, pas le mot exact.
 Rien pour une simple question sur la route, une conversation, ou une demande d'aide ponctuelle (guider jusqu'à la porte, porter un sac).
 PNJ présents (pas encore suiveurs) : ${o.nomsPresents.join(", ") || "(aucun)"}.
 Suiveurs actuels : ${o.nomsSuiveurs.join(", ") || "(aucun)"}.
