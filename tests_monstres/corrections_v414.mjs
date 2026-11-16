@@ -350,30 +350,30 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("4. NICO ET BEN : AJUSTER UN LIEN, ANNULER UN CHANGEMENT");
+titre("4. NICO ET BEN : ANNULER UN CHANGEMENT ; RÉGLER UN LIEN (v426 : SEULEMENT EN MODE DEV)");
 // =========================================================================
 await section(async () => {
   await G(() => { window.COMPTE_JOUEUR = { nom: "Nico", idJoueur: "P_01", admin: true }; window.confirm = () => true; });
   await toucher('#grimoire-liens-d .noeud-liens[data-id="H1"]');
   await p.waitForTimeout(150);
-  verifier("l'encart montre « Ajuster » et « annuler » à un admin", /Ajuster/.test(await G(() => document.querySelector("#grimoire-liens-d .encart-liens").innerText)) && !!(await G(() => document.querySelector('#grimoire-liens-d .annuler-liens[data-n="1"]'))));
-  await toucher('#grimoire-liens-d .encart-liens [data-cb="ajuster"]');
-  await G(() => { const i = document.querySelector('#grimoire-liens-d .ajuste-liens[data-axe="confiance"]'); i.value = "40"; });
-  await toucher('#grimoire-liens-d .encart-liens [data-cb="enregistrer"]');
+  verifier("l'encart montre « annuler » à un admin, et plus de bouton « Ajuster » (v426)", !/Ajuster/.test(await G(() => document.querySelector("#grimoire-liens-d .encart-liens").innerText)) && !(await G(() => document.querySelector('#grimoire-liens-d [data-cb="ajuster"]'))) && !!(await G(() => document.querySelector('#grimoire-liens-d .annuler-liens[data-n="1"]'))));
+  const refuseAdmin = await G(async () => { try { await window.SOCIAL.ajusterLien("P1", "PNJ_DOROS", "H1", { confiance: 99 }); return "passé"; } catch (e) { return e.message; } });
+  verifier("un admin hors mode DEV ne règle plus un lien à la main", /Réservé au mode développeur/.test(refuseAdmin), refuseAdmin);
+  await G(async () => { localStorage.setItem("ivalis_DEV_MODE", "on"); await window.SOCIAL.ajusterLien("P1", "PNJ_DOROS", "H1", { confiance: 40 }); localStorage.setItem("ivalis_DEV_MODE", "off"); });
   await attendreQue(async () => ((await lien("PNJ_DOROS", "H1")) || { axes: {} }).axes.confiance === 40, 4000);
   const l = await lien("PNJ_DOROS", "H1");
   const aj = await G(() => window.__docs["Systeme_Parties/P1/Evenements_Sociaux/000002"] || null);
-  verifier("ajusté : Doros → Thorin, confiance 40 ; le journal le dit (« ajustement », par Nico, avant/après)", l.axes.confiance === 40 && !!aj && aj.type === "ajustement" && aj.par === "Nico" && aj.changements[0].avant === -60 && aj.changements[0].apres === 40, JSON.stringify(aj && aj.changements));
-  // (l'encart de Thorin est resté ouvert après l'enregistrement ; sinon, on le rouvre)
-  if (!(await G(() => document.querySelector('#grimoire-liens-d .annuler-liens[data-n="1"]')))) await toucher('#grimoire-liens-d .noeud-liens[data-id="H1"]');
+  verifier("en mode DEV : Doros → Thorin, confiance 40 ; le journal le dit (« ajustement », par Nico, avant/après)", l.axes.confiance === 40 && !!aj && aj.type === "ajustement" && aj.par === "Nico" && /Réglé en mode DEV/.test(aj.resume) && aj.changements[0].avant === -60 && aj.changements[0].apres === 40, JSON.stringify(aj && aj.changements));
+  await G(() => window.GRIMOIRE_LIENS.centrer("PNJ_DOROS")); await p.waitForTimeout(600);
+  await toucher('#grimoire-liens-d .noeud-liens[data-id="H1"]');
   await p.waitForTimeout(150);
   await toucher('#grimoire-liens-d .annuler-liens[data-n="1"]');
   await attendreQue(async () => !!((await G(() => window.__docs["Systeme_Parties/P1/Evenements_Sociaux/000001"])) || {}).annule, 4000);
   const l2 = await lien("PNJ_DOROS", "H1"), e1 = await G(() => window.__docs["Systeme_Parties/P1/Evenements_Sociaux/000001"]);
-  verifier("annulé : l'humiliation est retirée (respect −40 → −32, attachement −70 → −60), l'ajustement d'après reste", e1.annule === true && e1.annulePar === "Nico" && l2.axes.respect === -32 && l2.axes.attachement === -60 && l2.axes.confiance === 40, JSON.stringify(l2.axes));
+  verifier("annulé : l'humiliation est retirée (respect −40 → −32, attachement −70 → −60), le réglage d'après reste", e1.annule === true && e1.annulePar === "Nico" && l2.axes.respect === -32 && l2.axes.attachement === -60 && l2.axes.confiance === 40, JSON.stringify(l2.axes));
   verifier("…et le changement est barré dans l'encart", (l2.derniers.find(x => x.n === 1) || {}).annule === true);
   const refuse = await G(async () => { window.COMPTE_JOUEUR = { nom: "Adrien", admin: false }; try { await window.SOCIAL.ajusterLien("P1", "PNJ_DOROS", "H1", { confiance: 99 }); return "passé"; } catch (e) { return e.message; } });
-  verifier("un joueur ne peut ni ajuster ni annuler", /Réservé à Nico et Ben/.test(refuse));
+  verifier("un joueur ne peut pas régler un lien", /Réservé au mode développeur/.test(refuse));
 });
 
 // =========================================================================

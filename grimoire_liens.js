@@ -18,7 +18,8 @@
 //      forts). Un toucher sur un portrait : l'encart du lien (le chiffre, les
 //      six axes, ce qu'il en dit, les derniers changements) ; « Placer au
 //      centre » (ou deux touchers) recentre. Nico et Ben y annulent un
-//      changement et ajustent un lien (social.js, avec trace dans le journal).
+//      changement ; en mode DEV, la roue crantée d'une barre la règle (v425 ;
+//      v426 : le bouton « Ajuster » est parti) — social.js, trace dans le journal.
 //
 //  Les données : social.js (lireReseau) ; le calcul de la disposition est pur
 //  (disposerRadar) et se vérifie au banc.
@@ -98,7 +99,7 @@ export function liensDuRegard(reseau, centre, regard, filtre, P) {
 //  L'ÉTAT DE LA DOUBLE PAGE
 // ---------------------------------------------------------------------
 let pages = null;
-const vue = { centre: "", regard: "out", filtre: "tous", selection: "", recherche: "", ajuste: false, regle: "", reseau: null, souvenirs: [], charge: 0, retourRecit: false, retourParametres: false, retourGroupe: false, dernierToucher: null };
+const vue = { centre: "", regard: "out", filtre: "tous", selection: "", recherche: "", regle: "", reseau: null, souvenirs: [], charge: 0, retourRecit: false, retourParametres: false, retourGroupe: false, dernierToucher: null };
 
 function creer() {
     if (pages) return pages;
@@ -204,7 +205,6 @@ function htmlEncart(choix) {
         const [min, max] = P.BORNES[axe], v = P.nombre(a[axe]);
         const regle = dev && vue.regle === axe;
         return `<div class="axe-liens${dev ? " avec-roue" : ""}"><span>${P.NOMS_AXES[axe]}</span><b>${signe(v)}</b><span class="barre-liens"><i class="${v < 0 ? "neg" : ""}" style="width:${((v - min) / (max - min) * 100).toFixed(1)}%"></i></span>
-          ${vue.ajuste && admin ? `<input class="ajuste-liens" type="number" step="1" min="${min}" max="${max}" data-axe="${axe}" value="${Math.round(v)}">` : ""}
           ${dev ? `<button type="button" class="roue-liens${regle ? " ouverte" : ""}" data-action="liens" data-cb="roue" data-axe="${axe}" title="Régler ${echapper(P.NOMS_AXES[axe])} (DEV)" aria-label="Régler ${echapper(P.NOMS_AXES[axe])}">${ROUE}</button>` : ""}</div>
           ${regle ? `<div class="reglette-liens"><input type="range" class="curseur-liens" min="${min}" max="${max}" step="1" value="${Math.round(v)}" data-axe="${axe}"><output>${signe(v)}</output></div>` : ""}`;
     }).join("");
@@ -224,7 +224,6 @@ function htmlEncart(choix) {
         ${derniers ? `<div class="sous-titre-liens petit">Les derniers changements</div><ul class="derniers-liens">${derniers}</ul>` : ""}
         <div class="boutons-encart-liens">
           <button type="button" class="lien-fiche" data-action="liens" data-cb="centrer" data-id="${echapper(choix.id)}">Placer au centre</button>
-          ${admin ? (vue.ajuste ? `<button type="button" class="lien-fiche" data-action="liens" data-cb="enregistrer">Enregistrer</button>` : `<button type="button" class="lien-fiche" data-action="liens" data-cb="ajuster">Ajuster</button>`) : ""}
         </div>
       </div>`;
 }
@@ -300,12 +299,12 @@ async function reglerJauge(axe, valeur) {
     const P = S(), p = window.ID_PARTIE_COURANTE;
     const de = vue.regard === "in" ? vue.selection : vue.centre, vers = vue.regard === "in" ? vue.centre : vue.selection;
     if (!P || !p || !de || !vers) return;
-    try { await P.ajusterLien(p, de, vers, { [axe]: valeur }, { dev: true }); } catch (e) { alert(e.message || e); return; }
+    try { await P.ajusterLien(p, de, vers, { [axe]: valeur }); } catch (e) { alert(e.message || e); return; }
     await charger(true);
 }
 async function centrer(id) {
     if (!id || !ames()[id]) return;
-    vue.centre = id; vue.selection = ""; vue.ajuste = false; vue.regle = "";
+    vue.centre = id; vue.selection = ""; vue.regle = "";
     vue.souvenirs = await S().lireSouvenirsDe(window.ID_PARTIE_COURANTE, id).catch(() => []);
     rendre();
 }
@@ -327,25 +326,17 @@ async function agir(cible) {
         vue.dernierToucher = { id, t: Date.now() };
         // Deux touchers sur le même portrait : il passe au centre.
         if (d && d.id === id && Date.now() - d.t < 450) { son(); await centrer(id); return; }
-        son(); vue.selection = vue.selection === id ? "" : id; vue.ajuste = false; vue.regle = ""; rendre(); return;
+        son(); vue.selection = vue.selection === id ? "" : id; vue.regle = ""; rendre(); return;
     }
     if (cb === "centrer") { son(); await centrer(cible.dataset.id); return; }
     if (cb === "regard") { son(); vue.regard = cible.dataset.regard === "in" ? "in" : "out"; vue.selection = ""; rendre(); return; }
-    if (cb === "fermer") { vue.selection = ""; vue.ajuste = false; vue.regle = ""; rendre(); return; }
+    if (cb === "fermer") { vue.selection = ""; vue.regle = ""; rendre(); return; }
     // (v425) La roue crantée (mode DEV) : la réglette de cette jauge s'ouvre (ou se referme).
     if (cb === "roue") { if (!modeDev()) return; son(); vue.regle = vue.regle === cible.dataset.axe ? "" : cible.dataset.axe; rendre(); return; }
     if (cb === "recit") { son(); vue.retourRecit = false; if (window.GRIMOIRE_RECIT && window.GRIMOIRE_RECIT.allerAuRecit) window.GRIMOIRE_RECIT.allerAuRecit(); return; }
     if (cb === "parametres") { son(); vue.retourParametres = false; if (window.GRIMOIRE_PARAMETRES) window.GRIMOIRE_PARAMETRES.revenirDesLiens(); return; }
     if (cb === "groupe") { son(); vue.retourGroupe = false; if (window.GRIMOIRE_GROUPE) window.GRIMOIRE_GROUPE.ouvrir(); return; }
-    if (cb === "ajuster") { vue.ajuste = true; rendre(); return; }
     const lien = () => { const de = vue.regard === "in" ? vue.selection : vue.centre, vers = vue.regard === "in" ? vue.centre : vue.selection; return { de, vers }; };
-    if (cb === "enregistrer") {
-        const valeurs = {};
-        pages.d.querySelectorAll(".ajuste-liens").forEach(i => { valeurs[i.dataset.axe] = i.value; });
-        const { de, vers } = lien();
-        try { await P.ajusterLien(p, de, vers, valeurs); } catch (e) { alert(e.message || e); }
-        vue.ajuste = false; await charger(true); return;
-    }
     if (cb === "annuler") {
         const n = Number(cible.dataset.n);
         if (!confirm(`Annuler ce changement (n° ${n}) ? Ses écarts sont retirés des liens.`)) return;
@@ -403,7 +394,7 @@ setInterval(() => {
         if (!g || typeof g.pagesLiens !== "function") return;
         if (ouverte()) {
             enRoute = 0;
-            if (!vue.ajuste && Date.now() - derniereLecture > 20000) { derniereLecture = Date.now(); charger(true); }
+            if (!vue.regle && Date.now() - derniereLecture > 20000) { derniereLecture = Date.now(); charger(true); }
         } else if (g.pagesLiens().length && Date.now() - enRoute > 8000) g.definirLiens([]);
     } catch (e) { console.warn("Le livre : les fils invisibles", e); }
 }, 1000);

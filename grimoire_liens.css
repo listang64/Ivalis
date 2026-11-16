@@ -93,7 +93,6 @@
 .reglette-liens { display: flex; align-items: center; gap: calc(var(--u) * 1.4); margin: calc(var(--u) * -0.2) 0 calc(var(--u) * 0.6) calc(var(--u) * 18); }
 .reglette-liens input { flex: 1; accent-color: #c0261c; }
 .reglette-liens output { min-width: calc(var(--u) * 6); text-align: right; font-weight: bold; color: #8b1a10; font-size: calc(var(--u) * 2.7); }
-.ajuste-liens { width: calc(var(--u) * 10); font-size: calc(var(--u) * 2.6); }
 .derniers-liens { margin: 0; padding-left: calc(var(--u) * 3); font-size: calc(var(--u) * 2.6); }
 .derniers-liens li.annule { opacity: 0.55; text-decoration: line-through; }
 .ecarts-liens { color: #6b4a2b; font-size: 0.92em; }

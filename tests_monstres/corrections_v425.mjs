@@ -285,8 +285,10 @@ await section(async () => {
   await ouvrirThorin();
   verifier("l'encart « Doros → Thorin » s'ouvre, ses six barres", await G(() => document.querySelectorAll("#grimoire-liens-d .encart-liens .axe-liens").length === 6));
   verifier("…sans aucune roue crantée", await G(() => document.querySelectorAll("#grimoire-liens-d .roue-liens").length === 0));
+  verifier("(v426) …ni l'ancien bouton « Ajuster », même pour un admin", await G(async () => { window.COMPTE_JOUEUR = { ...(window.COMPTE_JOUEUR || {}), admin: true }; window.GRIMOIRE_LIENS.rendre();
+    const r = !document.querySelector('#grimoire-liens-d [data-cb="ajuster"]') && !document.querySelector("#grimoire-liens-d .ajuste-liens"); window.COMPTE_JOUEUR.admin = false; return r; }));
   verifier("…et la réglette refuse de s'ouvrir hors mode DEV", await G(async () => { const lien = window.__docs["Systeme_Parties/P1/Liens/PNJ_DOROS~H1"]; const avant = JSON.stringify(lien.axes);
-    try { await window.SOCIAL.ajusterLien("P1", "PNJ_DOROS", "H1", { confiance: 50 }, { dev: true }); } catch (e) {} return JSON.stringify(window.__docs["Systeme_Parties/P1/Liens/PNJ_DOROS~H1"].axes) === avant; }));
+    try { await window.SOCIAL.ajusterLien("P1", "PNJ_DOROS", "H1", { confiance: 50 }); } catch (e) {} return JSON.stringify(window.__docs["Systeme_Parties/P1/Liens/PNJ_DOROS~H1"].axes) === avant; }));
 });
 // =========================================================================
 titre("3. EN MODE DEV : UNE ROUE ROUGE À CÔTÉ DE CHAQUE BARRE, ET SA RÉGLETTE");

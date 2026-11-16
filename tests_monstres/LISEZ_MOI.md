@@ -12111,3 +12111,7 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 ## v425 — La roue crantée rouge des fils invisibles (mode DEV)
 
 - Nico : « quand le mode dev est activé (et uniquement là), à côté de chaque barre dans les fils invisibles (relations entre PNJ / PJ), une toute petite roue crantée rouge qui ouvre une réglette pour changer manuellement les jauges ; pour les tests ». Dans l'encart d'un lien (grimoire_liens.js), chacune des six barres (Confiance, Respect, Attachement, Dette, Crainte, Familiarité) a sa roue ; un toucher ouvre sa réglette (bornes de l'axe), le chiffre suit le doigt, et relâchée elle enregistre par `SOCIAL.ajusterLien(…, { dev: true })` — un « ajustement » du journal, « Réglé en mode DEV par … », annulable comme les autres. Une seule réglette ouverte à la fois ; elle règle le lien affiché (« Ce qu'il ressent » ou « Ce qu'on ressent pour lui »). Hors mode DEV : ni roue, ni réglage possible (social.js le refuse). corrections_v425.mjs le vérifie sur la vraie page.
+
+## v426 — Plus que les roues crantées
+
+- Nico : « enlève l'ancien truc pour ne garder que les roues crantées rouges ». Le bouton « Ajuster » des admins (v414 : des cases chiffrées puis « Enregistrer ») est retiré de l'encart des fils invisibles ; seul le mode développeur règle un lien à la main, par la roue crantée de chaque barre (`SOCIAL.ajusterLien` le refuse hors mode DEV, admin compris). Le bouton « annuler » d'un changement reste aux admins. corrections_v414 (section 4) et corrections_v425 le vérifient.
