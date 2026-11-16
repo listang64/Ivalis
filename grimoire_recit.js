@@ -1530,6 +1530,10 @@ async function archiverChapitre(messages) {
     const entrees = construireEntrees((messages || []).map(m => ({ idDoc: m.idDoc || m.id, ...m })));
     if (!entrees.some(e => e.type === "narration" || e.type === "joueur")) return null;
     const texte = entrees.map(e => e.textes.join(" ")).join("\n").slice(-14000);
+    // (v421) MIA_RENCONTRES lit le chapitre en même temps que son titre (rencontres_recit.js) :
+    // les types de rencontre, rangés en secret pour que le Narrateur varie.
+    const promesseRencontres = window.RENCONTRES && typeof window.RENCONTRES.analyserChapitre === "function"
+        ? window.RENCONTRES.analyserChapitre(texte).catch(e => { console.warn("[MIA_RENCONTRES] :", e); return []; }) : null;
     let titre = null;
     try {
         titre = await appelLite(`Tu donnes leur titre aux chapitres du livre d'Ivalis (un jeu de rôle d'Antiquité fantastique). Lis ce chapitre et donne-lui un titre de 3 à 8 mots, évocateur, à la manière d'un vieux roman d'aventures, d'après ce qui y a été vécu. Réponds par le titre seul, sans guillemets ni ponctuation finale.`, texte);
@@ -1550,6 +1554,7 @@ async function archiverChapitre(messages) {
         Entrees: entrees.map(e => ({ id: e.id, type: e.type, auteurId: e.auteurId || "", textes: e.textes, jets: e.jets, cerveaux: e.cerveaux || [] }))
     });
     console.log(`📖 [Le livre] Chapitre ${numero} rangé : « ${titre} ».`);
+    if (promesseRencontres) window.RENCONTRES.apresChapitre(idPartie, promesseRencontres, numero, titre);
     if (etat.idPartie === idPartie) {
         etat.chapitres.push({ id: fiche.id, ID_Partie: idPartie, Numero: numero, Titre: titre });
         rendre();

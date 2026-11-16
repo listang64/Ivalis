@@ -699,12 +699,14 @@ async function composerLesEnnemis() {
     const monde = typeof window.contexteEnnemisIvalis === "function" ? window.contexteEnnemisIvalis(region) : "";
     const listePnj = pnjs.length ? pnjs.map(x => `- ${x.Nom_PNJ} (${x.Race || "?"}, ${x.Occupation || "?"}) : ${x.Description_Physique || ""}`).join("\n") : "(aucun)";
     const c = etat();
+    // (v421) Les combats des derniers chapitres (rencontres_recit.js) : varier, si le récit ne l'impose pas.
+    const combatsRecents = window.RENCONTRES && typeof window.RENCONTRES.contexteEnnemis === "function" ? window.RENCONTRES.contexteEnnemis(partie.Rencontres_Recentes) : "";
 
     // 1. CEUX DU RÉCIT, ET COMBIEN.
     let analyse = null;
     try {
         analyse = await demanderJSON({ systeme: PROMPT_ENNEMIS, temperature: 0.6,
-            texte: `--- LE MONDE ---\n${monde}\n\n--- CE QUI A DÉCLENCHÉ LE COMBAT ---\n${c.Raison || ""} ${c.Adversaires ? "(adversaires : " + c.Adversaires + ")" : ""}\n\n--- LES PNJ NOMMÉS PRÉSENTS ---\n${listePnj}\n\n--- LES ${R.messagesLieu} DERNIERS MESSAGES ---\n${messages}` });
+            texte: `--- LE MONDE ---\n${monde}\n\n--- CE QUI A DÉCLENCHÉ LE COMBAT ---\n${c.Raison || ""} ${c.Adversaires ? "(adversaires : " + c.Adversaires + ")" : ""}\n\n--- LES PNJ NOMMÉS PRÉSENTS ---\n${listePnj}${combatsRecents}\n\n--- LES ${R.messagesLieu} DERNIERS MESSAGES ---\n${messages}` });
     } catch (e) { console.error("[MIA_ENNEMIS] Analyse impossible :", e); }
     const apparition = Math.max(1, Math.min(4, Math.round(Number(analyse && analyse.nombre) || 1)));
 

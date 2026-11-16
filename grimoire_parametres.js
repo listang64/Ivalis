@@ -25,6 +25,7 @@
     const lavis = (...a) => (D().lavis ? D().lavis(...a) : "");
     const cadre = (g, amp) => (D().cadre ? D().cadre(g, amp) : (G() && G().dessins ? G().dessins.cadreMain(g, amp) : ""));
     const son = () => { try { if (typeof window.jouerSonClic === "function") window.jouerSonClic(); } catch (e) {} };
+    const echapper = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const modeDev = () => { try { return localStorage.getItem("ivalis_DEV_MODE") === "on"; } catch (e) { return false; } };
     const FLEURON = `<svg class="fleuron fleuron-parametres" viewBox="0 0 200 24" aria-hidden="true"><path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>`;
     // Un cadenas, à la plume.
@@ -41,7 +42,9 @@
               ["cles", "Clés API", () => window.ouvrirClesApi && window.ouvrirClesApi("etape-menu-parametres")],
               // (v416) Nico : « vire les fils invisibles du sommaire et mets-les dans les paramètres » :
               // l'outil de Nico et Ben pour lire et corriger les relations des PNJ (grimoire_liens.js).
-              ["liens", "Les fils invisibles", () => ouvrirLesLiens()]
+              ["liens", "Les fils invisibles", () => ouvrirLesLiens()],
+              // (v421) Nico : « mets un truc dans paramètres » : les types de rencontre des derniers chapitres.
+              ["rencontres", "Rencontres récentes", () => ouvrirRencontres()]
           ] },
         { id: "monde", titre: "Le monde et ses règles", teinte: "vert", cote: "droite",
           texte: "Les effets, les peuples, les créatures et ce qu'elles laissent.",
@@ -159,9 +162,44 @@
             `<div class="contenu-page page-parametres-d defile-fiche place-fenetre"></div>`
         ];
     }
+    // (v421) LES RENCONTRES RÉCENTES (rencontres_recit.js) : ce que MIA_RENCONTRES a relevé
+    // à la clôture des chapitres, et ce que le Narrateur en lit.
+    let rencontres = null;
+    function htmlRencontres() {
+        const R = window.RENCONTRES;
+        const liste = (rencontres || []).slice().sort((a, b) => (Number(b.numero) || 0) - (Number(a.numero) || 0));
+        const lignes = !R || rencontres === null ? `<p class="texte-parametres discret">Le livre cherche les chapitres…</p>`
+            : liste.length ? `<ul class="liste-rencontres">${liste.map(ch => `<li><b>Chapitre ${echapper(ch.numero)}${ch.titre ? ` — ${echapper(ch.titre)}` : ""}</b>
+                <ul>${(ch.rencontres || []).map(r => `<li>${echapper(R.TYPES[r.type] || r.type)}${r.resume ? ` <em>(${echapper(r.resume)})</em>` : ""}</li>`).join("")}</ul></li>`).join("")}</ul>`
+            : `<p class="texte-parametres discret">Aucun chapitre clos depuis la v421 : la liste se remplira à la prochaine clôture.</p>`;
+        const lu = R && rencontres && rencontres.length ? R.contexteNarrateur(rencontres).trim() : "";
+        return [
+            `<div class="contenu-page page-parametres-g">
+               <div class="sur-titre-parametres">Le Maître du Jeu</div>
+               <div class="titre-page-fiche titre-parametres">Rencontres récentes</div>
+               ${FLEURON}
+               <p class="texte-parametres">À la clôture d'un chapitre, une IA relève ses types de rencontre. Les joueurs ne les voient pas ; le Narrateur évite de reproposer ceux des ${R ? R.FENETRE : 5} derniers chapitres.</p>
+               ${lu ? `<div class="sous-titre-rencontres">Ce que lit le Narrateur</div><p class="texte-parametres lu-rencontres">${echapper(lu.replace(/^--- RENCONTRES RÉCENTES \(varie\) ---\s*/, ""))}</p>` : ""}
+               <button type="button" class="lien-fiche revenir-parametres" data-action="param-menu">← Retour aux paramètres</button>
+             </div>`,
+            `<div class="contenu-page page-parametres-d defile-fiche">${lignes}</div>`
+        ];
+    }
+    async function ouvrirRencontres() {
+        if (!window.RENCONTRES || !G().enPartie()) {
+            const t = document.querySelector('.encart-parametres[data-cat="mj"] .texte-parametres');
+            if (t) t.textContent = "Les rencontres récentes se lisent en partie : ouvre d'abord une partie.";
+            return;
+        }
+        rencontres = null;
+        montrer("rencontres");
+        try { rencontres = await window.RENCONTRES.lire(window.ID_PARTIE_COURANTE); } catch (e) { console.warn("Paramètres : les rencontres", e); rencontres = []; }
+        if (vue === "rencontres" && actif()) montrer("rencontres");
+    }
     function html() {
         if (vue === "verrou") return htmlVerrou();
         if (vue === "menu") return htmlMenu();
+        if (vue === "rencontres") return htmlRencontres();
         return SOUS_PAGES[vue] ? htmlSousPage(vue) : htmlMenu();
     }
     // La double page vient d'être écrite (grimoire.js, remplirChapitre).

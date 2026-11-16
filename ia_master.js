@@ -2458,6 +2458,8 @@ window.declencherTourIA = async function(options) {
 
         contexte += await lireAmesPresentes(pnjCibles);
         contexte += contexteCompagnie;
+        // (v421) LES RENCONTRES RÉCENTES (rencontres_recit.js) : ne pas retomber toujours sur les mêmes.
+        if (window.RENCONTRES && typeof window.RENCONTRES.contexteNarrateur === "function") contexte += window.RENCONTRES.contexteNarrateur(dataPartieMJ.Rencontres_Recentes);
         contexte += contexteFichesPreparees(fichesPreparees);
 
         if (issueCombat) contexte += `\n${issueCombat}\n`;

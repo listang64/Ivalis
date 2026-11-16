@@ -67,3 +67,10 @@
   font-size: calc(var(--u) * 6 * var(--echelle-titres, 1)) !important; }
 .place-large { flex: 1; min-height: 0; overflow: auto; }
 .place-large .fenetre-dans-le-livre > h2 { display: none; }
+
+/* (v421) Les rencontres récentes (grimoire_parametres.js, rencontres_recit.js). */
+.sous-titre-rencontres { font-family: 'Cinzel', serif !important; font-size: calc(var(--u) * 2.6); letter-spacing: 0.12em; text-transform: uppercase; color: #2f4f6f; margin-top: calc(var(--u) * 1); }
+.lu-rencontres { font-style: italic; }
+.liste-rencontres { margin: 0; padding-left: calc(var(--u) * 2); font-size: calc(var(--u) * 3); color: #2b1a0e; display: flex; flex-direction: column; gap: calc(var(--u) * 1.4); }
+.liste-rencontres ul { margin: calc(var(--u) * 0.4) 0 0; padding-left: calc(var(--u) * 3); font-size: 0.95em; }
+.liste-rencontres em { color: #6b4a2b; }
