@@ -92,11 +92,18 @@ function htmlGauche() {
     const heros = herosDuGroupe();
     const l = donnees.lieu || {};
     const lieu = l.nature ? "Dans la nature" : (l.nom || "");
+    // (v419) Nico : « un petit symbole de double flèche à côté du nom de notre personnage
+    // ouvre la page Aventuriers avec la liste de ses personnages » (pour en changer).
+    const moi = (() => { try { return localStorage.getItem("ID_JOUEUR_COURANT") || ""; } catch (e) { return ""; } })();
     const ligneHeros = heros.map(h => {
         const url = h.urlCloudinary || h.urlAvatarEquipe || h.urlPortraitReference || "";
-        return `<button type="button" class="heros-groupe" data-action="groupe" data-gp="heros" data-id="${echapper(h.idPersonnage)}">
-            ${medaillon(url, nomHeros(h), "heros")}<span class="nom-groupe">${echapper(nomHeros(h))}</span>
-            <span class="role-groupe">${echapper(classeDe(h))}${h.niveau ? ` · niv. ${echapper(h.niveau)}` : ""}</span></button>`;
+        const id = echapper(h.idPersonnage);
+        const changer = moi && h.idJoueur === moi
+            ? `<button type="button" class="changer-heros-groupe" data-action="groupe" data-gp="changer" title="Changer de personnage" aria-label="Changer de personnage">⇄</button>` : "";
+        return `<div class="heros-groupe">
+            <button type="button" class="portrait-heros-groupe" data-action="groupe" data-gp="heros" data-id="${id}">${medaillon(url, nomHeros(h), "heros")}</button>
+            <span class="ligne-nom-groupe"><button type="button" class="nom-groupe" data-action="groupe" data-gp="heros" data-id="${id}">${echapper(nomHeros(h))}</button>${changer}</span>
+            <span class="role-groupe">${echapper(classeDe(h))}${h.niveau ? ` · niv. ${echapper(h.niveau)}` : ""}</span></div>`;
     }).join("");
     return `<div class="contenu-page page-groupe-gauche">
         <div class="entete-groupe">${lavis(TEINTE_GROUPE, "groupe-titre")}<span class="titre-page-fiche">Le groupe</span></div>
@@ -177,6 +184,8 @@ async function agir(cible) {
     const gp = cible.dataset.gp;
     if (gp === "heros") { son(); if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.ouvrir(cible.dataset.id); return; }
     if (gp === "revenir") { son(); ouvrir(); return; }
+    // (v419) La liste de nos personnages (notre clan, dans les Aventuriers), pour en changer.
+    if (gp === "changer") { son(); if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.allerAuxAventuriers(); return; }
     if (gp === "aventuriers") { son(); if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.allerAuxAventuriers(); return; }
     if (gp === "ame") { son(); if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id: cible.dataset.id, nom: cible.dataset.nom, depuisGroupe: true }); return; }
     if (gp === "renvoyer") {

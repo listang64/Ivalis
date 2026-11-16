@@ -19,10 +19,18 @@
 .sous-titre-groupe.petit { font-size: calc(var(--u) * 2.4); color: #5e2a44; }
 
 /* LES HÉROS */
-.liste-heros-groupe { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--u) * 26), 1fr)); gap: calc(var(--u) * 2) calc(var(--u) * 1.5); }
-.heros-groupe { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 0.6); background: none !important; border: none !important; cursor: pointer; padding: 0 !important; text-align: center; }
+.liste-heros-groupe { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--u) * 36), 1fr)); gap: calc(var(--u) * 2) calc(var(--u) * 1.5); }
+.heros-groupe { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 0.6); text-align: center; }
+.portrait-heros-groupe, .heros-groupe .nom-groupe { background: none !important; border: none !important; cursor: pointer; padding: 0 !important; }
 .heros-groupe .medaillon-liens { width: calc(var(--u) * 15); height: calc(var(--u) * 15); transition: transform 0.18s ease; }
-.heros-groupe:hover .medaillon-liens { transform: scale(1.05) rotate(-1deg); }
+.portrait-heros-groupe:hover .medaillon-liens { transform: scale(1.05) rotate(-1deg); }
+/* (v419) La double flèche, à côté du nom de notre héros : la liste de nos personnages. */
+.ligne-nom-groupe { display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--u) * 1); }
+.ligne-nom-groupe .nom-groupe { white-space: nowrap; }
+.changer-heros-groupe { background: none !important; border: 1px solid rgba(107, 26, 16, 0.45) !important; border-radius: 50%; cursor: pointer;
+  width: calc(var(--u) * 5); height: calc(var(--u) * 5); padding: 0 !important; display: inline-grid; place-items: center;
+  font-size: calc(var(--u) * 3.2); line-height: 1; color: #6b1a10 !important; flex: none; }
+.changer-heros-groupe:hover { background: rgba(107, 26, 16, 0.1) !important; }
 .nom-groupe { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 3.6); color: #24150a; line-height: 1.1; }
 .role-groupe { font-size: calc(var(--u) * 2.7); font-style: italic; color: #6b4a2b; }
 .bouton-aventuriers-groupe { position: relative; align-self: center; margin-top: auto; padding: calc(var(--u) * 1.6) calc(var(--u) * 5) !important;

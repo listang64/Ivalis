@@ -327,7 +327,7 @@ await section(async () => {
 titre("3. LES GESTES : UN HÉROS, LES AVENTURIERS ET RETOUR, UN SUIVEUR ET RETOUR");
 // =========================================================================
 await section(async () => {
-  await cliquer('#grimoire-groupe-g .heros-groupe[data-id="H1"]');
+  await cliquer('#grimoire-groupe-g .nom-groupe[data-id="H1"]');
   verifier("un toucher sur Thorin : sa fiche", await attendreQue(() => G(() => window.GRIMOIRE_FICHES.herosAffiche() === "H1"), 5000));
   await pose();
   await G(() => window.GRIMOIRE_GROUPE.ouvrir()); await attendreQue(surGroupe, 6000); await pose();
@@ -359,18 +359,19 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("5. LE NOM DE NOTRE HÉROS, DANS LE RÉCIT : LA LISTE DE NOS HÉROS");
+titre("5. (v419) LA DOUBLE FLÈCHE À CÔTÉ DU NOM DE NOTRE HÉROS : LA LISTE DE NOS PERSONNAGES");
 // =========================================================================
 await section(async () => {
-  const gr = lire("grimoire_recit.js"), css = lire("grimoire_recit.css");
-  verifier("un toucher sur le nom de notre héros mène aux Aventuriers (le portrait : sa fiche)", /closest\("#recit-avatar-nom"\)[^\n]*GRIMOIRE_FICHES/.test(gr) && /allerAuxAventuriers\(\);/.test(gr.split('closest("#recit-avatar-nom")')[1] || ""));
-  verifier("…le nom de notre papier se touche (pas celui du PNJ)", /#recit-avatar \.nom-portrait \{ pointer-events: auto; cursor: pointer; \}/.test(css));
-  const nom = await G(() => !!document.getElementById("recit-avatar-nom"));
-  if (nom) {
-    await G(() => { const el = document.getElementById("recit-avatar-nom"); const o = { bubbles: true, clientX: 10, clientY: 10 };
-      el.dispatchEvent(new PointerEvent("pointerdown", o)); el.dispatchEvent(new PointerEvent("pointerup", o)); });
-    verifier("…et en vrai : on arrive sur la page de notre clan", await attendreQue(() => G(() => { const c = window.GRIMOIRE_FICHES.pages().clans[0]; const i = window.GRIMOIRE.indexDe(c), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1); }), 6000));
-  }
+  await G(() => window.GRIMOIRE_GROUPE.ouvrir()); await attendreQue(surGroupe, 6000); await pose();
+  const fleches = await G(() => [...document.querySelectorAll("#grimoire-groupe-g .heros-groupe")].map(h => [h.querySelector(".nom-groupe").textContent.trim(), !!h.querySelector(".changer-heros-groupe")]));
+  verifier("⇄ à côté de Thorin (notre héros), pas de Lyra (celle de J2)", JSON.stringify(fleches) === '[["Thorin Ironfoot",true],["Lyra Sombreval",false]]', JSON.stringify(fleches));
+  verifier("…sur la même ligne que son nom", await G(() => { const n = document.querySelector("#grimoire-groupe-g .heros-groupe .nom-groupe").getBoundingClientRect(), f = document.querySelector(".changer-heros-groupe").getBoundingClientRect();
+    return f.left >= n.right - 1 && f.top < n.bottom && f.bottom > n.top; }));
+  await cliquer("#grimoire-groupe-g .changer-heros-groupe");
+  verifier("un toucher : la page Aventuriers, la liste de nos personnages (notre clan, ses cases)", await attendreQue(() => G(() => { const c = window.GRIMOIRE_FICHES.pages().clans[0]; const i = window.GRIMOIRE.indexDe(c), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1) && !!c.querySelector(".case-actif"); }), 6000));
+  const gr = lire("grimoire_recit.js");
+  verifier("le récit ne s'en mêle plus (son papier ouvre toujours la fiche)", !/closest\("#recit-avatar-nom"\)/.test(gr) && /toucherVite\(avatar, \(\) => ouvrirFicheDuPapier\(avatar\)\);/.test(gr));
+  await cap("v419-groupe-fleche");
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

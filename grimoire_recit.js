@@ -856,18 +856,7 @@ function creerElements() {
     toucherVite(elts.micro, () => basculerDictee());
     toucherVite(postit, () => lancerNarrateur());
     // (v312) Les papiers des avatars : un toucher ouvre la fiche du héros.
-    // (v418) Nico : « au niveau du nom du personnage actif, ouvrir la liste de tous nos
-    // persos » : un toucher sur son NOM mène aux Aventuriers (la liste de nos héros, où
-    // l'on coche celui qu'on joue) ; sur le portrait, toujours sa fiche.
-    toucherVite(avatar, (cible) => {
-        if (cible && cible.closest && cible.closest("#recit-avatar-nom") && window.GRIMOIRE_FICHES) {
-            son("page-prise", 0.5);
-            avatar.classList.remove("sortie");
-            window.GRIMOIRE_FICHES.allerAuxAventuriers();
-            return;
-        }
-        ouvrirFicheDuPapier(avatar);
-    });
+    toucherVite(avatar, () => ouvrirFicheDuPapier(avatar));
     toucherVite(portrait, () => ouvrirFicheDuPapier(portrait));
     // Les liens du récit (noms, chapitres) et le choix du héros : une seule
     // fois par scène (elle sert à toutes les parties).

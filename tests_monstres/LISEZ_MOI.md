@@ -12065,3 +12065,9 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - **Le caractère du compagnon** : un encart « Son caractère » (agressif, joueur…) à sa création (le livre et l'ancienne fenêtre), gardé avec le héros (`Compagnon_Caractere`).
 - **Le nom de notre héros, dans le récit** (« au niveau du nom du personnage actif, ouvrir la liste de tous nos persos ») : un toucher sur son nom (le papier de l'avatar) mène aux Aventuriers, où l'on coche celui qu'on joue ; le portrait ouvre toujours sa fiche.
 - corrections_v418_moteur.mjs (les règles, le tour du MJ, les blessures) et corrections_v418_livre.mjs (la double page) le vérifient sur la vraie page. v299, v312, v313, v365 et v416_fils suivent le nouveau sommaire.
+
+## v419 — Changer de héros depuis la page du Groupe
+
+- **La double flèche** (Nico : « le menu pour changer de héros, c'est dans la page du groupe : un petit symbole de double flèche à côté du nom de notre personnage ouvre la page Aventuriers avec la liste de ses personnages ») : sur la double page du Groupe, un ⇄ à côté du nom de NOS héros (pas ceux des autres joueurs) mène à notre clan dans les Aventuriers, où l'on coche celui qu'on joue. Le nom et le portrait ouvrent toujours la fiche.
+- Le toucher sur le nom du papier de l'avatar, dans le récit (v418, un malentendu), est retiré : le papier ouvre la fiche, comme en v417.
+- corrections_v418_livre.mjs (section 5) le vérifie.
