@@ -210,6 +210,9 @@
     // La double page vient d'être écrite (grimoire.js, remplirChapitre).
     function rempli(g, d) {
         [g, d].forEach(p => p.classList.add("page-fiches", "page-parametres"));
+        // (v424) Nico : « dans les paramètres, dans les sous-pages, partout où il y a des tableaux
+        // et autres trucs en double page, retire l'ombre du milieu du livre comme pour le village ».
+        [g, d].forEach(p => p.classList.toggle("sans-pliure", vue !== "verrou" && vue !== "menu"));
         if (vue === "verrou") {
             setTimeout(() => {
                 const champ = document.getElementById("grimoire-mdp-param");
@@ -247,7 +250,7 @@
         }
         if (calqueLarge) calqueLarge.classList.remove("visible");
         const g = G();
-        if (g) [3, 4].forEach(i => { const p = g.pageChapitre(i); if (p) p.classList.remove("page-fiches", "page-parametres"); });
+        if (g) [3, 4].forEach(i => { const p = g.pageChapitre(i); if (p) p.classList.remove("page-fiches", "page-parametres", "sans-pliure"); });
     }
     // La double page des grands tableaux : posée sur les deux pages, dans la scène.
     function calque() {

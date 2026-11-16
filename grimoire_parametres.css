@@ -74,3 +74,7 @@
 .liste-rencontres { margin: 0; padding-left: calc(var(--u) * 2); font-size: calc(var(--u) * 3); color: #2b1a0e; display: flex; flex-direction: column; gap: calc(var(--u) * 1.4); }
 .liste-rencontres ul { margin: calc(var(--u) * 0.4) 0 0; padding-left: calc(var(--u) * 3); font-size: 0.95em; }
 .liste-rencontres em { color: #6b4a2b; }
+
+/* (v424) Les sous-pages des Paramètres (tableaux, fenêtres sur la double page) : pas d'ombre
+   de pliure au milieu du livre, comme le village (grimoire.css, v400). Le cadenas et le menu la gardent. */
+.page-parametres.sans-pliure.page-papier::after { display: none; }
