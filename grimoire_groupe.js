@@ -85,6 +85,8 @@ function jaugeLoyaute(v) {
     const gauche = n < 0 ? 50 + n / 2 : 50, largeur = Math.abs(n) / 2;
     return `<span class="jauge-groupe" title="Loyauté ${n}"><i class="${n < 0 ? "neg" : "pos"}" style="left:${gauche}%;width:${largeur}%"></i><b></b></span>`;
 }
+// (v422) La tête qui parle : une discussion en privé avec un suiveur (discussion_privee.js).
+const TETE_QUI_PARLE = `<svg viewBox="0 0 24 24" aria-hidden="true"><path class="tete" d="M8.6 3.2c-3.3 0-5.9 2.6-5.9 5.8 0 1.9.8 3.4 2 4.5V20.5h6.6v-2.6h1.9c.9 0 1.5-.7 1.5-1.5v-2.2l1.5-.5c.4-.1.5-.5.3-.8l-1.6-2.6c-.2-3.9-2.8-7.1-6.3-7.1z"/><path class="onde" d="M17.6 7.6c1.3 1.6 1.3 3.9 0 5.5M20.1 5.4c2.5 2.9 2.5 7.1 0 10"/></svg>`;
 const ETAT_JOLI = { avec: "avec nous", laisse: "laissé en arrière", parti: "parti", renvoye: "renvoyé", mort: "mort" };
 
 // LA PAGE DE GAUCHE : la compagnie.
@@ -134,6 +136,7 @@ function htmlSuiveur(s) {
             <span class="loyaute-groupe">Loyauté ${jaugeLoyaute(s.loyaute)} <small>${echapper(s.motLoyaute || "")}</small></span>
           </span>
         </button>
+        <button type="button" class="parler-groupe" data-action="groupe" data-gp="parler" data-id="${echapper(s.id)}" title="Parler en privé avec ${echapper(s.nom)}" aria-label="Parler en privé avec ${echapper(s.nom)}">${TETE_QUI_PARLE}</button>
         <button type="button" class="lien-fiche renvoyer-groupe" data-action="groupe" data-gp="renvoyer" data-id="${echapper(s.id)}" data-nom="${echapper(s.nom)}">Se séparer de lui</button>
       </li>`;
 }
@@ -188,6 +191,14 @@ async function agir(cible) {
     if (gp === "changer") { son(); if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.allerAuxAventuriers(); return; }
     if (gp === "aventuriers") { son(); if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.allerAuxAventuriers(); return; }
     if (gp === "ame") { son(); if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id: cible.dataset.id, nom: cible.dataset.nom, depuisGroupe: true }); return; }
+    // (v422) Parler en privé avec un suiveur.
+    if (gp === "parler") {
+        const s = (donnees.suiveurs || []).find(x => x.id === cible.dataset.id && x.etat === "avec");
+        if (!s || !window.DISCUSSION) return;
+        son();
+        window.DISCUSSION.ouvrir({ id: s.id, nom: s.nom, fiche: s.fiche || {} });
+        return;
+    }
     if (gp === "renvoyer") {
         if (!window.GROUPE || !confirm(`Se séparer de ${cible.dataset.nom} ? Il quitte la compagnie et reste là où vous êtes.`)) return;
         son();
