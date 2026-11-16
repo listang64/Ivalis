@@ -27,6 +27,7 @@
     const son = () => { try { if (typeof window.jouerSonClic === "function") window.jouerSonClic(); } catch (e) {} };
     const echapper = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const modeDev = () => { try { return localStorage.getItem("ivalis_DEV_MODE") === "on"; } catch (e) { return false; } };
+    const pilote = () => { try { return localStorage.getItem("ivalis_PILOTE_COMBAT") === "on"; } catch (e) { return false; } };
     const FLEURON = `<svg class="fleuron fleuron-parametres" viewBox="0 0 200 24" aria-hidden="true"><path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>`;
     // Un cadenas, à la plume.
     const CADENAS = `<svg class="cadenas-parametres" viewBox="0 0 40 48" aria-hidden="true"><path d="M11 21 L11 14 C11 6 29 6 29 14 L29 21"/><path class="plein" d="M6 21.5 Q20 20 34 21 L33.5 44 Q20 45.5 6.5 44 Z"/><path d="M20 30 L20 37 M17.5 31 a2.6 2.6 0 1 1 5 0"/></svg>`;
@@ -123,7 +124,11 @@
         const dev = cat.id === "atelier"
             ? `<button type="button" class="case-parametre${modeDev() ? " coche" : ""}" id="grimoire-param-dev" data-action="param-dev" aria-pressed="${modeDev()}">
                  <svg class="case-belligerant" viewBox="0 0 24 24" aria-hidden="true"><path class="boite" d="M 4 5 Q 12 3.6 20 4.6 L 19.4 19.6 Q 12 20.6 4.6 19.4 Z"/>${modeDev() ? `<path class="coche" d="M 7 12.5 L 10.6 16 L 18 7"/>` : ""}</svg>
-                 <span>Mode développeur (DEV)</span></button>` : "";
+                 <span>Mode développeur (DEV)</span></button>`
+              // (v423) Le pilote des combats de test : ce poste commande tous les héros joueurs.
+              + (modeDev() ? `<button type="button" class="case-parametre${pilote() ? " coche" : ""}" id="grimoire-param-pilote" data-action="param-pilote" aria-pressed="${pilote()}">
+                 <svg class="case-belligerant" viewBox="0 0 24 24" aria-hidden="true"><path class="boite" d="M 4 5 Q 12 3.6 20 4.6 L 19.4 19.6 Q 12 20.6 4.6 19.4 Z"/>${pilote() ? `<path class="coche" d="M 7 12.5 L 10.6 16 L 18 7"/>` : ""}</svg>
+                 <span>Piloter tous les héros en combat</span></button>` : "") : "";
         return `<section class="encart-fiche encart-parametres" data-cat="${cat.id}">
             ${lavis(cat.teinte, "param-cat-" + cat.id)}${cadre("param-cat-" + cat.id, 1.3)}
             <div class="titre-encart-parametres">${cat.titre}</div>
@@ -325,6 +330,14 @@
             const caseDev = document.getElementById("toggle-dev-mode");
             if (caseDev) caseDev.checked = oui;
             if (typeof window.basculerDevMode === "function") window.basculerDevMode(oui);
+            montrer("menu");
+            return;
+        }
+        if (a === "param-pilote") {
+            son();
+            const oui = !pilote();
+            if (typeof window.basculerPiloteCombat === "function") window.basculerPiloteCombat(oui);
+            else { try { localStorage.setItem("ivalis_PILOTE_COMBAT", oui ? "on" : "off"); } catch (e) {} }
             montrer("menu");
             return;
         }

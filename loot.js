@@ -374,7 +374,7 @@ window.demanderCasquesEnAttente = async function(persos) {
     if (!moi || typeof window.demanderCasque !== "function") return;
     for (const p of (persos || window.PERSOS_PARTIE || [])) {
         const armure = p && p.equipArmure;
-        if (!armure || !armure.casqueAChoisir || p.idJoueur !== moi) continue;
+        if (!armure || !armure.casqueAChoisir || !(p.idJoueur === moi || (typeof window.estHerosDuPoste === "function" && window.estHerosDuPoste(p, moi)))) continue;
         const cle = p.idPersonnage + "|" + (armure.uid || armure.nom || "");
         if (casquesEnQuestion.has(cle)) continue;
         casquesEnQuestion.add(cle);
@@ -1512,7 +1512,8 @@ window.afficherFenetreButin = function(butin) {
     const joueurId = localStorage.getItem("ID_JOUEUR_COURANT");
     const mesPersonnages = (butin.participants || [])
         .map(id => (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === id))
-        .filter(p => p && p.idJoueur === joueurId);
+        // (v423) Le pilote des combats de test (mode DEV) mène tous les héros, l'un après l'autre.
+        .filter(p => p && (p.idJoueur === joueurId || (typeof window.estHerosDuPoste === "function" && window.estHerosDuPoste(p, joueurId))));
 
     // Le butin personnel se joue héros par héros : la fenêtre appartient à
     // celui dont c'est le tour, et à lui seul. Un joueur qui mène deux
@@ -2229,7 +2230,7 @@ window.validerButinPool = async function() {
     const mesPersonnages = (butinLocal.participants || [])
         .filter(id => {
             const p = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === id);
-            return p && p.idJoueur === joueurId;
+            return p && (p.idJoueur === joueurId || (typeof window.estHerosDuPoste === "function" && window.estHerosDuPoste(p, joueurId)));
         });
     if (mesPersonnages.length === 0) return;
 
@@ -2275,7 +2276,7 @@ window.validerButinPool = async function() {
             const { candidats, mains, gagnant, ...objet } = item;
             // Le héros d'un autre joueur : sa question du couvre-chef lui revient.
             const perso = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === gagnant);
-            const pourUnAutre = !!(perso && perso.idJoueur && perso.idJoueur !== joueurId);
+            const pourUnAutre = !!(perso && perso.idJoueur && perso.idJoueur !== joueurId && !(typeof window.piloteCombat === "function" && window.piloteCombat()));
             if (test.possible) await window.equiperObjetButin(gagnant, objet, (mains || {})[gagnant], { pourUnAutre });
         }
     }

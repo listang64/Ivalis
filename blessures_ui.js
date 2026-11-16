@@ -449,7 +449,8 @@ window.blessuresDuPoste = function (fin) {
     if (!fin || !fin.blessures || !moi) return [];
     return Object.keys(fin.blessures)
         .map(id => ({ idPersonnage: id, ...fin.blessures[id] }))
-        .filter(b => b.idJoueur === moi && Array.isArray(b.tirages) && b.tirages.length > 0);
+        // (v423) Le pilote des combats de test (mode DEV) voit celles de tous les héros.
+        .filter(b => (b.idJoueur === moi || (typeof window.piloteCombat === "function" && window.piloteCombat() && !!b.idJoueur)) && Array.isArray(b.tirages) && b.tirages.length > 0);
 };
 
 window.afficherFinCombat = function (fin, options) {

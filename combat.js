@@ -575,10 +575,50 @@ window.fermerCombat = function() {
 // PERSOS_PARTIE pour qu'on puisse la viser et la faire tomber, mais elle n'a de
 // fiche à montrer nulle part. Une seule lecture répond donc à « qui sont mes
 // héros ? », et tout ce qui se pose la question passe par elle.
+// (v423) LE PILOTE DES COMBATS DE TEST (mode DEV). Nico : « en mode dev, dans les
+// combats, deux flèches au niveau de l'avatar de notre perso, pour contrôler tous
+// les tours des personnages joueurs : une seule personne peut lancer des combats
+// de test. » Avec le mode développeur ET la case « Piloter tous les héros »
+// (Paramètres > L'atelier), ce poste commande tous les héros joueurs de la partie :
+// les trois questions « ce héros est-il à moi ? » (herosDuJoueur, commandeParMoi,
+// estMonHerosCombat) répondent oui pour chacun — jamais pour une créature. Les
+// demandes partent au nom du joueur du héros (posteDeLIntention), le cerveau les
+// accepte donc comme s'il les avait envoyées lui-même.
+window.piloteCombat = function() {
+    try { return localStorage.getItem("ivalis_DEV_MODE") === "on" && localStorage.getItem("ivalis_PILOTE_COMBAT") === "on"; }
+    catch (e) { return false; }
+};
+// Le joueur qui commande ce combattant : celui du héros ; pour un monstre possédé, celui du Maudit.
+window.joueurQuiCommande = function(perso) {
+    if (!perso) return "";
+    if (perso.estMonstre) {
+        const maudit = perso.possedePar ? (window.PERSOS_PARTIE || []).find(p => p && p.idPersonnage === perso.possedePar) : null;
+        return (maudit && maudit.idJoueur) || "";
+    }
+    return perso.idJoueur || "";
+};
+// Le poste au nom duquel une demande part (regime_cerveau.js, demander).
+window.posteDeLIntention = function(idActeur, poste) {
+    if (!window.piloteCombat()) return poste;
+    const perso = (window.PERSOS_PARTIE || []).find(p => p && p.idPersonnage === idActeur);
+    return window.joueurQuiCommande(perso) || poste;
+};
+// Ce héros est-il commandé d'ici (pour les fenêtres d'après combat : blessures, butin) ?
+window.estHerosDuPoste = function(perso, monId) {
+    if (!perso || perso.estMonstre || perso.estIllusion) return false;
+    if (window.piloteCombat() && perso.idJoueur) return true;
+    const moi = monId || (() => { try { return localStorage.getItem("ID_JOUEUR_COURANT") || ""; } catch (e) { return ""; } })();
+    return !!moi && perso.idJoueur === moi;
+};
+
 window.herosDuJoueur = function(idJoueur) {
     if (!idJoueur) return [];
     const persos = window.PERSOS_PARTIE || [];
-    const miens = persos.filter(p => p && p.idJoueur === idJoueur && !p.estMonstre && !p.estIllusion);
+    // (v423) Le pilote : tous les héros joueurs de la partie, les siens d'abord.
+    const miens = (typeof window.piloteCombat === "function" && window.piloteCombat())
+        ? persos.filter(p => p && p.idJoueur && p.actif !== false && !p.estMonstre && !p.estIllusion)
+                .sort((a, b) => (a.idJoueur === idJoueur ? 0 : 1) - (b.idJoueur === idJoueur ? 0 : 1))
+        : persos.filter(p => p && p.idJoueur === idJoueur && !p.estMonstre && !p.estIllusion);
     // (v364) LA POSSESSION DU MAUDIT : le monstre qu'un de mes héros possède se
     // joue d'ici, à sa place — le Maudit, inerte, sort de la liste.
     const idsMiens = new Set(miens.map(p => p.idPersonnage));
@@ -591,6 +631,8 @@ window.herosDuJoueur = function(idJoueur) {
 window.commandeParMoi = function(perso, monId) {
     if (!perso || !monId) return false;
     if (perso.idJoueur === monId) return true;
+    // (v423) Le pilote commande tous les héros joueurs (et les monstres qu'ils possèdent).
+    if ((typeof window.piloteCombat === "function" && window.piloteCombat()) && !!window.joueurQuiCommande(perso)) return true;
     if (!perso.possedePar) return false;
     const maudit = (window.PERSOS_PARTIE || []).find(p => p && p.idPersonnage === perso.possedePar);
     return !!maudit && maudit.idJoueur === monId;
@@ -608,6 +650,113 @@ window.initialiserPersosCombat = function() {
 // LES FLÈCHES ◄ ► ONT DISPARU AVEC LE PANNEAU, et changerPersoCombat avec
 // elles : c'étaient ses deux seuls appelants. Un joueur n'aura bientôt plus
 // qu'un personnage, et d'ici là c'est le premier de sa liste qui joue.
+
+// (v423) ELLES REVIENNENT POUR LE PILOTE, ET POUR LUI SEUL : de part et d'autre de
+// l'avatar du héros, elles font défiler les héros de la partie (le deck, les
+// jauges, le nom et l'avatar suivent). En préparation, une compétence retenue
+// passe d'elle-même au héros suivant qui n'a pas encore choisi ; en résolution,
+// l'avatar suit le héros dont c'est le tour (et son pion est sélectionné).
+function montrerHerosPilote(i) {
+    const liste = window.COMBAT_PERSOS_JOUEUR || [];
+    if (!liste[i]) return null;
+    window.COMBAT_INDEX_PERSO = i;
+    window.afficherPersoCombatActuel();
+    if (typeof window.actualiserHudHeros === "function") window.actualiserHudHeros();
+    return liste[i];
+}
+window.changerPersoCombat = function(sens) {
+    const liste = window.COMBAT_PERSOS_JOUEUR || [];
+    if (!window.piloteCombat() || liste.length < 2) return null;
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    const h = montrerHerosPilote(((window.COMBAT_INDEX_PERSO || 0) + (sens < 0 ? -1 : 1) + liste.length) % liste.length);
+    // En préparation, le deck du héros montré se rallume (s'il n'a pas encore choisi).
+    const phase = (window.PARTIE_DATA || {}).Phase_Combat || "Preparation";
+    if (h && phase === "Preparation" && !(window.PARTIE_DATA.File_Attente_Combat || []).some(x => x.idPersonnage === h.idPersonnage)
+        && typeof window.rouvrirDeckApresEchec === "function") window.rouvrirDeckApresEchec();
+    return h;
+};
+// La compétence d'un héros est retenue : au suivant qui n'a pas encore choisi.
+window.piloteHerosSuivant = function(file) {
+    const liste = window.COMBAT_PERSOS_JOUEUR || [];
+    if (!window.piloteCombat() || liste.length < 2) return null;
+    const choisis = new Set((file || (window.PARTIE_DATA || {}).File_Attente_Combat || []).map(x => x && x.idPersonnage));
+    const depuis = window.COMBAT_INDEX_PERSO || 0;
+    for (let k = 1; k < liste.length; k++) {
+        const j = (depuis + k) % liste.length, h = liste[j];
+        if (!h || choisis.has(h.idPersonnage) || h.possede) continue;
+        if (typeof window.herosATerre === "function" && window.herosATerre(h.idPersonnage)) continue;
+        montrerHerosPilote(j);
+        if (typeof window.rouvrirDeckApresEchec === "function") window.rouvrirDeckApresEchec();
+        if (typeof window.tracerCombat === "function") window.tracerCombat("🎮", `pilote : au tour de ${h.prenom || h.idPersonnage} de choisir`);
+        return h;
+    }
+    return null;
+};
+// En résolution, l'avatar suit le héros dont c'est le tour — une fois par tour :
+// les flèches restent libres de regarder ailleurs ensuite.
+let tourSuiviParLePilote = "";
+window.suivreLeHerosDuTour = function() {
+    if (!window.piloteCombat()) { tourSuiviParLePilote = ""; return null; }
+    const partie = window.PARTIE_DATA || {};
+    if ((partie.Phase_Combat || "Preparation") !== "Resolution") { tourSuiviParLePilote = ""; return null; }
+    const tete = (partie.File_Attente_Combat || [])[0];
+    const liste = window.COMBAT_PERSOS_JOUEUR || [];
+    const i = tete ? liste.findIndex(h => h && h.idPersonnage === tete.idPersonnage) : -1;
+    if (i < 0) return null;
+    const cle = `${partie.Tour_Combat || 0}|${tete.idPersonnage}|${(partie.File_Attente_Combat || []).length}`;
+    if (cle === tourSuiviParLePilote) return null;
+    tourSuiviParLePilote = cle;
+    const h = i !== window.COMBAT_INDEX_PERSO ? montrerHerosPilote(i) : liste[i];
+    // Son pion est sélectionné : il n'y a plus qu'à tracer son chemin.
+    if (window.TOKEN_SELECTIONNE !== tete.idPersonnage && (window.TOKENS_VTT_DATA || {})[tete.idPersonnage]) {
+        window.TOKEN_SELECTIONNE = tete.idPersonnage;
+        if (typeof window.appliquerTokensVTT === "function") window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    }
+    return h;
+};
+// Les deux flèches, de part et d'autre de l'avatar (bandeau du bas à droite).
+window.actualiserFlechesPilote = function() {
+    const hote = document.getElementById("combat-hud-bas-droite");
+    let bloc = document.getElementById("pilote-fleches");
+    const liste = window.COMBAT_PERSOS_JOUEUR || [];
+    const voulu = !!hote && window.piloteCombat() && liste.length > 1;
+    if (!voulu) { if (bloc) bloc.style.display = "none"; return false; }
+    if (!bloc) {
+        bloc = document.createElement("div");
+        bloc.id = "pilote-fleches";
+        bloc.innerHTML = `<button type="button" class="fleche-pilote gauche" aria-label="Héros précédent" onclick="event.stopPropagation(); window.changerPersoCombat(-1)">◄</button>`
+            + `<button type="button" class="fleche-pilote droite" aria-label="Héros suivant" onclick="event.stopPropagation(); window.changerPersoCombat(1)">►</button>`
+            + `<span class="rang-pilote"></span>`;
+        hote.appendChild(bloc);
+    }
+    bloc.style.display = "block";
+    const rang = bloc.querySelector(".rang-pilote");
+    const texte = `Pilote ${Math.min(liste.length, (window.COMBAT_INDEX_PERSO || 0) + 1)}/${liste.length}`;
+    if (rang.textContent !== texte) rang.textContent = texte;
+    // Calées sur le nom du héros, posé sur son avatar : l'anneau touche le bord
+    // droit de l'écran, il n'y a pas la place d'une flèche à sa droite.
+    const nom = document.getElementById("hud-nom-heros-texte") || document.getElementById("hud-nom-heros");
+    const anneau = document.getElementById("hud-anneau-boite");
+    const ref = (nom && nom.getBoundingClientRect().width > 0) ? nom : anneau;
+    const r = ref ? ref.getBoundingClientRect() : null, h = hote.getBoundingClientRect();
+    if (r && r.width > 0) {
+        const milieu = Math.round(r.top + r.height / 2 - h.top);
+        const g = bloc.querySelector(".gauche"), d = bloc.querySelector(".droite");
+        g.style.left = Math.round(Math.max(4 - h.left, r.left - h.left - 46)) + "px"; g.style.top = milieu + "px";
+        d.style.left = Math.round(Math.min(window.innerWidth - h.left - 44, r.right - h.left + 6)) + "px"; d.style.top = milieu + "px";
+        rang.style.left = Math.round(r.left - h.left + r.width / 2) + "px"; rang.style.top = Math.round(r.top - h.top - 28) + "px";
+    }
+    return true;
+};
+// La case des Paramètres (et un combat déjà ouvert se recompose aussitôt).
+window.basculerPiloteCombat = function(oui) {
+    try { localStorage.setItem("ivalis_PILOTE_COMBAT", oui ? "on" : "off"); } catch (e) {}
+    if (document.getElementById("fenetre-combat")?.style.display === "block" && typeof window.initialiserPersosCombat === "function") {
+        window.initialiserPersosCombat();
+        if (typeof window.actualiserHudHeros === "function") window.actualiserHudHeros();
+    }
+    window.actualiserFlechesPilote();
+};
 
 window.afficherPersoCombatActuel = function() {
     const liste = document.getElementById("combat-liste-competences");
@@ -1248,6 +1397,9 @@ window.rafraichirAffichageCombat = function() {
         }
     }
 
+    // (v423) Le pilote : l'avatar suit le héros dont c'est le tour.
+    try { if (typeof window.suivreLeHerosDuTour === "function") window.suivreLeHerosDuTour(); } catch (e) { console.error("Pilote :", e); }
+
     // Chaque redessin est isolé : une bulle d'initiative qui casse ne doit pas
     // emporter les jauges avec elle.
     const sansCasser = (nom, fn) => { try { fn(); } catch (e) { console.error("Redessin " + nom + " :", e); } };
@@ -1390,7 +1542,9 @@ window.herosDuPoste = function() {
     // NI UNE ILLUSION. Elle est filtrée en amont, à la construction de la liste
     // (herosDuJoueur) ; ce second filet est là parce que ce bloc-ci est le seul
     // endroit où l'erreur se VOIT, et qu'elle s'y est déjà vue une fois.
-    const mien = miens.find(h => h && !h.estMonstre && !h.estIllusion);
+    // (v423) Le pilote : le héros que les flèches montrent.
+    const montre = (typeof window.piloteCombat === "function" && window.piloteCombat()) ? miens[window.COMBAT_INDEX_PERSO || 0] : null;
+    const mien = (montre && !montre.estMonstre && !montre.estIllusion) ? montre : miens.find(h => h && !h.estMonstre && !h.estIllusion);
     if (!mien) return null;
     return (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === mien.idPersonnage) || mien;
 };
@@ -1742,6 +1896,8 @@ window.actualiserHudHeros = function() {
             divNom.dataset.ajuste = "1";
         }
     }
+    // (v423) Les flèches du pilote, calées sur l'avatar.
+    if (typeof window.actualiserFlechesPilote === "function") window.actualiserFlechesPilote();
 };
 
 // =========================================================================
@@ -5101,7 +5257,7 @@ window.jouerCarteCombat = async function(idCarte) {
     if (typeof window.rangerDeckApresChoix === "function") window.rangerDeckApresChoix();
     window.mettreAJourJaugeFatigue(0); // Cache la jauge rouge
 
-
+    let fileEcrite = null;
     try {
         // Sous transaction : trois joueurs qui choisissent au même instant ne
         // doivent pas s'effacer mutuellement de la file (cf. modifierPartie).
@@ -5145,6 +5301,7 @@ window.jouerCarteCombat = async function(idCarte) {
             const ontJoue = window.avecCarteJouee(data, persoActuel.idPersonnage);
             if (window.toutLeMondeAJoue({ ...data, Ont_Joue_Ce_Round: ontJoue }, file)) phase = "Resolution";
 
+            fileEcrite = file;
             return { maj: { File_Attente_Combat: file, Phase_Combat: phase, Ont_Joue_Ce_Round: ontJoue } };
         });
 
@@ -5159,6 +5316,8 @@ window.jouerCarteCombat = async function(idCarte) {
         // le chemin d'erreur : le deck se rouvre, et le joueur le sait.
         if (!ecriture.ok) throw (ecriture.erreur || new Error("la carte n'a pas pu être inscrite"));
         if (avecRetourArriere) window.RETOUR_ARRIERE_EN_ATTENTE = null;
+        // (v423) Le pilote : au héros suivant qui n'a pas encore choisi.
+        if ((typeof window.piloteCombat === "function" && window.piloteCombat())) window.piloteHerosSuivant(fileEcrite);
 
     } catch (e) {
         console.error("Erreur jouerCarteCombat:", e);
@@ -5199,6 +5358,7 @@ window.jouerReposLong = async function() {
     window.mettreAJourJaugeFatigue(0);
     window.actualiserEtatCarteCombat("REPOS_LONG");
 
+    let fileRepos = null;
     try {
         // Même règle que pour une carte ordinaire : sous transaction, sinon un
         // repos long effacerait la carte qu'un autre joueur vient de poser.
@@ -5228,10 +5388,13 @@ window.jouerReposLong = async function() {
             const ontJoueRepos = window.avecCarteJouee(data, persoActuel.idPersonnage);
             if (window.toutLeMondeAJoue({ ...data, Ont_Joue_Ce_Round: ontJoueRepos }, file)) newPhase = "Resolution";
 
+            fileRepos = file;
             return { maj: { File_Attente_Combat: file, Phase_Combat: newPhase,
                             Ont_Joue_Ce_Round: ontJoueRepos } };
         });
         if (!ecriture.ok) throw (ecriture.erreur || new Error("le repos long n'a pas pu être inscrit"));
+        // (v423) Le pilote : au héros suivant qui n'a pas encore choisi.
+        if ((typeof window.piloteCombat === "function" && window.piloteCombat())) window.piloteHerosSuivant(fileRepos);
     } catch (e) {
         console.error("Erreur jouerReposLong:", e);
         if (typeof window.rouvrirDeckApresEchec === "function") window.rouvrirDeckApresEchec();

@@ -605,7 +605,11 @@ export function creerRegime(contexte) {
             // tour restait figé. Un champ vide ne doit jamais coûter une
             // technique — il est retiré, et la trace dit lequel.
             const retires = [];
-            const propre = sansIndefinis({ ...intention, poste }, "", retires);
+            // (v423) Le pilote (mode DEV) demande au nom du joueur du héros : le cerveau
+            // n'accepte d'un poste que les héros qu'il commande.
+            const posteDemande = (typeof window !== "undefined" && typeof window.posteDeLIntention === "function")
+                ? (window.posteDeLIntention(intention.acteur, poste) || poste) : poste;
+            const propre = sansIndefinis({ ...intention, poste: posteDemande }, "", retires);
             if (retires.length > 0) {
                 tracer("🧹", `${intention.type} : champ(s) vide(s) retiré(s)`, retires.slice(0, 6).join(", "));
             }

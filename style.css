@@ -5374,3 +5374,14 @@ textarea.input-texte-parchemin {
 .totem-annuler { background: none; border: 1px solid #a07a3a; color: #e8d5a5; border-radius: 8px; padding: 6px 18px; cursor: pointer; font: inherit; }
 .faisceau-totem { animation: faisceauTotem 1.6s ease-in-out infinite; }
 @keyframes faisceauTotem { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+
+/* (v423) LE PILOTE DES COMBATS DE TEST (mode DEV) : deux flèches de part et
+   d'autre de l'avatar du héros, et le rang du héros montré (combat.js,
+   actualiserFlechesPilote). Le bandeau ne prend pas les clics : elles, si. */
+#pilote-fleches { position: absolute; inset: 0; pointer-events: none; z-index: 8; }
+#pilote-fleches .fleche-pilote { position: absolute; width: 40px; height: 40px; margin-top: -20px; border-radius: 50%; pointer-events: auto; cursor: pointer;
+  border: 2px solid #d9b25a; background: rgba(20, 12, 4, 0.82); color: #f3dfa8; font-size: 18px; line-height: 1; padding: 0;
+  display: grid; place-items: center; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.7); }
+#pilote-fleches .fleche-pilote:hover { background: rgba(90, 60, 20, 0.9); }
+#pilote-fleches .rang-pilote { position: absolute; transform: translateX(-50%); white-space: nowrap; padding: 2px 10px; border-radius: 999px;
+  background: rgba(20, 12, 4, 0.82); border: 1px solid #d9b25a; color: #f3dfa8; font: 600 12px/1.4 'Cinzel', serif; letter-spacing: 0.06em; }

@@ -170,7 +170,10 @@ function estMonHeros(idPersonnage) {
     const perso = (window.PERSOS_PARTIE || []).find(x => x.idPersonnage === idPersonnage);
     const estCreature = (typeof window.estMonstre === "function" && window.estMonstre(idPersonnage))
                         || !!(perso && perso.estMonstre);
-    return !estCreature && !!perso && perso.idJoueur === monPoste();
+    if (estCreature || !perso) return false;
+    // (v423) Le pilote des combats de test (mode DEV) commande tous les héros joueurs.
+    if (typeof window.piloteCombat === "function" && window.piloteCombat() && !!perso.idJoueur) return true;
+    return perso.idJoueur === monPoste();
 }
 window.estMonHerosCombat = estMonHeros;
 

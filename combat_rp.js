@@ -1112,7 +1112,10 @@ function retourAuRecit(idRencontre) {
     // CE JOUEUR EST REVENU : le récit reprendra quand tous le seront.
     const c = etat();
     if (c && c.ID_Rencontre === idRencontre && !(c.Sortis || {})[idJoueur()]) {
-        maj({ [`Combat_RP.Sortis.${idJoueur()}`]: Date.now() }).catch(e => console.error("Retour au récit :", e));
+        // (v423) Le pilote (mode DEV, seul à la table) revient pour tous les joueurs du combat.
+        const pour = typeof window.piloteCombat === "function" && window.piloteCombat()
+            ? [...new Set([idJoueur(), ...joueursAttendus((lirePartieVue().Fin_Combat || {}).idRencontre === idRencontre ? lirePartieVue().Fin_Combat : null)])] : [idJoueur()];
+        maj(Object.fromEntries(pour.map(j => [`Combat_RP.Sortis.${j}`, Date.now()]))).catch(e => console.error("Retour au récit :", e));
     }
     console.log("📜 [Combat du récit] Retour au récit.");
 }
