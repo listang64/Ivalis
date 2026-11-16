@@ -223,7 +223,12 @@ function persoDocVersFront(id, d) {
     compagnon: (d.Compagnon_Nom || d.Compagnon_Description || d.Compagnon_Image || d.Compagnon_Token) ? {
       nom: d.Compagnon_Nom || "", description: d.Compagnon_Description || "",
       image: d.Compagnon_Image || "", token: d.Compagnon_Token || "",
-      attaque: d.Compagnon_Attaque || ""
+      attaque: d.Compagnon_Attaque || "",
+      // (v418) Son caractère (le Narrateur le joue), ses blessures et sa mort
+      // (un groupe vaincu : blessures_ui.js, cloturerCombat).
+      caractere: d.Compagnon_Caractere || "",
+      blessures: Array.isArray(d.Compagnon_Blessures) ? d.Compagnon_Blessures : [],
+      mort: !!d.Compagnon_Mort
     } : null,
     // Décoché depuis la liste des héros (mode développeur) : le personnage
     // existe toujours, mais il est mis de côté — ni combat, ni tour de parole.
@@ -2097,7 +2102,10 @@ function frontVersPersoDoc(donnees, idPersonnage) {
       Compagnon_Description: donnees.compagnon.description || "",
       Compagnon_Image: donnees.compagnon.image || "",
       Compagnon_Token: donnees.compagnon.token || "",
-      Compagnon_Attaque: donnees.compagnon.attaque || ""
+      Compagnon_Attaque: donnees.compagnon.attaque || "",
+      Compagnon_Caractere: donnees.compagnon.caractere || "",
+      Compagnon_Blessures: Array.isArray(donnees.compagnon.blessures) ? donnees.compagnon.blessures : [],
+      Compagnon_Mort: !!donnees.compagnon.mort
     } : {})
   };
 }

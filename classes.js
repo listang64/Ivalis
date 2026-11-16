@@ -673,6 +673,9 @@ window.ouvrirFenetreCompagnon = function() {
                 <textarea id="champ-compagnon-description" maxlength="600" rows="5"
                     placeholder="Un grand loup au pelage gris cendré, une oreille déchirée, des yeux ambrés...">${echapper(deja.description)}</textarea>
             </label>
+            <label class="fenetre-compagnon-champ">Son caractère
+                <input type="text" id="champ-compagnon-caractere" maxlength="120" placeholder="Agressif, joueur, craintif, protecteur..." value="${echapper(deja.caractere)}">
+            </label>
             <div class="fenetre-compagnon-erreur" id="erreur-compagnon"></div>
             <div class="fenetre-compagnon-boutons">
                 <button type="button" class="fenetre-compagnon-retour" onclick="window.retourFenetreCompagnon()">Retour</button>
@@ -693,13 +696,14 @@ window.retourFenetreCompagnon = function() {
 window.validerCompagnon = function() {
     const nom = ((document.getElementById("champ-compagnon-nom") || {}).value || "").trim();
     const description = ((document.getElementById("champ-compagnon-description") || {}).value || "").trim();
+    const caractere = ((document.getElementById("champ-compagnon-caractere") || {}).value || "").trim();
     const erreur = document.getElementById("erreur-compagnon");
     if (!nom || !description) {
         if (erreur) erreur.textContent = !nom ? "Donnez-lui un nom." : "Décrivez-le en quelques mots.";
         return;
     }
     if (typeof window.jouerSonClic === "function") window.jouerSonClic();
-    window.COMPAGNON_TEMP = { nom, description };
+    window.COMPAGNON_TEMP = { nom, description, caractere };
     window.fermerFenetreCompagnon();
     if (typeof window.ouvrirEtapeIdentite === "function") window.ouvrirEtapeIdentite();
 };
@@ -708,5 +712,5 @@ window.validerCompagnon = function() {
 window.compagnonPourCreation = function(nomClasse) {
     const c = window.COMPAGNON_TEMP;
     if (!c || !window.classeAvecCompagnon(nomClasse)) return null;
-    return { nom: c.nom, description: c.description, image: "", token: "" };
+    return { nom: c.nom, description: c.description, caractere: c.caractere || "", image: "", token: "" };
 };

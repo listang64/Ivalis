@@ -165,9 +165,11 @@
     // Tirer les blessures d'un héros : la première, et celles des relances.
     // `alea()` rend un nombre dans [0, 1[ (Math.random en jeu, un dé fixé au
     // banc). Rend { tirages: [{ de, bonus, retraits, score, blessure }], veinardConsomme }.
-    window.tirerBlessures = function (perso, alea) {
+    // (v418) `retraitsImposes` : pour qui n'a pas de fiche de héros (un suiveur,
+    // le compagnon du Pisteur), { modCon: 0, chanceux: 0, veinard: 0, total: 0 }.
+    window.tirerBlessures = function (perso, alea, retraitsImposes) {
         const tirer = typeof alea === "function" ? alea : Math.random;
-        const retraits = window.retraitsJetBlessure(perso);
+        const retraits = retraitsImposes || window.retraitsJetBlessure(perso);
         const tirages = [];
         let bonus = 0, garde = 0;
         // Le Veinard ne vaut que pour le prochain jet : le premier.

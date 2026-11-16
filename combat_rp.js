@@ -691,7 +691,8 @@ const momentDe = (m) => m.surReleve ? "renfort (quand le leader se relève)" : m
 async function composerLesEnnemis() {
     const partie = await lirePartie();
     const [messages, lieu] = await Promise.all([lireMessages(R.messagesLieu), contexteDuLieu(partie)]);
-    const pnjs = Object.values((lieu.env && lieu.env.pnjsPresents) || {}).filter(x => x && x.Nom_PNJ);
+    // (v418) Les suiveurs de la compagnie ne sont jamais des ennemis (ils ne combattent que dans le récit).
+    const pnjs = Object.values((lieu.env && lieu.env.pnjsPresents) || {}).filter(x => x && x.Nom_PNJ && !x.Suiveur);
     // L'univers, les peuples, la région du groupe (v287).
     const region = Number(partie.Position_Groupe && partie.Position_Groupe.Region) || 0;
     await window.chargerRacesDuMonde();
@@ -1180,6 +1181,17 @@ window.resumeCombatPourMJ = function(c, fin) {
                 lignes.push(`- ${b.nom} : ${mort ? "MORT — il ne se relèvera pas" : t.map(x => `${x.nom} (${x.texte})`).join(" ; ")}`);
             });
         } else lignes.push("Aucune blessure durable n'est à signaler.");
+        // (v418) La compagnie est tombée avec eux : ses suiveurs et le compagnon du Pisteur.
+        const compagnie = Object.values((fin && fin.blessuresCompagnie) || {});
+        if (compagnie.length) {
+            lignes.push("Les blessures de la compagnie (tombée avec eux) :");
+            compagnie.forEach(b => {
+                const t = (b.tirages || []);
+                const mort = t.some(x => x.id === "BLE_MORT");
+                const qui = b.type === "compagnon" ? `${b.nom} (le compagnon de ${b.maitre || "son maître"})` : b.nom;
+                lignes.push(`- ${qui} : ${mort ? "MORT — il ne se relèvera pas" : t.map(x => `${x.nom} (${x.texte})`).join(" ; ")}`);
+            });
+        }
     }
     lignes.push("CONSIGNES ABSOLUES POUR TA RÉPONSE :");
     lignes.push("- Ne rejoue pas le combat coup par coup : raconte la fin de l'affrontement et ce qui suit immédiatement.");

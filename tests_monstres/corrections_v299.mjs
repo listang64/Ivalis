@@ -362,7 +362,7 @@ await section(async () => {
   const tout = [...r.g, ...r.d];
   // v312 : « dans le sommaire, devant chaque titre le numéro en chiffres romains ; dans cet
   // ordre : Aventuriers, Carte du monde, Le village, Les combats, Le récit ».
-  verifier("page de gauche (v312) : I- Aventuriers, II- Carte du monde, III- Le village", r.g.map(x => x.texte).join(" | ") === "I- Aventuriers | II- Carte du monde | III- Le village", r.g.map(x => x.texte).join(" | "));
+  verifier("page de gauche (v312, v418) : I- Groupe, II- Carte du monde, III- Le village", r.g.map(x => x.texte).join(" | ") === "I- Groupe | II- Carte du monde | III- Le village", r.g.map(x => x.texte).join(" | "));
   verifier("page de droite (v312) : IV- Les combats, V- Le récit", r.d.map(x => x.texte).join(" | ") === "IV- Les combats | V- Le récit", r.d.map(x => x.texte).join(" | "));
   verifier("en gros (plus de deux fois le texte des pages)", tout.every(x => x.taille > r.u * 5.5), `${tout[0] && tout[0].taille.toFixed(1)} px, u = ${r.u.toFixed(2)} px`);
   verifier("à la main (v313 : l'écriture choisie dans Paramètres, Shadows Into Light par défaut depuis v340)", tout.every(x => /Shadows Into Light/.test(x.police)), tout[0] && tout[0].police);

@@ -54,7 +54,13 @@ async function preparerEnvironnement(lieuActuelId) {
         reputationTags: []
     };
 
-    if (!lieuActuelId) return env;
+    // (v418) LA COMPAGNIE (groupe.js) : ses suiveurs sont là où est le groupe, même en pleine nature.
+    const avecLaCompagnie = async (e) => {
+        if (!window.GROUPE || typeof window.GROUPE.rejoindreLaScene !== "function") return e;
+        try { return await window.GROUPE.rejoindreLaScene(e, lieuActuelId); }
+        catch (err) { console.warn("[La compagnie] Les suiveurs dans la scène :", err); return e; }
+    };
+    if (!lieuActuelId) return avecLaCompagnie(env);
 
     let idLieuParent = lieuActuelId;
     const idPartieCourante = window.ID_PARTIE_COURANTE;
@@ -123,7 +129,7 @@ async function preparerEnvironnement(lieuActuelId) {
         });
     }
 
-    return env;
+    return avecLaCompagnie(env);
 }
 
 window.preparerEnvironnementIvalis = preparerEnvironnement;   // (v411, social.js et les bancs)
@@ -2107,6 +2113,11 @@ async function arbitrerAvantLeMJ(messages) {
     console.log(`[MIA_DES] ${jets.length ? jets.map(j => `${j.heros} : ${j.caracteristique} (${j.difficulte})${j.parLesMots ? " — par les mots" : ""}`).join(", ") : "aucun jet"} — ${Date.now() - t0} ms`, window.DERNIER_ARBITRAGE);
     if (!jets.length) return true;
     jets.forEach(j => { delete j.parLesMots; });
+    await annoncerJetsArbitre(jets);
+    return false;
+}
+// L'Arbitre annonce des jets dans le chat (v418 : la compagnie s'en sert aussi, un jet de Charisme pour convaincre).
+async function annoncerJetsArbitre(jets) {
     const date = window.DATE_EN_JEU_ACTUELLE || {};
     const lignes = jets.map(j => `🎲 ${j.heros} : jet de ${nomCaracJoli(j.caracteristique)} — difficulté ${j.difficulte}${j.action ? ` (${j.action})` : ""}`);
     await addDoc(collection(db, "Messages_Chat"), {
@@ -2114,7 +2125,6 @@ async function arbitrerAvantLeMJ(messages) {
         Texte: lignes.join("<br>"), Jets_Demandes: jets,
         Date_Jour: date.jour || "", Date_An: date.annee || "", Timestamp: Date.now()
     });
-    return false;
 }
 
 window.__arbitrerAvantLeMJBanc = (messages) => arbitrerAvantLeMJ(messages);   // (v317) pour les bancs
@@ -2348,6 +2358,18 @@ window.declencherTourIA = async function(options) {
         const env = await preparerEnvironnement(lieuActuel);
         const nomsPnjPresents = Object.keys(env.pnjsPresents);
 
+        // (v418) LA COMPAGNIE (groupe.js) : les demandes des héros (rejoindre, renvoyer,
+        // attendre ici) tranchées par le moteur, les mécontents qui préviennent ou partent.
+        // Un jet de Charisme à faire d'abord : l'Arbitre le demande, et le MJ attend les dés.
+        let contexteCompagnie = "";
+        if (window.GROUPE && typeof window.GROUPE.avantLeMJ === "function") {
+            try {
+                const compagnie = await window.GROUPE.avantLeMJ({ messages: issueCombat ? [] : messages, env, demanderJets: annoncerJetsArbitre });
+                if (compagnie.attendre) { console.log("🎲 [La compagnie] Un jet de Charisme d'abord : le MJ attend les dés."); return; }
+                contexteCompagnie = compagnie.contexte || "";
+            } catch (e) { console.error("[La compagnie] Avant le MJ (le tour continue) :", e); }
+        }
+
         // Mia (les PNJ sollicités) part tout de suite ; MIA_CASTING la rejoindra
         // une fois la scène décrite (v292) : on les attend ensemble.
         const promessePnjCibles = nomsPnjPresents.length > 0
@@ -2435,6 +2457,7 @@ window.declencherTourIA = async function(options) {
         }
 
         contexte += await lireAmesPresentes(pnjCibles);
+        contexte += contexteCompagnie;
         contexte += contexteFichesPreparees(fichesPreparees);
 
         if (issueCombat) contexte += `\n${issueCombat}\n`;
@@ -2608,10 +2631,13 @@ window.declencherTourIA = async function(options) {
                         await analyserMortsPNJ(nomsPnjPresents, reponseTexte);
                         await analyserStigmates(lieuFinal, reponseTexte);
                         await analyserReputation(window.ID_PARTIE_COURANTE, lieuFinal, reponseTexte);
+                    } else if (nomsPnjPresents.length) await analyserMortsPNJ(nomsPnjPresents, reponseTexte);   // (v418) les suiveurs, en pleine nature
+                    {
                         // (v411) LES FILS INVISIBLES : les âmes de la scène (ceux qui y étaient au
-                        // début, ceux qui y sont à la fin, et chaque héros).
-                        if (window.SOCIAL && typeof window.SOCIAL.apresLeTour === "function") {
-                            const envFin = await preparerEnvironnement(lieuFinal).catch(() => ({ pnjsPresents: {} }));
+                        // début, ceux qui y sont à la fin, et chaque héros). (v418) Aussi en pleine
+                        // nature : la compagnie y est.
+                        if (window.SOCIAL && typeof window.SOCIAL.apresLeTour === "function" && (lieuFinal || nomsPnjPresents.length)) {
+                            const envFin = await preparerEnvironnement(lieuFinal || null).catch(() => ({ pnjsPresents: {} }));
                             const vus = new Map();
                             [...Object.values(env.pnjsPresents || {}), ...Object.values(envFin.pnjsPresents || {})].forEach(f => { if (f && f.idDoc && !vus.has(f.idDoc)) vus.set(f.idDoc, { id: f.idDoc, fiche: f }); });
                             // (la liste des joueurs peut être vide : celle de la partie prend le relais, comme en v315)

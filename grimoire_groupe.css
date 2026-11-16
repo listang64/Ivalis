@@ -1,0 +1,57 @@
+/* =========================================================================
+   v418 — LE GROUPE DANS LE LIVRE (grimoire_groupe.js)
+   À gauche la compagnie (le groupe, où, quand, la réputation, les héros) ;
+   à droite ceux qui nous suivent (les PNJ suiveurs, le compagnon du Pisteur).
+   --u : 1 % d'une page. Les médaillons viennent des fils invisibles (.medaillon-liens).
+   ========================================================================= */
+.page-groupe .contenu-page { gap: calc(var(--u) * 1.6) !important; }
+.page-groupe-droite > * { flex-shrink: 0; }
+.entete-groupe { position: relative; align-self: center; padding: calc(var(--u) * 0.6) calc(var(--u) * 4); }
+.entete-groupe .titre-page-fiche { position: relative; font-size: calc(var(--u) * 6.4 * var(--echelle-titres, 1)); color: #24150a; }
+.entete-groupe .lavis { left: -4%; top: -10%; width: 108%; height: 120%; }
+.fleuron-groupe { width: 40%; height: auto; align-self: center; margin: 0 0 calc(var(--u) * 0.4); fill: none; stroke: #6b1a10; stroke-width: 1.2; }
+.fleuron-groupe circle { fill: #6b1a10; }
+.nom-du-groupe { align-self: center; font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 4.6); color: #5c2a14; text-align: center; }
+.infos-groupe { display: grid; gap: calc(var(--u) * 0.6); font-size: calc(var(--u) * 3.1); color: #2b1a0e; }
+.infos-groupe em { color: #6b4a2b; }
+.cle-groupe { display: inline-block; min-width: calc(var(--u) * 20); font-family: 'Cinzel', serif !important; font-size: 0.82em; letter-spacing: 0.08em; text-transform: uppercase; color: #6b1a10; }
+.sous-titre-groupe { margin-top: calc(var(--u) * 1); font-family: 'Cinzel', serif !important; font-size: calc(var(--u) * 2.8); letter-spacing: 0.12em; text-transform: uppercase; color: #6b1a10; }
+.sous-titre-groupe.petit { font-size: calc(var(--u) * 2.4); color: #5e2a44; }
+
+/* LES HÉROS */
+.liste-heros-groupe { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--u) * 26), 1fr)); gap: calc(var(--u) * 2) calc(var(--u) * 1.5); }
+.heros-groupe { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 0.6); background: none !important; border: none !important; cursor: pointer; padding: 0 !important; text-align: center; }
+.heros-groupe .medaillon-liens { width: calc(var(--u) * 15); height: calc(var(--u) * 15); transition: transform 0.18s ease; }
+.heros-groupe:hover .medaillon-liens { transform: scale(1.05) rotate(-1deg); }
+.nom-groupe { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 3.6); color: #24150a; line-height: 1.1; }
+.role-groupe { font-size: calc(var(--u) * 2.7); font-style: italic; color: #6b4a2b; }
+.bouton-aventuriers-groupe { position: relative; align-self: center; margin-top: auto; padding: calc(var(--u) * 1.6) calc(var(--u) * 5) !important;
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 4.4 * var(--echelle-titres, 1)); color: #24150a !important;
+  background: none !important; border: none !important; cursor: pointer; }
+.bouton-aventuriers-groupe > span { position: relative; }
+.bouton-aventuriers-groupe .lavis { left: -4%; top: -12%; width: 108%; height: 124%; }
+
+/* CEUX QUI NOUS SUIVENT */
+.compte-suiveurs { align-self: center; font-size: calc(var(--u) * 2.8); font-style: italic; color: #476944; }
+.liste-suiveurs, .liste-partis { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(var(--u) * 1.6); }
+.suiveur-groupe { display: flex; flex-direction: column; align-items: stretch; }
+.carte-suiveur { display: flex; align-items: center; gap: calc(var(--u) * 2.4); text-align: left; background: rgba(249, 239, 217, 0.45) !important; border: 1px solid rgba(160, 122, 70, 0.45) !important;
+  border-radius: 6px; padding: calc(var(--u) * 1.2) calc(var(--u) * 2) !important; cursor: pointer; }
+.carte-suiveur.fixe { cursor: default; }
+.carte-suiveur .medaillon-liens { width: calc(var(--u) * 12); height: calc(var(--u) * 12); flex: none; }
+.texte-suiveur { display: flex; flex-direction: column; gap: calc(var(--u) * 0.3); min-width: 0; flex: 1; }
+.etat-groupe { font-size: calc(var(--u) * 2.7); color: #3a2210; }
+.caractere-groupe { font-size: calc(var(--u) * 2.7); font-style: italic; color: #5e2a44; }
+.loyaute-groupe { display: flex; align-items: center; gap: calc(var(--u) * 1); font-size: calc(var(--u) * 2.6); color: #3a2210; }
+.loyaute-groupe small { font-style: italic; color: #6b4a2b; font-size: 1em; }
+.jauge-groupe { position: relative; display: inline-block; width: calc(var(--u) * 22); height: calc(var(--u) * 1.2); background: rgba(120, 90, 50, 0.22); border-radius: 9px; overflow: hidden; }
+.jauge-groupe i { position: absolute; top: 0; bottom: 0; background: #597358; }
+.jauge-groupe i.neg { background: #a65c55; }
+.jauge-groupe b { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(60, 35, 15, 0.55); }
+.renvoyer-groupe { align-self: flex-end; font-size: calc(var(--u) * 2.4) !important; color: #8b1a10 !important; }
+.compagnon-groupe.mort .carte-suiveur { opacity: 0.6; }
+.parti-groupe { background: none !important; border: none !important; padding: 0 !important; text-align: left; cursor: pointer; font-size: calc(var(--u) * 2.8); color: #3a2210; }
+.parti-groupe.mort { opacity: 0.6; text-decoration: line-through; }
+
+/* (v418) Dans les Aventuriers : revenir au groupe. */
+.retour-groupe-clan { align-self: flex-start; }

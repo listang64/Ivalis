@@ -285,6 +285,9 @@
   -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
   filter: drop-shadow(0 calc(var(--u) * 0.15) calc(var(--u) * 0.1) rgba(30, 14, 2, 0.95)) drop-shadow(0 0 calc(var(--u) * 0.5) rgba(30, 14, 2, 0.7));
   text-shadow: none; pointer-events: none; }
+/* (v418) Le nom de NOTRE héros se touche : il mène à la liste de nos héros (les Aventuriers). */
+#recit-avatar .nom-portrait { pointer-events: auto; cursor: pointer; }
+#recit-avatar .nom-portrait::after { content: " ⇄"; font-size: 0.55em; vertical-align: middle; }
 
 /* v312 — LA DICTÉE : la tête qui parle, au-dessus de la plume ; elle rougit en écoutant. */
 .ecriture-micro {

@@ -1332,6 +1332,8 @@ window.donneesCompagnon = function(heros) {
 };
 window.poserCompagnonSurTerrain = async function(heros, tokensData) {
     if (!heros || !window.ID_PARTIE_COURANTE) return null;
+    // (v418) Un compagnon mort (un groupe vaincu, blessures_ui.js) ne revient plus.
+    if (heros.compagnon && heros.compagnon.mort) return null;
     const idCompagnon = window.ID_COMPAGNON(heros.idPersonnage);
     if (tokensData[idCompagnon]) return null;
     const data = window.donneesCompagnon(heros);

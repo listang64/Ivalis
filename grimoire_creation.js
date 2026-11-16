@@ -233,6 +233,8 @@ function htmlCompagnonGauche() {
           <input type="text" id="creation-compagnon-nom" maxlength="40" placeholder="Croc-Gris" value="${echapper(deja.nom)}"></label>
         <label class="champ-creation">À quoi ressemble-t-il ?
           <textarea id="creation-compagnon-description" maxlength="600" rows="5" placeholder="Un grand loup au pelage gris cendré, une oreille déchirée, des yeux ambrés…">${echapper(deja.description)}</textarea></label>
+        <label class="champ-creation">Son caractère
+          <input type="text" id="creation-compagnon-caractere" maxlength="120" placeholder="Agressif, joueur, craintif, protecteur…" value="${echapper(deja.caractere)}"></label>
         <p class="erreur-creation" id="creation-compagnon-erreur"></p>
         <button type="button" class="bouton-encre grand" data-action="creation" data-ca="compagnon">${cadre("compagnon", 1.2)}<span>Il me suit</span></button>
       </div>`;
@@ -548,9 +550,11 @@ function agir(cible) {
         const nom = ((document.getElementById("creation-compagnon-nom") || {}).value || "").trim();
         const description = ((document.getElementById("creation-compagnon-description") || {}).value || "").trim();
         const erreur = document.getElementById("creation-compagnon-erreur");
+        // (v418) Son caractère (agressif, joueur…) : le Narrateur le joue dans le récit.
+        const caractere = ((document.getElementById("creation-compagnon-caractere") || {}).value || "").trim();
         if (!nom || !description) { if (erreur) erreur.textContent = !nom ? "Donnez-lui un nom." : "Décrivez-le en quelques mots."; return; }
         son();
-        window.COMPAGNON_TEMP = { nom, description };
+        window.COMPAGNON_TEMP = { nom, description, caractere };
         allerAuFormulaire();
         return;
     }

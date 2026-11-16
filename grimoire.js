@@ -92,8 +92,10 @@
     // chaque titre le numéro en chiffres romains ; dans cet ordre : Aventuriers
     // (qui remplace Fiches persos), Carte du monde, Le village, Les combats, Le
     // récit » ; les Paramètres passent au menu principal). Trois puis deux.
+    // (v418) Nico : « à la place du bouton Aventuriers, un bouton Groupe » (grimoire_groupe.js) ;
+    // les Aventuriers en deviennent les sous-pages.
     const ENTREES_INDEX = [
-        ["fiches", "Aventuriers"], ["carte", "Carte du monde"], ["village", "Le village"],
+        ["groupe", "Groupe"], ["carte", "Carte du monde"], ["village", "Le village"],
         ["combats", "Les combats"], ["recit", "Le récit"]
     ];
     const ROMAINS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
@@ -136,7 +138,9 @@
     // elle n'est dans le livre que le temps qu'on la lit (ouverte des Paramètres ou du
     // portrait d'un PNJ dans le récit), et en ressort quand on la quitte.
     let pagesLiens = [];
-    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesFiches.length + pagesLiens.length + pagesCombats.length + pagesVillage.length : 0);
+    // (v418) La double page du Groupe (grimoire_groupe.js), juste avant les Aventuriers (ses sous-pages).
+    let pagesGroupe = [];
+    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesGroupe.length + pagesFiches.length + pagesLiens.length + pagesCombats.length + pagesVillage.length : 0);
     // LA CARTE DU MONDE (v302) : sa double page vient juste après l'index (5-6),
     // en partie seulement ; la suite (le récit) commence alors à la page 7.
     // Nico : « page de gauche cette partie de la map, page de droite celle-là ;
@@ -275,6 +279,7 @@
     // par chapitre, et l'or sous « Sommaire ».
     const TEINTES_INDEX = {
         fiches: { couleurs: ["#b3261e", "#c8402f", "#8f1d15"], opacite: 0.3, nom: "index-fiches" },
+        groupe: { couleurs: ["#b3261e", "#c8402f", "#8f1d15"], opacite: 0.3, nom: "index-groupe" },
         carte: { couleurs: ["#5f86b0", "#7fa2c4", "#4a6f98"], opacite: 0.3, nom: "index-carte" },
         village: { couleurs: ["#6fa64f", "#8dbb6a", "#567f3c"], opacite: 0.3, nom: "index-village" },
         combats: { couleurs: ["#9b2c22", "#7a1d14", "#c0503a"], opacite: 0.32, nom: "index-combats" },
@@ -1072,7 +1077,7 @@
     function definirSuite(elements) {
         suite = (elements || []).slice();
         if (!pageFlip) return;
-        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesFiches, ...pagesLiens, ...pagesCombats, ...pagesVillage] : []), ...suite, ...vierges, dos];
+        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesGroupe, ...pagesFiches, ...pagesLiens, ...pagesCombats, ...pagesVillage] : []), ...suite, ...vierges, dos];
         const generation = ++definirSuite.generation;      // seule la dernière demande s'applique
         const appliquer = () => {
             if (generation !== definirSuite.generation) return;
@@ -1277,6 +1282,8 @@
         recit: () => window.GRIMOIRE_RECIT && (window.GRIMOIRE_RECIT.allerAuSommaireDuRecit || window.GRIMOIRE_RECIT.allerAuRecit)(),
         // v313 : les Aventuriers sont dans le livre (grimoire_fiches.js).
         fiches: () => (window.GRIMOIRE_FICHES ? window.GRIMOIRE_FICHES.allerAuxAventuriers() : (window.ouvrirMenuPersonnages && window.ouvrirMenuPersonnages())),
+        // (v418) le Groupe : sa double page (grimoire_groupe.js) ; les Aventuriers en secours.
+        groupe: () => ((window.GRIMOIRE_GROUPE && window.GRIMOIRE_GROUPE.ouvrir()) || OUVRIR_INDEX.fiches()),
         // (v388) Les combats ont leur double page (grimoire_combats.js) ; la popup en secours.
         combats: () => (window.GRIMOIRE_COMBATS && window.GRIMOIRE_COMBATS.ouvrir()) || (window.ouvrirPopupRencontre && window.ouvrirPopupRencontre()),
         parametres: () => window.ouvrirParametres && window.ouvrirParametres()
@@ -1328,6 +1335,7 @@
         if (action === "creation") { if (window.GRIMOIRE_CREATION) window.GRIMOIRE_CREATION.agir(cible); return; }
         if (action === "combats") { if (window.GRIMOIRE_COMBATS) window.GRIMOIRE_COMBATS.agir(cible); return; }
         if (action === "liens") { if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.agir(cible); return; }
+        if (action === "groupe") { if (window.GRIMOIRE_GROUPE) window.GRIMOIRE_GROUPE.agir(cible); return; }
         // (v312) Le marque-page du menu : la page principale (le journal), en partie ou non.
         if (action === "marque-menu") {
             if (!pageFlip || !ouvert) return;
@@ -1456,6 +1464,9 @@
         // (v414) la double page des fils invisibles
         definirLiens: (els) => { pagesLiens = (els || []).slice(); if (enPartie) definirSuite(suite); },
         pagesLiens: () => pagesLiens.slice(),
+        // (v418) la double page du Groupe
+        definirGroupe: (els) => { pagesGroupe = (els || []).slice(); if (enPartie) definirSuite(suite); },
+        pagesGroupe: () => pagesGroupe.slice(),
         // (v398) la double page du village
         pagesVillage: () => pagesVillage.slice(), allerAuVillage, IMAGE_VILLAGE,
         // (v395) les Paramètres du livre (grimoire_parametres.js) : le chapitre des pages 3-4

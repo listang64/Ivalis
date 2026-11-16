@@ -98,7 +98,7 @@ export function liensDuRegard(reseau, centre, regard, filtre, P) {
 //  L'ÉTAT DE LA DOUBLE PAGE
 // ---------------------------------------------------------------------
 let pages = null;
-const vue = { centre: "", regard: "out", filtre: "tous", selection: "", recherche: "", ajuste: false, reseau: null, souvenirs: [], charge: 0, retourRecit: false, retourParametres: false, dernierToucher: null };
+const vue = { centre: "", regard: "out", filtre: "tous", selection: "", recherche: "", ajuste: false, reseau: null, souvenirs: [], charge: 0, retourRecit: false, retourParametres: false, retourGroupe: false, dernierToucher: null };
 
 function creer() {
     if (pages) return pages;
@@ -152,7 +152,8 @@ function htmlIndexAmes() {
 function htmlGauche() {
     const P = S(), id = vue.centre, a = ames()[id];
     const retour = vue.retourRecit ? `<button type="button" class="lien-fiche retour-liens" data-action="liens" data-cb="recit">← Revenir au récit</button>`
-        : vue.retourParametres ? `<button type="button" class="lien-fiche retour-liens" data-action="liens" data-cb="parametres">← Revenir aux paramètres</button>` : "";
+        : vue.retourParametres ? `<button type="button" class="lien-fiche retour-liens" data-action="liens" data-cb="parametres">← Revenir aux paramètres</button>`
+        : vue.retourGroupe ? `<button type="button" class="lien-fiche retour-liens" data-action="liens" data-cb="groupe">← Revenir au groupe</button>` : "";
     if (!P || !a) return `<div class="contenu-page page-liens-gauche">
         <div class="entete-liens">${lavis(TEINTE_LIENS, "liens-titre")}<span class="titre-page-fiche">Les fils invisibles</span></div>${FLEURON}
         <p class="fiche-attente">${vue.charge === 1 ? "Le livre cherche les âmes de la partie…" : "Aucune âme n'est encore connue dans cette partie : elles naissent avec les personnages nommés du récit."}</p>${retour}</div>`;
@@ -309,6 +310,7 @@ async function agir(cible) {
     if (cb === "fermer") { vue.selection = ""; vue.ajuste = false; rendre(); return; }
     if (cb === "recit") { son(); vue.retourRecit = false; if (window.GRIMOIRE_RECIT && window.GRIMOIRE_RECIT.allerAuRecit) window.GRIMOIRE_RECIT.allerAuRecit(); return; }
     if (cb === "parametres") { son(); vue.retourParametres = false; if (window.GRIMOIRE_PARAMETRES) window.GRIMOIRE_PARAMETRES.revenirDesLiens(); return; }
+    if (cb === "groupe") { son(); vue.retourGroupe = false; if (window.GRIMOIRE_GROUPE) window.GRIMOIRE_GROUPE.ouvrir(); return; }
     if (cb === "ajuster") { vue.ajuste = true; rendre(); return; }
     const lien = () => { const de = vue.regard === "in" ? vue.selection : vue.centre, vers = vue.regard === "in" ? vue.centre : vue.selection; return { de, vers }; };
     if (cb === "enregistrer") {
@@ -329,7 +331,7 @@ async function agir(cible) {
 // ---------------------------------------------------------------------
 //  ALLER AUX FILS INVISIBLES
 // ---------------------------------------------------------------------
-// `options` : { id } ou { nom } (l'âme à placer au centre), { depuisRecit }, { depuisParametres } (v416).
+// `options` : { id } ou { nom } (l'âme à placer au centre), { depuisRecit }, { depuisParametres } (v416), { depuisGroupe } (v418).
 async function ouvrir(options) {
     const o = options || {}, g = G();
     if (!g || !g.enPartie || !g.enPartie() || typeof g.definirLiens !== "function") return false;
@@ -342,6 +344,7 @@ async function ouvrir(options) {
     poser();
     vue.retourRecit = !!o.depuisRecit;
     vue.retourParametres = !!o.depuisParametres;
+    vue.retourGroupe = !!o.depuisGroupe;      // (v418) depuis la double page du Groupe
     await charger();
     if (o.id && ames()[o.id]) await centrer(o.id);
     else if (o.nom) {

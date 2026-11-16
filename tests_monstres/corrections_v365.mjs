@@ -191,7 +191,8 @@ titre("2. LA FICHE : LA BULLE AU SURVOL DE LA SOURIS");
 await section(async () => {
   for (let i = 0; i < 60 && (await p.evaluate(() => window.grimoireEtat().chapitre)) !== "index"; i++) await p.waitForTimeout(100);
   await pose(); await p.waitForTimeout(600);
-  await cliquer("#grimoire-index-fiches"); await p.waitForTimeout(2500); await pose();
+  // (v418) Les Aventuriers sont les sous-pages du Groupe (le sommaire mène au Groupe).
+  await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2500); await pose();
   await cliquer('.ligne-aventurier[data-id="H1"]'); await p.waitForTimeout(2500); await pose();
   const clans = await p.evaluate(() => [...document.querySelectorAll(".ligne-aventurier")].map(b => b.textContent.replace(/\s+/g, " ").trim()));
   verifier("la liste des clans : « Kaya - Pisteur » (plus « Pisteuse »)", clans.includes("Kaya - Pisteur") || (await p.evaluate(() => /Pisteur/.test(document.querySelector("#grimoire-fiches-fiche-d .encart-identite").textContent)

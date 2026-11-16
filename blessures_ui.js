@@ -132,6 +132,14 @@ window.cloturerCombat = async function (issue) {
     // le butin (demarrerButin, loot.js) ; une défaite n'a pas de butin, elle la
     // donne ici — la même somme, celle des créatures tombées (xpDeLaVictoire),
     // une fois, par le poste qui écrit la fin du combat.
+    // (v418) LA COMPAGNIE AUSSI : le groupe vaincu, chaque suiveur (PNJ) et chaque
+    // compagnon du Pisteur tire sa blessure (groupe.js) ; le gagnant les écrit.
+    let blessuresCompagnie = {};
+    if (issue === "defaite" && window.GROUPE && typeof window.GROUPE.tirerBlessuresCompagnie === "function") {
+        try { blessuresCompagnie = await window.GROUPE.tirerBlessuresCompagnie(Math.random); }
+        catch (e) { console.error("Blessures de la compagnie :", e); }
+    }
+
     const xpDefaite = issue === "defaite" && typeof window.xpDeLaVictoire === "function"
         ? Math.max(0, Math.round(Number(window.xpDeLaVictoire()) || 0)) : 0;
 
@@ -142,6 +150,7 @@ window.cloturerCombat = async function (issue) {
         ts: Date.now(),
         participants: heros.map(p => p.idPersonnage),
         blessures,
+        ...(Object.keys(blessuresCompagnie).length ? { blessuresCompagnie } : {}),
         bilan: bilanDuCombat(heros),
         ...(xpDefaite > 0 ? { xp: xpDefaite } : {})
     };
@@ -161,6 +170,11 @@ window.cloturerCombat = async function (issue) {
     if (fin.xp > 0 && typeof window.distribuerXP === "function") {
         try { await window.distribuerXP(fin.participants, fin.xp); }
         catch (e) { console.error("XP de la défaite :", e); }
+    }
+
+    if (fin.blessuresCompagnie && window.GROUPE && typeof window.GROUPE.ecrireBlessuresCompagnie === "function") {
+        try { await window.GROUPE.ecrireBlessuresCompagnie(fin.blessuresCompagnie, Math.random); }
+        catch (e) { console.error("Blessures de la compagnie (écriture) :", e); }
     }
 
     // LE GAGNANT ÉCRIT LES FICHES. Chaque héros du combat : ses anciennes

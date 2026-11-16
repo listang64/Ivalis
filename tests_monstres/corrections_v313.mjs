@@ -177,7 +177,8 @@ await section(async () => {
   const r = await p.evaluate(() => ({ page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), chapitre: window.grimoireEtat().chapitre }));
   verifier("à l'entrée en partie, le livre est ouvert sur le sommaire (pages 3-4)", r.page === 3 && r.chapitre === "index", JSON.stringify(r));
   await pose(); await p.waitForTimeout(600);
-  await cliquer("#grimoire-index-fiches"); await p.waitForTimeout(2500); await pose();
+  // (v418) Les Aventuriers sont les sous-pages du Groupe (le sommaire mène au Groupe).
+  await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2500); await pose();
   const clans = await p.evaluate(() => [...document.querySelectorAll(".page-clan:not(.page-clan-vide)")].map(pg => ({
     titre: pg.querySelector(".titre-clan").textContent, heros: [...pg.querySelectorAll(".ligne-aventurier")].map(b => b.textContent.replace(/\s+/g, " ").trim()) })));
   verifier("« Aventuriers » ouvre la page des clans", (await ici()) === "clans", await ici());

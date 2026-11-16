@@ -187,7 +187,9 @@ function pageClan(c, cote, i) {
                   <span class="nom-aventurier">${echapper(nomHeros(h))}</span>${classeDe(h) ? ` <span class="tiret-aventurier">-</span> <span class="classe-aventurier">${echapper(classeDe(h))}</span>` : ""}
                   ${h.actif === false ? `<span class="aventurier-absent">(au repos)</span>` : ""}</button></li>`;
     }).join("");
-    el.innerHTML = `<div class="contenu-page page-liste-clan">
+    // (v418) Les Aventuriers sont les sous-pages du Groupe : on y revient d'ici.
+    const retourGroupe = i === 0 && window.GRIMOIRE_GROUPE ? `<button type="button" class="lien-fiche retour-groupe-clan" data-action="groupe" data-gp="revenir">‹ Le groupe</button>` : "";
+    el.innerHTML = `<div class="contenu-page page-liste-clan">${retourGroupe}
         <div class="titre-clan">${echapper(titreClan(c))}</div>
         <svg class="fleuron fleuron-clan" viewBox="0 0 200 24" aria-hidden="true">
           <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>
