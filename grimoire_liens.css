@@ -30,6 +30,7 @@
 .souvenirs-liens li + li { margin-top: calc(var(--u) * 0.6); }
 .date-liens { font-size: 0.8em; color: #7a5a36; }
 /* (v415) les âmes de la partie : une liste déroulante, par ordre alphabétique */
+.page-liens-droite > .index-liens { margin-bottom: calc(var(--u) * 0.6); }
 .index-liens { align-self: stretch; font-size: calc(var(--u) * 3); padding: calc(var(--u) * 0.8) calc(var(--u) * 1.2); border: 1px solid #bba076; border-radius: 6px;
   background: rgba(249, 239, 217, 0.85); color: #3a2210; font-family: 'IM Fell English', 'Almendra', serif; }
 .ame-index-liens { font-size: calc(var(--u) * 2.9) !important; text-decoration: underline; text-decoration-color: rgba(94, 42, 68, 0.4); text-underline-offset: 0.18em; }

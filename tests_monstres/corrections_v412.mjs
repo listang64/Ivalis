@@ -284,7 +284,9 @@ await section(async () => {
   verifier("Koré → Lyra : soignée, elle se sent redevable", !!kl && kl.axes.dette > 0 && kl.axes.attachement > 0, JSON.stringify(kl && kl.axes));
   verifier("Thorin → Doros : son acte révèle son hostilité (attachement négatif)", !!td && td.axes.attachement < 0, JSON.stringify(td && td.axes));
   verifier("le chiffre glissé par l'IA (confiance 50) est ignoré", !!dt && dt.axes.confiance < 0);
-  verifier("aucun lien chiffré entre deux héros (Thorin → Lyra)", !(await lien("H1", "H2")) && !(await lien("H2", "H1")));
+  // (v417) les héros ont désormais un lien neutre de compagnons ; la scène ne le chiffre pas.
+  const hh = [await lien("H1", "H2"), await lien("H2", "H1")];
+  verifier("aucun lien chiffré entre deux héros (Thorin → Lyra : neutre, compagnon)", hh.every(l => !l || (l.etiquette === "compagnon" && l.axes.confiance === 0 && l.axes.attachement === 0 && l.axes.respect === 0)), JSON.stringify(hh[0] && hh[0].axes));
   const ev = await docsDe("Evenements_Sociaux");
   verifier("deux événements notés (Zeus, une action hors catalogue, deux héros : écartés)", ev.length === 2 && ev.map(e => e.type).join(",") === "menacer,soigner", ev.map(e => e.type).join(","));
   const menace = ev.find(e => e.type === "menacer") || {};

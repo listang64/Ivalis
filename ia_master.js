@@ -3,7 +3,7 @@
 // =========================================================================
 
 import { db } from "./firebase-config.js?v=2";
-import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch, increment } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch, increment, runTransaction } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // LE DÉPÔT DES DÉPENSES DU MJ (v294, depenses_ia.js) : une fiche par tour
 // (Depenses_MJ) et le compteur commun (Depenses_MJ_Compteur/global), le même
@@ -621,6 +621,29 @@ function memeNomPNJ(a, b) {
     return coeurDuNom(a).some(m => cy.has(m));
 }
 window.memeNomPNJIvalis = memeNomPNJ;   // (pour les bancs)
+// UN NOM DE LIEU N'EST PAS UN PNJ (v417). Nico : « je me suis rendu dans un
+// village du nom de Sylvarion et l'IA m'a créé un PNJ avec ce nom ». Les noms
+// des lieux (Monde_Lieux) et des bâtiments (Monde_Batiment), lus une fois puis
+// gardés cinq minutes, ne deviennent jamais des personnages : ni par
+// MIA_CASTING, ni par le rattrapage, ni par MIA_ILLUSTRATEUR. « Sylvarion » est
+// le lieu « Village de Sylvarion » (tous les mots du nom sont dans celui du lieu).
+let nomsDeLieuxCache = null, nomsDeLieuxLe = 0;
+async function nomsDeLieux() {
+    if (nomsDeLieuxCache && Date.now() - nomsDeLieuxLe < 5 * 60 * 1000) return nomsDeLieuxCache;
+    const noms = new Set();
+    try {
+        (await getDocs(query(collection(db, "Monde_Lieux")))).forEach(d => { const n = (d.data() || {}).Nom_Du_Lieu; if (n) noms.add(String(n)); });
+        (await getDocs(query(collection(db, "Monde_Batiment")))).forEach(d => { const n = (d.data() || {}).Nom_Batiment; if (n) noms.add(String(n)); });
+    } catch (e) { console.warn("[MIA_PNJ] Les noms des lieux :", e); }
+    nomsDeLieuxCache = [...noms]; nomsDeLieuxLe = Date.now();
+    return nomsDeLieuxCache;
+}
+function estNomDeLieu(nom, lieux) {
+    const mots = coeurDuNom(nom);
+    if (!mots.length) return false;
+    return (lieux || []).some(l => { const ml = new Set(coeurDuNom(l)); return mots.every(m => ml.has(m)); });
+}
+window.estNomDeLieuIvalis = async (nom) => estNomDeLieu(nom, await nomsDeLieux());
 // UN PNJ DE CETTE PARTIE (v409) : les PNJ n'existent que dans la partie qui les a
 // vus naître (Nico : « ses PNJ n'existeront pas dans les autres parties »). Une
 // fiche sans ID_Partie (d'avant la v330) passe encore.
@@ -731,6 +754,7 @@ async function preparerNouveauxPNJ(contexteScene, historique4, nomsPnjExistants,
     const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
     if (!cleGemini) return [];
     const racesConnues = await lireRacesConnues();
+    const lieux = await nomsDeLieux();
     const promptSysteme = `Tu es MIA_CASTING, la directrice de casting d'Ivalis (Antiquité magique, mythologie).
 Le Maître du Jeu va répondre aux dernières actions des joueurs. Avant qu'il écrive, décide si la scène a besoin d'un NOUVEAU personnage NOMMÉ.
 
@@ -742,7 +766,8 @@ Chaque personnage a un VRAI nom propre, court, antique (un prénom, éventuellem
 RACES OBLIGATOIRES : ${racesConnues.join(", ")}.
 
 Personnages DÉJÀ connus : ${JSON.stringify(nomsPnjExistants)}.
-Héros : ${JSON.stringify(nomsHeros)}.${window.SOCIAL ? window.SOCIAL.consigneCreation(nomsPnjExistants) : ""}
+Héros : ${JSON.stringify(nomsHeros)}.
+UN LIEU N'EST PAS UN PERSONNAGE (v417) : jamais une fiche au nom d'un village, d'une ville, d'un bâtiment, d'une région${lieux.length ? ` (lieux connus : ${JSON.stringify(lieux.slice(0, 80))})` : ""}.${window.SOCIAL ? window.SOCIAL.consigneCreation(nomsPnjExistants) : ""}
 
 ${contexteScene}`;
     const outils = [{
@@ -788,6 +813,7 @@ ${contexteScene}`;
         ((appel && appel.functionCall.args && appel.functionCall.args.pnjs) || []).forEach(f => {
             const nom = String((f && f.nom) || "").trim();
             if (!nom || nomsHeros.some(h => memeNomPNJ(h, nom)) || nomsPnjExistants.some(n => memeNomPNJ(n, nom))) return;
+            if (estNomDeLieu(nom, lieux)) { console.warn(`[MIA_CASTING] « ${nom} » est un lieu, pas un personnage : écarté.`); return; }
             if (fiches.some(x => memeNomPNJ(x.nom, nom)) || fiches.length >= MAX_PNJ_PREPARES) return;
             fiches.push({ ...f, nom, race: validerRacePNJ(f.race, racesConnues) });
         });
@@ -826,12 +852,14 @@ async function analyserNouveauxPNJ(lieu, nomsPnjExistants, nomsHeros, texteMJ, s
     // =========================================================
     // ÉTAPE 1 : LE DÉTECTEUR (Froid, Rapide et Précis à 0.0)
     // =========================================================
+    const lieuxConnus = await nomsDeLieux();
     const promptDetection = `Tu es l'IA de casting d'Ivalis.
 Voici les personnages DEJA connus : ${JSON.stringify(nomsPnjExistants)}.
 Voici les Héros : ${JSON.stringify(nomsHeros)}.
 
 Lis le texte du Maître du Jeu. Y a-t-il de NOUVEAUX personnages expressément NOMMÉS (VRAI prénom ou nom propre de personne) qui viennent d'apparaître ?
 Règles : Ignore les descriptions génériques ("un garde", "le tavernier", "la prêtresse"), les titres seuls, les foules, les dieux et les lieux. Ne liste JAMAIS les Héros. Trois noms au plus.
+UN LIEU N'EST PAS UN PERSONNAGE (v417) : un nom de village, de ville, de bâtiment, de région n'est JAMAIS un personnage${lieuxConnus.length ? ` (lieux connus : ${JSON.stringify(lieuxConnus.slice(0, 80))})` : ""}.
 PRÉSENTS (v330) : ne liste que les personnages PHYSIQUEMENT LÀ, que les héros voient ou à qui ils parlent. Un nom lu sur un parchemin, une lettre, un sceau, une inscription, entendu dans une rumeur, un souvenir ou cité par quelqu'un, d'une personne absente : NE LE LISTE PAS.
 Un personnage DÉJÀ connu sous un autre titre (« Maître Valerius » pour « Valerius ») n'est pas nouveau : NE LE LISTE PAS.
 IMPORTANCE (v312) : ne liste un nom que si ce personnage COMPTE dans la scène — il parle avec les héros ou agit envers eux, il a un rôle à jouer (une information, une demande, un marché, un conflit, une menace), on risque de le revoir. Un figurant nommé au passage (un paysan, un passant, un serviteur, un client de taverne, un enfant qui court) : NE LE LISTE PAS.
@@ -873,7 +901,8 @@ Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste 
 
     // Filtrage de sécurité (au cas où il remet un héros ou un PNJ déjà connu).
     // Trois nouveaux venus au plus par réponse (v292 : chacun coûte un portrait).
-    const dejaConnu = (nom) => nomsHeros.includes(nom) || nomsPnjExistants.some(n => memeNomPNJ(n, nom));
+    const dejaConnu = (nom) => nomsHeros.includes(nom) || nomsPnjExistants.some(n => memeNomPNJ(n, nom))
+        || (estNomDeLieu(nom, lieuxConnus) && (console.warn(`[MIA_PNJ] « ${nom} » est un lieu, pas un personnage : écarté.`), true));
     nouveauxNomsDetectes = [...new Set(nouveauxNomsDetectes.map(n => String(n || "").trim()).filter(Boolean))]
         .filter(nom => !dejaConnu(nom)).slice(0, MAX_PNJ_RATTRAPES);
     // (v330) Déjà connu ailleurs dans la partie ou le monde : pas de double.
@@ -2219,15 +2248,29 @@ window.declencherTourIA = async function(options) {
         return; // On bloque l'exécution ici, la BDD ne sera jamais verrouillée !
     }
 
-    // 1. SÉCURITÉ LOCALE : Vérifie si le verrou est déjà actif
-    const snapVerrou = await getDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE));
-    if (snapVerrou.exists() && snapVerrou.data().IA_En_Cours === true) {
+    // 1-2. LE VERROU, D'UN SEUL GESTE (v417). Nico : « le MJ a joué deux fois de
+    // suite, et ce à chaque fois que je le lance ». Lire le verrou PUIS l'écrire
+    // laissait passer deux déclenchements rapprochés (un double toucher, deux
+    // jets qui relancent le Narrateur, deux postes) : chacun lisait « libre »
+    // avant que l'autre n'écrive. Une transaction le lit et le prend d'un bloc ;
+    // sur ce poste, un second appel pendant la prise est ignoré.
+    if (window.__tourIAEnVol) { console.log("⏳ Un tour du MJ part déjà de ce poste, clic ignoré."); return; }
+    window.__tourIAEnVol = true;
+    let verrouPris = false;
+    try {
+        const refPartieVerrou = doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE);
+        verrouPris = await runTransaction(db, async (tx) => {
+            const snapVerrou = await tx.get(refPartieVerrou);
+            if (snapVerrou.exists() && snapVerrou.data().IA_En_Cours === true) return false;
+            tx.update(refPartieVerrou, { IA_En_Cours: true });
+            return true;
+        });
+    } catch (e) { console.error("[Tour IA] Le verrou :", e); }
+    finally { window.__tourIAEnVol = false; }
+    if (!verrouPris) {
         console.log("⏳ L'IA réfléchit déjà, clic ignoré.");
         return;
     }
-
-    // 2. VERROUILLAGE GLOBAL : On dit à Firebase de bloquer tous les joueurs
-    await updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { IA_En_Cours: true });
 
     // LE RELEVÉ DES DÉPENSES DU TOUR (v293, depenses_ia.js) : il se referme
     // une fois les IA d'arrière-plan finies (ou tout de suite, sans réponse).
@@ -2251,6 +2294,20 @@ window.declencherTourIA = async function(options) {
         let messages = [];
         snapMsgAll.forEach(d => messages.push(d.data()));
         if (messages.length === 0) return;
+
+        // (v417) PAS DEUX NARRATIONS DE SUITE PAR UN RELAIS AUTOMATIQUE. Un relais
+        // (le dernier dé lancé, l'arrivée d'un voyage : `auto`) ne relance pas le
+        // Narrateur si le dernier message qui compte est déjà sa réponse (personne
+        // n'a joué depuis). Un toucher sur « Narrateur », lui, le fait toujours
+        // continuer (v295).
+        if (!issueCombat && options && options.auto) {
+            const comptent = messages.filter(m => m && !["ARBITRE_DES", "Date", "SYSTEME_TEMPS"].includes(m.Auteur_ID) && m.Auteur_Nom !== "Système");
+            const dernier = comptent[comptent.length - 1];
+            if (dernier && dernier.Est_Narration_IA) {
+                console.log("⏳ [Tour IA] Relais automatique : le MJ a déjà répondu et personne n'a joué depuis, pas de seconde narration.");
+                return;
+            }
+        }
 
         // L'ARBITRE DES DÉS (v295) : un jet à faire ? Il l'annonce, et le MJ
         // attend les dés. Aucun ? Le narrateur part aussitôt. (Pas après un

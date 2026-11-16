@@ -348,6 +348,8 @@ window.validerEtapeDescriptif = async function() {
         yeux: document.getElementById("champ-yeux") ? document.getElementById("champ-yeux").value.trim() : "",
         pilosite: document.getElementById("champ-pilosite") ? document.getElementById("champ-pilosite").value.trim() : "",
         signes: document.getElementById("champ-signes").value.trim(),
+        // (v417) son secret, s'il en a un (facultatif)
+        secret: document.getElementById("champ-secret") ? document.getElementById("champ-secret").value.trim() : "",
         expression: document.getElementById("champ-expression").value,
         corpulence: document.getElementById("champ-corpulence").value,
         peau: document.getElementById("champ-peau") ? document.getElementById("champ-peau").value : "",
@@ -416,7 +418,7 @@ window.validerEtapeDescriptifRapide = async function() {
         typeArme: document.getElementById("champ-type-arme") ? document.getElementById("champ-type-arme").value : "Arme légère CAC",
         typeArmure: document.getElementById("champ-tenue") ? document.getElementById("champ-tenue").value : "Armure légère",
 
-        cheveux: "", yeux: "", pilosite: "", signes: "", expression: "", corpulence: "", peau: "", style: "", couleursDom: "",
+        cheveux: "", yeux: "", pilosite: "", signes: "", secret: "", expression: "", corpulence: "", peau: "", style: "", couleursDom: "",
         ecailles: "", aretes: "", pelage: "", cornes: "", champignons: "", ecorce: "", peauGob: "", oreilles: "", masque: "", colonne: ""
     };
 

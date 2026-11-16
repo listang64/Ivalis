@@ -227,7 +227,8 @@ await section(async () => {
     mise_en_scene: "medium shot, slightly low angle, Fargus alone among the tree trunks", pnj_nommes: [] }, TEXTE_MJ);
   const cr = croquisDepuis(n);
   verifier("l'agent reçoit les héros avec leur identifiant (H1 = A- Fargus…)", /H1 = A- Fargus/.test(res.agent) && /H2 = Kaya/.test(res.agent), res.agent.slice(0, 0));
-  verifier("le portrait de RÉFÉRENCE de Fargus est lu en binaire (pas l'avatar habillé)", JSON.stringify(res.blobs) === '["portrait-fargus.png"]', JSON.stringify(res.blobs));
+  // (v417) Nico : « donne-lui l'apparence actuelle du perso » : l'avatar habillé, plus le portrait de référence.
+  verifier("(v417) l'avatar du moment de Fargus (sa tenue) est lu en binaire, pas le portrait de référence", JSON.stringify(res.blobs) === '["fargus-equipe.png"]', JSON.stringify(res.blobs));
   verifier("il part joint à /images/edits (une image[])", !!cr && /images\/edits/.test(cr.url) && nbImages(cr) === 1, cr ? cr.url + " " + nbImages(cr) : "aucun croquis");
   verifier("l'image 1 est Fargus, avec sa place, son geste et son visage", !!cr && /image 1 is A- Fargus \(a man, Requin, Protecteur\).{1,4} in the scene: center; spinning around toward the viewer, one clawed hand raised; urgent, teeth bared/.test(cr.corps));
   verifier("la mise en scène (le cadrage) part au dessinateur", !!cr && /STAGING: medium shot, slightly low angle, Fargus alone among the tree trunks\./.test(cr.corps));
@@ -246,7 +247,7 @@ await section(async () => {
               { nom: "a hunting hound", type: "autre", place: "right background", action: "sniffing the air" }],
     mise_en_scene: "wide shot from behind the trunk", pnj_nommes: [] }, TEXTE_MJ + " Kaya glisse derrière un tronc.");
   const cr = croquisDepuis(n);
-  verifier("deux portraits joints, Kaya puis Fargus (l'ordre de la scène)", JSON.stringify(res.blobs) === '["portrait-kaya.png","portrait-fargus.png"]' && !!cr && nbImages(cr) === 2, JSON.stringify(res.blobs));
+  verifier("deux portraits joints, Kaya puis Fargus (l'ordre de la scène)", JSON.stringify(res.blobs) === '["kaya-equipe.png","fargus-equipe.png"]' && !!cr && nbImages(cr) === 2, JSON.stringify(res.blobs));
   verifier("image 1 Kaya à gauche, image 2 Fargus au centre", !!cr && /image 1 is Kaya[^;]*.{1,4} in the scene: left; pulled down by the arm; surprised/.test(cr.corps) && /image 2 is A- Fargus[^;]*.{1,4} in the scene: center; crouching, dragging Kaya down; fierce/.test(cr.corps));
   verifier("le chien sans nom est compté, avec sa place : trois figures", !!cr && /EXACTLY 3 figures in the whole drawing: Kaya, A- Fargus, a hunting hound \(right background; sniffing the air\)/.test(cr.corps));
 });
@@ -263,7 +264,7 @@ await section(async () => {
   const n2 = imagesIA.length;
   const vieux = await illustrer({ illustrer: true, moment: "dramatique", sujet: "scene", description: "Fargus spins around, whispering that they must hide.", heros: ["Fargus"], pnj_dans_le_croquis: [], autres: [], nombre: 1, pnj_nommes: [] }, TEXTE_MJ);
   const cr = croquisDepuis(n2);
-  verifier("une réponse à l'ancienne (« heros »: [\"Fargus\"]) : son portrait part aussi", JSON.stringify(vieux.blobs) === '["portrait-fargus.png"]' && !!cr && /images\/edits/.test(cr.url), JSON.stringify(vieux.blobs));
+  verifier("une réponse à l'ancienne (« heros »: [\"Fargus\"]) : son portrait part aussi", JSON.stringify(vieux.blobs) === '["fargus-equipe.png"]' && !!cr && /images\/edits/.test(cr.url), JSON.stringify(vieux.blobs));
 });
 
 console.log(erreurs.length ? "\nErreurs de page : " + erreurs.slice(0, 5).join(" | ") : "");

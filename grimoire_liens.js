@@ -133,30 +133,38 @@ function medaillon(id, classe) {
         ? `<img src="${echapper(url)}" alt="" draggable="false" onerror="this.remove()">` : ""}</span>`;
 }
 
+// (v415) Nico : « les âmes de la partie, mets-les dans une liste déroulante, sinon il y en
+// aura trop ; et classe-les par ordre alphabétique ». Un choix : elle passe au centre.
+// (v417) « …le placer en haut de la page de droite ».
+function htmlIndexAmes() {
+    const id = vue.centre, a = ames()[id];
+    const liste = Object.values(ames()).sort((x, y) => String(x.nom).localeCompare(String(y.nom), "fr", { sensitivity: "base" }));
+    if (!liste.length) return "";
+    return `<select class="index-liens" aria-label="Les âmes de la partie">
+        ${a ? "" : `<option value="" selected>Choisir une âme…</option>`}
+        ${liste.map(x => `<option value="${echapper(x.id)}"${x.id === id ? " selected" : ""}>${echapper(x.nom)}${x.type === "heros" ? " (héros)" : ""}${x.statut === "mort" ? " †" : ""}</option>`).join("")}
+      </select>`;
+}
+
 // ---------------------------------------------------------------------
 //  LA PAGE DE GAUCHE : la fiche
 // ---------------------------------------------------------------------
 function htmlGauche() {
     const P = S(), id = vue.centre, a = ames()[id];
-    // (v415) Nico : « les âmes de la partie, mets-les dans une liste déroulante, sinon il y en
-    // aura trop ; et classe-les par ordre alphabétique ». Un choix : elle passe au centre.
-    const liste = Object.values(ames()).sort((x, y) => String(x.nom).localeCompare(String(y.nom), "fr", { sensitivity: "base" }));
-    const index = `<select class="index-liens" aria-label="Les âmes de la partie">
-        ${a ? "" : `<option value="" selected>Choisir une âme…</option>`}
-        ${liste.map(x => `<option value="${echapper(x.id)}"${x.id === id ? " selected" : ""}>${echapper(x.nom)}${x.type === "heros" ? " (héros)" : ""}${x.statut === "mort" ? " †" : ""}</option>`).join("")}
-      </select>`;
     const retour = vue.retourRecit ? `<button type="button" class="lien-fiche retour-liens" data-action="liens" data-cb="recit">← Revenir au récit</button>`
         : vue.retourParametres ? `<button type="button" class="lien-fiche retour-liens" data-action="liens" data-cb="parametres">← Revenir aux paramètres</button>` : "";
     if (!P || !a) return `<div class="contenu-page page-liens-gauche">
         <div class="entete-liens">${lavis(TEINTE_LIENS, "liens-titre")}<span class="titre-page-fiche">Les fils invisibles</span></div>${FLEURON}
-        <p class="fiche-attente">${vue.charge === 1 ? "Le livre cherche les âmes de la partie…" : "Aucune âme n'est encore connue dans cette partie : elles naissent avec les personnages nommés du récit."}</p>${retour}${liste.length ? index : ""}</div>`;
+        <p class="fiche-attente">${vue.charge === 1 ? "Le livre cherche les âmes de la partie…" : "Aucune âme n'est encore connue dans cette partie : elles naissent avec les personnages nommés du récit."}</p>${retour}</div>`;
     const ps = P.psycheValide(a.psyche), f = (vue.reseau.fiches || {})[a.ref || id] || {}, h = herosDe(id);
     const qui = a.type === "heros" ? [h && h.race, h && h.classe].filter(Boolean).join(", ") || "Héros"
         : [f.Occupation, f.Race].filter(Boolean).join(", ") || "PNJ";
     const tour = Number((vue.reseau.etat || {}).tour || 0) + 1;
     const hum = P.humeurActive(a, tour);
     const traits = P.TRAITS.map(t => `<div class="trait-liens"><span>${P.NOMS_TRAITS[t]}</span><span class="jauge-liens"><i style="width:${ps.traits[t]}%"></i></span><b>${Math.round(ps.traits[t])}</b></div>`).join("");
-    const souvenirs = (vue.souvenirs || []).slice(0, 6).map(sv => `<li>${sv.dateJeu ? `<span class="date-liens">${echapper(sv.dateJeu)}</span> ` : ""}« ${echapper(sv.texte)} »</li>`).join("");
+    // (v417) Nico : « il va y en avoir plein ; mettre toujours le plus récent en haut de la liste ».
+    const souvenirs = (vue.souvenirs || []).slice().sort((x, y) => (Number(y.tour) || 0) - (Number(x.tour) || 0) || (Number(y.Le) || 0) - (Number(x.Le) || 0))
+        .slice(0, 30).map(sv => `<li>${sv.dateJeu ? `<span class="date-liens">${echapper(sv.dateJeu)}</span> ` : ""}« ${echapper(sv.texte)} »</li>`).join("");
     return `<div class="contenu-page page-liens-gauche defile-fiche">
         <div class="entete-liens">${lavis(TEINTE_LIENS, "liens-titre")}<span class="titre-page-fiche">Les fils invisibles</span></div>${FLEURON}${retour}
         <div class="identite-liens">${medaillon(id, "grand")}<div>
@@ -172,9 +180,9 @@ function htmlGauche() {
         ${ps.masque ? `<p class="ligne-liens"><b>Masque :</b> ${echapper(ps.masque)}</p>` : ""}
         ${ps.style ? `<p class="ligne-liens"><b>Parole :</b> ${echapper(ps.style)}</p>` : ""}
         ${a.type === "pnj" && f.Secret_Mental ? `<p class="ligne-liens"><b>Secret :</b> ${echapper(f.Secret_Mental)}</p>` : ""}
+        ${a.type === "heros" && h && h.secret ? `<p class="ligne-liens"><b>Secret :</b> ${echapper(h.secret)}</p>` : ""}
         <div class="sous-titre-liens">Ses souvenirs</div>
         ${souvenirs ? `<ul class="souvenirs-liens">${souvenirs}</ul>` : `<p class="fiche-attente">Pas encore de souvenir.</p>`}
-        <div class="sous-titre-liens">Les âmes de la partie</div>${index}
       </div>${(window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.FLECHE_DEFILE) || ""}`;
 }
 
@@ -190,7 +198,12 @@ function htmlEncart(choix) {
         return `<div class="axe-liens"><span>${P.NOMS_AXES[axe]}</span><b>${signe(v)}</b><span class="barre-liens"><i class="${v < 0 ? "neg" : ""}" style="width:${((v - min) / (max - min) * 100).toFixed(1)}%"></i></span>
           ${vue.ajuste && admin ? `<input class="ajuste-liens" type="number" step="1" min="${min}" max="${max}" data-axe="${axe}" value="${Math.round(v)}">` : ""}</div>`;
     }).join("");
-    const derniers = (l.derniers || []).slice().reverse().map(d => `<li class="${d.annule ? "annule" : ""}">${echapper(d.resume || "")} <span class="ecarts-liens">${Object.entries(d.ecarts || {}).map(([x, v]) => `${echapper(P.NOMS_AXES[x] || x).toLowerCase()} ${signe(v)}`).join(" · ")}</span>${d.annule ? " <i>(annulé)</i>" : admin ? ` <button type="button" class="annuler-liens" data-action="liens" data-cb="annuler" data-n="${d.n}">annuler</button>` : ""}</li>`).join("");
+    // (v417) Nico : « les derniers changements, oui, mais en rapport avec le personnage en
+    // question » : seulement ce qui s'est passé ENTRE les deux (l'un a agi envers l'autre) ;
+    // ce que l'un a seulement vu l'autre faire à un tiers n'y figure pas. Un ajustement à la
+    // main reste ; un changement d'avant la v417 (sans acteur noté) aussi.
+    const entreEux = (d) => d.type === "ajustement" || !d.acteur || ((d.acteur === de && d.cible === vers) || (d.acteur === vers && d.cible === de));
+    const derniers = (l.derniers || []).filter(entreEux).slice().reverse().map(d => `<li class="${d.annule ? "annule" : ""}">${echapper(d.resume || "")} <span class="ecarts-liens">${Object.entries(d.ecarts || {}).map(([x, v]) => `${echapper(P.NOMS_AXES[x] || x).toLowerCase()} ${signe(v)}`).join(" · ")}</span>${d.annule ? " <i>(annulé)</i>" : admin ? ` <button type="button" class="annuler-liens" data-action="liens" data-cb="annuler" data-n="${d.n}">annuler</button>` : ""}</li>`).join("");
     return `<div class="encart-liens">
         <button type="button" class="fermer-encart-liens" data-action="liens" data-cb="fermer" aria-label="Fermer">×</button>
         <div class="titre-encart-liens">${echapper(nomDe(de))} → ${echapper(nomDe(vers))}</div>
@@ -214,7 +227,7 @@ function htmlDroite() {
         <input class="recherche-liens" type="search" placeholder="Chercher un nom…" value="${echapper(vue.recherche)}" list="liste-ames-liens">
         <datalist id="liste-ames-liens">${Object.values(ames()).map(a => `<option value="${echapper(a.nom)}"></option>`).join("")}</datalist>
       </div>`;
-    if (!P || !ames()[id]) return `<div class="contenu-page page-liens-droite"><div class="entete-liens"><span class="titre-page-fiche">Le réseau</span></div>${FLEURON}${outils}<p class="fiche-attente">Choisissez une âme à gauche.</p></div>`;
+    if (!P || !ames()[id]) return `<div class="contenu-page page-liens-droite">${htmlIndexAmes()}<div class="entete-liens"><span class="titre-page-fiche">Le réseau</span></div>${FLEURON}${outils}<p class="fiche-attente">Choisissez une âme dans la liste.</p></div>`;
     const { montres, caches, total } = liensDuRegard(vue.reseau, id, vue.regard, vue.filtre, P);
     const pts = disposerRadar(montres, { P });
     const anneaux = [16, 31, 46].map(r => `<ellipse cx="50" cy="50" rx="${r}" ry="${(r * 0.86).toFixed(1)}" class="anneau-liens"/>`).join("");
@@ -222,7 +235,7 @@ function htmlDroite() {
     const noeuds = pts.map(q => `<button type="button" class="noeud-liens${q.id === vue.selection ? " choisi" : ""}" style="left:${q.x.toFixed(2)}%;top:${q.y.toFixed(2)}%" data-action="liens" data-cb="choisir" data-id="${echapper(q.id)}" data-aff="${q.aff.toFixed(2)}" title="${echapper(nomDe(q.id))}">${medaillon(q.id)}</button>`).join("");
     const choix = montres.concat(caches).find(x => x.id === vue.selection);
     const reste = caches.length ? `<div class="reste-liens">${caches.length} autre${caches.length > 1 ? "s" : ""} lien${caches.length > 1 ? "s" : ""} : ${caches.map(x => `<button type="button" class="ame-index-liens" data-action="liens" data-cb="choisir" data-id="${echapper(x.id)}">${echapper(nomDe(x.id))}</button>`).join(" ")}</div>` : "";
-    return `<div class="contenu-page page-liens-droite">
+    return `<div class="contenu-page page-liens-droite">${htmlIndexAmes()}
         <div class="entete-liens"><span class="titre-page-fiche">Le réseau</span></div>${FLEURON}${outils}
         <div class="radar-liens">
           <svg class="fils-liens" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${anneaux}${fils}</svg>
@@ -247,7 +260,7 @@ function rendre() {
     if (champ) champ.addEventListener("change", () => chercher(champ.value));
     const filtre = pages.d.querySelector(".filtre-liens");
     if (filtre) filtre.addEventListener("change", () => { vue.filtre = filtre.value; vue.selection = ""; rendre(); });
-    const choixAme = pages.g.querySelector("select.index-liens");
+    const choixAme = pages.d.querySelector("select.index-liens");
     if (choixAme) choixAme.addEventListener("change", () => { if (choixAme.value) { son(); centrer(choixAme.value); } });
 }
 async function charger(garderSelection) {

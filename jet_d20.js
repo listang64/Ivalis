@@ -133,6 +133,16 @@
     // étape qui découvre qu'un autre jet a commencé s'arrête là.
     let numeroScene = 0;
     let minuterieFermeture = null;
+    // (v417) Nico : « le bruit du lancement de dés se poursuit une fois le
+    // lancement terminé, comme s'il se faisait deux fois ». Un même lancer
+    // (idLancer) ne se rejoue jamais, et les sons d'une scène s'éteignent net
+    // dès qu'elle se ferme ou qu'un autre jet la chasse.
+    const lancersJoues = new Set();
+    let sortiesActives = [];
+    function taireLesSons() {
+        sortiesActives.forEach(g => { try { g.disconnect(); } catch (e) {} });
+        sortiesActives = [];
+    }
     const attendre = (ms) => new Promise(r => setTimeout(r, ms));
 
     function avatarDuLanceur(donnees) {
@@ -216,6 +226,7 @@
             const sortie = ctx.createGain();
             sortie.gain.value = v;
             sortie.connect(ctx.destination);
+            sortiesActives.push(sortie);
             fabriquer(ctx, sortie);
         } catch (e) { /* un son raté ne coupe jamais la scène */ }
     }
@@ -260,6 +271,7 @@
     function fermer() {
         const s = scene;
         numeroScene++;
+        taireLesSons();
         if (minuterieFermeture) { clearTimeout(minuterieFermeture); minuterieFermeture = null; }
         if (!s) return;
         s.hote.classList.remove("d20-visible");
@@ -281,8 +293,13 @@
 
     window.jouerAnimationDesGlobal = async function (donnees) {
         if (!donnees) return;
+        if (donnees.idLancer) {
+            if (lancersJoues.has(donnees.idLancer)) return;   // (v417) déjà joué : pas une seconde fois
+            lancersJoues.add(donnees.idLancer);
+        }
         const s = construireScene();
         if (!s) return;
+        taireLesSons();                       // (v417) le jet d'avant se tait
         const moi = ++numeroScene;
         const encore = () => moi === numeroScene;
         if (minuterieFermeture) { clearTimeout(minuterieFermeture); minuterieFermeture = null; }

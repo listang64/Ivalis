@@ -682,10 +682,50 @@ async function terminerEtape(id, cle) {
                  resultat: { arrivee: true, region: n, lieu: v.Arrivee.Lieu || "" } };
     });
     if (r && r.nuit) posterMessageCampement();
-    if (r && (r.nuit || r.arrivee)) analyserLeTerrain();
+    const terrain = (r && (r.nuit || r.arrivee)) ? analyserLeTerrain() : null;
+    // (v417) Arrivés à destination : le poste qui a clos le voyage annonce
+    // l'arrivée et réveille le Narrateur (chacun passe sur la page du récit).
+    if (r && r.arrivee) annoncerArrivee(r, terrain);
     return r;
 }
 window.terminerEtapeVoyageGroupe = terminerEtape;
+
+// L'ARRIVÉE À DESTINATION (v417). Nico : « quand le groupe se déplace quelque
+// part et qu'il arrive à destination, mets tous les joueurs sur la page du RP et
+// lance le narrateur avec tout ce qu'il faut sur le lieu actuel où il se
+// trouve ». Le Destin pose l'arrivée (le nom du lieu, ou la région en pleine
+// nature) ; le Narrateur part une fois le terrain analysé (environnement_mj.js
+// le lui donne, avec le lieu, ses bâtiments et ses habitants).
+async function annoncerArrivee(r, terrain) {
+    if (!window.ID_PARTIE_COURANTE) return;
+    let nom = "";
+    if (r.lieu) {
+        try { const s = await getDoc(doc(db, "Monde_Lieux", r.lieu)); nom = (s.exists() && s.data().Nom_Du_Lieu) || ""; }
+        catch (e) { console.warn("[Voyage] Le nom du lieu d'arrivée :", e); }
+    }
+    if (terrain) { try { await Promise.race([terrain, new Promise(res => setTimeout(res, 15000))]); } catch (e) {} }
+    const date = window.DATE_EN_JEU_ACTUELLE || {};
+    const ou = nom ? `arrive à destination : ${nom}` : "arrive à destination, en pleine nature";
+    try {
+        await addDoc(collection(db, "Messages_Chat"), {
+            ID_Partie: window.ID_PARTIE_COURANTE, ...AUTEUR_DESTIN,
+            Texte: `*Le groupe ${ou}.* (Narrateur, décris de manière immersive leur arrivée, l'atmosphère et ce qu'ils voient en premier, d'après ce que tu sais du lieu et de ses environs ; le récit tourne autour de ce lieu.)`,
+            Date_Jour: date.jour || "", Date_An: date.annee || "", Timestamp: Date.now()
+        });
+    } catch (e) { console.error("[Voyage] Message d'arrivée :", e); }
+    if (typeof window.declencherTourIA === "function") setTimeout(() => window.declencherTourIA({ auto: true }), 300);
+}
+window.__annoncerArriveeBanc = annoncerArrivee;   // (pour les bancs)
+// Chacun, à l'arrivée (un voyage qui vient de s'achever, une fois) : la page du récit.
+const arriveesRecit = new Set();
+function allerAuRecitALArrivee(fin) {
+    if (!fin || !fin.Id || arriveesRecit.has(fin.Id)) return;
+    arriveesRecit.add(fin.Id);
+    setTimeout(() => {
+        try { if (window.GRIMOIRE_RECIT && typeof window.GRIMOIRE_RECIT.allerAuRecit === "function") window.GRIMOIRE_RECIT.allerAuRecit(); }
+        catch (e) { console.error("[Voyage] Vers la page du récit :", e); }
+    }, 1200);
+}
 
 // LE VOTE DU POI : tous oui pour y aller ; un non, et l'on passe son chemin
 // (le POI disparaît). Le DEV force.
@@ -836,7 +876,7 @@ async function arriverAuPoi(poi) {
             Date_Jour: date.jour || "", Date_An: date.annee || "", Timestamp: Date.now()
         });
     } catch (e) { console.error("Message d'arrivée au POI :", e); }
-    if (typeof window.declencherTourIA === "function") setTimeout(() => window.declencherTourIA(), 300);
+    if (typeof window.declencherTourIA === "function") setTimeout(() => window.declencherTourIA({ auto: true }), 300);
 }
 
 // LA NUIT : repartir ou rester ici. Rien ne bouge tant que tous ne sont pas
@@ -879,8 +919,8 @@ window.choisirNuitVoyageGroupe = async function(reponse, options) {
 const SITUATION_NATURE = "Dans la nature";
 const situationDe = (lieu) => (lieu ? "Dans un lieu" : SITUATION_NATURE);
 function analyserLeTerrain() {
-    if (typeof window.analyserTerrainGroupe !== "function") return;
-    Promise.resolve(window.analyserTerrainGroupe()).catch(e => console.error("Analyse du terrain (le jeu continue) :", e));
+    if (typeof window.analyserTerrainGroupe !== "function") return null;
+    return Promise.resolve(window.analyserTerrainGroupe()).catch(e => console.error("Analyse du terrain (le jeu continue) :", e));
 }
 
 // --- LE CHAT ---------------------------------------------------------------
@@ -2009,6 +2049,8 @@ window.appliquerVoyageDeLaPartie = function(data) {
     // Arrivés au lieu (v281) : le voyage vient de s'achever sur lui.
     const fin = partie.Voyage_Termine;
     if (fin && fin.Poi && fin.Poi.Id && Date.now() - (Number(fin.Le) || 0) < 120000) arriverAuPoi(fin.Poi);
+    // (v417) Toute arrivée qui vient d'avoir lieu (un lieu, un POI, une région) : la page du récit, chez chacun.
+    if (fin && fin.Id && !fin.Annule && Date.now() - (Number(fin.Le) || 0) < 120000) allerAuRecitALArrivee(fin);
     // Un combat qui commence ferme le mode voyage de ce poste.
     if (combatEnCours() && choix && choix.type === "voyage") quitterChoix();
     const cle = JSON.stringify([partie.Position_Groupe || null, partie.Lieu_Actuel || "", v, partie.Voyage_Annule || null, combatEnCours()]);

@@ -24,7 +24,7 @@
   <link rel="stylesheet" href="grimoire_fiches.css?v=10">
   <link rel="stylesheet" href="grimoire_creation.css?v=9">
   <link rel="stylesheet" href="grimoire_combats.css?v=1">
-  <link rel="stylesheet" href="grimoire_liens.css?v=2">
+  <link rel="stylesheet" href="grimoire_liens.css?v=3">
   <link rel="stylesheet" href="grimoire_parametres.css?v=1">
   <link rel="stylesheet" href="vocal.css?v=2">
 
@@ -2196,7 +2196,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=306"></script>
+<script src="trace_combat.js?v=307"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2263,14 +2263,14 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=56"></script>
 <!-- LES FILS INVISIBLES (v411) : les âmes des PNJ et des héros, leurs liens (social_pur.js calcule). -->
-<script type="module" src="social.js?v=6"></script>
-<script type="module" src="ia_master.js?v=34"></script>
-<script type="module" src="illustrations_recit.js?v=12"></script>
-<script type="module" src="app.js?v=178"></script>
+<script type="module" src="social.js?v=7"></script>
+<script type="module" src="ia_master.js?v=35"></script>
+<script type="module" src="illustrations_recit.js?v=13"></script>
+<script type="module" src="app.js?v=179"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=5"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
-<script type="module" src="grimoire_recit.js?v=28"></script>
+<script type="module" src="grimoire_recit.js?v=29"></script>
 <!-- v396 : le chat vocal de la table (WebRTC, signalé par Firestore). -->
 <script type="module" src="vocal.js?v=3"></script>
 <!-- LA CARTE DU MONDE DANS LE GRIMOIRE (v302) : sa double page, ses zones (DEV). -->
@@ -2282,7 +2282,7 @@
 <!-- Les combats dans le livre (v388) : la double page du menu Combat. -->
 <script type="module" src="grimoire_combats.js?v=1"></script>
 <!-- LES FILS INVISIBLES DANS LE LIVRE (v414) : la fiche et le radar des âmes de la partie. -->
-<script type="module" src="grimoire_liens.js?v=3"></script>
+<script type="module" src="grimoire_liens.js?v=4"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=4"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région et son titre (plus de nuages dessus, v286). -->
@@ -2297,13 +2297,13 @@
 <!-- Le déplacement des PJ (v275) : les terrains praticables des cartes régionales,
      puis le groupe, son bouton voyage, les tracés, les votes, la marche et les nuits. -->
 <script type="module" src="terrains_regionaux.js?v=3"></script>
-<script type="module" src="voyage_groupe.js?v=20"></script>
+<script type="module" src="voyage_groupe.js?v=21"></script>
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
 <script type="module" src="environnement_mj.js?v=5"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->
 <script src="poi_catalogue.js?v=1"></script>
 <script type="module" src="poi_creation.js?v=4"></script>
-<script src="jet_d20.js?v=2"></script>
+<script src="jet_d20.js?v=3"></script>
 <script src="fabrique_sons.js?v=23"></script>
 <!-- Les animations de combat (le catalogue, script simple), puis leur studio. -->
 <script src="animations_combat.js?v=12"></script>
@@ -2317,7 +2317,7 @@
 <script src="talents.js?v=7"></script>
 <!-- Les blessures : la table et ses règles (script simple), puis l'écran. -->
 <script src="blessures.js?v=2"></script>
-<script type="module" src="creation_personnage.js?v=28"></script>
+<script type="module" src="creation_personnage.js?v=29"></script>
 <script type="module" src="classes.js?v=48"></script>
 <script type="module" src="competences.js?v=77"></script>
 <script type="module" src="talents_ui.js?v=2"></script>
@@ -2576,6 +2576,8 @@
         <div class="bloc-formulaire">
           <h4>Détails</h4>
           <div class="champ-formulaire"><label>Signes distinctifs et accessoires</label><input type="text" class="input-perso" id="champ-signes"></div>
+          <!-- (v417) Nico : « dans toutes les fiches de création de personnages, rajoute un encart : Secret (si le perso a un secret) ». -->
+          <div class="champ-formulaire" id="groupe-secret"><label>Secret (si ton personnage en a un)</label><textarea class="input-perso" id="champ-secret" rows="2" maxlength="400" placeholder="Ce qu'il cache aux autres… (facultatif)"></textarea></div>
           <div class="champ-formulaire" id="groupe-expression">
             <label>Expression du visage</label>
             <select class="input-perso" id="champ-expression">

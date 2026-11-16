@@ -169,6 +169,7 @@ Utilise l'outil 'donnerAmes', une entrée par personnage, avec son nom exact.`;
     } catch (e) { console.warn("[MIA_AME] Personnalités impossibles (valeurs moyennes) :", e); return {}; }
 }
 
+export const FAMILIARITE_COMPAGNONS = 40;
 // LES ÂMES DE LA SCÈNE : chaque PNJ présent (`pnjs` : [{ id, fiche }]) et
 // chaque héros (`heros` : les fiches de la partie) a son âme ; un PNJ qui
 // découvre un héros s'en fait une première impression. Rend { ames, liens }
@@ -182,7 +183,7 @@ export async function assurerAmes(o) {
     const ames = await lireAmes(p, ids);
     const manquants = [
         ...pnjs.filter(x => !ames[x.id]).map(x => ({ id: x.id, type: "pnj", nom: x.fiche.Nom_PNJ, fiche: { occupation: x.fiche.Occupation || "", race: x.fiche.Race || "", physique: String(x.fiche.Description_Physique || "").slice(0, 300), secret: x.fiche.Secret_Mental || "", parole: x.fiche.Style_De_Parole || "" } })),
-        ...heros.filter(h => !ames[h.idPersonnage]).map(h => ({ id: h.idPersonnage, type: "heros", nom: h.prenom, fiche: { nom: `${h.prenom} ${h.nom || ""}`.trim(), genre: h.genre || "", race: h.race || "", classe: h.classe || "", age: h.age || "", signes: h.signes || "", histoire: String(h.histoire || h.Histoire || h.background || "").slice(0, 400) } }))
+        ...heros.filter(h => !ames[h.idPersonnage]).map(h => ({ id: h.idPersonnage, type: "heros", nom: h.prenom, fiche: { nom: `${h.prenom} ${h.nom || ""}`.trim(), genre: h.genre || "", race: h.race || "", classe: h.classe || "", age: h.age || "", signes: h.signes || "", secret: h.secret || "", histoire: String(h.histoire || h.Histoire || h.background || "").slice(0, 400) } }))
     ].slice(0, 10);
     const lot = writeBatch(db);
     let ecrits = 0;
@@ -197,6 +198,18 @@ export async function assurerAmes(o) {
         journal(`MIA_AME : ${manquants.map(m => m.nom).join(", ")} reçoi${manquants.length > 1 ? "vent" : "t"} une âme.`);
     }
     const liens = await lireLiens(p, ids);
+    // (v417) LES COMPAGNONS DE ROUTE. Nico : « les héros ne connaissent pas, dans le
+    // réseau, les autres membres du groupe : mets-leur des relations neutres de
+    // base ». Deux héros de la partie sans lien : un lien neutre (aucun axe, une
+    // familiarité de compagnons), étiqueté « compagnon ». Le moteur ne le fait pas
+    // bouger (pas de relation chiffrée entre héros : les joueurs décident).
+    heros.forEach(a => heros.forEach(b => {
+        if (a.idPersonnage === b.idPersonnage) return;
+        const k = P.cleLien(a.idPersonnage, b.idPersonnage);
+        if (liens[k]) return;
+        liens[k] = { de: a.idPersonnage, vers: b.idPersonnage, axes: { ...P.axesVides(), familiarite: FAMILIARITE_COMPAGNONS }, origine: "groupe", etiquette: "compagnon", histoire: "", majLe: Date.now(), derniers: [] };
+        lot.set(refLien(p, a.idPersonnage, b.idPersonnage), liens[k]); ecrits++;
+    }));
     // LA PREMIÈRE RENCONTRE : un PNJ et un héros présents ensemble, sans lien encore.
     pnjs.forEach(x => heros.forEach(h => {
         const a = ames[x.id];
@@ -346,7 +359,9 @@ export async function tourSocial(o) {
     touches.forEach(k => {
         const l = calcul.etat.liens[k];
         const ici = calcul.changements.filter(c => P.cleLien(c.de, c.vers) === k);
+        // (v417) qui a agi envers qui : l'encart ne montre que ce qui s'est passé entre les deux.
         const parEv = [...new Set(ici.map(c => c.evenement))].map(n => ({ n: numeros[n], tour, resume: calcul.evenements[n].resume,
+            acteur: calcul.evenements[n].acteur, cible: calcul.evenements[n].cible,
             ecarts: Object.fromEntries(ici.filter(c => c.evenement === n).map(c => [c.axe, Math.round((c.apres - c.avant) * 100) / 100])) }));
         lot.set(refLien(p, l.de, l.vers), { ...l, majLe: Date.now(), derniers: [...((liens[k] && liens[k].derniers) || []), ...parEv].slice(-5) });
     });
@@ -474,7 +489,7 @@ export async function ajusterLien(p, de, vers, valeurs) {
     const resume = `Ajusté à la main par ${qui}.`;
     const lot = writeBatch(db);
     lot.set(refEvenement(p, numero), { numero, tour: P.nombre(e.tour), message: "", type: "ajustement", acteur: "", cible: "", gravite: 0, discret: true, resume, temoins: [], changements, annule: false, par: qui, Le: Date.now() });
-    lot.set(refL, { ...l, axes, majLe: Date.now(), derniers: [...(l.derniers || []), { n: numero, tour: P.nombre(e.tour), resume, ecarts: Object.fromEntries(changements.map(c => [c.axe, Math.round((c.apres - c.avant) * 100) / 100])) }].slice(-5) });
+    lot.set(refL, { ...l, axes, majLe: Date.now(), derniers: [...(l.derniers || []), { n: numero, tour: P.nombre(e.tour), resume, type: "ajustement", ecarts: Object.fromEntries(changements.map(c => [c.axe, Math.round((c.apres - c.avant) * 100) / 100])) }].slice(-5) });
     lot.set(refEtat(p), { compteur: numero }, { merge: true });
     await lot.commit();
     journal(`${resume} (${de} → ${vers})`);

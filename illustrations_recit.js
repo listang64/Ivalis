@@ -38,7 +38,8 @@
 //      dans sa description ; s'il parle du groupe sans les nommer, ceux que le
 //      Narrateur cite ;
 //    · comme pour l'avatar rhabillé (objets_ia.js, dessinerAvatarHabille) :
-//      chaque portrait de référence (urlPortraitReference, sinon l'avatar),
+//      chaque portrait de référence (v417 : l'avatar du moment, avec sa tenue,
+//      sinon le portrait de référence),
 //      mis en PNG carré sur le magenta (imageVersBlobPng), joint en image[] à
 //      /v1/images/edits, dans l'ordre annoncé par le texte, qualité
 //      « medium » ; un héros dont le portrait ne se lit pas : pas de croquis
@@ -154,6 +155,9 @@ window.acteursDuCroquisIllustrateur = acteursDuCroquis;   // (pour les bancs)
 // LE GROS PLAN FORCÉ (v326) : un héros de la partie qui a son portrait — de
 // préférence un que le Narrateur vient de citer —, en gros plan, saisi dans ce
 // moment (la phrase du récit qui parle de lui part avec).
+// (v417) L'apparence actuelle d'un héros : son avatar du moment (la tenue qu'il porte,
+// ses blessures), sinon son portrait de référence.
+const apparenceActuelle = (h) => (h && (h.urlCloudinary || h.urlAvatarEquipe || h.urlPortraitReference)) || "";
 function grosPlanForce(texteMJ) {
     const tous = herosDeLaPartie();
     const avecImage = tous.filter(h => h.urlPortraitReference || h.urlCloudinary);
@@ -436,8 +440,13 @@ window.illustrerLeRecit = async function (options) {
 
     // LES PNJ NOMMÉS SANS PORTRAIT : en pleine page (au plus deux).
     // (v330) Seulement ceux qui sont LÀ : un nom lu sur un parchemin ne fait pas de portrait.
-    const nommes = (Array.isArray(avis.pnj_nommes) ? avis.pnj_nommes : []).filter(p => p && p.nom && p.present === true
+    let nommes = (Array.isArray(avis.pnj_nommes) ? avis.pnj_nommes : []).filter(p => p && p.nom && p.present === true
         && !herosDeLaPartie().some(h => memeNom(h.prenom, p.nom)));
+    // (v417) Un nom de lieu (« Sylvarion ») n'est jamais un PNJ : pas de fiche, pas de portrait.
+    if (nommes.length && typeof window.estNomDeLieuIvalis === "function") {
+        const lieux = await Promise.all(nommes.map(p => window.estNomDeLieuIvalis(p.nom).catch(() => false)));
+        nommes = nommes.filter((p, i) => !lieux[i]);
+    }
     const fiches = nommes.length ? await fichesPnj(nommes.map(p => p.nom), o.pnjConnus) : {};
     const sansPortrait = nommes.filter(p => !(fiches[p.nom] && fiches[p.nom].URL_Cloudinary)).slice(0, R.portraitsMax);
     const promessesPortraits = sansPortrait.map(p => portraitDuPnj(p, fiches[p.nom]).catch(e => { console.warn("[MIA_ILLUSTRATEUR] Portrait de " + p.nom, e); return null; }));
@@ -460,7 +469,10 @@ window.illustrerLeRecit = async function (options) {
             console.warn("[MIA_ILLUSTRATEUR] Plus personne à dessiner : pas de croquis.");
             return null;
         }
-        heros.forEach(h => refs.push({ nom: h.prenom, qui: decrireHeros(h), url: h.urlPortraitReference || h.urlCloudinary || "", heros: true, scene: acteurs.scene[h.prenom] || "" }));
+        // (v417) Nico : « l'IA d'image du récit n'a pas pris en référence la nouvelle tenue de mon
+        // personnage ; donne-lui l'apparence actuelle ». L'avatar du moment (urlCloudinary : la
+        // tenue portée, les blessures) d'abord ; le portrait de référence seulement à défaut.
+        heros.forEach(h => refs.push({ nom: h.prenom, qui: decrireHeros(h), url: apparenceActuelle(h), heros: true, scene: acteurs.scene[h.prenom] || "" }));
         // (v367) Leurs armes : en image quand l'objet en a une, sinon en mots.
         const enMots = [];
         heros.forEach(h => armesDuHeros(h).forEach(o => {
@@ -485,7 +497,7 @@ window.illustrerLeRecit = async function (options) {
         try {
             // (Un héros qui n'a encore aucun portrait se dit en mots ; celui dont le
             // portrait existe mais ne se lit pas arrête le croquis.)
-            const sansImage = heros.filter(h => !(h.urlPortraitReference || h.urlCloudinary));
+            const sansImage = heros.filter(h => !apparenceActuelle(h));
             if (sansImage.length) a.description += " " + sansImage.map(h => `${h.prenom} is ${decrireHeros(h) || "an adventurer"}.`).join(" ");
             // (v318) Qui est dessiné, et combien : personne d'autre.
             const noms = [...heros.map(h => h.prenom), ...acteurs.pnj];

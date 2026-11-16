@@ -226,7 +226,7 @@ console.log("\n3. FERMER AU TOUCHER");
   verifier("un autre poste ne poste pas le message", r2.messages === 0, String(r2.messages));
   const r3 = await p.evaluate(async () => {
     window.RYTHME_D20.fermetureAuto = 400;
-    await window.jouerAnimationDesGlobal({ idLancer: "X", nomPerso: "?", caract: "Force", resultatBrut: 5, modificateur: 0, totalFinal: 5 });
+    await window.jouerAnimationDesGlobal({ idLancer: "X1", nomPerso: "?", caract: "Force", resultatBrut: 5, modificateur: 0, totalFinal: 5 });
     await new Promise(r => setTimeout(r, 1200));
     const h = document.getElementById("overlay-jet-des");
     window.RYTHME_D20.fermetureAuto = 60000;
@@ -238,7 +238,7 @@ console.log("\n3. FERMER AU TOUCHER");
 
 console.log("\n4. UN 1 NATUREL : TOUT AU ROUGE ; UN 20 NATUREL : TOUT AU VIOLET");
 {
-  const r1 = await jouer({ idLancer: "X", idPerso: "P1", nomPerso: "Cybile Ardente", caract: "Dextérité",
+  const r1 = await jouer({ idLancer: "X2", idPerso: "P1", nomPerso: "Cybile Ardente", caract: "Dextérité",
                            resultatBrut: 1, modificateur: 2, totalFinal: 3 });
   await p.screenshot({ path: "/tmp/claude-0/d20_rouge.png" });
   const [r, g, b] = rgb(r1.centre);
@@ -246,20 +246,20 @@ console.log("\n4. UN 1 NATUREL : TOUT AU ROUGE ; UN 20 NATUREL : TOUT AU VIOLET"
   verifier("le chiffre suit (clair sur rouge)", rgb(r1.chiffreFill)[0] > 240, r1.chiffreFill);
   verifier("le total s'affiche quand même : 3", r1.final === "3");
   await p.evaluate(() => window.fermerJetD20());
-  const r20 = await jouer({ idLancer: "X", idPerso: "P1", nomPerso: "Cybile Ardente", caract: "Charisme",
+  const r20 = await jouer({ idLancer: "X3", idPerso: "P1", nomPerso: "Cybile Ardente", caract: "Charisme",
                             resultatBrut: 20, modificateur: -1, totalFinal: 19 });
   await p.screenshot({ path: "/tmp/claude-0/d20_violet.png" });
   const [vr, vg, vb] = rgb(r20.centre);
   verifier("un 20 naturel : thème violet", /theme-violet/.test(r20.classes) && vb > vg + 60 && vr > vg, r20.centre);
   await p.evaluate(() => window.fermerJetD20());
-  const r15 = await jouer({ idLancer: "X", nomPerso: "?", caract: "Force", resultatBrut: 13, modificateur: 7, totalFinal: 20 });
+  const r15 = await jouer({ idLancer: "X4", nomPerso: "?", caract: "Force", resultatBrut: 13, modificateur: 7, totalFinal: 20 });
   verifier("un 20 obtenu grâce au modificateur reste doré", /theme-or/.test(r15.classes), r15.classes);
   await p.evaluate(() => window.fermerJetD20());
 }
 
 console.log("\n5. UN MALUS DESCEND DE LA MÊME FAÇON");
 {
-  const r = await jouer({ idLancer: "X", idPerso: "P1", nomPerso: "Cybile Ardente", caract: "Force",
+  const r = await jouer({ idLancer: "X5", idPerso: "P1", nomPerso: "Cybile Ardente", caract: "Force",
                           resultatBrut: 7, modificateur: -2, totalFinal: 5 });
   await p.screenshot({ path: "/tmp/claude-0/d20_malus.png" });
   const c = r.releve.chiffres;
@@ -343,6 +343,26 @@ console.log("\n7. L'ANCIEN PARCHEMIN EST PARTI");
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
+// (v417) Nico : « le bruit du lancement de dés se poursuit une fois le lancement
+// terminé, comme s'il se faisait deux fois ».
+{
+  const r = await p.evaluate(async () => {
+    window.RYTHME_D20.fermetureAuto = 60000;
+    const vrai = window.SONS_D20.tic; let tics = 0;
+    window.SONS_D20.tic = () => { tics++; vrai(); };
+    const d = { idLancer: "DOUBLE", nomPerso: "?", caract: "Force", resultatBrut: 9, modificateur: 0, totalFinal: 9 };
+    await window.jouerAnimationDesGlobal(d);
+    const apres1 = tics;
+    await window.jouerAnimationDesGlobal({ ...d });          // le même lancer, reçu une seconde fois
+    const apres2 = tics;
+    window.SONS_D20.tic = vrai;
+    window.fermerJetD20();
+    return { apres1, apres2 };
+  });
+  verifier("(v417) le même lancer reçu deux fois ne se rejoue pas (aucun tic de plus)", r.apres1 > 0 && r.apres2 === r.apres1, JSON.stringify(r));
+  const src = fs.readFileSync(path.join(RACINE, "jet_d20.js"), "utf-8");
+  verifier("(v417) la scène qui se ferme, ou qu'un autre jet chasse, tait ses sons", /function fermer\(\) \{[\s\S]{0,80}taireLesSons\(\);/.test(src) && /taireLesSons\(\);\s+\/\/ \(v417\) le jet d'avant se tait/.test(src));
+}
 await b.close(); serveur.close();
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);

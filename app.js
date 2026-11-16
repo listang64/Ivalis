@@ -166,6 +166,7 @@ function persoDocVersFront(id, d) {
     couleursDom: d.Couleurs_Dominante || "",
     equipement: d.Equipement_Visible || "",
     signes: d.Signes_Distinctif || "",
+    secret: d.Secret || "",   // (v417) le secret du héros, s'il en a un
     expression: d.Expression_Du_Visage || "",
     idFaction: d.ID_Faction || "",
     PV_Max: d.PV_Max || 0,
@@ -2082,6 +2083,7 @@ function frontVersPersoDoc(donnees, idPersonnage) {
     Equip_Main_Gauche: donnees.equipMainGauche || null,
     Equipement_Visible: donnees.equipement || "",
     Signes_Distinctif: donnees.signes || "",
+    Secret: donnees.secret || "",   // (v417)
     Expression_Du_Visage: donnees.expression || "",
     ID_Faction: donnees.idFaction || "",
     // 🔻 NOUVEAU : On sauvegarde les états altérés ! 🔻

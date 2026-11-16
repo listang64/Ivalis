@@ -236,7 +236,9 @@ await p.evaluate(() => {
   ame("PNJ_MYRTO", "pnj", "Myrto", { statut: "mort" }); fiche("PNJ_MYRTO", "Myrto", "Tavernière");
   ame("H1", "heros", "Thorin"); ame("H2", "heros", "Lyra");
   const L = (de, vers, axes, extra) => { d[`${P}Liens/${de}~${vers}`] = { de, vers, axes: { confiance: 0, respect: 0, attachement: 0, dette: 0, crainte: 0, familiarite: 60, ...axes }, origine: "rencontre", etiquette: "", histoire: "", derniers: [], ...(extra || {}) }; };
-  L("PNJ_DOROS", "H1", { confiance: -60, respect: -40, attachement: -70, crainte: 10, familiarite: 30 }, { derniers: [{ n: 1, tour: 1, resume: "Thorin a humilié Doros au marché.", ecarts: { respect: -8, attachement: -10 } }] });
+  L("PNJ_DOROS", "H1", { confiance: -60, respect: -40, attachement: -70, crainte: 10, familiarite: 30 }, { derniers: [{ n: 1, tour: 1, resume: "Thorin a humilié Doros au marché.", acteur: "H1", cible: "PNJ_DOROS", ecarts: { respect: -8, attachement: -10 } },
+                 // (v417) un témoignage : Doros a vu Thorin bousculer Koré — pas « entre eux », l'encart ne le montre pas
+                 { n: 7, tour: 2, resume: "Thorin a bousculé Dame Koré.", acteur: "H1", cible: "PNJ_KORE", ecarts: { confiance: -3 } }] });
   L("PNJ_DOROS", "H2", { confiance: 60, attachement: 70, respect: 50, dette: 45, familiarite: 80 });
   L("PNJ_DOROS", "PNJ_KORE", { respect: 40, crainte: 20, confiance: 10, familiarite: 90 }, { origine: "preexistant", etiquette: "patron", histoire: "Koré possède les quais." });
   L("PNJ_DOROS", "PNJ_MYRTO", { attachement: 50, confiance: 40, familiarite: 70 });
@@ -244,6 +246,7 @@ await p.evaluate(() => {
   L("PNJ_KORE", "PNJ_DOROS", { respect: 10, confiance: 15, familiarite: 90 }, { etiquette: "employé" });
   for (let i = 1; i <= 14; i++) { ame("PNJ_N" + i, "pnj", "Voisin " + i); fiche("PNJ_N" + i, "Voisin " + i, "Pêcheur"); L("PNJ_DOROS", "PNJ_N" + i, { confiance: ((i * 37) % 100) - 50, attachement: ((i * 53) % 100) - 50, familiarite: 10 + i * 3 }); }
   d[P + "Souvenirs/s1"] = { ame: "PNJ_DOROS", texte: "Thorin m'a humilié au marché, devant mes frères.", sujets: ["H1"], importance: 3, tour: 1, dateJeu: "Jour 2 de l'an 1000" };
+  d[P + "Souvenirs/s2"] = { ame: "PNJ_DOROS", texte: "Lyra m'a soigné la main.", sujets: ["H2"], importance: 1, tour: 3, dateJeu: "Jour 4 de l'an 1000" };
   d[P + "Social/etat"] = { tour: 3, compteur: 1, historique: [], messages: [] };
   d[P + "Evenements_Sociaux/000001"] = { numero: 1, tour: 1, type: "humilier", acteur: "H1", cible: "PNJ_DOROS", gravite: 2, resume: "Thorin a humilié Doros au marché.", temoins: [], annule: false,
     changements: [{ de: "PNJ_DOROS", vers: "H1", axe: "respect", avant: -32, apres: -40 }, { de: "PNJ_DOROS", vers: "H1", axe: "attachement", avant: -60, apres: -70 }] };
@@ -285,12 +288,14 @@ await section(async () => {
   verifier("…ses six traits chiffrés, ses valeurs, son objectif, sa faille, son masque, sa parole, son secret",
            ["Prudence", "Impulsivité", "Loyauté", "Empathie", "Orgueil", "Sociabilité"].every(t => g.includes(t)) && /Valeurs : l'honneur/.test(g) && /Venger son honneur/.test(g) && /Faille : Il ne pardonne pas/.test(g) && /Masque : Bourru/.test(g) && /Parole : Rauque/.test(g) && /Secret : Il vole la recette/.test(g));
   verifier("…ses souvenirs, datés", /Jour 2 de l'an 1000/.test(g) && /humilié au marché/.test(g));
+  // (v417) Nico : « mettre toujours le plus récent en haut de la liste ».
+  verifier("(v417) le souvenir le plus récent en haut (Lyra, jour 4, avant Thorin, jour 2)", g.indexOf("Lyra m'a soigné") >= 0 && g.indexOf("Lyra m'a soigné") < g.indexOf("humilié au marché"));
   // (v415) Nico : « une liste déroulante, par ordre alphabétique ».
-  const index = await G(() => [...document.querySelectorAll("#grimoire-liens-g select.index-liens option")].map(o => ({ t: o.textContent.trim(), v: o.value, choisi: o.selected })));
+  const index = await G(() => [...document.querySelectorAll("#grimoire-liens-d select.index-liens option")].map(o => ({ t: o.textContent.trim(), v: o.value, choisi: o.selected })));
   const noms = index.map(x => x.t);
-  verifier("en bas, toutes les âmes de la partie dans une liste déroulante, par ordre alphabétique ; Myrto, morte, marquée †", index.length === 19 && JSON.stringify(noms) === JSON.stringify(noms.slice().sort((x, y) => x.localeCompare(y, "fr", { sensitivity: "base" })))
+  verifier("en haut de la page de droite (v417), toutes les âmes de la partie dans une liste déroulante, par ordre alphabétique ; Myrto, morte, marquée †", index.length === 19 && JSON.stringify(noms) === JSON.stringify(noms.slice().sort((x, y) => x.localeCompare(y, "fr", { sensitivity: "base" })))
            && noms[0] === "Dame Koré" && noms.includes("Myrto †") && noms.includes("Thorin (héros)") && index.find(x => x.v === "PNJ_DOROS").choisi, noms.slice(0, 5).join(", "));
-  await G(() => { const s = document.querySelector("#grimoire-liens-g select.index-liens"); s.value = "PNJ_KORE"; s.dispatchEvent(new Event("change")); });
+  await G(() => { const s = document.querySelector("#grimoire-liens-d select.index-liens"); s.value = "PNJ_KORE"; s.dispatchEvent(new Event("change")); });
   await attendreQue(() => G(() => window.GRIMOIRE_LIENS.vue().centre === "PNJ_KORE"), 3000);
   verifier("choisir une âme dans la liste la met au centre", (await G(() => window.GRIMOIRE_LIENS.vue().centre)) === "PNJ_KORE");
   await G(() => window.GRIMOIRE_LIENS.centrer("PNJ_DOROS"));
@@ -319,6 +324,8 @@ await section(async () => {
   const enc = await G(() => (document.querySelector("#grimoire-liens-d .encart-liens") || {}).innerText || "");
   verifier("un toucher sur Thorin : l'encart « Doros → Thorin », le chiffre (−58), le mot, les six axes", /Doros → Thorin/.test(enc) && /−58/.test(enc) && /hostile/.test(enc) && ["Confiance", "Respect", "Attachement", "Dette", "Crainte", "Familiarité"].every(x => enc.includes(x)), enc.slice(0, 160).replace(/\n/g, " | "));
   verifier("…ce qu'il en dit, et le dernier changement (sa cause)", /ne lui fait pas confiance/.test(enc) && /Thorin a humilié Doros au marché/.test(enc));
+  // (v417) Nico : « les derniers changements, mais en rapport avec le personnage en question ».
+  verifier("(v417) seulement ce qui s'est passé entre Doros et Thorin (pas ce que Doros a vu Thorin faire à Koré)", !/bousculé Dame Koré/.test(enc));
   verifier("…sans les gestes de Nico et Ben pour un joueur", !/Ajuster/.test(enc) && !/annuler/.test(enc));
   await cap("v414_encart");
   // L'autre regard : ce qu'on ressent pour Doros.

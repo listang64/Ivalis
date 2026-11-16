@@ -380,6 +380,7 @@ const SVG_CERVEAU = `<svg class="cerveau-marge-svg" viewBox="0 0 40 40" aria-hid
     + `<path class="sillon" d="M12 13.5 C14 15 13 18 15.5 18.5 M28 13.5 C26 15 27 18 24.5 18.5 M11 24 C13 23 14.5 25 16 24 M29 24 C27 23 25.5 25 24 24"/>`
     + `<g class="engrenage"><path d="M20 15.2 L21.3 15.4 L21.7 16.9 L23.1 17.5 L24.4 16.7 L25.3 17.6 L24.5 18.9 L25.1 20.3 L26.6 20.7 L26.6 22 L25.1 22.4 L24.5 23.8 L25.3 25.1 L24.4 26 L23.1 25.2 L21.7 25.8 L21.3 27.3 L20 27.3 L18.7 27.3 L18.3 25.8 L16.9 25.2 L15.6 26 L14.7 25.1 L15.5 23.8 L14.9 22.4 L13.4 22 L13.4 20.7 L14.9 20.3 L15.5 18.9 L14.7 17.6 L15.6 16.7 L16.9 17.5 L18.3 16.9 L18.7 15.4 Z"/>`
     + `<circle cx="20" cy="21.3" r="2.2"/></g></svg>`;
+const modeDevRecit = () => { try { return localStorage.getItem("ivalis_DEV_MODE") === "on"; } catch (e) { return false; } };
 function cerveauDeMarge(cerveaux, id) {
     const lignes = cerveaux.flatMap(c => c.lignes || []);
     return `<span class="cerveau-marge" data-e="${echapper(id || "")}" data-social="${echapper(JSON.stringify(lignes))}" title="${echapper(lignes.join(" — "))}">${SVG_CERVEAU}</span>`;
@@ -438,7 +439,9 @@ function paragraphesDuChapitre(entrees) {
             const mots = jetons.map((h, x) => ({ h, e: e.id, i: i0 + x }));
             if (k === 0 && e.jets.length && mots.length) mots[0].de = e.jets;
             // (v412) le petit cerveau à engrenage se pose en marge du paragraphe qui a fait bouger un lien
-            const cerveaux = (e.cerveaux || []).filter(c => c && Number(c.para) === k);
+            // (v417) Nico : « le symbole des fils invisibles dans les marges du récit : affiche-le
+            // seulement quand le mode DEV est activé ».
+            const cerveaux = modeDevRecit() ? (e.cerveaux || []).filter(c => c && Number(c.para) === k) : [];
             if (cerveaux.length && mots.length) mots[0].cerveau = cerveaux;
             // v307 : Nico, « quand les joueurs écrivent leur texte, fais que l'IA saute
             // quand même une ligne pour aérer le texte » — la ligne d'un joueur ouvre
@@ -1578,7 +1581,7 @@ window.livreRecitMessages = function (messages, options) {
     const nouveauJet = etat.messages.find(m => !avant.has(idDe(m)) && estJet(m) && mesIds.has(m.Auteur_ID));
     if (nouveauJet && attente.demandes.length && !attente.manquants.length && !etat.autoLances.has(idDe(nouveauJet))) {
         etat.autoLances.add(idDe(nouveauJet));
-        setTimeout(() => { if (typeof window.declencherTourIA === "function") Promise.resolve(window.declencherTourIA()).catch(e => console.error("Le Narrateur :", e)); }, 700);
+        setTimeout(() => { if (typeof window.declencherTourIA === "function") Promise.resolve(window.declencherTourIA({ auto: true })).catch(e => console.error("Le Narrateur :", e)); }, 700);
     }
 };
 window.livreRecitPartie = function (data) {
