@@ -469,8 +469,10 @@ export async function annulerEvenement(p, numero) {
 }
 // AJUSTER un lien à la main : chaque axe changé devient un événement
 // « ajustement » du journal (qui, quand, avant, après).
-export async function ajusterLien(p, de, vers, valeurs) {
-    if (!estAdminSocial()) throw new Error("Réservé à Nico et Ben.");
+export async function ajusterLien(p, de, vers, valeurs, options) {
+    // (v425) La réglette du mode DEV (grimoire_liens.js) : réservée au mode développeur.
+    const dev = !!(options && options.dev) && (() => { try { return localStorage.getItem("ivalis_DEV_MODE") === "on"; } catch (e) { return false; } })();
+    if (!estAdminSocial() && !dev) throw new Error("Réservé à Nico et Ben.");
     const refL = refLien(p, de, vers), sl = await getDoc(refL);
     const l = sl.exists() ? sl.data() : { de, vers, axes: P.axesVides(), origine: "rencontre", etiquette: "", histoire: "", derniers: [] };
     const axes = { ...P.axesVides(), ...(l.axes || {}) };
@@ -486,7 +488,7 @@ export async function ajusterLien(p, de, vers, valeurs) {
     const etatSnap = await getDoc(refEtat(p));
     const e = etatSnap.exists() ? etatSnap.data() : {};
     const numero = P.nombre(e.compteur) + 1, qui = quiCorrige();
-    const resume = `Ajusté à la main par ${qui}.`;
+    const resume = dev && !estAdminSocial() ? `Réglé en mode DEV par ${qui}.` : `Ajusté à la main par ${qui}.`;
     const lot = writeBatch(db);
     lot.set(refEvenement(p, numero), { numero, tour: P.nombre(e.tour), message: "", type: "ajustement", acteur: "", cible: "", gravite: 0, discret: true, resume, temoins: [], changements, annule: false, par: qui, Le: Date.now() });
     lot.set(refL, { ...l, axes, majLe: Date.now(), derniers: [...(l.derniers || []), { n: numero, tour: P.nombre(e.tour), resume, type: "ajustement", ecarts: Object.fromEntries(changements.map(c => [c.axe, Math.round((c.apres - c.avant) * 100) / 100])) }].slice(-5) });

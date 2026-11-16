@@ -85,6 +85,14 @@
 .barre-liens { height: calc(var(--u) * 1.2); background: #d9c29a; border-radius: 9px; overflow: hidden; }
 .barre-liens i { display: block; height: 100%; background: #597358; border-radius: 9px; }
 .barre-liens i.neg { background: #a65c55; }
+/* (v425) La roue crantée rouge (mode DEV) et sa réglette. */
+.axe-liens.avec-roue { grid-template-columns: calc(var(--u) * 17) calc(var(--u) * 6) 1fr auto auto; }
+.roue-liens { width: calc(var(--u) * 3.4); height: calc(var(--u) * 3.4); padding: 0 !important; border: none !important; background: none !important; cursor: pointer; display: grid; place-items: center; }
+.roue-liens svg { width: 100%; height: 100%; fill: #c0261c; transition: transform 0.25s ease; }
+.roue-liens:hover svg, .roue-liens.ouverte svg { transform: rotate(45deg); fill: #e0301f; }
+.reglette-liens { display: flex; align-items: center; gap: calc(var(--u) * 1.4); margin: calc(var(--u) * -0.2) 0 calc(var(--u) * 0.6) calc(var(--u) * 18); }
+.reglette-liens input { flex: 1; accent-color: #c0261c; }
+.reglette-liens output { min-width: calc(var(--u) * 6); text-align: right; font-weight: bold; color: #8b1a10; font-size: calc(var(--u) * 2.7); }
 .ajuste-liens { width: calc(var(--u) * 10); font-size: calc(var(--u) * 2.6); }
 .derniers-liens { margin: 0; padding-left: calc(var(--u) * 3); font-size: calc(var(--u) * 2.6); }
 .derniers-liens li.annule { opacity: 0.55; text-decoration: line-through; }

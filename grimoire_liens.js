@@ -98,7 +98,7 @@ export function liensDuRegard(reseau, centre, regard, filtre, P) {
 //  L'ÉTAT DE LA DOUBLE PAGE
 // ---------------------------------------------------------------------
 let pages = null;
-const vue = { centre: "", regard: "out", filtre: "tous", selection: "", recherche: "", ajuste: false, reseau: null, souvenirs: [], charge: 0, retourRecit: false, retourParametres: false, retourGroupe: false, dernierToucher: null };
+const vue = { centre: "", regard: "out", filtre: "tous", selection: "", recherche: "", ajuste: false, regle: "", reseau: null, souvenirs: [], charge: 0, retourRecit: false, retourParametres: false, retourGroupe: false, dernierToucher: null };
 
 function creer() {
     if (pages) return pages;
@@ -191,13 +191,22 @@ function htmlGauche() {
 //  LA PAGE DE DROITE : le radar et l'encart
 // ---------------------------------------------------------------------
 const signe = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(Math.round(v));
+const modeDev = () => { try { return localStorage.getItem("ivalis_DEV_MODE") === "on"; } catch (e) { return false; } };
+const ROUE = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 2h3.4l.5 2.6c.7.2 1.3.5 1.9.9l2.3-1.3 2.4 2.4-1.3 2.3c.4.6.7 1.2.9 1.9l2.6.5v3.4l-2.6.5c-.2.7-.5 1.3-.9 1.9l1.3 2.3-2.4 2.4-2.3-1.3c-.6.4-1.2.7-1.9.9l-.5 2.6h-3.4l-.5-2.6c-.7-.2-1.3-.5-1.9-.9l-2.3 1.3-2.4-2.4 1.3-2.3c-.4-.6-.7-1.2-.9-1.9L2 13.7v-3.4l2.6-.5c.2-.7.5-1.3.9-1.9L4.2 5.6l2.4-2.4 2.3 1.3c.6-.4 1.2-.7 1.9-.9zM12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z"/></svg>`;
 function htmlEncart(choix) {
     const P = S(), l = choix.lien, a = l.axes || {}, aff = P.affinite(a);
     const de = l.de, vers = l.vers, admin = P.estAdminSocial && P.estAdminSocial();
+    // (v425) Nico : « quand le mode dev est activé (et uniquement là), à côté de chaque barre,
+    // une toute petite roue crantée rouge qui ouvre une réglette pour changer la jauge à la
+    // main ; pour les tests ». Relâchée, la réglette enregistre (un « ajustement » du journal).
+    const dev = modeDev();
     const barres = P.AXES.map(axe => {
         const [min, max] = P.BORNES[axe], v = P.nombre(a[axe]);
-        return `<div class="axe-liens"><span>${P.NOMS_AXES[axe]}</span><b>${signe(v)}</b><span class="barre-liens"><i class="${v < 0 ? "neg" : ""}" style="width:${((v - min) / (max - min) * 100).toFixed(1)}%"></i></span>
-          ${vue.ajuste && admin ? `<input class="ajuste-liens" type="number" step="1" min="${min}" max="${max}" data-axe="${axe}" value="${Math.round(v)}">` : ""}</div>`;
+        const regle = dev && vue.regle === axe;
+        return `<div class="axe-liens${dev ? " avec-roue" : ""}"><span>${P.NOMS_AXES[axe]}</span><b>${signe(v)}</b><span class="barre-liens"><i class="${v < 0 ? "neg" : ""}" style="width:${((v - min) / (max - min) * 100).toFixed(1)}%"></i></span>
+          ${vue.ajuste && admin ? `<input class="ajuste-liens" type="number" step="1" min="${min}" max="${max}" data-axe="${axe}" value="${Math.round(v)}">` : ""}
+          ${dev ? `<button type="button" class="roue-liens${regle ? " ouverte" : ""}" data-action="liens" data-cb="roue" data-axe="${axe}" title="Régler ${echapper(P.NOMS_AXES[axe])} (DEV)" aria-label="Régler ${echapper(P.NOMS_AXES[axe])}">${ROUE}</button>` : ""}</div>
+          ${regle ? `<div class="reglette-liens"><input type="range" class="curseur-liens" min="${min}" max="${max}" step="1" value="${Math.round(v)}" data-axe="${axe}"><output>${signe(v)}</output></div>` : ""}`;
     }).join("");
     // (v417) Nico : « les derniers changements, oui, mais en rapport avec le personnage en
     // question » : seulement ce qui s'est passé ENTRE les deux (l'un a agi envers l'autre) ;
@@ -261,6 +270,13 @@ function rendre() {
     if (champ) champ.addEventListener("change", () => chercher(champ.value));
     const filtre = pages.d.querySelector(".filtre-liens");
     if (filtre) filtre.addEventListener("change", () => { vue.filtre = filtre.value; vue.selection = ""; rendre(); });
+    // (v425) La réglette : le chiffre suit le doigt ; relâchée, la jauge s'enregistre.
+    const curseur = pages.d.querySelector(".curseur-liens");
+    if (curseur) {
+        const sortie = curseur.parentNode.querySelector("output");
+        curseur.addEventListener("input", () => { if (sortie) sortie.textContent = signe(Number(curseur.value)); });
+        curseur.addEventListener("change", () => reglerJauge(curseur.dataset.axe, Number(curseur.value)));
+    }
     const choixAme = pages.d.querySelector("select.index-liens");
     if (choixAme) choixAme.addEventListener("change", () => { if (choixAme.value) { son(); centrer(choixAme.value); } });
 }
@@ -279,9 +295,17 @@ async function charger(garderSelection) {
     vue.charge = 2;
     rendre();
 }
+async function reglerJauge(axe, valeur) {
+    if (!modeDev()) return;
+    const P = S(), p = window.ID_PARTIE_COURANTE;
+    const de = vue.regard === "in" ? vue.selection : vue.centre, vers = vue.regard === "in" ? vue.centre : vue.selection;
+    if (!P || !p || !de || !vers) return;
+    try { await P.ajusterLien(p, de, vers, { [axe]: valeur }, { dev: true }); } catch (e) { alert(e.message || e); return; }
+    await charger(true);
+}
 async function centrer(id) {
     if (!id || !ames()[id]) return;
-    vue.centre = id; vue.selection = ""; vue.ajuste = false;
+    vue.centre = id; vue.selection = ""; vue.ajuste = false; vue.regle = "";
     vue.souvenirs = await S().lireSouvenirsDe(window.ID_PARTIE_COURANTE, id).catch(() => []);
     rendre();
 }
@@ -303,11 +327,13 @@ async function agir(cible) {
         vue.dernierToucher = { id, t: Date.now() };
         // Deux touchers sur le même portrait : il passe au centre.
         if (d && d.id === id && Date.now() - d.t < 450) { son(); await centrer(id); return; }
-        son(); vue.selection = vue.selection === id ? "" : id; vue.ajuste = false; rendre(); return;
+        son(); vue.selection = vue.selection === id ? "" : id; vue.ajuste = false; vue.regle = ""; rendre(); return;
     }
     if (cb === "centrer") { son(); await centrer(cible.dataset.id); return; }
     if (cb === "regard") { son(); vue.regard = cible.dataset.regard === "in" ? "in" : "out"; vue.selection = ""; rendre(); return; }
-    if (cb === "fermer") { vue.selection = ""; vue.ajuste = false; rendre(); return; }
+    if (cb === "fermer") { vue.selection = ""; vue.ajuste = false; vue.regle = ""; rendre(); return; }
+    // (v425) La roue crantée (mode DEV) : la réglette de cette jauge s'ouvre (ou se referme).
+    if (cb === "roue") { if (!modeDev()) return; son(); vue.regle = vue.regle === cible.dataset.axe ? "" : cible.dataset.axe; rendre(); return; }
     if (cb === "recit") { son(); vue.retourRecit = false; if (window.GRIMOIRE_RECIT && window.GRIMOIRE_RECIT.allerAuRecit) window.GRIMOIRE_RECIT.allerAuRecit(); return; }
     if (cb === "parametres") { son(); vue.retourParametres = false; if (window.GRIMOIRE_PARAMETRES) window.GRIMOIRE_PARAMETRES.revenirDesLiens(); return; }
     if (cb === "groupe") { son(); vue.retourGroupe = false; if (window.GRIMOIRE_GROUPE) window.GRIMOIRE_GROUPE.ouvrir(); return; }
