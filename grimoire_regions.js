@@ -457,18 +457,31 @@
             const postit = papierDuMonde();
             ici = postit && postit.querySelector(".papier-voyage");
         }
+        // (v428) Nico : « quand on voyage et qu'on s'arrête à un feu de camp, j'ai encore la
+        // vieille popup : crée un post-it qui sort en haut, côté gauche du livre, avec le style
+        // habituel du livre, et mets-y tout ce qu'il y a dans la popup ». Ailleurs que sur les
+        // cartes (le récit, le groupe…), le livre ouvert, la boîte du voyage (le vote, la nuit
+        // au campement, la halte…) et le bandeau s'écrivent sur le même post-it, à gauche.
+        const g = G(), ecranLivre = g && g.ecran && g.ecran();
+        const ailleurs = !loupe && !r && !monde && !!g && g.enPartie && g.enPartie() && g.ouvert && g.ouvert() && !!ecranLivre && ecranLivre.style.display !== "none";
+        const papierAilleurs = ailleurs ? (papierDuMonde() || null) : null;
+        const surPostit = papierAilleurs && papierAilleurs.querySelector(".papier-voyage");
         const dehors = $("ecran-jeu") || document.body;
         FENETRES_VOYAGE.forEach(id => {
             const el = $(id);
             if (!el) return;
-            const voulu = ici || (id === "apercu-lieu" ? document.body : dehors);
+            const voulu = ici || (surPostit && (id === "boite-voyage" || id === "bandeau-voyage") ? surPostit : (id === "apercu-lieu" ? document.body : dehors));
             if (el.parentNode !== voulu) voulu.appendChild(el);
         });
         // Le titre de la région remonte quand une fenêtre s'écrit sur la page ; le post-it sort.
         const occupe = !!ici && [...ici.children].some(fenetreVisible);
         regions.forEach(x => x.pages[0].classList.toggle("avec-voyage", occupe && x === r));
         const postit = $("voyage-postit");
-        if (postit) postit.classList.toggle("sortie", occupe && !r && !!monde);
+        if (postit) {
+            const occupeAilleurs = !!surPostit && [...surPostit.children].some(fenetreVisible);
+            postit.classList.toggle("a-gauche", !!surPostit);
+            postit.classList.toggle("sortie", (occupe && !r && !!monde) || occupeAilleurs);
+        }
     }
     window.rangerFenetresVoyageLivre = rangerFenetresVoyage;
     let tailleVue = "", vueObservee = null, vueRedimensionnee = true;

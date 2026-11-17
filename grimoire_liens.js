@@ -183,6 +183,7 @@ function htmlGauche() {
         ${ps.style ? `<p class="ligne-liens"><b>Parole :</b> ${echapper(ps.style)}</p>` : ""}
         ${a.type === "pnj" && f.Secret_Mental ? `<p class="ligne-liens"><b>Secret :</b> ${echapper(f.Secret_Mental)}</p>` : ""}
         ${a.type === "heros" && h && h.secret ? `<p class="ligne-liens"><b>Secret :</b> ${echapper(h.secret)}</p>` : ""}
+        ${a.memoire ? `<div class="sous-titre-liens">Sa mémoire à long terme</div><p class="memoire-liens">${echapper(a.memoire)}</p>` : ""}
         <div class="sous-titre-liens">Ses souvenirs</div>
         ${souvenirs ? `<ul class="souvenirs-liens">${souvenirs}</ul>` : `<p class="fiche-attente">Pas encore de souvenir.</p>`}
       </div>${(window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.FLECHE_DEFILE) || ""}`;
@@ -362,20 +363,27 @@ async function ouvrir(options) {
     vue.retourRecit = !!o.depuisRecit;
     vue.retourParametres = !!o.depuisParametres;
     vue.retourGroupe = !!o.depuisGroupe;      // (v418) depuis la double page du Groupe
-    await charger();
+    // (v428) Nico : « les fils invisibles dans paramètres, le bouton ne fonctionne pas ». Le
+    // livre attendait d'avoir tout lu dans la base avant de tourner : rien ne bougeait sous
+    // le doigt et, si la lecture passait 8 secondes, la double page ressortait du livre
+    // pendant l'attente (plus rien à atteindre). Il tourne tout de suite (« Le livre cherche
+    // les âmes… »), lit pendant ce temps, et repose sa double page si elle était ressortie.
+    if (o.id) { vue.centre = o.id; vue.selection = ""; }
+    const lecture = charger();
+    const aller = (essai) => {
+        const i = g.indexDe(pages.g);
+        if (i < 0) { poser(); enRoute = Date.now(); if (essai < 60) setTimeout(() => aller(essai + 1), 100); return; }
+        g.allerALaPage(i);
+    };
+    enRoute = Date.now();
+    aller(0);
+    await lecture;
     if (o.id && ames()[o.id]) await centrer(o.id);
     else if (o.nom) {
         const t = sansAccent(o.nom), mm = typeof window.memeNomPNJIvalis === "function" ? window.memeNomPNJIvalis : (a, b) => sansAccent(a) === sansAccent(b);
         const a = Object.values(ames()).find(x => sansAccent(x.nom) === t) || Object.values(ames()).find(x => mm(o.nom, x.nom));
         if (a) await centrer(a.id);
     }
-    const aller = (essai) => {
-        const i = g.indexDe(pages.g);
-        if (i < 0) { if (essai < 30) setTimeout(() => aller(essai + 1), 100); return; }
-        g.allerALaPage(i);
-    };
-    enRoute = Date.now();
-    aller(0);
     return true;
 }
 function ouverte() {

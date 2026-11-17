@@ -6,7 +6,7 @@
    en petit, en bas de l'écran.
    ========================================================================= */
 .discussion-privee { --larg-av: min(36vw, 560px); --marge-dp: 2.5vw;
-  position: fixed; inset: 0; z-index: 2147482000; background: rgba(0, 0, 0, 0.7); color: #f3e9d6; overflow: hidden;
+  position: fixed; inset: 0; z-index: 2147482000; background: rgba(0, 0, 0, 0.82); color: #f3e9d6; overflow: hidden;
   font-family: 'Almendra', Georgia, serif; animation: entree-dp 0.25s ease; }
 @keyframes entree-dp { from { opacity: 0; } to { opacity: 1; } }
 
@@ -18,14 +18,25 @@
 .avatar-dp.sans-image { display: grid; place-items: end center; padding-bottom: 14vh; box-sizing: border-box; }
 .avatar-dp.sans-image span { display: grid; place-items: center; width: min(26vw, 300px); aspect-ratio: 1; border-radius: 50%; background: rgba(120, 90, 50, 0.55);
   border: 2px solid rgba(243, 233, 214, 0.4); font-family: 'Cinzel', serif; font-size: min(9vw, 110px); color: #f3e9d6; }
-/* LES ENCARTS : sur l'avatar de celui qui parle, jusqu'avant celui de l'autre */
-.encart-dp { position: absolute; top: 20vh; box-sizing: border-box; min-height: 7em; padding: 1.1em 1.4em; border-radius: 22px; background: rgba(0, 0, 0, 0.8);
+/* LES ENCARTS : sur l'avatar de celui qui parle, jusqu'avant celui de l'autre.
+   (v428) Nico : « l'encart pour parler est en haut de l'écran, déplace-les en bas ; et rends
+   le fond un peu plus opaque » (82 %) ; « les deux encarts se chevauchent : quand le PNJ parle,
+   l'encart du joueur à 10 %, et l'inverse quand c'est au joueur, l'actif passant devant ». */
+.encart-dp { position: absolute; bottom: 11vh; box-sizing: border-box; min-height: 7em; padding: 1.1em 1.4em; border-radius: 22px; background: rgba(0, 0, 0, 0.8);
   border: 1px solid rgba(243, 233, 214, 0.16); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5); font-size: clamp(17px, 2vw, 26px); line-height: 1.4;
   animation: encart-dp 0.22s ease; }
 .encart-dp[hidden] { display: none; }
+.encart-dp { transition: opacity 0.3s ease; }
+.discussion-privee[data-tour="pj"] .encart-dp.pnj,
+.discussion-privee:not([data-tour="pj"]) .encart-dp.pj { opacity: 0.1; z-index: 1; }
+.discussion-privee[data-tour="pj"] .encart-dp.pj,
+.discussion-privee:not([data-tour="pj"]) .encart-dp.pnj { opacity: 1; z-index: 2; }
+.suite-dp { margin-top: 0.5em; font-size: 0.55em; font-style: italic; letter-spacing: 0.04em; color: rgba(243, 233, 214, 0.55); text-align: right; }
+.suite-dp:empty { display: none; }
 @keyframes encart-dp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.encart-dp.pnj { right: var(--marge-dp); left: calc(var(--marge-dp) + var(--larg-av) + 1.5vw); cursor: pointer; }
-.encart-dp.pj { left: var(--marge-dp); right: calc(var(--marge-dp) + var(--larg-av) + 1.5vw); display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.3em 0.6em; }
+.encart-dp.pnj { right: var(--marge-dp); left: calc(var(--marge-dp) + var(--larg-av) * 0.55); }
+.discussion-privee:not([data-tour="pj"]) { cursor: pointer; }
+.encart-dp.pj { left: var(--marge-dp); right: calc(var(--marge-dp) + var(--larg-av) * 0.55); display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.3em 0.6em; }
 .nom-dp { flex: 0 0 100%; margin-bottom: 0.35em; font-family: 'Cinzel', serif; font-size: 0.62em; letter-spacing: 0.1em; text-transform: uppercase; color: #d9bf8c; }
 .geste-dp { font-style: italic; color: #d9bf8c; }
 .saisie-dp { flex: 1; min-width: 0; background: transparent; border: none; outline: none; resize: none; color: #f3e9d6; font: inherit; line-height: 1.4; }
@@ -40,7 +51,7 @@
 @keyframes point-dp { 0%, 100% { opacity: 0.25; transform: none; } 40% { opacity: 1; transform: translateY(-4px); } }
 
 /* LA PHRASE DU PNJ, EN PETIT, EN BAS DE L'ÉCRAN */
-.rappel-dp { position: absolute; left: 50%; bottom: 3vh; transform: translateX(-50%); width: min(72vw, 820px); box-sizing: border-box; z-index: 2;
+.rappel-dp { position: absolute; left: 50%; bottom: 1.5vh; transform: translateX(-50%); width: min(72vw, 820px); box-sizing: border-box; z-index: 2;
   padding: 0.6em 1em; border-radius: 14px; background: rgba(0, 0, 0, 0.8); border: 1px solid rgba(243, 233, 214, 0.12);
   font-size: clamp(13px, 1.3vw, 17px); line-height: 1.35; color: rgba(243, 233, 214, 0.9); text-align: center; }
 .rappel-dp[hidden] { display: none; }
@@ -54,7 +65,7 @@
 @media (max-width: 700px) and (orientation: portrait) {
   .discussion-privee { --larg-av: 46vw; --marge-dp: 2vw; }
   .avatar-dp { height: 52vh; }
-  .encart-dp { top: 11vh; }
+  .encart-dp { bottom: 10vh; }
   .encart-dp.pnj { left: 14vw; right: 3vw; }
   .encart-dp.pj { left: 3vw; right: 14vw; }
   .rappel-dp { width: 92vw; bottom: 1.5vh; }

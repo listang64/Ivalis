@@ -192,7 +192,7 @@ export async function avantLeMJ(o) {
                 if (verdict.verdict === "jet") {
                     jets.push({ idPerso: h.idPersonnage, heros: h.prenom, caracteristique: "CHARISME", difficulte: GP.motDifficulte(verdict.dd), action: `convaincre ${f.Nom_PNJ} de rejoindre la compagnie` });
                 } else if (verdict.verdict === "oui") {
-                    actionsCompagnie.push({ type: "recruter", id: f.idDoc, nom: f.Nom_PNJ, depuis: dateJeu(), ts: Date.now() });
+                    actionsCompagnie.push({ type: "recruter", id: f.idDoc, nom: f.Nom_PNJ, depuis: dateJeu(), ts: Date.now(), par: nomH });
                     decisions.push(`${f.Nom_PNJ} ACCEPTE de rejoindre la compagnie (demandé par ${nomH} : ${verdict.raison}). Joue son acceptation ; désormais il voyage avec les héros.`);
                 } else if (verdict.verdict === "non") {
                     decisions.push(`${f.Nom_PNJ} REFUSE de suivre la compagnie (demandé par ${nomH} : ${verdict.raison}). Joue ce refus avec son caractère, sans le changer.`);
@@ -229,6 +229,18 @@ export async function avantLeMJ(o) {
     }
     if (JSON.stringify(liste) !== avant) {
         try { await ecrireCompagnie(p, liste); } catch (e) { console.error("[La compagnie] Écriture impossible :", e); }
+    }
+    // (v428) Nico : « le PNJ a décidé de me suivre, mais en parlant avec lui il n'a pas
+    // conscience qu'il est dans mon groupe : quand un PNJ rejoint le groupe, l'indiquer dans
+    // ses souvenirs, avec la date ». Un souvenir important, au sujet des héros.
+    for (const a of actionsCompagnie.filter(x => x.type === "recruter")) {
+        if (!window.SOCIAL || typeof window.SOCIAL.noterSouvenir !== "function") break;
+        const noms = heros.map(h => h.prenom).filter(Boolean);
+        const qui = noms.length > 1 ? `${noms.slice(0, -1).join(", ")} et ${noms[noms.length - 1]}` : (noms[0] || "les héros");
+        try {
+            await window.SOCIAL.noterSouvenir(p, a.id, `J'ai rejoint la compagnie de ${qui} : désormais je voyage avec eux${a.par && a.par !== "un héros" ? ` (c'est ${a.par} qui me l'a demandé)` : ""}.`,
+                { cle: "compagnie", sujets: heros.map(h => h.idPersonnage), importance: 3, dateJeu: a.depuis || dateJeu() });
+        } catch (e) { console.warn("[La compagnie] Le souvenir de l'arrivée :", e); }
     }
     return { attendre: false, contexte: contexteDuNarrateur(liste, loy, heros, decisions, env) };
 }

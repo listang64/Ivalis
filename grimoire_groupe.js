@@ -74,7 +74,8 @@ async function lire(force) {
 //  LES DESSINS
 // ---------------------------------------------------------------------
 const initiales = (nom) => String(nom || "?").split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join("");
-const medaillon = (url, nom, classes) => `<span class="medaillon-liens ${classes || ""}">${url ? `<img src="${echapper(url)}" alt="" draggable="false">` : `<span class="initiales-liens">${echapper(initiales(nom))}</span>`}</span>`;
+// (v428) L'avatar en pied (héros à gauche, suiveurs à droite) ; sans image, ses initiales.
+const avatarEnPied = (url, nom, classe) => `<span class="${classe}${url ? "" : " sans-image"}">${url ? `<img src="${echapper(url)}" alt="" draggable="false">` : `<span class="initiales-liens">${echapper(initiales(nom))}</span>`}</span>`;
 function motReputation(v) {
     if (v == null) return "inconnue";
     if (v >= 7) return "adulés"; if (v >= 3) return "bien vus"; if (v > -3) return "inconnus ou neutres"; if (v > -7) return "mal vus"; return "honnis";
@@ -102,8 +103,11 @@ function htmlGauche() {
         const id = echapper(h.idPersonnage);
         const changer = moi && h.idJoueur === moi
             ? `<button type="button" class="changer-heros-groupe" data-action="groupe" data-gp="changer" title="Changer de personnage" aria-label="Changer de personnage">⇄</button>` : "";
+        // (v428) Nico : « à gauche, l'avatar des personnages les uns à côté des autres, avec en
+        // dessous leurs noms, et un dégradé noir faible opacité pour masquer la coupe du bas de
+        // leurs images ; adapte la taille des avatars au nombre de personnages » (--n, le CSS).
         return `<div class="heros-groupe">
-            <button type="button" class="portrait-heros-groupe" data-action="groupe" data-gp="heros" data-id="${id}">${medaillon(url, nomHeros(h), "heros")}</button>
+            <button type="button" class="portrait-heros-groupe" data-action="groupe" data-gp="heros" data-id="${id}">${avatarEnPied(url, nomHeros(h), "avatar-heros-groupe")}</button>
             <span class="ligne-nom-groupe"><button type="button" class="nom-groupe" data-action="groupe" data-gp="heros" data-id="${id}">${echapper(nomHeros(h))}</button>${changer}</span>
             <span class="role-groupe">${echapper(classeDe(h))}${h.niveau ? ` · niv. ${echapper(h.niveau)}` : ""}</span></div>`;
     }).join("");
@@ -117,7 +121,7 @@ function htmlGauche() {
           ${!l.nature && l.reputation != null ? `<div><span class="cle-groupe">Réputation ici</span> ${l.reputation > 0 ? "+" : ""}${echapper(l.reputation)} — ${motReputation(l.reputation)}${(l.tags || []).length ? ` <em>(${echapper(l.tags.slice(0, 3).join(", "))})</em>` : ""}</div>` : ""}
         </div>
         <div class="sous-titre-groupe">La compagnie</div>
-        <div class="liste-heros-groupe">${ligneHeros || `<p class="fiche-attente">Aucun héros dans le groupe.</p>`}</div>
+        <div class="liste-heros-groupe" style="--n:${Math.max(1, heros.length)}">${ligneHeros || `<p class="fiche-attente">Aucun héros dans le groupe.</p>`}</div>
         <button type="button" class="bouton-aventuriers-groupe" data-action="groupe" data-gp="aventuriers">${lavis(TEINTE_AVENTURIERS, "aventuriers-groupe")}${cadre("aventuriers-groupe", 1.3)}<span>Les aventuriers ›</span></button>
       </div>`;
 }
@@ -126,9 +130,12 @@ function htmlGauche() {
 function htmlSuiveur(s) {
     const f = s.fiche || {};
     const etat = s.etat === "avec" ? (s.blesse ? "avec nous, blessé" : "avec nous") : (ETAT_JOLI[s.etat] || s.etat);
+    // (v428) Nico : « page de droite, l'avatar des PNJ aussi : garde la taille de leurs encarts,
+    // l'avatar collé en bas de son encart, qui dépasse un peu en haut, sur le côté gauche » ;
+    // « le symbole pour parler en privé, plus petit et sous l'image du PNJ ».
     return `<li class="suiveur-groupe">
         <button type="button" class="carte-suiveur" data-action="groupe" data-gp="ame" data-id="${echapper(s.id)}" data-nom="${echapper(s.nom)}">
-          ${medaillon(f.URL_Cloudinary || "", s.nom)}
+          ${avatarEnPied(f.URL_Cloudinary || "", s.nom, "avatar-suiveur")}
           <span class="texte-suiveur">
             <span class="nom-groupe">${echapper(s.nom)}</span>
             <span class="role-groupe">${echapper(f.Occupation || "")}${s.depuis ? ` · depuis le ${echapper(s.depuis)}` : ""}</span>
@@ -136,15 +143,17 @@ function htmlSuiveur(s) {
             <span class="loyaute-groupe">Loyauté ${jaugeLoyaute(s.loyaute)} <small>${echapper(s.motLoyaute || "")}</small></span>
           </span>
         </button>
-        <button type="button" class="parler-groupe" data-action="groupe" data-gp="parler" data-id="${echapper(s.id)}" title="Parler en privé avec ${echapper(s.nom)}" aria-label="Parler en privé avec ${echapper(s.nom)}">${TETE_QUI_PARLE}</button>
-        <button type="button" class="lien-fiche renvoyer-groupe" data-action="groupe" data-gp="renvoyer" data-id="${echapper(s.id)}" data-nom="${echapper(s.nom)}">Se séparer de lui</button>
+        <div class="actions-suiveur">
+          <button type="button" class="parler-groupe" data-action="groupe" data-gp="parler" data-id="${echapper(s.id)}" title="Parler en privé avec ${echapper(s.nom)}" aria-label="Parler en privé avec ${echapper(s.nom)}">${TETE_QUI_PARLE}</button>
+          <button type="button" class="lien-fiche renvoyer-groupe" data-action="groupe" data-gp="renvoyer" data-id="${echapper(s.id)}" data-nom="${echapper(s.nom)}">Se séparer de lui</button>
+        </div>
       </li>`;
 }
 function htmlCompagnon(c) {
     const etat = c.mort ? "mort" : (c.blessures || []).length ? "avec nous, blessé" : "avec nous";
     return `<li class="suiveur-groupe compagnon-groupe${c.mort ? " mort" : ""}">
         <div class="carte-suiveur fixe">
-          ${medaillon(c.image || c.token || "", c.nom, c.mort ? "mort" : "")}
+          ${avatarEnPied(c.image || c.token || "", c.nom, "avatar-suiveur")}
           <span class="texte-suiveur">
             <span class="nom-groupe">${echapper(c.nom)}</span>
             <span class="role-groupe">Le compagnon de ${echapper(c.maitre || "")}</span>
@@ -196,7 +205,7 @@ async function agir(cible) {
         const s = (donnees.suiveurs || []).find(x => x.id === cible.dataset.id && x.etat === "avec");
         if (!s || !window.DISCUSSION) return;
         son();
-        window.DISCUSSION.ouvrir({ id: s.id, nom: s.nom, fiche: s.fiche || {} });
+        window.DISCUSSION.ouvrir({ id: s.id, nom: s.nom, fiche: s.fiche || {}, depuis: s.depuis || "" });
         return;
     }
     if (gp === "renvoyer") {

@@ -698,11 +698,16 @@ window.terminerEtapeVoyageGroupe = terminerEtape;
 // le lui donne, avec le lieu, ses bâtiments et ses habitants).
 async function annoncerArrivee(r, terrain) {
     if (!window.ID_PARTIE_COURANTE) return;
-    let nom = "";
+    let nom = "", image = "";
     if (r.lieu) {
-        try { const s = await getDoc(doc(db, "Monde_Lieux", r.lieu)); nom = (s.exists() && s.data().Nom_Du_Lieu) || ""; }
+        try { const s = await getDoc(doc(db, "Monde_Lieux", r.lieu)); nom = (s.exists() && s.data().Nom_Du_Lieu) || ""; image = (s.exists() && s.data().URL_Cloudinary) || ""; }
         catch (e) { console.warn("[Voyage] Le nom du lieu d'arrivée :", e); }
     }
+    // (v428) Nico : « à l'arrivée dans un lieu, mettre l'image générée en fond de page aussi » :
+    // l'image du lieu (Monde_Lieux) part avec l'annonce, et le livre la pose en double page,
+    // comme les illustrations du récit (elle reste celle du lieu : jamais effacée avec un chapitre).
+    const illustration = image && !String(image).startsWith("data:")
+        ? { Illustration: { Url: image, Ratio: +(1792 / 1024).toFixed(4), Format: "double-page", Sujet: "lieu", Lieu: r.lieu, Le: Date.now() } } : {};
     if (terrain) { try { await Promise.race([terrain, new Promise(res => setTimeout(res, 15000))]); } catch (e) {} }
     const date = window.DATE_EN_JEU_ACTUELLE || {};
     const ou = nom ? `arrive à destination : ${nom}` : "arrive à destination, en pleine nature";
@@ -710,7 +715,7 @@ async function annoncerArrivee(r, terrain) {
         await addDoc(collection(db, "Messages_Chat"), {
             ID_Partie: window.ID_PARTIE_COURANTE, ...AUTEUR_DESTIN,
             Texte: `*Le groupe ${ou}.* (Narrateur, décris de manière immersive leur arrivée, l'atmosphère et ce qu'ils voient en premier, d'après ce que tu sais du lieu et de ses environs ; le récit tourne autour de ce lieu.)`,
-            Date_Jour: date.jour || "", Date_An: date.annee || "", Timestamp: Date.now()
+            Date_Jour: date.jour || "", Date_An: date.annee || "", Timestamp: Date.now(), ...illustration
         });
     } catch (e) { console.error("[Voyage] Message d'arrivée :", e); }
     if (typeof window.declencherTourIA === "function") setTimeout(() => window.declencherTourIA({ auto: true }), 300);

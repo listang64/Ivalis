@@ -341,8 +341,10 @@ await section(async () => {
   const t = await G(() => [...document.querySelectorAll("#grimoire-groupe-d .suiveur-groupe")].map(li => [li.querySelector(".nom-groupe").textContent.trim(), !!li.querySelector(".parler-groupe")]));
   verifier("Doros (il nous suit) a sa tête qui parle ; Croc-Gris (le loup de Lyra) n'en a pas", JSON.stringify(t) === '[["Doros",true],["Croc-Gris",false]]', JSON.stringify(t));
   verifier("…ni Dame Koré (laissée en arrière)", await G(() => document.querySelectorAll(".parler-groupe").length === 1));
-  verifier("…une tête dessinée (une silhouette et ses ondes), dans le coin de la carte", await G(() => { const b = document.querySelector(".parler-groupe"), c = b.closest(".suiveur-groupe").querySelector(".carte-suiveur").getBoundingClientRect(), r = b.getBoundingClientRect();
-    return !!b.querySelector("svg .tete") && !!b.querySelector("svg .onde") && r.right <= c.right + 1 && r.top >= c.top - 1 && r.top < c.top + c.height / 2 && r.width > 10; }));
+  // (v428) Nico : « le symbole pour parler en privé, plus petit et sous l'image du PNJ ».
+  verifier("…une tête dessinée (une silhouette et ses ondes), sous l'image de Doros (v428)", await G(() => { const b = document.querySelector(".parler-groupe"), li = b.closest(".suiveur-groupe"), c = li.querySelector(".carte-suiveur").getBoundingClientRect(),
+    a = li.querySelector(".avatar-suiveur").getBoundingClientRect(), r = b.getBoundingClientRect();
+    return !!b.querySelector("svg .tete") && !!b.querySelector("svg .onde") && r.top >= c.bottom - 1 && r.left + r.width / 2 > a.left && r.left + r.width / 2 < a.right && r.width > 10; }));
   await cap("v422-icone");
 });
 
@@ -352,15 +354,19 @@ titre("2. LA FENÊTRE : « OUI ? »");
 await section(async () => {
   await cliquer('#grimoire-groupe-d .parler-groupe[data-id="PNJ_DOROS"]');
   verifier("un toucher : la discussion s'ouvre", await attendreQue(ouverte, 3000));
-  verifier("…un fond noir à 70 %, sur tout l'écran", await style("#discussion-privee", "backgroundColor") === "rgba(0, 0, 0, 0.7)" && await G(() => { const r = document.getElementById("discussion-privee").getBoundingClientRect(); return r.width === innerWidth && r.height === innerHeight; }));
+  // (v428) Nico : « rends le fond un peu plus opaque » : 82 %.
+  verifier("…un fond noir à 82 % (v428 ; 70 % avant), sur tout l'écran", await style("#discussion-privee", "backgroundColor") === "rgba(0, 0, 0, 0.82)" && await G(() => { const r = document.getElementById("discussion-privee").getBoundingClientRect(); return r.width === innerWidth && r.height === innerHeight; }));
   const pj = await rect(".avatar-dp.pj"), pnj = await rect(".avatar-dp.pnj");
   verifier("…à gauche en grand Thorin (son portrait), à droite Doros (le sien)", await G(() => /portrait-thorin/.test(document.querySelector(".avatar-dp.pj").src) && /doros\.png/.test(document.querySelector(".avatar-dp.pnj").src))
     && pj.l < 100 && pnj.r > 1094 && pj.h > 500 && pnj.h > 500, JSON.stringify([pj, pnj]));
   verifier("…« Oui ? » dans l'encart de Doros (son nom en tête)", (await texte(".encart-dp.pnj .texte-dp")) === "Oui ?" && (await texte(".encart-dp.pnj .nom-dp")) === "Doros" && await tour() === "pnj");
   const e = await rect(".encart-dp.pnj");
-  verifier("…l'encart de Doros : sur son avatar, il s'arrête avant celui de Thorin", e.r > pnj.l + 50 && e.l > pj.r && e.l - pj.r < 60, JSON.stringify(e));
+  // (v428) Nico : « les encarts sont en haut de l'écran, déplace-les en bas » ; ils se chevauchent.
+  verifier("(v428) l'encart de Doros : sur son avatar, en bas de l'écran, il passe sur celui de Thorin", e.r > pnj.l + 50 && e.l < pj.r && e.b > 834 * 0.75, JSON.stringify(e));
   verifier("…noir à 80 %, aux coins arrondis", await style(".encart-dp.pnj", "backgroundColor") === "rgba(0, 0, 0, 0.8)" && parseFloat(await style(".encart-dp.pnj", "borderTopLeftRadius")) >= 12);
-  verifier("…pas encore d'encart pour Thorin, un bouton pour quitter", !(await rect(".encart-dp.pj")) && await visible(".quitter-dp"));
+  await p.waitForTimeout(500);
+  verifier("(v428) …l'encart de Thorin derrière, à 10 % ; un bouton pour quitter", Number(await style(".encart-dp.pj", "opacity")) <= 0.11 && Number(await style(".encart-dp.pnj", "opacity")) === 1
+    && Number(await style(".encart-dp.pnj", "zIndex")) > Number(await style(".encart-dp.pj", "zIndex")) && await visible(".quitter-dp"));
   verifier("aucune IA n'a encore parlé (« Oui ? » est écrit d'avance)", appelsParole().length === 0);
   await cap("v422-oui");
 });
@@ -369,11 +375,16 @@ await section(async () => {
 titre("3. AU JOUEUR : LA PHRASE DU PNJ EN PETIT, EN BAS ; SON ENCART À LUI");
 // =========================================================================
 await section(async () => {
-  verifier("la phrase lue, c'est au joueur", await attendreQue(async () => (await tour()) === "pj", 4000));
+  // (v428) Nico : « les paroles du PNJ ne vont en bas que quand le joueur a cliqué quelque part ».
+  await p.waitForTimeout(4500);
+  verifier("(v428) lue, la phrase reste : rien ne bouge sans un toucher", (await tour()) === "pnj");
+  await p.mouse.click(600, 120);
+  verifier("un toucher n'importe où : c'est au joueur", await attendreQue(async () => (await tour()) === "pj", 2000));
+  await p.waitForTimeout(400);
   const r = await rect(".rappel-dp"), pj = await rect(".avatar-dp.pj"), pnj = await rect(".avatar-dp.pnj"), e = await rect(".encart-dp.pj");
   verifier("…« Oui ? » de Doros, en petit, en bas de l'écran", /Doros Oui \?/.test(await texte(".rappel-dp")) && r.b > 834 - 60 && parseFloat(await style(".rappel-dp", "fontSize")) < parseFloat(await style(".encart-dp.pj", "fontSize")), JSON.stringify(r));
-  verifier("…l'encart de Doros a disparu", !(await rect(".encart-dp.pnj")));
-  verifier("…l'encart de Thorin : sur son avatar, il s'arrête avant celui de Doros", e && e.l < pj.r - 50 && e.r < pnj.l && pnj.l - e.r < 60, JSON.stringify(e));
+  verifier("(v428) …l'encart de Doros passe derrière, à 10 %", Number(await style(".encart-dp.pnj", "opacity")) <= 0.11 && Number(await style(".encart-dp.pj", "zIndex")) > Number(await style(".encart-dp.pnj", "zIndex")));
+  verifier("(v428) …l'encart de Thorin : sur son avatar, en bas, il passe sur celui de Doros", e && e.l < pj.r - 50 && e.r > pnj.l && e.b > 834 * 0.75, JSON.stringify(e));
   verifier("…noir à 80 %, coins arrondis, une zone pour écrire", await style(".encart-dp.pj", "backgroundColor") === "rgba(0, 0, 0, 0.8)" && parseFloat(await style(".encart-dp.pj", "borderTopLeftRadius")) >= 12 && await visible(".saisie-dp"));
   verifier("…son nom en tête de son encart ; rien ne chevauche la phrase de Doros en bas", (await texte(".encart-dp.pj .nom-dp")) === "Thorin" && await G(() => { const r = document.querySelector(".rappel-dp").getBoundingClientRect();
     return [...document.querySelectorAll("#discussion-privee .nom-dp, #discussion-privee .encart-dp")].every(e => { const q = e.getBoundingClientRect(); return !q.width || q.bottom <= r.top || q.top >= r.bottom; }); }));
@@ -414,8 +425,13 @@ await section(async () => {
   paroles.push({ replique: "*détourne les yeux* Bon. Je vole la recette du vieux Phokas, voilà. *se lève* Assez parlé pour ce soir.", partir: true });
   await dire("Tu peux tout me dire, tu sais.");
   verifier("sa dernière phrase s'affiche…", await attendreQue(async () => /Assez parlé pour ce soir/.test(await texte(".encart-dp.pnj")), 4000) && await tour() === "parti");
-  verifier("…le joueur ne peut plus répondre", !(await rect(".encart-dp.pj")));
-  verifier("…puis la fenêtre se ferme toute seule", await attendreQue(async () => !(await ouverte()), 12000));
+  await p.waitForTimeout(500);
+  verifier("…le joueur ne peut plus répondre (son encart à 10 %, sans plume)", Number(await style(".encart-dp.pj", "opacity")) <= 0.11 && await G(() => document.querySelector(".saisie-dp").disabled));
+  // (v428) elle reste jusqu'au toucher du joueur
+  await p.waitForTimeout(3000);
+  verifier("(v428) …elle reste, « Touchez l'écran pour quitter »", await ouverte() && /Touchez l'écran pour quitter/.test(await texte(".encart-dp.pnj")));
+  await p.mouse.click(600, 120);
+  verifier("…un toucher : la fenêtre se ferme", await attendreQue(async () => !(await ouverte()), 3000));
   verifier("MIA_SOCIAL lit toute la discussion, une fois", await attendreQue(() => appelsSocial().length === 1, 4000), String(appelsSocial().length));
   const s = appelsSocial()[0] || { txt: "" };
   verifier("…en privé, sans témoin, le dialogue entier", /EN PRIVÉ entre Thorin et Doros, sans aucun témoin/.test(s.txt) && /Thorin : Tu peux tout me dire, tu sais\.\nDoros : \*détourne les yeux\*/.test(s.txt), s.txt.slice(0, 300));
@@ -484,9 +500,10 @@ await section(async () => {
   await p.setViewportSize({ width: 390, height: 844 });
   await cliquer('#grimoire-groupe-d .parler-groupe[data-id="PNJ_DOROS"]');
   await attendreQue(ouverte, 3000);
+  await p.waitForTimeout(500);
   const e = await rect(".encart-dp.pnj"), q = await rect(".quitter-dp");
   verifier("l'encart tient dans l'écran, le bouton Quitter aussi", e.l >= 0 && e.r <= 390 && q.r <= 390 && q.l >= 0, JSON.stringify([e, q]));
-  verifier("une seule fenêtre, un seul encart (celui de Doros)", await G(() => document.querySelectorAll(".discussion-privee").length === 1 && [...document.querySelectorAll(".encart-dp")].filter(e => !e.hidden).map(e => e.classList.contains("pnj") ? "pnj" : "pj").join() === "pnj"),
+  verifier("une seule fenêtre ; l'encart de Doros devant, celui de Thorin à 10 % (v428)", await G(() => document.querySelectorAll(".discussion-privee").length === 1 && [...document.querySelectorAll(".encart-dp")].filter(e => Number(getComputedStyle(e).opacity) > 0.5).map(e => e.classList.contains("pnj") ? "pnj" : "pj").join() === "pnj"),
     await G(() => document.querySelectorAll(".discussion-privee").length + " " + [...document.querySelectorAll(".encart-dp")].map(e => e.className + ":" + e.hidden).join()));
   await cap("v422-telephone-oui");
   await cliquer(".encart-dp.pnj");

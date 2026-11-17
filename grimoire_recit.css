@@ -79,6 +79,16 @@
 .ligne-sommaire .tit { font-family: 'Almendra', serif; font-style: italic; border-bottom: 1px dotted rgba(43, 26, 14, 0.4); flex: 1; }
 .ligne-sommaire.courant .tit { font-weight: 700; }
 .ligne-sommaire:hover .tit { color: #000; border-bottom-style: solid; }
+/* (v428) Le mode DEV du sommaire : la roue crantée rouge à côté du titre ; les « − » rouges des chapitres. */
+.ligne-sommaire-dev { display: flex; align-items: baseline; gap: calc(var(--u) * 1); }
+.ligne-sommaire-dev > .ligne-sommaire { flex: 1; min-width: 0; }
+.roue-sommaire { display: inline-grid; place-items: center; vertical-align: super; margin-left: calc(var(--u) * 1.4); width: calc(var(--u) * 3.6); height: calc(var(--u) * 3.6);
+  padding: 0 !important; background: none !important; border: none !important; cursor: pointer; transition: transform 0.3s ease; }
+.roue-sommaire svg { width: 100%; height: 100%; fill: #b3261e; fill-rule: evenodd; }
+.roue-sommaire.ouverte { transform: rotate(60deg); }
+.moins-sommaire { flex: none; align-self: center; width: calc(var(--u) * 4); height: calc(var(--u) * 4); padding: 0 !important; display: grid; place-items: center;
+  background: none !important; border: 1.5px solid #b3261e !important; border-radius: 50%; color: #b3261e !important; font-size: calc(var(--u) * 3.6); line-height: 1; cursor: pointer; }
+.moins-sommaire:hover { background: rgba(179, 38, 30, 0.12) !important; }
 .note-sommaire { margin-top: auto; margin-bottom: calc(var(--u) * 6); font-style: italic; font-size: calc(var(--u) * 3.2); color: #6b4a2b; text-align: center; }
 
 /* LE PARCHEMIN D'ÉCRITURE (v301) : un marque-page au-dessus de la page de
@@ -390,6 +400,10 @@
 .fond-recit img.pret, .portrait-avatar img.pret { opacity: 1; }
 /* Le portrait d'un PNJ nouveau, fait comme l'avatar des héros : en couleur, détouré. */
 .portrait-avatar img { mix-blend-mode: normal; filter: none; object-fit: contain; }
+/* (v428) Le nom en grand, au-dessus ; l'image posée tout en bas de la page. */
+.portrait-pleine-page.portrait-avatar { inset: calc(var(--u) * 6) calc(var(--u) * 4) 0; }
+.portrait-avatar figcaption { order: -1; margin: 0 0 calc(var(--u) * 1.2); font-size: calc(var(--u) * 9 * var(--echelle-titres, 1)); }
+.portrait-avatar img { object-position: 50% 100%; }
 @keyframes croquis-monte {
   0% { opacity: 0; filter: blur(6px) sepia(1) contrast(0.4); clip-path: inset(0 100% 0 0); }
   40% { opacity: 0.8; }

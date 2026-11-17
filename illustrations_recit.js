@@ -120,10 +120,14 @@ function herosDuCroquis(avis, texteMJ) {
     const tous = herosDeLaPartie();
     const choisis = tous.filter(h => (avis.heros || []).some(n => memeNom(h.prenom, n)) || nommeDans(avis.description || "", h.prenom));
     if (!choisis.length && /\b(heroes|hero|heroine|adventurers?|companions?|party|group|travell?ers?|friends)\b/i.test(avis.description || "")) {
-        return tous.filter(h => nommeDans(texteMJ || "", h.prenom)).slice(0, 4);
+        return tous.filter(h => nommeDans(texteMJ || "", h.prenom)).slice(0, MAX_FIGURES);
     }
-    return choisis.slice(0, 4);
+    return choisis.slice(0, MAX_FIGURES);
 }
+// (v428) Nico : « limiter le plan à deux personnages au plus, avec tout l'équipement qu'ils
+// portent ; des plans plus rapprochés, dynamiques ». Deux figures au plus dans l'image.
+const MAX_FIGURES = 2;
+window.MAX_FIGURES_ILLUSTRATEUR = MAX_FIGURES;
 // LES ACTEURS DU CROQUIS (v323) : la mise en scène de l'agent, figure par
 // figure, chaque héros relié à sa fiche (son identifiant H1…, sinon son nom).
 // Un héros qu'on ne retrouve pas : `perdus` (le croquis ne part pas : plutôt
@@ -133,13 +137,15 @@ function acteursDuCroquis(avis, texteMJ) {
     const liste = Array.isArray(avis.acteurs) ? avis.acteurs.filter(a => a && (a.nom || a.id)) : [];
     const res = { heros: [], pnj: [], autres: [], perdus: [], scene: {} };
     const enScene = (a) => [a.place, a.action, a.expression].map(x => String(x || "").trim()).filter(Boolean).join("; ");
+    const place = () => res.heros.length + res.pnj.length + res.autres.length < MAX_FIGURES;
     if (!liste.length) {
         res.heros = herosDuCroquis(avis, texteMJ);
-        res.pnj = (avis.pnj_dans_le_croquis || []).filter(Boolean).map(String);
-        res.autres = (Array.isArray(avis.autres) ? avis.autres : []).filter(Boolean).map(String).slice(0, 4);
+        (avis.pnj_dans_le_croquis || []).filter(Boolean).map(String).forEach(n => { if (place()) res.pnj.push(n); });
+        (Array.isArray(avis.autres) ? avis.autres : []).filter(Boolean).map(String).forEach(n => { if (place()) res.autres.push(n); });
         return res;
     }
     liste.slice(0, 6).forEach(a => {
+        if (!place()) return;               // (v428) deux figures au plus : les premières de la mise en scène
         const id = String(a.id || "").trim().toUpperCase(), nom = String(a.nom || "").trim();
         const type = String(a.type || "").toLowerCase();
         const parId = /^H\d+$/.test(id) ? tous[Number(id.slice(1)) - 1] : null;
@@ -158,6 +164,19 @@ window.acteursDuCroquisIllustrateur = acteursDuCroquis;   // (pour les bancs)
 // (v417) L'apparence actuelle d'un héros : son avatar du moment (la tenue qu'il porte,
 // ses blessures), sinon son portrait de référence.
 const apparenceActuelle = (h) => (h && (h.urlCloudinary || h.urlAvatarEquipe || h.urlPortraitReference)) || "";
+// (v428) Nico : « pour les images des personnages, propose à l'IA des prises de vue originales
+// et dynamiques ». Une au hasard pour le gros plan forcé ; la liste part aussi à l'agent.
+const PRISES_DE_VUE = [
+    "dynamic close-up, dutch angle, the hero leaning toward the camera, strong rim light",
+    "low-angle hero shot from below, the hero towering against the sky, wind in the clothes",
+    "over-the-shoulder shot from behind the hero, their face turned in three-quarter view toward the action",
+    "tight medium shot in mid-motion, a slight motion blur on the edges, the weapon caught in the movement",
+    "high-angle shot looking down at the hero, who looks up at the camera, dramatic shadows",
+    "close shot through foreground elements (leaves, smoke, sparks) partially framing the hero",
+    "profile shot, the hero's silhouette cut out by a backlight, the eyes catching the light",
+    "wide-lens close-up, slight fisheye perspective, the hero's hand reaching toward the viewer"
+];
+window.PRISES_DE_VUE_ILLUSTRATEUR = PRISES_DE_VUE;
 function grosPlanForce(texteMJ) {
     const tous = herosDeLaPartie();
     const avecImage = tous.filter(h => h.urlPortraitReference || h.urlCloudinary);
@@ -174,7 +193,7 @@ function grosPlanForce(texteMJ) {
         description: `${h.prenom} at this very moment of the story, in the place where it happens: a strong, expressive face and body language reacting to what is happening.`,
         acteurs: [{ id: "H" + (tous.indexOf(h) + 1), nom: h.prenom, type: "heros", place: "right",
                     action: "medium shot, caught in the moment", expression: "the emotion of this moment of the story" }],
-        mise_en_scene: "cinematic medium shot, the hero on the right half of the frame, three-quarter view, slightly low angle, strong rim light; the setting of the scene behind, calm and quiet on the left half",
+        mise_en_scene: `${PRISES_DE_VUE[Math.floor(Math.random() * PRISES_DE_VUE.length)]}; the hero on the right half of the frame, wearing all of their current equipment; the setting of the scene behind, calm and quiet on the left half`,
         extrait, pnj_nommes: []
     };
 }
@@ -217,22 +236,27 @@ QUOI DESSINER : soit une SCÈNE (les personnages en action), soit UN PERSONNAGE 
 
 LE NARRATEUR N'APPARAÎT JAMAIS : la réponse est écrite à la première personne par le chroniqueur du groupe (le « je », le « nous »). Ce chroniqueur ne se dessine JAMAIS : ne le décris pas, ne le compte pas, n'écris jamais « the narrator », « I », « me », « we » ni « us » dans la description. « Nous » ne désigne que les héros présents.
 
+DEUX PERSONNAGES AU PLUS (v428) : jamais plus de DEUX figures dans l'image (héros, PNJ et êtres sans nom confondus) — choisis les deux qui portent le moment. Des plans RAPPROCHÉS et DYNAMIQUES (gros plan, plan rapproché, plan taille en mouvement), des prises de vue originales : contre-plongée, plongée, angle hollandais, par-dessus l'épaule, à travers un premier plan (feuillage, fumée, étincelles), profil en contre-jour, courte focale… Chaque personnage porte TOUT son équipement du moment (armure, vêtements, armes, accessoires), tel que sur son portrait.
+
 PERSONNE D'AUTRE : le croquis ne montre QUE les héros que tu cites, les PNJ que tu cites et, seulement s'ils sont indispensables et décrits dans la réponse, des êtres sans nom (« a wolf », « two guards ») que tu listes dans "autres". Aucun figurant, aucune foule, aucun témoin, aucune silhouette au loin. Indique le nombre total de personnages et de créatures dessinés dans "nombre".
 
 LES HÉROS : cite TOUS ceux qui apparaissent DANS le croquis (leur prénom exact, dans la liste fournie), et dans la description, désigne chacun par son prénom exact (jamais « a warrior », « the adventurers » : « Kaya », « Thorin »). N'ajoute AUCUN personnage anonyme qui ne serait pas dans la réponse du Narrateur.
 
 LA MISE EN SCÈNE : chaque héros de la liste a un identifiant (H1, H2…). Dans "acteurs", liste CHAQUE figure du croquis, une par une, dans l'ordre de gauche à droite : un héros par son identifiant ("id": "H1") et son prénom, un PNJ par son nom ("type": "pnj"), un être sans nom par ce qu'il est ("type": "autre", "nom": "a wolf"). Pour chacune, en anglais : "place" (toujours dans la moitié droite : center-right, right, far right, foreground right, background right), "action" (ce qu'elle fait, sa posture : debout, accroupie, en mouvement, assise…), "expression" (son visage, son émotion). Puis "mise_en_scene", en anglais, comme un directeur artistique de cinéma : le cadrage et l'angle (plan large, plan moyen, contre-plongée, par-dessus l'épaule…), le point focal (où l'œil va d'abord), qui est au premier plan et qui au fond, comment les figures se tiennent l'une par rapport à l'autre, l'objet clé, le décor derrière elles, et la lumière qui donne de la force à l'image (contre-jour, lumière qui accroche les contours…). Une image lisible d'un coup d'œil. Le dessinateur reçoit le portrait de chaque héros et de chaque PNJ connu : il dessine la scène telle que tu la mets en scène.
+LES PNJ CONNUS : la liste « LES PNJ DE LA SCÈNE » donne les noms exacts des PNJ présents dont le dessinateur a le portrait ; si l'un d'eux est dans le croquis, écris son nom EXACT (dans "acteurs", "pnj_dans_le_croquis" et "pnj_nommes" avec "present": true).
 LES PNJ NOMMÉS : liste les personnages non-joueurs PRÉSENTS dans la scène (v330 : physiquement là, que les héros voient ou à qui ils parlent ; mets "present": true) et désignés par un VRAI nom propre dans la réponse du Narrateur — jamais un nom lu sur un parchemin, une lettre, un sceau ou une inscription, ni entendu dans une rumeur ou un souvenir (alors "present": false) ; un personnage déjà connu sous un autre titre (« Maître Valerius » pour « Valerius ») garde son nom connu (pas les héros, pas « l'aubergiste », pas un nom inventé par un héros pour bluffer), avec leur race (parmi celles du monde, Humain par défaut) et une description physique précise tirée du texte (ou plausible). Indique aussi ceux qui apparaissent dans le croquis.
 
 Réponds UNIQUEMENT en JSON :
 {"illustrer": true, "moment": "drôle|dramatique|attachant|lieu", "sujet": "scene|personnage|lieu", "description": "...", "acteurs": [{"id": "H1", "nom": "Kaya", "type": "heros", "place": "center-right", "action": "crouching behind a fallen trunk, one hand raised to stop the others", "expression": "tense, eyes wide"}, {"nom": "Varos", "type": "pnj", "place": "right", "action": "...", "expression": "..."}], "mise_en_scene": "medium shot, slightly low angle; Kaya in the foreground right turned toward Varos, the tavern behind them…", "extrait": "Varos éclate de rire quand Kaya glisse sur l'amphore.", "heros": ["Kaya"], "pnj_dans_le_croquis": ["Varos"], "autres": [], "nombre": 2, "pnj_nommes": [{"nom": "Varos", "present": true, "race": "Humain", "description_physique": "..."}]}
 ou {"illustrer": false, "pnj_nommes": [...]}`;
 
-async function demanderAgent(texteJoueurs, texteMJ) {
+async function demanderAgent(texteJoueurs, texteMJ, pnjConnus) {
     const heros = herosDeLaPartie().map((h, i) => `H${i + 1} = ${h.prenom}${h.genre ? ` (${/f/i.test(h.genre) ? "femme" : "homme"})` : ""}${h.race ? ", " + h.race : ""}${h.classe ? ", " + h.classe : ""}`).join(" ; ");
+    // (v428) les PNJ de la scène qui ont leur portrait : l'agent les nomme exactement
+    const pnj = [...new Set(Object.values(pnjConnus || {}).filter(p => p && p.Nom_PNJ && p.URL_Cloudinary && p.Statut !== "Mort").map(p => p.Nom_PNJ))];
     const corps = JSON.stringify({
         systemInstruction: { parts: [{ text: PROMPT_AGENT }] },
-        contents: [{ role: "user", parts: [{ text: `--- LES HÉROS ---\n${heros || "(aucun)"}\n\n--- LES DERNIERS MESSAGES DES JOUEURS ---\n${texteJoueurs || "(rien)"}\n\n--- LA RÉPONSE DU NARRATEUR ---\n${texteMJ}` }] }],
+        contents: [{ role: "user", parts: [{ text: `--- LES HÉROS ---\n${heros || "(aucun)"}\n\n--- LES PNJ DE LA SCÈNE (avec portrait) ---\n${pnj.join(" ; ") || "(aucun)"}\n\n--- LES DERNIERS MESSAGES DES JOUEURS ---\n${texteJoueurs || "(rien)"}\n\n--- LA RÉPONSE DU NARRATEUR ---\n${texteMJ}` }] }],
         generationConfig: { temperature: 0.5, responseMimeType: "application/json" }
     });
     const rep = await window.fetchGemini("illustrateur", corps);
@@ -432,7 +456,7 @@ window.illustrerLeRecit = async function (options) {
     const ecartForce = partage ? ecart : (brut === null ? 1 : (Number(brut) || 0) + 1);
     ecrireEcart(ecartForce);
     let avis;
-    try { avis = await demanderAgent(o.texteJoueurs || "", o.texteMJ); }
+    try { avis = await demanderAgent(o.texteJoueurs || "", o.texteMJ, o.pnjConnus); }
     catch (e) { console.warn("[MIA_ILLUSTRATEUR]", e); avis = { illustrer: false, pnj_nommes: [] }; }
     avis = avis && typeof avis === "object" ? avis : { illustrer: false };
     const ref = doc(db, "Messages_Chat", o.idMessage);
@@ -493,7 +517,21 @@ window.illustrerLeRecit = async function (options) {
         // relie ainsi chaque prénom à son image).
         const manquants = heros.filter(h => !nommeDans(a.description, h.prenom)).map(h => h.prenom);
         if (manquants.length) a.description += ` (With ${manquants.join(" and ")}.)`;
-        acteurs.pnj.forEach(n => { const f = Object.values(fiches).find(x => memeNom(x.Nom_PNJ, n)); if (f && f.URL_Cloudinary) refs.push({ nom: f.Nom_PNJ, qui: f.Race || "", url: f.URL_Cloudinary, scene: acteurs.scene[n] || "" }); });
+        // (v428) Nico : « l'IA n'a pas pris le PNJ à côté alors qu'il avait déjà son image ».
+        // Un PNJ du croquis se cherche aussi hors des « nommés » de l'agent : les PNJ de la
+        // scène, les portraits posés à ce tour, sa fiche dans la base.
+        const portraitDe = async (n) => {
+            const avecImage = (x) => x && x.URL_Cloudinary && !String(x.URL_Cloudinary).startsWith("data:");
+            let f = Object.values(fiches).find(x => avecImage(x) && memeNom(x.Nom_PNJ, n)) || Object.values(o.pnjConnus || {}).find(x => avecImage(x) && memeNom(x.Nom_PNJ, n));
+            if (!f) { const pose = (o.portraitsPoses || []).find(x => x && x.Url && memeNom(x.Nom, n)); if (pose) f = { Nom_PNJ: pose.Nom, URL_Cloudinary: pose.Url }; }
+            if (!f) { const t = (await fichesPnj([n], {}).catch(() => ({})))[n]; if (avecImage(t)) f = t; }
+            return f || null;
+        };
+        for (const n of acteurs.pnj) {
+            const f = await portraitDe(n);
+            if (f) refs.push({ nom: f.Nom_PNJ, qui: f.Race || "", url: f.URL_Cloudinary, scene: acteurs.scene[n] || "" });
+            else console.warn(`[MIA_ILLUSTRATEUR] Pas de portrait connu pour ${n} : il est décrit en mots.`);
+        }
         try {
             // (Un héros qui n'a encore aucun portrait se dit en mots ; celui dont le
             // portrait existe mais ne se lit pas arrête le croquis.)

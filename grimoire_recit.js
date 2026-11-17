@@ -41,7 +41,7 @@
 //  nombre pair, puis la quatrième de couverture.
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
-import { collection, doc, getDoc, getDocs, addDoc, updateDoc, setDoc, query, where, runTransaction } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { collection, doc, getDoc, getDocs, addDoc, updateDoc, setDoc, deleteDoc, query, where, runTransaction } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 const G = () => window.GRIMOIRE || null;
 // (v302 : la carte du monde occupe 5-6, juste après l'index, grimoire.js.)
@@ -71,7 +71,8 @@ const etat = {
     heros: null,                       // le héros pour qui j'écris
     lances: new Set(), autoLances: new Set(), reecritures: new Set(),
     pnjImages: {}, notes: {}, ecouteFlip: false, minuteur: null, sonPlume: 0,
-    lu: null                           // (v311) le dernier mot lu, sur ce poste : { e, i }
+    lu: null,                          // (v311) le dernier mot lu, sur ce poste : { e, i }
+    suppression: false                 // (v428) mode DEV : les « − » rouges du sommaire
 };
 
 // ---------------------------------------------------------------------
@@ -312,6 +313,8 @@ function construireEntrees(messages) {
         }
         if (AUTEURS_RECRITS.includes(m.Auteur_ID)) {
             if (m.Texte_Livre) entrees.push({ id, type: "temps", auteurId: m.Auteur_ID, textes: parasDeTexte(m.Texte_Livre), jets: [] });
+            // (v428) l'arrivée dans un lieu : son image, en double page (voyage_groupe.js, annoncerArrivee)
+            if (m.Texte_Livre && m.Illustration && m.Illustration.Url) entrees.push({ id: id + "-lieu", type: "illustration", image: m.Illustration, textes: [], jets: [] });
             continue;
         }
         if (["Date", "Système", "Date_En_Jeu"].includes(m.Auteur_Nom) || m.Auteur_ID === "Date") continue;
@@ -472,8 +475,9 @@ function htmlCroquis(para) {
 function htmlPortraitPleinePage(para) {
     const im = para.image;
     // (v346) Le portrait fait comme l'avatar des héros : il arrive en fondu, préchargé.
+    // (v428) Nico : « son image tout en bas de la page, et son nom en plus gros, au-dessus de lui ».
     if (im.Format === "avatar") return `<figure class="portrait-pleine-page portrait-avatar" data-e="${echapper(para.e)}">`
-        + `${imgDuFond(im.Url, im.Nom || "")}<figcaption>${echapper(im.Nom || "")}</figcaption></figure>`;
+        + `<figcaption>${echapper(im.Nom || "")}</figcaption>${imgDuFond(im.Url, im.Nom || "")}</figure>`;
     const neuf = !etat.croquisVus.has(para.e);
     if (neuf) setTimeout(() => etat.croquisVus.add(para.e), 4000);
     return `<figure class="portrait-pleine-page${neuf ? " neuf" : ""}" data-e="${echapper(para.e)}">`
@@ -548,7 +552,16 @@ function paginer(entrees) {
         // sur la page suivante s'il n'y tient pas) ; le portrait d'un PNJ prend une page entière.
         // (v346) Le portrait, en pleine page de droite ; l'illustration, en double page.
         if (para.image) {
-            if (para.type === "portrait") { placer({ gauche: "", droite: htmlPortraitPleinePage(para) }); continue; }
+            // (v428) Nico : « l'avatar du PNJ peut se mettre sur la première page libre » : une
+            // page blanche, celle-ci ; sinon la page d'en face (on écrit à gauche) ; sinon la
+            // suivante, de quelque côté qu'elle soit.
+            if (para.type === "portrait") {
+                const html = htmlPortraitPleinePage(para);
+                if (!boite.innerHTML.trim()) { boite.innerHTML = html; fermer(); }
+                else if (j % 2 === 0 && reservee === null) reservee = html;
+                else { fermer(); if (!boite.innerHTML.trim()) { boite.innerHTML = html; fermer(); } else placer({ gauche: "", droite: html }); }
+                continue;
+            }
             if (para.image.Format === "double-page") { placer({ gauche: htmlFondRecit(para, "gauche"), droite: htmlFondRecit(para, "droite") }); continue; }
             const tmp = document.createElement("div");
             tmp.innerHTML = htmlCroquis(para);
@@ -607,16 +620,23 @@ function paginer(entrees) {
 }
 
 // LE SOMMAIRE DU RÉCIT (pages 5-6) : les chapitres finis, puis celui en cours.
+// (v428) Nico : « à côté de "Le récit", une petite roue crantée rouge, visible en mode dev
+// seulement ; un clic affiche des petits − rouges à côté des chapitres ; un clic sur un − 
+// supprime le chapitre du livre et de la base, avec les images qui sont dedans (sauf les
+// PNJ) ». Les chapitres finis seulement (le chapitre en cours vit dans le chat).
+const ROUE_SOMMAIRE = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 2h3.4l.5 2.6c.7.2 1.3.5 1.9.9l2.3-1.3 2.4 2.4-1.3 2.3c.4.6.7 1.2.9 1.9l2.6.5v3.4l-2.6.5c-.2.7-.5 1.3-.9 1.9l1.3 2.3-2.4 2.4-2.3-1.3c-.6.4-1.2.7-1.9.9l-.5 2.6h-3.4l-.5-2.6c-.7-.2-1.3-.5-1.9-.9l-2.3 1.3-2.4-2.4 1.3-2.3c-.4-.6-.7-1.2-.9-1.9L2 13.7v-3.4l2.6-.5c.2-.7.5-1.3.9-1.9L4.2 5.6l2.4-2.4 2.3 1.3c.6-.4 1.2-.7 1.9-.9zM12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z"/></svg>`;
 function sommaireHtml() {
-    const ligne = (id, numero, titre, classe) =>
-        `<a class="ligne-sommaire${classe ? " " + classe : ""}" data-recit="${echapper(id)}"><span class="num">${romain(numero)}</span><span class="tit">${echapper(titre)}</span></a>`;
-    const finis = etat.chapitres.map(c => ligne("chap:" + c.id, c.Numero, c.Titre || "Sans titre", ""));
+    const dev = modeDevRecit();
+    if (!dev) etat.suppression = false;
+    const ligne = (id, numero, titre, classe, idChap) =>
+        `<div class="ligne-sommaire-dev">${dev && etat.suppression && idChap ? `<button type="button" class="moins-sommaire" data-supprimer="${echapper(idChap)}" title="Supprimer ce chapitre (DEV)" aria-label="Supprimer le chapitre ${echapper(romain(numero))}">−</button>` : ""}<a class="ligne-sommaire${classe ? " " + classe : ""}" data-recit="${echapper(id)}"><span class="num">${romain(numero)}</span><span class="tit">${echapper(titre)}</span></a></div>`;
+    const finis = etat.chapitres.map(c => ligne("chap:" + c.id, c.Numero, c.Titre || "Sans titre", "", c.id));
     const courant = ligne("courant", etat.chapitres.length + 1, "Le chapitre en cours", "courant");
     const toutes = [...finis, courant];
     const gauche = toutes.slice(0, 8), droite = toutes.slice(8);
     return [
         `<div class="contenu-page page-sommaire">
-           <h2 class="titre-sommaire">Le récit</h2>
+           <h2 class="titre-sommaire">Le récit${dev ? `<button type="button" class="roue-sommaire${etat.suppression ? " ouverte" : ""}" title="Supprimer des chapitres (DEV)" aria-label="Supprimer des chapitres">${ROUE_SOMMAIRE}</button>` : ""}</h2>
            <svg class="fleuron" viewBox="0 0 200 24" aria-hidden="true"><path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>
            <div class="liste-sommaire">${gauche.join("")}</div>
          </div>`,
@@ -868,9 +888,14 @@ function creerElements() {
         if (nom) { montrerPortrait(nom.dataset.nom); return true; }
         const cerveau = cible.closest(".cerveau-marge");
         if (cerveau) { montrerSocial(cerveau); return true; }
+        // (v428) le mode DEV du sommaire : la roue, puis les « − » d'un chapitre
+        if (cible.closest(".roue-sommaire")) { if (modeDevRecit()) { etat.suppression = !etat.suppression; son("page-prise", 0.4); rendre(); } return true; }
+        const moins = cible.closest("[data-supprimer]");
+        if (moins) { supprimerChapitre(moins.dataset.supprimer); return true; }
         const r = cible.closest("[data-recit]");
         if (r) { choisirDansLeSommaire(r.dataset.recit); return true; }
-        const h = cible.closest("[data-heros]");
+        // (v428) les papiers des avatars portent aussi data-heros : ce n'est pas le choix du héros
+        const h = cible.closest("[data-heros]:not(.papier-avatar)");
         if (h) { etat.heros = h.dataset.heros; majInterface(); return true; }
         return false;
     }, true);
@@ -945,8 +970,24 @@ function finirDictee() {
 document.addEventListener("pointerdown", (ev) => {
     if (!elts || !elts.portrait.classList.contains("sortie")) return;
     if (ev.target.closest && (ev.target.closest(".nom-livre") || ev.target.closest("#recit-portrait"))) return;
-    elts.portrait.classList.remove("sortie");
+    rentrerPortrait();
 }, true);
+// (v428) Nico : « on clique sur sa fiche (le papier du PNJ) mais les pages tournent déjà sur
+// la fiche du personnage ; c'est dû à la superposition des deux images à gauche : quand une
+// feuille est sortie, désactive temporairement l'accès à la fiche perso ». Le papier du PNJ
+// rentre sous le doigt et Safari envoie son « click » après coup, sur ce qui est dessous : le
+// papier du héros. Tant que le papier d'un nom est sorti, et un instant après qu'il est
+// rentré, celui du héros n'ouvre rien.
+const ATTENTE_APRES_PORTRAIT = 1200;
+function rentrerPortrait() {
+    if (!elts || !elts.portrait.classList.contains("sortie")) return;
+    elts.portrait.classList.remove("sortie");
+    elts.portrait.__rentreLe = Date.now();
+}
+function avatarBloque() {
+    if (!elts) return false;
+    return elts.portrait.classList.contains("sortie") || Date.now() - (elts.portrait.__rentreLe || 0) < ATTENTE_APRES_PORTRAIT;
+}
 // Agir dès que le doigt se lève (Safari retarde le « click », v298) ; le
 // « click » qui suit est ignoré. `deleguer` : la cible est cherchée dedans.
 function toucherVite(el, faire, deleguer) {
@@ -990,10 +1031,12 @@ function ajusterNom(el) {
 }
 window.addEventListener("resize", () => setTimeout(() => document.querySelectorAll(".papier-avatar .nom-portrait").forEach(ajusterNom), 300));
 function ouvrirFicheDuPapier(papier) {
+    // (v428) le papier du héros, sous celui d'un nom sorti (ou qui vient de rentrer) : rien
+    if (elts && papier === elts.avatar && avatarBloque()) { rentrerPortrait(); return; }
     // (v414) Nico : « un clic sur cette image fait apparaître sa fiche » — celle d'un PNJ aussi.
     if (papier && !papier.dataset.heros && papier.dataset.pnj && window.GRIMOIRE_LIENS) {
         son("page-prise", 0.5);
-        papier.classList.remove("sortie");
+        if (papier === elts.portrait) rentrerPortrait(); else papier.classList.remove("sortie");
         window.GRIMOIRE_LIENS.ouvrir({ nom: papier.dataset.pnj, depuisRecit: true });
         return;
     }
@@ -1025,11 +1068,38 @@ async function choisirDansLeSommaire(cle) {
         const snap = await getDoc(doc(db, "Recits_Textes", id));
         const data = snap.exists() ? snap.data() : {};
         const entrees = (data.Entrees || []).map(e => ({ id: e.id, type: e.type || "narration", auteurId: e.auteurId || "",
-            textes: (e.textes || []).slice(), jets: (e.jets || []).slice(), cerveaux: (e.cerveaux || []).slice() }));
+            textes: (e.textes || []).slice(), jets: (e.jets || []).slice(), cerveaux: (e.cerveaux || []).slice(), ...(e.image ? { image: e.image } : {}) }));
         etat.lecture = { id, numero: fiche.Numero, titre: fiche.Titre, entrees };
         rendre();
         G().allerALaPage(premiereRecit());
     } catch (e) { console.error("Le livre : chapitre", e); }
+}
+// (v428) SUPPRIMER UN CHAPITRE FINI (mode DEV) : sa fiche, ses pages, ses croquis (les
+// portraits des PNJ restent : ce sont les leurs) ; les chapitres suivants reprennent les numéros.
+async function supprimerChapitre(id) {
+    if (!modeDevRecit() || !etat.suppression) return false;
+    const fiche = etat.chapitres.find(c => c.id === id);
+    if (!fiche) return false;
+    if (!confirm(`Supprimer le chapitre ${romain(fiche.Numero)} « ${fiche.Titre || "Sans titre"} » du livre et de la base, avec ses images (sauf les PNJ) ?`)) return false;
+    son("page-prise", 0.5);
+    try {
+        const snap = await getDoc(doc(db, "Recits_Textes", id));
+        const entrees = (snap.exists() && snap.data().Entrees) || [];
+        // (l'image d'un lieu, posée à l'arrivée, reste au lieu)
+        const images = [...new Set(entrees.filter(e => e && e.type === "illustration" && e.image && e.image.Url && !e.image.Lieu).map(e => e.image.Url))];
+        await deleteDoc(doc(db, "Recits_Textes", id));
+        await deleteDoc(doc(db, "Recits_Chapitres", id));
+        const suivants = etat.chapitres.filter(c => c.id !== id && (c.Numero || 0) > (fiche.Numero || 0));
+        for (const c of suivants) { c.Numero = (c.Numero || 0) - 1; await updateDoc(doc(db, "Recits_Chapitres", c.id), { Numero: c.Numero }); }
+        etat.chapitres = etat.chapitres.filter(c => c.id !== id);
+        if (etat.lecture && etat.lecture.id === id) etat.lecture = null;
+        if (typeof window.supprimerImageCloudinary === "function") {
+            for (const url of images) { try { await window.supprimerImageCloudinary(url); } catch (e) { console.warn("Le livre : une image du chapitre", e); } }
+        }
+        console.log(`🗑️ [Le livre] Chapitre ${fiche.Numero} supprimé (DEV), ${images.length} image(s).`);
+        rendre();
+        return true;
+    } catch (e) { console.error("Le livre : supprimer le chapitre", e); alert("Le chapitre n'a pas pu être supprimé : " + (e.message || e)); return false; }
 }
 function allerAuRecit() {
     if (!etat.actif) return;
@@ -1551,7 +1621,8 @@ async function archiverChapitre(messages) {
     });
     await setDoc(doc(db, "Recits_Textes", fiche.id), {
         ID_Partie: idPartie,
-        Entrees: entrees.map(e => ({ id: e.id, type: e.type, auteurId: e.auteurId || "", textes: e.textes, jets: e.jets, cerveaux: e.cerveaux || [] }))
+        // (v428) les croquis et les portraits gardent leur image (le sommaire peut l'effacer avec le chapitre)
+        Entrees: entrees.map(e => ({ id: e.id, type: e.type, auteurId: e.auteurId || "", textes: e.textes, jets: e.jets, cerveaux: e.cerveaux || [], ...(e.image ? { image: e.image } : {}) }))
     });
     console.log(`📖 [Le livre] Chapitre ${numero} rangé : « ${titre} ».`);
     if (promesseRencontres) window.RENCONTRES.apresChapitre(idPartie, promesseRencontres, numero, titre);
@@ -1722,7 +1793,7 @@ let redim = null;
 window.addEventListener("resize", () => { clearTimeout(redim); redim = setTimeout(() => { if (etat.actif) { etat.htmlPages = []; rendre(); } }, 250); });
 
 window.GRIMOIRE_RECIT = {
-    entrer, sortir, allerAuRecit, allerAuSommaireDuRecit, marqueDuRecit, archiverChapitre, rendre, envoyer,
+    entrer, sortir, allerAuRecit, allerAuSommaireDuRecit, marqueDuRecit, archiverChapitre, supprimerChapitre, rendre, envoyer,
     construireEntrees, jetsEnAttente, reformuler,
     etat: () => ({ actif: etat.actif, idPartie: etat.idPartie, pagesRecit: etat.pagesRecit, verrou: etat.verrou, envoi: etat.envoi,
                    lecture: etat.lecture ? etat.lecture.id : null, chapitres: etat.chapitres.length,

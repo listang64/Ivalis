@@ -418,7 +418,87 @@ export async function tourSocial(o) {
     await lot.commit();
     resultat.changements = calcul.changements;
     journal(`Tour ${tour} : ${calcul.evenements.length} événement(s), ${touches.size} lien(s) changé(s), ${resultat.souvenirs.length} souvenir(s).`);
+    // (v428) Un journal trop plein passe dans la mémoire à long terme (derrière, sans attendre).
+    resultat.memoire = consoliderSiBesoin(p, resultat.souvenirs.map(sv => sv.ame));
     return resultat;
+}
+
+// -------------------------------------------------------------------------
+//  LA MÉMOIRE À LONG TERME (v428)
+// -------------------------------------------------------------------------
+// Nico : « dans les souvenirs : Gladys a parlé avec truc, a pris des nouvelles de
+// truc… on va très vite remplir le journal. Une fois qu'on arrive à 30 souvenirs, une
+// IA trie les dix derniers pour ne garder que les plus importants, les synthétise et
+// les met dans sa mémoire à long terme (envoyée avec le reste). On lui envoie la
+// mémoire à long terme existante, et elle récrit le tout propre. »
+//    · « les dix derniers » : les dix plus anciens (le bas de la liste, le livre met
+//      les plus récents en haut) ; ils quittent le journal une fois la mémoire écrite ;
+//    · la mémoire vit sur l'âme (Ames/{id} : memoire, memoireMaj) ; le MJ, la
+//      discussion privée et les fils invisibles la lisent.
+export const SEUIL_MEMOIRE = 30, LOT_MEMOIRE = 10, MAX_MEMOIRE = 1500;
+export function promptMemoire(nom) {
+    return `Tu es MIA_MEMOIRE, l'IA qui tient la mémoire à long terme des personnages d'Ivalis (un jeu de rôle antique fantastique).
+On te donne la MÉMOIRE À LONG TERME actuelle de ${nom} (elle peut être vide) et ses ${LOT_MEMOIRE} SOUVENIRS LES PLUS ANCIENS, écrits au fil du jeu.
+- Trie ces souvenirs : garde seulement ce qui compte pour ${nom} (ce qui a changé ses relations, ce qu'il a appris, promis, perdu ou gagné, ce qui l'a marqué, où et avec qui il voyage). Oublie l'anecdotique (saluer, bavarder, prendre des nouvelles, une banalité).
+- Récris TOUTE la mémoire à long terme, propre : l'ancienne et ce que tu gardes, fondus ensemble, sans doublon ni contradiction (le plus récent l'emporte).
+- À la première personne (c'est ${nom} qui se souvient), en phrases courtes, avec les dates quand elles sont connues. Les noms exacts des personnages.
+- ${MAX_MEMOIRE} caractères au plus. N'invente rien.
+Réponds en JSON seul : {"memoire":"..."}`;
+}
+async function demanderMemoire(nom, memoire, vieux) {
+    if (typeof window.fetchGemini !== "function") return "";
+    const souvenirs = vieux.map(z => `- ${z.dateJeu ? `[${z.dateJeu}] ` : ""}${z.texte}`).join("\n");
+    const corps = JSON.stringify({ systemInstruction: { parts: [{ text: promptMemoire(nom) }] },
+        contents: [{ role: "user", parts: [{ text: `--- LA MÉMOIRE À LONG TERME DE ${nom.toUpperCase()} ---\n${memoire || "(vide)"}\n\n--- SES ${vieux.length} SOUVENIRS LES PLUS ANCIENS ---\n${souvenirs}` }] }],
+        generationConfig: { temperature: 0.3, responseMimeType: "application/json" } });
+    const rep = await window.fetchGemini("social", corps);
+    if (!rep || !rep.ok) throw new Error("statut " + (rep && rep.status));
+    const data = await rep.json();
+    if (data.usageMetadata && typeof window.ajouterTokens === "function") window.ajouterTokens(data.usageMetadata.totalTokenCount || 0);
+    const brut = ((data.candidates?.[0]?.content?.parts) || []).filter(x => typeof x.text === "string" && !x.thought).map(x => x.text).join("");
+    let o = null;
+    const m = brut.match(/\{[\s\S]*\}/);
+    if (m) { try { o = JSON.parse(m[0]); } catch (e) { o = null; } }
+    return String((o && o.memoire) || "").replace(/\s+\n/g, "\n").trim().slice(0, MAX_MEMOIRE);
+}
+const enConsolidation = new Set();
+// Les souvenirs d'une âme passent le seuil : les dix plus anciens entrent dans sa mémoire.
+export async function consoliderMemoire(p, id) {
+    if (!p || !id || enConsolidation.has(p + "/" + id)) return null;
+    enConsolidation.add(p + "/" + id);
+    try {
+        const sv = await lireSouvenirsDe(p, id);
+        if (sv.length < SEUIL_MEMOIRE) return null;
+        const vieux = sv.slice().sort((a, b) => P.nombre(a.tour) - P.nombre(b.tour) || P.nombre(a.Le) - P.nombre(b.Le)).slice(0, LOT_MEMOIRE);
+        const sa = await getDoc(refAme(p, id));
+        const ame = sa.exists() ? sa.data() : {};
+        const memoire = await demanderMemoire(ame.nom || id, ame.memoire || "", vieux);
+        if (!memoire) return null;                       // rien d'écrit : les souvenirs restent
+        const lot = writeBatch(db);
+        lot.set(refAme(p, id), { memoire, memoireMaj: Date.now() }, { merge: true });
+        vieux.forEach(z => lot.delete(refSouvenir(p, z.id)));
+        await lot.commit();
+        journal(`${ame.nom || id} : ${vieux.length} vieux souvenirs entrés dans sa mémoire à long terme.`);
+        return memoire;
+    } catch (e) { console.warn("[Fils invisibles] La mémoire à long terme :", e); return null; }
+    finally { enConsolidation.delete(p + "/" + id); }
+}
+export async function consoliderSiBesoin(p, ids) {
+    const faits = {};
+    for (const id of [...new Set((ids || []).filter(Boolean))]) faits[id] = await consoliderMemoire(p, id);
+    return faits;
+}
+// Un souvenir écrit hors d'une scène (v428 : un PNJ qui rejoint la compagnie).
+export async function noterSouvenir(p, ame, texte, o) {
+    if (!p || !ame || !texte) return null;
+    const x = o || {};
+    const id = `${x.cle || "note"}_${ame}_${Date.now()}`;
+    const etat = await getDoc(refEtat(p));
+    const d = { ame, texte: String(texte).slice(0, 300), sujets: (x.sujets || []).filter(Boolean), importance: Math.max(1, Math.min(3, Math.round(P.nombre(x.importance, 2)))),
+                tour: P.nombre(((etat.exists() && etat.data()) || {}).tour) + 1, dateJeu: x.dateJeu || "", Le: Date.now() };
+    await setDoc(refSouvenir(p, id), d);
+    consoliderMemoire(p, ame);
+    return { ...d, id };
 }
 
 // -------------------------------------------------------------------------
@@ -554,6 +634,8 @@ export async function contexteDuMJ(o) {
         const avis = ids.filter(y => y !== x.id).map(y => ({ y, l: liens[P.cleLien(x.id, y)] })).filter(v => v.l)
             .sort((u, v) => Math.abs(P.affinite(v.l.axes)) - Math.abs(P.affinite(u.l.axes))).slice(0, detail ? 5 : 3);
         if (avis.length) t += `  Ce qu'il pense des présents : ${avis.map(v => `${nom(v.y)}${v.l.etiquette ? ` (${v.l.etiquette})` : ""} — ${P.motAffinite(P.affinite(v.l.axes))} (${signeNb(P.affinite(v.l.axes))}) : ${P.resumeLien(v.l.axes)}`).join(" ; ")}.\n`;
+        // (v428) sa mémoire à long terme (le passé lointain, synthétisé)
+        if (a.memoire) t += `  Sa mémoire (le passé lointain) : ${String(a.memoire).slice(0, detail ? 900 : 300)}\n`;
         const sv = meilleursSouvenirs(souvenirs[x.id] || [], ids, detail ? 5 : 2).filter(() => total < 8);
         if (sv.length) { total += sv.length; t += `  Ses souvenirs : ${sv.map(z => `${z.dateJeu ? `[${z.dateJeu}] ` : ""}« ${z.texte} »`).join(" ")}\n`; }
     });
@@ -598,5 +680,5 @@ export async function apresLeTour(o) {
     catch (e) { console.error("[Fils invisibles] Le tour social :", e); return null; }
 }
 
-window.SOCIAL = { ...P, elaguerSouvenirs, MAX_SOUVENIRS, contexteDuMJ, caractere, lireReseau, lireSouvenirsDe, annulerEvenement, ajusterLien, estAdminSocial, lireAmes, lireLiens, lireLiensVers, naissancePnj, assurerAmes, marquerMort, oublierAme, apresLeTour, tourSocial, paragrapheDe, lignesDeMarge,
+window.SOCIAL = { ...P, elaguerSouvenirs, MAX_SOUVENIRS, consoliderMemoire, consoliderSiBesoin, noterSouvenir, promptMemoire, SEUIL_MEMOIRE, LOT_MEMOIRE, contexteDuMJ, caractere, lireReseau, lireSouvenirsDe, annulerEvenement, ajusterLien, estAdminSocial, lireAmes, lireLiens, lireLiensVers, naissancePnj, assurerAmes, marquerMort, oublierAme, apresLeTour, tourSocial, paragrapheDe, lignesDeMarge,
                   schemaPsyche, schemaLiens, consigneCreation, psycheDeLIA, LIENS_IA };

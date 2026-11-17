@@ -258,6 +258,10 @@ await section(async () => {
   verifier("le Narrateur reçoit LA COMPAGNIE : Doros, et Croc-Gris avec son caractère", /--- LA COMPAGNIE/.test(ctx) && /- Doros \(Docker\) : suiveur/.test(ctx) && /Croc-Gris : le compagnon animal de Lyra[^\n]*caractère : joueur et protecteur/.test(ctx), ctx.slice(ctx.indexOf("LA COMPAGNIE"), ctx.indexOf("LA COMPAGNIE") + 400));
   verifier("…ils ne combattent que dans le récit", /combattent SEULEMENT dans le récit/.test(ctx));
   verifier("…et la décision à jouer : Doros ACCEPTE", /DÉCISIONS DE LA COMPAGNIE[\s\S]*Doros ACCEPTE de rejoindre la compagnie \(demandé par Thorin/.test(ctx));
+  // (v428) Nico : « il est dans mon groupe, mais en parlant avec lui il n'en a pas conscience ».
+  const sv = await G(() => Object.entries(window.__docs).filter(([k, v]) => k.startsWith("Systeme_Parties/P1/Souvenirs/") && v.ame === "PNJ_DOROS" && /compagnie/.test(v.texte)).map(([, v]) => v));
+  verifier("(v428) un souvenir de Doros : il a rejoint la compagnie, daté, important, au sujet des héros", sv.length === 1 && /^J'ai rejoint la compagnie de Thorin et Lyra : désormais je voyage avec eux \(c'est Thorin qui me l'a demandé\)\.$/.test(sv[0].texte)
+           && sv[0].dateJeu === "Jour 12 de l'an 3" && sv[0].importance === 3 && JSON.stringify(sv[0].sujets) === '["H1","H2"]', JSON.stringify(sv));
 });
 
 // =========================================================================

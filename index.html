@@ -17,16 +17,16 @@
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
   <link rel="stylesheet" href="grimoire.css?v=25">
-  <link rel="stylesheet" href="grimoire_recit.css?v=26">
+  <link rel="stylesheet" href="grimoire_recit.css?v=27">
   <link rel="stylesheet" href="grimoire_carte.css?v=2">
-  <link rel="stylesheet" href="grimoire_regions.css?v=7">
+  <link rel="stylesheet" href="grimoire_regions.css?v=8">
   <link rel="stylesheet" href="loupe_cartes.css?v=5">
   <link rel="stylesheet" href="grimoire_fiches.css?v=10">
   <link rel="stylesheet" href="grimoire_creation.css?v=9">
   <link rel="stylesheet" href="grimoire_combats.css?v=1">
-  <link rel="stylesheet" href="grimoire_liens.css?v=5">
-  <link rel="stylesheet" href="grimoire_groupe.css?v=3">
-  <link rel="stylesheet" href="discussion_privee.css?v=1">
+  <link rel="stylesheet" href="grimoire_liens.css?v=6">
+  <link rel="stylesheet" href="grimoire_groupe.css?v=4">
+  <link rel="stylesheet" href="discussion_privee.css?v=2">
   <link rel="stylesheet" href="grimoire_parametres.css?v=3">
   <link rel="stylesheet" href="vocal.css?v=2">
 
@@ -2198,7 +2198,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=317"></script>
+<script src="trace_combat.js?v=318"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2265,34 +2265,34 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=57"></script>
 <!-- LES FILS INVISIBLES (v411) : les âmes des PNJ et des héros, leurs liens (social_pur.js calcule). -->
-<script type="module" src="social.js?v=9"></script>
+<script type="module" src="social.js?v=10"></script>
 <!-- LA COMPAGNIE (v418) : les PNJ qui suivent le groupe (groupe_pur.js calcule). -->
-<script type="module" src="groupe.js?v=2"></script>
+<script type="module" src="groupe.js?v=3"></script>
 <!-- LES RENCONTRES RÉCENTES (v421) : les types de rencontre des derniers chapitres, pour que le Narrateur varie. -->
 <script type="module" src="rencontres_recit.js?v=1"></script>
 <script type="module" src="ia_master.js?v=37"></script>
-<script type="module" src="illustrations_recit.js?v=13"></script>
+<script type="module" src="illustrations_recit.js?v=14"></script>
 <script type="module" src="app.js?v=181"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=5"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
-<script type="module" src="grimoire_recit.js?v=32"></script>
+<script type="module" src="grimoire_recit.js?v=33"></script>
 <!-- v396 : le chat vocal de la table (WebRTC, signalé par Firestore). -->
 <script type="module" src="vocal.js?v=3"></script>
 <!-- LA CARTE DU MONDE DANS LE GRIMOIRE (v302) : sa double page, ses zones (DEV). -->
 <script type="module" src="grimoire_carte.js?v=6"></script>
-<script src="grimoire_regions.js?v=15"></script>
+<script src="grimoire_regions.js?v=16"></script>
 <script src="loupe_cartes.js?v=6"></script>
 <script type="module" src="grimoire_fiches.js?v=14"></script>
 <script type="module" src="grimoire_creation.js?v=13"></script>
 <!-- Les combats dans le livre (v388) : la double page du menu Combat. -->
 <script type="module" src="grimoire_combats.js?v=1"></script>
 <!-- LES FILS INVISIBLES DANS LE LIVRE (v414) : la fiche et le radar des âmes de la partie. -->
-<script type="module" src="grimoire_liens.js?v=7"></script>
+<script type="module" src="grimoire_liens.js?v=8"></script>
 <!-- LE GROUPE (v418) : la double page de la compagnie ; les Aventuriers en sont les sous-pages. -->
-<script type="module" src="grimoire_groupe.js?v=3"></script>
+<script type="module" src="grimoire_groupe.js?v=4"></script>
 <!-- LA DISCUSSION PRIVÉE (v422) : parler en tête-à-tête avec un suiveur, depuis la page du Groupe. -->
-<script type="module" src="discussion_privee.js?v=1"></script>
+<script type="module" src="discussion_privee.js?v=2"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=4"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région et son titre (plus de nuages dessus, v286). -->
@@ -2307,7 +2307,7 @@
 <!-- Le déplacement des PJ (v275) : les terrains praticables des cartes régionales,
      puis le groupe, son bouton voyage, les tracés, les votes, la marche et les nuits. -->
 <script type="module" src="terrains_regionaux.js?v=3"></script>
-<script type="module" src="voyage_groupe.js?v=21"></script>
+<script type="module" src="voyage_groupe.js?v=22"></script>
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
 <script type="module" src="environnement_mj.js?v=5"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->

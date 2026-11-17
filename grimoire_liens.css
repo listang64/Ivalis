@@ -28,6 +28,7 @@
 .sous-titre-liens.petit { font-size: calc(var(--u) * 2.3); margin-top: calc(var(--u) * 1); }
 .souvenirs-liens { margin: 0; padding-left: calc(var(--u) * 3); font-size: calc(var(--u) * 2.9); }
 .souvenirs-liens li + li { margin-top: calc(var(--u) * 0.6); }
+.memoire-liens { margin: 0; font-size: calc(var(--u) * 2.9); font-style: italic; white-space: pre-line; color: #3a2210; } /* (v428) la mémoire à long terme */
 .date-liens { font-size: 0.8em; color: #7a5a36; }
 /* (v415) les âmes de la partie : une liste déroulante, par ordre alphabétique */
 .page-liens-droite > .index-liens { margin-bottom: calc(var(--u) * 0.6); }

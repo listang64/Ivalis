@@ -216,7 +216,9 @@ await section(async () => {
   // (v346) Le « gros plan » forcé devient un plan moyen en 16:9, le héros à droite, le décor derrière.
   verifier("un plan sur un héros (« personnage »), en 16:9 (v346)", !!il && il.Sujet === "personnage" && il.Moment === "gros plan" && !!cr && /name="size"\r\n\r\n1792x1024/.test(cr.corps));
   verifier("d'un héros que le Narrateur vient de citer, avec son portrait", !!il && il.References.length === 1 && ["A- Fargus", "Kaya"].includes(il.References[0]), il ? JSON.stringify(il.References) : "");
-  verifier("un plan moyen, le héros sur la moitié droite, le décor derrière (v346)", !!cr && /cinematic medium shot, the hero on the right half of the frame/.test(cr.corps) && /the setting of the scene behind/.test(cr.corps));
+  // (v428) « des prises de vue originales et dynamiques » : une au hasard dans la liste, tout l'équipement porté.
+  const prises = await p.evaluate(() => window.PRISES_DE_VUE_ILLUSTRATEUR || []);
+  verifier("(v428) une prise de vue dynamique de la liste, le héros sur la moitié droite avec tout son équipement, le décor derrière", !!cr && prises.length >= 6 && prises.some(x => cr.corps.includes(x + "; the hero on the right half of the frame, wearing all of their current equipment")) && /the setting of the scene behind/.test(cr.corps));
   verifier("la phrase du récit qui parle de lui part avec (le moment)", !!cr && (/coup de sandale contre la jambi/.test(cr.corps) || /retient son souffle/.test(cr.corps)));
   verifier("toujours une seule figure", !!cr && /EXACTLY 1 figure in the whole drawing/.test(cr.corps));
 });

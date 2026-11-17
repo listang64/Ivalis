@@ -115,6 +115,9 @@ COMMENT TU PARLES :
         const a = s.affinite(lien);
         t += `\nCE QUE TU PENSES DE ${String(h.prenom || nomHeros(h)).toUpperCase()} : ${s.motAffinite ? s.motAffinite(a) : ""} (${Math.round(a)} sur une échelle de −100 à +100)${s.resumeLien ? ` — ${s.resumeLien(lien)}` : ""}.`;
     }
+    // (v428) il sait qu'il fait partie de la compagnie, depuis quand ; et sa mémoire à long terme
+    if (d.depuis) t += `\nTU FAIS PARTIE DE LA COMPAGNIE de ${nomHeros(h)} : tu voyages avec eux depuis le ${d.depuis}.`;
+    if (k.ame && k.ame.memoire) t += `\nTA MÉMOIRE (ce que tu as retenu du passé plus lointain) : ${String(k.ame.memoire).slice(0, 1500)}`;
     if (k.souvenirs.length) t += `\nTES SOUVENIRS : ${k.souvenirs.map(z => `${z.dateJeu ? `[${z.dateJeu}] ` : ""}« ${z.texte} »`).join(" ")}`;
     if (k.recit) t += `\n\nOÙ EN EST L'HISTOIRE (les dernières lignes du récit) :\n${k.recit}`;
     t += `\n\nRéponds en JSON seul : {"replique":"...","partir":false}`;
@@ -190,7 +193,6 @@ let fenetre = null;
 const $ = (sel) => fenetre && fenetre.querySelector(sel);
 const avatar = (url, nom, cote) => url ? `<img class="avatar-dp ${cote}" src="${echapper(url)}" alt="" draggable="false">`
     : `<div class="avatar-dp ${cote} sans-image"><span>${echapper(String(nom || "?").split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0].toUpperCase()).join(""))}</span></div>`;
-const lecture = (t) => Math.max(1400, Math.min(6000, 900 + String(t || "").length * 45));
 
 export function peutParler(idPnj) {
     const p = window.ID_PARTIE_COURANTE;
@@ -207,7 +209,7 @@ export async function ouvrir(s) {
     if (refus) { alert(refus); return false; }
     const p = window.ID_PARTIE_COURANTE;
     const heros = window.GROUPE.herosDeLaPartie().find(h => h.idJoueur === moi());
-    d = { p, id: `${Date.now()}_${s.id}`, idPnj: s.id, nomPnj: s.nom || (s.fiche || {}).Nom_PNJ || "?", fiche: s.fiche || {}, heros, joueur: moi(),
+    d = { p, id: `${Date.now()}_${s.id}`, idPnj: s.id, nomPnj: s.nom || (s.fiche || {}).Nom_PNJ || "?", fiche: s.fiche || {}, depuis: s.depuis || "", heros, joueur: moi(),
           lignes: [{ qui: "pnj", texte: "Oui ?" }], dateJeu: dateJeu(), ouverte: Date.now(), attente: false, fini: false, k: null };
     construire();
     rattraper(p, d.id);
@@ -227,8 +229,8 @@ function construire() {
     fenetre.innerHTML = `
       ${avatar(h.urlCloudinary || h.urlAvatarEquipe || h.urlPortraitReference || "", nomHeros(h), "pj")}
       ${avatar((d.fiche || {}).URL_Cloudinary || "", d.nomPnj, "pnj")}
-      <div class="encart-dp pnj" hidden><div class="nom-dp">${echapper(d.nomPnj)}</div><div class="texte-dp"></div></div>
-      <form class="encart-dp pj" hidden autocomplete="off">
+      <div class="encart-dp pnj"><div class="nom-dp">${echapper(d.nomPnj)}</div><div class="texte-dp"></div><div class="suite-dp"></div></div>
+      <form class="encart-dp pj" autocomplete="off">
         <div class="nom-dp">${echapper(h.prenom || nomHeros(h))}</div>
         <textarea class="saisie-dp" rows="3" maxlength="600" placeholder="Ce que tu lui dis…"></textarea>
         <button type="submit" class="envoyer-dp" title="Dire (Entrée)" aria-label="Dire">➤</button>
@@ -239,32 +241,41 @@ function construire() {
     $(".quitter-dp").addEventListener("click", () => fermer("joueur"));
     $(".encart-dp.pj").addEventListener("submit", (e) => { e.preventDefault(); envoyer(); });
     $(".saisie-dp").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); envoyer(); } });
-    $(".encart-dp.pnj").addEventListener("click", () => { if (d && !d.attente && !d.fini) tourDuJoueur(); });
+    // (v428) Nico : « les paroles du PNJ disparaissent et vont en bas seulement quand le joueur a
+    // cliqué quelque part sur l'écran ». Un toucher n'importe où (sauf « Quitter ») : à lui de
+    // répondre ; le PNJ parti, le toucher referme la discussion.
+    fenetre.addEventListener("click", (e) => {
+        if (!d || e.target.closest(".quitter-dp")) return;
+        const t = fenetre.dataset.tour;
+        if (t === "pnj" && !d.attente && !d.fini) { e.preventDefault(); tourDuJoueur(); }
+        else if (t === "parti") fermer("pnj");
+    });
     fenetre.addEventListener("keydown", (e) => { if (e.key === "Escape") fermer("joueur"); });
 }
-// Le PNJ parle (ou réfléchit : « … ») ; puis, sa phrase lue, c'est au joueur.
+// Le PNJ parle (ou réfléchit : « … ») ; sa phrase reste jusqu'au toucher du joueur.
+// (v428) Nico : « les deux encarts se chevauchent : quand le PNJ parle, l'encart du joueur à
+// 10 %, et l'inverse quand c'est au joueur, l'encart actif passant devant ». Les deux restent
+// là, en bas de l'écran ; `data-tour` dit lequel est devant (discussion_privee.css).
 function afficherPnj(texte, reflechit) {
     if (!fenetre) return;
-    $(".encart-dp.pj").hidden = true;
     $(".rappel-dp").hidden = true;
     const e = $(".encart-dp.pnj");
-    e.hidden = false;
     e.classList.toggle("reflechit", !!reflechit);
     e.querySelector(".texte-dp").innerHTML = reflechit ? `<span class="points-dp"><i></i><i></i><i></i></span>` : htmlReplique(texte);
+    e.querySelector(".suite-dp").textContent = reflechit ? "" : d.fini ? "Touchez l'écran pour quitter" : "Touchez l'écran pour répondre";
     fenetre.dataset.tour = reflechit ? "attente" : "pnj";
-    clearTimeout(afficherPnj.minuteur);
-    if (!reflechit && !d.fini) afficherPnj.minuteur = setTimeout(tourDuJoueur, lecture(texte));
+    const s = $(".saisie-dp");
+    s.disabled = true;
+    try { s.blur(); } catch (er) {}
 }
 // Au joueur : la phrase du PNJ, en petit, en bas de l'écran ; son encart à lui.
 function tourDuJoueur() {
     if (!fenetre || !d || d.fini) return;
-    clearTimeout(afficherPnj.minuteur);
     const derniere = [...d.lignes].reverse().find(l => l.qui === "pnj");
-    $(".encart-dp.pnj").hidden = true;
     const r = $(".rappel-dp");
     r.innerHTML = derniere ? `<b>${echapper(d.nomPnj)}</b> ${htmlReplique(derniere.texte)}` : "";
     r.hidden = !derniere;
-    $(".encart-dp.pj").hidden = false;
+    $(".encart-dp.pnj .suite-dp").textContent = "";
     fenetre.dataset.tour = "pj";
     const s = $(".saisie-dp");
     s.disabled = false;
@@ -289,10 +300,7 @@ async function envoyer() {
         if (r.partir) { ici.fini = true; ici.parti = true; }
         sauver(ici);
         afficherPnj(r.replique, false);
-        if (r.partir) {
-            fenetre.dataset.tour = "parti";
-            setTimeout(() => { if (d === ici) fermer("pnj"); }, lecture(r.replique) + 2000);
-        }
+        if (r.partir) fenetre.dataset.tour = "parti";       // (v428) un toucher referme
     } catch (e) {
         console.warn("[Discussion] La réplique n'est pas venue :", e);
         if (d !== ici) return;
@@ -310,7 +318,6 @@ export async function fermer(qui) {
     if (!d) return null;
     const x = d;
     d = null;
-    clearTimeout(afficherPnj.minuteur);
     if (fenetre) { fenetre.remove(); fenetre = null; }
     x.fini = true;
     await sauver(x, { fermee: Date.now(), fin: qui === "pnj" ? "pnj" : "joueur" });

@@ -249,7 +249,8 @@ await section(async () => {
   const cr = croquisDepuis(n);
   verifier("deux portraits joints, Kaya puis Fargus (l'ordre de la scène)", JSON.stringify(res.blobs) === '["kaya-equipe.png","fargus-equipe.png"]' && !!cr && nbImages(cr) === 2, JSON.stringify(res.blobs));
   verifier("image 1 Kaya à gauche, image 2 Fargus au centre", !!cr && /image 1 is Kaya[^;]*.{1,4} in the scene: left; pulled down by the arm; surprised/.test(cr.corps) && /image 2 is A- Fargus[^;]*.{1,4} in the scene: center; crouching, dragging Kaya down; fierce/.test(cr.corps));
-  verifier("le chien sans nom est compté, avec sa place : trois figures", !!cr && /EXACTLY 3 figures in the whole drawing: Kaya, A- Fargus, a hunting hound \(right background; sniffing the air\)/.test(cr.corps));
+  // (v428) Nico : « limiter le plan à deux personnages au plus » : le chien reste hors du plan.
+  verifier("(v428) deux figures au plus : Kaya et Fargus ; le chien sans nom reste hors du plan", !!cr && /EXACTLY 2 figures in the whole drawing: Kaya, A- Fargus\./.test(cr.corps) && !/hunting hound/.test(cr.corps));
 });
 
 // =========================================================================

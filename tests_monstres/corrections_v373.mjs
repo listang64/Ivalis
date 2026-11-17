@@ -334,13 +334,31 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("6. AILLEURS QUE SUR LES CARTES : LES FENÊTRES RETOURNENT À L'ÉCRAN DE JEU");
+titre("6. (v428) AILLEURS QUE SUR LES CARTES : LE MÊME POST-IT, EN HAUT À GAUCHE DU LIVRE");
 // =========================================================================
+// Nico : « quand on s'arrête à un feu de camp, j'ai encore la vieille popup : un post-it qui
+// sort en haut, côté gauche du livre, avec le style habituel, et tout ce qu'il y a dedans ».
 await section(async () => {
   await p.evaluate(() => window.GRIMOIRE_RECIT.allerAuRecit());
   await attendreQue(() => p.evaluate(() => !window.GRIMOIRE.defileEnCours()), 8000); await pose(); await p.waitForTimeout(600);
-  const f = await fenetre("boite-voyage"), g = await fenetre("bandeau-voyage");
-  verifier("dans le récit, elles sont rendues à l'écran de jeu (comme avant)", !!f && f.dansEcran && !!g && g.dansEcran, JSON.stringify({ f, g }));
+  await p.evaluate(() => { window.__nuit = []; window.choisirNuitVoyageGroupe = (a) => window.__nuit.push(a); });
+  await relayerVoyage(voyageRegion("nuit", { Choix_Nuit: {} }));
+  await attendreQue(() => p.evaluate(() => !!document.querySelector("#voyage-postit.sortie #boite-voyage")), 6000); await p.waitForTimeout(900);
+  const f = await fenetre("boite-voyage");
+  const r = await p.evaluate(() => { const el = document.getElementById("voyage-postit"), l = document.getElementById("grimoire-livre").getBoundingClientRect(), pa = el.querySelector(".papier-voyage").getBoundingClientRect();
+    const t = document.querySelector("#boite-voyage .boite-voyage-tete"), cs = getComputedStyle(t);
+    return { gauche: el.classList.contains("a-gauche"), sortie: el.classList.contains("sortie"), depasse: pa.top < l.top - 20, aGauche: pa.left + pa.width / 2 < l.left + l.width / 2,
+             texte: document.getElementById("boite-voyage").textContent.replace(/\s+/g, " "), police: cs.fontFamily, fond: getComputedStyle(document.getElementById("boite-voyage")).backgroundColor }; });
+  verifier("la nuit au campement, dans le récit : dans le post-it, à l'encre (plus de boîte)", !!f && f.postit && f.vu && f.position === "static" && !f.dansEcran && r.fond === "rgba(0, 0, 0, 0)", JSON.stringify({ f, fond: r.fond }));
+  verifier("…tout ce qu'il y avait dans la popup (la nuit, les votants, les choix, le feu de camp)", /Nuit 1 au campement/.test(r.texte) && /Repartir à l'aube/.test(r.texte) && /Rester ici/.test(r.texte) && /Discuter autour du feu de camp/.test(r.texte), r.texte.slice(0, 200));
+  verifier("…le post-it sort par le haut, côté gauche du livre", r.gauche && r.sortie && r.depasse && r.aGauche, JSON.stringify(r));
+  const c = await p.evaluate(() => { const b = document.querySelector('#voyage-postit [data-action="rester"]'); if (!b) return null; const q = b.getBoundingClientRect(); const el = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
+    return { x: q.left + q.width / 2, y: q.top + q.height / 2, touche: !!(el && el.closest('[data-action="rester"]')) }; });
+  if (c && c.touche) { await p.mouse.click(c.x, c.y); await p.waitForTimeout(400); }
+  verifier("…ses boutons marchent (« Rester ici »)", !!c && c.touche && JSON.stringify(await p.evaluate(() => window.__nuit)) === '["rester"]', JSON.stringify(c));
+  await cap("v428_feu_de_camp");
+  await relayerVoyage(null); await p.waitForTimeout(900);
+  verifier("le voyage fini : le post-it rentre", !(await p.evaluate(() => document.getElementById("voyage-postit").classList.contains("sortie"))));
 });
 
 // =========================================================================

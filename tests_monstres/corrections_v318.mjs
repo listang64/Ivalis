@@ -210,7 +210,8 @@ await section(async () => {
   await illustrer({ illustrer: true, moment: "drôle", sujet: "scene", description: "Kaya slips on a wet amphora while Varos laughs, a stray wolf sniffing the spilled wine. I watch from the doorway, laughing.",
                     heros: ["Kaya"], pnj_dans_le_croquis: ["Varos"], autres: ["a stray wolf"], nombre: 3, pnj_nommes: [] }, "Varos éclate de rire quand Kaya glisse sur une amphore ; je ris aussi depuis le seuil.");
   const cr = imagesIA.slice(n).find(x => /concept art/.test(x.corps));
-  verifier("le dessinateur reçoit le compte exact et les noms (Kaya, Varos, le loup), personne d'autre", !!cr && /EXACTLY 3 figures in the whole drawing: Kaya, Varos, a stray wolf/.test(cr.corps) && /no narrator, no chronicler, no onlooker, no crowd/.test(cr.corps), cr ? "" : "aucun croquis");
+  // (v428) deux figures au plus : Kaya et Varos (le loup reste hors du plan).
+  verifier("le dessinateur reçoit le compte exact et les noms (Kaya, Varos ; v428 : pas le loup), personne d'autre", !!cr && /EXACTLY 2 figures in the whole drawing: Kaya, Varos\./.test(cr.corps) && /no narrator, no chronicler, no onlooker, no crowd/.test(cr.corps), cr ? "" : "aucun croquis");
   verifier("la phrase du chroniqueur (« I watch from the doorway ») ne part pas au dessinateur", !!cr && !/I watch|doorway/.test(cr.corps));
   // (v346) Plus d'encre noire : l'illustration est en couleur (concept art) — voir corrections_v346.mjs.
   verifier("plus d'encre noire sur blanc : un concept art (v346)", !!cr && /concept art/.test(cr.corps) && !/PURE BLACK INK/.test(cr.corps));
