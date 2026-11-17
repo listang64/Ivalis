@@ -42,7 +42,8 @@
   to { opacity: 1; filter: blur(0); }
 }
 /* Un nom qui se touche : son portrait sort du livre. */
-.nom-livre { color: #4a1f0c; font-weight: bold; text-decoration: none; border-bottom: 1px dotted rgba(74, 31, 12, 0.55); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* (v430) Nico : « le nom des PNJ, cliquable, est souligné en pointillé : enlève le pointillé ». */
+.nom-livre { color: #4a1f0c; font-weight: bold; text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .nom-livre:hover { color: #000; border-bottom-style: solid; }
 
 /* Le petit dé dans la marge, à côté de l'action. */
@@ -503,3 +504,8 @@
 .papier-usure::before { content: ""; position: absolute; left: 0; top: 0; width: 15%; height: 7%; z-index: 2; pointer-events: none;
   background: linear-gradient(135deg, rgba(40, 20, 5, 0) 0 46%, rgba(247, 232, 196, 0.95) 49%, #e9d3a3 62%, #cdb07a 100%);
   clip-path: polygon(0 0, 100% 0, 0 100%); filter: drop-shadow(1px 1px 1px rgba(40, 20, 5, 0.5)); }
+
+/* (v430) Mode DEV : forcer la lecture finie pour tous — tout petit, en rouge, sous le bouton. */
+.forcer-lecture { display: block; margin: calc(var(--u, 8px) * 0.4) auto 0; padding: 0 !important; background: none !important; border: none !important;
+  font: italic 11px/1.2 Georgia, serif; color: #b91c1c !important; text-decoration: underline; cursor: pointer; opacity: 0.85; }
+.forcer-lecture[hidden] { display: none; }

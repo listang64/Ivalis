@@ -262,6 +262,8 @@ function afficherPnj(texte, reflechit) {
     const e = $(".encart-dp.pnj");
     e.classList.toggle("reflechit", !!reflechit);
     e.querySelector(".texte-dp").innerHTML = reflechit ? `<span class="points-dp"><i></i><i></i><i></i></span>` : htmlReplique(texte);
+    // (v430) Une nouvelle phrase arrive en fondu rapide.
+    if (!reflechit) { e.classList.remove("neuf"); void e.offsetWidth; e.classList.add("neuf"); }
     e.querySelector(".suite-dp").textContent = reflechit ? "" : d.fini ? "Touchez l'écran pour quitter" : "Touchez l'écran pour répondre";
     fenetre.dataset.tour = reflechit ? "attente" : "pnj";
     const s = $(".saisie-dp");

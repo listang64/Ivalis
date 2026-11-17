@@ -215,10 +215,16 @@ export async function avantLeMJ(o) {
     // 3. LES MÉCONTENTS préviennent, puis s'en vont.
     const restants = GP.actifs(liste);
     const loy = await loyautes(p, restants.map(s => s.id), heros);
+    // (v430) Ceux qui s'en vont ce tour-ci : leur souvenir du départ (plus bas, une fois écrit).
+    const avantListe = JSON.parse(avant);
+    const departs = actionsCompagnie.filter(a => a.type === "renvoyer" || a.type === "laisser")
+        .map(a => ({ a, s: avantListe.find(x => x.id === a.id) })).filter(x => x.s);
     for (const s of restants) {
         const v = loy[s.id] || 0, verdict = GP.verdictDepart({ loyaute: v, averti: s.averti });
         if (verdict === "partir") {
-            liste = GP.appliquer(liste, { type: "partir", id: s.id, quand: dateJeu(), lieu: (env.details && (env.details.Nom_Du_Lieu || env.details.Nom_Batiment)) || "", raison: "il est parti de lui-même" });
+            const depart = { type: "partir", id: s.id, quand: dateJeu(), lieu: (env.details && (env.details.Nom_Du_Lieu || env.details.Nom_Batiment)) || "", raison: "il est parti de lui-même" };
+            liste = GP.appliquer(liste, depart);
+            departs.push({ a: depart, s });
             decisions.push(`${s.nom} QUITTE LA COMPAGNIE de lui-même (loyauté ${v} : ${GP.motLoyaute(v)}). Raconte son départ dans la scène, avec ce qu'il reproche aux héros ; il reste ici.`);
             journal(`${s.nom} s'en va (loyauté ${v}).`);
         } else if (verdict === "avertir") {
@@ -230,6 +236,7 @@ export async function avantLeMJ(o) {
     if (JSON.stringify(liste) !== avant) {
         try { await ecrireCompagnie(p, liste); } catch (e) { console.error("[La compagnie] Écriture impossible :", e); }
     }
+    for (const d of departs) await souvenirDuDepart(p, d.s, d.a, heros);
     // (v428) Nico : « le PNJ a décidé de me suivre, mais en parlant avec lui il n'a pas
     // conscience qu'il est dans mon groupe : quand un PNJ rejoint le groupe, l'indiquer dans
     // ses souvenirs, avec la date ». Un souvenir important, au sujet des héros.
@@ -243,6 +250,40 @@ export async function avantLeMJ(o) {
         } catch (e) { console.warn("[La compagnie] Le souvenir de l'arrivée :", e); }
     }
     return { attendre: false, contexte: contexteDuNarrateur(liste, loy, heros, decisions, env) };
+}
+
+// (v430) Nico : « quand un PNJ quitte le groupe, inscrire dans ses souvenirs un très léger
+// résumé de ce moment et des choses importantes ». Un souvenir important (au sujet des
+// héros) : pourquoi, où et quand il s'en va, depuis quand il les suivait, et ce qu'il
+// retient de ce temps-là (ses un ou deux souvenirs les plus forts depuis son arrivée).
+const RAISONS_DEPART = {
+    partir: "J'ai quitté la compagnie de mon propre chef",
+    renvoyer: "La compagnie s'est séparée de moi",
+    laisser: "La compagnie m'a demandé de l'attendre ici"
+};
+export async function souvenirDuDepart(p, suiveur, action, heros) {
+    if (!p || !suiveur || !action || !RAISONS_DEPART[action.type] || !window.SOCIAL || typeof window.SOCIAL.noterSouvenir !== "function") return null;
+    const noms = (heros || []).map(h => h.prenom).filter(Boolean);
+    const qui = noms.length > 1 ? `${noms.slice(0, -1).join(", ")} et ${noms[noms.length - 1]}` : (noms[0] || "des héros");
+    let retenu = [];
+    try {
+        const tous = typeof window.SOCIAL.lireSouvenirsDe === "function" ? await window.SOCIAL.lireSouvenirsDe(p, suiveur.id) : [];
+        // (ni ses arrivées ni ses départs : seulement ce qu'il a vécu avec eux)
+        const deCompagnie = /^(J'ai rejoint la compagnie|J'ai quitté la compagnie|La compagnie s'est séparée|La compagnie m'a demandé)/;
+        const court = (t) => { const x = String(t).replace(/\s+/g, " ").trim().replace(/[.!…]+$/, ""); return x.length <= 90 ? x : x.slice(0, 88).replace(/[\s,;:]+\S*$/, "") + "…"; };
+        retenu = tous.filter(x => x && x.texte && !deCompagnie.test(x.texte) && !String(x.id || "").startsWith("depart_")
+                && (!suiveur.ts || !(Number(x.Le) > 0) || Number(x.Le) >= Number(suiveur.ts)))
+            .sort((a, b) => (Number(b.importance) || 1) - (Number(a.importance) || 1) || (Number(b.Le) || 0) - (Number(a.Le) || 0))
+            .slice(0, 2).map(x => court(x.texte));
+    } catch (e) {}
+    const par = (/ par (.+)$/.exec(String(action.raison || "")) || [])[1];
+    const raison = par && par !== "le groupe" && action.type !== "partir"
+        ? (action.type === "laisser" ? ` (c'est ${par} qui me l'a demandé)` : ` (c'est ${par} qui l'a décidé)`) : "";
+    const texte = `${RAISONS_DEPART[action.type]}${raison}${action.lieu ? `, à ${action.lieu}` : ""}. J'ai voyagé avec ${qui}${suiveur.depuis ? ` depuis le ${suiveur.depuis}` : ""}`
+        + (retenu.length ? ` ; j'en retiens : ${retenu.join(" ; ")}.` : ".");
+    try {
+        return await window.SOCIAL.noterSouvenir(p, suiveur.id, texte, { cle: "depart", sujets: (heros || []).map(h => h.idPersonnage), importance: 3, dateJeu: action.quand || dateJeu() });
+    } catch (e) { console.warn("[La compagnie] Le souvenir du départ :", e); return null; }
 }
 
 // LA COMPAGNIE, telle que le Narrateur la lit.
@@ -277,7 +318,10 @@ export async function renvoyer(id) {
     if (!p || !id) return false;
     const liste = await lireCompagnie(p);
     if (!GP.actifs(liste).some(s => s.id === id)) return false;
-    await ecrireCompagnie(p, GP.appliquer(liste, { type: "renvoyer", id, quand: dateJeu(), raison: "renvoyé par le groupe" }));
+    const action = { type: "renvoyer", id, quand: dateJeu(), lieu: "", raison: "renvoyé par le groupe" };
+    await ecrireCompagnie(p, GP.appliquer(liste, action));
+    // (v430) Son souvenir du départ.
+    await souvenirDuDepart(p, liste.find(s => s.id === id), action, herosDeLaPartie());
     return true;
 }
 
@@ -383,5 +427,5 @@ async function lieuDuGroupe(p) {
 }
 
 const GROUPE = { ...GP, herosDeLaPartie, compagnonsDuGroupe, lireCompagnie, rejoindreLaScene, detecterDemandes, avantLeMJ, contexteDuNarrateur,
-                 renvoyer, tirerBlessuresCompagnie, ecrireBlessuresCompagnie, etatPourLeLivre };
+                 renvoyer, souvenirDuDepart, tirerBlessuresCompagnie, ecrireBlessuresCompagnie, etatPourLeLivre };
 window.GROUPE = GROUPE;

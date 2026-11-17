@@ -90,6 +90,34 @@ function jaugeLoyaute(v) {
 const TETE_QUI_PARLE = `<svg viewBox="0 0 24 24" aria-hidden="true"><path class="tete" d="M8.6 3.2c-3.3 0-5.9 2.6-5.9 5.8 0 1.9.8 3.4 2 4.5V20.5h6.6v-2.6h1.9c.9 0 1.5-.7 1.5-1.5v-2.2l1.5-.5c.4-.1.5-.5.3-.8l-1.6-2.6c-.2-3.9-2.8-7.1-6.3-7.1z"/><path class="onde" d="M17.6 7.6c1.3 1.6 1.3 3.9 0 5.5M20.1 5.4c2.5 2.9 2.5 7.1 0 10"/></svg>`;
 const ETAT_JOLI = { avec: "avec nous", laisse: "laissé en arrière", parti: "parti", renvoye: "renvoyé", mort: "mort" };
 
+// (v430) La séparation dorée sous chaque héros : un trait d'or qui s'effile en pointe
+// fine à chaque bout, un losange au milieu. Le dégradé est défini une fois par page.
+const DEFS_OR = `<svg class="defs-or-groupe" width="0" height="0" aria-hidden="true"><defs>
+    <linearGradient id="or-groupe" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a6420" stop-opacity="0.2"/><stop offset="0.15" stop-color="#9c7020"/>
+      <stop offset="0.5" stop-color="#f0c95e"/><stop offset="0.85" stop-color="#9c7020"/><stop offset="1" stop-color="#8a6420" stop-opacity="0.2"/></linearGradient>
+    <linearGradient id="or-groupe-plein" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6dc8c"/><stop offset="1" stop-color="#a87c26"/></linearGradient></defs></svg>`;
+const SEPARATION_DOREE = `<svg class="separation-doree" viewBox="0 0 200 16" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 8 C 40 6, 68 5, 91 6.4 L 100 1.6 L 109 6.4 C 132 5, 160 6, 200 8 C 160 10, 132 11, 109 9.6 L 100 14.4 L 91 9.6 C 68 11, 40 10, 0 8 Z" fill="url(#or-groupe)" stroke="#7a5518" stroke-width="0.35"/>
+    <path d="M100 4.6 L 104.2 8 L 100 11.4 L 95.8 8 Z" fill="url(#or-groupe-plein)" stroke="#7a5518" stroke-width="0.5"/></svg>`;
+// (v430) Nico : « le corps réputation plus joli, dans le style du livre » : une règle
+// à l'encre de « honnis » à « adulés », un losange doré à sa place, le mot dessous.
+function htmlReputation(l) {
+    const v = Math.max(-10, Math.min(10, Number(l.reputation) || 0));
+    const x = 10 + (v + 10) * 9;          // de 10 à 190
+    const graduations = Array.from({ length: 11 }, (_, i) => { const gx = 10 + i * 18, grand = i % 5 === 0;
+        return `<line x1="${gx}" y1="${grand ? 9 : 11}" x2="${gx}" y2="${grand ? 19 : 17}"/>`; }).join("");
+    return `<div class="reputation-groupe">
+        ${lavis({ couleurs: ["#d8b56a", "#e9cc86", "#c49a4a"], opacite: 0.32, nom: "reputation" }, "groupe-reputation")}
+        <div class="titre-reputation">Réputation ici</div>
+        <div class="ligne-reputation"><span>honnis</span>
+        <svg class="regle-reputation" viewBox="0 0 200 28" aria-hidden="true">
+          <path class="trait-reputation" d="M10 14 C 60 12.8, 140 15.2, 190 14"/>${graduations}
+          <path d="M${x} 6 L ${x + 6} 14 L ${x} 22 L ${x - 6} 14 Z" fill="url(#or-groupe-plein)" stroke="#5c3a12" stroke-width="0.8"/>
+        </svg><span>adulés</span></div>
+        <div class="mot-reputation"><b>${v > 0 ? "+" : ""}${echapper(v)}</b> — ${motReputation(v)}${(l.tags || []).length ? ` <em>(${echapper(l.tags.slice(0, 3).join(", "))})</em>` : ""}</div>
+      </div>`;
+}
+
 // LA PAGE DE GAUCHE : la compagnie.
 function htmlGauche() {
     const heros = herosDuGroupe();
@@ -106,21 +134,25 @@ function htmlGauche() {
         // (v428) Nico : « à gauche, l'avatar des personnages les uns à côté des autres, avec en
         // dessous leurs noms, et un dégradé noir faible opacité pour masquer la coupe du bas de
         // leurs images ; adapte la taille des avatars au nombre de personnages » (--n, le CSS).
+        // (v430) Nico : « enlève l'ombre noire sous chaque avatar et mets plutôt une séparation
+        // dorée jolie, dessinée en SVG, qui part en pointe fine sur les bords, sous chaque avatar,
+        // avec en dessous le nom » — et le nom un peu plus gros, en doré.
         return `<div class="heros-groupe">
             <button type="button" class="portrait-heros-groupe" data-action="groupe" data-gp="heros" data-id="${id}">${avatarEnPied(url, nomHeros(h), "avatar-heros-groupe")}</button>
+            ${SEPARATION_DOREE}
             <span class="ligne-nom-groupe"><button type="button" class="nom-groupe" data-action="groupe" data-gp="heros" data-id="${id}">${echapper(nomHeros(h))}</button>${changer}</span>
             <span class="role-groupe">${echapper(classeDe(h))}${h.niveau ? ` · niv. ${echapper(h.niveau)}` : ""}</span></div>`;
     }).join("");
-    return `<div class="contenu-page page-groupe-gauche">
+    return `<div class="contenu-page page-groupe-gauche">${DEFS_OR}
         <div class="entete-groupe">${lavis(TEINTE_GROUPE, "groupe-titre")}<span class="titre-page-fiche">Le groupe</span></div>
         ${nomDuGroupe() ? `<div class="nom-du-groupe">${echapper(nomDuGroupe())}</div>` : ""}
         ${FLEURON}
         <div class="infos-groupe">
           ${lieu ? `<div><span class="cle-groupe">Où</span> ${echapper(lieu)}</div>` : ""}
           ${dateDuJeu() ? `<div><span class="cle-groupe">Quand</span> ${echapper(dateDuJeu())}</div>` : ""}
-          ${!l.nature && l.reputation != null ? `<div><span class="cle-groupe">Réputation ici</span> ${l.reputation > 0 ? "+" : ""}${echapper(l.reputation)} — ${motReputation(l.reputation)}${(l.tags || []).length ? ` <em>(${echapper(l.tags.slice(0, 3).join(", "))})</em>` : ""}</div>` : ""}
         </div>
-        <div class="sous-titre-groupe">La compagnie</div>
+        ${!l.nature && l.reputation != null ? htmlReputation(l) : ""}
+        <div class="sous-titre-groupe compagnie-groupe">La compagnie</div>
         <div class="liste-heros-groupe" style="--n:${Math.max(1, heros.length)}">${ligneHeros || `<p class="fiche-attente">Aucun héros dans le groupe.</p>`}</div>
         <button type="button" class="bouton-aventuriers-groupe" data-action="groupe" data-gp="aventuriers">${lavis(TEINTE_AVENTURIERS, "aventuriers-groupe")}${cadre("aventuriers-groupe", 1.3)}<span>Les aventuriers ›</span></button>
       </div>`;
@@ -133,8 +165,10 @@ function htmlSuiveur(s) {
     // (v428) Nico : « page de droite, l'avatar des PNJ aussi : garde la taille de leurs encarts,
     // l'avatar collé en bas de son encart, qui dépasse un peu en haut, sur le côté gauche » ;
     // « le symbole pour parler en privé, plus petit et sous l'image du PNJ ».
+    // (v430) Nico : « le bouton pour parler au PNJ, en discret, dans son encart tout en bas à droite ».
     return `<li class="suiveur-groupe">
-        <button type="button" class="carte-suiveur" data-action="groupe" data-gp="ame" data-id="${echapper(s.id)}" data-nom="${echapper(s.nom)}">
+        <div class="cadre-suiveur">
+        <button type="button" class="carte-suiveur avec-parler" data-action="groupe" data-gp="ame" data-id="${echapper(s.id)}" data-nom="${echapper(s.nom)}">
           ${avatarEnPied(f.URL_Cloudinary || "", s.nom, "avatar-suiveur")}
           <span class="texte-suiveur">
             <span class="nom-groupe">${echapper(s.nom)}</span>
@@ -143,8 +177,9 @@ function htmlSuiveur(s) {
             <span class="loyaute-groupe">Loyauté ${jaugeLoyaute(s.loyaute)} <small>${echapper(s.motLoyaute || "")}</small></span>
           </span>
         </button>
-        <div class="actions-suiveur">
           <button type="button" class="parler-groupe" data-action="groupe" data-gp="parler" data-id="${echapper(s.id)}" title="Parler en privé avec ${echapper(s.nom)}" aria-label="Parler en privé avec ${echapper(s.nom)}">${TETE_QUI_PARLE}</button>
+        </div>
+        <div class="actions-suiveur">
           <button type="button" class="lien-fiche renvoyer-groupe" data-action="groupe" data-gp="renvoyer" data-id="${echapper(s.id)}" data-nom="${echapper(s.nom)}">Se séparer de lui</button>
         </div>
       </li>`;

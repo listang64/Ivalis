@@ -1715,10 +1715,13 @@ async function appelNarrateurEnFlux(modele, corps, cle, surTexte) {
         try { const d = await reponse.json(); if (d && d.error && d.error.message) message = d.error.message; } catch (e) {}
         const err = new Error(message); err.statut = reponse.status; throw err;
     }
-    let texte = "", tokens = 0, usage = null;
+    let texte = "", tokens = 0, usage = null, fin = "";
     const lireMorceau = (data) => {
         if (!data) return;
         if (data.error) { const err = new Error(data.error.message || "Erreur"); err.statut = data.error.code; throw err; }
+        // (v430) Pourquoi la réponse s'arrête (STOP, MAX_TOKENS…) : une réponse coupée se reprend.
+        const c0 = data.candidates && data.candidates[0];
+        if (c0 && c0.finishReason) fin = c0.finishReason;
         const t = texteDesParts(data);
         if (data.usageMetadata) usage = data.usageMetadata;
         if (data.usageMetadata && data.usageMetadata.totalTokenCount) tokens = data.usageMetadata.totalTokenCount;
@@ -1730,10 +1733,10 @@ async function appelNarrateurEnFlux(modele, corps, cle, surTexte) {
         let data = null;
         try { data = JSON.parse(brut); } catch (e) {
             brut.split(/\r?\n/).filter(l => l.startsWith("data:")).forEach(l => { try { lireMorceau(JSON.parse(l.slice(5))); } catch (err) { if (err.statut) throw err; } });
-            return { texte, tokens, usage };
+            return { texte, tokens, usage, fin };
         }
         (Array.isArray(data) ? data : [data]).forEach(lireMorceau);
-        return { texte, tokens, usage };
+        return { texte, tokens, usage, fin };
     }
     const lecteur = reponse.body.getReader();
     const decodeur = new TextDecoder();
@@ -1754,8 +1757,32 @@ async function appelNarrateurEnFlux(modele, corps, cle, surTexte) {
         if (done) break;
     }
     if (tampon.trim().startsWith("data:")) { try { lireMorceau(JSON.parse(tampon.trim().slice(5))); } catch (e) { if (e.statut) throw e; } }
-    return { texte, tokens, usage };
+    return { texte, tokens, usage, fin };
 }
+
+// (v430) Nico : « le Maître du jeu était en train d'écrire et ça s'est arrêté en pleine
+// phrase, puis le cerveau des fils invisibles est apparu, mais le Narrateur n'a pas
+// continué ». Une réponse coupée (le flux qui casse en route, la limite de longueur
+// atteinte, un texte qui finit sans ponctuation) était gardée telle quelle, et le tour
+// se terminait dessus. Elle se REPREND : le modèle reçoit ce qu'il a déjà écrit et
+// continue exactement là où il s'est arrêté, sans rien répéter (deux reprises au plus).
+export function reponseCoupee(texte, fin) {
+    const t = String(texte || "").replace(/\s+$/, "");
+    if (!t) return false;
+    if (fin && !["STOP", "FINISH_REASON_UNSPECIFIED"].includes(fin)) return true;
+    return !/[.!?…»"”*)\]—:]$/.test(t);
+}
+window.reponseCoupeeNarrateur = reponseCoupee;
+const CONSIGNE_REPRISE = "(Ta réponse a été coupée net. Continue EXACTEMENT là où elle s'arrête — au milieu de la phrase s'il le faut —, sans rien répéter, sans résumer, sans titre ni préambule.)";
+function raccorder(avant, suite) {
+    // La suite se colle telle que le modèle l'écrit (une espace en tête : un nouveau mot ;
+    // rien : la fin d'un mot coupé) ; après une ponctuation, une espace d'office.
+    const a = String(avant || ""), b = String(suite || "");
+    if (!b.trim()) return a;
+    if (/^\s/.test(b) || /\s$/.test(a)) return a.replace(/\s+$/, "") + (/^\s*\n/.test(b) ? "\n" : " ") + b.replace(/^\s+/, "");
+    return a + (/[.!?…:;,»]$/.test(a) && /^[\p{L}«]/u.test(b) ? " " : "") + b;
+}
+window.raccorderNarrateur = raccorder;
 
 // `surTexte(texteJusquIci)` (v291) : le texte du MJ au fil de son écriture,
 // pour ouvrir le parchemin avant la fin. Une fois qu'un morceau est parti, on
@@ -1793,16 +1820,37 @@ async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTe
     const cles = typeof window.clesGeminiPour === "function" ? window.clesGeminiPour() : [cleGemini];
     let iCle = 0;
     const relais = surTexte ? (t) => { dejaEnvoye = true; texteRecu = t; surTexte(t); } : null;
+    // (v430) LA REPRISE d'une réponse coupée (reponseCoupee, plus haut) : deux essais au plus ;
+    // ce qui arrive s'ajoute au texte déjà écrit (le livre voit la suite s'écrire).
+    const reprendre = async (deja, pourquoi) => {
+        let texteTotal = deja;
+        for (let essai = 1; essai <= 2 && reponseCoupee(texteTotal, essai === 1 ? pourquoi : ""); essai++) {
+            console.warn(`✂️ [Narrateur] Réponse coupée (${pourquoi || "sans ponctuation finale"}) : reprise ${essai}/2.`);
+            const corpsReprise = { ...bodyRequete, contents: [...bodyRequete.contents, { role: "model", parts: [{ text: texteTotal }] },
+                                                               { role: "user", parts: [{ text: CONSIGNE_REPRISE }] }] };
+            try {
+                const base = texteTotal;
+                const r = await appelNarrateurEnFlux(modele, corpsNarrateur(corpsReprise, modele, reglages.reflexion), cles[iCle] || cleGemini,
+                                                     surTexte ? (t) => { texteRecu = raccorder(base, t); surTexte(texteRecu); } : null);
+                if (r.usage && window.DEPENSES_IA) window.DEPENSES_IA.noterNarrateur(null, modele, r.usage);
+                if (typeof window.ajouterTokens === "function") window.ajouterTokens(r.tokens);
+                if (!r.texte.trim()) break;
+                texteTotal = raccorder(base, r.texte);
+                pourquoi = r.fin;
+            } catch (e) { console.warn("[Narrateur] La reprise a échoué :", e.message); break; }
+        }
+        return texteTotal;
+    };
 
     for (let tentative = 1; tentative <= maxTentatives; tentative++) {
         try {
             console.log(`✍️ [Narrateur] ${modele} (réflexion ${reglages.reflexion}) — tentative ${tentative}/${maxTentatives}`);
-            const { texte, tokens, usage } = await appelNarrateurEnFlux(modele, corpsNarrateur(bodyRequete, modele, reglages.reflexion), cles[iCle] || cleGemini, relais);
+            const { texte, tokens, usage, fin } = await appelNarrateurEnFlux(modele, corpsNarrateur(bodyRequete, modele, reglages.reflexion), cles[iCle] || cleGemini, relais);
             // Les dépenses du tour (v293, depenses_ia.js) : ce que le narrateur a lu et écrit.
             if (usage && window.DEPENSES_IA) window.DEPENSES_IA.noterNarrateur(null, modele, usage);
             if (!texte.trim()) throw new Error("réponse vide");
             if (typeof window.ajouterTokens === "function") window.ajouterTokens(tokens);
-            return texte;
+            return reponseCoupee(texte, fin) ? await reprendre(texte, fin) : texte;
         } catch (erreur) {
             console.warn(`⚠️ [Narrateur] Échec tentative ${tentative} (${modele}) :`, erreur.message);
             if (!dejaEnvoye && [402, 429, 503].includes(erreur.statut) && iCle < cles.length - 1) {
@@ -1819,7 +1867,7 @@ async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTe
                 tentative--;
                 continue;
             }
-            if (dejaEnvoye) return texteRecu;
+            if (dejaEnvoye) return await reprendre(texteRecu, "COUPURE");
             // (v312) Une coupure réseau (sans statut : « Failed to fetch »,
             // ERR_QUIC_PROTOCOL_ERROR…) : le navigateur repasse par une autre
             // connexion ; on relance presque aussitôt plutôt qu'après 4 s.

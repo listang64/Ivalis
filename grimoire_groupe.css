@@ -28,8 +28,6 @@
 .portrait-heros-groupe { width: 100%; display: block; }
 .avatar-heros-groupe { position: relative; display: block; width: 100%; aspect-ratio: 1 / 1.75; overflow: hidden; border-radius: 4px; transition: transform 0.18s ease; }
 .avatar-heros-groupe img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; display: block; }
-.avatar-heros-groupe::after { content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(to bottom, transparent 58%, rgba(0, 0, 0, 0.18) 80%, rgba(0, 0, 0, 0.38) 100%); }
 .avatar-heros-groupe.sans-image { display: grid; place-items: center; background: rgba(120, 90, 50, 0.22); }
 .avatar-heros-groupe.sans-image .initiales-liens { font-family: 'Cinzel', serif; font-size: calc(var(--u) * 6); color: #6b4a2b; }
 .portrait-heros-groupe:hover .avatar-heros-groupe { transform: scale(1.03) rotate(-0.6deg); }
@@ -94,3 +92,37 @@
 
 /* (v418) Dans les Aventuriers : revenir au groupe. */
 .retour-groupe-clan { align-self: flex-start; }
+
+/* (v430) Nico : « enlève l'ombre noire sous chaque avatar, mets une séparation dorée en SVG
+   qui part en pointe fine sur les bords, sous chaque avatar, avec en dessous le nom » ;
+   « le nom un peu plus gros et en doré » ; « la compagnie au-dessus des avatars, au centre » ;
+   « la réputation plus jolie, dans le style du livre » ; « le bouton pour parler au PNJ, en
+   discret, dans son encart tout en bas à droite ». */
+.defs-or-groupe { position: absolute; width: 0; height: 0; overflow: hidden; }
+.separation-doree { display: block; width: 104%; height: calc(var(--u) * 3.4); margin: calc(var(--u) * -1.7) 0 calc(var(--u) * 0.2);
+  position: relative; z-index: 1; overflow: visible; filter: drop-shadow(0 1px 0 rgba(255, 244, 214, 0.6)); }
+.heros-groupe .nom-groupe { font-size: calc(var(--u) * 4.2); color: #a87c26 !important;
+  background: linear-gradient(180deg, #e8c364 0%, #b8862b 55%, #8a6420 100%) !important; -webkit-background-clip: text !important; background-clip: text !important;
+  -webkit-text-fill-color: transparent; filter: drop-shadow(0 1px 0 rgba(60, 35, 10, 0.35)); }
+.compagnie-groupe { align-self: center; text-align: center; }
+.reputation-groupe { position: relative; align-self: center; width: 80%; display: flex; flex-direction: column; align-items: center;
+  padding: calc(var(--u) * 0.6) calc(var(--u) * 3); }
+/* Les avatars un peu moins hauts : la réputation a pris sa place, les noms restent sur la page. */
+.heros-groupe { flex-basis: min(calc(var(--u) * 30), calc((100% - (var(--n, 1) - 1) * var(--gouttiere)) / var(--n, 1))); }
+.avatar-heros-groupe { aspect-ratio: 1 / 1.5; }
+.reputation-groupe .lavis { left: -2%; top: -6%; width: 104%; height: 112%; }
+.reputation-groupe > *:not(.lavis) { position: relative; }
+.titre-reputation { font-family: 'Cinzel', serif !important; font-size: calc(var(--u) * 2.6); letter-spacing: 0.14em; text-transform: uppercase; color: #6b1a10; }
+.ligne-reputation { width: 100%; display: flex; align-items: center; gap: calc(var(--u) * 1.4); font-size: calc(var(--u) * 2.3); font-style: italic; color: #6b4a2b; }
+.regle-reputation { flex: 1; min-width: 0; height: auto; overflow: visible; }
+.regle-reputation .trait-reputation { fill: none; stroke: #5c2a14; stroke-width: 1.2; stroke-linecap: round; }
+.regle-reputation line { stroke: #5c2a14; stroke-width: 0.9; stroke-linecap: round; }
+.mot-reputation { font-size: calc(var(--u) * 3.1); color: #2b1a0e; text-align: center; }
+.mot-reputation b { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive; color: #5c2a14; }
+.mot-reputation em { color: #6b4a2b; }
+.cadre-suiveur { position: relative; display: flex; flex-direction: column; }
+.carte-suiveur.avec-parler { padding-right: calc(var(--u) * 6.4) !important; }
+.cadre-suiveur .parler-groupe { position: absolute; right: calc(var(--u) * 1); bottom: calc(var(--u) * 0.9); margin: 0;
+  width: calc(var(--u) * 3.8); height: calc(var(--u) * 3.8); padding: 0 !important; background: none !important; border: none !important; opacity: 0.55; }
+.cadre-suiveur .parler-groupe:hover { opacity: 1; background: none !important; }
+.actions-suiveur { justify-content: flex-end; }

@@ -859,7 +859,8 @@ function creerElements() {
     lecture.id = "recit-lecture";
     lecture.innerHTML = `<div class="papier-ecriture papier-lecture">
         <button type="button" class="bouton-lecture" id="recit-lecture-bouton">Lecture terminée</button>
-        <div class="attente-lecture" id="recit-lecture-attente"></div></div>`;
+        <div class="attente-lecture" id="recit-lecture-attente"></div>
+        <button type="button" class="forcer-lecture" id="recit-lecture-forcer" hidden>forcer la lecture finie pour tous (DEV)</button></div>`;
     papierDechire(lecture.querySelector(".papier-ecriture"));
     avantLivre(lecture);
     const poussiere = document.createElement("div");
@@ -868,6 +869,7 @@ function creerElements() {
     ecran.appendChild(poussiere);
     elts = { portrait, avatar, avatars, notes, postit, ecriture, lecture, poussiere, saisie: ecriture.querySelector("textarea"), form: ecriture.querySelector("form") };
     toucherVite(lecture.querySelector("#recit-lecture-bouton"), () => terminerLecture());
+    toucherVite(lecture.querySelector("#recit-lecture-forcer"), () => forcerLecturePourTous());
     elts.form.addEventListener("submit", (ev) => { ev.preventDefault(); envoyer(); });
     elts.saisie.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); envoyer(); } });
     elts.saisie.addEventListener("input", surSaisie);          // (v387) la plume se prend à la première lettre
@@ -1269,6 +1271,9 @@ function majLecture(lecture, voulu, fige) {
         bouton.textContent = fini ? "✓ Lecture terminée" : "Lecture terminée";
         const noms = (lecture.manquants || []).map(nomJoueurLecture);
         elts.lecture.querySelector("#recit-lecture-attente").textContent = noms.length ? `En attente : ${noms.join(", ")}` : "";
+        // (v430) En mode DEV seulement : forcer la lecture finie pour tous (tant que quelqu'un manque).
+        const forcer = elts.lecture.querySelector("#recit-lecture-forcer");
+        if (forcer) forcer.hidden = !(modeDevRecit() && (lecture.manquants || []).length > 0);
     }
     if (!fige) elts.lecture.classList.toggle("sortie", !!voulu);
 }
@@ -1284,6 +1289,24 @@ function terminerLecture() {
         updateDoc(doc(db, "Messages_Chat", lecture.message.idDoc), { [`Lectures.${qui}`]: Date.now() })
             .catch(e => console.error("Le livre : lecture terminée", e));
     }
+}
+
+// (v430) Nico : « en dessous du bouton Lecture terminée, et uniquement en mode Dev, un truc
+// pour forcer la lecture finie pour tous, en tout petit et en rouge ». Chaque joueur attendu
+// est marqué comme ayant lu : le Narrateur peut reprendre.
+function forcerLecturePourTous() {
+    if (!modeDevRecit()) return;
+    const lecture = etatLecture();
+    if (!lecture.message || !(lecture.manquants || []).length) return;
+    const id = lecture.id, quand = Date.now();
+    son("page-prise", 0.5);
+    lusIci[id] = { ...(lusIci[id] || {}), ...Object.fromEntries(lecture.manquants.map(j => [j, quand])) };
+    majInterface();
+    if (lecture.message.idDoc) {
+        updateDoc(doc(db, "Messages_Chat", lecture.message.idDoc), Object.fromEntries(lecture.manquants.map(j => [`Lectures.${j}`, quand])))
+            .catch(e => console.error("Le livre : lecture forcée", e));
+    }
+    console.log(`📖 [DEV] Lecture forcée pour : ${lecture.manquants.join(", ")}`);
 }
 
 // LE COMBAT DU RÉCIT (v278, combat_rp.js) : son bouton vivait dans l'ancien

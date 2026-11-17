@@ -70,9 +70,12 @@ const R = window.REGLAGES_ILLUSTRATIONS = window.REGLAGES_ILLUSTRATIONS || {
     ecart: 2,                 // au plus une illustration toutes les N réponses du Narrateur
     qualite: "medium",        // v315 : « low » donnait un trait pixelisé (l'avatar rhabillé : medium)
     portraitsMax: 2,          // portraits pleine page par réponse, au plus
-    forcerApres: 3            // (v326) 3 réponses du Narrateur sans croquis : un gros plan d'un héros, d'office
+    // (v326) N réponses du Narrateur sans croquis : un gros plan d'un héros, d'office.
+    // (v430) Nico : « ça ne va pas, il génère une image à chaque génération du Narrateur » →
+    // « les moments forts seulement » : plus de croquis forcé (0), et l'agent est plus strict.
+    forcerApres: 0
 };
-if (R.forcerApres === undefined) R.forcerApres = 3;
+if (R.forcerApres === undefined) R.forcerApres = 0;
 
 const lireCles = () => (typeof window.clesApiIvalis === "function" ? window.clesApiIvalis() : {});
 const aLesCles = () => { const c = lireCles(); return !!(c.openai && c.cloudName && c.cloudKey && c.cloudSecret) && typeof window.fetchGemini === "function"; };
@@ -228,7 +231,7 @@ const ecrireEcart = (n) => { try { localStorage.setItem(cleCadence(), String(n))
 // ---------------------------------------------------------------------
 const PROMPT_AGENT = `Tu es MIA_ILLUSTRATEUR, l'illustrateur du carnet de voyage d'un groupe d'aventuriers (jeu de rôle, Antiquité fantastique). Après chaque réponse du Narrateur, tu lis les dernières actions des joueurs et cette réponse, et tu décides s'il y a UN moment qui mérite une illustration cinématographique en double page dans le carnet.
 
-QUAND DESSINER : seulement un moment qui marque — drôle (une maladresse, une réplique, une situation absurde), dramatique (un danger, une perte, un affrontement, une révélation), ou attachant (un geste tendre, une rencontre, un instant de camaraderie), ou un lieu saisissant. Une réponse banale (on marche, on parle de la route, on achète du pain) : NE DESSINE PAS. Dans le doute, ne dessine pas.
+QUAND DESSINER : SEULEMENT LES MOMENTS FORTS, rares — un tournant de l'histoire : un danger mortel, un affrontement qui éclate, une mort, une perte, une trahison, une révélation qui change tout, une rencontre décisive, ou l'arrivée dans un lieu vraiment grandiose vu pour la première fois. Une discussion, une négociation, une scène d'auberge, un trajet, un achat, une plaisanterie, une petite maladresse, un geste aimable, un lieu déjà vu : NE DESSINE PAS. La plupart des réponses du Narrateur ne méritent AUCUNE illustration : au plus une sur cinq environ. Note "force" de 1 à 10 l'intensité du moment ; ne propose "illustrer": true que pour une force de 8 ou plus. Dans le doute, ne dessine pas.
 
 LE MOMENT PRÉCIS (v325) : pas un résumé de la réponse — UN instant, le plus fort, figé comme une photo : celui où tout bascule (le pied qui heurte la jambière du héros camouflé, la lame qui sort du fourreau, le regard qui croise un autre). Reste FIDÈLE au texte : qui fait quoi à qui, avec quoi ; qui est caché, camouflé, couché, debout ; qui voit qui. Un héros caché ou déguisé se dessine caché ou déguisé. Recopie dans "extrait" la ou les phrases exactes du texte qui racontent cet instant (en français, 1 à 3 phrases).
 
@@ -247,7 +250,7 @@ LES PNJ CONNUS : la liste « LES PNJ DE LA SCÈNE » donne les noms exacts des P
 LES PNJ NOMMÉS : liste les personnages non-joueurs PRÉSENTS dans la scène (v330 : physiquement là, que les héros voient ou à qui ils parlent ; mets "present": true) et désignés par un VRAI nom propre dans la réponse du Narrateur — jamais un nom lu sur un parchemin, une lettre, un sceau ou une inscription, ni entendu dans une rumeur ou un souvenir (alors "present": false) ; un personnage déjà connu sous un autre titre (« Maître Valerius » pour « Valerius ») garde son nom connu (pas les héros, pas « l'aubergiste », pas un nom inventé par un héros pour bluffer), avec leur race (parmi celles du monde, Humain par défaut) et une description physique précise tirée du texte (ou plausible). Indique aussi ceux qui apparaissent dans le croquis.
 
 Réponds UNIQUEMENT en JSON :
-{"illustrer": true, "moment": "drôle|dramatique|attachant|lieu", "sujet": "scene|personnage|lieu", "description": "...", "acteurs": [{"id": "H1", "nom": "Kaya", "type": "heros", "place": "center-right", "action": "crouching behind a fallen trunk, one hand raised to stop the others", "expression": "tense, eyes wide"}, {"nom": "Varos", "type": "pnj", "place": "right", "action": "...", "expression": "..."}], "mise_en_scene": "medium shot, slightly low angle; Kaya in the foreground right turned toward Varos, the tavern behind them…", "extrait": "Varos éclate de rire quand Kaya glisse sur l'amphore.", "heros": ["Kaya"], "pnj_dans_le_croquis": ["Varos"], "autres": [], "nombre": 2, "pnj_nommes": [{"nom": "Varos", "present": true, "race": "Humain", "description_physique": "..."}]}
+{"illustrer": true, "force": 9, "moment": "drôle|dramatique|attachant|lieu", "sujet": "scene|personnage|lieu", "description": "...", "acteurs": [{"id": "H1", "nom": "Kaya", "type": "heros", "place": "center-right", "action": "crouching behind a fallen trunk, one hand raised to stop the others", "expression": "tense, eyes wide"}, {"nom": "Varos", "type": "pnj", "place": "right", "action": "...", "expression": "..."}], "mise_en_scene": "medium shot, slightly low angle; Kaya in the foreground right turned toward Varos, the tavern behind them…", "extrait": "Varos éclate de rire quand Kaya glisse sur l'amphore.", "heros": ["Kaya"], "pnj_dans_le_croquis": ["Varos"], "autres": [], "nombre": 2, "pnj_nommes": [{"nom": "Varos", "present": true, "race": "Humain", "description_physique": "..."}]}
 ou {"illustrer": false, "pnj_nommes": [...]}`;
 
 async function demanderAgent(texteJoueurs, texteMJ, pnjConnus) {
@@ -557,8 +560,10 @@ window.illustrerLeRecit = async function (options) {
             return illustration;
         } catch (e) { console.warn("[MIA_ILLUSTRATEUR] Le croquis :", e); return null; }
     };
-    if (avis.illustrer && avis.description && ecart >= R.ecart) resultat.illustration = await croquer(avis, false);
-    else console.log(`🖋️ [MIA_ILLUSTRATEUR] Pas de croquis cette fois (${!avis.illustrer ? "l'agent n'a pas vu de moment" : ecart < R.ecart ? "le dernier est trop récent" : "sans description"}) — ${ecartForce} réponse(s) du Narrateur sans croquis.`);
+    // (v430) Un moment fort seulement : une force de 8 ou plus (un avis sans force reste permis).
+    const fort = !(Number.isFinite(Number(avis.force)) && avis.force !== undefined && avis.force !== null) || Number(avis.force) >= (R.forceMin || 8);
+    if (avis.illustrer && fort && avis.description && ecart >= R.ecart) resultat.illustration = await croquer(avis, false);
+    else console.log(`🖋️ [MIA_ILLUSTRATEUR] Pas de croquis cette fois (${!avis.illustrer ? "l'agent n'a pas vu de moment" : !fort ? `moment pas assez fort (${avis.force})` : ecart < R.ecart ? "le dernier est trop récent" : "sans description"}) — ${ecartForce} réponse(s) du Narrateur sans croquis.`);
     // (v326) Nico : « s'il n'y a pas eu de dessin après 3 réponses du MJ, ça force le
     // dessin, sur un gros plan d'un des aventuriers ».
     if (!resultat.illustration && R.forcerApres > 0 && ecartForce >= R.forcerApres) {

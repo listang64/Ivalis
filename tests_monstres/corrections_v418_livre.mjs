@@ -313,7 +313,7 @@ await section(async () => {
   await attendreQue(() => G(() => /Doros/.test(document.getElementById("grimoire-groupe-d").textContent)), 6000);
   const g = await texte("#grimoire-groupe-g"), d = await texte("#grimoire-groupe-d");
   verifier("à gauche : « Le groupe », son nom (Les Lames d'Héra)", /Le groupe/.test(g) && /Les Lames d'Héra/.test(g), g.slice(0, 120));
-  verifier("…où (Le port de Mégara), quand (Jour 12 de l'an 3), la réputation ici (+3, bien vus)", /Où Le port de Mégara/.test(g) && /Quand Jour 12 de l'an 3/.test(g) && /Réputation ici \+3 — bien vus/.test(g), g.slice(0, 260));
+  verifier("…où (Le port de Mégara), quand (Jour 12 de l'an 3), la réputation ici (+3, bien vus)", /Où Le port de Mégara/.test(g) && /Quand Jour 12 de l'an 3/.test(g) && /Réputation ici honnis\s*adulés \+3 — bien vus/.test(g), g.slice(0, 260));
   verifier("…les héros, avec leur portrait (Thorin) ou leurs initiales (Lyra)", await G(() => { const h = [...document.querySelectorAll("#grimoire-groupe-g .heros-groupe")]; return h.length === 2 && !!h[0].querySelector("img[src='portrait-thorin.png']") && /LS/.test(h[1].textContent); }));
   verifier("à droite : « Ceux qui nous suivent », 1 suiveur sur 3", /Ceux qui nous suivent/.test(d) && /1 suiveur sur 3/.test(d), d.slice(0, 120));
   verifier("…Doros : son rôle, depuis quand, avec nous, sa loyauté (une jauge)", /Doros Docker · depuis le Jour 10 de l'an 3/.test(d) && /avec nous/.test(d) && await G(() => !!document.querySelector("#grimoire-groupe-d .carte-suiveur .jauge-groupe i.pos")), d.slice(0, 300));

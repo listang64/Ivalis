@@ -24,11 +24,16 @@
    l'encart du joueur à 10 %, et l'inverse quand c'est au joueur, l'actif passant devant ». */
 .encart-dp { position: absolute; bottom: 11vh; box-sizing: border-box; min-height: 7em; padding: 1.1em 1.4em; border-radius: 22px; background: rgba(0, 0, 0, 0.8);
   border: 1px solid rgba(243, 233, 214, 0.16); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5); font-size: clamp(17px, 2vw, 26px); line-height: 1.4;
-  animation: encart-dp 0.22s ease; }
+  animation: encart-dp 0.18s ease; }
 .encart-dp[hidden] { display: none; }
-.encart-dp { transition: opacity 0.3s ease; }
+/* (v430) Nico : « fais que les encarts de chacun apparaissent et disparaissent en fondu rapide » :
+   celui qui ne parle pas s'efface tout à fait (et ne prend plus les clics). */
+.encart-dp { transition: opacity 0.18s ease, visibility 0s linear 0s; }
 .discussion-privee[data-tour="pj"] .encart-dp.pnj,
-.discussion-privee:not([data-tour="pj"]) .encart-dp.pj { opacity: 0.1; z-index: 1; }
+.discussion-privee:not([data-tour="pj"]) .encart-dp.pj { opacity: 0; visibility: hidden; pointer-events: none; z-index: 1;
+  transition: opacity 0.18s ease, visibility 0s linear 0.18s; }
+/* Une nouvelle phrase du PNJ arrive en fondu, elle aussi. */
+.encart-dp.neuf { animation: encart-dp 0.18s ease; }
 .discussion-privee[data-tour="pj"] .encart-dp.pj,
 .discussion-privee:not([data-tour="pj"]) .encart-dp.pnj { opacity: 1; z-index: 2; }
 .suite-dp { margin-top: 0.5em; font-size: 0.55em; font-style: italic; letter-spacing: 0.04em; color: rgba(243, 233, 214, 0.55); text-align: right; }

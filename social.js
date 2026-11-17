@@ -311,6 +311,10 @@ const signe = (v) => (v > 0 ? "+" : "−") + Math.abs(Math.round(v));
 export function lignesDeMarge(changements, ames) {
     const parLien = new Map();
     changements.forEach(c => {
+        // (v430) Nico : « dans l'icône du petit cerveau, c'est toujours le nom du PJ, une
+        // flèche et le nom du PNJ ; il faudrait mettre quand ça modifie la relation du PNJ » :
+        // seulement ce que ressent un PNJ (PNJ → héros, PNJ → PNJ), pas ce que ressent un héros.
+        if (!ames[c.de] || ames[c.de].type !== "pnj") return;
         const d = c.apres - c.avant;
         if (Math.abs(d) < 0.5) return;
         const k = c.de + "~" + c.vers;
