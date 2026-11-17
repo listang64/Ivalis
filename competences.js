@@ -1223,6 +1223,16 @@ function parseFrenchFloat(val) {
     return isNaN(parsed) ? 0 : parsed;
 }
 
+// (v427) Nico : « coût en fatigue de l'effet Persistance : une valeur ou un % ».
+// Ce que les menus de la Forge écrivent après ⚡ : la fatigue par cran, ou
+// « +30 % » (de la carte) quand la Persistance est réglée en pourcentage.
+function texteCoutFatigue(eff) {
+    const r = (eff && (eff.Nom || "").toLowerCase().includes("persistance") && typeof window.reglagesPersistance === "function")
+        ? window.reglagesPersistance(eff) : null;
+    if (r && r.coutEnPourcent) return `+${String(r.coutPourcent).replace(".", ",")} %`;
+    return String(parseFrenchFloat(eff.Cout_PT) * 5);
+}
+
 // Simple garde-fou d'affichage : neutralise les espaces parasites (y compris "&nbsp;" littéral
 // et les espaces insécables ou de largeur nulle) qu'un nom saisi en base pourrait traîner.
 // ⚠️ Ne pas confondre avec le décalage des titres du Grimoire, longtemps mis sur le dos de ces
@@ -1448,6 +1458,32 @@ function texteValeurSurpuissante(act, fatigue) {
     const valeur = (parseFrenchFloat(act.baseEffet.Valeur) || 0) * (act.count || 1);
     if (valeur <= 0) return "";
     return `<span class="forge-valeur-surpuissante">→ ${Math.round(valeur * m)} ${soigne ? "de soin" : "de dégâts"} avec la surpuissance</span>`;
+}
+
+// (v427) Nico : « Affiche ces différents dégâts lors de la création du sort (la
+// Forge), entre parenthèses à côté, avec 2 couleurs différentes. » Sur une carte
+// qui porte une Persistance terrain, à côté des dégâts d'une attaque : ce qu'elle
+// fait au lancement, et ce que fait la zone (case franchie ou fin de tour dessus).
+// La zone ne reprend que la PREMIÈRE attaque de la carte (creerZonePure) : sa
+// part ne s'affiche que là. Calculé sur les dégâts posés dans la Forge.
+function texteDegatsPersistance(act) {
+    const actions = (window.forgeState && window.forgeState.actions) || [];
+    const bdd = (window.forgeState && window.forgeState.effetsBDD) || [];
+    let effetPersistance = null;
+    actions.forEach(a => {
+        [a.baseEffet, ...Object.keys(a.mods || {}).map(id => bdd.find(e => e.id === id))].forEach(e => {
+            if (!effetPersistance && e && (e.Nom || "").toLowerCase().includes("persistance")) effetPersistance = e;
+        });
+    });
+    if (!effetPersistance || typeof window.reglagesPersistance !== "function") return "";
+    const nom = ((act && act.baseEffet && act.baseEffet.Nom) || "").toLowerCase();
+    const valeurDe = (a) => (parseFrenchFloat(a.baseEffet.Valeur) || 0) * (a.count || 1);
+    if (!estUneAttaqueDeBase(nom) || valeurDe(act) <= 0) return "";
+    const r = window.reglagesPersistance(effetPersistance);
+    const ecrire = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
+    const premiere = actions.find(a => a.baseEffet && estUneAttaqueDeBase(a.baseEffet.Nom) && valeurDe(a) > 0);
+    return ` <span class="forge-persistance-lancement">(${ecrire(valeurDe(act) * r.lancement / 100)} au lancement)</span>`
+        + (premiere === act ? ` <span class="forge-persistance-zone">(${ecrire(valeurDe(act) * r.zone / 100)} dans la zone)</span>` : "");
 }
 
 // === OUTILS POUR LA ZONE ===
@@ -1707,7 +1743,7 @@ window.ouvrirMenuAjoutForge = function() {
                 const isDisabled = isLocked || capAtteint || isArmeIncompatible || isAttackLocked || isPoisonLocked || isSoinLocked;
                 
                 // Calcul de la fatigue
-                const coutFatigue = parseFrenchFloat(eff.Cout_PT) * 5;
+                const coutFatigue = texteCoutFatigue(eff);   // (v427) « +30 % » pour une Persistance en %
 
                 htmlLignes += `
                     <div class="forge-grimoire-ligne${isDisabled ? " desactive" : ""}" data-bulle-effet="${eff.id}">
@@ -2053,12 +2089,13 @@ window.texteBulleEffet = function(idEffet, idAction) {
     let base = "";
     try { base = formatterTexteEffet(eff, (act && act.mods && act.mods[idEffet]) || 1, act || undefined); } catch (e) { base = eff.Effet_Base || ""; }
     const carac = eff.Modificateur && eff.Modificateur !== "AUCUN" ? eff.Modificateur : "";
-    const cout = parseFrenchFloat(eff.Cout_PT) * 5;
+    const cout = texteCoutFatigue(eff);
     const notes = String(eff.Notes || "").replace(/^\s*EFFET\s+[ÉE]TAT\s+[^=]*=\s*/i, "").trim();
     return `<div class="bulle-effet-titre">${echapper(nettoyerNomEffet(eff.Nom))}${carac ? `<span class="bulle-effet-carac">${echapper(carac)}</span>` : ""}</div>`
         + (base ? `<div class="bulle-effet-base">${base}</div>` : "")
         + (notes ? `<div class="bulle-effet-notes">${echapper(notes)}</div>` : "")
-        + `<div class="bulle-effet-cout">⚡ ${cout} de fatigue par cran</div>`;
+        // (v427) Une Persistance réglée en % : sa part du coût de la carte.
+        + `<div class="bulle-effet-cout">⚡ ${cout.endsWith("%") ? `${cout} du coût de la carte` : `${cout} de fatigue par cran`}</div>`;
 };
 function bulleEffet() {
     let b = document.getElementById("bulle-effet-forge");
@@ -2618,7 +2655,18 @@ function coutDUneAction(act, bdd, statsPerso, coutDureePlus) {
     // suit le prix payé.
     const atoutForge = (statsPerso && typeof window.atoutRace === "function") ? (window.atoutRace(statsPerso) || {}) : {};
     const partInitPlus = 1 - Math.min(100, Math.max(0, Number(atoutForge.reductionInitiativePlus) || 0)) / 100;
-    const coutPT = (eff) => parseFrenchFloat(eff.Cout_PT) * (eff.Nom === "Initiative +" ? partInitPlus : 1);
+    // (v427) Nico : « possibilité de mettre une valeur ou un %, fixe ou % au choix »
+    // pour le coût de la Persistance. En %, elle ne coûte rien ICI : sa part se
+    // calcule sur le coût de toute la carte (pourcentPersistance, rafraichirForge).
+    let pourcentPersistance = 0;
+    const persistanceEnPourcent = (eff) => {
+        if (!eff || !(eff.Nom || "").toLowerCase().includes("persistance") || typeof window.reglagesPersistance !== "function") return false;
+        const r = window.reglagesPersistance(eff);
+        if (r.coutEnPourcent) pourcentPersistance = Math.max(pourcentPersistance, r.coutPourcent);
+        return r.coutEnPourcent;
+    };
+    const coutPT = (eff) => persistanceEnPourcent(eff) ? 0
+        : parseFrenchFloat(eff.Cout_PT) * (eff.Nom === "Initiative +" ? partInitPlus : 1);
     let baseActionCost = coutPT(act.baseEffet) * act.count;
     let coutDureeBase = (act.baseDuree || 0) * coutDureePlus;
     
@@ -2710,7 +2758,7 @@ function coutDUneAction(act, bdd, statsPerso, coutDureePlus) {
     let coutActionTotale = baseActionCost + coutDureeBase + coutMods;
     // Seule la part étalable est divisée ; le reste se paie plein pot.
     if (aDOT) coutActionTotale = (coutActionTotale - coutEtalable) + coutEtalable / diviseurDOT;
-    return { cout: coutActionTotale, plein: baseActionCost + coutDureeBase + coutMods, initBonus, coutZone };
+    return { cout: coutActionTotale, plein: baseActionCost + coutDureeBase + coutMods, initBonus, coutZone, pourcentPersistance };
 }
 window.coutDUneActionForge = coutDUneAction;
 
@@ -2769,12 +2817,20 @@ window.rafraichirForge = function() {
 
     // La puissance de la carte : son coût sans la ristourne de l'étalement.
     let totalPCPlein = 0;
+    let pourcentPersistance = 0;
     window.forgeState.actions.forEach(act => {
         const c = coutDUneAction(act, window.forgeState.effetsBDD, window.forgeState && window.forgeState.statsPerso, coutDureePlus);
         totalPC += c.cout;
         totalPCPlein += c.plein;
         initBonusNet += c.initBonus;
+        pourcentPersistance = Math.max(pourcentPersistance, c.pourcentPersistance || 0);
     });
+    // (v427) Nico : « coût en fatigue de l'effet Persistance : une valeur ou un % ».
+    // En %, la Persistance coûte cette part de tout le reste de la carte.
+    if (pourcentPersistance > 0) {
+        totalPC += totalPC * pourcentPersistance / 100;
+        totalPCPlein += totalPCPlein * pourcentPersistance / 100;
+    }
 
     const caracs = window.forgeState.caracs || {};
     let statsTable = {
@@ -2885,7 +2941,7 @@ window.rafraichirForge = function() {
             const carac = (mod.Modificateur && mod.Modificateur !== "AUCUN") ? mod.Modificateur.toUpperCase() : "GÉNÉRAL";
             if (!groupesMods[carac]) groupesMods[carac] = [];
             // Calcul de la fatigue pour l'affichage
-            const coutFatigue = parseFrenchFloat(mod.Cout_PT) * 5;
+            const coutFatigue = texteCoutFatigue(mod);   // (v427) « +30 % » pour une Persistance en %
             groupesMods[carac].push(etat === "incompatible"
                 ? `<div class="forge-menu-option incompatible" data-bulle-effet="${mod.id}" data-action="${actionId}">${nettoyerNomEffet(mod.Nom)} <span class="forge-menu-cout">non compatible</span></div>`
                 : `<div class="forge-menu-option" data-bulle-effet="${mod.id}" data-mod="${mod.id}" data-action="${actionId}">${nettoyerNomEffet(mod.Nom)} <span class="forge-menu-cout">⚡ ${coutFatigue}</span></div>`);
@@ -3003,7 +3059,7 @@ window.rafraichirForge = function() {
                     <div class="forge-ligne">
                         <div class="forge-ligne-texte">
                             <span class="forge-nom-effet" data-bulle-effet="${act.baseEffet.id}" data-action="${act.idInst}">${nettoyerNomEffet(act.baseEffet.Nom)}</span>${act.baseEffet.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${act.baseEffet.Modificateur}</span>` : ""}${genreDuLien(act) ? `<button type="button" class="forge-element-pastille${elementAct ? "" : " manquant"}" data-genre="${genreDuLien(act)}" title="Changer d'élément" ${elementAct ? `style="--el-couleur: ${elementAct.couleur}; --el-fond: ${elementAct.fond};"` : ""} onclick="window.changerElementForge('${act.idInst}')">${elementAct ? `${elementAct.dessin ? `<span class="forge-pastille-dessin">${iconeDuLien(elementAct)}</span>` : elementAct.icone} ${elementAct.nom}` : "Choisir un élément"}</button>` : ""}
-                            <div class="forge-desc">${formatterTexteEffet(act.baseEffet, act.count, act)}${texteValeurSurpuissante(act, fatigueSurpuissance)}${currentBaseDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentBaseDuree} tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
+                            <div class="forge-desc">${formatterTexteEffet(act.baseEffet, act.count, act)}${texteDegatsPersistance(act)}${texteValeurSurpuissante(act, fatigueSurpuissance)}${currentBaseDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentBaseDuree} tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
                         </div>
                         <div class="forge-controles">
                             ${baseHasDuree ? `

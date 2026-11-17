@@ -266,6 +266,32 @@ jaugeContainer.className = "jauge-flash-token";
 // =========================================================================
 window.ZONES_PERSISTANTES = window.ZONES_PERSISTANTES || {};
 
+// (v427) Nico : « Possibilité d'établir et changer le coût en fatigue de l'effet
+// Persistance : une valeur ou un %, fixe ou % au choix, modifiable. Ensuite, pour
+// l'effet, possibilité de modifier librement les dégâts lorsque le sort est lancé
+// sur la cible, et lorsque la cible se déplace sur une case de la zone du sort ou
+// termine son tour sur la zone, en % des dégâts fixés sur le sort. »
+// Les réglages vivent sur l'effet du grimoire (Combat_Effets, éditeur des effets,
+// app.js). Un effet enregistré avant la v427 n'a aucun de ces champs : coût fixe
+// (son Cout_PT, comme avant), 100 % au lancement, 100 % dans la zone.
+window.reglagesPersistance = function(effet) {
+    const lire = (v) => {
+        if (v === undefined || v === null || v === "") return null;
+        const n = parseFloat(String(v).replace(",", "."));
+        return Number.isFinite(n) ? Math.max(0, n) : null;
+    };
+    const e = effet || {};
+    const pourcent = lire(e.Persistance_Cout_Pourcent);
+    const lancement = lire(e.Persistance_Degats_Lancement);
+    const zone = lire(e.Persistance_Degats_Zone);
+    return {
+        coutEnPourcent: e.Persistance_Cout_Mode === "pourcent" && pourcent !== null,
+        coutPourcent: pourcent === null ? 0 : pourcent,
+        lancement: lancement === null ? 100 : lancement,
+        zone: zone === null ? 100 : zone
+    };
+};
+
 // Quel visuel pour quel état embarqué par le sort d'origine.
 window.TYPES_ZONES_PERSISTANTES = {
     "Brûlé": "feu",
@@ -1144,6 +1170,8 @@ window.demarrerCiblage = async function(idCarte, options) {
     // Persistance de terrain : le sort laisse derrière lui une zone dangereuse sur la ou les
     // cases visées (voir creerZonePersistante). Détecté ici, appliqué après la résolution.
     let aPersistanceTerrain = false;
+    // (v427) L'effet du grimoire qui l'a donnée : ses réglages de dégâts (reglagesPersistance).
+    let effetPersistance = null;
     // Un Étalement posé sur une action Distance ou Zone ne frappe ni ne soigne
     // lui-même : il étale ce que CETTE CARTE fait passer par sa portée ou sa
     // zone. On le retient ici, et il se reporte sur les dégâts et les soins de
@@ -1315,10 +1343,16 @@ window.demarrerCiblage = async function(idCarte, options) {
             // Persistance de terrain : simple drapeau de carte (mod ou effet de base). La zone
             // qu'elle laisse derrière elle est construite après la résolution, à partir des
             // dégâts/états de la carte (voir declencherResolution).
-            if (nomLower.includes("persistance")) aPersistanceTerrain = true;
+            if (nomLower.includes("persistance")) {
+                aPersistanceTerrain = true;
+                effetPersistance = effetPersistance || effBase;
+            }
             listeMods.forEach(m => {
                 const modEff = window.EFFETS_BDD_CACHE[m.id];
-                if (modEff && (modEff.Nom || "").toLowerCase().includes("persistance")) aPersistanceTerrain = true;
+                if (modEff && (modEff.Nom || "").toLowerCase().includes("persistance")) {
+                    aPersistanceTerrain = true;
+                    effetPersistance = effetPersistance || modEff;
+                }
             });
 
             // Repli : sa Valeur est le nombre de cases, son Pourcentage de base
@@ -2305,6 +2339,22 @@ window.demarrerCiblage = async function(idCarte, options) {
         zoneHexesBase = [{ q: 1, r: 0 }];
         attaquesExtraites.forEach(a => { a.enZone = true; });
         alterationsExtraites.forEach(a => { a.enZone = true; });
+    }
+
+    // (v427) Nico : « les dégâts lorsque le sort est lancé sur la cible […] et
+    // lorsque la cible se déplace sur une case de la zone du sort, ou termine son
+    // tour sur la zone, en % des dégâts fixés sur le sort (exemple : 40 %) ».
+    // Les deux parts voyagent sur chaque attaque qui frappe, jusqu'au cerveau :
+    // partLancement (chaineDeDegats) et partZone (creerZonePure), moteur_pur.js.
+    // À 100 % (réglage absent), rien n'est posé : la carte reste celle d'avant.
+    // Créatures comprises : elles passent par cette même extraction.
+    if (aPersistanceTerrain) {
+        const parts = window.reglagesPersistance(effetPersistance);
+        attaquesExtraites.forEach(a => {
+            if (a.isHeal || a.isShield || a.purifChance > 0) return;
+            if (parts.lancement !== 100) a.partLancement = parts.lancement;
+            if (parts.zone !== 100) a.partZone = parts.zone;
+        });
     }
 
     // Bond : résolu à part (choix de la case, animation). On respecte l'ordre de la carte :

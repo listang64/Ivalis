@@ -3372,6 +3372,10 @@ textarea.input-texte-parchemin {
 }
 .ligne-surpuissance .titre-effet-hd { color: #ffb347 !important; }
 .forge-valeur-surpuissante { display: block; margin-top: 2px; color: #b91c1c; font-weight: bold; font-style: normal; }
+/* (v427) Nico : « Affiche ces différents dégâts […] entre parenthèses à côté, avec 2 couleurs
+   différentes. » Persistance terrain : les dégâts au lancement, puis ceux de la zone. */
+.forge-persistance-lancement { color: #c2410c; font-weight: bold; font-style: normal; white-space: nowrap; }
+.forge-persistance-zone { color: #0f766e; font-weight: bold; font-style: normal; white-space: nowrap; }
 
 /* =====================================================================
    LES TECHNIQUES DE CLASSE (fiche perso, onglet Compétences)

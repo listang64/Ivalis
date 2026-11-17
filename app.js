@@ -4988,6 +4988,36 @@ window.ajouterLigneEffetHTML = function(id, data = {}) {
         </td>`;
         tbody.appendChild(sousLigne);
     }
+
+    // (v427) Nico : « Possibilité d'établir et changer le coût en fatigue de l'effet
+    // Persistance : une valeur ou un %, fixe ou % au choix, modifiable. Ensuite, pour
+    // l'effet, possibilité de modifier librement les dégâts lorsque le sort est lancé
+    // sur la cible […] et lorsque la cible se déplace sur une case de la zone du sort,
+    // ou termine son tour sur la zone, en % des dégâts fixés sur le sort. »
+    // Une ligne de plus sous la Persistance terrain. Lue par reglagesPersistance
+    // (moteur_effets.js) ; vides, les champs valent l'ancien comportement : coût fixe
+    // (colonne PT), 100 % au lancement, 100 % dans la zone.
+    if (d.Nom.toLowerCase().includes("persistance")) {
+        const vide = (v) => (v === undefined || v === null) ? "" : v;
+        const enPourcent = data.Persistance_Cout_Mode === "pourcent";
+        const sousLigne = document.createElement("tr");
+        sousLigne.id = `ligne-persistance-${id}`;
+        sousLigne.innerHTML = `
+        <td colspan="13" style="background: rgba(0,0,0,0.04);">
+            <b>Persistance</b> — coût :
+            <select id="pers-mode-${id}">
+                <option value="fixe" ${enPourcent ? "" : "selected"}>Fixe (colonne PT, ×5 = fatigue)</option>
+                <option value="pourcent" ${enPourcent ? "selected" : ""}>% du coût de la carte</option>
+            </select>
+            <input type="number" id="pers-cout-${id}" value="${vide(data.Persistance_Cout_Pourcent)}" placeholder="%" style="width: 60px; text-align: center;"> %
+            &nbsp;·&nbsp; dégâts au lancement :
+            <input type="number" id="pers-lancement-${id}" value="${vide(data.Persistance_Degats_Lancement)}" placeholder="100" style="width: 60px; text-align: center;"> %
+            &nbsp;·&nbsp; dégâts dans la zone (case franchie, fin de tour dessus) :
+            <input type="number" id="pers-zone-${id}" value="${vide(data.Persistance_Degats_Zone)}" placeholder="100" style="width: 60px; text-align: center;"> %
+            <span style="opacity: 0.7;">(en % des dégâts fixés sur le sort)</span>
+        </td>`;
+        tbody.appendChild(sousLigne);
+    }
 };
 
 window.sauvegarderEffetLigne = async function(id) {
@@ -5017,6 +5047,21 @@ window.sauvegarderEffetLigne = async function(id) {
         newData.Zone_Fixe_5plus = document.getElementById(`zone-fixe5-${id}`).value.trim();
     }
 
+    // (v427) Les réglages de la Persistance (voir ajouterLigneEffetHTML). Un % vide
+    // de dégâts revient à 100 ; un coût en % vide revient au coût fixe.
+    const modePersistance = document.getElementById(`pers-mode-${id}`);
+    if (modePersistance) {
+        const pourcent = (champ, defaut) => {
+            const v = parseFloat(String(document.getElementById(champ).value).replace(",", "."));
+            return Number.isFinite(v) ? Math.max(0, v) : defaut;
+        };
+        const coutPourcent = pourcent(`pers-cout-${id}`, null);
+        newData.Persistance_Cout_Mode = (modePersistance.value === "pourcent" && coutPourcent !== null) ? "pourcent" : "fixe";
+        newData.Persistance_Cout_Pourcent = coutPourcent === null ? 0 : coutPourcent;
+        newData.Persistance_Degats_Lancement = pourcent(`pers-lancement-${id}`, 100);
+        newData.Persistance_Degats_Zone = pourcent(`pers-zone-${id}`, 100);
+    }
+
     try {
         await setDoc(doc(db, "Combat_Effets", id), newData, { merge: true });
         if (btn) {
@@ -5034,9 +5079,8 @@ window.supprimerEffetLigne = async function(id) {
     try {
         await deleteDoc(doc(db, "Combat_Effets", id));
         document.getElementById(`ligne-effet-${id}`).remove();
-        // (v427) Et les paliers de la Zone, s'il y en avait.
-        const sousLigne = document.getElementById(`ligne-zone-${id}`);
-        if (sousLigne) sousLigne.remove();
+        // (v427) Et ses sous-lignes : les paliers de la Zone, les réglages de la Persistance.
+        [`ligne-zone-${id}`, `ligne-persistance-${id}`].forEach(cle => { const sousLigne = document.getElementById(cle); if (sousLigne) sousLigne.remove(); });
     } catch(e) { alert("Échec de la suppression."); }
 };
 

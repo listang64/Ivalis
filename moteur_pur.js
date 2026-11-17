@@ -1306,6 +1306,13 @@ export function chaineDeDegats(cible, attaque, options) {
     //    UN ÉTALEMENT NE CRITIQUE PAS (v260, Nico : « étalement des dégâts et
     //    soins : pas de critique possible ») : ses parts gardent leur montant.
     let degats = Math.max(0, decimal(attaque.valeurBrute)) * (critique && !attaque.estEtalement ? 2 : 1);
+    // (v427) Nico : « les dégâts lorsque le sort est lancé sur la cible, en % des
+    //    dégâts fixés sur le sort (exemple : 40 % des dégâts) ». La part qu'une
+    //    carte de Persistance terrain garde au lancement (moteur_effets.js) ;
+    //    absente, 100 %. Pas d'arrondi ici : il vient après les résistances.
+    if (attaque.partLancement !== undefined && attaque.partLancement !== null) {
+        degats = degats * Math.max(0, decimal(attaque.partLancement, 100)) / 100;
+    }
 
     // 2. Une attaque À DISTANCE employée au contact perd trente pour cent.
     //
@@ -1638,7 +1645,14 @@ export function creerZonePure(etat, action, hexes, idLanceur) {
     const soigne = attaques.find(a => a.isHeal && nombre(a.valeurBrute) > 0);
     const alt = (action.alterations || []).find(a => a && a.persistante);
 
-    const degats = frappe ? { valeurBrute: decimal(frappe.valeurBrute), typeRes: frappe.typeRes } : null;
+    // (v427) Nico : « les dégâts lorsque la cible se déplace sur une case de la
+    // zone du sort, ou termine son tour sur la zone, en % des dégâts fixés sur le
+    // sort ». partZone (moteur_effets.js) ; absente, 100 %. Gardée décimale :
+    // traverserZones n'arrondit qu'après la résistance. À 0 %, pas de dégâts au sol.
+    const partZone = frappe && frappe.partZone !== undefined && frappe.partZone !== null
+        ? Math.max(0, decimal(frappe.partZone, 100)) : 100;
+    const valeurZone = frappe ? decimal(frappe.valeurBrute) * partZone / 100 : 0;
+    const degats = valeurZone > 0 ? { valeurBrute: valeurZone, typeRes: frappe.typeRes } : null;
     // PLUS DE NAPPE QUI SOIGNE (règle de Nico) : la Persistance terrain ne se
     // pose pas sur un soin. La Forge la grise ; ici, une carte qui en porterait
     // quand même (ancienne carte, soin posé à côté d'une attaque persistante)
