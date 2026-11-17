@@ -12115,3 +12115,29 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 ## v426 — Plus que les roues crantées
 
 - Nico : « enlève l'ancien truc pour ne garder que les roues crantées rouges ». Le bouton « Ajuster » des admins (v414 : des cases chiffrées puis « Enregistrer ») est retiré de l'encart des fils invisibles ; seul le mode développeur règle un lien à la main, par la roue crantée de chaque barre (`SOCIAL.ajusterLien` le refuse hors mode DEV, admin compris). Le bouton « annuler » d'un changement reste aux admins. corrections_v414 (section 4) et corrections_v425 le vérifient.
+
+## v427 — Persistance, Zone, Surpuissance, Pugiliste (quatre lots fusionnés)
+
+### La Persistance terrain se règle : coût, dégâts au lancement, dégâts dans la zone
+
+- Nico : « Possibilité d'établir et changer le coût en fatigue de l'effet Persistance : une valeur ou un %, fixe ou % au choix, modifiable. Ensuite, les dégâts lorsque le sort est lancé sur la cible, et lorsque la cible se déplace sur une case de la zone du sort ou termine son tour sur la zone, en % des dégâts fixés sur le sort (exemple : 40 %). Affiche ces différents dégâts dans la Forge, entre parenthèses, avec 2 couleurs différentes. »
+- **L'éditeur des effets** (Paramètres > Le monde et ses règles > Effets de combat) ajoute sous la Persistance terrain une ligne de réglages : coût « Fixe » (la colonne PT, comme avant) ou « % du coût de la carte », % des dégâts au lancement, % des dégâts dans la zone. Écrits dans Combat_Effets : Persistance_Cout_Mode, Persistance_Cout_Pourcent, Persistance_Degats_Lancement, Persistance_Degats_Zone. Un effet enregistré avant la v427 n'a aucun de ces champs : rien ne change.
+- **La Forge** : en %, la Persistance coûte cette part de tout le reste de la carte (4 PC + 50 % = 6 PC, 30 de fatigue) ; les menus et la bulle disent « ⚡ +50 % ». À côté des dégâts de l'attaque : « (8 au lancement) » en orange, « (12 dans la zone) » en vert-bleu (la zone ne reprend que la première attaque de la carte).
+- **Le combat** : l'extraction (moteur_effets.js) pose partLancement et partZone sur les attaques de la carte, créatures comprises ; chaineDeDegats applique la première, creerZonePure la seconde (case franchie et fin de manche). Décimales gardées, arrondi après les résistances ; à 0 % sans état, pas de nappe.
+- corrections_v427_persistance.mjs : le noyau, le cerveau de bout en bout (héros et créature), l'extraction dans la vraie page, la Forge et l'éditeur.
+
+### Le coût de la Zone, palier par palier
+
+- Nico : « Zone (avec un % pour la première zone, puis des fixes. 1 / 2 / 3 / 4 / 5 et +) ». Les paliers sont les cases PAYANTES de la zone (la première case reste offerte, la 5e payante du Géomancien aussi) : la 1re payante coûte un % du coût de la technique (le reste de l'action, avant la ristourne de l'étalement), la 2e, la 3e et la 4e un coût fixe chacune, chaque case à partir de la 5e le coût « 5 et + » (`coutCasesZone`, app.js). Réglé dans l'éditeur des effets de combat, sous la ligne de la Zone (`Zone_Pct_1`, `Zone_Fixe_2`, `Zone_Fixe_3`, `Zone_Fixe_4`, `Zone_Fixe_5plus`) ; un réglage vide garde le PT de la Zone par case, comme avant.
+- corrections_v427_zone.mjs : le calcul, la Forge (coût PC, fatigue, éditeur de zone), le Géomancien, les sorts des monstres (même compte que la Forge) et l'éditeur des effets.
+
+### La surpuissance relève le max des effets du sort
+
+- Nico : « Surpuissance > première surpuissance +5 % max pour les effets associés au sort. Deuxième surpuissance > +8 % max pour les effets (+8 qui se rajoute sans prendre en compte max autorisé). » Les deux paliers sont ceux de la surpuissance (70 et 100 de fatigue, `PALIERS_SURPUISSANCE`, app.js) ; le ×1,25 / ×1,35 des dégâts et soins ne bouge pas. Effets concernés : ceux qui ont une chance et un « Pourcentage max » au grimoire (états, Poussée, Traction, Lumière, Repli) ; ni les créatures, ni le Maudit (`surpuissanceDesEffets`).
+- **1re surpuissance (70+)** : le max autorisé monte de 5 points. La Forge laisse acheter un cran de plus, plafonné au max relevé (Brûlé 10 %/cran, max 60 : un 7e cran donne 65, pas 70) et le rend si la carte retombe sous 70 ; le combat plafonne à 65. Rien d'office sous le max.
+- **2e surpuissance (100+)** : le max relevé reste, et +8 points s'ajoutent sur la chance une fois plafonnée, sans regarder le max, 100 au plus (60 → 68, 65 → 73, 30 → 38).
+- À l'écran : la Forge annonce « max des effets +5 % » (« , +8 % par-dessus » à 100), l'effet dit « max 65% » et, à 100, « → 68 % avec la surpuissance ». corrections_v427_surpuissance.mjs ; provocation.mjs suit (son bac à sable connaît `surpEffets`).
+
+### Le Pugiliste Vargen fait saigner sur tous ses sorts
+
+- Nico : « Wargen, talent pugilat > +15 % de saignement (pas max) sur tous les sorts, à la place d'empoisonnement. » Le Pugiliste Vargen (sans arme, ou seulement des bagues) donne +15 % de faire saigner sur toutes ses cartes qui frappent, sorts magiques compris. La chance de la carte n'est plus plafonnée à 100 (95 + 15 = 110), mais le jet (`chanceFaceA`) ne tire jamais au-delà de 100. Un Vargen armé, ou un non-Vargen, ne reçoit rien. corrections_v427_pugiliste.mjs ; corrections_v416_vargen.mjs mis à jour.
