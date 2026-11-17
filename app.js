@@ -2005,10 +2005,41 @@ window.multiplicateurSoinsRecus = function(perso) {
 //  Ni les boucliers ni les purifications : ce ne sont ni des dégâts ni des
 //  soins. Le montant multiplié est arrondi au plus proche. Les techniques des
 //  héros seulement : celles des créatures ne sont pas forgées.
+//
+//  (v427) Nico : « Surpuissance > première surpuissance +5 % max pour les
+//  effets associés au sort. Deuxième surpuissance > +8 % max pour les effets
+//  (+8 qui se rajoute sans prendre en compte max autorisé). »
+//  LES EFFETS À CHANCE DU SORT (ceux qui ont un « Pourcentage max » au
+//  grimoire : Brûlé, Peur, Poussée, Lumière…) en profitent aussi :
+//      1re surpuissance (70+)  → leur max autorisé monte de 5 points : la
+//                                 Forge laisse acheter jusque-là, le combat
+//                                 plafonne là (60 % → 65 %) ;
+//      2e surpuissance (100+)  → le max relevé reste, et +8 points s'ajoutent
+//                                 d'office par-dessus, sans regarder le max
+//                                 (60 % → 68 %, 65 % → 73 %), 100 au plus.
+//  En points de pourcentage, pas en ×1,05. Ni le Maudit (pas de surpuissance
+//  classique) ni les créatures.
 window.PALIERS_SURPUISSANCE = [
-    { fatigue: 100, multiplicateur: 1.35 },
-    { fatigue: 70,  multiplicateur: 1.25 }
+    { fatigue: 100, multiplicateur: 1.35, plafondEffets: 5, bonusEffets: 8 },
+    { fatigue: 70,  multiplicateur: 1.25, plafondEffets: 5, bonusEffets: 0 }
 ];
+// (v427) Ce que la surpuissance donne aux effets à chance d'une carte de
+// `fatigue` (sa puissance, fatigueDeSurpuissance) lancée par `perso` :
+// { plafond: points ajoutés au max autorisé, bonus: points ajoutés par-dessus }.
+window.surpuissanceDesEffets = function(fatigue, perso) {
+    const rien = { plafond: 0, bonus: 0 };
+    if (perso && perso.estMonstre) return rien;
+    if (perso && typeof window.atoutRace === "function" && (window.atoutRace(perso) || {}).sansSurpuissanceOffensive) return rien;
+    const f = Number(fatigue) || 0;
+    const palier = window.PALIERS_SURPUISSANCE.find(p => f >= p.fatigue);
+    return palier ? { plafond: Number(palier.plafondEffets) || 0, bonus: Number(palier.bonusEffets) || 0 } : rien;
+};
+// « max des effets +5 % » — ce que la Forge et la carte en disent.
+window.texteSurpuissanceEffets = function(fatigue, perso) {
+    const s = window.surpuissanceDesEffets(fatigue, perso);
+    return [s.plafond > 0 ? `max des effets +${s.plafond} %` : "", s.bonus > 0 ? `+${s.bonus} % par-dessus` : ""]
+        .filter(Boolean).join(", ");
+};
 // (v362) LA MAGIE DU SANG DU MAUDIT : une carte qui la porte.
 window.MULTIPLICATEUR_MAGIE_DU_SANG = 1.2;
 window.carteAMagieDuSang = (dataCarte) => !!dataCarte && (
