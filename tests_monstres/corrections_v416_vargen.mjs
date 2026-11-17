@@ -90,10 +90,11 @@ await section(async () => {
     resumeHumain: window.resumeTalent(window.__heros({ race: "Humain" }), "TAL_PUGILISTE"),
     atout: window.texteAtout("chanceSaignementPhysique", 15)
   }));
-  verifier("le talent dit « Vargen : en plus +15 % de chance de faire saigner et +6 % de critique »",
-           /Vargen : en plus \+15 % de chance de faire saigner et \+6 % de critique/.test(r.texte) && !/empoison/i.test(r.texte), r.texte);
-  verifier("le résumé d'un Vargen mains nues : « +15 % de faire saigner, +6 % de critique »",
-           /\+15 % de faire saigner, \+6 % de critique/.test(r.resume) && !/empoison/i.test(r.resume), r.resume);
+  // (v427) le texte dit en plus « sur tous ses sorts, sans plafond » — corrections_v427_pugiliste.mjs.
+  verifier("le talent dit « Vargen : en plus +15 % de chance de faire saigner … et +6 % de critique »",
+           /Vargen : en plus \+15 % de chance de faire saigner[^.]* et \+6 % de critique/.test(r.texte) && !/empoison/i.test(r.texte), r.texte);
+  verifier("le résumé d'un Vargen mains nues : « +15 % de faire saigner …, +6 % de critique »",
+           /\+15 % de faire saigner[^,]*, \+6 % de critique/.test(r.resume) && !/empoison/i.test(r.resume), r.resume);
   verifier("le résumé d'un Humain n'en parle pas", !/saigner|empoison|critique/.test(r.resumeHumain), r.resumeHumain);
   verifier("l'atout se lit « +15 % de chance de faire saigner »", r.atout === "+15 % de chance de faire saigner", r.atout);
   const sources = ["talents.js", "moteur_effets.js", "app.js", "combat_etat.js", "moteur_pur.js", "cerveau_combat.js"].map(lire).join("\n");
@@ -144,7 +145,9 @@ await section(async () => {
   const poison = r.dejaPoison.find(a => a.nom === "Empoisonnement"), saigne = r.dejaPoison.find(a => a.nom === "Saignement");
   verifier("une carte qui empoisonne (20 %) : le poison reste à 20, le Saignement à 15 s'ajoute",
            poison && poison.chance === 20 && saigne && saigne.chance === 15, JSON.stringify(r.dejaPoison));
-  verifier("un sort (magique) : rien", r.magie.length === 0, JSON.stringify(r.magie));
+  // (v427) Nico : « +15 % de saignement (pas max) sur tous les sorts » : la magie aussi.
+  verifier("un sort (magique) : un Saignement à 15 % aussi (v427)",
+           r.magie.length === 1 && r.magie[0].nom === "Saignement" && r.magie[0].chance === 15, JSON.stringify(r.magie));
   verifier("un soin : rien", r.soin.length === 0, JSON.stringify(r.soin));
   verifier("Vargen armé (épée) : rien", r.arme.length === 0, JSON.stringify(r.arme));
   verifier("Humain Pugiliste mains nues : rien", r.humain.length === 0, JSON.stringify(r.humain));

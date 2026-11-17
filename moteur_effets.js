@@ -3752,17 +3752,22 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
     };
     pousserEtats((window.ELEMENTS_MAGIQUES || []).map(e => e.etat), Number(atouts.chanceElementaire) || 0);
     pousserEtats(window.ETATS_CHARISME_TALENT || ["Confusion", "Peur", "Immobilisation"], Number(atouts.chanceEtatsCharisme) || 0);
-    // LE PUGILISTE VARGEN : +15 % de faire saigner sur ses coups physiques —
+    // LE PUGILISTE VARGEN : +15 % de faire saigner sur TOUS ses sorts —
     // en plus du Saignement de la carte, ou un Saignement à lui s'il n'y en a
     // pas. Nico : « Pour la race Vargen > le boost qui leur boost
     // l'empoisonnement, mettre plutôt le même boost pour le saignement. »
+    // (v427) Nico : « Wargen, talent pugilat > +15 % de saignement (pas max)
+    // sur tous les sorts, à la place d'empoisonnement. » Les sorts magiques
+    // aussi, et plus de plafond à 100 sur la chance de la carte (le jet,
+    // chanceFaceA dans moteur_pur.js, ne tire de toute façon jamais au-delà
+    // de 100). Toujours sans arme : la condition reste celle du talent.
     const saignementTalent = Number(atouts.chanceSaignementPhysique) || 0;
-    const frappesPhysiques = saignementTalent > 0 ? attaquesFrappantes(state).filter(a => a.typeRes !== "Magique") : [];
-    if (frappesPhysiques.length > 0) {
+    const frappes = saignementTalent > 0 ? attaquesFrappantes(state) : [];
+    if (frappes.length > 0) {
         state.alterations = state.alterations || [];
         const saignement = state.alterations.find(a => a.nom === "Saignement");
-        const visees = [...new Set(frappesPhysiques.flatMap(a => a.cibles || []))];
-        if (saignement) saignement.chance = Math.min(100, (saignement.chance || 0) + saignementTalent);
+        const visees = [...new Set(frappes.flatMap(a => a.cibles || []))];
+        if (saignement) saignement.chance = (Number(saignement.chance) || 0) + saignementTalent;
         else if (visees.length > 0 && GABARITS_ETATS_EQUIPEMENT["Saignement"]) {
             state.alterations.push({ nom: "Saignement", ...GABARITS_ETATS_EQUIPEMENT["Saignement"], chance: saignementTalent,
                 venuDuTalent: true, isRanged: false, rangeMax: 1, cibles: visees });
