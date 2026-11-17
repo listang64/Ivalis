@@ -3371,7 +3371,7 @@ textarea.input-texte-parchemin {
     font-style: normal; font-weight: bold; font-size: 12.5px; color: #b91c1c;
 }
 .ligne-surpuissance .titre-effet-hd { color: #ffb347 !important; }
-.forge-valeur-surpuissante { display: block; margin-top: 2px; color: #b91c1c; font-weight: bold; font-style: normal; }
+.forge-valeur-surpuissante, .forge-chance-surpuissante { display: block; margin-top: 2px; color: #b91c1c; font-weight: bold; font-style: normal; }
 
 /* =====================================================================
    LES TECHNIQUES DE CLASSE (fiche perso, onglet Compétences)

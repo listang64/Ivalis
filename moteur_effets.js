@@ -1190,11 +1190,22 @@ window.demarrerCiblage = async function(idCarte, options) {
     // rééquilibrait : l'Immobilisation montée à 50 % restait bloquée à 40 en
     // combat alors que la Forge en annonçait 50. Le chiffre d'avant ne sert
     // plus que de secours, si la base n'en donne pas.
+    //
+    // (v427) Nico : « première surpuissance +5 % max pour les effets associés
+    // au sort. Deuxième surpuissance > +8 % […] (+8 qui se rajoute sans prendre
+    // en compte max autorisé). » LA SURPUISSANCE DES EFFETS (app.js), lue sur la
+    // puissance de la carte comme celle des dégâts : `plafond` relève chaque
+    // max autorisé des effets à chance ; `bonus` s'ajoute par-dessus, une fois
+    // les actions lues (plus bas). Une carte de créature n'en a pas.
+    const surpEffets = (typeof window.surpuissanceDesEffets === "function")
+        ? window.surpuissanceDesEffets(typeof window.fatigueDeSurpuissance === "function"
+            ? window.fatigueDeSurpuissance(dataCarte, lanceurCarte) : dataCarte.Fatigue, lanceurCarte)
+        : { plafond: 0, bonus: 0 };
     const plafondDuGrimoire = (motCle, defaut) => {
         const e = Object.values(window.EFFETS_BDD_CACHE || {})
             .find(x => x && (x.Nom || "").toLowerCase().includes(motCle));
         const p = e ? parseFrFloat(e.Pourcent_Max) : 0;
-        return p > 0 ? Math.min(100, p) : defaut;
+        return Math.min(100, (p > 0 ? Math.min(100, p) : defaut) + surpEffets.plafond);
     };
 
     // Même principe que estEtatEtourdi, pour l'état Confusion.
@@ -1329,7 +1340,8 @@ window.demarrerCiblage = async function(idCarte, options) {
                 const portee = Math.max(1, Math.round(parseFrFloat(eff.Valeur) || 3));
                 let chance = (parseFrFloat(eff.Pourcent_Base) || 60) * (n || 1);
                 const plafond = parseFrFloat(eff.Pourcent_Max);
-                if (plafond > 0) chance = Math.min(chance, plafond);
+                // (v427) relevé par la 1re surpuissance (surpEffets, plus haut).
+                if (plafond > 0) chance = Math.min(chance, plafond + surpEffets.plafond);
                 repliCarte = { portee: Math.max((repliCarte || {}).portee || 0, portee),
                                chance: Math.min(100, Math.max((repliCarte || {}).chance || 0, chance)) };
             };
@@ -1475,7 +1487,8 @@ window.demarrerCiblage = async function(idCarte, options) {
             const lireLumiere = (eff, n) => {
                 if (!eff || !(eff.Nom || "").toLowerCase().startsWith("lumi")) return;
                 chanceLumiere += (parseFrFloat(eff.Pourcent_Base) || 15) * (n || 1);
-                const plafond = parseFrFloat(eff.Pourcent_Max) || 60;
+                // (v427) relevé par la 1re surpuissance (surpEffets, plus haut).
+                const plafond = (parseFrFloat(eff.Pourcent_Max) || 60) + surpEffets.plafond;
                 chanceLumiere = Math.min(chanceLumiere, plafond);
             };
             lireLumiere(effBase, act.count);
@@ -1602,6 +1615,14 @@ window.demarrerCiblage = async function(idCarte, options) {
             });
 
             if (isStun) {
+                // (v427) Le cran de plus que la 1re surpuissance laisse acheter
+                // à la Forge s'arrête au max relevé (l'Étourdi n'avait pas de
+                // plafond ici : la Forge suffisait).
+                if (surpEffets.plafond > 0) {
+                    const plafondStun = Math.max(0, ...[effBase, ...listeMods.map(m => window.EFFETS_BDD_CACHE[m.id])]
+                        .filter(estEtatEtourdi).map(e => parseFrFloat(e.Pourcent_Max)));
+                    if (plafondStun > 0) stunChance = Math.min(stunChance, plafondStun + surpEffets.plafond);
+                }
                 if (stunDuree <= 0) stunDuree = 2; // Sécurité si la BDD n'a pas de durée
                 console.log(`⚡ État Étourdi configuré : ${stunDuree} tours (chance ${stunChance}%).`);
 
@@ -1635,7 +1656,8 @@ window.demarrerCiblage = async function(idCarte, options) {
                 if (modEff && (modEff.Nom || "").toLowerCase().includes("aveugl")) lireAveuglement(modEff, m.count, modsDuree[m.id]);
             });
             if (estAveuglement) {
-                if (aveuglePlafond > 0) aveugleChance = Math.min(aveugleChance, aveuglePlafond);
+                // (v427) relevé par la 1re surpuissance (surpEffets, plus haut).
+                if (aveuglePlafond > 0) aveugleChance = Math.min(aveugleChance, aveuglePlafond + surpEffets.plafond);
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({
                     nom: "Aveuglé",
@@ -2010,7 +2032,8 @@ window.demarrerCiblage = async function(idCarte, options) {
                 const effPoussee = Object.values(window.EFFETS_BDD_CACHE || {})
                     .find(x => x && (x.Nom || "").toLowerCase().includes("pouss"));
                 const plafondPoussee = effPoussee ? parseFrFloat(effPoussee.Pourcent_Max) : 0;
-                pousseeChance = Math.min(pousseeChance, plafondPoussee > 0 ? Math.min(100, plafondPoussee) : 50);
+                // (v427) relevé par la 1re surpuissance (surpEffets, plus haut).
+                pousseeChance = Math.min(pousseeChance, Math.min(100, (plafondPoussee > 0 ? Math.min(100, plafondPoussee) : 50) + surpEffets.plafond));
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({
@@ -2255,10 +2278,24 @@ window.demarrerCiblage = async function(idCarte, options) {
         dataCarte.Composants.actions.forEach((act, idxAction) => {
             const avantA = attaquesExtraites.length, avantAlt = alterationsExtraites.length;
             lireAction(act, idxAction);
+            // (v427) LA 2e SURPUISSANCE : +8 points sur les chances des effets
+            // de l'action, une fois plafonnées, sans regarder le max autorisé
+            // (100 au plus) — états, Poussée, Traction, Lumière.
+            if (surpEffets.bonus > 0) {
+                alterationsExtraites.slice(avantAlt).forEach(alt => {
+                    if ((Number(alt.chance) || 0) > 0) alt.chance = Math.min(100, Number(alt.chance) + surpEffets.bonus);
+                    if (alt.estTraction) alt.bonusSurpuissance = surpEffets.bonus;
+                });
+                attaquesExtraites.slice(avantA).forEach(a => {
+                    if ((Number(a.chanceLumiere) || 0) > 0) a.chanceLumiere = Math.min(100, Number(a.chanceLumiere) + surpEffets.bonus);
+                });
+            }
             const enZone = !!(act.zoneHexes && act.zoneHexes.length > 0);
             attaquesExtraites.slice(avantA).forEach(a => { a.enZone = enZone; actionSource.set(a, idxAction); });
             alterationsExtraites.slice(avantAlt).forEach(a => { a.enZone = enZone; actionSource.set(a, idxAction); });
         });
+        // (v427) Le Repli de la carte aussi : +8 par-dessus son max (2e surpuissance).
+        if (surpEffets.bonus > 0 && repliCarte) repliCarte.chance = Math.min(100, repliCarte.chance + surpEffets.bonus);
     }
 
     // UN SORT À PLUSIEURS ÉLÉMENTS (Nico) : l'élément choisi pour l'Attaque
@@ -3271,7 +3308,8 @@ window.chanceTractionRepartie = function(alt, crans) {
     const parCran = Number(alt && alt.chanceParCran) || 0;
     if (!(parCran > 0)) return Number(alt && alt.chance) || 0;
     const plafond = Number(alt.plafond) || 60;
-    return Math.min(plafond, parCran * crans);
+    // (v427) +8 par-dessus le plafond pour une carte de 2e surpuissance.
+    return Math.min(100, Math.min(plafond, parCran * crans) + (Number(alt.bonusSurpuissance) || 0));
 };
 window.repartirTractionCiblage = function(state, phase, idCible, tkCible) {
     const total = window.cransTractionCiblage(state, phase);
