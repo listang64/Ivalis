@@ -834,8 +834,8 @@ function coutPCChantier(chantier, palette) {
                 const taille = act.zoneHexes.length > 0 ? act.zoneHexes.length : m.count;
                 // (v427) Nico : « Zone (avec un % pour la première zone, puis
                 // des fixes. 1 / 2 / 3 / 4 / 5 et +) » — ⚖️ règle Forge :
-                // palier par palier (coutCasesZone, app.js) ; le % de la 1re
-                // case payante se compte après, sur le reste de l'action.
+                // palier par palier (coutCasesZone, app.js) ; le % de la 2e
+                // case (v429 : la 1re est offerte) se compte après, sur le reste de l'action.
                 const payantes = Math.max(0, taille - 1);
                 const z = typeof window.coutCasesZone === "function"
                     ? window.coutCasesZone(m.effet, payantes, coutPC(m.effet))

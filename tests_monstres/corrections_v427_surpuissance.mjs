@@ -16,6 +16,9 @@
 //
 // Lancer : node tests_monstres/corrections_v427_surpuissance.mjs
 //   (IVALIS_RACINE=<dossier> pour un autre exemplaire du dépôt)
+// (v429) Nico a précisé : « Surpuissance > +5 % et augmente le max de 5 %, ou 8 % si
+// surpuissance 100 » : +5 (70+) ou +8 (100+) d'office, par-dessus le max ; plus de cran
+// supplémentaire à la Forge. Les contrôles ci-dessous suivent la règle précisée.
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -107,15 +110,15 @@ await section(async () => {
     maudit: window.surpuissanceDesEffets(100, { Race: "Humain", Classe: "Maudit", Niveau: 3, niveau: 3 }),
     atoutMaudit: !!(window.atoutRace({ Race: "Humain", Classe: "Maudit", Niveau: 3, niveau: 3 }) || {}).sansSurpuissanceOffensive
   }));
-  const eq = (o, pl, bo) => o.plafond === pl && o.bonus === bo;
-  verifier("sans surpuissance (0, 69) : rien", eq(r.paliers[0], 0, 0) && eq(r.paliers[1], 0, 0), JSON.stringify(r.paliers.slice(0, 2)));
-  verifier("1re surpuissance (70 à 99) : max +5, rien par-dessus", eq(r.paliers[2], 5, 0) && eq(r.paliers[3], 5, 0), JSON.stringify(r.paliers.slice(2, 4)));
-  verifier("2e surpuissance (100+) : max +5 qui reste, et +8 par-dessus", eq(r.paliers[4], 5, 8) && eq(r.paliers[5], 5, 8), JSON.stringify(r.paliers.slice(4)));
+  const eq = (o, bo) => o.bonus === bo;
+  verifier("sans surpuissance (0, 69) : rien", eq(r.paliers[0], 0) && eq(r.paliers[1], 0), JSON.stringify(r.paliers.slice(0, 2)));
+  verifier("1re surpuissance (70 à 99) : +5 par-dessus le max", eq(r.paliers[2], 5) && eq(r.paliers[3], 5), JSON.stringify(r.paliers.slice(2, 4)));
+  verifier("2e surpuissance (100+) : +8 par-dessus le max", eq(r.paliers[4], 8) && eq(r.paliers[5], 8), JSON.stringify(r.paliers.slice(4)));
   verifier("le multiplicateur des dégâts ne bouge pas (×1 / ×1,25 / ×1,35)", r.mult.join() === "1,1.25,1.35", r.mult.join());
-  verifier("les textes : « » / « max des effets +5 % » / « …, +8 % par-dessus »",
-    r.textes[0] === "" && r.textes[1] === "max des effets +5 %" && r.textes[2] === "max des effets +5 %, +8 % par-dessus", JSON.stringify(r.textes));
-  verifier("une créature : rien", eq(r.monstre, 0, 0), JSON.stringify(r.monstre));
-  verifier("le Maudit (pas de surpuissance classique) : rien", !r.atoutMaudit || eq(r.maudit, 0, 0), `atout ${r.atoutMaudit} ${JSON.stringify(r.maudit)}`);
+  verifier("les textes : « » / « effets +5 % (max +5 %) » / « effets +8 % (max +8 %) »",
+    r.textes[0] === "" && r.textes[1] === "effets +5 % (max +5 %)" && r.textes[2] === "effets +8 % (max +8 %)", JSON.stringify(r.textes));
+  verifier("une créature : rien", eq(r.monstre, 0), JSON.stringify(r.monstre));
+  verifier("le Maudit (pas de surpuissance classique) : rien", !r.atoutMaudit || eq(r.maudit, 0), `atout ${r.atoutMaudit} ${JSON.stringify(r.maudit)}`);
 });
 
 // =========================================================================
@@ -168,40 +171,39 @@ await section(async () => {
   verifier("sans surpuissance : Brûlé ×6 = 60 %, ×3 = 30 %", s6.chances["Brûlé"] === 60 && s3.chances["Brûlé"] === 30, JSON.stringify([s6.chances, s3.chances]));
   verifier("sans surpuissance : un 7e cran reste plafonné au max du grimoire (60)", s7.chances["Brûlé"] === 60, JSON.stringify(s7.chances));
 
-  // 1re SURPUISSANCE
+  // 1re SURPUISSANCE : +5 d'office, par-dessus le max
   const p6 = await extraire(75, 4, { EFF_BRULE: 6 });
   const p7 = await extraire(75, 4, { EFF_BRULE: 7 });
-  const p8 = await extraire(75, 4, { EFF_BRULE: 8 });
   const p3 = await extraire(75, 4, { EFF_BRULE: 3 });
-  verifier("1re surpuissance : le 7e cran monte au max relevé, 65 % (au lieu de 60)", p7.chances["Brûlé"] === 65, JSON.stringify(p7.chances));
-  verifier("1re surpuissance : jamais au-delà du max relevé (8 crans → 65)", p8.chances["Brûlé"] === 65, JSON.stringify(p8.chances));
-  verifier("1re surpuissance : rien d'office sous le max (×6 = 60, ×3 = 30)", p6.chances["Brûlé"] === 60 && p3.chances["Brûlé"] === 30,
-           JSON.stringify([p6.chances, p3.chances]));
+  verifier("1re surpuissance : Brûlé au max (60) +5 → 65", p6.chances["Brûlé"] === 65, JSON.stringify(p6.chances));
+  verifier("1re surpuissance : sous le max aussi, 30 + 5 → 35", p3.chances["Brûlé"] === 35, JSON.stringify(p3.chances));
+  verifier("1re surpuissance : un cran de trop reste plafonné au max, puis +5 (7 crans → 65)", p7.chances["Brûlé"] === 65, JSON.stringify(p7.chances));
   const feu40 = await extraire(40, 4, { EFF_BRULE: 6 }, { element: "Feu" });
   const feu75 = await extraire(75, 4, { EFF_BRULE: 6 }, { element: "Feu" });
   verifier("Attaque de Feu, 60 % + 5 % offerts : 60 sans, 65 à la 1re surpuissance", feu40.chances["Brûlé"] === 60 && feu75.chances["Brûlé"] === 65,
            `${feu40.chances["Brûlé"]} / ${feu75.chances["Brûlé"]}`);
-  const et = await extraire(75, 4, { EFF_ETOURDI: 5 });
+  const et = await extraire(75, 4, { EFF_ETOURDI: 4 });
   const po = await extraire(75, 4, { EFF_POUSSEE: 5 });
   const lu = await extraire(75, 4, { EFF_LUMIERE: 5 });
-  verifier("1re surpuissance : Étourdi 5 × 10 (max 40) → 45", et.chances["Étourdi"] === 45, JSON.stringify(et.chances));
+  verifier("1re surpuissance : Étourdi 4 × 10 (max 40) → 45", et.chances["Étourdi"] === 45, JSON.stringify(et.chances));
   verifier("1re surpuissance : Poussée 5 × 15 (max 60) → 65", po.chances["Poussée"] === 65, JSON.stringify(po.chances));
   verifier("1re surpuissance : Lumière 5 × 20 (max 80) → 85", lu.lumiere === 85, String(lu.lumiere));
 
-  // 2e SURPUISSANCE
+  // 2e SURPUISSANCE : +8 d'office, par-dessus le max
   const d6 = await extraire(100, 7, { EFF_BRULE: 6 });
   const d7 = await extraire(100, 7, { EFF_BRULE: 7 });
   const d3 = await extraire(100, 7, { EFF_BRULE: 3 });
   const pe = await extraire(100, 7, { EFF_PEUR: 4 });
-  verifier("2e surpuissance : Brûlé au max (60) +8 par-dessus → 68", d6.chances["Brûlé"] === 68, JSON.stringify(d6.chances));
-  verifier("2e surpuissance : le max relevé reste, 65 + 8 → 73", d7.chances["Brûlé"] === 73, JSON.stringify(d7.chances));
+  verifier("2e surpuissance : Brûlé au max (60) +8 → 68", d6.chances["Brûlé"] === 68, JSON.stringify(d6.chances));
+  verifier("2e surpuissance : un cran de trop ne fait pas plus (7 crans → 68)", d7.chances["Brûlé"] === 68, JSON.stringify(d7.chances));
   verifier("2e surpuissance : sous le max aussi, 30 + 8 → 38", d3.chances["Brûlé"] === 38, JSON.stringify(d3.chances));
   verifier("2e surpuissance : Peur 4 × 15 = 60 → 68", pe.chances["Peur"] === 68, JSON.stringify(pe.chances));
   const lu100 = await extraire(100, 7, { EFF_LUMIERE: 4 });
   verifier("2e surpuissance : Lumière 80 → 88", lu100.lumiere === 88, String(lu100.lumiere));
   const tr = await p.evaluate(() => [window.chanceTractionRepartie({ chanceParCran: 15, plafond: 60, bonusSurpuissance: 8 }, 4),
+                                     window.chanceTractionRepartie({ chanceParCran: 15, plafond: 60, bonusSurpuissance: 5 }, 4),
                                      window.chanceTractionRepartie({ chanceParCran: 15, plafond: 60 }, 4)]);
-  verifier("Traction répartie : 4 crans × 15 (max 60) → 68 avec la 2e surpuissance, 60 sans", tr[0] === 68 && tr[1] === 60, JSON.stringify(tr));
+  verifier("Traction répartie : 4 crans × 15 (max 60) → 68 (100+), 65 (70+), 60 sans", tr[0] === 68 && tr[1] === 65 && tr[2] === 60, JSON.stringify(tr));
 
   // LES DÉGÂTS GARDENT LEUR MULTIPLICATEUR
   verifier("les dégâts : 2 × 3 = 6 ; 4 × 3 = 12 → 15 (×1,25) ; 7 × 3 = 21 → 28 (×1,35)",
@@ -209,7 +211,7 @@ await section(async () => {
 
   // NI LES CRÉATURES
   const m = await extraire(100, 7, { EFF_BRULE: 6 }, { lanceur: "M1" });
-  verifier("une créature à 100 : sa seule triche (60 × 1,2 = 72), ni max relevé ni +8",
+  verifier("une créature à 100 : sa seule triche (60 × 1,2 = 72), pas de +8",
            m.chances["Brûlé"] === 72, JSON.stringify(m.chances));
 });
 
@@ -244,9 +246,7 @@ await section(async () => {
     const res = {};
     poser(3, 6); res.sans = lire();                        // 30 + 30 = 60
     poser(4, 6); res.p1 = lire();                          // 40 + 30 = 70
-    window.modifierModCount("A1", "EFF_BRULE", 1); res.p1plus = lire();   // 7e cran : 75
-    window.modifierModCount("A1", "EFF_BRULE", 1); res.p1plusplus = lire(); // pas de 8e
-    window.forgeState.actions[0].count = 3; window.rafraichirForge(); res.retombe = lire();  // 30 + 35 = 65 → rabot
+    window.modifierModCount("A1", "EFF_BRULE", 1); res.p1plus = lire();   // pas de 7e cran
     poser(7, 6); res.p2 = lire();                          // 70 + 30 = 100
     window.modifierModCount("A1", "EFF_BRULE", 1); res.p2plus = lire();   // 105
     window.fermerForgeCompetence();
@@ -255,16 +255,12 @@ await section(async () => {
   verifier("sans surpuissance (60) : Brûlé ×6 = 60 %, « + » fermé, rien en plus",
     r.sans.fatigue === "60" && /60%/.test(r.sans.desc) && /max 60%/.test(r.sans.desc) && !r.sans.plusActif && r.sans.chance === ""
     && !/effets/.test(r.sans.bandeau), JSON.stringify(r.sans));
-  verifier("1re surpuissance (70) : max 65 % annoncé, le « + » s'ouvre",
-    r.p1.fatigue === "70" && /max 65%/.test(r.p1.desc) && r.p1.plusActif && /max des effets \+5 %/.test(r.p1.bandeau), JSON.stringify(r.p1));
-  verifier("le 7e cran s'achète : 65 % (pas 70), fatigue 75",
-    r.p1plus.crans === 7 && r.p1plus.fatigue === "75" && /^65%/.test(r.p1plus.desc.trim()) && r.p1plus.chance === "", JSON.stringify(r.p1plus));
-  verifier("pas de 8e cran (le « + » se referme)", r.p1plusplus.crans === 7 && !r.p1plusplus.plusActif, JSON.stringify(r.p1plusplus));
-  verifier("retombée sous 70 : le cran du max relevé est rendu (×6, 60)",
-    r.retombe.crans === 6 && r.retombe.fatigue === "60" && /max 60%/.test(r.retombe.desc), JSON.stringify(r.retombe));
-  verifier("2e surpuissance (100) : « → 68 % avec la surpuissance », bandeau « +8 % par-dessus »",
-    r.p2.fatigue === "100" && /→ 68 % avec la surpuissance/.test(r.p2.chance) && /\+8 % par-dessus/.test(r.p2.bandeau), JSON.stringify(r.p2));
-  verifier("2e surpuissance, 7e cran : 65 + 8 → 73 %", r.p2plus.crans === 7 && /→ 73 %/.test(r.p2plus.chance), JSON.stringify(r.p2plus));
+  verifier("1re surpuissance (70) : « → 65 % avec la surpuissance », bandeau « effets +5 % (max +5 %) »",
+    r.p1.fatigue === "70" && /max 60%/.test(r.p1.desc) && /→ 65 % avec la surpuissance/.test(r.p1.chance) && /effets \+5 % \(max \+5 %\)/.test(r.p1.bandeau), JSON.stringify(r.p1));
+  verifier("…le « + » reste fermé au max du grimoire : pas de 7e cran", !r.p1.plusActif && r.p1plus.crans === 6 && r.p1plus.fatigue === "70", JSON.stringify(r.p1plus));
+  verifier("2e surpuissance (100) : « → 68 % avec la surpuissance », bandeau « effets +8 % (max +8 %) »",
+    r.p2.fatigue === "100" && /→ 68 % avec la surpuissance/.test(r.p2.chance) && /effets \+8 % \(max \+8 %\)/.test(r.p2.bandeau), JSON.stringify(r.p2));
+  verifier("2e surpuissance : toujours pas de 7e cran", r.p2plus.crans === 6 && /→ 68 %/.test(r.p2plus.chance), JSON.stringify(r.p2plus));
 });
 
 // =========================================================================

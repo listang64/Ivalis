@@ -21,7 +21,7 @@
 //    degatsPhysiques / degatsMagiques / degatsMotsPouvoir (la Distorsion
 //    mentale, ex-Mots de pouvoir — la clé garde l'ancien nom)   dégâts plats sur
 //        la carte (appliquerEquipementALaCarte, moteur_effets.js)
-//    chanceElementaire / chanceEtatsCharisme / chanceSaignementPhysique   chance
+//    chanceElementaire / chanceEtatsCharisme / chanceSaignementPhysique / chanceSaignementSort   chance
 //        en plus sur les états de la carte (idem), au-delà du plafond
 //    testsCarac { cle: n }   jets de carac au d20 (lancerJetDeCaracteristique)
 //    fatigueSurKO, inertieMartiale, impactCinetique, elanPartage,
@@ -82,18 +82,22 @@
           resume: (m, p, n, choix) => choix ? `+2 aux tests de ${NOM_CARAC[choix] || choix}` : "+2 aux tests (carac à choisir)" },
         { id: "TAL_PUGILISTE", nom: "Pugiliste", carac: null, min: null, max: 1,
           texte: "Sans arme équipée (ou seulement des bagues) : +1 dégât physique, +5 % d'esquive. "
-               + "Vampire : en plus +5 d'initiative et +2 dégâts physiques. Vargen : en plus +15 % de chance de faire saigner sur tous ses sorts, sans plafond, et +6 % de critique.",
+               + "Vampire : en plus +5 d'initiative et +2 dégâts physiques. Vargen : en plus +15 % de chance de faire saigner sur tous ses sorts, "
+               + "au-delà du max (à mains nues pour une attaque physique, même armé pour un sort magique), et +6 % de critique.",
           effet: (m, p) => {
-              if (!sansArme(p)) return {};
-              const a = { degatsPhysiques: 1, esquive: 5 };
+              // (v429) Nico : « retire la condition pour les sorts : c'est juste quand il y a
+              // un dégât physique, avec mains nues » : le saignement d'un sort magique ne
+              // demande pas les mains nues (appliquerEquipementALaCarte, moteur_effets.js).
+              const a = estVargen(p) ? { chanceSaignementSort: 15 } : {};
+              if (!sansArme(p)) return a;
+              Object.assign(a, { degatsPhysiques: 1, esquive: 5 });
               if (estVampire(p)) { a.initiative = 5; a.degatsPhysiques += 2; }
-              // (v427) Nico : « Wargen, talent pugilat > +15 % de saignement (pas max) sur tous les sorts » :
-              // la clé garde son nom, mais vaut aussi pour la magie (appliquerEquipementALaCarte).
+              // (v427) Nico : « Wargen, talent pugilat > +15 % de saignement (pas max) sur tous les sorts ».
               if (estVargen(p)) { a.chanceSaignementPhysique = 15; a.critique = 6; }
               return a;
           },
           resume: (m, p) => {
-              if (!sansArme(p)) return "Inactif : une arme est en main";
+              if (!sansArme(p)) return estVargen(p) ? "Une arme est en main : seulement +15 % de faire saigner sur ses sorts magiques" : "Inactif : une arme est en main";
               const morceaux = [`+${1 + (estVampire(p) ? 2 : 0)} dégât(s) physique(s)`, "+5 % d'esquive"];
               if (estVampire(p)) morceaux.push("+5 d'initiative");
               if (estVargen(p)) morceaux.push("+15 % de faire saigner sur tous ses sorts", "+6 % de critique");

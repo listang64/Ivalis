@@ -820,7 +820,7 @@ window.afficherApercuCarteHD = function(idCarte, isLocked = false) {
         }
     } else {
     const surpuissance = typeof window.texteSurpuissance === "function" ? window.texteSurpuissance(puissance) : "";
-    // (v427) et ce qu'elle donne aux effets à chance (« max des effets +5 % »).
+    // (v427) et ce qu'elle donne aux effets à chance (« effets +5 % (max +5 %) »).
     const surpEffetsCarte = typeof window.texteSurpuissanceEffets === "function" ? window.texteSurpuissanceEffets(puissance, porteurCout) : "";
     if (surpuissance) {
         htmlEffets += `<div class="ligne-surpuissance">${ligneEffetHD("Surpuissance " + surpuissance,
@@ -1341,29 +1341,14 @@ function getMaxStacks(effet) {
     return 25;
 }
 
-// (v427) Nico : « première surpuissance +5 % max pour les effets associés au
-// sort. Deuxième surpuissance > +8 % […] (+8 qui se rajoute sans prendre en
-// compte max autorisé). » La surpuissance des effets (app.js) de la carte en
-// cours de forge, lue sur sa puissance (bilan de rafraichirForge). Un effet à
-// chance (un % de base ET un max) voit son max autorisé relevé : on peut y
-// monter d'un cran de plus, plafonné au max relevé (60 % → 65 %).
+// (v427/v429) Nico : « Surpuissance > +5 % et augmente le max de 5 %, ou 8 %
+// si surpuissance 100 ». La surpuissance des effets (app.js) de la carte en cours
+// de forge, lue sur sa puissance (bilan de rafraichirForge). Les crans achetés
+// restent bornés au max du grimoire : le bonus s'y ajoute (texteChanceSurpuissante).
 function surpuissanceEffetsForge() {
     const fs = window.forgeState || {};
-    if (typeof window.surpuissanceDesEffets !== "function" || !fs.bilan) return { plafond: 0, bonus: 0 };
+    if (typeof window.surpuissanceDesEffets !== "function" || !fs.bilan) return { bonus: 0 };
     return window.surpuissanceDesEffets(fs.bilan.fatigueSurpuissance, fs.statsPerso);
-}
-function plafondRelevePourForge(effet) {
-    const pBase = parseFrenchFloat(effet && effet.Pourcent_Base);
-    const pMax = parseFrenchFloat(effet && effet.Pourcent_Max);
-    if (!(pBase > 0 && pMax > 0)) return 0;
-    return Math.min(100, pMax + surpuissanceEffetsForge().plafond);
-}
-window.plafondRelevePourForge = plafondRelevePourForge;
-function maxCransForge(effet) {
-    const releve = plafondRelevePourForge(effet);
-    const pMax = parseFrenchFloat(effet && effet.Pourcent_Max);
-    if (!(releve > pMax)) return getMaxStacks(effet);
-    return Math.max(getMaxStacks(effet), Math.ceil(releve / parseFrenchFloat(effet.Pourcent_Base)));
 }
 
 // Remplacement intelligent dans le texte selon les valeurs BDD en temps réel
@@ -1393,11 +1378,7 @@ function formatterTexteEffet(effet, stacks, action) {
     let texte = effet.Effet_Base || "";
     const val = parseFrenchFloat(effet.Valeur);
     const pBase = parseFrenchFloat(effet.Pourcent_Base);
-    // (v427) Le max relevé par la 1re surpuissance (65 % au lieu de 60), quand
-    // la carte en a une : le cran de plus s'y arrête, et la carte le dit.
-    const releve = typeof window.plafondRelevePourForge === "function" ? window.plafondRelevePourForge(effet) : 0;
-    const pMax = Math.max(parseFrenchFloat(effet.Pourcent_Max), releve);
-    const maxRelevee = releve > parseFrenchFloat(effet.Pourcent_Max);
+    const pMax = parseFrenchFloat(effet.Pourcent_Max);
 
     // 1. Remplacement du % de base et du Max
     if (pBase > 0) {
@@ -1405,7 +1386,7 @@ function formatterTexteEffet(effet, stacks, action) {
         // (une fonction du même fichier, lue par window : les bancs qui
         // n'extraient que formatterTexteEffet s'en passent.)
         const offert = typeof window.chanceOfferteForge === "function" ? window.chanceOfferteForge(effet, action) : 0;
-        const calcP = (offert > 0 || maxRelevee) && pMax > 0 ? Math.min(pMax, pBase * stacks + offert) : pBase * stacks + offert;
+        const calcP = offert > 0 && pMax > 0 ? Math.min(pMax, pBase * stacks + offert) : pBase * stacks + offert;
         if (/\d+(?:[.,]\d+)?\s*%/.test(texte)) {
             texte = texte.replace(/\d+(?:[.,]\d+)?\s*%/, calcP + "%");
         }
@@ -1517,15 +1498,15 @@ function texteDegatsPersistance(act) {
         + (premiere === act ? ` <span class="forge-persistance-zone">(${ecrire(valeurDe(act) * r.zone / 100)} dans la zone)</span>` : "");
 }
 
-// (v427) LA CHANCE QU'AURA VRAIMENT L'EFFET EN COMBAT, 2e surpuissance
-// comprise : ses +8 points s'ajoutent par-dessus le max (« → 68 % avec la
+// (v429) LA CHANCE QU'AURA VRAIMENT L'EFFET EN COMBAT, surpuissance comprise :
+// ses +5 (70+) ou +8 (100+) points s'ajoutent par-dessus le max (« → 65 % avec la
 // surpuissance »). Les effets à chance seulement (un % de base et un max).
 function texteChanceSurpuissante(effet, stacks, act) {
     const bonus = surpuissanceEffetsForge().bonus;
     const pBase = parseFrenchFloat(effet && effet.Pourcent_Base);
-    const releve = plafondRelevePourForge(effet);
-    if (!(bonus > 0) || !(releve > 0) || !(stacks > 0)) return "";
-    const chance = Math.min(100, Math.min(releve, pBase * stacks + chanceOfferteSur(effet, act)) + bonus);
+    const pMax = parseFrenchFloat(effet && effet.Pourcent_Max);
+    if (!(bonus > 0) || !(pBase > 0 && pMax > 0) || !(stacks > 0)) return "";
+    const chance = Math.min(100, Math.min(pMax, pBase * stacks + chanceOfferteSur(effet, act)) + bonus);
     return `<span class="forge-chance-surpuissante">→ ${String(Math.round(chance * 100) / 100).replace(".", ",")} % avec la surpuissance</span>`;
 }
 
@@ -2049,9 +2030,8 @@ window.modifierActionCount = function(idInst, delta) {
     act.count += delta;
     if (act.count <= 0) {
         window.forgeState.actions = window.forgeState.actions.filter(a => a.idInst !== idInst);
-    } else if (act.count > maxCransForge(act.baseEffet)) {
-        // (v427) maxCransForge : le max relevé par la surpuissance compris.
-        act.count = maxCransForge(act.baseEffet);
+    } else if (act.count > getMaxStacks(act.baseEffet)) {
+        act.count = getMaxStacks(act.baseEffet);
     }
     window.rafraichirForge();
 };
@@ -2067,7 +2047,7 @@ window.modifierModCount = function(idInst, modId, delta) {
         if (modEffet && modEffet.Nom === "Zone") act.zoneHexes = [];
     } else {
         const modEffet = window.forgeState.effetsBDD.find(e => e.id === modId);
-        if (act.mods[modId] > maxCransForge(modEffet)) act.mods[modId] = maxCransForge(modEffet);
+        if (act.mods[modId] > getMaxStacks(modEffet)) act.mods[modId] = getMaxStacks(modEffet);
     }
     
     const modEffet = window.forgeState.effetsBDD.find(e => e.id === modId);
@@ -2766,8 +2746,8 @@ function coutDUneAction(act, bdd, statsPerso, coutDureePlus) {
                     : Math.max(0, zoneLen - 1);
                 // (v427) Nico : « Zone (avec un % pour la première zone, puis
                 // des fixes. 1 / 2 / 3 / 4 / 5 et +) » : palier par palier
-                // (coutCasesZone, app.js) ; le % de la 1re case payante se
-                // compte après la boucle, sur le reste de l'action.
+                // (coutCasesZone, app.js) ; le % de la 2e case (v429 : la 1re
+                // est offerte) se compte après la boucle, sur le reste de l'action.
                 const z = typeof window.coutCasesZone === "function"
                     ? window.coutCasesZone(modEff, payantes, parseFrenchFloat(modEff.Cout_PT))
                     : { fixe: parseFrenchFloat(modEff.Cout_PT) * payantes, pct: 0 };
@@ -2903,23 +2883,6 @@ window.rafraichirForge = function() {
     // v267 : la surpuissance se juge sur la fatigue payée, après l'étalement.
     const fatigueSurpuissance = window.SURPUISSANCE_APRES_ETALEMENT ? fatigueConsommee : Math.max(fatigueConsommee, Math.floor(totalPCPlein * 5));
     window.forgeState.bilan = { totalPC, fatigue: fatigueConsommee, cap: capFatigue, initiative, fatigueSurpuissance };
-    // (v427) Une carte retombée sous sa surpuissance rend le cran que seul le
-    // max relevé permettait (les comptes ne font que baisser : ça s'arrête).
-    // Seulement ce cran-là : une vieille carte au-delà de tout max reste telle quelle.
-    const releveMax = Math.max(0, ...(window.PALIERS_SURPUISSANCE || []).map(p => Number(p.plafondEffets) || 0));
-    const cranDuMaxReleve = (e, n) => {
-        const pBase = parseFrenchFloat(e && e.Pourcent_Base), pMax = parseFrenchFloat(e && e.Pourcent_Max);
-        return pBase > 0 && pMax > 0 && n > maxCransForge(e) && n <= Math.ceil(Math.min(100, pMax + releveMax) / pBase);
-    };
-    let rabote = false;
-    window.forgeState.actions.forEach(act => {
-        if (cranDuMaxReleve(act.baseEffet, act.count)) { act.count = maxCransForge(act.baseEffet); rabote = true; }
-        Object.keys(act.mods || {}).forEach(modId => {
-            const modEff = window.forgeState.effetsBDD.find(e => e.id === modId);
-            if (cranDuMaxReleve(modEff, act.mods[modId])) { act.mods[modId] = maxCransForge(modEff); rabote = true; }
-        });
-    });
-    if (rabote) return window.rafraichirForge();
 
     const armeContainer = document.getElementById("forge-weapon-tag-container");
     if (armeContainer) {
@@ -2971,7 +2934,7 @@ window.rafraichirForge = function() {
         const prochain = [...window.PALIERS_SURPUISSANCE].reverse().find(p => fatigueSurpuissance < p.fatigue);
         // Étalée, la carte coûte moins qu'elle ne pèse : on le dit.
         const avantEtalement = fatigueSurpuissance > fatigueConsommee ? ` — ${fatigueSurpuissance} avant l'étalement` : "";
-        // (v427) et ce qu'elle donne aux effets à chance : « max des effets +5 % ».
+        // (v427) et ce qu'elle donne aux effets à chance : « effets +5 % (max +5 %) ».
         const texteEffets = typeof window.texteSurpuissanceEffets === "function"
             ? window.texteSurpuissanceEffets(fatigueSurpuissance, window.forgeState.statsPerso) : "";
         surpuissance.classList.toggle("active", !!texte);
@@ -3033,7 +2996,7 @@ window.rafraichirForge = function() {
     if (window.forgeState.actions.length > 0) {
         window.forgeState.actions.forEach(act => {
 
-            const isActMaxed = act.count >= maxCransForge(act.baseEffet);
+            const isActMaxed = act.count >= getMaxStacks(act.baseEffet);
             const btnPlusActDisabled = (isActMaxed || capDepasse) ? `class="forge-btn-plus" disabled` : `class="forge-btn-plus"`;
 
             // Immobilisation et Empoisonnement ont une durée fixe (2 tours chacun) :
@@ -3073,7 +3036,7 @@ window.rafraichirForge = function() {
                 const modEff = window.forgeState.effetsBDD.find(e => e.id === modId);
                 const offertIci = chanceOfferteSur(modEff, act);
 
-                const isModMaxed = modCount >= maxCransForge(modEff);
+                const isModMaxed = modCount >= getMaxStacks(modEff);
                 const btnPlusModDisabled = (isModMaxed || capDepasse) ? `class="forge-btn-plus" disabled` : `class="forge-btn-plus"`;
 
                 let boutonEditerZone = "";

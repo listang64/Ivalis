@@ -8,6 +8,8 @@
 // (La mise en place du livre et de la Forge : celle de corrections_v392.)
 //
 // Lancer : node tests_monstres/corrections_v427_zone.mjs
+// (v429) Nico a précisé : « 1re zone toujours gratuite, c'est à partir de la 2e > %, 3 etc. > fixe » :
+// la 2e case en % (Zone_Pct_2), la 3e et la 4e en fixe, la 5e et les suivantes au fixe « 5 et + ».
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -89,7 +91,7 @@ const pose = () => attendreQue(() => p.evaluate(() => window.GRIMOIRE_PAGEFLIP.g
 await p.waitForTimeout(2500);
 
 // Les effets : une Attaque légère à 1 PT le cran, une Zone à 1,5 PT (le réglage d'avant).
-const ZONE_REGLEE = { Zone_Pct_1: "50", Zone_Fixe_2: "1", Zone_Fixe_3: "2", Zone_Fixe_4: "2,5", Zone_Fixe_5plus: "4" };
+const ZONE_REGLEE = { Zone_Pct_2: "50", Zone_Fixe_3: "2", Zone_Fixe_4: "2,5", Zone_Fixe_5plus: "4" };
 await p.evaluate(() => {
   const e = (Nom, Modificateur, t1, extra) => Object.assign({ Nom, Modificateur, Type_Mecanique: t1, Type_Mecanique_2: "", Cout_PT: "1", Valeur: 5, Tours: "0", Max_Stacks: 5, Effet_Base: "5 dégâts physique" }, extra || {});
   window.EFFETS_BDD_CACHE = { A1: e("Attaque légère", "DEXTÉRITÉ", "Action/Global"),
@@ -107,25 +109,25 @@ await section(async () => {
   const r = await p.evaluate((reglee) => {
     const c = (eff, n, tech) => { const z = window.coutCasesZone(eff, n, 1.5); return z.fixe + tech * z.pct / 100; };
     const avant = { Nom: "Zone", Cout_PT: "1,5" };
-    const vides = { Nom: "Zone", Cout_PT: "1,5", Zone_Pct_1: "", Zone_Fixe_2: "", Zone_Fixe_3: " ", Zone_Fixe_4: null, Zone_Fixe_5plus: "" };
+    const vides = { Nom: "Zone", Cout_PT: "1,5", Zone_Pct_2: "", Zone_Fixe_3: " ", Zone_Fixe_4: null, Zone_Fixe_5plus: "" };
     const z = { Nom: "Zone", Cout_PT: "1,5", ...reglee };
     return {
       defaut: [0, 1, 4, 5, 14].map(n => c(avant, n, 20)), vides: [0, 1, 6].map(n => c(vides, n, 20)),
       regle: [0, 1, 2, 3, 4, 5, 6, 14].map(n => c(z, n, 20)),
-      pct: window.coutCasesZone(z, 1, 1.5), sansFixes: [1, 3].map(n => c({ Nom: "Zone", Cout_PT: "1,5", Zone_Pct_1: "25" }, n, 8)),
-      zero: c({ Nom: "Zone", Cout_PT: "1,5", Zone_Pct_1: "0", Zone_Fixe_2: "0" }, 2, 20),
+      pct: window.coutCasesZone(z, 1, 1.5), sansFixes: [1, 3].map(n => c({ Nom: "Zone", Cout_PT: "1,5", Zone_Pct_2: "25" }, n, 8)),
+      zero: c({ Nom: "Zone", Cout_PT: "1,5", Zone_Pct_2: "0", Zone_Fixe_3: "0" }, 2, 20),
       paliers: window.ZONE_PALIERS
     };
   }, ZONE_REGLEE);
   verifier("sans réglage (un effet d'avant) : 1,5 PT par case payante, comme avant", JSON.stringify(r.defaut) === JSON.stringify([0, 1.5, 6, 7.5, 21]), JSON.stringify(r.defaut));
   verifier("des réglages laissés vides : pareil", JSON.stringify(r.vides) === JSON.stringify([0, 1.5, 9]), JSON.stringify(r.vides));
-  verifier("1re case payante : 50 % d'une technique à 20 PC → 10 PC", proche(r.regle[1], 10) && r.pct.pct === 50 && r.pct.fixe === 0, JSON.stringify(r.pct));
-  verifier("2e : +1 (fixe) → 11 ; 3e : +2 → 13 ; 4e : +2,5 → 15,5", proche(r.regle[2], 11) && proche(r.regle[3], 13) && proche(r.regle[4], 15.5), JSON.stringify(r.regle));
-  verifier("5e et + : +4 par case → 19,5 (5 cases), 23,5 (6), 55,5 (14)", proche(r.regle[5], 19.5) && proche(r.regle[6], 23.5) && proche(r.regle[7], 55.5), JSON.stringify(r.regle));
+  verifier("1re case offerte ; la 2e : 50 % d'une technique à 20 PC → 10 PC", proche(r.regle[1], 10) && r.pct.pct === 50 && r.pct.fixe === 0, JSON.stringify(r.pct));
+  verifier("3e : +2 (fixe) → 12 ; 4e : +2,5 → 14,5", proche(r.regle[2], 12) && proche(r.regle[3], 14.5), JSON.stringify(r.regle));
+  verifier("5e et + : +4 par case → 18,5 (5e), 22,5 (6e), 26,5 (7e), 58,5 (15e)", proche(r.regle[4], 18.5) && proche(r.regle[5], 22.5) && proche(r.regle[6], 26.5) && proche(r.regle[7], 58.5), JSON.stringify(r.regle));
   verifier("aucune case payante : rien, même avec un %", r.regle[0] === 0);
-  verifier("seul le % réglé : la 1re en %, les suivantes au PT d'avant", proche(r.sansFixes[0], 2) && proche(r.sansFixes[1], 2 + 1.5 + 1.5), JSON.stringify(r.sansFixes));
+  verifier("seul le % réglé : la 2e case en %, les suivantes au PT d'avant", proche(r.sansFixes[0], 2) && proche(r.sansFixes[1], 2 + 1.5 + 1.5), JSON.stringify(r.sansFixes));
   verifier("un 0 écrit vaut 0 (pas le PT d'avant)", r.zero === 0, String(r.zero));
-  verifier("les cinq réglages : 1 (%), 2, 3, 4, 5 et +", JSON.stringify(r.paliers) === '["Zone_Pct_1","Zone_Fixe_2","Zone_Fixe_3","Zone_Fixe_4","Zone_Fixe_5plus"]');
+  verifier("les quatre réglages : 2e (%), 3e, 4e, 5e et +", JSON.stringify(r.paliers) === '["Zone_Pct_2","Zone_Fixe_3","Zone_Fixe_4","Zone_Fixe_5plus"]');
 });
 
 // =========================================================================
@@ -147,9 +149,9 @@ const forger = (zone) => p.evaluate(([zone]) => {
   return lu;
 }, [zone]);
 const regler = (champs) => p.evaluate((champs) => {
-  const z = window.EFFETS_BDD_CACHE.Z; ["Zone_Pct_1", "Zone_Fixe_2", "Zone_Fixe_3", "Zone_Fixe_4", "Zone_Fixe_5plus"].forEach(k => delete z[k]); Object.assign(z, champs);
+  const z = window.EFFETS_BDD_CACHE.Z; window.ZONE_PALIERS.forEach(k => delete z[k]); Object.assign(z, champs);
   window.forgeState.effetsBDD.find(e => e.id === "Z") && Object.assign(window.forgeState.effetsBDD.find(e => e.id === "Z"), z,
-    Object.fromEntries(["Zone_Pct_1", "Zone_Fixe_2", "Zone_Fixe_3", "Zone_Fixe_4", "Zone_Fixe_5plus"].map(k => [k, z[k]])));
+    Object.fromEntries(window.ZONE_PALIERS.map(k => [k, z[k]])));
 }, champs);
 await section(async () => {
   await regler({});
@@ -159,12 +161,12 @@ await section(async () => {
   verifier("… l'éditeur de zone : 9 PC, puis 7,5 PC avec une case de moins", d.editeur === "9 PC" && d.editeurMoins === "7.5 PC", JSON.stringify(d));
   await regler(ZONE_REGLEE);
   const r = await forger(SEPT);
-  // 1re : 50 % de 4 = 2 ; 2e 1 ; 3e 2 ; 4e 2,5 ; 5e et 6e : 4 + 4 → 15,5 ; total 19,5 PC → 97 de fatigue.
-  verifier("réglée : 2 (50 % de 4) + 1 + 2 + 2,5 + 4 + 4 = 15,5 PC de zone ; 19,5 PC, 97 de fatigue", r.pc === "19.5 PC" && r.fatigue === "97" && proche(r.bilan, 19.5), JSON.stringify(r));
-  verifier("… l'éditeur de zone : 15,5 PC, puis 11,5 PC avec une case de moins", r.editeur === "15.5 PC" && r.editeurMoins === "11.5 PC", JSON.stringify(r));
+  // 1re offerte ; 2e : 50 % de 4 = 2 ; 3e 2 ; 4e 2,5 ; 5e, 6e, 7e : 4 × 3 → 18,5 ; total 22,5 PC → 112 de fatigue.
+  verifier("réglée : 2 (50 % de 4) + 2 + 2,5 + 4 × 3 = 18,5 PC de zone ; 22,5 PC, 112 de fatigue", r.pc === "22.5 PC" && r.fatigue === "112" && proche(r.bilan, 22.5), JSON.stringify(r));
+  verifier("… l'éditeur de zone : 18,5 PC, puis 14,5 PC avec une case de moins", r.editeur === "18.5 PC" && r.editeurMoins === "14.5 PC", JSON.stringify(r));
   const un = await forger([{ q: 1, r: 0 }, { q: 2, r: 0 }]);
-  verifier("2 cases (1 payante) : 50 % de 4 = 2 PC de zone ; 6 PC, 30 de fatigue", un.pc === "6.0 PC" && un.fatigue === "30" && un.editeur === "2 PC" && un.editeurMoins === "Gratuit", JSON.stringify(un));
-  // Le % se prend sur le reste de l'action : avec 6 crans, la 1re case vaut 3.
+  verifier("2 cases : la 2e, 50 % de 4 = 2 PC de zone ; 6 PC, 30 de fatigue", un.pc === "6.0 PC" && un.fatigue === "30" && un.editeur === "2 PC" && un.editeurMoins === "Gratuit", JSON.stringify(un));
+  // Le % se prend sur le reste de l'action : avec 6 crans, la 2e case vaut 3.
   const r6 = await p.evaluate(() => { const a = window.forgeState.actions[0]; a.count = 6; window.rafraichirForge(); return window.forgeState.bilan.totalPC; });
   verifier("le % suit le coût de la technique (6 crans : 6 + 3 = 9 PC)", proche(r6, 9), String(r6));
 });
@@ -179,8 +181,8 @@ await section(async () => {
     const geo = { Classe: "Géomancien", XP: 0, Race: "Ankylar" }, autre = { Classe: "Sentinelle", XP: 0, Race: "Ankylar" };
     return { geo: window.coutDUneActionForge(act, bdd, geo, 5).cout, autre: window.coutDUneActionForge(act, bdd, autre, 5).cout };
   });
-  // 6 payantes ; lui en paie 5 : 2 + 1 + 2 + 2,5 + 4 = 11,5 (+ 4) ; un autre 19,5.
-  verifier("7 cases : lui 15,5 PC (une case « 5 et + » de moins), un autre 19,5", proche(r.geo, 15.5) && proche(r.autre, 19.5), JSON.stringify(r));
+  // 6 payantes ; lui en paie 5 : 2 + 2 + 2,5 + 4 + 4 = 14,5 (+ 4) ; un autre 22,5.
+  verifier("7 cases : lui 18,5 PC (une case « 5 et + » de moins), un autre 22,5", proche(r.geo, 18.5) && proche(r.autre, 22.5), JSON.stringify(r));
 });
 
 // =========================================================================
@@ -198,7 +200,7 @@ await section(async () => {
     return [2, 4, 7, 12].map(n => [coutPCChantier(chantier(n), bdd), forge(n)]);
   });
   verifier("un monstre paie sa zone comme la Forge (2, 4, 7, 12 cases)", r.every(([m, f]) => proche(m, f)), JSON.stringify(r));
-  verifier("… réglée : 7 cases = 19,5 PC", proche(r[2][0], 19.5), JSON.stringify(r[2]));
+  verifier("… réglée : 7 cases = 22,5 PC", proche(r[2][0], 22.5), JSON.stringify(r[2]));
 });
 
 // =========================================================================
@@ -212,30 +214,30 @@ await section(async () => {
   await p.evaluate(() => window.chargerTableauEffets()); await p.waitForTimeout(300);
   const l = await p.evaluate(() => ({
     zone: !!document.getElementById("ligne-zone-Z"), autre: !!document.getElementById("ligne-zone-A1"),
-    champs: ["zone-pct1-Z", "zone-fixe2-Z", "zone-fixe3-Z", "zone-fixe4-Z", "zone-fixe5-Z"].map(id => { const el = document.getElementById(id); return el ? el.value : null; }),
+    champs: ["zone-pct2-Z", "zone-fixe3-Z", "zone-fixe4-Z", "zone-fixe5-Z"].map(id => { const el = document.getElementById(id); return el ? el.value : null; }),
     texte: (document.getElementById("ligne-zone-Z") || {}).innerText || ""
   }));
   verifier("la ligne de la Zone a ses paliers (et pas les autres effets)", l.zone && !l.autre, JSON.stringify(l));
-  verifier("un effet d'avant : les cinq réglages vides", JSON.stringify(l.champs) === '["","","","",""]', JSON.stringify(l.champs));
-  verifier("écrit en clair : %, 2e, 3e, 4e, 5e et +", /%/.test(l.texte) && /5e et \+/.test(l.texte), l.texte.replace(/\s+/g, " ").slice(0, 160));
+  verifier("un effet d'avant : les quatre réglages vides", JSON.stringify(l.champs) === '["","","",""]', JSON.stringify(l.champs));
+  verifier("écrit en clair : 1re case offerte, 2e en %, 3e, 4e, 5e et +", /1re case offerte/.test(l.texte) && /%/.test(l.texte) && /5e et \+/.test(l.texte), l.texte.replace(/\s+/g, " ").slice(0, 160));
   // On règle et on sauvegarde avec le 💾 de la ligne.
   const s = await p.evaluate(async () => {
-    const v = { "zone-pct1-Z": "40", "zone-fixe2-Z": "1,5", "zone-fixe3-Z": "2", "zone-fixe4-Z": "", "zone-fixe5-Z": "3" };
+    const v = { "zone-pct2-Z": "40", "zone-fixe3-Z": "2", "zone-fixe4-Z": "", "zone-fixe5-Z": "3" };
     Object.entries(v).forEach(([id, x]) => { document.getElementById(id).value = x; });
     await window.sauvegarderEffetLigne("Z");
     const autre = window.__docs["Combat_Effets/A1"]; await window.sauvegarderEffetLigne("A1");
     return { z: window.__docs["Combat_Effets/Z"], a: window.__docs["Combat_Effets/A1"] };
   });
-  verifier("sauvegardé dans Combat_Effets : 40 %, 1,5, 2, (vide), 3",
-           s.z.Zone_Pct_1 === "40" && s.z.Zone_Fixe_2 === "1,5" && s.z.Zone_Fixe_3 === "2" && s.z.Zone_Fixe_4 === "" && s.z.Zone_Fixe_5plus === "3" && s.z.Cout_PT === "1,5", JSON.stringify(s.z));
-  verifier("un autre effet n'en reçoit pas", !("Zone_Pct_1" in s.a), JSON.stringify(s.a));
+  verifier("sauvegardé dans Combat_Effets : 40 %, 2, (vide), 3",
+           s.z.Zone_Pct_2 === "40" && s.z.Zone_Fixe_3 === "2" && s.z.Zone_Fixe_4 === "" && s.z.Zone_Fixe_5plus === "3" && s.z.Cout_PT === "1,5", JSON.stringify(s.z));
+  verifier("un autre effet n'en reçoit pas", !("Zone_Pct_2" in s.a), JSON.stringify(s.a));
   // Relu : les réglages reviennent dans les cases ; et le vide de la 4e garde le PT de la Zone.
   await p.evaluate(() => window.chargerTableauEffets()); await p.waitForTimeout(300);
-  const relu = await p.evaluate(() => ["zone-pct1-Z", "zone-fixe2-Z", "zone-fixe3-Z", "zone-fixe4-Z", "zone-fixe5-Z"].map(id => document.getElementById(id).value));
-  verifier("relu : les réglages reviennent", JSON.stringify(relu) === '["40","1,5","2","","3"]', JSON.stringify(relu));
+  const relu = await p.evaluate(() => ["zone-pct2-Z", "zone-fixe3-Z", "zone-fixe4-Z", "zone-fixe5-Z"].map(id => document.getElementById(id).value));
+  verifier("relu : les réglages reviennent", JSON.stringify(relu) === '["40","2","","3"]', JSON.stringify(relu));
   const c = await p.evaluate(() => { const z = window.__docs["Combat_Effets/Z"]; const x = window.coutCasesZone(z, 5, 1.5); return x.fixe + 10 * x.pct / 100; });
-  // 40 % de 10 = 4 ; 1,5 ; 2 ; (vide → 1,5) ; 3 → 12.
-  verifier("le compte qui en sort : 4 + 1,5 + 2 + 1,5 (vide) + 3 = 12", proche(c, 12), String(c));
+  // 5 payantes (6 cases) : 2e 40 % de 10 = 4 ; 3e 2 ; 4e (vide → 1,5) ; 5e et 6e : 3 + 3 → 13,5.
+  verifier("le compte qui en sort : 4 + 2 + 1,5 (vide) + 3 + 3 = 13,5", proche(c, 13.5), String(c));
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

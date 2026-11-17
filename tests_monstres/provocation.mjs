@@ -44,8 +44,6 @@ function executerBloc({ effBase, mods = [], count = 1, isRanged = false, rangeMa
         return isNaN(res) ? 0 : res;
     };
     const lanceurCarte = { idPersonnage: idCaster };
-    // (v427) plafondDuGrimoire lit la surpuissance des effets de la carte : ici, aucune.
-    const surpEffets = { plafond: 0, bonus: 0 };
     eval(blocPlafond + "\n" + blocProvocation);
     return alterationsExtraites;
 }

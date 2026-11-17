@@ -96,7 +96,8 @@ await section(async () => {
   verifier("le résumé d'un Vargen mains nues : « +15 % de faire saigner …, +6 % de critique »",
            /\+15 % de faire saigner[^,]*, \+6 % de critique/.test(r.resume) && !/empoison/i.test(r.resume), r.resume);
   verifier("le résumé d'un Humain n'en parle pas", !/saigner|empoison|critique/.test(r.resumeHumain), r.resumeHumain);
-  verifier("l'atout se lit « +15 % de chance de faire saigner »", r.atout === "+15 % de chance de faire saigner", r.atout);
+  // (v429) l'atout dit en plus pour quoi : « (attaques physiques, à mains nues) ».
+  verifier("l'atout se lit « +15 % de chance de faire saigner »", /^\+15 % de chance de faire saigner/.test(r.atout), r.atout);
   const sources = ["talents.js", "moteur_effets.js", "app.js", "combat_etat.js", "moteur_pur.js", "cerveau_combat.js"].map(lire).join("\n");
   verifier("plus aucune trace de chancePoisonPhysique dans le code du jeu", !/chancePoisonPhysique/.test(sources));
 });

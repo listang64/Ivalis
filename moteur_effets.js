@@ -1222,18 +1222,18 @@ window.demarrerCiblage = async function(idCarte, options) {
     // (v427) Nico : « première surpuissance +5 % max pour les effets associés
     // au sort. Deuxième surpuissance > +8 % […] (+8 qui se rajoute sans prendre
     // en compte max autorisé). » LA SURPUISSANCE DES EFFETS (app.js), lue sur la
-    // puissance de la carte comme celle des dégâts : `plafond` relève chaque
-    // max autorisé des effets à chance ; `bonus` s'ajoute par-dessus, une fois
-    // les actions lues (plus bas). Une carte de créature n'en a pas.
+    // puissance de la carte comme celle des dégâts. (v429) « +5 % et augmente le
+    // max de 5 %, ou 8 % si surpuissance 100 » : `bonus` s'ajoute par-dessus le
+    // max, une fois les actions lues (plus bas). Une carte de créature n'en a pas.
     const surpEffets = (typeof window.surpuissanceDesEffets === "function")
         ? window.surpuissanceDesEffets(typeof window.fatigueDeSurpuissance === "function"
             ? window.fatigueDeSurpuissance(dataCarte, lanceurCarte) : dataCarte.Fatigue, lanceurCarte)
-        : { plafond: 0, bonus: 0 };
+        : { bonus: 0 };
     const plafondDuGrimoire = (motCle, defaut) => {
         const e = Object.values(window.EFFETS_BDD_CACHE || {})
             .find(x => x && (x.Nom || "").toLowerCase().includes(motCle));
         const p = e ? parseFrFloat(e.Pourcent_Max) : 0;
-        return Math.min(100, (p > 0 ? Math.min(100, p) : defaut) + surpEffets.plafond);
+        return p > 0 ? Math.min(100, p) : defaut;
     };
 
     // Même principe que estEtatEtourdi, pour l'état Confusion.
@@ -1374,8 +1374,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 const portee = Math.max(1, Math.round(parseFrFloat(eff.Valeur) || 3));
                 let chance = (parseFrFloat(eff.Pourcent_Base) || 60) * (n || 1);
                 const plafond = parseFrFloat(eff.Pourcent_Max);
-                // (v427) relevé par la 1re surpuissance (surpEffets, plus haut).
-                if (plafond > 0) chance = Math.min(chance, plafond + surpEffets.plafond);
+                if (plafond > 0) chance = Math.min(chance, plafond);
                 repliCarte = { portee: Math.max((repliCarte || {}).portee || 0, portee),
                                chance: Math.min(100, Math.max((repliCarte || {}).chance || 0, chance)) };
             };
@@ -1521,8 +1520,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             const lireLumiere = (eff, n) => {
                 if (!eff || !(eff.Nom || "").toLowerCase().startsWith("lumi")) return;
                 chanceLumiere += (parseFrFloat(eff.Pourcent_Base) || 15) * (n || 1);
-                // (v427) relevé par la 1re surpuissance (surpEffets, plus haut).
-                const plafond = (parseFrFloat(eff.Pourcent_Max) || 60) + surpEffets.plafond;
+                const plafond = parseFrFloat(eff.Pourcent_Max) || 60;
                 chanceLumiere = Math.min(chanceLumiere, plafond);
             };
             lireLumiere(effBase, act.count);
@@ -1649,14 +1647,6 @@ window.demarrerCiblage = async function(idCarte, options) {
             });
 
             if (isStun) {
-                // (v427) Le cran de plus que la 1re surpuissance laisse acheter
-                // à la Forge s'arrête au max relevé (l'Étourdi n'avait pas de
-                // plafond ici : la Forge suffisait).
-                if (surpEffets.plafond > 0) {
-                    const plafondStun = Math.max(0, ...[effBase, ...listeMods.map(m => window.EFFETS_BDD_CACHE[m.id])]
-                        .filter(estEtatEtourdi).map(e => parseFrFloat(e.Pourcent_Max)));
-                    if (plafondStun > 0) stunChance = Math.min(stunChance, plafondStun + surpEffets.plafond);
-                }
                 if (stunDuree <= 0) stunDuree = 2; // Sécurité si la BDD n'a pas de durée
                 console.log(`⚡ État Étourdi configuré : ${stunDuree} tours (chance ${stunChance}%).`);
 
@@ -1690,8 +1680,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 if (modEff && (modEff.Nom || "").toLowerCase().includes("aveugl")) lireAveuglement(modEff, m.count, modsDuree[m.id]);
             });
             if (estAveuglement) {
-                // (v427) relevé par la 1re surpuissance (surpEffets, plus haut).
-                if (aveuglePlafond > 0) aveugleChance = Math.min(aveugleChance, aveuglePlafond + surpEffets.plafond);
+                if (aveuglePlafond > 0) aveugleChance = Math.min(aveugleChance, aveuglePlafond);
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({
                     nom: "Aveuglé",
@@ -2066,8 +2055,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                 const effPoussee = Object.values(window.EFFETS_BDD_CACHE || {})
                     .find(x => x && (x.Nom || "").toLowerCase().includes("pouss"));
                 const plafondPoussee = effPoussee ? parseFrFloat(effPoussee.Pourcent_Max) : 0;
-                // (v427) relevé par la 1re surpuissance (surpEffets, plus haut).
-                pousseeChance = Math.min(pousseeChance, Math.min(100, (plafondPoussee > 0 ? Math.min(100, plafondPoussee) : 50) + surpEffets.plafond));
+                pousseeChance = Math.min(pousseeChance, plafondPoussee > 0 ? Math.min(100, plafondPoussee) : 50);
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({
@@ -2312,9 +2300,10 @@ window.demarrerCiblage = async function(idCarte, options) {
         dataCarte.Composants.actions.forEach((act, idxAction) => {
             const avantA = attaquesExtraites.length, avantAlt = alterationsExtraites.length;
             lireAction(act, idxAction);
-            // (v427) LA 2e SURPUISSANCE : +8 points sur les chances des effets
-            // de l'action, une fois plafonnées, sans regarder le max autorisé
-            // (100 au plus) — états, Poussée, Traction, Lumière.
+            // (v429) LA SURPUISSANCE DES EFFETS : +5 points (70+) ou +8 (100+) sur
+            // les chances des effets de l'action, une fois plafonnées au max du
+            // grimoire — le max monte d'autant (100 au plus) — états, Poussée,
+            // Traction, Lumière.
             if (surpEffets.bonus > 0) {
                 alterationsExtraites.slice(avantAlt).forEach(alt => {
                     if ((Number(alt.chance) || 0) > 0) alt.chance = Math.min(100, Number(alt.chance) + surpEffets.bonus);
@@ -2328,7 +2317,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             attaquesExtraites.slice(avantA).forEach(a => { a.enZone = enZone; actionSource.set(a, idxAction); });
             alterationsExtraites.slice(avantAlt).forEach(a => { a.enZone = enZone; actionSource.set(a, idxAction); });
         });
-        // (v427) Le Repli de la carte aussi : +8 par-dessus son max (2e surpuissance).
+        // (v429) Le Repli de la carte aussi : +5 / +8 par-dessus son max.
         if (surpEffets.bonus > 0 && repliCarte) repliCarte.chance = Math.min(100, repliCarte.chance + surpEffets.bonus);
     }
 
@@ -3358,7 +3347,7 @@ window.chanceTractionRepartie = function(alt, crans) {
     const parCran = Number(alt && alt.chanceParCran) || 0;
     if (!(parCran > 0)) return Number(alt && alt.chance) || 0;
     const plafond = Number(alt.plafond) || 60;
-    // (v427) +8 par-dessus le plafond pour une carte de 2e surpuissance.
+    // (v429) +5 / +8 par-dessus le plafond pour une carte surpuissante.
     return Math.min(100, Math.min(plafond, parCran * crans) + (Number(alt.bonusSurpuissance) || 0));
 };
 window.repartirTractionCiblage = function(state, phase, idCible, tkCible) {
@@ -3808,7 +3797,8 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
 
     // LE PROTECTEUR PROVOQUE : chacune de ses attaques a 10 % de chance de
     // provoquer les ennemis qu'elle frappe (20 % dès le niveau 5, v347). Une carte qui provoquait déjà
-    // garde la meilleure des deux chances.
+    // ajoute les deux chances (v429, Nico : « en cas de bonus d'état multiples > somme,
+    // et c'est valable pour tout sur ce jeu »).
     const provoc = Number(atouts.provocationAttaques) || 0;
     if (provoc > 0) {
         const camp = (id) => ((window.PERSOS_PARTIE || []).find(p => p.idPersonnage === id) || {}).camp || "Allié";
@@ -3818,7 +3808,7 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
             state.alterations = state.alterations || [];
             const deja = state.alterations.find(a => a.nom === "Provocation");
             if (deja) {
-                deja.chance = Math.max(deja.chance || 0, provoc);
+                deja.chance = (Number(deja.chance) || 0) + provoc;
                 deja.idProvocateur = lanceur.idPersonnage;
                 deja.cibles = [...new Set([...(deja.cibles || []), ...visees])];
             } else {
@@ -3846,12 +3836,16 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
     // l'empoisonnement, mettre plutôt le même boost pour le saignement. »
     // (v427) Nico : « Wargen, talent pugilat > +15 % de saignement (pas max)
     // sur tous les sorts, à la place d'empoisonnement. » Les sorts magiques
-    // aussi, et plus de plafond à 100 sur la chance de la carte (le jet,
+    // aussi, et le +15 ne compte pas dans le max du grimoire (le jet,
     // chanceFaceA dans moteur_pur.js, ne tire de toute façon jamais au-delà
-    // de 100). Toujours sans arme : la condition reste celle du talent.
-    const saignementTalent = Number(atouts.chanceSaignementPhysique) || 0;
-    const frappes = saignementTalent > 0 ? attaquesFrappantes(state) : [];
-    if (frappes.length > 0) {
+    // de 100). (v429) « Retire la condition pour les sorts : c'est juste quand
+    // il y a un dégât physique, avec mains nues » : une carte qui frappe
+    // physiquement le demande à mains nues (chanceSaignementPhysique, talents.js) ;
+    // un sort qui ne frappe que par la magie l'a toujours (chanceSaignementSort).
+    const frappes = attaquesFrappantes(state);
+    const physique = frappes.some(a => a.typeRes !== "Magique");
+    const saignementTalent = physique ? (Number(atouts.chanceSaignementPhysique) || 0) : (Number(atouts.chanceSaignementSort) || 0);
+    if (saignementTalent > 0 && frappes.length > 0) {
         state.alterations = state.alterations || [];
         const saignement = state.alterations.find(a => a.nom === "Saignement");
         const visees = [...new Set(frappes.flatMap(a => a.cibles || []))];
@@ -3878,11 +3872,13 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
     etatsArme.forEach(e => {
         const gabarit = GABARITS_ETATS_EQUIPEMENT[e.etat];
         if (!gabarit) return;
-        // Si la carte inflige DÉJÀ cet état, l'arme ne le double pas : elle
-        // améliore simplement ses chances, en gardant la meilleure des deux.
+        // Si la carte (ou un autre objet) inflige DÉJÀ cet état, l'arme ne le
+        // double pas : elle AJOUTE sa chance à la sienne (v429, Nico : « en cas
+        // de bonus d'état multiples > somme, et c'est valable pour tout sur ce
+        // jeu »). Le jet ne tire jamais au-delà de 100 (chanceFaceA).
         const dejaLa = state.alterations.find(a => a.nom === e.etat);
         if (dejaLa) {
-            dejaLa.chance = Math.max(dejaLa.chance || 0, e.chance || 0);
+            dejaLa.chance = (Number(dejaLa.chance) || 0) + (Number(e.chance) || 0);
             return;
         }
         const alteration = {

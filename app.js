@@ -1423,17 +1423,18 @@ window.casesZonePayantes = function(nbCases, perso) {
     return (atout.zoneGratuite && payantes >= 5) ? payantes - 1 : payantes;
 };
 // (v427) Nico : « Zone (avec un % pour la première zone, puis des fixes.
-// 1 / 2 / 3 / 4 / 5 et +) ». LE COÛT DES CASES DE ZONE, PALIER PAR PALIER : les
-// paliers sont les cases PAYANTES (casesZonePayantes : la première case reste
-// offerte, la 5e payante du Géomancien aussi). La 1re case payante coûte un %
-// du coût de la technique (Zone_Pct_1) ; la 2e, la 3e et la 4e un coût fixe
-// chacune (Zone_Fixe_2, _3, _4) ; chaque case à partir de la 5e, le coût « 5 et
-// + » (Zone_Fixe_5plus). Les fixes sont en PC, comme Cout_PT (×5 = la fatigue).
-// Un réglage vide — les effets d'avant n'en ont aucun — vaut `parCase`, le coût
-// d'une case d'avant (le Cout_PT de la Zone) : sans réglage, rien ne change.
+// 1 / 2 / 3 / 4 / 5 et +) ». (v429) Précisé : « la 1re zone toujours gratuite,
+// c'est à partir de la 2e > %, 3 etc. > fixe ». LE COÛT DES CASES DE ZONE, CASE
+// PAR CASE : la 1re case est offerte (casesZonePayantes ; la 5e payante du
+// Géomancien aussi). La 2e case coûte un % du coût de la technique (Zone_Pct_2) ;
+// la 3e et la 4e un coût fixe chacune (Zone_Fixe_3, Zone_Fixe_4) ; chaque case à
+// partir de la 5e, le coût « 5 et + » (Zone_Fixe_5plus). Les fixes sont en PC,
+// comme Cout_PT (×5 = la fatigue). Un réglage vide — les effets d'avant n'en ont
+// aucun — vaut `parCase`, le coût d'une case d'avant (le Cout_PT de la Zone) :
+// sans réglage, rien ne change. `nbPayantes` compte les cases après la 1re.
 // Renvoie { fixe, pct } : l'appelant ajoute `pct` % du reste de l'action, qu'il
 // est seul à connaître. Rien n'est arrondi ici (la fatigue l'est à la fin).
-window.ZONE_PALIERS = ["Zone_Pct_1", "Zone_Fixe_2", "Zone_Fixe_3", "Zone_Fixe_4", "Zone_Fixe_5plus"];
+window.ZONE_PALIERS = ["Zone_Pct_2", "Zone_Fixe_3", "Zone_Fixe_4", "Zone_Fixe_5plus"];
 window.coutCasesZone = function(modZone, nbPayantes, parCase) {
     const z = modZone || {};
     const lu = (champ) => {
@@ -1446,14 +1447,13 @@ window.coutCasesZone = function(modZone, nbPayantes, parCase) {
     const unite = Number(parCase) || 0;
     // Aucun réglage : le compte d'avant, tel quel.
     if (window.ZONE_PALIERS.every(c => lu(c) === null)) return { fixe: unite * n, pct: 0 };
-    const pct = lu("Zone_Pct_1");
+    const pct = lu("Zone_Pct_2");
     const fixeDe = (champ) => { const v = lu(champ); return v === null ? unite : v; };
     let fixe = 0;
-    if (n >= 1 && pct === null) fixe += unite;
-    if (n >= 2) fixe += fixeDe("Zone_Fixe_2");
-    if (n >= 3) fixe += fixeDe("Zone_Fixe_3");
-    if (n >= 4) fixe += fixeDe("Zone_Fixe_4");
-    if (n >= 5) fixe += fixeDe("Zone_Fixe_5plus") * (n - 4);
+    if (n >= 1 && pct === null) fixe += unite;                      // la 2e case
+    if (n >= 2) fixe += fixeDe("Zone_Fixe_3");                      // la 3e
+    if (n >= 3) fixe += fixeDe("Zone_Fixe_4");                      // la 4e
+    if (n >= 4) fixe += fixeDe("Zone_Fixe_5plus") * (n - 3);        // la 5e et les suivantes
     return { fixe, pct: (n >= 1 && pct !== null) ? pct : 0 };
 };
 // Une carte qui porte une Zone (ses effets compilés le disent).
@@ -1818,7 +1818,8 @@ window.texteAtout = function(cle, valeur) {
         case "degatsMotsPouvoir": return `${plus(n)} dégât à la Distorsion mentale`;
         case "chanceElementaire": return `${plus(n)} % de chance sur Brûlé, Électrifié et Glacé`;
         case "chanceEtatsCharisme": return `${plus(n)} % de chance sur Confusion, Peur et Immobilisation`;
-        case "chanceSaignementPhysique": return `${plus(n)} % de chance de faire saigner`;
+        case "chanceSaignementPhysique": return `${plus(n)} % de chance de faire saigner (attaques physiques, à mains nues)`;
+        case "chanceSaignementSort": return `${plus(n)} % de chance de faire saigner (sorts magiques)`;
         case "testsCarac":      return Object.keys(valeur || {}).map(c => `${plus(Number(valeur[c]) || 0)} aux tests de ${NOMS_CARACS_ATOUT[c] || c}`).join(" · ");
         case "fatigueSurKO":    return `${plus(n)} de fatigue à chaque ennemi abattu`;
         case "inertieMartiale": return `−${n} de fatigue sur la mêlée après 4 cases en ligne droite`;
@@ -2009,36 +2010,35 @@ window.multiplicateurSoinsRecus = function(perso) {
 //  (v427) Nico : « Surpuissance > première surpuissance +5 % max pour les
 //  effets associés au sort. Deuxième surpuissance > +8 % max pour les effets
 //  (+8 qui se rajoute sans prendre en compte max autorisé). »
-//  LES EFFETS À CHANCE DU SORT (ceux qui ont un « Pourcentage max » au
-//  grimoire : Brûlé, Peur, Poussée, Lumière…) en profitent aussi :
-//      1re surpuissance (70+)  → leur max autorisé monte de 5 points : la
-//                                 Forge laisse acheter jusque-là, le combat
-//                                 plafonne là (60 % → 65 %) ;
-//      2e surpuissance (100+)  → le max relevé reste, et +8 points s'ajoutent
-//                                 d'office par-dessus, sans regarder le max
-//                                 (60 % → 68 %, 65 % → 73 %), 100 au plus.
-//  En points de pourcentage, pas en ×1,05. Ni le Maudit (pas de surpuissance
-//  classique) ni les créatures.
+//  (v429) Précisé : « Surpuissance > +5 % et augmente le max de 5 %, ou 8 % si
+//  surpuissance 100 ». LES EFFETS À CHANCE DU SORT (ceux qui ont un
+//  « Pourcentage max » au grimoire : Brûlé, Peur, Poussée, Lumière…) en profitent :
+//      1re surpuissance (70+)  → +5 points d'office, et le max monte d'autant
+//                                 (60 % → 65 %, 30 % → 35 %) ;
+//      2e surpuissance (100+)  → +8 points d'office, le max monte de 8
+//                                 (60 % → 68 %, 30 % → 38 %), 100 au plus.
+//  Les crans achetés à la Forge restent bornés au max du grimoire : le bonus
+//  s'ajoute par-dessus, une fois la chance plafonnée. En points de pourcentage,
+//  pas en ×1,05. Ni le Maudit (pas de surpuissance classique) ni les créatures.
 window.PALIERS_SURPUISSANCE = [
-    { fatigue: 100, multiplicateur: 1.35, plafondEffets: 5, bonusEffets: 8 },
-    { fatigue: 70,  multiplicateur: 1.25, plafondEffets: 5, bonusEffets: 0 }
+    { fatigue: 100, multiplicateur: 1.35, bonusEffets: 8 },
+    { fatigue: 70,  multiplicateur: 1.25, bonusEffets: 5 }
 ];
 // (v427) Ce que la surpuissance donne aux effets à chance d'une carte de
 // `fatigue` (sa puissance, fatigueDeSurpuissance) lancée par `perso` :
-// { plafond: points ajoutés au max autorisé, bonus: points ajoutés par-dessus }.
+// { bonus: points ajoutés par-dessus le max autorisé } (v429).
 window.surpuissanceDesEffets = function(fatigue, perso) {
-    const rien = { plafond: 0, bonus: 0 };
+    const rien = { bonus: 0 };
     if (perso && perso.estMonstre) return rien;
     if (perso && typeof window.atoutRace === "function" && (window.atoutRace(perso) || {}).sansSurpuissanceOffensive) return rien;
     const f = Number(fatigue) || 0;
     const palier = window.PALIERS_SURPUISSANCE.find(p => f >= p.fatigue);
-    return palier ? { plafond: Number(palier.plafondEffets) || 0, bonus: Number(palier.bonusEffets) || 0 } : rien;
+    return palier ? { bonus: Number(palier.bonusEffets) || 0 } : rien;
 };
-// « max des effets +5 % » — ce que la Forge et la carte en disent.
+// « effets +5 % (max +5 %) » — ce que la Forge et la carte en disent.
 window.texteSurpuissanceEffets = function(fatigue, perso) {
     const s = window.surpuissanceDesEffets(fatigue, perso);
-    return [s.plafond > 0 ? `max des effets +${s.plafond} %` : "", s.bonus > 0 ? `+${s.bonus} % par-dessus` : ""]
-        .filter(Boolean).join(", ");
+    return s.bonus > 0 ? `effets +${s.bonus} % (max +${s.bonus} %)` : "";
 };
 // (v362) LA MAGIE DU SANG DU MAUDIT : une carte qui la porte.
 window.MULTIPLICATEUR_MAGIE_DU_SANG = 1.2;
@@ -5010,9 +5010,8 @@ window.ajouterLigneEffetHTML = function(id, data = {}) {
         sousLigne.id = `ligne-zone-${id}`;
         sousLigne.innerHTML = `
         <td colspan="13" style="font-size: 13px;">
-            Coût des cases payantes (la 1re case de la zone reste offerte ; vide = le PT de la ligne) :
-            1re <input type="text" id="zone-pct1-${id}" value="${val("Zone_Pct_1")}" style="width: 45px; text-align: center;"> % du coût de la technique ·
-            2e <input type="text" id="zone-fixe2-${id}" value="${val("Zone_Fixe_2")}" style="width: 45px; text-align: center;"> ·
+            Coût des cases de la zone (vide = le PT de la ligne) : 1re case offerte ·
+            2e <input type="text" id="zone-pct2-${id}" value="${val("Zone_Pct_2")}" style="width: 45px; text-align: center;"> % du coût de la technique ·
             3e <input type="text" id="zone-fixe3-${id}" value="${val("Zone_Fixe_3")}" style="width: 45px; text-align: center;"> ·
             4e <input type="text" id="zone-fixe4-${id}" value="${val("Zone_Fixe_4")}" style="width: 45px; text-align: center;"> ·
             5e et + <input type="text" id="zone-fixe5-${id}" value="${val("Zone_Fixe_5plus")}" style="width: 45px; text-align: center;"> PT par case
@@ -5070,9 +5069,8 @@ window.sauvegarderEffetLigne = async function(id) {
         Notes: document.getElementById(`notes-${id}`).value.trim()
     };
     // (v427) Les paliers de la Zone, s'ils sont sous la ligne (du texte, comme Cout_PT).
-    if (document.getElementById(`zone-pct1-${id}`)) {
-        newData.Zone_Pct_1 = document.getElementById(`zone-pct1-${id}`).value.trim();
-        newData.Zone_Fixe_2 = document.getElementById(`zone-fixe2-${id}`).value.trim();
+    if (document.getElementById(`zone-pct2-${id}`)) {
+        newData.Zone_Pct_2 = document.getElementById(`zone-pct2-${id}`).value.trim();
         newData.Zone_Fixe_3 = document.getElementById(`zone-fixe3-${id}`).value.trim();
         newData.Zone_Fixe_4 = document.getElementById(`zone-fixe4-${id}`).value.trim();
         newData.Zone_Fixe_5plus = document.getElementById(`zone-fixe5-${id}`).value.trim();

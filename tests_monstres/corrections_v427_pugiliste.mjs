@@ -90,18 +90,18 @@ await section(async () => {
     resumeHumain: window.resumeTalent(window.__heros({ race: "Humain" }), "TAL_PUGILISTE"),
     resumeArme: window.resumeTalent(window.__heros({ equipMainDroite: window.__epee }), "TAL_PUGILISTE")
   }));
-  verifier("le texte : sans arme, et Vargen +15 % de faire saigner sur tous ses sorts, sans plafond",
-           /^Sans arme équipée/.test(r.texte) && /Vargen : en plus \+15 % de chance de faire saigner sur tous ses sorts, sans plafond/.test(r.texte)
+  verifier("le texte : Vargen +15 % de faire saigner sur tous ses sorts, au-delà du max (v429 : à mains nues pour une attaque physique)",
+           /^Sans arme équipée/.test(r.texte) && /Vargen : en plus \+15 % de chance de faire saigner sur tous ses sorts, au-delà du max \(à mains nues pour une attaque physique, même armé pour un sort magique\)/.test(r.texte)
            && !/empoison/i.test(r.texte), r.texte);
   verifier("le résumé d'un Vargen mains nues : « +15 % de faire saigner sur tous ses sorts »",
            /\+15 % de faire saigner sur tous ses sorts, \+6 % de critique/.test(r.resume) && !/empoison/i.test(r.resume), r.resume);
   verifier("le résumé d'un Humain n'en parle pas", !/saigner|empoison/.test(r.resumeHumain), r.resumeHumain);
-  verifier("le résumé d'un Vargen armé : inactif", /^Inactif/.test(r.resumeArme), r.resumeArme);
+  verifier("(v429) le résumé d'un Vargen armé : seulement le saignement de ses sorts magiques", /seulement \+15 % de faire saigner sur ses sorts magiques/.test(r.resumeArme), r.resumeArme);
   const sources = ["talents.js", "moteur_effets.js", "app.js", "combat_etat.js", "moteur_pur.js", "cerveau_combat.js", "pont_combat.js"].map(lire).join("\n");
   verifier("aucune trace de chancePoisonPhysique dans le code du jeu", !/chancePoisonPhysique/.test(sources));
   const bloc = (lire("moteur_effets.js").match(/LE PUGILISTE VARGEN[\s\S]*?\n    \}\n/) || [""])[0];
-  verifier("le bloc du talent (moteur_effets.js) ne filtre plus la magie et ne plafonne plus",
-           !!bloc && !/Magique/.test(bloc) && !/Math\.min\(100/.test(bloc) && !/Empoisonnement/.test(bloc));
+  verifier("le bloc du talent (moteur_effets.js) : physique à mains nues, sort magique toujours, sans plafond",
+           !!bloc && /chanceSaignementSort/.test(bloc) && /chanceSaignementPhysique/.test(bloc) && !/Math\.min\(100/.test(bloc) && !/Empoisonnement/.test(bloc));
 });
 
 titre("2. CE QUE LA CARTE EMPORTE (appliquerEquipementALaCarte)");
@@ -118,6 +118,8 @@ await section(async () => {
       humain95: window.__carte(window.__heros({ race: "Humain" }), window.__sort(), [{ nom: "Saignement", chance: 95, duree: 2, cibles: ["M"] }]),
       armeEpee: window.__carte(window.__heros({ equipMainDroite: window.__epee }), window.__sort(), []),
       armeBaton: window.__carte(window.__heros({ equipMainDroite: window.__baton }), window.__sort(), []),
+      armeCoup: window.__carte(window.__heros({ equipMainDroite: window.__epee }), coup(), [], "Arme légère"),
+      armeMixte: window.__carte(window.__heros({ equipMainDroite: window.__epee }), [...coup(), ...window.__sort()], [], "Arme légère"),
       soin: window.__carte(window.__heros({}), [{ nom: "Soin", isHeal: true, valeurBrute: 10, cibles: ["P1"] }], []),
       gabarit: window.GABARITS_ETATS_EQUIPEMENT["Saignement"]
     };
@@ -136,8 +138,11 @@ await section(async () => {
            r.coup.length === 1 && r.coup[0].nom === "Saignement" && r.coup[0].chance === 15, JSON.stringify(r.coup));
   verifier("un Humain Pugiliste, sort magique : rien", r.humain.length === 0, JSON.stringify(r.humain));
   verifier("un Humain Pugiliste, sort à 95 % : reste à 95", r.humain95.length === 1 && r.humain95[0].chance === 95, JSON.stringify(r.humain95));
-  verifier("un Vargen armé d'une épée, sort magique : rien", r.armeEpee.length === 0, JSON.stringify(r.armeEpee));
-  verifier("un Vargen armé d'un bâton, sort magique : rien", r.armeBaton.length === 0, JSON.stringify(r.armeBaton));
+  // (v429) Nico : « retire la condition pour les sorts : c'est juste quand il y a un dégât physique, avec mains nues ».
+  verifier("(v429) un Vargen armé d'une épée, sort magique : Saignement 15 %", r.armeEpee.length === 1 && r.armeEpee[0].chance === 15, JSON.stringify(r.armeEpee));
+  verifier("(v429) un Vargen armé d'un bâton, sort magique : Saignement 15 %", r.armeBaton.length === 1 && r.armeBaton[0].chance === 15, JSON.stringify(r.armeBaton));
+  verifier("(v429) un Vargen armé, coup physique : rien (mains nues exigées)", r.armeCoup.length === 0, JSON.stringify(r.armeCoup));
+  verifier("(v429) un Vargen armé, carte qui frappe physiquement ET par la magie : rien (le physique demande les mains nues)", r.armeMixte.length === 0, JSON.stringify(r.armeMixte));
   verifier("un soin : rien", r.soin.length === 0, JSON.stringify(r.soin));
 });
 
