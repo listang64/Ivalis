@@ -82,11 +82,13 @@
           resume: (m, p, n, choix) => choix ? `+2 aux tests de ${NOM_CARAC[choix] || choix}` : "+2 aux tests (carac à choisir)" },
         { id: "TAL_PUGILISTE", nom: "Pugiliste", carac: null, min: null, max: 1,
           texte: "Sans arme équipée (ou seulement des bagues) : +1 dégât physique, +5 % d'esquive. "
-               + "Vampire : en plus +5 d'initiative et +2 dégâts physiques. Vargen : en plus +15 % de chance de faire saigner et +6 % de critique.",
+               + "Vampire : en plus +5 d'initiative et +2 dégâts physiques. Vargen : en plus +15 % de chance de faire saigner sur tous ses sorts, sans plafond, et +6 % de critique.",
           effet: (m, p) => {
               if (!sansArme(p)) return {};
               const a = { degatsPhysiques: 1, esquive: 5 };
               if (estVampire(p)) { a.initiative = 5; a.degatsPhysiques += 2; }
+              // (v427) Nico : « Wargen, talent pugilat > +15 % de saignement (pas max) sur tous les sorts » :
+              // la clé garde son nom, mais vaut aussi pour la magie (appliquerEquipementALaCarte).
               if (estVargen(p)) { a.chanceSaignementPhysique = 15; a.critique = 6; }
               return a;
           },
@@ -94,7 +96,7 @@
               if (!sansArme(p)) return "Inactif : une arme est en main";
               const morceaux = [`+${1 + (estVampire(p) ? 2 : 0)} dégât(s) physique(s)`, "+5 % d'esquive"];
               if (estVampire(p)) morceaux.push("+5 d'initiative");
-              if (estVargen(p)) morceaux.push("+15 % de faire saigner", "+6 % de critique");
+              if (estVargen(p)) morceaux.push("+15 % de faire saigner sur tous ses sorts", "+6 % de critique");
               return morceaux.join(", ");
           } },
         { id: "TAL_ADRENALINE", nom: "Adrénaline du Bourreau", carac: null, min: null, max: 1,
