@@ -1422,6 +1422,40 @@ window.casesZonePayantes = function(nbCases, perso) {
     const atout = (typeof window.atoutRace === "function" && perso) ? (window.atoutRace(perso) || {}) : {};
     return (atout.zoneGratuite && payantes >= 5) ? payantes - 1 : payantes;
 };
+// (v427) Nico : « Zone (avec un % pour la première zone, puis des fixes.
+// 1 / 2 / 3 / 4 / 5 et +) ». LE COÛT DES CASES DE ZONE, PALIER PAR PALIER : les
+// paliers sont les cases PAYANTES (casesZonePayantes : la première case reste
+// offerte, la 5e payante du Géomancien aussi). La 1re case payante coûte un %
+// du coût de la technique (Zone_Pct_1) ; la 2e, la 3e et la 4e un coût fixe
+// chacune (Zone_Fixe_2, _3, _4) ; chaque case à partir de la 5e, le coût « 5 et
+// + » (Zone_Fixe_5plus). Les fixes sont en PC, comme Cout_PT (×5 = la fatigue).
+// Un réglage vide — les effets d'avant n'en ont aucun — vaut `parCase`, le coût
+// d'une case d'avant (le Cout_PT de la Zone) : sans réglage, rien ne change.
+// Renvoie { fixe, pct } : l'appelant ajoute `pct` % du reste de l'action, qu'il
+// est seul à connaître. Rien n'est arrondi ici (la fatigue l'est à la fin).
+window.ZONE_PALIERS = ["Zone_Pct_1", "Zone_Fixe_2", "Zone_Fixe_3", "Zone_Fixe_4", "Zone_Fixe_5plus"];
+window.coutCasesZone = function(modZone, nbPayantes, parCase) {
+    const z = modZone || {};
+    const lu = (champ) => {
+        const v = z[champ];
+        if (v === undefined || v === null || String(v).trim() === "") return null;
+        const n = parseFloat(String(v).replace(",", "."));
+        return Number.isFinite(n) ? n : null;
+    };
+    const n = Math.max(0, Number(nbPayantes) || 0);
+    const unite = Number(parCase) || 0;
+    // Aucun réglage : le compte d'avant, tel quel.
+    if (window.ZONE_PALIERS.every(c => lu(c) === null)) return { fixe: unite * n, pct: 0 };
+    const pct = lu("Zone_Pct_1");
+    const fixeDe = (champ) => { const v = lu(champ); return v === null ? unite : v; };
+    let fixe = 0;
+    if (n >= 1 && pct === null) fixe += unite;
+    if (n >= 2) fixe += fixeDe("Zone_Fixe_2");
+    if (n >= 3) fixe += fixeDe("Zone_Fixe_3");
+    if (n >= 4) fixe += fixeDe("Zone_Fixe_4");
+    if (n >= 5) fixe += fixeDe("Zone_Fixe_5plus") * (n - 4);
+    return { fixe, pct: (n >= 1 && pct !== null) ? pct : 0 };
+};
 // Une carte qui porte une Zone (ses effets compilés le disent).
 window.carteAZone = (dataCarte) => !!dataCarte && (dataCarte.Effets_Compiles || [])
     .some(e => e && (e.isZone || e.nom === "Zone"));
@@ -4935,6 +4969,25 @@ window.ajouterLigneEffetHTML = function(id, data = {}) {
         </td>
     `;
     tbody.appendChild(tr);
+
+    // (v427) Nico : « Zone (avec un % pour la première zone, puis des fixes.
+    // 1 / 2 / 3 / 4 / 5 et +) » : sous la ligne de la Zone, le coût de ses cases
+    // payantes, palier par palier (coutCasesZone). Vide : le PT de la ligne.
+    if (d.Nom.trim() === "Zone") {
+        const val = (champ) => String(data[champ] ?? "").replace(/"/g, "&quot;");
+        const sousLigne = document.createElement("tr");
+        sousLigne.id = `ligne-zone-${id}`;
+        sousLigne.innerHTML = `
+        <td colspan="13" style="font-size: 13px;">
+            Coût des cases payantes (la 1re case de la zone reste offerte ; vide = le PT de la ligne) :
+            1re <input type="text" id="zone-pct1-${id}" value="${val("Zone_Pct_1")}" style="width: 45px; text-align: center;"> % du coût de la technique ·
+            2e <input type="text" id="zone-fixe2-${id}" value="${val("Zone_Fixe_2")}" style="width: 45px; text-align: center;"> ·
+            3e <input type="text" id="zone-fixe3-${id}" value="${val("Zone_Fixe_3")}" style="width: 45px; text-align: center;"> ·
+            4e <input type="text" id="zone-fixe4-${id}" value="${val("Zone_Fixe_4")}" style="width: 45px; text-align: center;"> ·
+            5e et + <input type="text" id="zone-fixe5-${id}" value="${val("Zone_Fixe_5plus")}" style="width: 45px; text-align: center;"> PT par case
+        </td>`;
+        tbody.appendChild(sousLigne);
+    }
 };
 
 window.sauvegarderEffetLigne = async function(id) {
@@ -4955,6 +5008,14 @@ window.sauvegarderEffetLigne = async function(id) {
         Effet_Base: document.getElementById(`effet-${id}`).value.trim(),
         Notes: document.getElementById(`notes-${id}`).value.trim()
     };
+    // (v427) Les paliers de la Zone, s'ils sont sous la ligne (du texte, comme Cout_PT).
+    if (document.getElementById(`zone-pct1-${id}`)) {
+        newData.Zone_Pct_1 = document.getElementById(`zone-pct1-${id}`).value.trim();
+        newData.Zone_Fixe_2 = document.getElementById(`zone-fixe2-${id}`).value.trim();
+        newData.Zone_Fixe_3 = document.getElementById(`zone-fixe3-${id}`).value.trim();
+        newData.Zone_Fixe_4 = document.getElementById(`zone-fixe4-${id}`).value.trim();
+        newData.Zone_Fixe_5plus = document.getElementById(`zone-fixe5-${id}`).value.trim();
+    }
 
     try {
         await setDoc(doc(db, "Combat_Effets", id), newData, { merge: true });
@@ -4973,6 +5034,9 @@ window.supprimerEffetLigne = async function(id) {
     try {
         await deleteDoc(doc(db, "Combat_Effets", id));
         document.getElementById(`ligne-effet-${id}`).remove();
+        // (v427) Et les paliers de la Zone, s'il y en avait.
+        const sousLigne = document.getElementById(`ligne-zone-${id}`);
+        if (sousLigne) sousLigne.remove();
     } catch(e) { alert("Échec de la suppression."); }
 };
 
