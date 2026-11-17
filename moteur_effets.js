@@ -3842,7 +3842,8 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
     // il y a un dégât physique, avec mains nues » : une carte qui frappe
     // physiquement le demande à mains nues (chanceSaignementPhysique, talents.js) ;
     // un sort qui ne frappe que par la magie l'a toujours (chanceSaignementSort).
-    const frappes = attaquesFrappantes(state);
+    const talentSaignement = (Number(atouts.chanceSaignementPhysique) || 0) + (Number(atouts.chanceSaignementSort) || 0) > 0;
+    const frappes = talentSaignement ? attaquesFrappantes(state) : [];
     const physique = frappes.some(a => a.typeRes !== "Magique");
     const saignementTalent = physique ? (Number(atouts.chanceSaignementPhysique) || 0) : (Number(atouts.chanceSaignementSort) || 0);
     if (saignementTalent > 0 && frappes.length > 0) {

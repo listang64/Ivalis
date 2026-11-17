@@ -551,9 +551,10 @@ console.log("\n8. 10 % DE PROVOCATION SUR CHACUNE DE SES ATTAQUES (20 % AU NIVEA
   verifier("une attaque : Provocation 10 %, sur l'ennemi frappé seulement, au nom du Protecteur",
            prov(r.simple) && prov(r.simple).chance === 10 && JSON.stringify(prov(r.simple).cibles) === '["M1"]'
            && prov(r.simple).idProvocateur === "H1" && prov(r.simple).duree === 2, JSON.stringify(r.simple));
-  verifier("une carte qui provoquait à 5 % : montée à 10", prov(r.dejaFaible).chance === 10 && r.dejaFaible.length === 1);
+  // (v429) Nico : « en cas de bonus d'état multiples > somme, valable pour tout » : les chances s'ajoutent.
+  verifier("une carte qui provoquait à 5 % : 5 + 10 = 15", prov(r.dejaFaible).chance === 15 && r.dejaFaible.length === 1, JSON.stringify(r.dejaFaible));
   verifier("niveau 5 : 20 % de provocation", prov(r.niv5) && prov(r.niv5).chance === 20, JSON.stringify(r.niv5));
-  verifier("une carte qui provoquait à 40 % : garde 40", prov(r.dejaForte).chance === 40);
+  verifier("une carte qui provoquait à 40 % : 40 + 10 = 50", prov(r.dejaForte).chance === 50, JSON.stringify(r.dejaForte));
   verifier("un soin : aucune provocation", !prov(r.soin));
   verifier("une autre classe : rien", !prov(r.autre));
   verifier("un héros resté « Hoplite » sur sa fiche provoque aussi", prov(r.ancien) && prov(r.ancien).chance === 10);
