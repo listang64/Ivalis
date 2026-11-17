@@ -2356,10 +2356,21 @@ window.dessinerGrilleZone = function() {
     const currentZoneCount = window.forgeState.selectedZoneHexes.length;
     // On remet la gratuité pour le 1er hexagone — et pour le Géomancien, la
     // 5e case payante est offerte aussi (casesZonePayantes, app.js).
-    const finalCost = Math.max(0, casesZoneAPayer(currentZoneCount) * costPC);
-    
+    let finalCost = Math.max(0, casesZoneAPayer(currentZoneCount) * costPC);
+    // (v427) Nico : « Zone (avec un % pour la première zone, puis des fixes.
+    // 1 / 2 / 3 / 4 / 5 et +) » : le prix des cases cochées, palier par palier,
+    // tel que la Forge le compte (coutDUneAction) — le % dépend de l'action.
+    if (modZone && act) {
+        const dureePlus = window.forgeState.effetsBDD.find(e => e.Nom === "Durée +");
+        const essai = { ...act, zoneHexes: window.forgeState.selectedZoneHexes,
+                        mods: { ...act.mods, [modZone.id]: Math.max(1, currentZoneCount) } };
+        finalCost = Math.max(0, coutDUneAction(essai, window.forgeState.effetsBDD, window.forgeState.statsPerso,
+                                               dureePlus ? parseFrenchFloat(dureePlus.Cout_PT) : 5).coutZone);
+    }
+
     const affichage = document.getElementById("zone-cout-affichage");
-    affichage.innerText = finalCost === 0 ? "Gratuit" : `${finalCost} PC`;
+    // Arrondi pour l'affichage seulement (un % peut tomber sur 2,6666…).
+    affichage.innerText = finalCost === 0 ? "Gratuit" : `${Math.round(finalCost * 100) / 100} PC`;
     affichage.style.color = finalCost === 0 ? "#1b6e3a" : "#ff4c4c";
 
     const hexRadius = 25;
@@ -2612,6 +2623,8 @@ function coutDUneAction(act, bdd, statsPerso, coutDureePlus) {
     let coutDureeBase = (act.baseDuree || 0) * coutDureePlus;
     
     let coutMods = 0;
+    // (v427) Les cases de zone (leur coût) et le % de la 1re case payante.
+    let coutZone = 0, pctZone = 0;
     let aDOT = false;
     let diviseurDOT = DIVISEUR_ETALEMENT;
     // LA RISTOURNE DE L'ÉTALEMENT NE VAUT QUE POUR LES DÉGÂTS ET LES SOINS
@@ -2656,9 +2669,19 @@ function coutDUneAction(act, bdd, statsPerso, coutDureePlus) {
                 let zoneLen = (act.zoneHexes && act.zoneHexes.length > 0) ? act.zoneHexes.length : modCount;
                 // On remet le premier hexagone gratuit ici aussi ! (Et la
                 // 5e case payante du Géomancien.)
-                coutCeMod = parseFrenchFloat(modEff.Cout_PT) * (typeof window.casesZonePayantes === "function"
+                const payantes = typeof window.casesZonePayantes === "function"
                     ? window.casesZonePayantes(zoneLen, statsPerso)
-                    : Math.max(0, zoneLen - 1));
+                    : Math.max(0, zoneLen - 1);
+                // (v427) Nico : « Zone (avec un % pour la première zone, puis
+                // des fixes. 1 / 2 / 3 / 4 / 5 et +) » : palier par palier
+                // (coutCasesZone, app.js) ; le % de la 1re case payante se
+                // compte après la boucle, sur le reste de l'action.
+                const z = typeof window.coutCasesZone === "function"
+                    ? window.coutCasesZone(modEff, payantes, parseFrenchFloat(modEff.Cout_PT))
+                    : { fixe: parseFrenchFloat(modEff.Cout_PT) * payantes, pct: 0 };
+                coutCeMod = z.fixe;
+                coutZone += z.fixe;
+                pctZone = z.pct;
             } else if (modEff.Nom === "DOT" || modEff.Nom === "Durée étalement dégâts") {
                 aDOT = true;
                 diviseurDOT = diviseurEtalement(modEff, statsPerso);
@@ -2674,10 +2697,20 @@ function coutDUneAction(act, bdd, statsPerso, coutDureePlus) {
         }
     });
 
+    // (v427) Nico : « Zone (avec un % pour la première zone, … ) » : la 1re
+    // case payante réglée en % coûte ce % du coût de la technique — tout le
+    // reste de l'action (socle, durées, autres sous-effets), avant la ristourne
+    // de l'étalement. Comme le reste de la Zone, elle ne s'étale pas.
+    if (pctZone > 0) {
+        const coutPremiere = (baseActionCost + coutDureeBase + coutMods - coutZone) * pctZone / 100;
+        coutMods += coutPremiere;
+        coutZone += coutPremiere;
+    }
+
     let coutActionTotale = baseActionCost + coutDureeBase + coutMods;
     // Seule la part étalable est divisée ; le reste se paie plein pot.
     if (aDOT) coutActionTotale = (coutActionTotale - coutEtalable) + coutEtalable / diviseurDOT;
-    return { cout: coutActionTotale, plein: baseActionCost + coutDureeBase + coutMods, initBonus };
+    return { cout: coutActionTotale, plein: baseActionCost + coutDureeBase + coutMods, initBonus, coutZone };
 }
 window.coutDUneActionForge = coutDUneAction;
 

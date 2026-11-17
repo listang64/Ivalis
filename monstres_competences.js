@@ -815,6 +815,8 @@ function coutPCChantier(chantier, palette) {
         let coutBase = coutPC(act.baseEffet) * act.count;
         let coutDuree = (act.baseDuree || 0) * coutDureePlus;
         let coutMods = 0;
+        // (v427) Les cases de zone (leur coût) et le % de la 1re case payante.
+        let coutZone = 0, pctZone = 0;
         let aEtalement = false;
         let diviseur = 1.3;
         // ⚖️ règle Forge : la ristourne de l'Étalement ne vaut que pour les
@@ -830,7 +832,17 @@ function coutPCChantier(chantier, palette) {
             if (nom === "Zone") {
                 // Le premier hexagone est offert.
                 const taille = act.zoneHexes.length > 0 ? act.zoneHexes.length : m.count;
-                coutCeMod = coutPC(m.effet) * Math.max(0, taille - 1);
+                // (v427) Nico : « Zone (avec un % pour la première zone, puis
+                // des fixes. 1 / 2 / 3 / 4 / 5 et +) » — ⚖️ règle Forge :
+                // palier par palier (coutCasesZone, app.js) ; le % de la 1re
+                // case payante se compte après, sur le reste de l'action.
+                const payantes = Math.max(0, taille - 1);
+                const z = typeof window.coutCasesZone === "function"
+                    ? window.coutCasesZone(m.effet, payantes, coutPC(m.effet))
+                    : { fixe: coutPC(m.effet) * payantes, pct: 0 };
+                coutCeMod = z.fixe;
+                coutZone += z.fixe;
+                pctZone = z.pct;
             } else if (nom === "DOT" || nom === "Durée étalement dégâts") {
                 aEtalement = true;
                 // ⚖️ règle Forge : 1,3, ou plus si le grimoire le dit
@@ -843,6 +855,14 @@ function coutPCChantier(chantier, palette) {
             coutMods += coutCeMod;
             if (etalable(nom)) coutEtalable += coutCeMod;
         });
+
+        // (v427) ⚖️ règle Forge : la 1re case payante en % — ce % du reste de
+        // l'action, avant la ristourne de l'étalement ; elle ne s'étale pas.
+        if (pctZone > 0) {
+            const coutPremiere = (coutBase + coutDuree + coutMods - coutZone) * pctZone / 100;
+            coutMods += coutPremiere;
+            coutZone += coutPremiere;
+        }
 
         let coutAction = coutBase + coutDuree + coutMods;
         if (aEtalement) coutAction = (coutAction - coutEtalable) + coutEtalable / diviseur;
