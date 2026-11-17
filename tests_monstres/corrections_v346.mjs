@@ -103,6 +103,8 @@ await p.route('**/generativelanguage.googleapis.com/**', r => {
 });
 const erreurs = []; p.on('pageerror', e => erreurs.push(e.message)); p.on('console', m => { if (m.type() === 'error' && /Grimoire/.test(m.text())) console.log('CONSOLE', m.text()); });
 await p.goto(base + '/index.html'); await p.waitForTimeout(1200);
+// (v430) Le croquis forcé est éteint par défaut (Nico : « les moments forts seulement ») : ce banc le rallume pour le vérifier.
+await p.evaluate(() => { window.REGLAGES_ILLUSTRATIONS.forcerApres = 3; });
 const titre = (t) => console.log("\n" + t);
 const section = async (f) => { try { await f(); } catch (e) { verifier("la section a pu tourner", false, String(e && e.message || e).slice(0, 180)); } };
 const etat = () => p.evaluate(() => window.grimoireEtat());

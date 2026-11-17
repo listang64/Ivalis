@@ -87,6 +87,8 @@ await p.route('**/generativelanguage.googleapis.com/**', r => {
 });
 const erreurs = []; p.on('pageerror', e => erreurs.push(e.message)); p.on('console', m => { if (m.type() === 'error' && /Grimoire/.test(m.text())) console.log('CONSOLE', m.text()); });
 await p.goto(base + '/index.html'); await p.waitForTimeout(1200);
+// (v430) Le croquis forcé est éteint par défaut (Nico : « les moments forts seulement ») : ce banc le rallume pour le vérifier.
+await p.evaluate(() => { window.REGLAGES_ILLUSTRATIONS.forcerApres = 3; });
 const titre = (t) => console.log("\n" + t);
 const section = async (f) => { try { await f(); } catch (e) { verifier("la section a pu tourner", false, String(e && e.message || e).slice(0, 180)); } };
 const etat = () => p.evaluate(() => window.grimoireEtat());
@@ -255,8 +257,9 @@ titre("4. LE COMPTE, DANS LES MESSAGES DE LA PARTIE");
 await section(async () => {
   const src = lire("ia_master.js");
   verifier("ia_master compte les réponses du Narrateur depuis le dernier croquis et le transmet", /const narrationsSansCroquis = /.test(src) && /m\.Illustration && m\.Illustration\.Url\) break; if \(m\.Est_Narration_IA\) n\+\+/.test(src) && /illustrerLeRecit\(\{[^}]*narrationsSansCroquis/.test(src));
+  // (v430) Par défaut : plus de croquis forcé (0) ; le réglage reste là (ici rallumé à 3).
   const r = await p.evaluate(() => window.REGLAGES_ILLUSTRATIONS.forcerApres);
-  verifier("le réglage : 3 réponses", r === 3, String(r));
+  verifier("le réglage : 3 réponses quand on le rallume (0 par défaut depuis la v430)", r === 3 && /forcerApres: 0/.test(fs.readFileSync(RACINE + "/illustrations_recit.js", "utf-8")), String(r));
 });
 
 console.log(erreurs.length ? "\nErreurs de page : " + erreurs.slice(0, 5).join(" | ") : "");

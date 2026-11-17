@@ -299,8 +299,7 @@
         });
       }
       document.addEventListener('visibilitychange', function () { if (!document.hidden) remesurerAuRetour(); });
-      window.addEventListener('pageshow', remesurerAuRetour);
-      window.addEventListener('focus', remesurerAuRetour);
+      window.addEventListener('pageshow', function (e) { if (e && e.persisted) remesurerAuRetour(); });
 
       /* Les scenes s'ouvrent et se ferment depuis une dizaine d'endroits du jeu : plutot que
          de les instrumenter, on les veille. (v384) Plus toutes les 400 ms : le fond se recopie

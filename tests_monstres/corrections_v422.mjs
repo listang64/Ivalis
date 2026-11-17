@@ -342,9 +342,9 @@ await section(async () => {
   verifier("Doros (il nous suit) a sa tête qui parle ; Croc-Gris (le loup de Lyra) n'en a pas", JSON.stringify(t) === '[["Doros",true],["Croc-Gris",false]]', JSON.stringify(t));
   verifier("…ni Dame Koré (laissée en arrière)", await G(() => document.querySelectorAll(".parler-groupe").length === 1));
   // (v428) Nico : « le symbole pour parler en privé, plus petit et sous l'image du PNJ ».
-  verifier("…une tête dessinée (une silhouette et ses ondes), sous l'image de Doros (v428)", await G(() => { const b = document.querySelector(".parler-groupe"), li = b.closest(".suiveur-groupe"), c = li.querySelector(".carte-suiveur").getBoundingClientRect(),
-    a = li.querySelector(".avatar-suiveur").getBoundingClientRect(), r = b.getBoundingClientRect();
-    return !!b.querySelector("svg .tete") && !!b.querySelector("svg .onde") && r.top >= c.bottom - 1 && r.left + r.width / 2 > a.left && r.left + r.width / 2 < a.right && r.width > 10; }));
+  verifier("…une tête dessinée (une silhouette et ses ondes), dans le coin bas droit de son encart (v430)", await G(() => { const b = document.querySelector(".parler-groupe"), li = b.closest(".suiveur-groupe"), c = li.querySelector(".carte-suiveur").getBoundingClientRect(),
+    r = b.getBoundingClientRect();
+    return !!b.querySelector("svg .tete") && !!b.querySelector("svg .onde") && r.right <= c.right + 0.5 && r.bottom <= c.bottom + 0.5 && r.top > c.top + c.height / 2 && r.width > 10; }));
   await cap("v422-icone");
 });
 

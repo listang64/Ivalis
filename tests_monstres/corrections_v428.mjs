@@ -402,9 +402,10 @@ await section(async () => {
   const m = await mesureGroupe();
   const [a, b2] = m.av;
   // Nico : « à gauche, l'avatar des personnages les uns à côté des autres, avec en dessous leurs noms… »
-  verifier("deux héros : leurs avatars côte à côte, de même taille, en pied", m.av.length === 2 && Math.abs(a.t - b2.t) < 1 && a.r <= b2.l + 0.5 && Math.abs(a.w - b2.w) < 1 && a.h > a.w * 1.5, JSON.stringify(m.av));
+  verifier("deux héros : leurs avatars côte à côte, de même taille, en pied", m.av.length === 2 && Math.abs(a.t - b2.t) < 1 && a.r <= b2.l + 0.5 && Math.abs(a.w - b2.w) < 1 && a.h >= a.w * 1.45, JSON.stringify(m.av));   // (v430) 1 / 1,5
   verifier("…leurs noms en dessous", m.av.every(x => x.nom >= x.b - 1));
-  verifier("…un dégradé noir léger cache la coupe du bas de l'image", /linear-gradient/.test(m.apres) && /rgba\(0, 0, 0, 0\.38\) 100%/.test(m.apres) && /rgba\(0, 0, 0, 0\) 58%/.test(m.apres), m.apres);
+  // (v430) Nico : « enlève l'ombre noire sous chaque avatar, mets une séparation dorée » (corrections_v430.mjs, v418_livre).
+  verifier("(v430) plus de dégradé noir : une séparation dorée sous chaque avatar", !/linear-gradient/.test(m.apres) && await G(() => document.querySelectorAll("#grimoire-groupe-g .heros-groupe .separation-doree").length === 2), m.apres);
   // « …adapte la taille des avatars au nombre de personnages »
   await G(() => { const h = (i, n) => ({ idPersonnage: "HX" + i, idJoueur: "J" + (i + 3), prenom: n, nom: "", actif: true, urlCloudinary: "" });
     window.__sauveHeros = window.PERSOS_JOUEURS_PARTIE.slice(); window.PERSOS_JOUEURS_PARTIE.push(h(1, "Ione"), h(2, "Castor")); window.GRIMOIRE_GROUPE.maj(); });
@@ -425,7 +426,10 @@ await section(async () => {
   verifier("Doros : son avatar collé en bas de son encart, à gauche", s.img && Math.abs(s.av[2] - s.c[2]) <= 1.5 && s.av[0] - s.c[0] < s.u * 3 && s.t >= s.av[3] - 1, JSON.stringify(s));
   verifier("…il dépasse un peu au-dessus de l'encart", s.av[1] < s.c[1] - s.u * 3 && s.av[1] > s.c[1] - s.u * 8, JSON.stringify(s));
   verifier("…l'encart garde sa taille (la place de l'ancien médaillon)", s.c[3] >= s.u * 14.4 - 1 && s.c[3] < s.u * 24, JSON.stringify(s.c));
-  verifier("la tête qui parle : plus petite (4,4 % de page au lieu de 6,4), sous l'image de Doros", s.b[2] <= s.u * 4.6 && s.b[1] >= s.c[2] - 1 && s.b[0] + s.b[2] / 2 > s.av[0] && s.b[0] + s.b[2] / 2 < s.av[3], JSON.stringify(s.b));
+  // (v430) Nico : « le bouton pour parler au PNJ, en discret, dans son encart tout en bas à droite ».
+  verifier("(v430) la tête qui parle : petite, dans l'encart, en bas à droite", await G(() => { const li = document.querySelector('#grimoire-groupe-d .suiveur-groupe'), u = document.getElementById("grimoire-groupe-d").getBoundingClientRect().width / 100;
+    const c = li.querySelector(".carte-suiveur").getBoundingClientRect(), b = li.querySelector(".parler-groupe").getBoundingClientRect();
+    return b.width <= u * 4.6 && b.right <= c.right + 0.5 && b.right > c.right - u * 3 && b.bottom <= c.bottom + 0.5 && b.bottom > c.bottom - u * 3; }), JSON.stringify(s.b));
   await cap("v428_groupe");
 });
 
