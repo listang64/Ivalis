@@ -71,3 +71,21 @@
 .fond-guilde.gauche { -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.07) 0%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%);
   mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.07) 0%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%); }
 .fond-guilde.droite { -webkit-mask-image: linear-gradient(to right, #000 0%, #000 88%, rgba(0, 0, 0, 0.75) 100%); mask-image: linear-gradient(to right, #000 0%, #000 88%, rgba(0, 0, 0, 0.75) 100%); }
+
+/* v442 — LES MISSIONS DANS LES ENCARTS : le rang, un petit séparateur à la plume, le titre,
+   le résumé ; une écriture à la main par encart ; le texte penche avec l'encart (il est dedans).
+   Les tailles suivent celles de l'encart (unités cqw / cqh). */
+.encart-tableau.avec-mission { pointer-events: auto; cursor: pointer; container-type: size; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.encart-tableau.avec-mission:hover .mission-encart { color: #000; }
+.mission-encart, .mission-encart * { font-family: var(--ecriture, 'Caveat'), 'Almendra', cursive !important; }
+.mission-encart { position: absolute; inset: 6% 7%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; overflow: hidden;
+  color: #2a1608; line-height: 1.12; pointer-events: none; }
+.rang-mission { font-size: clamp(8px, 15cqh, 18cqw); font-weight: 700; letter-spacing: 0.02em; line-height: 1; }
+.rang-mission.rang-A { color: #8f1d15; }
+.rang-mission.rang-B { color: #4a3a12; }
+.rang-mission.rang-C { color: #2f4a22; }
+.separateur-mission { width: 62%; height: clamp(3px, 5cqh, 9cqw); margin: 2.5cqh 0 3cqh; flex: none; }
+.separateur-mission path { fill: none; stroke: #3a2210; stroke-width: 1.3; }
+.separateur-mission path:last-child { fill: #3a2210; }
+.titre-mission { font-size: clamp(7px, 11cqh, 12.5cqw); font-weight: 700; margin-bottom: 3cqh; }
+.resume-mission { font-size: clamp(6px, 8cqh, 9cqw); display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }

@@ -1,0 +1,44 @@
+/* =========================================================================
+   v442 — LA FEUILLE D'UNE MISSION (missions_guilde.js) : une page de parchemin
+   (la texture des pages du livre) glisse du bas de l'écran ; son bas reste caché
+   sous le bord ; en bas du texte, le sceau rouge « Accepter la mission ».
+   ========================================================================= */
+.voile-feuille-mission { position: fixed; inset: 0; z-index: 99000; pointer-events: none; background: rgba(10, 6, 2, 0); transition: background 0.35s ease; }
+.voile-feuille-mission.ouverte { pointer-events: auto; background: rgba(10, 6, 2, 0.35); }
+.feuille-mission { position: absolute; left: 50%; bottom: 0; width: min(720px, 94vw); height: 100vh; box-sizing: border-box;
+  transform: translate(-50%, 100%); transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.25, 1);
+  background: url('images/grimoire/page.webp?v=1') center / 100% 100% no-repeat; filter: drop-shadow(0 -8px 22px rgba(0, 0, 0, 0.45)); }
+/* Ouverte : le haut à 5 % de l'écran ; les 5 derniers % de la feuille restent sous le bord. */
+.voile-feuille-mission.ouverte .feuille-mission { transform: translate(-50%, 5vh); }
+.contenu-feuille-mission { position: absolute; inset: 0 0 5vh 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  padding: 7vh 11% 4vh; box-sizing: border-box; color: #2b1a0e; font-family: 'IM Fell English', 'Almendra', serif; font-size: clamp(15px, 2.1vh, 19px); line-height: 1.42;
+  display: flex; flex-direction: column; align-items: stretch; }
+.rang-feuille { align-self: center; font-family: 'Cinzel', serif; font-weight: 700; letter-spacing: 0.12em; font-size: 1.05em; color: #5c3a12; }
+.rang-feuille.rang-A { color: #8f1d15; } .rang-feuille.rang-C { color: #2f4a22; }
+.titre-feuille { margin: 0.2em 0 0; text-align: center; font-weight: 400; font-size: 2em; line-height: 1.1; color: #24150a;
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; }
+.feuille-mission .separateur-mission { align-self: center; width: 40%; height: 12px; margin: 0.6em 0 0.9em; }
+.feuille-mission .separateur-mission path { fill: none; stroke: #3a2210; stroke-width: 1.3; }
+.feuille-mission .separateur-mission path:last-child { fill: #3a2210; }
+.faits-mission { margin: 0 0 0.6em; display: grid; gap: 0.25em; }
+.faits-mission > div { display: flex; gap: 0.7em; }
+.faits-mission dt { flex: none; width: 10.5em; font-family: 'Cinzel', serif; font-size: 0.78em; letter-spacing: 0.08em; color: #7a5228; padding-top: 0.25em; text-transform: uppercase; }
+.faits-mission dd { margin: 0; }
+.feuille-mission h3 { margin: 0.9em 0 0.25em; font-family: 'Cinzel', serif; font-weight: 700; font-size: 0.82em; letter-spacing: 0.1em; text-transform: uppercase; color: #7a5228; }
+.feuille-mission p { margin: 0 0 0.45em; text-align: justify; }
+.objectif-mission { font-weight: 700; }
+.lettre-mission, .lettre-mission * { font-family: var(--ecriture, 'Caveat'), 'Almendra', cursive !important; }
+.lettre-mission { font-size: 1.22em; line-height: 1.32; color: #2a1608; padding: 0.2em 0.4em; }
+.lettre-mission p { text-align: left; }
+/* LE SCEAU : de la cire rouge, ses bords irréguliers, l'inscription en relief. */
+.sceau-mission { align-self: center; flex: none; margin: 1.4em 0 0.6em; width: 9.5em; height: 9.5em; border: 0; padding: 0; cursor: pointer;
+  border-radius: 48% 52% 50% 47% / 51% 47% 53% 49%;
+  background: radial-gradient(circle at 38% 32%, #e2564a 0%, #b5241b 38%, #8a140e 72%, #5e0b07 100%);
+  box-shadow: 0 4px 10px rgba(60, 8, 4, 0.45), inset 0 0 0 0.55em rgba(255, 255, 255, 0.06), inset 0 -0.4em 0.8em rgba(0, 0, 0, 0.35);
+  color: #f6d9c4; font-family: 'Cinzel', serif; font-weight: 700; font-size: 1em; letter-spacing: 0.04em; line-height: 1.15; text-align: center;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5), 0 -1px 0 rgba(255, 190, 170, 0.25); transition: transform 0.2s ease; }
+.sceau-mission span { display: inline-block; padding: 1.2em; border-radius: 50%; border: 2px dashed rgba(246, 217, 196, 0.45); }
+.sceau-mission:hover { transform: scale(1.04) rotate(-2deg); }
+.sceau-mission:active { transform: scale(0.96); }
+.sceau-mission.bientot { filter: grayscale(0.4); }
+.sceau-mission:disabled, .sceau-mission.eteint { filter: grayscale(0.85) brightness(0.9); cursor: not-allowed; }

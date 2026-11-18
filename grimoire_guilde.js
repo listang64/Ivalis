@@ -129,11 +129,17 @@ const estDev = () => lireLS("ivalis_DEV_MODE") === "on";
 const edition = () => estDev() && lireLS(CLE_VISIBLES) === "on";
 const pct = (v) => (v * 100).toFixed(3) + "%";
 
+// (v442) Chaque encart porte la mission de sa place (missions_guilde.js : la i-ème mission
+// du tableau dans le i-ème encart, par numéro) ; un toucher ouvre sa feuille.
+const MG = () => window.MISSIONS_GUILDE;
 function htmlEncarts() {
     const ed = edition();
-    return Object.values(encarts).sort((a, b) => a.numero - b.numero).map(e => `<div class="encart-tableau${ed ? " edition" : ""}${selection === e.numero ? " choisi" : ""}" data-numero="${e.numero}"
+    return Object.values(encarts).sort((a, b) => a.numero - b.numero).map((e, slot) => {
+        const m = !ed && MG() ? MG().missionDe(slot) : null;
+        return `<div class="encart-tableau${ed ? " edition" : ""}${m ? " avec-mission" : ""}${selection === e.numero ? " choisi" : ""}" data-numero="${e.numero}"${m ? ` data-action="guilde" data-gu="mission" data-slot="${slot}"` : ""}
             style="left:${pct(e.x)};top:${pct(e.y)};width:${pct(e.l)};height:${pct(e.h)};transform:rotate(${e.angle}deg)">${ed ? `<span class="encart-numero">${e.numero}</span>
-            <span class="encart-poignee encart-taille" data-geste="taille"></span><span class="encart-poignee encart-rotation" data-geste="rotation"></span>` : ""}</div>`).join("");
+            <span class="encart-poignee encart-taille" data-geste="taille"></span><span class="encart-poignee encart-rotation" data-geste="rotation"></span>` : (m ? MG().htmlEncart(m, slot) : "")}</div>`;
+    }).join("");
 }
 // (v435) Nico : « il déborde de la page, règle-le pour qu'il ne déborde pas » : une marge
 // de papier autour. (v437) « Ça va toujours pas : mets-le partout dans les deux pages du
@@ -335,6 +341,7 @@ export function agir(cible) {
     const gu = cible && cible.dataset.gu;
     if (gu === "hall") { son(); ouvrir(); return; }
     if (gu === "clans") { son(); if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.allerAuxAventuriers(); return; }
+    if (gu === "mission") { if (MG()) MG().ouvrirFeuille(Number(cible.dataset.slot)); return; }
     if (PIECES.some(p => p[0] === gu)) { son(); ouvrir(gu); }
 }
 // La double page affichée : "hall", la pièce, ou "" (ni l'une ni l'autre).
@@ -371,7 +378,13 @@ export function preparerHall() {
     if (!hallEcrit() && window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.dessins) rendreHall();
     return hallEcrit();
 }
-let ecouteVillage = false;
+let ecouteVillage = false, missionsAbonnees = false;
+// (v442) Le tableau des missions change (renouvelé, une mission prise) : les encarts se réécrivent.
+function abonnerMissions() {
+    if (missionsAbonnees || !MG()) return;
+    missionsAbonnees = true;
+    MG().surChangement(() => rendreTableau());
+}
 function veillerVillage() {
     const g = G();
     if (!ecouteVillage && g && typeof g.ecran === "function" && g.ecran()) {
@@ -388,6 +401,7 @@ setInterval(() => {
     try {
         poserOutil();
         veillerVillage();
+        abonnerMissions();
         const g = G();
         if (!g || typeof g.pagesGuilde !== "function") return;
         if (surLesPages()) enRoute = Date.now();        // (lues à l'instant : 8 secondes de grâce une fois quittées)
