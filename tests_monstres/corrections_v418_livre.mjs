@@ -312,8 +312,20 @@ await section(async () => {
   await pose();
   await attendreQue(() => G(() => /Doros/.test(document.getElementById("grimoire-groupe-d").textContent)), 6000);
   const g = await texte("#grimoire-groupe-g"), d = await texte("#grimoire-groupe-d");
-  verifier("à gauche : « Le groupe », son nom (Les Lames d'Héra)", /Le groupe/.test(g) && /Les Lames d'Héra/.test(g), g.slice(0, 120));
-  verifier("…où (Le port de Mégara), quand (Jour 12 de l'an 3), la réputation ici (+3, bien vus)", /Où Le port de Mégara/.test(g) && /Quand Jour 12 de l'an 3/.test(g) && /Réputation ici honnis\s*adulés \+3 — bien vus/.test(g), g.slice(0, 260));
+  // (v438) Nico : « enlève le titre Le groupe ; le nom du groupe en plus gros, remonté en haut ».
+  const nom = await G(() => { const pg = document.getElementById("grimoire-groupe-g"), c = pg.querySelector(".contenu-page"), n = c.querySelector(".nom-du-groupe");
+    const premier = [...c.children].find(x => !x.classList.contains("defs-or-groupe"));
+    return n ? { texte: n.textContent.trim(), premier: premier === n, taille: parseFloat(getComputedStyle(n).fontSize) / (pg.getBoundingClientRect().width / 100), lavis: !!n.querySelector(".lavis"),
+                 haut: (n.getBoundingClientRect().top - pg.getBoundingClientRect().top) / pg.getBoundingClientRect().height } : null; });
+  verifier("(v438) à gauche : plus de titre « Le groupe » ; son nom (Les Lames d'Héra) tout en haut, en plus gros, sur son lavis",
+           !/Le groupe/.test(g) && nom && nom.texte === "Les Lames d'Héra" && nom.premier && nom.taille > 6.5 && nom.lavis && nom.haut < 0.08, JSON.stringify(nom));
+  verifier("…où (Le port de Mégara), quand (Jour 12 de l'an 3), la réputation ici", /Où Le port de Mégara/.test(g) && /Quand Jour 12 de l'an 3/.test(g) && /Réputation ici honnis\s*adulés/.test(g), g.slice(0, 260));
+  // (v438) « Sous la barre, juste les mots clés, avec une aquarelle grise légère sous chacun, comme des bulles. »
+  const bulles = await G(() => [...document.querySelectorAll("#grimoire-groupe-g .mots-reputation .bulle-reputation")].map(b => {
+    const l = b.querySelector(".lavis"), stops = l ? [...l.querySelectorAll("stop, [fill]")].map(x => x.getAttribute("stop-color") || x.getAttribute("fill")).join(",") : "";
+    return { mot: b.textContent.trim(), lavis: !!l, gris: /#8c8c8c|#a3a3a3|#737373/.test(l ? l.outerHTML : "") }; }));
+  verifier("(v438) sous la jauge : les mots clés seuls (Bien vus, Généreux), chacun sur une bulle d'aquarelle grise",
+           JSON.stringify(bulles.map(b => b.mot)) === JSON.stringify(["Bien vus", "Généreux"]) && bulles.every(b => b.lavis && b.gris) && !/\+3 —/.test(g), JSON.stringify(bulles));
   verifier("…les héros, avec leur portrait (Thorin) ou leurs initiales (Lyra)", await G(() => { const h = [...document.querySelectorAll("#grimoire-groupe-g .heros-groupe")]; return h.length === 2 && !!h[0].querySelector("img[src='portrait-thorin.png']") && /LS/.test(h[1].textContent); }));
   verifier("à droite : « Ceux qui nous suivent », 1 suiveur sur 3", /Ceux qui nous suivent/.test(d) && /1 suiveur sur 3/.test(d), d.slice(0, 120));
   verifier("…Doros : son rôle, depuis quand, avec nous, sa loyauté (une jauge)", /Doros Docker · depuis le Jour 10 de l'an 3/.test(d) && /avec nous/.test(d) && await G(() => !!document.querySelector("#grimoire-groupe-d .carte-suiveur .jauge-groupe i.pos")), d.slice(0, 300));

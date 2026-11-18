@@ -7,11 +7,14 @@
 .page-groupe .contenu-page { gap: calc(var(--u) * 1.6) !important; }
 .page-groupe-droite > * { flex-shrink: 0; }
 .entete-groupe { position: relative; align-self: center; padding: calc(var(--u) * 0.6) calc(var(--u) * 4); }
-.entete-groupe .titre-page-fiche { position: relative; font-size: calc(var(--u) * 6.4 * var(--echelle-titres, 1)); color: #24150a; }
 .entete-groupe .lavis { left: -4%; top: -10%; width: 108%; height: 120%; }
 .fleuron-groupe { width: 40%; height: auto; align-self: center; margin: 0 0 calc(var(--u) * 0.4); fill: none; stroke: #6b1a10; stroke-width: 1.2; }
 .fleuron-groupe circle { fill: #6b1a10; }
-.nom-du-groupe { align-self: center; font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 4.6); color: #5c2a14; text-align: center; }
+/* (v438) Le nom du groupe à la place du titre « Le groupe » : en haut de la page, en plus gros, sur son lavis. */
+.nom-du-groupe { align-self: center; font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-size: calc(var(--u) * 7 * var(--echelle-titres, 1));
+  color: #24150a; text-align: center; line-height: 1.1; margin-top: calc(var(--u) * -2.5); }
+.nom-du-groupe { isolation: isolate; }
+.nom-du-groupe > span { position: relative; }
 .infos-groupe { display: grid; gap: calc(var(--u) * 0.6); font-size: calc(var(--u) * 3.1); color: #2b1a0e; }
 .infos-groupe em { color: #6b4a2b; }
 .cle-groupe { display: inline-block; min-width: calc(var(--u) * 20); font-family: 'Cinzel', serif !important; font-size: 0.82em; letter-spacing: 0.08em; text-transform: uppercase; color: #6b1a10; }
@@ -111,9 +114,11 @@
 .regle-reputation { flex: 1; min-width: 0; height: auto; overflow: visible; }
 .regle-reputation .trait-reputation { fill: none; stroke: #5c2a14; stroke-width: 1.2; stroke-linecap: round; }
 .regle-reputation line { stroke: #5c2a14; stroke-width: 0.9; stroke-linecap: round; }
-.mot-reputation { font-size: calc(var(--u) * 3.1); color: #2b1a0e; text-align: center; }
-.mot-reputation b { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive; color: #5c2a14; }
-.mot-reputation em { color: #6b4a2b; }
+/* (v438) Les mots clés de la réputation, chacun sur une bulle d'aquarelle grise légère. */
+.mots-reputation { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(var(--u) * 1.2) calc(var(--u) * 2); margin-top: calc(var(--u) * 0.6); }
+.bulle-reputation { position: relative; isolation: isolate; padding: calc(var(--u) * 0.5) calc(var(--u) * 2.2); font-size: calc(var(--u) * 3); color: #2b1a0e; line-height: 1.15; white-space: nowrap; }
+.bulle-reputation > .lavis { left: -6%; top: -18%; width: 112%; height: 136%; }
+.bulle-reputation > span { position: relative; }
 .cadre-suiveur { position: relative; display: flex; flex-direction: column; }
 .carte-suiveur.avec-parler { padding-right: calc(var(--u) * 6.4) !important; }
 .cadre-suiveur .parler-groupe { position: absolute; right: calc(var(--u) * 1); bottom: calc(var(--u) * 0.9); margin: 0;

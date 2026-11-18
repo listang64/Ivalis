@@ -116,8 +116,17 @@ function htmlReputation(l) {
           <path class="trait-reputation" d="M10 14 C 60 12.8, 140 15.2, 190 14"/>${graduations}
           <path d="M${x} 6 L ${x + 6} 14 L ${x} 22 L ${x - 6} 14 Z" fill="url(#or-groupe-plein)" stroke="#5c3a12" stroke-width="0.8"/>
         </svg><span>adulés</span></div>
-        <div class="mot-reputation"><b>${v > 0 ? "+" : ""}${echapper(v)}</b> — ${motReputation(v)}${(l.tags || []).length ? ` <em>(${echapper(l.tags.slice(0, 3).join(", "))})</em>` : ""}</div>
+        <div class="mots-reputation">${motsReputation(v, l.tags).map((m, i) => `<span class="bulle-reputation">${lavis(TEINTE_BULLE, "bulle-reputation-" + i)}<span>${echapper(m)}</span></span>`).join("")}</div>
       </div>`;
+}
+// (v438) Nico : « sous la barre qui jauge la réputation, simplifier le texte : juste les mots
+// clés, avec une aquarelle grise légère sous chacun, comme des bulles (ex. Indésirable) » :
+// le mot de la jauge, puis les étiquettes du lieu (Reputations.Tags), trois au plus.
+const TEINTE_BULLE = { couleurs: ["#8c8c8c", "#a3a3a3", "#737373"], opacite: 0.22, nom: "bulle-reputation" };
+const majuscule = (t) => { const s = String(t || "").trim(); return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; };
+function motsReputation(v, tags) {
+    const mots = [majuscule(motReputation(v)), ...(tags || []).slice(0, 3).map(majuscule)].filter(Boolean);
+    return mots.filter((m, i) => mots.findIndex(x => x.toLowerCase() === m.toLowerCase()) === i);
 }
 
 // LA PAGE DE GAUCHE : la compagnie.
@@ -143,8 +152,8 @@ function htmlGauche() {
             <span class="role-groupe">${echapper(classeDe(h))}${h.niveau ? ` · niv. ${echapper(h.niveau)}` : ""}</span></div>`;
     }).join("");
     return `<div class="contenu-page page-groupe-gauche">${DEFS_OR}
-        <div class="entete-groupe">${lavis(TEINTE_GROUPE, "groupe-titre")}<span class="titre-page-fiche">Le groupe</span></div>
-        ${nomDuGroupe() ? `<div class="nom-du-groupe">${echapper(nomDuGroupe())}</div>` : ""}
+        ${/* (v438) Nico : « enlève le titre Le groupe ; le nom du groupe en plus gros, remonté en haut » */""}
+        ${nomDuGroupe() ? `<div class="entete-groupe nom-du-groupe">${lavis(TEINTE_GROUPE, "groupe-titre")}<span>${echapper(nomDuGroupe())}</span></div>` : ""}
         ${FLEURON}
         <div class="infos-groupe">
           ${lieu ? `<div><span class="cle-groupe">Où</span> ${echapper(lieu)}</div>` : ""}

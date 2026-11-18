@@ -12233,3 +12233,9 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - Nico : « l'image du tableau des missions, ça va toujours pas : mets-la partout dans les deux pages du livre, qu'elle prenne toute la place, quitte à déformer / étirer l'image ; sur le bord, un léger fondu d'opacité, vraiment léger, que sur la bordure de l'image ». Plus de marge (v435) : l'image couvre les deux pages entières, étirée ; sur son seul bord, un fondu d'opacité très léger (de 55 % à plein, sur 1,2 % de la largeur et 2 % de la hauteur).
 - Les encarts suivent l'image (en parts de l'image) : ceux posés en v435-v436 se retrouvent un peu plus grands et décalés vers les bords, à replacer.
 - corrections_v434.mjs le vérifie (ses contrôles « v437 ») ; V437_TABLEAU=chemin y sert la vraie image pour une capture.
+
+## v438 — La page du Groupe : le nom du groupe en haut ; la réputation en mots clés
+
+- Nico : « enlève le titre Le groupe ; mets le nom du groupe en plus gros et remonte-le en haut » : le titre « Le groupe » est parti ; le nom du groupe prend sa place, tout en haut de la page de gauche, plus gros (7 % de la page), sur le lavis rouge du titre.
+- « Sous la barre qui jauge la réputation, simplifier le texte : juste les mots clés, avec une aquarelle grise légère en dessous de chacun, comme des bulles » : plus de « +3 — bien vus (généreux) » ; le mot de la jauge (Honnis, Mal vus, Inconnus ou neutres, Bien vus, Adulés) puis les étiquettes du lieu (trois au plus), chacun sur sa bulle d'aquarelle grise.
+- corrections_v418_livre.mjs le vérifie (ses contrôles « v438 »).
