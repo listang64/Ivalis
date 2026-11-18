@@ -143,7 +143,8 @@
     // (v433) La double page du Hall de guilde (grimoire_guilde.js), juste après le village :
     // comme les fils invisibles, elle n'est dans le livre que le temps qu'on la lit.
     let pagesGuilde = [];
-    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesGroupe.length + pagesFiches.length + pagesLiens.length + pagesCombats.length + pagesVillage.length + pagesGuilde.length : 0);
+    let pagesMission = [];      // (v444) la double page « Mission en cours » (grimoire_mission.js), le temps qu'on la lit
+    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesGroupe.length + pagesFiches.length + pagesLiens.length + pagesCombats.length + pagesVillage.length + pagesGuilde.length + pagesMission.length : 0);
     // LA CARTE DU MONDE (v302) : sa double page vient juste après l'index (5-6),
     // en partie seulement ; la suite (le récit) commence alors à la page 7.
     // Nico : « page de gauche cette partie de la map, page de droite celle-là ;
@@ -361,6 +362,17 @@
     function dessinPlume() {
         return `<svg class="dessin-marque dessin-plume" viewBox="0 0 40 40" aria-hidden="true">`
             + `<path class="plein" d="M34 3 C24 8 15 18 11 31 C18 24 28 16 34 3 Z"/><path d="M34 3 C26 14 18 24 7 37"/></svg>`;
+    }
+    // LE MARQUE-PAGE DE LA MISSION (v444). Nico : « un nouveau marque-page de couleur en tissu à
+    // côté des autres, avec le symbole d'un parchemin plié en rouleau ». Le rouleau couché, ses
+    // deux bouts enroulés, trois lignes d'écriture, un ruban qui le noue.
+    function dessinRouleau() {
+        return `<svg class="dessin-marque dessin-rouleau" viewBox="0 0 60 80" aria-hidden="true">
+                  <path class="feuille" d="M 14 22 C 22 19 38 19 46 22 L 46 50 C 38 47 22 47 14 50 Z"/>
+                  <path class="coin" d="M 14 22 C 9 22 9 30 14 30 C 17 30 17 25 14 25 M 14 50 C 9 50 9 58 14 58 L 46 58 C 51 58 51 50 46 50"/>
+                  <path class="coin" d="M 46 22 C 51 22 51 30 46 30"/>
+                  <path class="ligne" d="M 19 30 L 41 30 M 19 36 L 39 36 M 19 42 L 35 42"/>
+                  <path class="ligne" d="M 28 49 L 26 62 M 32 49 L 35 62"/></svg>`;
     }
     // Le dessin du marque-page de la marche (v310) : des pas de sandales qui
     // montent, à l'encre, le long d'un chemin en pointillé.
@@ -592,6 +604,10 @@
             <button type="button" class="marque-page marque-plume inactif" id="grimoire-marque-recit" data-action="marque-recit"
                     aria-label="Aller au récit" aria-disabled="true" title="Le récit (en partie)">
               <span class="marque-papier">${dessinPlume()}</span></button>
+            <!-- v444 : la mission en cours (un parchemin roulé), à côté des autres. -->
+            <button type="button" class="marque-page marque-mission inactif" id="grimoire-marque-mission" data-action="marque-mission"
+                    aria-label="La mission en cours" aria-disabled="true" title="La mission en cours">
+              <span class="marque-papier">${dessinRouleau()}</span></button>
             <!-- v312 : plus de marque-page de la carte (Nico) ; le menu (≡), le plus à gauche. -->
             <button type="button" class="marque-page marque-menu" id="grimoire-marque-menu" data-action="marque-menu"
                     aria-label="Revenir à la page principale" title="La page principale">
@@ -1069,7 +1085,7 @@
     // Les marque-pages ne servent qu'en partie (Nico : « désactivé tant que pas
     // rentré dans une partie »). Le livre levé cache l'ancienne interface.
     function majMarquePage() {
-        ["grimoire-marque-page", "grimoire-marque-recit"].forEach(idm => {
+        ["grimoire-marque-page", "grimoire-marque-recit", "grimoire-marque-mission"].forEach(idm => {
             const m = document.getElementById(idm);
             if (!m) return;
             m.classList.toggle("inactif", !enPartie);
@@ -1097,7 +1113,7 @@
     function definirSuite(elements) {
         suite = (elements || []).slice();
         if (!pageFlip) return;
-        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesGroupe, ...pagesFiches, ...pagesLiens, ...pagesCombats, ...pagesVillage, ...pagesGuilde] : []), ...suite, ...vierges, dos];
+        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesGroupe, ...pagesFiches, ...pagesLiens, ...pagesCombats, ...pagesVillage, ...pagesGuilde, ...pagesMission] : []), ...suite, ...vierges, dos];
         const generation = ++definirSuite.generation;      // seule la dernière demande s'applique
         const appliquer = () => {
             if (generation !== definirSuite.generation) return;
@@ -1359,6 +1375,8 @@
         if (action === "groupe") { if (window.GRIMOIRE_GROUPE) window.GRIMOIRE_GROUPE.agir(cible); return; }
         // (v433) Le Hall de guilde (le bâtiment du village, sa double page : grimoire_guilde.js).
         if (action === "guilde") { if (window.GRIMOIRE_GUILDE) window.GRIMOIRE_GUILDE.agir(cible); return; }
+        // (v444) Le marque-page de la mission : la double page « Mission en cours ».
+        if (action === "marque-mission") { if (window.GRIMOIRE_MISSION) window.GRIMOIRE_MISSION.ouvrir(); return; }
         // (v312) Le marque-page du menu : la page principale (le journal), en partie ou non.
         if (action === "marque-menu") {
             if (!pageFlip || !ouvert) return;
@@ -1493,6 +1511,8 @@
         // (v433) la double page du Hall de guilde
         definirGuilde: (els) => { pagesGuilde = (els || []).slice(); if (enPartie) definirSuite(suite); },
         pagesGuilde: () => pagesGuilde.slice(),
+        definirMission: (els) => { pagesMission = (els || []).slice(); if (enPartie) definirSuite(suite); },
+        pagesMission: () => pagesMission.slice(),
         // (v398) la double page du village
         pagesVillage: () => pagesVillage.slice(), allerAuVillage, IMAGE_VILLAGE,
         // (v395) les Paramètres du livre (grimoire_parametres.js) : le chapitre des pages 3-4

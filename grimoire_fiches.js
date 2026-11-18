@@ -474,7 +474,18 @@ function htmlAvatar(h) {
         ${url ? `<img class="avatar-heros" src="${echapper(url)}" alt="" draggable="false">` : `<div class="avatar-absent">Pas encore de portrait</div>`}
         <div class="pied-avatar"></div>
         <div class="nom-heros-fiche" id="fiche-nom-heros">${echapper(nomHeros(h))}</div>
+        ${htmlMissionsReussies(h)}
       </div>`;
+}
+// (v444) Nico : « dans la fiche de personnage, sur la page de l'avatar, en bas à gauche en petit :
+// Missions réussies : 2 Rang B, 1 Rang C — en belle écriture et en rapport avec leurs vraies
+// stats » (les missions terminées réussies où le héros était, missions_guilde.js).
+const missionsDe = (h) => (window.MISSIONS_GUILDE && typeof window.MISSIONS_GUILDE.missionsReussies === "function") ? window.MISSIONS_GUILDE.missionsReussies(h.idPersonnage) : { A: 0, B: 0, C: 0 };
+function htmlMissionsReussies(h) {
+    const n = missionsDe(h);
+    const lignes = ["A", "B", "C"].filter(r => n[r] > 0).map(r => `<li>${n[r]} Rang ${r}</li>`).join("");
+    return `<div class="missions-reussies-fiche"><div class="titre-missions-reussies">Missions réussies :</div>
+        ${lignes ? `<ul>${lignes}</ul>` : `<p class="aucune-mission-reussie">aucune pour l'instant</p>`}</div>`;
 }
 
 // Le texte d'un appui long : une petite note à l'encre.
@@ -1357,7 +1368,7 @@ function brancherFicheAncienne() {
 function signatureFiche(h) {
     if (!h) return "";
     return JSON.stringify([h, caracsDe(h.idPersonnage), (window.CACHE_COMPETENCES_GLOBAL || {})[h.idPersonnage] || null,
-        deckDe(h), carteOuverte, modeDev(), typeof window.talentsDuPerso === "function" ? window.talentsDuPerso(h) : null, (window.JETS_DEMANDES || []).length, !!joueurs, !!(window.RACES_MONDE || []).length]);
+        deckDe(h), carteOuverte, modeDev(), typeof window.talentsDuPerso === "function" ? window.talentsDuPerso(h) : null, (window.JETS_DEMANDES || []).length, !!joueurs, !!(window.RACES_MONDE || []).length, missionsDe(h)]);
 }
 function majPlus(force) {
     const g = G();
@@ -1615,6 +1626,8 @@ function veiller() {
     setTimeout(veiller, 900);
 }
 setTimeout(veiller, 300);
+// (v444) Une mission qui s'achève : les missions réussies des fiches se relisent.
+window.addEventListener("missions-terminees", () => { try { majPlus(true); } catch (e) {} });
 
 window.GRIMOIRE_FICHES = {
     agir,

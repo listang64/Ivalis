@@ -1,0 +1,48 @@
+/* =========================================================================
+   v444 — LA DOUBLE PAGE « MISSION EN COURS » (grimoire_mission.js) : à gauche ce
+   que le groupe sait de la mission ; à droite ses notes, écrites à même le papier.
+   --u : 1 % d'une page.
+   ========================================================================= */
+.page-mission-en-cours .contenu-page { align-items: stretch; padding: calc(var(--u) * 9) calc(var(--u) * 9) calc(var(--u) * 7) !important; }
+.page-mission-en-cours .defile-fiche { overflow-y: auto; overscroll-behavior: contain; }
+.page-mission-vide { justify-content: center; align-items: center !important; text-align: center; }
+.titre-mission-en-cours { text-align: center; color: #24150a; line-height: 1.1; font-size: calc(var(--u) * 7 * var(--echelle-titres, 1));
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important; }
+.rang-mission-en-cours { text-align: center; font-family: 'Cinzel', serif; font-weight: 700; letter-spacing: 0.12em; font-size: calc(var(--u) * 3); color: #5c3a12; }
+.rang-mission-en-cours.rang-A { color: #8f1d15; } .rang-mission-en-cours.rang-C { color: #2f4a22; }
+.fleuron-mission { align-self: center; width: 46%; height: auto; margin: calc(var(--u) * 1) 0 calc(var(--u) * 2.4); fill: none; stroke: #3a2210; stroke-width: 1.2; }
+.fleuron-mission circle { fill: #3a2210; }
+.aucune-mission { font-size: calc(var(--u) * 4.4); font-style: italic; color: #4a3018; margin: calc(var(--u) * 4) 0 calc(var(--u) * 1.5); }
+.aide-mission { font-size: calc(var(--u) * 3); color: #6b4a2b; }
+.page-mission-infos { font-size: calc(var(--u) * 3); line-height: 1.38; color: #2b1a0e; }
+.page-mission-infos p { margin: 0 0 calc(var(--u) * 1.2); text-align: justify; }
+.faits-mission-en-cours { margin: 0 0 calc(var(--u) * 1.4); display: grid; gap: calc(var(--u) * 0.5); }
+.faits-mission-en-cours > div { display: flex; gap: calc(var(--u) * 1.6); }
+.faits-mission-en-cours dt { flex: none; width: calc(var(--u) * 22); font-family: 'Cinzel', serif; font-size: 0.78em; letter-spacing: 0.08em; text-transform: uppercase; color: #7a5228; padding-top: 0.2em; }
+.faits-mission-en-cours dd { margin: 0; }
+.sous-titre-mission { margin: calc(var(--u) * 1.4) 0 calc(var(--u) * 0.5); font-family: 'Cinzel', serif; font-weight: 700; font-size: 0.8em; letter-spacing: 0.1em; text-transform: uppercase; color: #7a5228; }
+.objectif-en-cours { font-weight: 700; }
+.indices-mission, .journal-mission { margin: 0 0 calc(var(--u) * 1); padding-left: 1.1em; }
+.indices-mission li, .journal-mission li { margin-bottom: calc(var(--u) * 0.4); }
+.abandon-mission { margin-top: auto; padding-top: calc(var(--u) * 2.4); text-align: center; }
+.abandon-mission .lien-fiche { color: #7a1a12 !important; }
+.vote-abandon p { margin: 0 0 calc(var(--u) * 0.8); text-align: center; }
+.vote-abandon .discret, .abandon-mission .lien-fiche.discret { color: #6b4a2b !important; font-style: italic; }
+.vote-abandon { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 0.8); }
+/* Les notes : le titre à la main, puis on écrit directement sur le papier (ni lignes ni cadre). */
+.page-mission-notes { gap: calc(var(--u) * 1.6); }
+.titre-notes-mission { text-align: center; color: #24150a; font-size: calc(var(--u) * 6 * var(--echelle-titres, 1));
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important; }
+.notes-mission { flex: 1; width: 100%; min-height: 0; box-sizing: border-box; resize: none; border: 0; outline: none; background: transparent; padding: 0;
+  color: #1b1009; font-size: calc(var(--u) * 4.4); line-height: 1.32; font-family: 'Caveat', 'Almendra', cursive !important; }
+.notes-mission::placeholder { color: rgba(60, 38, 18, 0.5); font-style: italic; }
+.notes-mission:disabled { opacity: 0.8; }
+
+/* v444 — LA FICHE : les missions réussies du héros, en bas à gauche, en petit, à la belle écriture. */
+.missions-reussies-fiche { position: absolute; left: calc(var(--u) * 4); bottom: calc(var(--u) * 2); z-index: 2; max-width: 40%;
+  color: #f6e3b0; font-size: calc(var(--u) * 2.9); line-height: 1.2; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 6px rgba(0, 0, 0, 0.7); }
+.missions-reussies-fiche, .missions-reussies-fiche * { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; }
+.titre-missions-reussies { font-size: 1.05em; }
+.missions-reussies-fiche ul { list-style: none; margin: 0.15em 0 0; padding: 0; }
+.missions-reussies-fiche li::before { content: "– "; }
+.aucune-mission-reussie { margin: 0.1em 0 0; font-style: italic; opacity: 0.85; }

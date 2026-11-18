@@ -12274,3 +12274,13 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - **Le Narrateur** (ia_master.js) : partout, un rappel de la mission (objectif, lieu, étape en cours) ; au lieu de la mission, le plan, pour lui seul. Après chaque tour, MIA_SUIVI_MISSION note les étapes accomplies, les indices et un journal ; quand le récit dit l'objectif accompli (ou la mission perdue), la mission est rangée dans Missions_Terminees (réussie ou échouée, avec ses héros) et n'est plus en cours.
 - **Les créatures** (monstres.js, niveauDesCreatures ; app.js, leurs résistances) : au lieu de la mission, le niveau du groupe −2 (Rang C), +0 (B), +2 (A), jamais sous 1 ; ailleurs, le niveau du groupe.
 - corrections_v443.mjs le vérifie.
+
+## v444 — Les missions de guilde (3/3) : le marque-page, la double page « Mission en cours », les notes, l'abandon, les missions réussies
+
+- **Le marque-page** (grimoire.js) : un ruban de tissu ambre, brodé d'un parchemin roulé, à droite de celui du récit ; actif en partie, il ouvre la double page « Mission en cours » (grimoire_mission.js), même sans mission (« Aucune mission en cours »).
+- **La page de gauche** : ce que le groupe sait de la mission — le rang, le titre, le commanditaire, la région, le lieu, l'objectif, ce qu'on en sait, les indices trouvés et ce qui s'est passé (MIA_SUIVI_MISSION) ; jamais le plan du MJ.
+- **La page de droite** : « Nos notes », écrites à même le papier (ni lignes ni cadre), partagées par le groupe (Guilde/Mission.Notes, enregistrées en s'arrêtant d'écrire) ; celles des autres arrivent sans écraser ce qu'on écrit.
+- **L'abandon** : « Voter pour abandonner la mission » (Guilde/Mission.Vote_Abandon) ; un « non » efface le vote ; tous d'accord, la mission est rangée « abandonnee » et n'est plus en cours.
+- **La fiche** (grimoire_fiches.js) : sur la page de l'avatar, en bas à gauche, en petit, à l'écriture des titres : « Missions réussies : – 1 Rang A… » (les missions terminées réussies où le héros était), ou « aucune pour l'instant ».
+- Le « ? » de la carte prend la classe marque-mission-carte (la classe marque-mission est celle du ruban). Le post-it du vote ne ressort plus après un vote fini.
+- corrections_v444.mjs le vérifie ; corrections_v443.mjs suit.

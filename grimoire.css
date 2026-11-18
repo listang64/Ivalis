@@ -435,7 +435,9 @@ body > #conteneur-parametres { z-index: 95; }
 #grimoire-marque-menu { --tissu: #6e1e24; --tissu-clair: #8e3238; --fil: #e9cf8e; }
 #grimoire-marque-page { --tissu: #24503a; --tissu-clair: #356a4f; --fil: #ecd89a; }
 #grimoire-marque-recit { --tissu: #22355a; --tissu-clair: #344c7a; --fil: #e6d29a; }
-#grimoire-marque-menu .marque-papier, #grimoire-marque-page .marque-papier, #grimoire-marque-recit .marque-papier {
+/* (v444) La mission en cours : un ruban ambre, à droite de celui du récit. */
+#grimoire-marque-mission { --tissu: #7a4a12; --tissu-clair: #9a6420; --fil: #f1dca0; }
+#grimoire-marque-menu .marque-papier, #grimoire-marque-page .marque-papier, #grimoire-marque-recit .marque-papier, #grimoire-marque-mission .marque-papier {
   background:
     /* le lustre qui roule sur la largeur du ruban */
     linear-gradient(90deg, rgba(0, 0, 0, 0.38) 0%, rgba(0, 0, 0, 0.12) 9%, rgba(255, 255, 255, 0.12) 30%, rgba(255, 255, 255, 0.05) 46%, rgba(0, 0, 0, 0.06) 64%, rgba(0, 0, 0, 0.16) 88%, rgba(0, 0, 0, 0.42) 100%),
@@ -452,19 +454,20 @@ body > #conteneur-parametres { z-index: 95; }
   clip-path: polygon(0 0, 6% 1.2%, 12% 0.4%, 20% 2.4%, 28% 3.6%, 36% 6%, 44% 8.4%, 50% 10.5%, 56% 8.4%, 64% 6%, 72% 3.6%, 80% 2.4%, 88% 0.4%, 94% 1.2%, 100% 0, 100% 100%, 0 100%);
 }
 /* Les coutures : un fil clair en points, de chaque côté, qui suit le bout taillé. */
-#grimoire-marque-menu .marque-papier::before, #grimoire-marque-page .marque-papier::before, #grimoire-marque-recit .marque-papier::before {
+#grimoire-marque-menu .marque-papier::before, #grimoire-marque-page .marque-papier::before, #grimoire-marque-recit .marque-papier::before, #grimoire-marque-mission .marque-papier::before {
   content: ""; position: absolute; top: 14%; bottom: -2%; left: 11%; right: 11%; pointer-events: none;
   border-left: calc(var(--u) * 0.32) dashed var(--fil); border-right: calc(var(--u) * 0.32) dashed var(--fil);
   opacity: 0.8; filter: drop-shadow(0 calc(var(--u) * 0.12) 0 rgba(0, 0, 0, 0.45)); }
 /* Les brins effilochés du bout. */
-#grimoire-marque-menu .marque-papier::after, #grimoire-marque-page .marque-papier::after, #grimoire-marque-recit .marque-papier::after {
+#grimoire-marque-menu .marque-papier::after, #grimoire-marque-page .marque-papier::after, #grimoire-marque-recit .marque-papier::after, #grimoire-marque-mission .marque-papier::after {
   content: ""; position: absolute; left: 0; right: 0; top: 0; height: 12%; pointer-events: none;
   background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.25) 0 1px, transparent 1px 3px, rgba(255, 255, 255, 0.12) 3px 4px, transparent 4px 6px);
   -webkit-mask-image: linear-gradient(to bottom, #000, transparent); mask-image: linear-gradient(to bottom, #000, transparent); }
 /* Le logo, brodé au fil d'or, en relief sur le tissu. */
-#grimoire-marque-menu .dessin-marque, #grimoire-marque-page .dessin-marque, #grimoire-marque-recit .dessin-marque { z-index: 1;
+#grimoire-marque-menu .dessin-marque, #grimoire-marque-page .dessin-marque, #grimoire-marque-recit .dessin-marque, #grimoire-marque-mission .dessin-marque { z-index: 1;
   filter: drop-shadow(0 calc(var(--u) * 0.15) 0 rgba(0, 0, 0, 0.55)); }
-#grimoire-marque-menu .dessin-marque path, #grimoire-marque-page .dessin-marque path, #grimoire-marque-recit .dessin-marque path { stroke: var(--fil) !important; }
+#grimoire-marque-menu .dessin-marque path, #grimoire-marque-page .dessin-marque path, #grimoire-marque-recit .dessin-marque path, #grimoire-marque-mission .dessin-marque path { stroke: var(--fil) !important; }
+#grimoire-marque-mission .dessin-marque .feuille { fill: rgba(233, 207, 142, 0.22) !important; }
 #grimoire-marque-page .dessin-marque .feuille, #grimoire-marque-recit .dessin-marque path.plein { fill: rgba(233, 207, 142, 0.22) !important; }
 
 /* =========================================================================
@@ -518,3 +521,12 @@ body > #conteneur-parametres { z-index: 95; }
 .entree-index > .lavis { left: -4%; top: -6%; width: 108%; height: 112%; }
 .entete-index > .lavis { left: -14%; top: -14%; width: 128%; height: 128%; }
 .entete-index > span { position: relative; }
+
+/* v444 — LE MARQUE-PAGE DE LA MISSION : à droite de celui du récit, un peu plus petit. */
+.marque-page.marque-mission { left: calc(525px * var(--s, 1)); top: calc(-14px * var(--s, 1)); width: calc(56px * var(--s, 1)); height: calc(172px * var(--s, 1)); transform: rotate(-3deg); }
+.marque-page.marque-mission:not(.inactif):hover, .marque-page.marque-mission:not(.inactif):focus-visible { transform: rotate(-1deg) translateY(-6%); }
+.marque-page.marque-mission:not(.inactif):active { transform: rotate(-2deg) translateY(-3%) scale(0.98); }
+.marque-page.marque-mission.inactif { transform: translateY(calc(110px * var(--s, 1))) rotate(-3deg); }
+.dessin-marque.dessin-rouleau { left: 4%; top: 12%; width: 92%; }
+.dessin-marque.dessin-rouleau .feuille { stroke-width: 2; }
+.dessin-marque.dessin-rouleau .coin { stroke-width: 1.8; }

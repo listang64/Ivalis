@@ -26,7 +26,7 @@
 //  mission ». Un toucher en dehors la referme. Le bruit d'une page qu'on attrape.
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
-import { doc, getDoc, onSnapshot, runTransaction, setDoc, deleteDoc, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { doc, getDoc, getDocs, collection, onSnapshot, runTransaction, setDoc, deleteDoc, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 const echapper = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const son = (id) => { try { if (typeof window.jouerSonEvenement === "function") window.jouerSonEvenement(id); } catch (e) {} };
@@ -537,7 +537,7 @@ function majPostit() {
     const g = window.GRIMOIRE, scene = g && g.scene && g.scene(), livre = g && g.livre && g.livre();
     let el = document.getElementById("postit-mission");
     const votant = v && v.Id && (v.Votants || []).some(x => x.id === j);
-    if (!votant || !scene || !livre) { if (el) el.classList.remove("sortie"); return; }
+    if (!votant || !scene || !livre) { if (el) { el.__voulu = false; el.classList.remove("sortie"); } return; }
     if (!el) {
         el = document.createElement("div");
         el.id = "postit-mission";
@@ -555,7 +555,9 @@ function majPostit() {
         : `<div class="titre-postit-mission">${echapper((v.Initiateur || {}).nom || "Un joueur")} propose une mission</div><p>« ${echapper(v.Titre)} » (${echapper((RANGS[v.Rang] || {}).nom || v.Rang)})</p>
            <div class="boutons-postit-mission"><button type="button" class="lien-postit-mission" data-mission="voir">Voir la mission</button>
            <button type="button" class="lien-postit-mission discret" data-mission="refuser">Refuser</button></div>`;
-    requestAnimationFrame(() => el.classList.add("sortie"));
+    // (le post-it ne sort que s'il le faut encore à l'image suivante : un vote fini entre-temps le laisse rentré)
+    el.__voulu = true;
+    requestAnimationFrame(() => { if (el.__voulu) el.classList.add("sortie"); });
 }
 
 // LE NIVEAU DES CRÉATURES AU LIEU DE LA MISSION : C −2, B +0, A +2 (monstres.js le lit).
@@ -657,7 +659,71 @@ export async function terminerMission(statut, resume) {
     missionEnCours = null; missionLue = "";
     partie = { ...partie, Mission_En_Cours: null };
     prevenirMission(); majDecalage();
+    lireTerminees(true);
     return true;
+}
+
+// =========================================================================
+//  v444 — LES NOTES DU GROUPE, L'ABANDON, LES MISSIONS RÉUSSIES DE CHAQUE HÉROS
+// =========================================================================
+//  Nico : « page de droite, la possibilité pour les joueurs d'écrire eux-mêmes (partagé par le
+//  groupe) des notes sur la mission en cours » ; « dans les pages missions, la possibilité de
+//  voter pour mettre fin à la mission en cours : si tous les joueurs sont OK, la mission est
+//  abandonnée » ; « dans la fiche de personnage, en bas à gauche, en petit : Missions réussies :
+//  2 Rang B, 1 Rang C — en rapport avec leurs vraies stats ».
+//    · les notes : Guilde/Mission.Notes (le texte, Notes_Par, Notes_Le) ;
+//    · l'abandon : Guilde/Mission.Vote_Abandon — { Initiateur, Votants, Votes } ;
+//    · les réussites : les missions terminées « reussie » où le héros était (Heros).
+export async function ecrireNotes(texte) {
+    const id = idPartie();
+    if (!id || !missionEnCours) return false;
+    const t = String(texte == null ? "" : texte).slice(0, 8000);
+    try { await setDoc(refMission(id), { Notes: t, Notes_Par: idJoueur(), Notes_Le: Date.now() }, { merge: true }); }
+    catch (e) { console.warn("Missions : les notes", e); return false; }
+    if (missionEnCours) missionEnCours = { ...missionEnCours, Notes: t, Notes_Par: idJoueur(), Notes_Le: Date.now() };
+    return true;
+}
+// « oui » : demander l'abandon (ou s'y joindre) ; « non » : le vote disparaît. Tous oui : abandonnée.
+export async function voterAbandon(reponse) {
+    const id = idPartie();
+    if (!id || !missionEnCours) return null;
+    const moi = idJoueur(), votants = votantsGroupe();
+    let r;
+    try {
+        r = await runTransaction(db, async (tx) => {
+            const s = await tx.get(refMission(id)); if (!s.exists()) return null;
+            const d = s.data(); let v = d.Vote_Abandon;
+            if (reponse === "non") { if (v) tx.set(refMission(id), { Vote_Abandon: deleteField() }, { merge: true }); return { refuse: true }; }
+            if (!v || !v.Votants) v = { Initiateur: { id: moi, nom: (votants.find(x => x.id === moi) || {}).nom || "Un joueur" }, Votants: votants, Votes: {}, Le: Date.now() };
+            const votes = { ...(v.Votes || {}), [moi]: "oui" };
+            const tous = (v.Votants || []).every(x => votes[x.id] === "oui");
+            tx.set(refMission(id), { Vote_Abandon: { ...v, Votes: votes } }, { merge: true });
+            return tous ? { abandon: true } : { vote: true };
+        });
+    } catch (e) { console.error("Missions : le vote d'abandon", e); return null; }
+    son("page-tourne");
+    await relireMission(id);
+    if (r && r.abandon) await terminerMission("abandonnee", "Le groupe a abandonné la mission.");
+    return r;
+}
+let terminees = [], termineesDe = "";
+async function lireTerminees(forcer) {
+    const id = idPartie();
+    if (!id) { terminees = []; termineesDe = ""; return terminees; }
+    if (!forcer && termineesDe === id) return terminees;
+    termineesDe = id;
+    try { const s = await getDocs(collection(db, "Systeme_Parties", id, "Missions_Terminees")); terminees = s.docs.map(d => d.data()); }
+    catch (e) { console.warn("Missions : les missions terminées", e); terminees = []; }
+    try { window.dispatchEvent(new CustomEvent("missions-terminees")); } catch (e) {}
+    return terminees;
+}
+export const relireTerminees = () => lireTerminees(true);
+// Les missions réussies d'un héros, par rang : { A, B, C } (lues une fois par partie).
+export function missionsReussies(idHeros) {
+    if (termineesDe !== idPartie()) lireTerminees();
+    const n = { A: 0, B: 0, C: 0 };
+    terminees.forEach(t => { if (t && t.Statut === "reussie" && Array.isArray(t.Heros) && t.Heros.includes(idHeros) && t.Mission && n[t.Mission.Rang] !== undefined) n[t.Mission.Rang]++; });
+    return n;
 }
 
 // LA VEILLE : la mission acceptée sur un poste sans clés se prépare sur un poste qui les a ;
@@ -678,4 +744,5 @@ setInterval(async () => {
 window.MISSIONS_GUILDE = { RANGS, ECRITURES, NB_MISSIONS, DUREE_JOURS, DECALAGE_NIVEAU, jourAbsolu, tirerRangs, promptMissions, genererMissions, renouveler, aRenouveler,
                           lireTableau, relireTableau, surChangement, htmlEncart, missionDe, ouvrirFeuille, fermerFeuille,
                           voterMission, refuserMission, lireMission, relireLaMission, surMission, preparerMission, promptPlan, marqueMission, decalageNiveauMission,
-                          contexteMissionMJ, suivreApresMJ, terminerMission, partie: () => partie };
+                          contexteMissionMJ, suivreApresMJ, terminerMission, partie: () => partie,
+                          ecrireNotes, voterAbandon, missionsReussies, relireTerminees, idJoueur };

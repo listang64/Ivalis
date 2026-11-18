@@ -438,7 +438,7 @@ await section(async () => {
            /connu_des_joueurs/.test(ap.sys) && /verite_cachee/.test(ap.sys) && /a_ne_pas_reveler/.test(ap.sys) && /issues/.test(ap.sys) && /rencontres/.test(ap.sys));
   await G(() => window.GRIMOIRE_REGIONS.ouvrir(5));
   await attendreQue(() => G(() => window.GRIMOIRE_REGIONS.montee() === 5 && window.carteRegionaleOuverte() === 5), 15000); await pose(); await p.waitForTimeout(800);
-  const mq = await G(() => { const el = [...document.querySelectorAll(".marque-mission")].find(e => e.getBoundingClientRect().width > 0); const k = [...document.querySelectorAll('.village-region[data-id="L_KESH"]')].find(e => e.getBoundingClientRect().width > 0);
+  const mq = await G(() => { const el = [...document.querySelectorAll(".marque-mission-carte")].find(e => e.getBoundingClientRect().width > 0); const k = [...document.querySelectorAll('.village-region[data-id="L_KESH"]')].find(e => e.getBoundingClientRect().width > 0);
     if (!el || !k) return null; const a = el.getBoundingClientRect(), b = k.getBoundingClientRect(); return { dx: Math.abs((a.left + a.width / 2) - (b.left + b.width / 2)), dy: Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)), w: a.width, svg: !!el.querySelector("svg text") }; });
   verifier("sur la carte de la région 5 : un « ? » doré posé sur Kesh, le lieu de la mission", mq && mq.dx < 2 && mq.dy < 2 && mq.w > 5 && mq.svg, JSON.stringify(mq));
   await cap("v443-carte");
@@ -479,8 +479,8 @@ await section(async () => {
   await G(() => window.__surPartie(window.__docs["Systeme_Parties/P1"]));
   const fin = await G((id) => window.__docs["Systeme_Parties/P1/Missions_Terminees/" + id] || null, m0.Id), pd = await partieDoc();
   verifier("réussie : rangée avec les missions terminées (statut, héros, fin), plus de mission en cours", fin && fin.Statut === "reussie" && fin.Heros.includes("H1") && fin.Fin_Le && !(await missionDoc()) && !pd.Mission_En_Cours, JSON.stringify(fin && { Statut: fin.Statut, Heros: fin.Heros }));
-  verifier("…plus de « ? » sur la carte (ni sur ses pages du livre)", await attendreQue(() => G(() => ![...document.querySelectorAll(".marque-mission")].some(e => e.getBoundingClientRect().width > 0)), 3000),
-           await G(() => [...document.querySelectorAll(".marque-mission")].map(e => e.parentNode.parentNode && (e.parentNode.parentNode.id || e.parentNode.parentNode.className)).join(" | ")));
+  verifier("…plus de « ? » sur la carte (ni sur ses pages du livre)", await attendreQue(() => G(() => ![...document.querySelectorAll(".marque-mission-carte")].some(e => e.getBoundingClientRect().width > 0)), 3000),
+           await G(() => [...document.querySelectorAll(".marque-mission-carte")].map(e => e.parentNode.parentNode && (e.parentNode.parentNode.id || e.parentNode.parentNode.className)).join(" | ")));
 });
 
 titre("8. UNE MISSION DANS UN LIEU À CRÉER : LE LIEU NAÎT COMME UN POI, À SON NOM");

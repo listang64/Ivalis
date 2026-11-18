@@ -59,6 +59,6 @@
 .lien-postit-mission.discret { font-weight: 400; color: #6b4a2b; }
 
 /* v443 — LE « ? » DORÉ du lieu de la mission, sur la carte régionale. */
-.marque-mission { position: absolute; pointer-events: none; z-index: 2; animation: marque-mission-pulse 2.6s ease-in-out infinite; }
+.marque-mission-carte { position: absolute; pointer-events: none; z-index: 2; animation: marque-mission-pulse 2.6s ease-in-out infinite; }
 .marque-mission-signe { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }
 @keyframes marque-mission-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }

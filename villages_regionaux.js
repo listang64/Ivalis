@@ -198,7 +198,7 @@ function marqueDeMission(numero) {
 }
 function elementMarqueMission(mq, b) {
     const el = document.createElement("div");
-    el.className = "marque-mission";
+    el.className = "marque-mission-carte";
     el.title = "Le lieu de la mission de guilde";
     Object.assign(el.style, { left: b.gauche + "px", top: b.haut + "px", width: b.cote + "px", height: b.cote + "px" });
     // (en SVG : il suit la taille de sa boîte, sur la carte vivante comme sur les pages du livre)
