@@ -30,14 +30,13 @@
 .lettre-mission, .lettre-mission * { font-family: var(--ecriture, 'Caveat'), 'Almendra', cursive !important; }
 .lettre-mission { font-size: 1.22em; line-height: 1.32; color: #2a1608; padding: 0.2em 0.4em; }
 .lettre-mission p { text-align: left; }
-/* LE SCEAU : de la cire rouge, ses bords irréguliers, l'inscription en relief. */
-.sceau-mission { align-self: center; flex: none; margin: 1.4em 0 0.6em; width: 9.5em; height: 9.5em; border: 0; padding: 0; cursor: pointer;
-  border-radius: 48% 52% 50% 47% / 51% 47% 53% 49%;
-  background: radial-gradient(circle at 38% 32%, #e2564a 0%, #b5241b 38%, #8a140e 72%, #5e0b07 100%);
-  box-shadow: 0 4px 10px rgba(60, 8, 4, 0.45), inset 0 0 0 0.55em rgba(255, 255, 255, 0.06), inset 0 -0.4em 0.8em rgba(0, 0, 0, 0.35);
-  color: #f6d9c4; font-family: 'Cinzel', serif; font-weight: 700; font-size: 1em; letter-spacing: 0.04em; line-height: 1.15; text-align: center;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5), 0 -1px 0 rgba(255, 190, 170, 0.25); transition: transform 0.2s ease; }
-.sceau-mission span { display: inline-block; padding: 1.2em; border-radius: 50%; border: 2px dashed rgba(246, 217, 196, 0.45); }
+/* LE SCEAU (v445) : un cachet de cire dessiné (missions_guilde.js, SCEAU_CIRE) ; son ombre portée sur la feuille. */
+.sceau-mission { position: relative; align-self: center; flex: none; margin: 1.2em 0 0.6em; width: 10.5em; height: 10.5em; border: 0; padding: 0; cursor: pointer;
+  background: none; border-radius: 50%; transition: transform 0.2s ease; -webkit-tap-highlight-color: transparent; }
+.dessin-sceau { display: block; width: 100%; height: 100%; overflow: visible;
+  filter: drop-shadow(0 0.18em 0.12em rgba(50, 8, 4, 0.55)) drop-shadow(0 0.5em 0.6em rgba(40, 20, 6, 0.3)); }
+.dessin-sceau .lettres-sceau { font-family: 'Cinzel', 'Almendra', serif !important; font-weight: 700 !important; letter-spacing: 0.08em; }
+.texte-cache { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .sceau-mission:hover { transform: scale(1.04) rotate(-2deg); }
 .sceau-mission:active { transform: scale(0.96); }
 .sceau-mission.bientot { filter: grayscale(0.4); }

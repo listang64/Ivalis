@@ -227,12 +227,43 @@ const SEPARATEUR = `<svg class="separateur-mission" viewBox="0 0 120 10" preserv
 export function htmlEncart(m, slot) {
     if (!m) return "";
     // (l'écriture passe par une variable : style.css impose Almendra à tout, en !important)
-    return `<div class="mission-encart" style="--ecriture:'${echapper(m.Ecriture || ECRITURES[slot % ECRITURES.length])}'">
+    // (v445) `--ajuste` : l'échelle du texte, mesurée pour qu'il tienne dans l'encart (ajusterEncarts).
+    const a = ajustements.get(m.Id);
+    return `<div class="mission-encart" data-mission="${echapper(m.Id)}" style="--ecriture:'${echapper(m.Ecriture || ECRITURES[slot % ECRITURES.length])}'${a ? `; --ajuste:${a}` : ""}">
+        <div class="texte-mission-encart">
         <div class="rang-mission rang-${echapper(m.Rang)}">${echapper((RANGS[m.Rang] || {}).nom || "Rang " + m.Rang)}</div>
         ${SEPARATEUR}
         <div class="titre-mission">${echapper(m.Titre)}</div>
-        <div class="resume-mission">${echapper(m.Resume)}</div></div>`;
+        <div class="resume-mission">${echapper(m.Resume)}</div></div></div>`;
 }
+// (v445) Nico : « l'encart en bas à droite, le texte est tronqué un peu ». Les écritures n'ont pas
+// toutes la même largeur (Homemade Apple, Satisfy… bien plus larges que Caveat) : chaque encart
+// rapetisse son texte, pas à pas, jusqu'à ce qu'il y tienne en entier (le rang, le titre, tout le
+// résumé), en hauteur comme en largeur. L'échelle est mesurée sur l'encart visible (les deux pages
+// en portent chacune une copie) ; elle ne dépend que des proportions (les tailles suivent l'encart).
+const ajustements = new Map();          // Id de la mission → l'échelle de son texte
+export function ajusterEncarts(pages) {
+    const parMission = new Map();
+    (pages || []).forEach(pg => pg && pg.querySelectorAll(".mission-encart").forEach(el => {
+        const id = el.dataset.mission;
+        if (!parMission.has(id)) parMission.set(id, []);
+        parMission.get(id).push(el);
+    }));
+    let tout = true;
+    parMission.forEach((els, id) => {
+        const el = els.find(e => e.clientHeight > 0 && e.clientWidth > 0);
+        const texte = el && el.querySelector(".texte-mission-encart");
+        if (!texte) { tout = false; return; }
+        const deborde = () => texte.offsetHeight > el.clientHeight + 0.5 || texte.scrollWidth > texte.clientWidth + 0.5;
+        let a = 1;
+        el.style.setProperty("--ajuste", "1");
+        while (deborde() && a > 0.3) { a = Math.round((a - 0.03) * 100) / 100; el.style.setProperty("--ajuste", String(a)); }
+        ajustements.set(id, a);
+        els.forEach(e => e.style.setProperty("--ajuste", String(a)));
+    });
+    return tout;
+}
+export const oublierAjustements = () => ajustements.clear();
 export const missionDe = (slot) => { const l = tableau && Array.isArray(tableau.Missions) ? tableau.Missions : []; return l[slot] || null; };
 
 // ---------------------------------------------------------------------
@@ -283,6 +314,48 @@ export function fermerFeuille() {
     son("page-prise");
     return true;
 }
+// (v445) Nico : « refais le dessin du sceau en bas de page : un sceau de cire réaliste ». La cire
+// coulée, au bord irrégulier (deux petites coulures), bombée par la lumière (un éclairage spéculaire
+// sur son épaisseur) et grenue ; au milieu, le creux du cachet, son biseau ; en relief dans le creux,
+// « ACCEPTER · LA MISSION » en arc autour de deux épées croisées (ombre et reflet décalés).
+const SCEAU_CIRE = `<svg class="dessin-sceau" viewBox="0 0 200 200" aria-hidden="true">
+  <defs>
+    <radialGradient id="sceau-cire" cx="38%" cy="32%" r="78%"><stop offset="0" stop-color="#e2574a"/><stop offset="0.35" stop-color="#b8261c"/><stop offset="0.75" stop-color="#7d110b"/><stop offset="1" stop-color="#4f0805"/></radialGradient>
+    <radialGradient id="sceau-creux" cx="58%" cy="62%" r="70%"><stop offset="0" stop-color="#a51e15"/><stop offset="0.7" stop-color="#8a150e"/><stop offset="1" stop-color="#5f0b07"/></radialGradient>
+    <linearGradient id="sceau-biseau" x1="0.15" y1="0.1" x2="0.85" y2="0.9"><stop offset="0" stop-color="#3c0503"/><stop offset="0.5" stop-color="#7d120c"/><stop offset="1" stop-color="#f08a7c"/></linearGradient>
+    <filter id="sceau-relief" x="-15%" y="-15%" width="130%" height="130%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="5" result="flou"/>
+      <feSpecularLighting in="flou" surfaceScale="6" specularConstant="0.85" specularExponent="24" lighting-color="#ffd9cc" result="eclat"><fePointLight x="55" y="35" z="150"/></feSpecularLighting>
+      <feComposite in="eclat" in2="SourceAlpha" operator="in" result="eclatCire"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="11" result="grain"/>
+      <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0.2  0 0 0 0 0.02  0 0 0 0 0.01  0 0 0 0.22 0" result="grainTeinte"/>
+      <feComposite in="grainTeinte" in2="SourceAlpha" operator="in" result="grainCire"/>
+      <feComposite in="SourceGraphic" in2="eclatCire" operator="arithmetic" k1="0" k2="1" k3="0.55" k4="0" result="avecEclat"/>
+      <feMerge><feMergeNode in="avecEclat"/><feMergeNode in="grainCire"/></feMerge>
+    </filter>
+    <path id="sceau-arc-haut" d="M 55.8 83.9 A 47 47 0 0 1 144.2 83.9"/>
+    <path id="sceau-arc-bas" d="M 46.4 119.5 A 57 57 0 0 0 153.6 119.5"/>
+    <g id="sceau-motif">
+      <text class="lettres-sceau" font-size="16.5"><textPath href="#sceau-arc-haut" startOffset="50%" text-anchor="middle">ACCEPTER</textPath></text>
+      <text class="lettres-sceau" font-size="14.5"><textPath href="#sceau-arc-bas" startOffset="50%" text-anchor="middle">LA MISSION</textPath></text>
+      <circle cx="58" cy="100" r="2.2"/><circle cx="142" cy="100" r="2.2"/>
+      <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M 80 120 L 118 78" stroke-width="4.2"/><path d="M 118 78 L 123 73" stroke-width="2.4"/>
+        <path d="M 120 120 L 82 78" stroke-width="4.2"/><path d="M 82 78 L 77 73" stroke-width="2.4"/>
+        <path d="M 74 114 L 86 126 M 126 114 L 114 126" stroke-width="3.2"/>
+        <path d="M 76 124 L 71 129 M 124 124 L 129 129" stroke-width="3.6"/>
+      </g>
+      <circle cx="69.5" cy="131.5" r="3.3"/><circle cx="130.5" cy="131.5" r="3.3"/>
+    </g>
+  </defs>
+  <path class="cire-sceau" d="M 187.1 100.0 C 187.5 102.5 186.7 105.1 186.0 107.5 C 185.3 110.0 183.8 112.3 182.7 114.6 C 181.7 116.9 180.8 119.2 179.7 121.4 C 178.6 123.5 177.1 125.5 176.2 127.7 C 175.4 130.0 175.2 132.4 174.7 134.8 C 174.2 137.2 174.4 140.2 173.2 142.2 C 171.9 144.3 169.4 145.7 167.3 147.1 C 165.2 148.6 162.5 149.3 160.7 150.9 C 159.0 152.6 158.1 154.8 156.9 156.9 C 155.6 158.9 154.4 161.0 153.0 163.2 C 151.7 165.3 150.3 167.5 148.8 169.7 C 147.3 171.9 146.0 174.7 144.1 176.4 C 142.2 178.1 139.6 178.9 137.2 179.8 C 134.8 180.7 132.2 180.9 129.8 181.9 C 127.5 183.0 125.5 185.3 123.1 186.2 C 120.7 187.1 118.0 187.7 115.4 187.3 C 112.8 186.9 109.9 184.7 107.3 183.9 C 104.8 183.0 102.4 182.6 100.0 182.3 C 97.6 181.9 95.2 182.2 92.8 181.7 C 90.5 181.3 88.3 180.2 86.0 179.5 C 83.7 178.9 81.4 178.5 79.1 177.9 C 76.9 177.2 74.6 176.6 72.5 175.6 C 70.4 174.6 68.6 172.8 66.5 171.9 C 64.3 170.9 61.9 170.7 59.6 169.9 C 57.4 169.1 54.7 168.7 53.0 167.2 C 51.2 165.7 50.4 162.7 49.0 160.8 C 47.5 158.9 46.5 156.9 44.2 155.8 C 41.9 154.7 38.2 155.0 35.2 154.3 C 32.2 153.7 28.6 153.1 26.2 151.7 C 23.8 150.3 22.1 148.0 20.8 145.7 C 19.6 143.4 19.0 140.6 18.8 137.9 C 18.5 135.1 19.3 132.0 19.5 129.3 C 19.7 126.6 20.0 124.0 19.8 121.5 C 19.6 119.0 18.2 116.8 18.2 114.4 C 18.2 112.0 19.0 109.4 19.8 107.0 C 20.6 104.6 22.6 102.3 23.1 100.0 C 23.5 97.7 22.9 95.5 22.6 93.2 C 22.3 90.9 21.4 88.5 21.2 86.1 C 21.0 83.7 21.1 81.3 21.3 78.9 C 21.4 76.5 21.3 73.9 22.1 71.7 C 22.9 69.4 24.5 67.4 26.0 65.5 C 27.5 63.6 30.0 62.3 31.1 60.2 C 32.3 58.2 32.3 55.5 32.9 53.0 C 33.6 50.6 33.7 47.5 34.9 45.4 C 36.1 43.3 38.4 41.9 40.2 40.2 C 41.9 38.4 43.6 36.7 45.4 34.9 C 47.2 33.2 48.7 31.0 50.7 29.6 C 52.7 28.1 55.2 27.4 57.5 26.4 C 59.8 25.4 62.0 24.3 64.3 23.4 C 66.6 22.5 68.7 21.0 71.2 21.0 C 73.8 21.0 76.9 22.9 79.5 23.5 C 82.1 24.0 84.4 25.0 86.7 24.5 C 88.9 24.0 90.8 21.4 93.0 20.4 C 95.3 19.3 97.6 18.6 100.0 18.2 C 102.4 17.9 104.7 18.4 107.1 18.4 C 109.6 18.3 112.0 17.9 114.5 18.0 C 116.9 18.2 119.2 18.9 121.6 19.5 C 123.9 20.0 126.2 20.8 128.6 21.5 C 131.0 22.1 133.6 22.2 135.8 23.2 C 138.0 24.3 139.8 26.3 141.6 27.9 C 143.5 29.5 144.9 31.6 147.0 32.8 C 149.2 34.0 152.2 34.0 154.5 35.1 C 156.8 36.2 159.3 37.3 160.8 39.2 C 162.3 41.2 162.7 44.3 163.4 46.8 C 164.2 49.3 164.7 51.8 165.3 54.3 C 165.9 56.7 166.4 59.1 167.0 61.3 C 167.6 63.6 167.8 65.9 169.0 67.8 C 170.1 69.8 172.4 71.2 173.9 73.1 C 175.4 75.0 177.3 76.9 178.2 79.0 C 179.2 81.2 178.9 83.7 179.7 85.9 C 180.6 88.2 182.0 90.4 183.2 92.7 C 184.4 95.1 186.6 97.5 187.1 100.0 Z" fill="url(#sceau-cire)" filter="url(#sceau-relief)"/>
+  <circle cx="100" cy="100" r="64" fill="url(#sceau-creux)"/>
+  <circle cx="100" cy="100" r="64" fill="none" stroke="url(#sceau-biseau)" stroke-width="5"/>
+  <circle cx="100" cy="100" r="61" fill="none" stroke="rgba(40, 3, 2, 0.35)" stroke-width="1.2"/>
+  <use href="#sceau-motif" transform="translate(1 1.3)" style="color:#3a0402" fill="#3a0402"/>
+  <use href="#sceau-motif" transform="translate(-0.8 -0.9)" style="color:#f6a89b" fill="#f6a89b" opacity="0.75"/>
+  <use href="#sceau-motif" style="color:#a51d14" fill="#a51d14"/>
+</svg>`;
 // (v443) Le sceau selon l'état du groupe : accepter (ou voter oui), en attente des autres,
 // une mission déjà en cours, un autre vote ; « Refuser » quand un vote porte sur elle.
 function htmlSceau(m) {
@@ -293,7 +366,7 @@ function htmlSceau(m) {
     else if (v && v.Id && !surElle) { etat = "eteint"; aide = `Un vote est en cours pour « ${v.Titre} ».`; }
     else if (surElle && (v.Votes || {})[j] === "oui") { etat = "eteint"; aide = `En attente des autres joueurs (${compterOui(v)}/${(v.Votants || []).length}).`; }
     else if (surElle) aide = `${(v.Initiateur || {}).nom || "Un joueur"} propose cette mission : tous doivent l'accepter.`;
-    return `<button type="button" class="sceau-mission${etat ? " " + etat : ""}" title="Accepter la mission"${etat ? " disabled" : ""}><span>Accepter<br>la mission</span></button>
+    return `<button type="button" class="sceau-mission${etat ? " " + etat : ""}" title="Accepter la mission" aria-label="Accepter la mission"${etat ? " disabled" : ""}>${SCEAU_CIRE}<span class="texte-cache">Accepter la mission</span></button>
         ${aide ? `<p class="aide-sceau">${echapper(aide)}</p>` : ""}
         ${surElle ? `<button type="button" class="refuser-mission">Refuser</button>` : ""}`;
 }
@@ -745,4 +818,4 @@ window.MISSIONS_GUILDE = { RANGS, ECRITURES, NB_MISSIONS, DUREE_JOURS, DECALAGE_
                           lireTableau, relireTableau, surChangement, htmlEncart, missionDe, ouvrirFeuille, fermerFeuille,
                           voterMission, refuserMission, lireMission, relireLaMission, surMission, preparerMission, promptPlan, marqueMission, decalageNiveauMission,
                           contexteMissionMJ, suivreApresMJ, terminerMission, partie: () => partie,
-                          ecrireNotes, voterAbandon, missionsReussies, relireTerminees, idJoueur };
+                          ecrireNotes, voterAbandon, missionsReussies, relireTerminees, idJoueur, ajusterEncarts, oublierAjustements };

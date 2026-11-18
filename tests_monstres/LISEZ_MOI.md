@@ -12284,3 +12284,9 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - **La fiche** (grimoire_fiches.js) : sur la page de l'avatar, en bas à gauche, en petit, à l'écriture des titres : « Missions réussies : – 1 Rang A… » (les missions terminées réussies où le héros était), ou « aucune pour l'instant ».
 - Le « ? » de la carte prend la classe marque-mission-carte (la classe marque-mission est celle du ruban). Le post-it du vote ne ressort plus après un vote fini.
 - corrections_v444.mjs le vérifie ; corrections_v443.mjs suit.
+
+## v445 — Le texte des encarts tient en entier ; un vrai sceau de cire
+
+- **Les encarts** (Nico : « l'encart en bas à droite, le texte est tronqué un peu ») : les écritures n'ont pas la même largeur (Homemade Apple, Satisfy… bien plus larges que Caveat) et le résumé était coupé à 5 lignes. Désormais chaque encart rapetisse son texte pas à pas (`--ajuste`, missions_guilde.js, ajusterEncarts) jusqu'à ce que le rang, le titre et tout le résumé y tiennent, en hauteur comme en largeur ; remesuré quand une écriture finit de se charger ; le texte, centré par ses marges, ne déborde plus par le haut.
+- **Le sceau** (« refais le dessin du sceau : un sceau de cire réaliste ») : un cachet de cire dessiné en SVG — la cire coulée au bord irrégulier (deux petites coulures), bombée par un éclairage spéculaire, grenue ; le creux du cachet et son biseau ; « ACCEPTER · LA MISSION » en arc et deux épées croisées en relief (ombre et reflet) ; son ombre portée sur la feuille.
+- corrections_v442.mjs le vérifie (ses contrôles « v445 »).

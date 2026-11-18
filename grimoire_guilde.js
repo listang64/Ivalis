@@ -157,6 +157,19 @@ function rendreTableau() {
         salle[k].innerHTML = `<div class="contenu-tableau"><div class="calque-tableau" style="${boiteTableau(cote)}">`
             + `<img class="image-tableau" src="${IMAGE_TABLEAU}" alt="${cote === "gauche" ? "Le tableau des missions" : ""}" draggable="false">${htmlEncarts()}</div></div>`;
     });
+    textesAAjuster = true;
+    requestAnimationFrame(ajusterTextes);
+}
+// (v445) Les textes des missions tiennent dans leurs encarts (missions_guilde.js, ajusterEncarts) ;
+// une page encore cachée se mesure quand elle s'ouvre ; une écriture qui finit de se charger
+// change la place qu'il faut : on remesure.
+let textesAAjuster = false;
+function ajusterTextes() {
+    if (!textesAAjuster || !salle || piece !== "missions" || !MG() || typeof MG().ajusterEncarts !== "function") return;
+    if (MG().ajusterEncarts([salle.g, salle.d])) textesAAjuster = false;
+}
+if (document.fonts && document.fonts.addEventListener) {
+    document.fonts.addEventListener("loadingdone", () => { if (MG() && MG().oublierAjustements) MG().oublierAjustements(); textesAAjuster = true; requestAnimationFrame(ajusterTextes); });
 }
 // La base : écoutée par tous les postes.
 function lireEncarts(data) {
@@ -404,7 +417,7 @@ setInterval(() => {
         abonnerMissions();
         const g = G();
         if (!g || typeof g.pagesGuilde !== "function") return;
-        if (surLesPages()) enRoute = Date.now();        // (lues à l'instant : 8 secondes de grâce une fois quittées)
+        if (surLesPages()) { enRoute = Date.now(); ajusterTextes(); }        // (lues à l'instant : 8 secondes de grâce une fois quittées)
         else if (g.pagesGuilde().length && Date.now() - enRoute > 8000 && !geste) { piece = null; g.definirGuilde([]); }
     } catch (e) { console.warn("Le livre : le Hall de guilde", e); }
 }, 1000);

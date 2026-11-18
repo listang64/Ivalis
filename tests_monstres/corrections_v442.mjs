@@ -6,6 +6,7 @@
 // l'inclinaison. Un clic : une page parchemin glisse du bas de l'écran (région, détail, commanditaire, objectif, le
 // mot du commanditaire à la première personne), son bas caché sous le bord, en bas un sceau rouge « Accepter la
 // mission » ; un clic dehors la ferme ; le bruit d'une page qu'on attrape. » Sur la vraie page (le décor du banc v424).
+// (v445) « L'encart en bas à droite, le texte est tronqué un peu » ; « refais le sceau : un sceau de cire réaliste ».
 // Lancer : node tests_monstres/corrections_v442.mjs
 import fs from 'fs';
 import http from 'http';
@@ -414,7 +415,7 @@ await section(async () => {
     return [...document.querySelectorAll(".page-tableau-missions.gauche .encart-tableau")].map((e, k) => { const m = e.querySelector(".mission-encart");
       return { rang: (e.querySelector(".rang-mission") || {}).textContent, sep: !!e.querySelector("svg.separateur-mission"), titre: (e.querySelector(".titre-mission") || {}).textContent,
                resume: (e.querySelector(".resume-mission") || {}).textContent, police: m ? getComputedStyle(m).fontFamily : "", attendu: t[k].Titre, angle: e.style.transform, doigt: getComputedStyle(e).pointerEvents,
-               ordre: m ? [...m.children].map(c => c.className.baseVal !== undefined ? c.className.baseVal : c.className) : [] }; }); });
+               ordre: m ? [...(m.querySelector(".texte-mission-encart") || m).children].map(c => c.className.baseVal !== undefined ? c.className.baseVal : c.className) : [] }; }); });
   verifier("six encarts écrits, chacun avec sa mission (dans l'ordre des encarts)", r.length === 6 && r.every(x => x.titre === x.attendu), JSON.stringify(r.map(x => x.titre)).slice(0, 200));
   verifier("…en haut le rang, dessous un petit séparateur dessiné, puis le titre, puis le résumé", r.every(x => /^Rang [ABC]$/.test(x.rang) && x.sep && x.resume && JSON.stringify(x.ordre) === JSON.stringify(["rang-mission rang-" + x.rang.slice(-1), "separateur-mission", "titre-mission", "resume-mission"])), JSON.stringify(r[0]));
   verifier("…six écritures différentes, à la main", new Set(r.map(x => x.police.split(",")[0])).size === 6, JSON.stringify(r.map(x => x.police.split(",")[0])));
@@ -431,12 +432,19 @@ await section(async () => {
   await p.waitForTimeout(900);
   const f = await G(() => { const v = document.getElementById("feuille-mission"), fe = v && v.querySelector(".feuille-mission"); if (!fe) return null; const r = fe.getBoundingClientRect(), s = fe.querySelector(".sceau-mission").getBoundingClientRect();
     return { ouverte: v.classList.contains("ouverte"), haut: r.top / innerHeight, bas: r.bottom - innerHeight, fond: getComputedStyle(fe).backgroundImage, texte: fe.textContent.replace(/\s+/g, " "),
-             sceau: fe.querySelector(".sceau-mission").innerText.replace(/\s+/g, " ").trim(), sceauVu: s.bottom <= innerHeight && s.top >= 0, sceauRouge: getComputedStyle(fe.querySelector(".sceau-mission")).backgroundImage,
+             sceau: fe.querySelector(".sceau-mission").getAttribute("aria-label") + "|" + fe.querySelector(".sceau-mission .texte-cache").textContent, sceauVu: s.bottom <= innerHeight && s.top >= 0, sceauRouge: (() => { const c = fe.querySelector(".sceau-mission .cire-sceau"); return c ? c.getAttribute("fill") + " " + c.getAttribute("filter") : ""; })(),
              sons: window.__sons.map(x => x[0]) }; });
   verifier("un toucher sur l'encart : la feuille glisse et s'ouvre", f && f.ouverte, JSON.stringify(f && f.ouverte));
   verifier("…une page de parchemin (la texture des pages du livre), en haut à 5 % ; son bas caché sous le bord de l'écran", f.fond.includes("images/grimoire/page.webp") && Math.abs(f.haut - 0.05) < 0.01 && f.bas > 10, JSON.stringify([f.haut, f.bas]));
   verifier("…la région, le lieu, le commanditaire, la mission, l'objectif, le mot du commanditaire", /Région\s*La région|Région/.test(f.texte) && /Kesh/.test(f.texte) && /Commanditaire 1, marchand d'huile/.test(f.texte) && /Les détails de la mission 1/.test(f.texte) && /Objectif 1\./.test(f.texte) && /Je vous écris, braves gens/.test(f.texte), f.texte.slice(0, 260));
-  verifier("…en bas, le sceau rouge « Accepter la mission », visible", f.sceau === "Accepter la mission" && f.sceauVu && /radial-gradient/.test(f.sceauRouge), JSON.stringify([f.sceau, f.sceauVu]));
+  verifier("…en bas, le sceau « Accepter la mission », visible", f.sceau === "Accepter la mission|Accepter la mission" && f.sceauVu, JSON.stringify([f.sceau, f.sceauVu]));
+  // (v445) « Refais le dessin du sceau : un sceau de cire réaliste. »
+  const sc = await G(() => { const b = document.querySelector("#feuille-mission .sceau-mission"), svg = b.querySelector("svg.dessin-sceau");
+    return svg ? { cire: b.querySelector(".cire-sceau").getAttribute("fill"), relief: !!svg.querySelector("filter feSpecularLighting") && !!svg.querySelector("filter feTurbulence"),
+      bosses: (b.querySelector(".cire-sceau").getAttribute("d").match(/C /g) || []).length, creux: svg.querySelectorAll("circle[r='64']").length,
+      lettres: [...svg.querySelectorAll("textPath")].map(t => t.textContent), couches: svg.querySelectorAll("use").length, ombre: getComputedStyle(svg).filter } : null; });
+  verifier("(v445) un cachet de cire : la cire coulée (bord irrégulier, éclat, grain), son creux biseauté", sc && sc.cire === "url(#sceau-cire)" && sc.relief && sc.bosses > 40 && sc.creux === 2 && /drop-shadow/.test(sc.ombre), JSON.stringify(sc));
+  verifier("(v445) …« ACCEPTER · LA MISSION » en relief dans le creux (ombre, reflet, cire)", sc && JSON.stringify(sc.lettres) === '["ACCEPTER","LA MISSION"]' && sc.couches === 3, JSON.stringify(sc && sc.lettres));
   verifier("…le bruit d'une page qu'on attrape", f.sons.includes("page-prise"), JSON.stringify(f.sons));
   await cap("v442-feuille");
   // Un toucher sur la feuille ne la ferme pas ; dehors, oui.
@@ -447,6 +455,24 @@ await section(async () => {
   await p.mouse.click(Math.max(5, fr.left - 40), 200); await p.waitForTimeout(700);
   const g = await G(() => ({ ouverte: document.getElementById("feuille-mission").classList.contains("ouverte"), haut: document.querySelector("#feuille-mission .feuille-mission").getBoundingClientRect().top / innerHeight, sons: window.__sons.map(x => x[0]) }));
   verifier("un toucher dehors : elle redescend, avec le même bruit", !g.ouverte && g.haut > 0.95 && g.sons.includes("page-prise"), JSON.stringify(g));
+});
+
+titre("6. (v445) LE TEXTE TIENT DANS SON ENCART, QUELLE QUE SOIT L'ÉCRITURE");
+await section(async () => {
+  // Nico : « l'encart en bas à droite, le texte est tronqué un peu ». Un long résumé, une écriture large, dans un petit encart.
+  await G(async () => { const t = window.__docs["Systeme_Parties/P1/Guilde/Tableau"];
+    t.Missions[5] = { ...t.Missions[5], Id: "M_LONGUE", Titre: "La cargaison échouée sur la grève des Doigts d'Atrium", Ecriture: "Homemade Apple",
+      Resume: "Protégez des caisses de marchandises sur une plage isolée, battue par les vents, contre des pillards côtiers qui rôdent la nuit autour des épaves." };
+    await window.MISSIONS_GUILDE.relireTableau(); });
+  await G(() => window.GRIMOIRE_GUILDE.ouvrir("missions")); await attendreQue(() => surPiece("missions"), 8000); await pose();
+  await p.waitForTimeout(600);
+  const r = await G(() => [...document.querySelectorAll(".page-tableau-missions .mission-encart")].filter(e => e.clientHeight > 0).map(e => { const t = e.querySelector(".texte-mission-encart");
+    return { id: e.dataset.mission, tient: t.offsetHeight <= e.clientHeight + 1 && t.scrollWidth <= t.clientWidth + 1, ajuste: Number(getComputedStyle(e).getPropertyValue("--ajuste")) || 1,
+             resume: e.querySelector(".resume-mission").textContent, coupe: getComputedStyle(e.querySelector(".resume-mission")).webkitLineClamp }; }));
+  const longue = r.find(x => x.id === "M_LONGUE");
+  verifier("tous les textes tiennent dans leurs encarts (hauteur et largeur)", r.length >= 6 && r.every(x => x.tient), JSON.stringify(r.map(x => [x.id.slice(-6), x.tient, x.ajuste])));
+  verifier("…le long résumé, en entier (plus de coupe à 5 lignes), son texte rapetissé pour tenir", longue && longue.tient && longue.ajuste < 1 && /autour des épaves\./.test(longue.resume) && (longue.coupe === "none" || !longue.coupe), JSON.stringify(longue));
+  await cap("v445-tableau");
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
