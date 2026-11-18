@@ -179,10 +179,12 @@ await section(async () => {
   await pose(); await p.waitForTimeout(600);
   // (v418) Les Aventuriers sont les sous-pages du Groupe (le sommaire mène au Groupe).
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2500); await pose();
-  const clans = await p.evaluate(() => [...document.querySelectorAll(".page-clan:not(.page-clan-vide)")].map(pg => ({
-    titre: pg.querySelector(".titre-clan").textContent, heros: [...pg.querySelectorAll(".ligne-aventurier")].map(b => b.textContent.replace(/\s+/g, " ").trim()) })));
+  // (v433) Le Livre des clans : une double page par clan — les héros à gauche, le nom du clan à droite.
+  const clans = await p.evaluate(() => [...document.querySelectorAll(".page-clan.gauche")].map(pg => ({
+    titre: ((pg.nextElementSibling && pg.nextElementSibling.querySelector(".nom-clan")) || document.querySelector("#" + pg.id.replace("clan-", "clan-banniere-") + " .nom-clan") || {}).textContent,
+    heros: [...pg.querySelectorAll(".ligne-aventurier")].map(b => b.textContent.replace(/\s+/g, " ").trim()) })));
   verifier("« Aventuriers » ouvre la page des clans", (await ici()) === "clans", await ici());
-  verifier("un clan par joueur, une page chacun, le sien d'abord : « Clan de Benjamin », « Clan de Nico »", clans.length === 2 && clans[0].titre === "Clan de Benjamin" && clans[1].titre === "Clan de Nico", JSON.stringify(clans.map(c => c.titre)));
+  verifier("un clan par joueur, une double page chacun, le sien d'abord : « Clan de Benjamin », « Clan de Nico »", clans.length === 2 && clans[0].titre === "Clan de Benjamin" && clans[1].titre === "Clan de Nico", JSON.stringify(clans.map(c => c.titre)));
   verifier("ses héros dans l'ordre de leur création, « Nom - Classe » (au masculin, v365)", JSON.stringify(clans[0].heros) === JSON.stringify(["Thorin Ironfoot - Protecteur", "Kaya - Pisteur"]), JSON.stringify(clans[0].heros));
   verifier("les autres clans avec leurs héros", JSON.stringify(clans[1].heros) === JSON.stringify(["Lyra Sombreval - Oracle"]), JSON.stringify(clans[1].heros));
   await cap("v313_clans");

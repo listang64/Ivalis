@@ -359,16 +359,15 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("5. (v419) LA DOUBLE FLÈCHE À CÔTÉ DU NOM DE NOTRE HÉROS : LA LISTE DE NOS PERSONNAGES");
+titre("5. (v419 → v433) PLUS DE DOUBLE FLÈCHE : « LES CLANS › » MÈNE À NOS PERSONNAGES");
 // =========================================================================
+// (v433, Nico : « retire le bouton ⇄ sous l'avatar ; le bouton Les aventuriers devient Les clans ».)
 await section(async () => {
   await G(() => window.GRIMOIRE_GROUPE.ouvrir()); await attendreQue(surGroupe, 6000); await pose();
   const fleches = await G(() => [...document.querySelectorAll("#grimoire-groupe-g .heros-groupe")].map(h => [h.querySelector(".nom-groupe").textContent.trim(), !!h.querySelector(".changer-heros-groupe")]));
-  verifier("⇄ à côté de Thorin (notre héros), pas de Lyra (celle de J2)", JSON.stringify(fleches) === '[["Thorin Ironfoot",true],["Lyra Sombreval",false]]', JSON.stringify(fleches));
-  verifier("…sur la même ligne que son nom", await G(() => { const n = document.querySelector("#grimoire-groupe-g .heros-groupe .nom-groupe").getBoundingClientRect(), f = document.querySelector(".changer-heros-groupe").getBoundingClientRect();
-    return f.left >= n.right - 1 && f.top < n.bottom && f.bottom > n.top; }));
-  await cliquer("#grimoire-groupe-g .changer-heros-groupe");
-  verifier("un toucher : la page Aventuriers, la liste de nos personnages (notre clan, ses cases)", await attendreQue(() => G(() => { const c = window.GRIMOIRE_FICHES.pages().clans[0]; const i = window.GRIMOIRE.indexDe(c), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1) && !!c.querySelector(".case-actif"); }), 6000));
+  verifier("plus de ⇄ à côté de nos héros", JSON.stringify(fleches) === '[["Thorin Ironfoot",false],["Lyra Sombreval",false]]', JSON.stringify(fleches));
+  await cliquer('[data-gp="aventuriers"]');
+  verifier("« Les clans › » : notre clan, la liste de nos personnages (ses cases)", await attendreQue(() => G(() => { const c = window.GRIMOIRE_FICHES.pages().clans[0]; const i = window.GRIMOIRE.indexDe(c), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1) && !!c.querySelector(".case-actif"); }), 6000));
   const gr = lire("grimoire_recit.js");
   verifier("le récit ne s'en mêle plus (son papier ouvre toujours la fiche)", !/closest\("#recit-avatar-nom"\)/.test(gr) && /toucherVite\(avatar, \(\) => ouvrirFicheDuPapier\(avatar\)\);/.test(gr));
   await cap("v419-groupe-fleche");
