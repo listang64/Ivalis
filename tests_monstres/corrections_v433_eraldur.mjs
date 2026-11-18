@@ -204,17 +204,25 @@ await section(async () => {
 });
 
 // =========================================================================
-titre("4. EN JEU : UN TOUCHER SUR ERALDUR OUVRE « LE VILLAGE » DU LIVRE");
+titre("4. EN JEU : UN TOUCHER SUR ERALDUR OUVRE « LE VILLAGE » DU LIVRE — SI LE GROUPE Y EST (v441)");
 // =========================================================================
 await section(async () => {
   await p.evaluate(() => { localStorage.setItem("ivalis_DEV_MODE", "off"); window.__village = 0; window.__apercu = 0;
     window.GRIMOIRE = window.GRIMOIRE || {}; window.GRIMOIRE.allerAuVillage = () => { window.__village++; }; window.afficherApercuLieu = () => { window.__apercu++; };
     window.dessinerVillagesRegion(); });
-  const c = await p.evaluate((id) => { const b = document.querySelector(`.village-region[data-id="${id}"]`).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; }, idEraldur);
-  await p.mouse.move(c.x, c.y); await p.mouse.down(); await p.mouse.up();
-  const r = await p.evaluate(() => ({ village: window.__village, apercu: window.__apercu }));
-  verifier("le toucher mène à la double page du village (pas à l'aperçu d'un lieu)", r.village === 1 && r.apercu === 0, JSON.stringify(r));
-  await p.evaluate(() => localStorage.setItem("ivalis_DEV_MODE", "on"));
+  const toucher = async () => { const c = await p.evaluate((id) => { const b = document.querySelector(`.village-region[data-id="${id}"]`).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; }, idEraldur);
+    await p.mouse.move(c.x, c.y); await p.mouse.down(); await p.mouse.up(); return p.evaluate(() => ({ village: window.__village, apercu: window.__apercu })); };
+  // (v441) Nico : « quand le groupe se déplace à Eraldur, plutôt que d'aller sur le récit ça ouvre la page du village ».
+  await p.evaluate(() => { window.PARTIE_DATA = { Lieu_Actuel: "AILLEURS" }; });
+  let r = await toucher();
+  verifier("(v441) le groupe est ailleurs : le toucher n'ouvre pas la page du village (on n'y est pas)", r.village === 0, JSON.stringify(r));
+  await p.evaluate((id) => { window.PARTIE_DATA = { Lieu_Actuel: id }; }, idEraldur);
+  r = await toucher();
+  verifier("le groupe est à Eraldur : le toucher mène à la double page du village (pas à l'aperçu d'un lieu)", r.village === 1 && r.apercu === 0, JSON.stringify(r));
+  await p.evaluate((id) => { window.PARTIE_DATA = { Lieu_Actuel: id, Voyage_Groupe: { Id: "V9", Etat: "marche" } }; }, idEraldur);
+  r = await toucher();
+  verifier("(v441) …mais en route (un voyage en cours) : non plus", r.village === 1, JSON.stringify(r));
+  await p.evaluate(() => { window.PARTIE_DATA = {}; localStorage.setItem("ivalis_DEV_MODE", "on"); });
 });
 
 // =========================================================================

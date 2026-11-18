@@ -335,13 +335,25 @@ function brancherVillage(el, v) {
     });
 }
 let appuiVillage = null, appuiApercu = null;
+// (v441) Nico : « quand le groupe se déplace à Eraldur, ça ne fait pas fonctionner le narrateur, et
+// plutôt que d'aller sur le récit ça ouvre la page du village ». Un toucher sur Eraldur n'ouvre sa
+// double page (« Le village ») que si le groupe y est déjà, et pas en route : sinon il fait comme
+// les autres lieux (son aperçu s'il a une image) — le voyage, l'arrivée et le Narrateur suivent
+// leur cours, et chacun reste sur le récit.
+function dansEraldur(v) {
+    const p = window.PARTIE_DATA || {};
+    const enRoute = (typeof window.voyageGroupeEnCours === "function" && window.voyageGroupeEnCours()) || !!(p.Voyage_Groupe && p.Voyage_Groupe.Id);
+    return !enRoute && !!v && p.Lieu_Actuel === v.id;
+}
+window.groupeDansEraldur = () => dansEraldur(villageEraldur());
 window.addEventListener("pointerup", (e) => {
     if (appuiApercu) {
         const a = appuiApercu;
         appuiApercu = null;
         if (Math.hypot(e.clientX - a.x, e.clientY - a.y) <= 6 && villages[a.id]) {
-            if (villages[a.id].hub) { if (window.GRIMOIRE && typeof window.GRIMOIRE.allerAuVillage === "function") window.GRIMOIRE.allerAuVillage(); }
-            else window.afficherApercuLieu(villages[a.id]);
+            const v = villages[a.id];
+            if (v.hub && dansEraldur(v)) { if (window.GRIMOIRE && typeof window.GRIMOIRE.allerAuVillage === "function") window.GRIMOIRE.allerAuVillage(); }
+            else if (v.image) window.afficherApercuLieu(v);
         }
     }
     if (!appuiVillage) return;

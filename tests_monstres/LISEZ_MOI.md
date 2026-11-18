@@ -12252,3 +12252,8 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - Nico : « quand on est sur le village et qu'on clique sur le Hall de guilde, il y a un petit délai avant qu'il affiche l'image du Hall ; quand on est sur le village, charge-la ». Sur la double page du village, la double page du Hall s'écrit d'avance (hors du livre) et sa grande image se charge et se décode (preparerHall, grimoire_guilde.js) : au toucher, elle entre dans le livre déjà affichée. Le Hall n'est plus réécrit à chaque ouverture.
 - « Sous le titre Hall de guilde, l'aquarelle un peu plus opaque » : 0,72 (0,46 avant).
 - corrections_v434.mjs le vérifie (ses contrôles « v440 »).
+
+## v441 — Le voyage vers Eraldur : le Narrateur et le récit
+
+- Nico : « quand le groupe se déplace à Eraldur (le village), ça ne fait pas fonctionner le narrateur, et plutôt que d'aller sur le récit ça ouvre la page du village ». Un toucher sur Eraldur, sur la carte régionale, menait toujours à la double page « Le village » (v433) — même en route, même quand le groupe n'y était pas : le livre quittait la carte ou le récit. Désormais, il n'ouvre « Le village » que si le groupe est déjà à Eraldur (Lieu_Actuel) et pas en voyage (villages_regionaux.js, dansEraldur ; voyage_groupe.js, voyageGroupeEnCours) ; sinon Eraldur fait comme les autres lieux. En mode voyage, il reste une destination comme une autre : à l'arrivée, le Destin l'annonce, le Narrateur part et chacun passe sur le récit.
+- corrections_v441.mjs le vérifie sur un voyage complet (le choix, le vote, la marche, l'arrivée) ; corrections_v433_eraldur.mjs suit.

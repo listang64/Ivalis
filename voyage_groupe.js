@@ -147,6 +147,8 @@ function centreMonde(numero) {
 const nomRegion = (n) => { const c = (window.CARTES_REGIONALES || {})[n]; return (c && c.nom) || `Région ${n}`; };
 const aspectRegion = (n) => (typeof window.aspectCarteRegionale === "function" ? window.aspectCarteRegionale(n) : 1.6);
 window.positionGroupe = () => { const p = positionEffective(); return p ? { ...p } : null; };
+// (v441) Un voyage en cours (villages_regionaux.js : Eraldur ne s'ouvre pas en route).
+window.voyageGroupeEnCours = () => !!(voyage && voyage.Id);
 // (v331) La position telle que la base la dit, même en attente, et son lieu.
 window.positionGroupeBrute = () => {
     const p = partie && partie.Position_Groupe;
