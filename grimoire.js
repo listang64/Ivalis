@@ -159,7 +159,8 @@
     // à fond transparent (1672 × 941) posé à même le papier, à cheval sur la reliure :
     // la moitié gauche sur la page de gauche, l'autre sur celle de droite.
     // (v399) Nico : « change l'image du village par celle-là plutôt » (même taille, même fond transparent).
-    const IMAGE_VILLAGE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794695518/IMG_2272_t1qzz5.png";
+    // (v432) Nico : « remplace l'image du village par celle-ci ».
+    const IMAGE_VILLAGE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794984079/IMG_2275_ncxeo8.png";
     const IMAGE_VILLAGE_PAGES = reduite(IMAGE_VILLAGE, 1600);
     const ASPECT_VILLAGE = 1672 / 941;
     const pages = {};

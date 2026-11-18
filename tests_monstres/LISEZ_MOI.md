@@ -12187,3 +12187,10 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - **L'Inquisiteur** : niveau 1, +1 compétence, la résistance au feu (un Ondari immunisé au Brûlé) et +1 dégât à ses attaques de feu (plus de 10 % de Brûlé offerts : 5 %, comme tous) ; niveau 3, la Combustion instantanée ; niveau 5, l'Aura brûlante — un ennemi Brûlé qui commence son tour à son contact prend 3 dégâts de feu, sans résistance magique, rien s'il résiste au feu (auraBrulanteDebutDeTour, cerveau_combat.js, au début de chaque tour) ; niveau 9, la Terreur ardente (une fois par combat).
 - **La portée d'une arme** (« s'applique bien à tous les sorts créés avec pour base l'arme en question ? ») : la portée et l'allonge d'une arme ne servent que les cartes forgées pour son type (une fronde tenue avec une dague n'allonge plus les coups de dague) ; une carte d'avant la Forge garde l'ancienne règle.
 - corrections_v431.mjs (la règle, la Forge, Contre et Absorption, la portée) ; inquisiteur.mjs (l'Aura brûlante par le vrai cerveau), hoplite, corrections_v429, v416_vargen, v427_pugiliste, v427_surpuissance, bouclier_absorption_contre, tableaux_nico, moteur_pur, corrections_v267, talents suivent.
+
+## v432 — « S'enfoncer dans la forêt » n'est pas un jet de Force ; le nouveau village ; l'aquarelle du Groupe
+
+- **Le filet des mots** (Nico : « mon personnage parlait de s'enfoncer dans la forêt, qu'il était trop tard ; le jeu m'a fait faire un jet de Force pour “s'enfoncer” ») : « enfoncer / défoncer » ne demande un jet de Force qu'avec ce qu'on enfonce (une porte, un mur, une grille, une barricade…), jamais « s'enfoncer » ni « on s'enfonce dans la forêt » (un déplacement). L'Arbitre IA lit aussi « enfoncer une porte (pas s'enfoncer dans la forêt) ».
+- **Le village** : la nouvelle image de Nico (IMG_2275, 1672 × 941 comme l'ancienne : le découpage sur les deux pages ne change pas). Les bancs qui la simulent suivent.
+- **La page du Groupe** : une tache d'aquarelle dorée sous « La compagnie » et sous « Réputation ici ».
+- corrections_v432.mjs le vérifie.

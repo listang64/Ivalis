@@ -23,6 +23,9 @@ const son = () => { try { if (typeof window.jouerSonClic === "function") window.
 const FLEURON = `<svg class="fleuron fleuron-groupe" viewBox="0 0 200 24" aria-hidden="true"><path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>`;
 const TEINTE_GROUPE = { couleurs: ["#b3261e", "#c8402f", "#8f1d15"], opacite: 0.3, nom: "groupe" };
 const TEINTE_SUIVEURS = { couleurs: ["#5e7f59", "#7d9c6f", "#476944"], opacite: 0.3, nom: "suiveurs" };
+// (v432) Nico : « sous le petit titre La compagnie, une tache d'aquarelle pour le mettre en valeur ;
+// pareil pour Réputation ici ».
+const TEINTE_SOUS_TITRES = { couleurs: ["#e8a43a", "#f0bf55", "#d1862c"], opacite: 0.6, nom: "sous-titres-groupe" };
 const TEINTE_AVENTURIERS = { couleurs: ["#c9772e", "#e0a046", "#a5532a"], opacite: 0.5, nom: "aventuriers" };
 
 let pages = null;                 // { g, d }
@@ -107,8 +110,7 @@ function htmlReputation(l) {
     const graduations = Array.from({ length: 11 }, (_, i) => { const gx = 10 + i * 18, grand = i % 5 === 0;
         return `<line x1="${gx}" y1="${grand ? 9 : 11}" x2="${gx}" y2="${grand ? 19 : 17}"/>`; }).join("");
     return `<div class="reputation-groupe">
-        ${lavis({ couleurs: ["#d8b56a", "#e9cc86", "#c49a4a"], opacite: 0.32, nom: "reputation" }, "groupe-reputation")}
-        <div class="titre-reputation">Réputation ici</div>
+        <div class="titre-reputation">${lavis(TEINTE_SOUS_TITRES, "groupe-reputation")}<span>Réputation ici</span></div>
         <div class="ligne-reputation"><span>honnis</span>
         <svg class="regle-reputation" viewBox="0 0 200 28" aria-hidden="true">
           <path class="trait-reputation" d="M10 14 C 60 12.8, 140 15.2, 190 14"/>${graduations}
@@ -152,7 +154,7 @@ function htmlGauche() {
           ${dateDuJeu() ? `<div><span class="cle-groupe">Quand</span> ${echapper(dateDuJeu())}</div>` : ""}
         </div>
         ${!l.nature && l.reputation != null ? htmlReputation(l) : ""}
-        <div class="sous-titre-groupe compagnie-groupe">La compagnie</div>
+        <div class="sous-titre-groupe compagnie-groupe">${lavis(TEINTE_SOUS_TITRES, "groupe-compagnie")}<span>La compagnie</span></div>
         <div class="liste-heros-groupe" style="--n:${Math.max(1, heros.length)}">${ligneHeros || `<p class="fiche-attente">Aucun héros dans le groupe.</p>`}</div>
         <button type="button" class="bouton-aventuriers-groupe" data-action="groupe" data-gp="aventuriers">${lavis(TEINTE_AVENTURIERS, "aventuriers-groupe")}${cadre("aventuriers-groupe", 1.3)}<span>Les aventuriers ›</span></button>
       </div>`;

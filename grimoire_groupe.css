@@ -110,7 +110,6 @@
 /* Les avatars un peu moins hauts : la réputation a pris sa place, les noms restent sur la page. */
 .heros-groupe { flex-basis: min(calc(var(--u) * 30), calc((100% - (var(--n, 1) - 1) * var(--gouttiere)) / var(--n, 1))); }
 .avatar-heros-groupe { aspect-ratio: 1 / 1.5; }
-.reputation-groupe .lavis { left: -2%; top: -6%; width: 104%; height: 112%; }
 .reputation-groupe > *:not(.lavis) { position: relative; }
 .titre-reputation { font-family: 'Cinzel', serif !important; font-size: calc(var(--u) * 2.6); letter-spacing: 0.14em; text-transform: uppercase; color: #6b1a10; }
 .ligne-reputation { width: 100%; display: flex; align-items: center; gap: calc(var(--u) * 1.4); font-size: calc(var(--u) * 2.3); font-style: italic; color: #6b4a2b; }
@@ -126,3 +125,8 @@
   width: calc(var(--u) * 3.8); height: calc(var(--u) * 3.8); padding: 0 !important; background: none !important; border: none !important; opacity: 0.55; }
 .cadre-suiveur .parler-groupe:hover { opacity: 1; background: none !important; }
 .actions-suiveur { justify-content: flex-end; }
+
+/* (v432) La tache d'aquarelle sous « La compagnie » et « Réputation ici ». */
+.compagnie-groupe, .titre-reputation { position: relative; isolation: isolate; padding: calc(var(--u) * 0.5) calc(var(--u) * 4); }
+.compagnie-groupe > .lavis, .titre-reputation > .lavis { left: -6%; top: -30%; width: 112%; height: 160%; z-index: -1; }
+.compagnie-groupe > span, .titre-reputation > span { position: relative; }
