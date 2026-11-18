@@ -14,6 +14,7 @@
 // (v437) « Le tableau, mets-le partout dans les deux pages, quitte à étirer ; un léger fondu sur sa bordure. »
 // (v440) « Sur le village, charge l'image du Hall d'avance » ; « l'aquarelle sous le titre Hall de guilde un peu plus opaque ».
 // (v446) « Cette image en fond des pages clans, comme pour les races, 10 % d'opacité en moins ; le nom du clan en doré. »
+// (v447) « Le fanion sur fond magenta fluo, détouré comme les personnages. »
 // Lancer : node tests_monstres/corrections_v434.mjs
 import fs from 'fs';
 import http from 'http';
@@ -306,9 +307,9 @@ const surPiece = (id) => G((id) => { const [g] = window.GRIMOIRE_GUILDE.pagesPie
 const surClan = (n) => G((n) => { const c = window.GRIMOIRE_FICHES.pages().clans; const i = window.GRIMOIRE.indexDe(c[2 * n]), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1); }, n);
 const tournerEnArriere = async () => { await G(() => window.GRIMOIRE_PAGEFLIP.flipPrev("top")); await p.waitForTimeout(200); await pose(); };
 
-// Les faux OpenAI et Cloudinary : un fanion rouge et or sur fond blanc (avec un cœur blanc, brodé), 300 × 450.
+// Les faux OpenAI et Cloudinary : un fanion rouge et or (avec un cœur blanc, brodé), 300 × 450 ; (v447) sur fond magenta fluo.
 const FANION_B64 = await p.evaluate(() => { const c = document.createElement("canvas"); c.width = 300; c.height = 450; const x = c.getContext("2d");
-  x.fillStyle = "#ffffff"; x.fillRect(0, 0, 300, 450); x.fillStyle = "#6b3a1a"; x.fillRect(40, 30, 220, 12);
+  x.fillStyle = "#ff00ff"; x.fillRect(0, 0, 300, 450); x.fillStyle = "#6b3a1a"; x.fillRect(40, 30, 220, 12);
   x.fillStyle = "#b3261e"; x.beginPath(); x.moveTo(70, 42); x.lineTo(230, 42); x.lineTo(230, 380); x.lineTo(150, 330); x.lineTo(70, 380); x.closePath(); x.fill();
   x.fillStyle = "#ffffff"; x.fillRect(130, 150, 40, 40); x.fillStyle = "#e8c25a"; x.fillRect(110, 220, 80, 20);
   return c.toDataURL("image/png").split(",")[1]; });
@@ -512,14 +513,15 @@ await section(async () => {
   verifier("le clan est écrit (Clans/J1 : son nom, la description de sa bannière)", await attendreQue(async () => { const c = await clan(); return c && c.Nom_Clan === "Les Lames d'Héra" && /épée d'or/.test(c.Description_Banniere); }, 4000), JSON.stringify(await clan()));
   verifier("le fanion est dessiné, déposé, et son adresse enregistrée", await attendreQue(async () => { const c = await clan(); return c && /Clans\/fanion_/.test(c.URL_Banniere || "") && !c.Banniere_En_Cours; }, 8000), JSON.stringify(await clan()));
   const o = appels.openai[0] || {};
-  verifier("l'IA : un fanion réaliste, l'emblème décrit, fond blanc uni, sans ombre, sans texte", /realistic heraldic pennant/.test(o.prompt) && /épée d'or/.test(o.prompt) && /pure flat white/.test(o.prompt) && /no shadow/.test(o.prompt) && /No text/.test(o.prompt) && o.size === "1024x1536", (o.prompt || "").slice(0, 120));
+  verifier("(v447) l'IA : un fanion réaliste, l'emblème décrit, sur fond magenta fluo uni (#FF00FF) sans reflet magenta, sans ombre, sans texte", /realistic heraldic pennant/.test(o.prompt) && /épée d'or/.test(o.prompt) && /FLUORESCENT MAGENTA \(#FF00FF\)/.test(o.prompt) && /no magenta, pink or purple reflections/.test(o.prompt) && /no shadow/.test(o.prompt) && /No text/.test(o.prompt) && o.size === "1024x1536", (o.prompt || "").slice(0, 120));
   verifier("Cloudinary reçoit l'image déjà détourée, dans « Clans »", appels.cloud.length === 1 && /Clans/.test(appels.cloud[0]) && !!fichierDepose);
-  // L'image déposée : le blanc du fond est parti, le blanc brodé (au cœur du fanion) est resté ; recadrée sur le fanion.
+  // L'image déposée : (v447) le magenta du fond est parti (le détourage des personnages), le blanc brodé est resté ; recadrée sur le fanion.
   const px = await G(async (b64) => { const img = new Image(); img.src = "data:image/png;base64," + b64; await img.decode();
     const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const x = c.getContext("2d"); x.drawImage(img, 0, 0);
     const a = (X, Y) => x.getImageData(X, Y, 1, 1).data;
     return { w: img.width, h: img.height, coin: a(2, img.height - 3)[3], rouge: Array.from(a(Math.round(img.width / 2) - 50, Math.round(img.height / 2))), coeur: Array.from(a(130 - 40 + 20, 150 - 30 + 20)) }; }, fichierDepose);
-  verifier("le fond blanc retiré (transparent), le fanion recadré (220 × 350)", px.w === 220 && px.h === 350 && px.coin === 0, JSON.stringify(px));
+  verifier("(v447) le fond magenta retiré (transparent), le fanion recadré (220 × 350)", px.w === 220 && px.h === 350 && px.coin === 0, JSON.stringify(px));
+  verifier("(v447) …par le détourage des personnages (app.js, detourerFondMagenta)", /window\.detourerFondMagenta\(source\)/.test(lire("grimoire_clans.js")) && !/retirerFondBlanc/.test(lire("grimoire_clans.js")));
   verifier("…les couleurs du fanion gardées, et le blanc brodé de l'emblème aussi", px.rouge[0] > 150 && px.rouge[3] === 255 && px.coeur[0] > 240 && px.coeur[3] === 255, JSON.stringify([px.rouge, px.coeur]));
   // La page du clan.
   await G(() => window.GRIMOIRE_FICHES.allerAuxAventuriers());

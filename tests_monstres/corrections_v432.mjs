@@ -104,8 +104,8 @@ verifier("plus aucune trace de l'ancienne (IMG_2272)", !/IMG_2272/.test(lire("gr
 
 console.log("\n3. LE GROUPE : L'AQUARELLE SOUS LES DEUX PETITS TITRES");
 const g = lire("grimoire_groupe.js");
-verifier("« La compagnie » et « Réputation ici » ont leur tache d'aquarelle (TEINTE_SOUS_TITRES)",
-  /compagnie-groupe">\$\{lavis\(TEINTE_SOUS_TITRES, "groupe-compagnie"\)\}<span>La compagnie<\/span>/.test(g) && /titre-reputation">\$\{lavis\(TEINTE_SOUS_TITRES, "groupe-reputation"\)\}<span>Réputation ici<\/span>/.test(g));
+verifier("« Réputation ici » a sa tache d'aquarelle (TEINTE_SOUS_TITRES) ; (v447) « La compagnie » n'est plus là",
+  !/<span>La compagnie<\/span>/.test(g) && /titre-reputation">\$\{lavis\(TEINTE_SOUS_TITRES, "groupe-reputation"\)\}<span>Réputation ici<\/span>/.test(g));
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

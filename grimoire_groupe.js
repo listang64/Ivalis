@@ -159,7 +159,7 @@ function htmlGauche() {
           ${lieu ? `<div><span class="cle-groupe">Où</span> ${echapper(lieu)}</div>` : ""}
         </div>
         ${!l.nature && l.reputation != null ? htmlReputation(l) : ""}
-        <div class="sous-titre-groupe compagnie-groupe">${lavis(TEINTE_SOUS_TITRES, "groupe-compagnie")}<span>La compagnie</span></div>
+        ${/* (v447) Nico : « sur la page groupe, vire le titre La compagnie » */""}
         <div class="liste-heros-groupe" style="--n:${Math.max(1, heros.length)}">${ligneHeros || `<p class="fiche-attente">Aucun héros dans le groupe.</p>`}</div>
         <button type="button" class="bouton-aventuriers-groupe" data-action="groupe" data-gp="aventuriers">${lavis(TEINTE_AVENTURIERS, "aventuriers-groupe")}${cadre("aventuriers-groupe", 1.3)}<span>Les clans ›</span></button>
       </div>`;

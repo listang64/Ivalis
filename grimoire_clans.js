@@ -5,7 +5,8 @@
 //  connexion, une popup de création de son clan, avec le nom de son clan et en
 //  dessous la description de sa bannière. Une fois validé, l'IA crée un fanion
 //  réaliste avec l'emblème de son clan sur fond blanc sans ombrage, hébergé sur
-//  Cloudinary ; un algo supprime le fond blanc, et l'image va sur la page de
+//  Cloudinary ; un algo supprime le fond blanc (v447 : un fond magenta, détouré comme
+//  les personnages), et l'image va sur la page de
 //  droite du clan, en grand, collée en haut de page. » « On peut fermer la popup :
 //  elle revient à la connexion suivante ; le MJ n'est pas un joueur. » « Un bouton
 //  dans les paramètres pour reboot un clan : son nom, sa description et son image
@@ -114,47 +115,29 @@ export async function fonderClan(id, nom, description) {
 }
 
 // ---------------------------------------------------------------------
-//  LE FANION : l'IA le peint sur fond blanc, le blanc s'en va, Cloudinary le garde.
+//  LE FANION : l'IA le peint sur fond magenta, le magenta s'en va, Cloudinary le garde.
 // ---------------------------------------------------------------------
+// (v447) Nico : « que l'image se fasse sur fond magenta fluo et que l'algo vire toute cette couleur,
+// comme pour les personnages, ce sera plus efficace » (le blanc du fond se confondait avec le
+// blanc du tissu et des emblèmes). Le fond magenta (#FF00FF), sans reflet magenta sur le fanion ;
+// le détourage des personnages (app.js, detourerFondMagenta) ; puis le recadrage sur le fanion.
 export function promptFanion(nom, description) {
     return `A single realistic heraldic pennant (a fanion: a hanging cloth banner) for a fantasy clan of adventurers called "${nom}".
 The emblem of the clan, embroidered and painted on the fabric: ${description}
 The pennant hangs vertically from a short horizontal wooden pole, seen from the front, fully visible and centered, with a natural cloth texture, stitched borders and a pointed or swallow-tailed bottom.
-Realistic, detailed, rich colors.
-The background is pure flat white (#FFFFFF), completely empty: no shadow, no drop shadow, no ground, no wall, no scenery, no gradient, no frame.
+Realistic, detailed, rich colors, lit by natural warm daylight.
+TECHNICAL RULE (overrides everything): the background is a totally flat, uniform FLUORESCENT MAGENTA (#FF00FF), filling all the empty space around and behind the pennant: no shadow, no drop shadow, no ground, no wall, no scenery, no gradient, no frame.
+The magenta background is only a technical mask and lights NOTHING: no magenta, pink or purple reflections, rims or halos on the pennant, its pole or its fabric (unless the emblem described is itself of these colors).
 No text, no letters, no words anywhere on the image.`;
 }
-// Le blanc retiré : seul le blanc relié au bord de l'image part (celui qu'on aurait
-// brodé dans l'emblème reste) ; le liseré du dessin s'adoucit ; puis l'image est
-// recadrée sur le fanion (pour qu'il se colle au haut de la page).
-export function retirerFondBlancPixels(data, w, h, seuil = 236, ecart = 18) {
-    const blanc = (i) => { const r = data[i], g = data[i + 1], b = data[i + 2]; return Math.min(r, g, b) >= seuil && Math.max(r, g, b) - Math.min(r, g, b) <= ecart; };
-    const fond = new Uint8Array(w * h), pile = [];
-    const pousser = (x, y) => { const k = y * w + x; if (fond[k] || !blanc(k * 4)) return; fond[k] = 1; pile.push(k); };
-    for (let x = 0; x < w; x++) { pousser(x, 0); pousser(x, h - 1); }
-    for (let y = 0; y < h; y++) { pousser(0, y); pousser(w - 1, y); }
-    while (pile.length) {
-        const k = pile.pop(), x = k % w, y = (k - x) / w;
-        if (x > 0) pousser(x - 1, y); if (x < w - 1) pousser(x + 1, y);
-        if (y > 0) pousser(x, y - 1); if (y < h - 1) pousser(x, y + 1);
-    }
-    for (let k = 0; k < w * h; k++) {
-        const i = k * 4;
-        if (fond[k]) { data[i + 3] = 0; continue; }
-        // Au bord du fond, un pixel presque blanc devient à demi transparent (pas de liseré blanc).
-        const x = k % w, y = (k - x) / w;
-        const voisinFond = (x > 0 && fond[k - 1]) || (x < w - 1 && fond[k + 1]) || (y > 0 && fond[k - w]) || (y < h - 1 && fond[k + w]);
-        if (voisinFond) {
-            const m = Math.min(data[i], data[i + 1], data[i + 2]);
-            if (m > 200) data[i + 3] = Math.round(data[i + 3] * Math.max(0, Math.min(1, (255 - m) / 55)));
-        }
-    }
-    // La boîte du fanion (ce qui reste visible).
+// Le recadrage : l'image détourée, réduite à la boîte du fanion (ce qui reste visible), pour
+// qu'il se colle au haut de la page.
+export function boiteVisible(data, w, h) {
     let x0 = w, y0 = h, x1 = -1, y1 = -1;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (data[(y * w + x) * 4 + 3] > 12) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
     return x1 < 0 ? { x: 0, y: 0, l: w, h } : { x: x0, y: y0, l: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
-export function retirerFondBlanc(source) {
+function recadrer(source) {
     return new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = "Anonymous";
@@ -164,18 +147,20 @@ export function retirerFondBlanc(source) {
                 c.width = img.naturalWidth || img.width; c.height = img.naturalHeight || img.height;
                 const ctx = c.getContext("2d", { willReadFrequently: true });
                 ctx.drawImage(img, 0, 0);
-                const im = ctx.getImageData(0, 0, c.width, c.height);
-                const boite = retirerFondBlancPixels(im.data, c.width, c.height);
-                ctx.putImageData(im, 0, 0);
+                const boite = boiteVisible(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
                 const r = document.createElement("canvas");
                 r.width = boite.l; r.height = boite.h;
                 r.getContext("2d").drawImage(c, boite.x, boite.y, boite.l, boite.h, 0, 0, boite.l, boite.h);
                 resolve(r.toDataURL("image/png"));
-            } catch (e) { console.warn("Le fanion : le blanc n'a pas pu être retiré", e); resolve(source); }
+            } catch (e) { console.warn("Le fanion : le recadrage", e); resolve(source); }
         };
         img.onerror = () => resolve(source);
         img.src = source;
     });
+}
+export async function detourerFanion(source) {
+    const detouree = typeof window.detourerFondMagenta === "function" ? await window.detourerFondMagenta(source) : source;
+    return recadrer(detouree || source);
 }
 async function signature(message) {
     const buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(message));
@@ -209,7 +194,7 @@ export async function dessinerFanion(id) {
         const d = j && j.data && j.data[0];
         if (!d) throw new Error("OpenAI : " + JSON.stringify((j && j.error) || j).slice(0, 200));
         const brute = d.b64_json ? "data:image/png;base64," + d.b64_json : d.url;
-        const detouree = await retirerFondBlanc(brute);
+        const detouree = await detourerFanion(brute);
         const url = await deposer(detouree, c);
         // Le clan a pu être réinitialisé entre-temps : on ne réécrit pas un clan effacé.
         const encore = await lireClan(id);
@@ -260,4 +245,4 @@ setInterval(() => {
 }, 1500);
 
 window.CLANS_IVALIS = { lireClan, listerClans, ouvrirPopup, fermerPopup, fonderClan, dessinerFanion, dessinerEnAttente, reinitialiserClan,
-                        promptFanion, retirerFondBlanc, retirerFondBlancPixels, NOM_MAX, DESCRIPTION_MAX };
+                        promptFanion, detourerFanion, boiteVisible, NOM_MAX, DESCRIPTION_MAX };

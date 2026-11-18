@@ -12296,3 +12296,9 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - Nico : « cette image en fond des pages clans, exactement comme pour les races, en baissant de 10 % l'opacité générale de l'image ; le nom du clan en doré ». L'image (une voûte de pierre ouverte sur la nuit, IMAGE_CLANS, grimoire_fiches.js) couvre la double page de chaque clan, comme les peuples de la création : à gauche voilée en dégradé sous la liste des membres (presque effacée au bord, entière vers la pliure), à droite entière sous le fanion ; toute l'image à 90 % d'opacité (.fond-clan).
 - Le nom du clan en or (le dégradé doré et l'ombre du nom du héros sur sa fiche) ; sur ce fond sombre, le fleuron sous le nom et la place vide du fanion passent aussi à l'or.
 - corrections_v434.mjs le vérifie (ses contrôles « v446 ») ; V446_IMAGE=chemin y sert la vraie image pour une capture.
+
+## v447 — Le Groupe sans « La compagnie » ; le fanion sur fond magenta
+
+- **La page du Groupe** (Nico : « vire le titre La compagnie ») : les héros suivent directement la réputation.
+- **Le fanion des clans** (« que l'image se fasse sur fond magenta fluo et que l'algo vire toute cette couleur, comme pour les personnages ») : MIA peint le fanion sur un fond magenta fluo uni (#FF00FF), sans reflet magenta sur le tissu ; le détourage est celui des personnages (app.js, detourerFondMagenta), puis le fanion est recadré (grimoire_clans.js, detourerFanion). Le blanc du tissu et des emblèmes ne risque plus d'être pris pour le fond.
+- corrections_v434.mjs (ses contrôles « v447 »), v418_livre et v432 le vérifient.

@@ -319,6 +319,7 @@ await section(async () => {
                  haut: (n.getBoundingClientRect().top - pg.getBoundingClientRect().top) / pg.getBoundingClientRect().height } : null; });
   verifier("(v438) à gauche : plus de titre « Le groupe » ; son nom (Les Lames d'Héra) tout en haut, en plus gros, sur son lavis",
            !/Le groupe/.test(g) && nom && nom.texte === "Les Lames d'Héra" && nom.premier && nom.taille > 6.5 && nom.lavis && nom.haut < 0.08, JSON.stringify(nom));
+  verifier("(v447) plus de titre « La compagnie » au-dessus des héros", !/La compagnie/.test(g) && !(await G(() => !!document.querySelector('#grimoire-groupe-g .compagnie-groupe'))), g.slice(0, 200));
   verifier("…où (Le port de Mégara), la réputation ici ; (v439) plus de « Quand »", /Où Le port de Mégara/.test(g) && !/Quand/.test(g) && /Réputation ici honnis\s*adulés/.test(g), g.slice(0, 260));
   // (v438) « Sous la barre, juste les mots clés, avec une aquarelle grise légère sous chacun, comme des bulles. »
   const bulles = await G(() => [...document.querySelectorAll("#grimoire-groupe-g .mots-reputation .bulle-reputation")].map(b => {
