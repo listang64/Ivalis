@@ -58,7 +58,7 @@ const REGLES = `RÈGLES DE CRÉATION (absolues) :
 8. SOBRIÉTÉ : du concret, des détails sensoriels, des gens crédibles ; du mystère, oui, mais du mystère qui tient debout.
 9. UN LIEU, PAS UNE FOIRE (v312) : l'accroche du MJ tourne autour de CE lieu — une seule piste, simple. Pas de rencontres annexes, pas d'autres sites alentour (autel, camp, ruine voisine), pas de méchants ajoutés pour faire du combat. Les menaces citées dans le descriptif de la région sont possibles mais pas obligatoires : beaucoup de lieux sont paisibles.`;
 
-function promptLieu(region, graine, terrain, nomsExistants, lieuxProches) {
+function promptLieu(region, graine, terrain, nomsExistants, lieuxProches, impose) {
     const carte = (window.CARTES_REGIONALES || {})[region] || {};
     const lore = typeof window.loreDeLaRegion === "function" ? window.loreDeLaRegion(region) : "";
     const descriptif = typeof window.descriptifRegion === "function" ? window.descriptifRegion(region).texte : (carte.description || "");
@@ -72,7 +72,13 @@ ${lore}
 LE TERRAIN à cet endroit (lu sur la carte) : ${t}.
 ${lieuxProches && lieuxProches.length ? `Lieux connus non loin : ${lieuxProches.join(" ; ")}.\n` : ""}Les lieux qui existent déjà sur cette carte : ${JSON.stringify(nomsExistants)}.
 
-LA GRAINE tirée au sort (brode le lieu dessus) :
+${impose ? `CE LIEU EST CELUI D'UNE MISSION DE GUILDE (v443) — il existe pour elle :
+- Son nom, à garder exactement : « ${impose.nom} ». Son type : ${impose.type || "à ta guise"}.
+- Ce qu'on en sait : ${impose.description || "(rien de plus)"}
+- La mission : ${impose.mission || ""}
+Brode le lieu pour qu'il serve cette mission (l'accroche du MJ dit comment) ; la graine ci-dessous n'est qu'une inspiration.
+
+` : ""}LA GRAINE tirée au sort (brode le lieu dessus) :
 - Type : ${graine.typeNom} (${graine.familleNom}), ${graine.variante}.
 - État : ${graine.etat}. Ambiance : ${graine.ambiance}.
 - Accroche : ${graine.accroche}.
@@ -97,13 +103,13 @@ Réponds OBLIGATOIREMENT avec un JSON valide, exactement dans ce format :
 }
 
 // LA FORGE : MIA_POI, à une température qui ondule (comme MIA_PNJ).
-async function inventerLieu(c, region, graine, terrain, nomsExistants, lieuxProches) {
+async function inventerLieu(c, region, graine, terrain, nomsExistants, lieuxProches, impose) {
     const temperature = parseFloat((Math.random() * (1.20 - 0.80) + 0.80).toFixed(2));
     console.log(`[MIA_POI] 🎲 ${graine.typeNom} ${graine.variante} — forge créative à ${temperature}°C…`);
     const rep = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${c.gemini}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            systemInstruction: { parts: [{ text: promptLieu(region, graine, terrain, nomsExistants, lieuxProches) }] },
+            systemInstruction: { parts: [{ text: promptLieu(region, graine, terrain, nomsExistants, lieuxProches, impose) }] },
             contents: [{ role: "user", parts: [{ text: "Fais naître ce lieu." }] }],
             generationConfig: { temperature, responseMimeType: "application/json" }
         })
@@ -143,7 +149,9 @@ window.creerLieuPoi = async function(options) {
     const surCarte = Object.values(window.VILLAGES_REGIONAUX || {}).filter(v => v.numero === region);
     const proches = typeof window.lieuxProchesDuGroupe === "function"
         ? window.lieuxProchesDuGroupe({ Position_Groupe: { Region: region, x, y }, Lieu_Actuel: "" }).map(l => l.texte) : [];
-    const lieu = await inventerLieu(c, region, graine, terrain, surCarte.map(v => v.nom), proches);
+    // (v443) `o.impose` : le lieu d'une mission de guilde (son nom gardé tel quel).
+    const lieu = await inventerLieu(c, region, graine, terrain, surCarte.map(v => v.nom), proches, o.impose || null);
+    if (o.impose && o.impose.nom) lieu.nom = String(o.impose.nom).trim();
     // 4. La fiche et les bâtiments.
     const id = nouvelIdLieu(lieu.nom);
     const fiche = {
@@ -152,7 +160,8 @@ window.creerLieuPoi = async function(options) {
         Accroche_MJ: lieu.accroche, Visuel_Village: lieu.visuel, Prompt_Image: lieu.prompt,
         Reputations: {}, Stigmates: lieu.stigmates, URL_Cloudinary: "", URL_Calque_Region: "",
         Carte_Regionale: region, Position_Region: { x: Math.round(x * 1e5) / 1e5, y: Math.round(y * 1e5) / 1e5, taille: TAILLE_POI },
-        Origine: "POI", Decouvert_Par: window.ID_PARTIE_COURANTE || "", Cree_Le: Date.now(), Calque_Plein: true
+        Origine: o.impose ? "Mission" : "POI", ...(o.impose && o.impose.missionId ? { Mission_Guilde: o.impose.missionId } : {}),
+        Decouvert_Par: window.ID_PARTIE_COURANTE || "", Cree_Le: Date.now(), Calque_Plein: true
     };
     await setDoc(doc(db, "Monde_Lieux", id), fiche);
     const batiments = [];

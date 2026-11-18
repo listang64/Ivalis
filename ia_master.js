@@ -2458,6 +2458,11 @@ window.declencherTourIA = async function(options) {
             try { contexte += `\n${await window.contexteEnvironnementMJ(dataPartieMJ)}\n`; }
             catch (e) { console.error("Environnement du MJ (le tour continue) :", e); }
         }
+        // (v443) LA MISSION DE GUILDE EN COURS (missions_guilde.js) : un rappel ; au lieu de la mission, son plan.
+        if (typeof window.contexteMissionMJ === "function") {
+            try { const cm = window.contexteMissionMJ(dataPartieMJ, lieuActuel); if (cm) contexte += `\n${cm}\n`; }
+            catch (e) { console.error("Mission de guilde (le tour continue) :", e); }
+        }
 
         // LES HÉROS (v312). Nico : « le narrateur n'a pas pris en compte le genre féminin
         // de mon personnage ; envoie-lui les fiches personnages avec ce genre d'infos ».
@@ -2688,6 +2693,10 @@ window.declencherTourIA = async function(options) {
                         await analyserStigmates(lieuFinal, reponseTexte);
                         await analyserReputation(window.ID_PARTIE_COURANTE, lieuFinal, reponseTexte);
                     } else if (nomsPnjPresents.length) await analyserMortsPNJ(nomsPnjPresents, reponseTexte);   // (v418) les suiveurs, en pleine nature
+                    // (v443) La mission de guilde : ses étapes, sa réussite ou son échec (MIA_SUIVI_MISSION).
+                    if (window.MISSIONS_GUILDE && typeof window.MISSIONS_GUILDE.suivreApresMJ === "function") {
+                        try { await window.MISSIONS_GUILDE.suivreApresMJ(reponseTexte); } catch (e) { console.error("[Mission de guilde] Le suivi :", e); }
+                    }
                     {
                         // (v411) LES FILS INVISIBLES : les âmes de la scène (ceux qui y étaient au
                         // début, ceux qui y sont à la fin, et chaque héros). (v418) Aussi en pleine

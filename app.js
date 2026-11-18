@@ -1721,7 +1721,8 @@ window.RESISTANCES_SELON_NIVEAU = [
 ];
 window.nbResistancesCreature = function(palier, options) {
     const o = options || {};
-    const niveau = Math.max(1, Math.round(Number(o.niveau !== undefined ? o.niveau : window.NIVEAU_GROUPE) || 1));
+    // (v443) au lieu d'une mission de guilde, le niveau des créatures (monstres.js : C −2, A +2)
+    const niveau = Math.max(1, Math.round(Number(o.niveau !== undefined ? o.niveau : (typeof window.niveauDesCreatures === "function" ? window.niveauDesCreatures() : window.NIVEAU_GROUPE)) || 1));
     const tranche = window.RESISTANCES_SELON_NIVEAU.find(t => niveau <= t.jusqua);
     const p = String(palier || "").trim();
     const chef = !!o.leader || p === "Boss" || p === "Élite" || p === "Elite";
@@ -4106,6 +4107,11 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
          if (typeof window.appliquerVoyageDeLaPartie === "function") {
              try { window.appliquerVoyageDeLaPartie(dataPartie); }
              catch (e) { console.error("Voyage du groupe (le jeu continue) :", e); }
+         }
+         // (v443) LES MISSIONS DE GUILDE (missions_guilde.js) : le vote, la mission en cours.
+         if (typeof window.appliquerMissionDeLaPartie === "function") {
+             try { window.appliquerMissionDeLaPartie(dataPartie); }
+             catch (e) { console.error("Missions de guilde (le jeu continue) :", e); }
          }
 
          // LES COMBATS DU RÉCIT (v278, combat_rp.js) : le verdict de MIA_COMBAT,

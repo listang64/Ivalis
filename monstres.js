@@ -558,9 +558,12 @@ const tricheDesFormules = (f) => {
 };
 // La triche du moment, au niveau du groupe d'aujourd'hui : le % de DÉGÂTS
 // (v406 : plus les PV ni les soins — voir tricheActuelle).
-window.tricheMonstresActuelle = () => window.tricheDuNiveau(window.NIVEAU_GROUPE || 1);
+// (v443) LE NIVEAU DES CRÉATURES : celui du groupe ; au lieu d'une mission de guilde,
+// décalé selon son rang (missions_guilde.js : C −2, B +0, A +2), jamais sous 1.
+window.niveauDesCreatures = () => Math.max(1, (window.NIVEAU_GROUPE || 1) + (typeof window.decalageNiveauMission === "function" ? (Number(window.decalageNiveauMission()) || 0) : 0));
+window.tricheMonstresActuelle = () => window.tricheDuNiveau(window.niveauDesCreatures());
 // (v406) Les trois, au niveau du groupe d'aujourd'hui : { degats, pv, soins }.
-window.tricheActuelle = () => window.tricheDeNiveau(window.NIVEAU_GROUPE || 1);
+window.tricheActuelle = () => window.tricheDeNiveau(window.niveauDesCreatures());
 
 const borner = (famille, v, defaut) => {
     // Une case vidée (ou un champ absent) garde la valeur d'avant.
@@ -605,11 +608,11 @@ window.normaliserReglagesMonstres = function(brut) {
     });
     // La triche par stature d'avant (Bonus_Degats_Pct, v255) ne se lit plus :
     // c'est le niveau du groupe qui la donne, la même pour toutes les statures.
-    const pct = window.tricheDuNiveau(window.NIVEAU_GROUPE || 1, triche.tricheDegats);
+    const pct = window.tricheDuNiveau(window.niveauDesCreatures(), triche.tricheDegats);
     return {
         bonusDegats: Object.fromEntries(PALIERS_TENUS.map(p => [p, pct])),
         // (v406) La valeur fixe ajoutée aux soins des créatures, à ce niveau.
-        soinsFixes: triche.tricheSoins[niveauTriche(window.NIVEAU_GROUPE || 1) - 1],
+        soinsFixes: triche.tricheSoins[niveauTriche(window.niveauDesCreatures()) - 1],
         ...triche,
         bonusSortsPct: borner("bonusSortsPct", src.Bonus_Sorts_Pct, d.bonusSortsPct),
         deplacement: parPalier("deplacement", "Deplacement"),

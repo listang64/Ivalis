@@ -26,7 +26,7 @@
 //  mission ». Un toucher en dehors la referme. Le bruit d'une page qu'on attrape.
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
-import { doc, getDoc, onSnapshot, runTransaction, setDoc, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { doc, getDoc, onSnapshot, runTransaction, setDoc, deleteDoc, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 const echapper = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const son = (id) => { try { if (typeof window.jouerSonEvenement === "function") window.jouerSonEvenement(id); } catch (e) {} };
@@ -240,7 +240,9 @@ export const missionDe = (slot) => { const l = tableau && Array.isArray(tableau.
 // ---------------------------------------------------------------------
 const paragraphes = (t) => String(t || "").split(/\n+/).map(x => x.trim()).filter(Boolean).map(x => `<p>${echapper(x)}</p>`).join("");
 export function ouvrirFeuille(slot) {
-    const m = missionDe(slot);
+    // (v443) La mission d'un vote en cours peut avoir quitté le tableau (renouvelé) : le vote la garde.
+    const v = partie.Vote_Mission;
+    const m = missionDe(slot) || (v && v.Mission && Number(v.Slot) === Number(slot) ? v.Mission : null);
     if (!m) return false;
     let voile = document.getElementById("feuille-mission");
     if (!voile) {
@@ -248,7 +250,8 @@ export function ouvrirFeuille(slot) {
         voile.id = "feuille-mission";
         voile.className = "voile-feuille-mission";
         voile.addEventListener("click", (e) => {
-            if (e.target.closest(".sceau-mission")) { e.stopPropagation(); accepter(Number(voile.dataset.slot)); return; }
+            if (e.target.closest(".sceau-mission")) { e.stopPropagation(); if (!e.target.closest(".sceau-mission").disabled) accepter(Number(voile.dataset.slot)); return; }
+            if (e.target.closest(".refuser-mission")) { e.stopPropagation(); refuserMission(); fermerFeuille(); return; }
             if (!e.target.closest(".feuille-mission")) fermerFeuille();
         });
         document.body.appendChild(voile);
@@ -267,7 +270,7 @@ export function ouvrirFeuille(slot) {
           <h3>La mission</h3>${paragraphes(m.Details)}
           <h3>L'objectif</h3><p class="objectif-mission">${echapper(m.Objectif)}</p>
           <h3>Le mot du commanditaire</h3><div class="lettre-mission" style="--ecriture:'${echapper(m.Ecriture || "Caveat")}'">${paragraphes(m.Lettre)}</div>
-          <button type="button" class="sceau-mission" title="Accepter la mission"><span>Accepter<br>la mission</span></button>
+          ${htmlSceau(m)}
         </div></div>`;
     son("page-prise");
     requestAnimationFrame(() => requestAnimationFrame(() => voile.classList.add("ouverte")));
@@ -280,14 +283,399 @@ export function fermerFeuille() {
     son("page-prise");
     return true;
 }
-// Accepter : le vote du groupe (v443). D'ici là, le sceau dit qu'il arrive.
-let accepterMission = null;
-export const brancherAcceptation = (f) => { accepterMission = f; };
-function accepter(slot) {
-    if (typeof accepterMission === "function") { accepterMission(slot, missionDe(slot)); return; }
-    const sceau = document.querySelector("#feuille-mission .sceau-mission");
-    if (sceau) sceau.classList.add("bientot");
+// (v443) Le sceau selon l'état du groupe : accepter (ou voter oui), en attente des autres,
+// une mission déjà en cours, un autre vote ; « Refuser » quand un vote porte sur elle.
+function htmlSceau(m) {
+    const v = partie.Vote_Mission, enCours = partie.Mission_En_Cours && partie.Mission_En_Cours.Id;
+    const surElle = v && v.Id === m.Id, j = idJoueur();
+    let etat = "", aide = "";
+    if (enCours) { etat = "eteint"; aide = "Une mission est déjà en cours."; }
+    else if (v && v.Id && !surElle) { etat = "eteint"; aide = `Un vote est en cours pour « ${v.Titre} ».`; }
+    else if (surElle && (v.Votes || {})[j] === "oui") { etat = "eteint"; aide = `En attente des autres joueurs (${compterOui(v)}/${(v.Votants || []).length}).`; }
+    else if (surElle) aide = `${(v.Initiateur || {}).nom || "Un joueur"} propose cette mission : tous doivent l'accepter.`;
+    return `<button type="button" class="sceau-mission${etat ? " " + etat : ""}" title="Accepter la mission"${etat ? " disabled" : ""}><span>Accepter<br>la mission</span></button>
+        ${aide ? `<p class="aide-sceau">${echapper(aide)}</p>` : ""}
+        ${surElle ? `<button type="button" class="refuser-mission">Refuser</button>` : ""}`;
+}
+const compterOui = (v) => (v.Votants || []).filter(x => (v.Votes || {})[x.id] === "oui").length;
+async function accepter(slot) {
+    const v = partie.Vote_Mission;
+    const m = missionDe(slot) || (v && v.Mission && Number(v.Slot) === slot ? v.Mission : null);
+    if (!m) return;
+    const r = await voterMission(slot, m, "oui");
+    if (r && r.acceptee) fermerFeuille(); else rafraichirFeuille();
+}
+function rafraichirFeuille() {
+    const voile = document.getElementById("feuille-mission");
+    if (!voile || !voile.classList.contains("ouverte")) return;
+    const slot = Number(voile.dataset.slot), v = partie.Vote_Mission;
+    const m = missionDe(slot) || (v && v.Mission && Number(v.Slot) === slot ? v.Mission : null);
+    const zone = voile.querySelector(".contenu-feuille-mission");
+    if (!m || !zone) return;
+    zone.querySelectorAll(".sceau-mission, .aide-sceau, .refuser-mission").forEach(e => e.remove());
+    zone.insertAdjacentHTML("beforeend", htmlSceau(m));
 }
 
-window.MISSIONS_GUILDE = { RANGS, ECRITURES, NB_MISSIONS, DUREE_JOURS, jourAbsolu, tirerRangs, promptMissions, genererMissions, renouveler, aRenouveler,
-                          lireTableau, relireTableau, surChangement, htmlEncart, missionDe, ouvrirFeuille, fermerFeuille, brancherAcceptation };
+// =========================================================================
+//  v443 — ACCEPTER UNE MISSION : LE VOTE, LE PLAN, LE LIEU, LE MJ
+// =========================================================================
+//  Nico : « oui vote : quand un joueur valide le choix d'une mission, c'est en attente des
+//  autres, un post-it apparaît sur le livre des autres joueurs, avec le lien qui fait
+//  apparaître la page de mission par le bas pour qu'ils puissent valider ; s'ils refusent,
+//  le vote disparaît. Une mission à la fois. » « Quand une mission est validée, ça la place
+//  dans un autre endroit de la base (celle du groupe), avec les tenants et aboutissants. Une
+//  IA intelligente (comme le narrateur) crée tout le plan de mission. Sur la map régionale
+//  où se passe la mission, un point d'interrogation doré : le lieu de la mission, créé comme
+//  un POI. » « Le niveau des monstres : Rang C −2, B le niveau du groupe, A +2 — juste au lieu
+//  de la mission. » « C'est le narrateur qui valide ou fait échouer la mission. »
+//
+//  LA BASE :
+//    · Systeme_Parties/{partie}.Vote_Mission — { Id, Slot, Titre, Rang, Mission, Initiateur,
+//      Votants, Votes, Le } ; Mission_En_Cours — { Id, Titre, Rang, Lieu_Id, Region, Le } ;
+//    · Systeme_Parties/{partie}/Guilde/Mission — { Mission, Statut, Accepte_Le, Jour_Accepte,
+//      Votants, Heros, Lieu_Id, Lieu_Position: { Region, x, y }, Plan, Avancement: { Etapes,
+//      Indices, Journal } } (les verrous Plan_En_Cours, Lieu_En_Creation : 5 minutes) ;
+//    · fini : Systeme_Parties/{partie}/Missions_Terminees/{mission} (Statut, Fin_Le, Heros).
+// =========================================================================
+export const DECALAGE_NIVEAU = { C: -2, B: 0, A: 2 };
+const VERROU_PREPARATION_MS = 5 * 60 * 1000;
+const refPartie = (id) => doc(db, "Systeme_Parties", id);
+const refMission = (id) => doc(db, "Systeme_Parties", id, "Guilde", "Mission");
+const idJoueur = () => { try { return localStorage.getItem("ID_JOUEUR_COURANT") || "INVITE"; } catch (e) { return "INVITE"; } };
+function votantsGroupe() {
+    if (typeof window.votantsVoyageGroupe === "function") { try { const l = window.votantsVoyageGroupe(); if (l && l.length) return l; } catch (e) {} }
+    return [{ id: idJoueur(), nom: (window.COMPTE_JOUEUR && window.COMPTE_JOUEUR.nom) || "Un joueur" }];
+}
+const herosDuGroupe = () => ((window.PERSOS_JOUEURS_PARTIE && window.PERSOS_JOUEURS_PARTIE.length ? window.PERSOS_JOUEURS_PARTIE : window.PERSOS_PARTIE) || [])
+    .filter(h => h && h.idPersonnage && h.actif !== false && !h.estMonstre && !h.estIllusion).map(h => h.idPersonnage);
+
+let partie = {}, missionEnCours = null, missionLue = "", ficheAbsente = false;
+// La partie, comme la base la relaie (app.js, l'écoute de la partie).
+window.appliquerMissionDeLaPartie = function(data) {
+    partie = data || {};
+    majPostit();
+    rafraichirFeuille();
+    ecouterMission(idPartie(), !!(partie.Mission_En_Cours && partie.Mission_En_Cours.Id));
+    majDecalage();
+};
+
+// LE VOTE : « oui » (le premier propose), « non » (le vote disparaît). Tous oui : acceptée.
+export async function voterMission(slot, m, reponse) {
+    const id = idPartie();
+    if (!id || !m) return null;
+    const moi = idJoueur(), votants = votantsGroupe();
+    let r;
+    try {
+        r = await runTransaction(db, async (tx) => {
+            const s = await tx.get(refPartie(id)), d = s.exists() ? s.data() : {};
+            if (d.Mission_En_Cours && d.Mission_En_Cours.Id) return { occupe: true };
+            let v = d.Vote_Mission;
+            if (v && v.Id && v.Id !== m.Id) return { autreVote: true };
+            if (reponse === "non") { if (v && v.Id === m.Id) tx.update(refPartie(id), { Vote_Mission: deleteField() }); return { refuse: true }; }
+            if (!v || !v.Id) v = { Id: m.Id, Slot: slot, Titre: m.Titre, Rang: m.Rang, Mission: m, Initiateur: { id: moi, nom: (votants.find(x => x.id === moi) || {}).nom || "Un joueur" }, Votants: votants, Votes: {}, Le: Date.now() };
+            const votes = { ...(v.Votes || {}), [moi]: "oui" };
+            if (!(v.Votants || []).every(x => votes[x.id] === "oui")) { tx.set(refPartie(id), { Vote_Mission: { ...v, Votes: votes } }, { merge: true }); return { vote: true }; }
+            const enCours = { Id: m.Id, Titre: m.Titre, Rang: m.Rang, Lieu_Id: (m.Lieu && m.Lieu.Id) || null, Region: m.Region, Le: Date.now() };
+            tx.update(refPartie(id), { Vote_Mission: deleteField(), Mission_En_Cours: enCours });
+            return { acceptee: true, enCours, votants: v.Votants || votants, slot: Number(v.Slot) };
+        });
+    } catch (e) { console.error("Missions : le vote", e); return null; }
+    son("page-tourne");
+    if (r && r.acceptee) await installerMission(m, r);
+    return r;
+}
+export const refuserMission = () => { const v = partie.Vote_Mission; return v && v.Mission ? voterMission(Number(v.Slot), v.Mission, "non") : null; };
+
+// La mission acceptée : sa fiche du groupe, l'encart vidé, la place de son lieu ; puis, en
+// fond, son plan et son lieu (sur ce poste s'il a les clés, sinon sur un autre).
+async function installerMission(m, r) {
+    const id = idPartie();
+    const existant = m.Lieu && m.Lieu.Id ? (window.VILLAGES_REGIONAUX || {})[m.Lieu.Id] : null;
+    const position = existant ? { Region: existant.numero, x: existant.x, y: existant.y } : placeDuLieu(m.Region);
+    try {
+        await setDoc(refMission(id), { Mission: m, Statut: "en_cours", Accepte_Le: Date.now(), Jour_Accepte: jourAbsolu(), Votants: r.votants || [], Heros: herosDuGroupe(),
+            Lieu_Id: (m.Lieu && m.Lieu.Id) || null, Lieu_Position: position, Plan: null, Avancement: { Etapes: {}, Indices: [], Journal: [] } });
+    } catch (e) { console.error("Missions : la fiche de la mission", e); }
+    await retirerDuTableau(m.Id);
+    await relireMission(id);
+    preparerMission();
+}
+async function retirerDuTableau(idMission) {
+    const id = idPartie();
+    try {
+        await runTransaction(db, async (tx) => {
+            const s = await tx.get(refTableau(id)); if (!s.exists()) return;
+            const l = Array.isArray(s.data().Missions) ? s.data().Missions : [];
+            if (!l.some(x => x && x.Id === idMission)) return;
+            tx.set(refTableau(id), { Missions: l.map(x => (x && x.Id === idMission ? null : x)) }, { merge: true });
+        });
+    } catch (e) { console.warn("Missions : l'encart vidé", e); }
+    await relire(id);
+}
+// Une place pour un lieu nouveau, dans sa région : sur le terrain, loin des autres lieux.
+function placeDuLieu(region) {
+    const n = Number(region) || 1;
+    for (let essai = 0; essai < 200; essai++) {
+        const x = 0.12 + Math.random() * 0.76, y = 0.12 + Math.random() * 0.76;
+        if (typeof window.placePoiValable !== "function" || window.placePoiValable(n, x, y)) return { Region: n, x: Math.round(x * 1e5) / 1e5, y: Math.round(y * 1e5) / 1e5 };
+    }
+    return { Region: n, x: 0.5, y: 0.5 };
+}
+
+// LA MISSION EN COURS, écoutée.
+let arretMission = null;
+const abonnesMission = new Set();
+export const surMission = (f) => { abonnesMission.add(f); return () => abonnesMission.delete(f); };
+export const lireMission = () => missionEnCours;
+function prevenirMission() {
+    abonnesMission.forEach(f => { try { f(missionEnCours); } catch (e) {} });
+    if (typeof window.dessinerVillagesRegion === "function") { try { window.dessinerVillagesRegion(); } catch (e) {} }
+    // (les pages des régions du livre portent une copie des lieux : elles se refont aussi)
+    if (window.GRIMOIRE_REGIONS && typeof window.GRIMOIRE_REGIONS.veiller === "function") { try { window.GRIMOIRE_REGIONS.veiller(); } catch (e) {} }
+    try { window.dispatchEvent(new CustomEvent("mission-guilde", { detail: { mission: missionEnCours } })); } catch (e) {}
+}
+function ecouterMission(id, active) {
+    const cle = id && active ? id : "";
+    if (missionLue === cle) return;
+    if (arretMission) { try { arretMission(); } catch (e) {} arretMission = null; }
+    missionLue = cle; missionEnCours = null; ficheAbsente = false;
+    if (!cle) { prevenirMission(); majDecalage(); return; }
+    relireMission(id);
+    try { arretMission = onSnapshot(refMission(id), (s) => { if (missionLue !== id) return; missionEnCours = s.exists() ? s.data() : null; ficheAbsente = !s.exists(); prevenirMission(); majDecalage(); }, () => {}); } catch (e) {}
+}
+async function relireMission(id) {
+    try { const s = await getDoc(refMission(id)); if (missionLue === id) { missionEnCours = s.exists() ? s.data() : null; ficheAbsente = !s.exists(); prevenirMission(); majDecalage(); } }
+    catch (e) { console.warn("Missions : la lecture de la mission", e); }
+}
+export const relireLaMission = () => relireMission(idPartie());
+
+// LE PLAN (MIA_PLAN_MISSION) : ce que le Narrateur saura, et ce qu'il gardera pour lui.
+export function promptPlan(m, lieu) {
+    let lore = "";
+    try { lore = typeof window.loreDeLaRegion === "function" ? String(window.loreDeLaRegion(m.Region) || "") : ""; } catch (e) {}
+    return `Tu es MIA_PLAN_MISSION, le stratège qui prépare les missions de la guilde d'Ivalis pour le Maître du Jeu (le Narrateur). Le monde : antique fantastique (mythologie, Antiquité magique), rien d'anachronique.
+La mission que le groupe vient d'accepter :
+- Rang ${m.Rang} (${(RANGS[m.Rang] || {}).consigne || ""})
+- Titre : ${m.Titre}
+- Région : ${m.Region_Nom}. ${lore.slice(0, 900)}
+- Lieu : ${(lieu && lieu.Nom) || (m.Lieu && m.Lieu.Nom) || "à préciser"} (${(m.Lieu && m.Lieu.Type) || "lieu"}) — ${(m.Lieu && m.Lieu.Description) || ""}
+- Commanditaire : ${m.Commanditaire}
+- Ce qu'on en sait : ${m.Details}
+- Objectif : ${m.Objectif}
+- Le mot du commanditaire : ${m.Lettre}
+
+Prépare le plan complet de cette mission : une intrigue cohérente, jouable, à la hauteur du rang, avec ses secrets. Réponds UNIQUEMENT en JSON :
+{
+  "connu_des_joueurs": "ce que les héros savent au départ (2 à 3 phrases)",
+  "verite_cachee": "ce qui se passe vraiment, qui est derrière, ce que le commanditaire tait (3 à 5 phrases)",
+  "etapes": [ { "numero": 1, "titre": "…", "description": "ce qui doit se passer", "validation": "ce qui la rend accomplie" } ] (3 à 5 étapes, la dernière accomplit l'objectif),
+  "personnages": [ { "nom": "…", "role": "…", "sait": "…", "secret": "…", "attitude": "…" } ],
+  "lieux": [ { "nom": "…", "description": "…", "ce_qu_on_y_trouve": "…" } ],
+  "indices": [ { "nom": "…", "ou": "…", "revele": "…", "necessaire": true } ],
+  "rencontres": [ { "quoi": "créatures ou dangers (adaptés au rang)", "ou": "…", "danger": "faible | moyen | élevé" } ],
+  "rebondissements": [ "…" ],
+  "a_ne_pas_reveler": [ "ce que le MJ ne doit jamais dire directement" ],
+  "issues": { "reussite": "…", "reussite_partielle": "…", "echec": "…" }
+}`;
+}
+async function appelJson(prompt, consigne, modele) {
+    const corps = JSON.stringify({ systemInstruction: { parts: [{ text: prompt }] }, contents: [{ role: "user", parts: [{ text: consigne }] }],
+                                   generationConfig: { temperature: 0.9, responseMimeType: "application/json" } });
+    let rep = await window.fetchGemini("missions", corps, modele ? { modele } : undefined);
+    if (!rep.ok && modele) rep = await window.fetchGemini("missions", corps);          // le modèle du Narrateur refusé : le modèle léger
+    const json = await rep.json();
+    if (!rep.ok || json.error) throw new Error((json.error && json.error.message) || `Gemini ${rep.status}`);
+    return JSON.parse(json.candidates[0].content.parts[0].text);
+}
+const modeleNarrateur = () => { try { return (window.reglagesNarrateur && window.reglagesNarrateur().modele) || ""; } catch (e) { return ""; } };
+// Prendre une tâche de préparation (le plan, le lieu) : un seul poste, 5 minutes.
+async function prendre(champ) {
+    const id = idPartie();
+    try {
+        return await runTransaction(db, async (tx) => {
+            const s = await tx.get(refMission(id)); if (!s.exists()) return false;
+            const d = s.data();
+            if (d.Statut !== "en_cours" || (champ === "Plan_En_Cours" ? d.Plan : d.Lieu_Id)) return false;
+            if (d[champ] && Date.now() - Number(d[champ]) < VERROU_PREPARATION_MS) return false;
+            tx.set(refMission(id), { [champ]: Date.now() }, { merge: true });
+            return true;
+        });
+    } catch (e) { return false; }
+}
+let preparation = false;
+export async function preparerMission() {
+    const id = idPartie(), d = missionEnCours;
+    if (!id || !d || d.Statut !== "en_cours" || preparation) return;
+    preparation = true;
+    try {
+        // Le lieu : un nouveau lieu (comme un POI), au nom de la mission.
+        if (!d.Lieu_Id && typeof window.creerLieuPoi === "function" && typeof window.peutCreerPoi === "function" && window.peutCreerPoi() && await prendre("Lieu_En_Creation")) {
+            const p = d.Lieu_Position || placeDuLieu(d.Mission.Region), m = d.Mission;
+            try {
+                const lieu = await window.creerLieuPoi({ region: p.Region, x: p.x, y: p.y,
+                    impose: { nom: m.Lieu.Nom, type: m.Lieu.Type, description: m.Lieu.Description, mission: `${m.Titre} — ${m.Objectif}`, missionId: m.Id } });
+                if (lieu && lieu.id) {
+                    await setDoc(refMission(id), { Lieu_Id: lieu.id, Lieu_En_Creation: deleteField() }, { merge: true });
+                    await setDoc(refPartie(id), { Mission_En_Cours: { Lieu_Id: lieu.id } }, { merge: true });
+                }
+            } catch (e) { console.error("Missions : le lieu de la mission", e); await setDoc(refMission(id), { Lieu_En_Creation: deleteField() }, { merge: true }); }
+        }
+        // Le plan.
+        if (!(missionEnCours && missionEnCours.Plan) && window.cleGemini && window.cleGemini("missions") && await prendre("Plan_En_Cours")) {
+            try {
+                const plan = await appelJson(promptPlan(d.Mission, d.Mission.Lieu), "Prépare le plan de cette mission.", modeleNarrateur());
+                await setDoc(refMission(id), { Plan: plan, Plan_En_Cours: deleteField() }, { merge: true });
+            } catch (e) { console.error("MIA_PLAN_MISSION :", e); await setDoc(refMission(id), { Plan_En_Cours: deleteField() }, { merge: true }); }
+        }
+        await relireMission(id);
+    } finally { preparation = false; }
+}
+
+// LE POST-IT : un vote en cours ; chez ceux qui n'ont pas encore dit oui, le lien vers la feuille.
+function majPostit() {
+    const v = partie.Vote_Mission, j = idJoueur();
+    const g = window.GRIMOIRE, scene = g && g.scene && g.scene(), livre = g && g.livre && g.livre();
+    let el = document.getElementById("postit-mission");
+    const votant = v && v.Id && (v.Votants || []).some(x => x.id === j);
+    if (!votant || !scene || !livre) { if (el) el.classList.remove("sortie"); return; }
+    if (!el) {
+        el = document.createElement("div");
+        el.id = "postit-mission";
+        el.className = "recit-ecriture postit-mission";
+        el.innerHTML = `<div class="papier-ecriture papier-postit-mission"></div>`;
+        el.addEventListener("click", (e) => { const b = e.target.closest("[data-mission]"); if (!b) return;
+            if (b.dataset.mission === "voir") ouvrirFeuille(Number((partie.Vote_Mission || {}).Slot));
+            if (b.dataset.mission === "refuser") refuserMission(); });
+        scene.insertBefore(el, livre);
+    }
+    const aVote = (v.Votes || {})[j] === "oui";
+    el.querySelector(".papier-postit-mission").innerHTML = aVote
+        ? `<div class="titre-postit-mission">Mission proposée</div><p>« ${echapper(v.Titre)} » (${echapper((RANGS[v.Rang] || {}).nom || v.Rang)})</p>
+           <p class="discret">En attente des autres joueurs (${compterOui(v)}/${(v.Votants || []).length}).</p>`
+        : `<div class="titre-postit-mission">${echapper((v.Initiateur || {}).nom || "Un joueur")} propose une mission</div><p>« ${echapper(v.Titre)} » (${echapper((RANGS[v.Rang] || {}).nom || v.Rang)})</p>
+           <div class="boutons-postit-mission"><button type="button" class="lien-postit-mission" data-mission="voir">Voir la mission</button>
+           <button type="button" class="lien-postit-mission discret" data-mission="refuser">Refuser</button></div>`;
+    requestAnimationFrame(() => el.classList.add("sortie"));
+}
+
+// LE NIVEAU DES CRÉATURES AU LIEU DE LA MISSION : C −2, B +0, A +2 (monstres.js le lit).
+export function decalageNiveauMission() {
+    const mc = partie.Mission_En_Cours;
+    const lieu = (missionEnCours && missionEnCours.Lieu_Id) || (mc && mc.Lieu_Id);
+    if (!mc || !mc.Id || !lieu || partie.Lieu_Actuel !== lieu) return 0;
+    return DECALAGE_NIVEAU[mc.Rang] || 0;
+}
+window.decalageNiveauMission = decalageNiveauMission;
+let decalageApplique = 0;
+function majDecalage() {
+    const d = decalageNiveauMission();
+    if (d === decalageApplique) return;
+    decalageApplique = d;
+    try { if (typeof window.appliquerReglagesMonstres === "function") window.appliquerReglagesMonstres(window.REGLAGES_MONSTRES_BRUTS); } catch (e) { console.warn("Missions : la triche des créatures", e); }
+    try { if (typeof window.afficherNiveauGroupe === "function") window.afficherNiveauGroupe(); } catch (e) {}
+}
+
+// LE « ? » DORÉ : la place du lieu de la mission (villages_regionaux.js le dessine).
+export function marqueMission() {
+    const d = missionEnCours;
+    if (!d || d.Statut !== "en_cours") return null;
+    const v = d.Lieu_Id ? (window.VILLAGES_REGIONAUX || {})[d.Lieu_Id] : null;
+    // (le « ? » une fois et demie plus grand que la place du lieu)
+    if (v) return { Region: v.numero, x: v.x, y: v.y, taille: 1.5 * (v.taille || 0.05), lieu: d.Lieu_Id };
+    return d.Lieu_Position ? { ...d.Lieu_Position, taille: 0.075, lieu: null } : null;
+}
+
+// LE NARRATEUR : un rappel partout ; au lieu de la mission, le plan (ses secrets gardés).
+const liste = (l, f) => (Array.isArray(l) ? l : []).map(f).filter(Boolean).join("\n");
+export function contexteMissionMJ(dataPartie, lieuActuel) {
+    const d = missionEnCours;
+    if (!d || d.Statut !== "en_cours" || !d.Mission) return "";
+    const m = d.Mission, plan = d.Plan || {}, faites = (d.Avancement && d.Avancement.Etapes) || {};
+    const etapes = Array.isArray(plan.etapes) ? plan.etapes : [];
+    const courante = etapes.find(e => !faites[String(e.numero)]);
+    const lignes = ["--- MISSION DE GUILDE EN COURS ---",
+        `${(RANGS[m.Rang] || {}).nom || m.Rang} — « ${m.Titre} », confiée par ${m.Commanditaire}.`,
+        `Objectif : ${m.Objectif}`,
+        `Lieu de la mission : ${(m.Lieu && m.Lieu.Nom) || "?"} (${m.Region_Nom}).`];
+    if (courante) lignes.push(`Étape en cours : ${courante.numero}. ${courante.titre}.`);
+    const ici = lieuActuel && d.Lieu_Id && lieuActuel === d.Lieu_Id;
+    if (ici && d.Plan) {
+        lignes.push("", "--- LE PLAN DE LA MISSION (POUR TOI SEUL, MJ) ---",
+            "Les héros sont sur le lieu de la mission. Sers-toi de ce plan pour mener la scène ; ne révèle rien qu'ils n'aient découvert eux-mêmes.",
+            `Ce que les héros savent : ${plan.connu_des_joueurs || ""}`,
+            `La vérité cachée : ${plan.verite_cachee || ""}`,
+            "Les étapes :", liste(etapes, e => `  ${e.numero}. ${e.titre} — ${e.description} (accomplie quand : ${e.validation})${faites[String(e.numero)] ? " [ACCOMPLIE]" : ""}`),
+            "Les personnages :", liste(plan.personnages, p => `  - ${p.nom} (${p.role}) : sait « ${p.sait} » ; secret « ${p.secret} » ; ${p.attitude}`),
+            "Les lieux :", liste(plan.lieux, l => `  - ${l.nom} : ${l.description} (on y trouve : ${l.ce_qu_on_y_trouve})`),
+            "Les indices :", liste(plan.indices, x => `  - ${x.nom} : ${x.ou} → ${x.revele}${x.necessaire ? " (nécessaire)" : ""}`),
+            "Les rencontres :", liste(plan.rencontres, x => `  - ${x.quoi} (${x.ou}, danger ${x.danger})`),
+            "Les rebondissements :", liste(plan.rebondissements, x => `  - ${x}`),
+            "À NE JAMAIS RÉVÉLER DIRECTEMENT :", liste(plan.a_ne_pas_reveler, x => `  - ${x}`),
+            `Les issues : réussite — ${(plan.issues || {}).reussite || ""} ; réussite partielle — ${(plan.issues || {}).reussite_partielle || ""} ; échec — ${(plan.issues || {}).echec || ""}`);
+        if (d.Avancement && (d.Avancement.Indices || []).length) lignes.push(`Indices déjà trouvés : ${d.Avancement.Indices.join(" ; ")}`);
+    }
+    lignes.push("Quand les héros accomplissent l'objectif de la mission, ou qu'ils échouent sans retour possible, dis-le clairement dans ton récit.");
+    return lignes.join("\n");
+}
+window.contexteMissionMJ = contexteMissionMJ;
+
+// LE SUIVI (MIA_SUIVI_MISSION) : après chaque tour du Narrateur, les étapes accomplies, les
+// indices trouvés ; la mission réussie ou échouée quand le récit le dit.
+export async function suivreApresMJ(texteMJ) {
+    const d = missionEnCours, id = idPartie();
+    if (!d || d.Statut !== "en_cours" || !d.Mission || !texteMJ || !window.cleGemini || !window.cleGemini("missions")) return null;
+    const m = d.Mission, etapes = Array.isArray((d.Plan || {}).etapes) ? d.Plan.etapes : [];
+    const faites = (d.Avancement && d.Avancement.Etapes) || {};
+    const prompt = `Tu es MIA_SUIVI_MISSION : tu suis l'avancement d'une mission de guilde dans le récit du Narrateur.
+La mission : « ${m.Titre} » — objectif : ${m.Objectif}
+Ses étapes : ${etapes.map(e => `${e.numero}. ${e.titre} (accomplie quand : ${e.validation})${faites[String(e.numero)] ? " [déjà accomplie]" : ""}`).join(" ; ") || "(pas encore de plan)"}
+Lis le dernier passage du Narrateur et dis seulement ce qu'il établit clairement (rien de supposé).
+Réponds en JSON : { "etapes_accomplies": [numéros], "indices_trouves": ["…"], "statut": "en_cours" | "reussie" | "echouee", "resume": "une phrase sur ce qui vient de se passer pour la mission (ou \"\")" }
+"reussie" seulement si l'objectif est accompli ; "echouee" seulement si la mission est perdue sans retour possible.`;
+    let r;
+    try { r = await appelJson(prompt, `Le passage du Narrateur :\n${String(texteMJ).slice(0, 6000)}`); } catch (e) { console.warn("MIA_SUIVI_MISSION :", e); return null; }
+    const nouvelles = (Array.isArray(r.etapes_accomplies) ? r.etapes_accomplies : []).map(String).filter(n => etapes.some(e => String(e.numero) === n) && !faites[n]);
+    const indices = (Array.isArray(r.indices_trouves) ? r.indices_trouves : []).map(x => String(x).trim()).filter(Boolean);
+    const av = d.Avancement || { Etapes: {}, Indices: [], Journal: [] };
+    const maj = { Avancement: { Etapes: { ...(av.Etapes || {}) }, Indices: [...new Set([...(av.Indices || []), ...indices])].slice(-40), Journal: [...(av.Journal || [])] } };
+    nouvelles.forEach(n => { maj.Avancement.Etapes[n] = true; });
+    if (r.resume) maj.Avancement.Journal = [...maj.Avancement.Journal, { Le: Date.now(), Jour: jourAbsolu(), Texte: String(r.resume).slice(0, 300) }].slice(-60);
+    try { await setDoc(refMission(id), maj, { merge: true }); } catch (e) { console.warn("Missions : l'avancement", e); }
+    await relireMission(id);
+    if (r.statut === "reussie" || r.statut === "echouee") await terminerMission(r.statut === "reussie" ? "reussie" : "echouee", r.resume || "");
+    return r;
+}
+// La fin d'une mission : rangée avec les missions terminées (ses héros) ; plus de mission en cours.
+export async function terminerMission(statut, resume) {
+    const id = idPartie(), d = missionEnCours;
+    if (!id || !d || !d.Mission) return false;
+    try {
+        await setDoc(doc(db, "Systeme_Parties", id, "Missions_Terminees", d.Mission.Id), { ...d, Statut: statut, Fin_Le: Date.now(), Jour_Fin: jourAbsolu(), Resume_Fin: resume || "" });
+        await deleteDoc(refMission(id));
+        await setDoc(refPartie(id), { Mission_En_Cours: deleteField() }, { merge: true });
+    } catch (e) { console.error("Missions : la fin de la mission", e); return false; }
+    missionEnCours = null; missionLue = "";
+    partie = { ...partie, Mission_En_Cours: null };
+    prevenirMission(); majDecalage();
+    return true;
+}
+
+// LA VEILLE : la mission acceptée sur un poste sans clés se prépare sur un poste qui les a ;
+// une mission en cours sans fiche (son poste fermé trop tôt) retrouve la sienne.
+setInterval(async () => {
+    if (document.hidden) return;
+    const id = idPartie(), mc = partie.Mission_En_Cours;
+    if (!id || !mc || !mc.Id || missionLue !== id) return;
+    if (!missionEnCours) {
+        if (!ficheAbsente) return;                                     // pas encore lue
+        const m = (tableau && Array.isArray(tableau.Missions) ? tableau.Missions : []).find(x => x && x.Id === mc.Id);
+        if (m) await installerMission(m, { votants: votantsGroupe() });
+        return;
+    }
+    if (missionEnCours.Statut === "en_cours" && (!missionEnCours.Plan || !missionEnCours.Lieu_Id)) preparerMission();
+}, 5000);
+
+window.MISSIONS_GUILDE = { RANGS, ECRITURES, NB_MISSIONS, DUREE_JOURS, DECALAGE_NIVEAU, jourAbsolu, tirerRangs, promptMissions, genererMissions, renouveler, aRenouveler,
+                          lireTableau, relireTableau, surChangement, htmlEncart, missionDe, ouvrirFeuille, fermerFeuille,
+                          voterMission, refuserMission, lireMission, relireLaMission, surMission, preparerMission, promptPlan, marqueMission, decalageNiveauMission,
+                          contexteMissionMJ, suivreApresMJ, terminerMission, partie: () => partie };

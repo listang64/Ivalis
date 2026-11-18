@@ -171,6 +171,9 @@ function dessiner() {
         brancherVillage(el, v);
         couche.appendChild(el);
     });
+    // (v443) Le lieu de la mission de guilde en cours : un point d'interrogation doré.
+    const mq = marqueDeMission(numero);
+    if (mq) couche.appendChild(elementMarqueMission(mq, boite(mq, c)));
     if (dev) {
         pastilles.forEach(p => {
             const b = boite(p, c);
@@ -186,6 +189,25 @@ function dessiner() {
     actualiserDev();
 }
 window.dessinerVillagesRegion = dessiner;
+// (v443) LE « ? » DORÉ DE LA MISSION (missions_guilde.js, marqueMission) : au-dessus de son
+// lieu (ou de sa place, le temps que le lieu naisse), sur sa carte régionale.
+function marqueDeMission(numero) {
+    const M = window.MISSIONS_GUILDE;
+    const mq = M && typeof M.marqueMission === "function" ? M.marqueMission() : null;
+    return mq && Number(mq.Region) === Number(numero) ? { x: Number(mq.x), y: Number(mq.y), taille: Number(mq.taille) || 0.05, plein: true, lieu: mq.lieu } : null;
+}
+function elementMarqueMission(mq, b) {
+    const el = document.createElement("div");
+    el.className = "marque-mission";
+    el.title = "Le lieu de la mission de guilde";
+    Object.assign(el.style, { left: b.gauche + "px", top: b.haut + "px", width: b.cote + "px", height: b.cote + "px" });
+    // (en SVG : il suit la taille de sa boîte, sur la carte vivante comme sur les pages du livre)
+    el.innerHTML = `<svg class="marque-mission-signe" viewBox="0 0 100 100" aria-hidden="true"><defs><radialGradient id="or-mission" cx="40%" cy="35%" r="70%">
+        <stop offset="0" stop-color="#fff2b8"/><stop offset="0.45" stop-color="#f0c95e"/><stop offset="1" stop-color="#a87c26"/></radialGradient></defs>
+        <circle cx="50" cy="50" r="40" fill="rgba(40, 24, 6, 0.28)"/><text x="50" y="72" text-anchor="middle" font-size="70" font-weight="700" fill="url(#or-mission)" stroke="#5c3a12" stroke-width="2.4">?</text></svg>`;
+    return el;
+}
+window.marqueMissionRegion = marqueDeMission;
 // Un lieu sur la carte : son dessin et son nom, dans sa boîte (en pixels de l'image).
 // `o.differer` : l'adresse du dessin attend dans data-src (les pages du livre la posent
 // à l'avance, v344) ; `o.suffixe` : des identifiants à part pour une copie.
@@ -223,10 +245,17 @@ window.calqueVillagesFixe = function(numero, aspect, suffixe) {
         if (nom) Object.assign(nom.style, { left: pct(nom.style.left, b.cote), top: pct(nom.style.top, b.cote), width: pct(nom.style.width, b.cote), height: pct(nom.style.height, b.cote) });
         couche.appendChild(el);
     });
+    // (v443) Le « ? » de la mission, aussi sur les pages du livre.
+    const mq = marqueDeMission(numero);
+    if (mq) {
+        const b = boite(mq, c), el = elementMarqueMission(mq, b);
+        Object.assign(el.style, { left: pct(el.style.left, c.largeur), top: pct(el.style.top, c.hauteur), width: pct(el.style.width, c.largeur), height: pct(el.style.height, c.hauteur) });
+        couche.appendChild(el);
+    }
     return couche;
 };
 // Ce qui change la couche d'une carte (pour ne la refaire qu'alors).
-window.signatureVillagesCarte = (numero) => JSON.stringify(villagesDeLaCarte(numero).map(v => [v.id, v.nom, v.x, v.y, v.taille, v.plein, v.calque]));
+window.signatureVillagesCarte = (numero) => JSON.stringify([villagesDeLaCarte(numero).map(v => [v.id, v.nom, v.x, v.y, v.taille, v.plein, v.calque]), marqueDeMission(numero)]);
 
 // LE NOM DU LIEU, sous son dessin (v281). Nico : « en écriture marron foncé,
 // style plume sur parchemin, le nom du lieu en arc de cercle inversé sur le
