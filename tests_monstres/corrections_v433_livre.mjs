@@ -325,28 +325,27 @@ await section(async () => {
       lavis: g.querySelectorAll(".entree-guilde .lavis").length, souligne: [...g.querySelectorAll(".entree-guilde-texte")].every(s => /url|svg/.test(s.style.backgroundImage || "")),
       retour: (g.querySelector(".retour-guilde") || {}).textContent }; });
   verifier("à droite : le gros titre « Hall de guilde »", r.droite && /^\s*Hall de guilde\s*$/.test(r.titre || ""), JSON.stringify(r.titre));
-  verifier("à gauche : les quatre entrées, dans l'ordre", r.gauche && JSON.stringify(r.entrees) === JSON.stringify(["I- Panneau des missions", "II- Salle du conseil", "III- Bureau du patriarche", "IV- Livre des clans"]), JSON.stringify(r.entrees));
-  verifier("…écrites comme le sommaire : un lavis et un trait de plume sous chacune", r.lavis === 4 && r.souligne, JSON.stringify([r.lavis, r.souligne]));
-  verifier("…et un retour au village", /Revenir au village/.test(r.retour || ""));
+  verifier("à gauche : les quatre entrées, dans l'ordre (v434 : sans numéro)", r.gauche && JSON.stringify(r.entrees) === JSON.stringify(["Panneau des missions", "Salle du conseil", "Bureau du patriarche", "Livre des clans"]), JSON.stringify(r.entrees));
+  verifier("…écrites comme le sommaire : un lavis sous chacune (v434 : sans trait)", r.lavis === 4 && !r.souligne, JSON.stringify([r.lavis, r.souligne]));
+  verifier("(v434) plus de bouton retour : on tourne la page", !r.retour);
   const police = await G(() => getComputedStyle(document.querySelector(".titre-guilde span")).fontFamily);
   verifier("le titre dans la police des titres du livre", /Berkshire|Swash|var|Almendra/.test(police), police);
   await cap("v433-hall");
 });
 
-titre("3. LES TROIS PIÈCES : « EN DÉVELOPPEMENT », AVEC LEUR RETOUR AU HALL");
+titre("3. LES TROIS PIÈCES : « EN DÉVELOPPEMENT » (v434 : chacune sa double page, après le Hall)");
 await section(async () => {
   for (const [id, nom] of [["missions", "Panneau des missions"], ["conseil", "Salle du conseil"], ["patriarche", "Bureau du patriarche"]]) {
+    await G(() => window.GRIMOIRE_GUILDE.ouvrir()); await attendreQue(surHall, 6000); await pose();
     await cliquer("#guilde-" + id);
-    await p.waitForTimeout(150);
-    const r = await G(() => { const [g, d] = window.GRIMOIRE_GUILDE.pages(); return { vue: window.GRIMOIRE_GUILDE.vue(), titre: d.querySelector(".titre-guilde").textContent.trim(), dev: g.textContent + d.textContent, ouverte: window.GRIMOIRE_GUILDE.ouverte() }; });
-    verifier(`« ${nom} » : sa page, « En développement »`, r.vue === id && r.titre === nom && /En développement/.test(r.dev) && r.ouverte, JSON.stringify(r).slice(0, 160));
-    await cliquer('.page-guilde [data-gu="hall"]');
-    await p.waitForTimeout(150);
-    verifier("…« Retour au Hall de guilde » : le menu revient", await G(() => window.GRIMOIRE_GUILDE.vue() === "hall" && document.querySelectorAll(".entree-guilde").length === 4));
+    const ok = await attendreQue(() => G((id) => { const [g] = window.GRIMOIRE_GUILDE.pagesPiece(); if (!g) return false; const i = window.GRIMOIRE.indexDe(g), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return window.GRIMOIRE_GUILDE.piece() === id && (ici === i || ici === i + 1); }, id), 6000);
+    await pose();
+    const r = await G(() => { const [g, d] = window.GRIMOIRE_GUILDE.pagesPiece(); return { titre: (d.querySelector(".titre-guilde") || {}).textContent || "", img: !!g.querySelector(".image-tableau") }; });
+    verifier(`« ${nom} » : sa propre double page`, ok && (id === "missions" ? r.img : r.titre.trim() === nom), JSON.stringify(r));
   }
-  if (CAPTURES) { await cliquer("#guilde-conseil"); await p.waitForTimeout(200); await cap("v433-piece"); await cliquer('.page-guilde [data-gu="hall"]'); }
 });
 
+// =========================================================================
 titre("4. LE LIVRE DES CLANS : UNE DOUBLE PAGE PAR CLAN, SUR LE SIEN D'ABORD");
 await section(async () => {
   await G(() => window.GRIMOIRE_GUILDE.ouvrir()); await attendreQue(surHall, 6000); await pose();
@@ -358,9 +357,9 @@ await section(async () => {
       nouvel: !!el.querySelector(".nouvel-aventurier"), banniere: !!el.querySelector(".cadre-banniere-clan"), vide: !!el.querySelector(".cadre-banniere-clan.vide"), nom: (el.querySelector(".nom-clan") || {}).textContent || "",
       titre: (el.querySelector(".titre-clan") || {}).textContent || "" })); });
   verifier("deux clans (Ben, l'autre joueur) : quatre pages, gauche / droite", r.length === 4 && r.map(x => x.cote).join("") === "gdgd", JSON.stringify(r.map(x => x.cote)));
-  verifier("le sien, à gauche : ses aventuriers, leur case, « + Un nouvel aventurier »", r[0].lignes.join() === "Thorin Ironfoot" && r[0].cases === 1 && r[0].nouvel && /Les aventuriers/.test(r[0].titre), JSON.stringify(r[0]).slice(0, 200));
-  verifier("…à droite : la place de la bannière (vide pour l'instant), « Clan de Ben » en gros titre dessous", r[1].banniere && r[1].vide && /^Clan de Ben$/.test(r[1].nom.trim()) && r[1].cases === 0, JSON.stringify(r[1]).slice(0, 200));
-  verifier("l'autre clan : ses aventuriers sans case (ce n'est pas le sien), sa bannière et son nom", r[2].lignes.join() === "Lyra Sombreval" && r[2].cases === 0 && !r[2].nouvel && r[3].banniere && /^Clan (de |sans nom)/.test(r[3].nom.trim()), JSON.stringify([r[2].lignes, r[3].nom]));
+  verifier("le sien, à gauche : ses aventuriers, leur case, « + Un nouvel aventurier »", r[0].lignes.join() === "Thorin Ironfoot" && r[0].cases === 1 && r[0].nouvel && /Membres du clan/.test(r[0].titre), JSON.stringify(r[0]).slice(0, 200));
+  verifier("…à droite : la place de la bannière (vide pour l'instant), « Clan Ben » en gros titre dessous (v434)", r[1].banniere && r[1].vide && /^Clan Ben$/.test(r[1].nom.trim()) && r[1].cases === 0, JSON.stringify(r[1]).slice(0, 200));
+  verifier("l'autre clan : ses aventuriers sans case (ce n'est pas le sien), sa bannière et son nom", r[2].lignes.join() === "Lyra Sombreval" && r[2].cases === 0 && !r[2].nouvel && r[3].banniere && /^Clan /.test(r[3].nom.trim()), JSON.stringify([r[2].lignes, r[3].nom]));
   const ordre = await G(() => { const c = window.GRIMOIRE_FICHES.pages().clans; return c.map(el => window.GRIMOIRE.indexDe(el)); });
   verifier("les pages se suivent : on tourne la page pour voir l'autre clan", ordre.every((x, i) => i === 0 || x === ordre[0] + i) && ordre[0] % 2 === 1, JSON.stringify(ordre));
   const taille = await G(() => { const n = document.querySelector("#grimoire-fiches-clan-banniere-0 .nom-clan"), b = document.querySelector("#grimoire-fiches-clan-banniere-0 .cadre-banniere-clan");

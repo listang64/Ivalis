@@ -1,0 +1,31 @@
+/* =========================================================================
+   v434 — LES CLANS (grimoire_clans.js) : la popup qui fonde un clan, à la
+   connexion ; la liste des clans dans les Paramètres du livre.
+   ========================================================================= */
+.voile-clan { position: fixed; inset: 0; z-index: 100000; display: flex; align-items: center; justify-content: center;
+  background: rgba(12, 7, 3, 0.62); padding: 16px; box-sizing: border-box; }
+.parchemin-clan { position: relative; width: min(560px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; box-sizing: border-box;
+  padding: 34px 38px 28px; border-radius: 6px; color: #2b1a0e; font-family: 'IM Fell English', 'Almendra', serif;
+  background: radial-gradient(ellipse at 50% 40%, #f4e4bf 0%, #e8d09b 62%, #d3b277 100%);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), inset 0 0 40px rgba(120, 76, 30, 0.35); display: flex; flex-direction: column; gap: 14px; }
+.titre-popup-clan { text-align: center; font-size: 34px; line-height: 1.1; color: #24150a;
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important; }
+.texte-popup-clan { margin: 0; font-size: 16px; line-height: 1.4; text-align: center; font-style: italic; color: #4a3018; }
+.champ-clan { display: flex; flex-direction: column; gap: 6px; font-size: 17px; font-weight: bold; color: #3a2210; }
+.champ-clan input, .champ-clan textarea { font: inherit; font-weight: normal; font-size: 16px; color: #24150a; width: 100%; box-sizing: border-box;
+  padding: 9px 11px; border: 1px solid rgba(90, 56, 24, 0.55); border-radius: 4px; background: rgba(255, 249, 232, 0.75); resize: vertical; }
+.champ-clan input:focus, .champ-clan textarea:focus { outline: 2px solid rgba(170, 110, 30, 0.55); }
+.message-clan { margin: 0; min-height: 1.2em; text-align: center; color: #8f1d15; font-size: 15px; }
+.valider-clan { align-self: center; font: inherit; font-size: 19px; padding: 9px 26px; cursor: pointer; color: #f6e7c4; border: 0; border-radius: 4px;
+  background: linear-gradient(#8f2a1a, #6b1d10); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35); }
+.valider-clan:disabled { opacity: 0.6; cursor: wait; }
+.fermer-clan { position: absolute; right: 10px; top: 8px; border: 0; background: transparent; font-size: 22px; color: #5a3818; cursor: pointer; padding: 4px 8px; }
+
+/* Les Paramètres : la liste des clans. */
+.liste-clans-parametres { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: calc(var(--u) * 2.5); }
+.clan-parametres { display: flex; align-items: center; gap: calc(var(--u) * 2.5); }
+.fanion-parametres { width: calc(var(--u) * 9); height: calc(var(--u) * 13); object-fit: contain; flex: none; }
+.fanion-parametres.vide { border: 1px dashed rgba(58, 34, 16, 0.3); box-sizing: border-box; }
+.nom-clan-parametres { flex: 1; line-height: 1.25; }
+.reinitialiser-clan { flex: none; color: #8f1d15 !important; }
+.message-clans-parametres { font-style: italic; color: #6b4a2b; }

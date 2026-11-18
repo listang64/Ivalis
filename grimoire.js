@@ -1164,7 +1164,8 @@
     }
     const planche = (p) => Math.floor((p + 1) / 2);         // 0 la couverture, 1 les pages 1-2, 2 les pages 3-4…
     // v310 : Nico, « fais défiler un tout petit peu plus vite » — 0,12 s la page (0,15 s avant).
-    const DEFILE = { tourne: 120, min: 2, max: NB_FEUILLETS / 2 };
+    // (v434) « fais tourner les pages plus rapidement » : 0,07 s la page, presque sans pause entre deux.
+    const DEFILE = { tourne: 70, pause: 8, min: 2, max: NB_FEUILLETS / 2 };
     function defiler(ici, cible) {
         const vrai = listeActuelle.slice();
         const sI = planche(ici), sC = planche(cible), enAvant = sC > sI;
@@ -1197,7 +1198,7 @@
             if (restant === 0) { finir(true); return; }
             restant--;
             try { enAvant ? pageFlip.flipNext("bottom") : pageFlip.flipPrev("bottom"); } catch (e) { finir(true); return; }
-            setTimeout(pas, 30);
+            setTimeout(pas, DEFILE.pause);
         };
         setTimeout(pas, 20);
         function finir(arrive) {
