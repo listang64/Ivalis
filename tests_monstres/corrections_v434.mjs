@@ -13,6 +13,7 @@
 // (v436) Nico : « cette image en fond dans la page Hall de guilde, de la même manière que les images en fond de race ».
 // (v437) « Le tableau, mets-le partout dans les deux pages, quitte à étirer ; un léger fondu sur sa bordure. »
 // (v440) « Sur le village, charge l'image du Hall d'avance » ; « l'aquarelle sous le titre Hall de guilde un peu plus opaque ».
+// (v446) « Cette image en fond des pages clans, comme pour les races, 10 % d'opacité en moins ; le nom du clan en doré. »
 // Lancer : node tests_monstres/corrections_v434.mjs
 import fs from 'fs';
 import http from 'http';
@@ -326,6 +327,10 @@ const TABLEAU = await (async () => { const pg = await b.newPage(); const u = awa
 // (v436) Le fond du Hall : un dessin servi sur place (ou la vraie image, V436_IMAGE=chemin, pour une capture).
 const FOND_HALL = process.env.V436_IMAGE ? fs.readFileSync(process.env.V436_IMAGE) : TABLEAU;
 const hallDemande = [];
+// (v446) Le fond des pages des clans (ou la vraie image, V446_IMAGE=chemin, pour une capture).
+const FOND_CLANS = process.env.V446_IMAGE ? fs.readFileSync(process.env.V446_IMAGE) : TABLEAU;
+const clansDemande = [];
+await p.route(/E95A92DD-534C-4DB7-AEB5-56C4D7F8446D_djgbg7/, r => { clansDemande.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: FOND_CLANS }); });
 await p.route(/BE4AA9CB-5F9D-4AA1-BC61-38390295F166_ncq5cc/, r => { hallDemande.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: FOND_HALL }); });
 const tableauDemande = [];
 // (la vraie image, V437_TABLEAU=chemin, pour une capture)
@@ -530,6 +535,18 @@ await section(async () => {
   verifier("à gauche, le titre « Membres du clan »", pg.gauche === "Membres du clan", pg.gauche);
   const autre = await G(() => (document.querySelector("#grimoire-fiches-clan-banniere-1 .nom-clan") || {}).textContent);
   verifier("un clan sans nom donné : « Clan » + le nom du joueur (sinon « Clan sans nom »)", /^Clan (sans nom|\S+)/.test((autre || "").trim()) && !/^Clan de /.test(autre || ""), autre);
+  // (v446) « Cette image en fond des pages clans, exactement comme pour les races, 10 % d'opacité en moins ; le nom du clan en doré. »
+  await attendreQue(() => G(() => [...document.querySelectorAll("#grimoire-fiches-clan-0 .fond-clan img, #grimoire-fiches-clan-banniere-0 .fond-clan img")].every(i => i.complete && i.naturalWidth > 0)), 4000);
+  const fc = await G(() => ["clan-0", "clan-banniere-0"].map(id => { const pg = document.getElementById("grimoire-fiches-" + id), fo = pg.querySelector(".fond-clan"), img = fo && fo.querySelector("img");
+    if (!img) return null; const pr = pg.getBoundingClientRect(), ir = img.getBoundingClientRect(), cs = getComputedStyle(fo);
+    return { src: img.getAttribute("src"), dx: Math.round(ir.left - pr.left), w: Math.round(ir.width / pr.width * 100) / 100, opacite: cs.opacity, voile: (cs.maskImage || cs.webkitMaskImage || "").replace(/\s+/g, " "),
+             dessus: Number(getComputedStyle(pg.querySelector(".contenu-page")).zIndex) > Number(cs.zIndex) }; }));
+  verifier("(v446) le fond des clans : l'image de Nico, sur les deux pages du clan, comme les peuples (deux pages de large)", fc[0] && fc[1] && /djgbg7\.png$/.test(fc[0].src) && fc[0].src === fc[1].src && clansDemande.length > 0
+           && fc[0].w === 2 && fc[1].w === 2 && fc[0].dx === 0 && fc[1].dx < 0 && fc[0].dessus && fc[1].dessus, JSON.stringify(fc).slice(0, 220));
+  verifier("(v446) …voilée à gauche sous la liste, entière à droite ; toute l'image à 90 % d'opacité", /rgba\(0, 0, 0, 0\.07\) 0%/.test(fc[0].voile) && /rgb\(0, 0, 0\) 88%/.test(fc[1].voile) && fc[0].opacite === "0.9" && fc[1].opacite === "0.9", JSON.stringify(fc.map(x => [x.opacite, x.voile.slice(0, 50)])));
+  const or = await G(() => { const n = document.querySelector("#grimoire-fiches-clan-banniere-0 .nom-clan"), cs = getComputedStyle(n); return { fond: cs.backgroundImage, remplissage: cs.webkitTextFillColor, clip: cs.webkitBackgroundClip || cs.backgroundClip }; });
+  verifier("(v446) le nom du clan en doré", /linear-gradient/.test(or.fond) && /240, 207, 99|f0cf63/i.test(or.fond) && or.clip === "text" && /rgba\(0, 0, 0, 0\)|transparent/.test(or.remplissage), JSON.stringify(or));
+  await p.waitForTimeout(400);
   await cap("v434-clan");
 });
 
@@ -554,7 +571,7 @@ await section(async () => {
   verifier("…et le fanion détruit sur Cloudinary", appels.detruits.length === 1 && /Clans\/fanion_1/.test(appels.detruits[0]), appels.detruits.join(" ").slice(0, 200));
   verifier("…la liste le dit", await attendreQue(() => G(() => /Aucun clan/.test(document.querySelector(".page-parametres-d").textContent) && /refondera/.test(document.querySelector(".page-parametres-g").textContent)), 3000));
   await attendreQue(() => G(() => /^Clan Ben$/.test(((document.querySelector("#grimoire-fiches-clan-banniere-0 .nom-clan") || {}).textContent || "").trim())), 5000);
-  const nom = await G(() => ({ nom: document.querySelector("#grimoire-fiches-clan-banniere-0 .nom-clan").textContent.trim(), img: !!document.querySelector("#grimoire-fiches-clan-banniere-0 img") }));
+  const nom = await G(() => ({ nom: document.querySelector("#grimoire-fiches-clan-banniere-0 .nom-clan").textContent.trim(), img: !!document.querySelector("#grimoire-fiches-clan-banniere-0 .cadre-banniere-clan img") }));
   verifier("la page du clan : plus de fanion, « Clan Ben » (le nom du joueur)", nom.nom === "Clan Ben" && !nom.img, JSON.stringify(nom));
   verifier("à sa prochaine connexion, la popup reviendra (le clan n'a plus de nom)", await G(async () => { const c = await window.CLANS_IVALIS.lireClan("J1"); return !c || !c.Nom_Clan; }));
 });

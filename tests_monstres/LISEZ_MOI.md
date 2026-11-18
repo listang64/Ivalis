@@ -12290,3 +12290,9 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - **Les encarts** (Nico : « l'encart en bas à droite, le texte est tronqué un peu ») : les écritures n'ont pas la même largeur (Homemade Apple, Satisfy… bien plus larges que Caveat) et le résumé était coupé à 5 lignes. Désormais chaque encart rapetisse son texte pas à pas (`--ajuste`, missions_guilde.js, ajusterEncarts) jusqu'à ce que le rang, le titre et tout le résumé y tiennent, en hauteur comme en largeur ; remesuré quand une écriture finit de se charger ; le texte, centré par ses marges, ne déborde plus par le haut.
 - **Le sceau** (« refais le dessin du sceau : un sceau de cire réaliste ») : un cachet de cire dessiné en SVG — la cire coulée au bord irrégulier (deux petites coulures), bombée par un éclairage spéculaire, grenue ; le creux du cachet et son biseau ; « ACCEPTER · LA MISSION » en arc et deux épées croisées en relief (ombre et reflet) ; son ombre portée sur la feuille.
 - corrections_v442.mjs le vérifie (ses contrôles « v445 »).
+
+## v446 — Le fond des pages des clans ; le nom du clan en or
+
+- Nico : « cette image en fond des pages clans, exactement comme pour les races, en baissant de 10 % l'opacité générale de l'image ; le nom du clan en doré ». L'image (une voûte de pierre ouverte sur la nuit, IMAGE_CLANS, grimoire_fiches.js) couvre la double page de chaque clan, comme les peuples de la création : à gauche voilée en dégradé sous la liste des membres (presque effacée au bord, entière vers la pliure), à droite entière sous le fanion ; toute l'image à 90 % d'opacité (.fond-clan).
+- Le nom du clan en or (le dégradé doré et l'ombre du nom du héros sur sa fiche) ; sur ce fond sombre, le fleuron sous le nom et la place vide du fanion passent aussi à l'or.
+- corrections_v434.mjs le vérifie (ses contrôles « v446 ») ; V446_IMAGE=chemin y sert la vraie image pour une capture.

@@ -182,6 +182,12 @@ function aller(el, essai) {
 }
 
 // LES PAGES DES CLANS
+// (v446) Nico : « cette image en fond des pages clans, exactement comme pour les races, en baissant de
+// 10 % l'opacité générale de l'image ; le nom du clan en doré ». L'image sur toute la double page du
+// clan : à gauche, voilée en dégradé sous la liste (presque effacée au bord, entière vers la
+// pliure) ; à droite, entière, sous le fanion et le nom (grimoire_fiches.css, .fond-clan).
+const IMAGE_CLANS = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1795022230/E95A92DD-534C-4DB7-AEB5-56C4D7F8446D_djgbg7.png";
+const fondClan = (cote) => `<div class="fond-clan ${cote}" aria-hidden="true"><img src="${IMAGE_CLANS}" alt="" draggable="false" decoding="async"></div>`;
 function pageClan(c, cote, i) {
     const el = page("clan-" + i, cote, "page-clan");
     const moi = c.id === idJoueurCourant();
@@ -205,7 +211,7 @@ function pageClan(c, cote, i) {
     const retourGroupe = i === 0 && window.GRIMOIRE_GROUPE ? `<button type="button" class="lien-fiche retour-groupe-clan" data-action="groupe" data-gp="revenir">‹ Le groupe</button>` : "";
     // (v433) Le Livre des clans : à gauche, les aventuriers du clan (le nom du clan est
     // sur la page de droite, sous sa bannière). (v434) « Renomme le titre : Membres du clan ».
-    el.innerHTML = `<div class="contenu-page page-liste-clan">${retourGroupe}
+    el.innerHTML = `${fondClan("gauche")}<div class="contenu-page page-liste-clan">${retourGroupe}
         <div class="titre-clan titre-aventuriers-clan">Membres du clan</div>
         <svg class="fleuron fleuron-clan" viewBox="0 0 200 24" aria-hidden="true">
           <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>
@@ -235,7 +241,7 @@ async function choisirHerosActif(id) {
 // en grand, collé en haut de la page ; sa place reste vide tant qu'il n'est pas dessiné.
 function pageBanniereClan(c, i) {
     const el = page("clan-banniere-" + i, "droite", "page-clan page-banniere-clan");
-    el.innerHTML = `<div class="contenu-page page-banniere-du-clan">
+    el.innerHTML = `${fondClan("droite")}<div class="contenu-page page-banniere-du-clan">
         <div class="cadre-banniere-clan${c.banniere ? "" : " vide"}">${c.banniere ? `<img src="${echapper(c.banniere)}" alt="" draggable="false">` : ""}</div>
         <div class="nom-clan">${echapper(titreClan(c))}</div>
         <svg class="fleuron fleuron-clan" viewBox="0 0 200 24" aria-hidden="true">

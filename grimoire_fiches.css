@@ -490,3 +490,24 @@
 .apercu-forge .encart-chiffre, .apercu-forge .carte-init, .apercu-forge .carte-fatigue, .apercu-forge .carte-distance b { line-height: 1; }
 .apercu-forge .carte-init { display: flex; align-items: center; justify-content: center; }
 .apercu-forge .carte-fatigue, .apercu-forge .carte-distance { display: inline-flex; align-items: center; gap: 0.25em; }
+
+/* v446 — LE FOND DES PAGES DES CLANS : comme les peuples de la création (.fond-classe) — l'image
+   sur toute la double page ; à gauche voilée en dégradé sous la liste, à droite entière — et
+   toute l'image à 90 % d'opacité. Le nom du clan en doré (comme le nom du héros sur sa fiche). */
+.page-clan { overflow: hidden; }
+.page-clan .contenu-page { z-index: 1; }
+.fond-clan { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; opacity: 0.9; }
+.fond-clan img { position: absolute; top: 0; height: 100%; width: 200%; max-width: none; object-fit: cover; -webkit-user-drag: none; user-select: none; }
+.fond-clan.gauche img { left: 0; }
+.fond-clan.droite img { left: -100%; }
+.fond-clan.gauche { -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.07) 0%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%);
+  mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.07) 0%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%); }
+.fond-clan.droite { -webkit-mask-image: linear-gradient(to right, #000 0%, #000 88%, rgba(0, 0, 0, 0.75) 100%); mask-image: linear-gradient(to right, #000 0%, #000 88%, rgba(0, 0, 0, 0.75) 100%); }
+.page-banniere-du-clan .nom-clan {
+  background: linear-gradient(180deg, #fff3b8 0%, #f0cf63 38%, #c8952c 62%, #8a5d12 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.15) rgba(0, 0, 0, 0.95)) drop-shadow(0 calc(var(--u) * 0.8) calc(var(--u) * 1.2) rgba(0, 0, 0, 0.7)); }
+/* Sur le fond sombre, le fleuron sous le nom et la place vide du fanion passent à l'or. */
+.page-banniere-du-clan .fleuron path { stroke: #d9b45a; }
+.page-banniere-du-clan .fleuron circle { fill: #d9b45a; }
+.page-banniere-du-clan .cadre-banniere-clan.vide { border-color: rgba(217, 180, 90, 0.45); }
