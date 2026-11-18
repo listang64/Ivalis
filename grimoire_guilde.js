@@ -37,6 +37,11 @@ const son = () => { try { if (typeof window.jouerSonClic === "function") window.
 const lireLS = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const ecrireLS = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 const FLEURON = `<svg class="fleuron fleuron-guilde" viewBox="0 0 200 24" aria-hidden="true"><path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>`;
+// (v436) Nico : « cette image en fond dans la page Hall de guilde, de la même manière que
+// les images en fond de race » : sur toute la double page ; à gauche, voilée en dégradé sous
+// le menu (presque effacée au bord, entière vers la pliure) ; à droite, entière.
+export const IMAGE_HALL = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1795004587/BE4AA9CB-5F9D-4AA1-BC61-38390295F166_ncq5cc.png";
+const fondHall = (cote) => `<div class="fond-guilde ${cote}" aria-hidden="true"><img src="${IMAGE_HALL}" alt="" draggable="false" decoding="async"></div>`;
 export const IMAGE_TABLEAU = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794992871/486DA9A4-10CC-430C-B103-A9E7B9EE1787_okyu3f.png";
 
 // Les entrées du menu : [id, titre, teinte du lavis].
@@ -89,10 +94,11 @@ function entree(id, texte, teinte) {
         + `${lavis(teinte, "guilde-" + id)}<span class="entree-guilde-texte">${echapper(texte)}</span></button>`;
 }
 function rendreHall() {
-    hall.g.innerHTML = `<div class="contenu-page page-guilde-menu">
+    [hall.g, hall.d].forEach(el => el.classList.add("page-hall-guilde"));
+    hall.g.innerHTML = `${fondHall("gauche")}<div class="contenu-page page-guilde-menu">
            <div class="entrees-guilde">${PIECES.map(([id, t, teinte]) => entree(id, t, teinte)).join("")}</div>
          </div>`;
-    hall.d.innerHTML = `<div class="contenu-page page-guilde-titre">
+    hall.d.innerHTML = `${fondHall("droite")}<div class="contenu-page page-guilde-titre">
            <div class="titre-guilde">${lavis(TEINTE_TITRE, "guilde-titre")}<span>Hall de guilde</span></div>
            ${FLEURON}
          </div>`;
@@ -354,7 +360,7 @@ setInterval(() => {
 
 window.GRIMOIRE_GUILDE = {
     ouvrir, agir, ouverte, vue: () => vueActuelle() || "hall", piece: () => piece,
-    pages: () => (hall ? [hall.g, hall.d] : []), pagesPiece: () => (salle && piece ? [salle.g, salle.d] : []), PIECES, IMAGE_TABLEAU,
+    pages: () => (hall ? [hall.g, hall.d] : []), pagesPiece: () => (salle && piece ? [salle.g, salle.d] : []), PIECES, IMAGE_TABLEAU, IMAGE_HALL,
     encarts: () => JSON.parse(JSON.stringify(encarts)), creerEncart, supprimerEncart, selection: () => selection,
     choisirEncart: (n) => { selection = encarts[n] ? n : null; rendreTableau(); majPopup(); }, incliner
 };

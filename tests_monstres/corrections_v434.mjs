@@ -10,6 +10,7 @@
 // soulignage. » « Membres du clan. » « Fais tourner les pages plus rapidement. »
 // Sur la vraie page (le décor du banc v424), avec de faux OpenAI et Cloudinary.
 // (v435) Nico : « mettre Clan devant le champ du nom » ; « la bannière, fais-la descendre encore un peu » ; « le panneau des missions déborde de la page ».
+// (v436) Nico : « cette image en fond dans la page Hall de guilde, de la même manière que les images en fond de race ».
 // Lancer : node tests_monstres/corrections_v434.mjs
 import fs from 'fs';
 import http from 'http';
@@ -320,6 +321,10 @@ await p.route(/res\.cloudinary\.com\/banc\/image\/upload\/.*Clans\/fanion_/, r =
 const TABLEAU = await (async () => { const pg = await b.newPage(); const u = await pg.evaluate(() => { const c = document.createElement("canvas"); c.width = 1536; c.height = 1024; const x = c.getContext("2d");
   x.fillStyle = "#6b4423"; x.fillRect(0, 0, 1536, 1024); x.fillStyle = "#e9d8b0"; x.fillRect(100, 150, 500, 300); x.fillRect(900, 550, 500, 380); x.fillStyle = "#c00"; x.fillRect(0, 0, 30, 1024); x.fillStyle = "#00c"; x.fillRect(1506, 0, 30, 1024);
   return c.toDataURL("image/png"); }); await pg.close(); return Buffer.from(u.split(",")[1], "base64"); })();
+// (v436) Le fond du Hall : un dessin servi sur place (ou la vraie image, V436_IMAGE=chemin, pour une capture).
+const FOND_HALL = process.env.V436_IMAGE ? fs.readFileSync(process.env.V436_IMAGE) : TABLEAU;
+const hallDemande = [];
+await p.route(/BE4AA9CB-5F9D-4AA1-BC61-38390295F166_ncq5cc/, r => { hallDemande.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: FOND_HALL }); });
 const tableauDemande = [];
 await p.route(/486DA9A4-10CC-430C-B103-A9E7B9EE1787_okyu3f/, r => { tableauDemande.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: TABLEAU }); });
 await G(() => { localStorage.setItem("ivalis_OPENAI_API_KEY", "sk-banc"); localStorage.setItem("ivalis_CLOUDINARY_CLOUD_NAME", "banc");
@@ -339,6 +344,17 @@ await section(async () => {
   verifier("les quatre titres, sans numéro", JSON.stringify(r.entrees) === JSON.stringify(["Panneau des missions", "Salle du conseil", "Bureau du patriarche", "Livre des clans"]) && r.numeros === 0, JSON.stringify(r.entrees));
   verifier("…sans trait de plume dessous", r.traits.every(t => t === "none"), JSON.stringify(r.traits));
   verifier("…et plus aucun bouton retour", r.retours === 0, String(r.retours));
+  // (v436) « Cette image en fond dans la page Hall de guilde, de la même manière que les images en fond de race. »
+  await attendreQue(() => G(() => [...document.querySelectorAll(".page-hall-guilde .fond-guilde img")].every(i => i.complete && i.naturalWidth > 0)), 4000);
+  const f = await G(() => window.GRIMOIRE_GUILDE.pages().map(pg => { const fo = pg.querySelector(".fond-guilde"), img = fo && fo.querySelector("img"); if (!img) return null;
+    const pr = pg.getBoundingClientRect(), ir = img.getBoundingClientRect(), c = pg.querySelector(".contenu-page"), m = getComputedStyle(fo).maskImage || getComputedStyle(fo).webkitMaskImage || "";
+    return { src: img.getAttribute("src"), dx: Math.round(ir.left - pr.left), w: Math.round(ir.width / pr.width * 100) / 100, h: Math.round(ir.height / pr.height * 100) / 100,
+             voile: m.replace(/\s+/g, " "), dessus: Number(getComputedStyle(c).zIndex) > Number(getComputedStyle(fo).zIndex), cache: getComputedStyle(pg).overflow }; }));
+  const [fg, fd] = f;
+  verifier("(v436) le fond du Hall : l'image de Nico, sur les deux pages", fg && fd && /ncq5cc\.png$/.test(fg.src) && fg.src === fd.src && hallDemande.length > 0, JSON.stringify(f).slice(0, 200));
+  verifier("…sur toute la double page, comme les peuples (deux pages de large, chaque page sa moitié)", fg.w === 2 && fd.w === 2 && fg.h === 1 && fg.dx === 0 && fd.dx < 0 && fg.cache === "hidden", JSON.stringify(f.map(x => [x.dx, x.w, x.h])));
+  verifier("…voilée à gauche sous le menu (presque effacée au bord, entière vers la pliure), entière à droite ; le texte par-dessus",
+           /rgba\(0, 0, 0, 0\.07\) 0%/.test(fg.voile) && /rgba\(0, 0, 0, 0\.92\) 100%/.test(fg.voile) && /rgb\(0, 0, 0\) 88%/.test(fd.voile) && fg.dessus && fd.dessus, fg.voile.slice(0, 120));
   await cap("v434-hall");
 });
 

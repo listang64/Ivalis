@@ -12222,3 +12222,8 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - **Le fanion** (« fais-le descendre encore un peu plus sur sa page ») : toujours collé en haut de la page, il en prend environ 74 % de la hauteur (67 % avant) ; le nom du clan dessous.
 - **Le Panneau des missions** (« il déborde de la page ») : l'image tient dans la double page avec une marge de papier autour (4,5 % de large, 5,5 % de haut), toujours étirée pour la remplir sans rien couper. Les encarts se mesurent désormais en parts de l'image (et non plus de la double page).
 - corrections_v434.mjs le vérifie (ses contrôles « v435 »).
+
+## v436 — Le fond du Hall de guilde
+
+- Nico : « cette image en fond dans la page Hall de guilde, de la même manière que les images en fond de race ». La salle du Hall (IMAGE_HALL, grimoire_guilde.js) couvre toute la double page, comme les peuples de la création : à gauche, voilée en dégradé sous le menu (presque effacée au bord, entière vers la pliure) ; à droite, entière, sous le titre.
+- corrections_v434.mjs le vérifie (ses contrôles « v436 »).

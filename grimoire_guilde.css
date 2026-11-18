@@ -50,3 +50,16 @@
 .encart-taille { right: -8px; bottom: -8px; cursor: nwse-resize; }
 .encart-rotation { left: 50%; top: -26px; margin-left: -8px; border-radius: 50%; cursor: grab; }
 .encart-rotation::after { content: ""; position: absolute; left: 50%; top: 100%; width: 2px; height: 10px; margin-left: -1px; background: #8f1d15; }
+
+/* v436 — LE FOND DU HALL : comme les peuples de la création (grimoire_creation.css,
+   .fond-classe) — l'image sur toute la double page ; à gauche, voilée en dégradé sous le
+   menu (presque effacée au bord, entière vers la pliure) ; à droite, entière. */
+.page-hall-guilde { overflow: hidden; }
+.page-hall-guilde .contenu-page { z-index: 1; }
+.fond-guilde { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.fond-guilde img { position: absolute; top: 0; height: 100%; width: 200%; max-width: none; object-fit: cover; -webkit-user-drag: none; user-select: none; }
+.fond-guilde.gauche img { left: 0; }
+.fond-guilde.droite img { left: -100%; }
+.fond-guilde.gauche { -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.07) 0%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%);
+  mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.07) 0%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%); }
+.fond-guilde.droite { -webkit-mask-image: linear-gradient(to right, #000 0%, #000 88%, rgba(0, 0, 0, 0.75) 100%); mask-image: linear-gradient(to right, #000 0%, #000 88%, rgba(0, 0, 0, 0.75) 100%); }
