@@ -1059,13 +1059,20 @@ window.objetsPourLaCarte = function(perso, armeDeLaCarte) {
 // pas. Le sort garde ses propres portées (Distance de la Forge, atout de
 // portée des sorts).
 const PORTEES_D_ARME = ["portee", "allonge"];
+//
+// (v431) Nico : « le bonus de portée d'arc s'applique bien à tous les sorts créés avec pour
+// base l'arme en question ? » La portée (et l'allonge) d'une arme ne sert que les cartes
+// forgées pour SON type d'arme : une fronde tenue avec une dague n'allonge pas les coups de
+// dague. Une carte d'un type inconnu (d'avant la Forge) garde l'ancienne règle.
 window.bonusEquipPourCarte = function(perso, cle, armeDeLaCarte) {
     const total = typeof window.bonusEquip === "function" ? window.bonusEquip(perso, cle) : 0;
     const sansArme = armeDeLaCarte === window.CARTE_SANS_ARME;
     const sortSansPorteeDArme = armeDeLaCarte === "Magie" && PORTEES_D_ARME.includes(cle);
-    if (!perso || !(sansArme || sortSansPorteeDArme)) return total;
+    const porteeDUneAutreArme = PORTEES_D_ARME.includes(cle) && (window.TYPES_ARMES_FORGE || []).includes(armeDeLaCarte);
+    if (!perso || !(sansArme || sortSansPorteeDArme || porteeDUneAutreArme)) return total;
     let desArmes = 0;
     window.armesEnMain(perso).forEach(o => {
+        if (!sansArme && !sortSansPorteeDArme && o.type === armeDeLaCarte) return;   // la sienne : gardée
         desArmes += parseInt((o.bonus || {})[cle]) || 0;
     });
     return total - desArmes;

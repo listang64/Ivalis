@@ -599,11 +599,14 @@ export function cloturerTour(etat, des) {
     // (combat_etat.js). Posé AVANT l'étape « tour », pour qu'elle emporte
     // l'entrée marquée « repos pris ».
     const etapesRepos = finDeManche ? [] : reposDuRetourArriere(etat);
+    // (v431) L'Aura brûlante de l'Inquisiteur : le tour qui commence est peut-être celui
+    // d'un ennemi Brûlé à son contact.
+    const etapesAura = finDeManche ? [] : auraBrulanteDebutDeTour(etat);
 
     const etapes = [...etapesSursis, ...etapesZombie,
                     { type: "tour", fini: partie.id, file, phase: etat.phase,
                       manche: etat.manche, ontJoue: etat.ontJoue },
-                    ...etapesRepos];
+                    ...etapesRepos, ...etapesAura];
     if (finDeManche) {
         // LA RÉGÉNÉRATION DE FIN DE MANCHE. Sans elle, l'énergie ne remonte
         // jamais et le combat s'éteint tout seul au bout de trois manches :
@@ -965,6 +968,29 @@ export function regenererPvFinDeManche(etat) {
     return etapes;
 }
 
+// (v431) L'AURA BRÛLANTE DE L'INQUISITEUR (niveau 5). Nico : « les personnages adjacents
+// sous l'effet Brûlé subissent 3 dégâts à chaque tour qui débute sur une case adjacente à
+// l'Inquisiteur » ; « seulement les ennemis » ; « des dégâts magiques de feu qui ne prennent
+// pas la résistance magique en compte ; si l'ennemi a une résistance au feu, ça ne fait pas
+// de dégâts ». Au début du tour du combattant en tête de file : Brûlé, ennemi d'un
+// Inquisiteur debout à son contact, il prend ses 3 dégâts (le bouclier d'abord) ; un
+// second Inquisiteur au contact, une seconde aura.
+export function auraBrulanteDebutDeTour(etat) {
+    const tete = (etat.file || [])[0];
+    const c = tete && combattant(etat, tete.id);
+    if (!c || c.aTerre || c.estIllusion || enSursis(c) || !aLEtat(c, "Brûlé")) return [];
+    const etapes = [];
+    (etat.ordre || Object.keys(etat.combattants || {})).forEach(idInq => {
+        const q = combattant(etat, idInq);
+        const degats = nombre(q && q.atouts && q.atouts.auraBrulante);
+        if (!q || idInq === tete.id || q.aTerre || degats <= 0 || c.aTerre) return;
+        if ((q.camp || "Allié") === (c.camp || "Allié") || distance(q, c) !== 1) return;
+        if (resisteA(c, "Brûlé")) return;             // résistant au feu : rien
+        etapes.push(...infligerTic(c, tete.id, degats, "Aura brûlante", etat, idInq));
+    });
+    return etapes;
+}
+
 // (v359) L'AURA DU PRÊTRE DE LA LUMIÈRE (niveau 9) : chaque allié à son
 // contact — pas lui — reprend 3 PV en fin de manche, selon les règles de tout
 // soin (soins reçus, brûlure ; rien en sursis). Deux prêtres : deux auras.
@@ -1065,7 +1091,7 @@ export function ouvrirManche(etat, file, des) {
     const positions = positionsDeManche(suivant);
     memoriserPositions(suivant, suivant.manche, positions);
     const etapes = [...etapesRelache, { type: "tour", file: propre, phase: "Resolution",
-                      manche: suivant.manche, ontJoue: [], positions }, ...etapesRepos];
+                      manche: suivant.manche, ontJoue: [], positions }, ...etapesRepos, ...auraBrulanteDebutDeTour(suivant)];
     return fabriquerPas(etat, suivant, etapes, `manche|${suivant.manche}`, null, des);
 }
 

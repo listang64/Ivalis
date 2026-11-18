@@ -91,8 +91,9 @@ await section(async () => {
   verifier("une carte à 30 % de Saignement + une arme à 20 % : 50 % (et plus le meilleur des deux)", ch(r.carteEtArme, "Saignement") === 50 && r.carteEtArme.length === 1, JSON.stringify(r.carteEtArme));
   verifier("deux objets qui brûlent (10 et 15) : 25 %, un seul Brûlé", ch(r.deuxObjets, "Brûlé") === 25 && r.deuxObjets.length === 1, JSON.stringify(r.deuxObjets));
   verifier("une arme seule : sa chance telle quelle (12 %)", ch(r.armeSeule, "Étourdi") === 12, JSON.stringify(r.armeSeule));
-  verifier("le Pugiliste Vargen (15) + une bague qui fait saigner (20) : 35 %", ch(r.talentEtBague, "Saignement") === 35, JSON.stringify(r.talentEtBague));
-  verifier("…et avec une carte qui fait déjà saigner à 40 : 40 + 15 + 20 = 75", ch(r.talentBagueCarte, "Saignement") === 75, JSON.stringify(r.talentBagueCarte));
+  // (v431) Le Pugiliste est une augmentation max (+10) : seulement sur le Saignement du sort ; l'arme, elle, s'ajoute partout.
+  verifier("(v431) un sort sans Saignement : le Pugiliste ne donne rien, la bague ajoute le sien (20 %)", ch(r.talentEtBague, "Saignement") === 20, JSON.stringify(r.talentEtBague));
+  verifier("(v431) …et avec une carte qui fait déjà saigner à 40 : 40 + 10 (Pugiliste) + 20 (bague) = 70", ch(r.talentBagueCarte, "Saignement") === 70, JSON.stringify(r.talentBagueCarte));
 });
 
 titre("2. LA PROVOCATION DU PROTECTEUR : LA SOMME AUSSI");
@@ -109,7 +110,8 @@ await section(async () => {
     } finally { window.atoutRace = vrai; }
   });
   const ch = (l) => (l.find(a => a.nom === "Provocation") || {}).chance;
-  verifier("la classe seule : 10 %", ch(r.seule) === 10, JSON.stringify(r.seule));
+  // (v431) une augmentation max ne sert que l'effet que porte le sort : sans Provocation, rien.
+  verifier("(v431) la classe seule, sur une carte qui ne provoque pas : rien", ch(r.seule) === undefined, JSON.stringify(r.seule));
   verifier("une carte qui provoque déjà à 25 % : 25 + 10 = 35", ch(r.avecCarte) === 35, JSON.stringify(r.avecCarte));
 });
 

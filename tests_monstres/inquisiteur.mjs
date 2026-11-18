@@ -20,7 +20,7 @@ import { SRC_STATS_COMMUNES } from './stats_communes.mjs';
 import { construireEtatCombat, clonerEtat, appliquerEntree, verifierEtatCombat, creerDes } from '../combat_etat.js';
 import { resoudreCarte, tirerDesCarte, chanceFaceA, prisMalgreResistance, immuniseA, combustionInstantanee,
          CHANCE_COMBUSTION, coutDeTechnique, bonusFeu } from '../moteur_pur.js';
-import { validerIntention, appliquerIntention } from '../cerveau_combat.js';
+import { validerIntention, appliquerIntention, auraBrulanteDebutDeTour, avancerFile, ouvrirManche } from '../cerveau_combat.js';
 import { misEnScene } from '../pont_combat.js';
 
 let echecs = 0;
@@ -58,21 +58,22 @@ const pos = (c) => `${c.q},${c.r}`;
 console.log("\n1. LES PALIERS");
 {
     const a = (n) => w.atoutClasse(inquisiteur(n));
-    verifier("niveau 1 : 10 % de brûlure offerte, +1 au feu", a(1).brulureOfferte === 10 && a(1).degatsFeu === 1 && !(a(1).techniques || []).length, JSON.stringify(a(1)));
-    verifier("niveau 3 : +1 compétence, résiste au Brûlé, l'Ondari immunisé",
-             a(3).competences === 1 && JSON.stringify(a(3).resistances) === '["Brûlé"]' && a(3).immuniteBrulureOndari === true && !a(2).competences);
-    verifier("niveau 5 : Combustion instantanée ; niveau 9 : + Terreur ardente (pas au 8)",
-             JSON.stringify(a(5).techniques) === '["CLASSE_COMBUSTION"]' && JSON.stringify(a(9).techniques) === '["CLASSE_COMBUSTION","CLASSE_TERREUR_ARDENTE"]'
-             && JSON.stringify(a(8).techniques) === '["CLASSE_COMBUSTION"]' && !(a(4).techniques || []).length);
+    // (v431) Nico : « niveau 1 : compétence +1, résistance au feu (immunité Brûlure si Ondari), +1 dégât avec ses
+    // compétences de feu ; niveau 3 : Combustion instantanée ; niveau 5 : Aura brûlante ; niveau 9 : Terreur ardente ».
+    verifier("(v431) niveau 1 : +1 compétence, résiste au Brûlé, l'Ondari immunisé, +1 au feu ; plus de brûlure offerte",
+             a(1).competences === 1 && JSON.stringify(a(1).resistances) === '["Brûlé"]' && a(1).immuniteBrulureOndari === true && a(1).degatsFeu === 1
+             && !a(1).brulureOfferte && !(a(1).techniques || []).length, JSON.stringify(a(1)));
+    verifier("(v431) niveau 3 : Combustion instantanée ; niveau 5 : l'Aura brûlante (3) ; niveau 9 : + Terreur ardente (pas au 8)",
+             JSON.stringify(a(3).techniques) === '["CLASSE_COMBUSTION"]' && !(a(2).techniques || []).length && !a(4).auraBrulante && a(5).auraBrulante === 3
+             && JSON.stringify(a(9).techniques) === '["CLASSE_COMBUSTION","CLASSE_TERREUR_ARDENTE"]' && JSON.stringify(a(8).techniques) === '["CLASSE_COMBUSTION"]');
     const co = w.TECHNIQUES_CLASSE.CLASSE_COMBUSTION, te = w.TECHNIQUES_CLASSE.CLASSE_TERREUR_ARDENTE;
-    verifier("Combustion : init 0, fatigue 0, sur soi", co.Initiative === 0 && co.Fatigue === 0 && co.cible === "soi" && co.niveau === 5 && co.classe === "Inquisiteur");
+    verifier("Combustion : init 0, fatigue 0, sur soi, niveau 3 (v431), une fois par combat", co.Initiative === 0 && co.Fatigue === 0 && co.cible === "soi" && co.niveau === 3 && co.classe === "Inquisiteur" && /Une fois par combat/.test(co.desc));
     verifier("Terreur ardente : init 50, fatigue 70, sur soi ; le moteur fait payer 70",
              te.Initiative === 50 && te.Fatigue === 70 && te.cible === "soi" && te.niveau === 9 && coutDeTechnique("CLASSE_TERREUR_ARDENTE") === 70);
-    verifier("la brûlure offerte : 10 % pour lui, 5 % sur la foudre, 5 % pour un autre",
-             w.chanceElementOfferte(inquisiteur(1), "Brûlé") === 10 && w.chanceElementOfferte(inquisiteur(1), "Électrifié") === 5
-             && w.chanceElementOfferte(fiche("X"), "Brûlé") === 5 && w.chanceElementOfferte(null, "Brûlé") === 5);
-    verifier("les textes", /10 % de chance de brûler/.test(w.texteAtout("brulureOfferte", 10)) && /\+1 dégât magique à ses attaques de feu/.test(w.texteAtout("degatsFeu", 1))
-             && /immunisé/.test(w.texteAtout("immuniteBrulureOndari", true)));
+    verifier("(v431) la brûlure offerte : 5 % pour lui comme pour tous",
+             w.chanceElementOfferte(inquisiteur(1), "Brûlé") === 5 && w.chanceElementOfferte(fiche("X"), "Brûlé") === 5 && w.chanceElementOfferte(null, "Brûlé") === 5);
+    verifier("les textes (l'Aura brûlante dite)", /Aura brûlante/.test(w.texteAtout("auraBrulante", 3)) && /3 dégâts de feu/.test(w.texteAtout("auraBrulante", 3))
+             && /\+1 dégât magique à ses attaques de feu/.test(w.texteAtout("degatsFeu", 1)) && /immunisé/.test(w.texteAtout("immuniteBrulureOndari", true)));
 }
 
 console.log("\n2. +1 DÉGÂT À SES ATTAQUES MAGIQUES DE FEU");
@@ -91,15 +92,15 @@ console.log("\n2. +1 DÉGÂT À SES ATTAQUES MAGIQUES DE FEU");
 
 console.log("\n3. RÉSISTANCE AU FEU ; L'ONDARI IMMUNISÉ");
 {
-    const humain3 = monde(3).combattants.I, ondari3 = monde(3, { race: "Ondari" }).combattants.I, ondari1 = monde(1, { race: "Ondari" }).combattants.I;
-    verifier("Humain niveau 3 : résiste (75 → 50), pas immunisé", chanceFaceA(humain3, "Brûlé", 75) === 50 && !immuniseA(humain3, "Brûlé"));
-    verifier("Ondari niveau 3 : immunisé — 0 % même à 100", immuniseA(ondari3, "Brûlé") && chanceFaceA(ondari3, "Brûlé", 100) === 0
+    // (v431) la résistance au feu et l'immunité de l'Ondari dès le niveau 1.
+    const humain3 = monde(1).combattants.I, ondari3 = monde(1, { race: "Ondari" }).combattants.I;
+    verifier("(v431) Humain niveau 1 : résiste (75 → 50), pas immunisé", chanceFaceA(humain3, "Brûlé", 75) === 50 && !immuniseA(humain3, "Brûlé"));
+    verifier("(v431) Ondari niveau 1 : immunisé — 0 % même à 100", immuniseA(ondari3, "Brûlé") && chanceFaceA(ondari3, "Brûlé", 100) === 0
              && JSON.stringify(ondari3.atouts.immunisesA) === '["Brûlé"]');
     verifier("…mais pas aux autres états", chanceFaceA(ondari3, "Glacé", 40) === 40);
-    verifier("Ondari niveau 1 : résiste par sa race, pas immunisé", chanceFaceA(ondari1, "Brûlé", 75) === 50 && !immuniseA(ondari1, "Brûlé"));
     verifier("un état « à coup sûr » ne le prend jamais", [1, 2, 3].every(g => prisMalgreResistance(ondari3, "Brûlé", creerDes(g)) === false));
     // Un critique impose les états, sauf à qui y résiste — l'immunisé, jamais.
-    const e = monde(3, { race: "Ondari" });
+    const e = monde(1, { race: "Ondari" });
     const feu = { type: "carte", idLanceur: "M1", idCarte: "X", critique: true,
         attaques: [], alterations: [{ nom: "Brûlé", chance: 100, duree: 2, cibles: ["I"] }] };
     const jets = tirerDesCarte(e, feu, "M1", true, creerDes(7));
@@ -110,9 +111,9 @@ console.log("\n3. RÉSISTANCE AU FEU ; L'ONDARI IMMUNISÉ");
 console.log("\n4. LA COMBUSTION INSTANTANÉE");
 {
     const lancer = { id: "C1", type: "classe", acteur: "I", idCarte: "CLASSE_COMBUSTION" };
-    const e = enTete(monde(5), "CLASSE_COMBUSTION");
-    verifier("niveau 5 : acceptée", validerIntention(e, lancer).ok, validerIntention(e, lancer).raison || "");
-    verifier("niveau 4 : il ne l'a pas", !validerIntention(enTete(monde(4), "CLASSE_COMBUSTION"), lancer).ok);
+    const e = enTete(monde(3), "CLASSE_COMBUSTION");
+    verifier("(v431) niveau 3 : acceptée", validerIntention(e, lancer).ok, validerIntention(e, lancer).raison || "");
+    verifier("(v431) niveau 2 : il ne l'a pas", !validerIntention(enTete(monde(2), "CLASSE_COMBUSTION"), lancer).ok);
     // Le moteur pose ce que le cerveau a tiré.
     const s = monde(5); s.combattants.M2.etats = [{ nom: "Brûlé", duree: 1 }];
     const et = combustionInstantanee(s, "I", { M1: true, M2: true, M3: false });
@@ -218,6 +219,55 @@ p.on('pageerror', e => erreurs.push(e.message));
 await p.goto(base + '/index.html');
 await p.waitForTimeout(2000);
 
+console.log("\n5 bis. (v431) L'AURA BRÛLANTE (NIVEAU 5)");
+// Nico : « les personnages adjacents sous l'effet Brûlé subissent 3 dégâts à chaque tour qui débute sur une case
+// adjacente à l'Inquisiteur » ; « seulement les ennemis » ; « au début de chaque tour, si adjacent » ; « des dégâts
+// magiques de feu qui ne prennent pas la résistance magique en compte ; si l'ennemi a une résistance feu, rien ».
+{
+    // M1 à son contact (1,0) ; A, allié, à son contact (0,1).
+    const prep = (niveau, extra) => { const e = monde(niveau); e.combattants.M1.q = 1; e.combattants.M1.r = 0;
+        e.combattants.M1.etats = [{ nom: "Brûlé", duree: 2 }]; e.combattants.A.etats = [{ nom: "Brûlé", duree: 2 }];
+        if (extra) extra(e); return e; };
+    const enTeteDe = (e, id) => { e.file = [{ id, carte: "X", initiative: 10, pas: 0 }]; return e; };
+    let e = enTeteDe(prep(5), "M1");
+    let et = auraBrulanteDebutDeTour(e);
+    verifier("un ennemi Brûlé qui commence son tour à son contact : 3 dégâts (100 → 97)", e.combattants.M1.pv === 97
+             && et.some(x => x.type === "degats" && x.cible === "M1" && x.montant === 3 && x.tic === "Aura brûlante"), JSON.stringify(et));
+    e = enTeteDe(prep(5, (x) => { x.combattants.M1.def = { ...(x.combattants.M1.def || {}), magique: 80 }; }), "M1");
+    auraBrulanteDebutDeTour(e);
+    verifier("…sa résistance magique (80 %) n'y change rien : 3 aussi", e.combattants.M1.pv === 97, String(e.combattants.M1.pv));
+    e = enTeteDe(prep(5, (x) => { x.combattants.M1.atouts.resistances = ["Brûlé"]; }), "M1");
+    et = auraBrulanteDebutDeTour(e);
+    verifier("…un ennemi qui résiste au feu : aucun dégât", e.combattants.M1.pv === 100 && et.length === 0, JSON.stringify(et));
+    e = enTeteDe(prep(5), "A");
+    auraBrulanteDebutDeTour(e);
+    verifier("un allié Brûlé à son contact : rien (les ennemis seulement)", e.combattants.A.pv === 100);
+    e = enTeteDe(prep(5, (x) => { x.combattants.M1.etats = []; }), "M1");
+    auraBrulanteDebutDeTour(e);
+    verifier("un ennemi à son contact, pas Brûlé : rien", e.combattants.M1.pv === 100);
+    e = enTeteDe(prep(5, (x) => { x.combattants.M1.q = 2; }), "M1");
+    auraBrulanteDebutDeTour(e);
+    verifier("un ennemi Brûlé à deux cases : rien", e.combattants.M1.pv === 100);
+    e = enTeteDe(prep(4), "M1");
+    auraBrulanteDebutDeTour(e);
+    verifier("un Inquisiteur de niveau 4 : pas d'aura", e.combattants.M1.pv === 100);
+    e = enTeteDe(prep(5, (x) => { x.combattants.I.aTerre = true; x.combattants.I.pv = 0; }), "M1");
+    auraBrulanteDebutDeTour(e);
+    verifier("un Inquisiteur à terre : pas d'aura", e.combattants.M1.pv === 100);
+    // Par le vrai cerveau : le tour de l'Inquisiteur se ferme, celui de M1 commence.
+    e = prep(5); e.file = [{ id: "I", carte: "X", initiative: 50, pas: 0 }, { id: "M1", carte: "X", initiative: 10, pas: 0 }];
+    let pas = avancerFile(e, creerDes(3));
+    verifier("par le cerveau : son tour fini, celui de M1 commence et il brûle (97), écrit dans le journal", pas.etat.combattants.M1.pv === 97
+             && appliquerEntree(e, pas.entree).combattants.M1.pv === 97, String(pas.etat.combattants.M1.pv));
+    verifier("…l'état reste cohérent", verifierEtatCombat(pas.etat).length === 0, verifierEtatCombat(pas.etat).join(" | "));
+    // À l'ouverture de la manche, M1 joue en premier : son tour débute, il brûle.
+    e = prep(5); e.phase = "Preparation"; e.file = [];
+    pas = ouvrirManche(e, [{ id: "M1", carte: "X", initiative: 60 }, { id: "I", carte: "X", initiative: 10 }], creerDes(3));
+    verifier("à l'ouverture d'une manche, M1 en tête : il brûle aussi (97)", pas && pas.etat.combattants.M1.pv === 97, String(pas && pas.etat.combattants.M1.pv));
+    const chiffre = misEnScene(pas.entree.etapes.find(x => x.type === "degats" && x.tic === "Aura brûlante"), pas.etat);
+    verifier("…et l'écran le montre", !!chiffre, JSON.stringify(chiffre).slice(0, 120));
+}
+
 console.log("\n6. LA PAGE : LA FICHE, LE CHOIX, LA FORGE");
 {
   const r = await p.evaluate(async () => {
@@ -241,9 +291,10 @@ console.log("\n6. LA PAGE : LA FICHE, LE CHOIX, LA FORGE");
   });
   verifier("la classe est dans la grille, sans « Arrive bientôt »", r.existe && !r.bientot);
   verifier("sa fiche s'ouvre : Niv. 1 / 3 / 5 / 9", r.ouverte && JSON.stringify(r.niveaux) === '["Niv. 1","Niv. 3","Niv. 5","Niv. 9"]', JSON.stringify(r.niveaux));
-  verifier("la fiche dit les 10 %, le +1, l'Ondari, la Combustion et la Terreur ardente",
-           /10 %/.test(r.texte) && /\+1 dégât magique/.test(r.texte) && /Ondari/.test(r.texte) && /Combustion instantanée/.test(r.texte) && /Terreur ardente/.test(r.texte));
-  verifier("la Forge : Feu → 10 % de Brûlé offerts pour lui, 5 % pour un Sorcier", r.offertI === 10 && r.offertS === 5, `${r.offertI} / ${r.offertS}`);
+  verifier("(v431) la fiche dit +1 compétence, le +1 au feu, l'Ondari, la Combustion, l'Aura brûlante et la Terreur ardente ; plus les 10 %",
+           /\+1 compétence/.test(r.texte) && /\+1 dégât magique/.test(r.texte) && /Ondari/.test(r.texte) && /Combustion instantanée/.test(r.texte)
+           && /Aura brûlante/.test(r.texte) && /Terreur ardente/.test(r.texte) && !/10 % de chance de brûler/.test(r.texte));
+  verifier("(v431) la Forge : Feu → 5 % de Brûlé offerts, pour lui comme pour un Sorcier", r.offertI === 5 && r.offertS === 5, `${r.offertI} / ${r.offertS}`);
 }
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
 await b.close(); serveur.close();

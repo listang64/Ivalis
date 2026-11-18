@@ -3263,7 +3263,7 @@
     ajouter(8, "Inquisiteur", [
         {
             id: "flammes-inquisiteur", nom: "Niv.1 Le feu de l'Inquisiteur", sens: "vers l'ennemi",
-            description: "Son attaque magique de feu frappe plus fort (+1) et embrase plus souvent : 10 % de Brûlé au lieu de 5 %.",
+            description: "Son attaque magique de feu frappe plus fort (+1).",
             async jouer(sc, o) {
                 const { a, b } = lieux(sc);
                 o.son("feu-lancer");
@@ -3278,7 +3278,7 @@
             }
         },
         {
-            id: "inquisiteur-feu-resiste", nom: "Niv.3 Résiste au feu (Ondari : immunisé)", sens: "sur soi",
+            id: "inquisiteur-feu-resiste", nom: "Niv.1 Résiste au feu (Ondari : immunisé)", sens: "sur soi",
             description: "Une boule de feu ennemie éclate sur l'Inquisiteur : les flammes lèchent sa robe sans prendre. « 🔥 Résiste » (un Ondari Inquisiteur n'est jamais Brûlé : « Immunisé »).",
             async jouer(sc, o) {
                 const { a } = lieux(sc);
@@ -3292,7 +3292,7 @@
             }
         },
         {
-            id: "combustion", nom: "Niv.5 Combustion instantanée", sens: "sur soi",
+            id: "combustion", nom: "Niv.3 Combustion instantanée", sens: "sur soi",
             description: "L'Inquisiteur lève le poing : une onde de chaleur part de lui et, sur toute la carte, les ennemis s'embrasent (75 % de Brûlé, 2 manches ; 50 % s'ils résistent au feu).",
             async jouer(sc, o) {
                 const { a } = lieux(sc);

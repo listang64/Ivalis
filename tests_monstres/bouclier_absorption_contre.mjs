@@ -37,23 +37,29 @@ const GRIMOIRE = {
 };
 
 // =========================================================================
-console.log("1. LA CHAÎNE DE DÉGÂTS : ABSORPTION = MAGIE, CONTRE = PHYSIQUE, EN %");
+// (v431) Nico : « Contre : inflige 25 %, puis 40 % à la deuxième obtention (2 cumuls max), des
+// dégâts physiques subis après réduction de l'armure. Absorption : se guérit de 25 %, puis
+// 40 %, des dégâts magiques subis après réduction de la résistance magique » ; « plus de
+// bonus d'armure dû au sort : Absorption et Contre font seulement ces effets ».
+console.log("1. LA CHAÎNE DE DÉGÂTS : ABSORPTION = MAGIE, CONTRE = PHYSIQUE, APRÈS L'ARMURE (v431)");
 {
-  const avec = (etat) => ({ pv: 60, pvMax: 60, bouclier: 0, etats: [etat], def: {} });
-  const abs = avec({ nom: "Absorption", valeurAbs: 20 });
-  let c = chaineDeDegats(abs, { valeurBrute: 50, typeRes: "Magique" }, {});
-  verifier("Absorption 20 % sur 50 magiques : 40 passent", c.degats === 40, `(${c.degats})`);
-  verifier("… et soigne 10 % de la frappe (5)", c.soinAbsorption === 5, `(${c.soinAbsorption})`);
-  c = chaineDeDegats(abs, { valeurBrute: 100, typeRes: "Magique" }, {});
-  verifier("c'est bien un pourcentage : 100 magiques → 80, soin 10", c.degats === 80 && c.soinAbsorption === 10,
+  const avec = (etat, def) => ({ pv: 60, pvMax: 60, bouclier: 0, etats: [etat], def: def || {} });
+  const abs = avec({ nom: "Absorption", valeurAbs: 25 });
+  let c = chaineDeDegats(abs, { valeurBrute: 40, typeRes: "Magique" }, {});
+  verifier("Absorption 25 % sur 40 magiques : les 40 passent (plus rien d'annulé)", c.degats === 40, `(${c.degats})`);
+  verifier("… et soigne 25 % des dégâts subis (10)", c.soinAbsorption === 10, `(${c.soinAbsorption})`);
+  c = chaineDeDegats(avec({ nom: "Absorption", valeurAbs: 40 }, { magique: 50 }), { valeurBrute: 40, typeRes: "Magique" }, {});
+  verifier("Absorption 40 %, 50 % de résistance magique : 20 subis, soin de 8 (40 % de 20)", c.degats === 20 && c.soinAbsorption === 8,
            `(${c.degats}, ${c.soinAbsorption})`);
   c = chaineDeDegats(abs, { valeurBrute: 50, typeRes: "Physique" }, {});
   verifier("Absorption ne touche PAS au physique", c.degats === 50 && c.soinAbsorption === 0, `(${c.degats})`);
 
-  const ctr = avec({ nom: "Contre", valeurContre: 20 });
-  c = chaineDeDegats(ctr, { valeurBrute: 50, typeRes: "Physique" }, {});
-  verifier("Contre 20 % sur 50 physiques : 40 passent", c.degats === 40, `(${c.degats})`);
-  verifier("… et renvoie 10 % de la frappe (5)", c.renvoi === 5, `(${c.renvoi})`);
+  const ctr = avec({ nom: "Contre", valeurContre: 25 });
+  c = chaineDeDegats(ctr, { valeurBrute: 40, typeRes: "Physique" }, {});
+  verifier("Contre 25 % sur 40 physiques : les 40 passent", c.degats === 40, `(${c.degats})`);
+  verifier("… et renvoie 25 % des dégâts subis (10)", c.renvoi === 10, `(${c.renvoi})`);
+  c = chaineDeDegats(avec({ nom: "Contre", valeurContre: 40 }, { physique: 50 }), { valeurBrute: 40, typeRes: "Physique" }, {});
+  verifier("Contre 40 %, 50 % d'armure : 20 subis, 8 renvoyés (40 % de 20)", c.degats === 20 && c.renvoi === 8, `(${c.degats}, ${c.renvoi})`);
   c = chaineDeDegats(ctr, { valeurBrute: 50, typeRes: "Magique" }, {});
   verifier("Contre ne touche PAS à la magie", c.degats === 50 && !c.renvoi, `(${c.degats}, ${c.renvoi})`);
 }
@@ -97,12 +103,12 @@ console.log("\n2. LE BOUCLIER : 25 % DES PV RESTANTS DE LA CIBLE");
 console.log("\n3. LE CONTRE RENVOIE SA PART À L'ATTAQUANT");
 {
   const etat = monde();
-  etat.combattants.H1.etats = [{ nom: "Contre", duree: 1, valeurContre: 20 }];
+  etat.combattants.H1.etats = [{ nom: "Contre", duree: 1, valeurContre: 40 }];
   etat.file = [{ id: "M1", carte: "C2", initiative: 0 }];
   const r = jouer(etat, { type: "carte", idLanceur: "M1", idCarte: "C2",
     attaques: [{ nom: "Griffes", valeurBrute: 30, typeRes: "Physique", cibles: ["H1"] }], alterations: [] });
-  verifier("le héros ne prend que 24 (20 % annulés)", r.etat.combattants.H1.pv === 36, `(${r.etat.combattants.H1.pv})`);
-  verifier("la goule reçoit 3 en retour (10 % de 30)", r.etat.combattants.M1.pv === 57, `(${r.etat.combattants.M1.pv})`);
+  verifier("(v431) le héros prend tout (30) : le Contre n'annule plus rien", r.etat.combattants.H1.pv === 30, `(${r.etat.combattants.H1.pv})`);
+  verifier("la goule reçoit 12 en retour (40 % de 30)", r.etat.combattants.M1.pv === 48, `(${r.etat.combattants.M1.pv})`);
   verifier("et l'écran voit passer ce renvoi", r.etapes.some(e => e.type === "degats" && e.renvoi && e.cible === "M1"));
 }
 
@@ -110,13 +116,20 @@ console.log("\n4. UN SOUTIEN POSÉ SUR SOI NE S'ESQUIVE PAS");
 {
   const etat = monde({ Esquive: 100 });
   const r = jouer(etat, { type: "carte", idLanceur: "H1", idCarte: "C1", attaques: [],
-    alterations: [{ nom: "Contre", chance: 100, duree: 1, valeurContre: 20, isHeal: true, cibles: ["H1"] },
-                  { nom: "Absorption", chance: 100, duree: 1, valeurAbs: 20, isHeal: true, cibles: ["H1"] }] });
+    alterations: [{ nom: "Contre", chance: 100, duree: 1, valeurContre: 25, isHeal: true, cibles: ["H1"] },
+                  { nom: "Absorption", chance: 100, duree: 1, valeurAbs: 25, isHeal: true, cibles: ["H1"] }] });
   const noms = r.etat.combattants.H1.etats.map(e => e.nom);
   verifier("un héros qui esquive tout reçoit quand même son Contre et son Absorption",
            noms.includes("Contre") && noms.includes("Absorption"), JSON.stringify(noms));
   verifier("le Contre posé garde son pourcentage",
-           (r.etat.combattants.H1.etats.find(e => e.nom === "Contre") || {}).valeurContre === 20);
+           (r.etat.combattants.H1.etats.find(e => e.nom === "Contre") || {}).valeurContre === 25);
+  // (v431) « une fois en combat, on ne cumule pas si on le fait 2 fois d'affilée sur une cible »
+  const etat2 = r.etat;
+  etat2.file = [{ id: "H1", carte: "C1", initiative: 0 }];
+  const r2 = jouer(etat2, { type: "carte", idLanceur: "H1", idCarte: "C1", attaques: [],
+    alterations: [{ nom: "Contre", chance: 100, duree: 1, valeurContre: 25, isHeal: true, cibles: ["H1"] }] });
+  const contres = r2.etat.combattants.H1.etats.filter(e => e.nom === "Contre");
+  verifier("(v431) un 2e Contre sur la même cible ne se cumule pas (un seul, toujours 25 %)", contres.length === 1 && contres[0].valeurContre === 25, JSON.stringify(contres));
 }
 
 // =========================================================================
@@ -151,19 +164,25 @@ console.log("\n5. CE QUE LA CARTE EXTRAIT (vrai moteur_effets.js)");
   const r = await p.evaluate(async () => {
     const b1 = await window.__extraire([{ baseEffetId: "EFF_BOUCLIER_MAGIQUE", count: 1, mods: {} }]);
     const b2 = await window.__extraire([{ baseEffetId: "EFF_BOUCLIER_MAGIQUE", count: 2, mods: {} }]);
+    const c1 = await window.__extraire([{ baseEffetId: "EFF_CONTRE", count: 1, mods: {} }]);
+    const c2 = await window.__extraire([{ baseEffetId: "EFF_CONTRE", count: 2, mods: {} }]);
     const c3 = await window.__extraire([{ baseEffetId: "EFF_CONTRE", count: 3, mods: {} }]);
+    const a1 = await window.__extraire([{ baseEffetId: "EFF_ABSORPTION", count: 1, mods: {} }]);
+    const a2 = await window.__extraire([{ baseEffetId: "EFF_ABSORPTION", count: 2, mods: {} }]);
     const c4 = await window.__extraire([{ baseEffetId: "EFF_CONTRE", count: 4, mods: {} }]);
     const a4 = await window.__extraire([{ baseEffetId: "EFF_ABSORPTION", count: 4, mods: {} }]);
     return { b1: b1.attaques[0].pourcentPV, b2: b2.attaques[0].pourcentPV,
+             c1: (c1.alterations[0] || {}).valeurContre, c2: (c2.alterations[0] || {}).valeurContre,
              c3: (c3.alterations[0] || {}).valeurContre, c4: (c4.alterations[0] || {}).valeurContre,
+             a1: (a1.alterations[0] || {}).valeurAbs, a2: (a2.alterations[0] || {}).valeurAbs,
              contreSoutien: !!(c3.alterations[0] || {}).isHeal, a4: (a4.alterations[0] || {}).valeurAbs };
   });
   verifier("Bouclier à 1 cran : 25 % des PV restants", r.b1 === 25, `(${r.b1})`);
   verifier("à 2 crans : plafonné au Pourcentage max (30 %)", r.b2 === 30, `(${r.b2})`);
-  verifier("Contre existe désormais : 3 crans → 60 %", r.c3 === 60, `(${r.c3})`);
-  verifier("plafonné lui aussi au Pourcentage max (60 %)", r.c4 === 60, `(${r.c4})`);
+  verifier("(v431) Contre : 1 cran → 25 %, 2 crans → 40 %", r.c1 === 25 && r.c2 === 40, `(${r.c1}, ${r.c2})`);
+  verifier("(v431) …au-delà (une carte d'avant), toujours 40 % (2 cumuls max)", r.c3 === 40 && r.c4 === 40, `(${r.c3}, ${r.c4})`);
   verifier("et se pose sur soi ou un allié", r.contreSoutien);
-  verifier("Absorption plafonnée au grimoire (60 %), plus à 100", r.a4 === 60, `(${r.a4})`);
+  verifier("(v431) Absorption : 25 % puis 40 %, jamais plus", r.a1 === 25 && r.a2 === 40 && r.a4 === 40, `(${r.a1}, ${r.a2}, ${r.a4})`);
 }
 
 console.log("\n6. UNE ZONE DE SOIN À DISTANCE, MÊME ENNEMI AU CONTACT");

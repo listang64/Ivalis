@@ -1327,6 +1327,8 @@ function diviseurEtalement(effet, perso) {
 window.diviseurEtalement = diviseurEtalement;
 
 function getMaxStacks(effet) {
+    // (v431) Contre et Absorption : 2 crans au plus (25 %, puis 40 %).
+    if (["contre", "absorption"].includes(String(effet.Nom || "").toLowerCase().trim())) return 2;
     const pBase = parseFrenchFloat(effet.Pourcent_Base);
     const pMax = parseFrenchFloat(effet.Pourcent_Max);
     const valBase = parseFrenchFloat(effet.Valeur);
@@ -1339,16 +1341,6 @@ function getMaxStacks(effet) {
     if (effet.Nom === "Initiative +") return 6;
     if (effet.Nom === "Zone") return 15;
     return 25;
-}
-
-// (v427/v429) Nico : « Surpuissance > +5 % et augmente le max de 5 %, ou 8 %
-// si surpuissance 100 ». La surpuissance des effets (app.js) de la carte en cours
-// de forge, lue sur sa puissance (bilan de rafraichirForge). Les crans achetés
-// restent bornés au max du grimoire : le bonus s'y ajoute (texteChanceSurpuissante).
-function surpuissanceEffetsForge() {
-    const fs = window.forgeState || {};
-    if (typeof window.surpuissanceDesEffets !== "function" || !fs.bilan) return { bonus: 0 };
-    return window.surpuissanceDesEffets(fs.bilan.fatigueSurpuissance, fs.statsPerso);
 }
 
 // Remplacement intelligent dans le texte selon les valeurs BDD en temps réel
@@ -1375,6 +1367,15 @@ function formatterTexteEffet(effet, stacks, action) {
         const tours = Math.max(2, Math.round(parseFrenchFloat(effet.Tours) || 2) + Math.round(crans));
         return `Dégâts ou soins divisés par ${tours} : rien au lancement, une part à chaque fin de manche pendant ${tours} tours.`;
     }
+    // (v431) Contre et Absorption : 25 % au 1er cran, 40 % au 2e, sur les dégâts subis
+    // après l'armure (ou la résistance magique) ; plus rien d'annulé.
+    const nomCA = nomEtal;
+    if (nomCA === "contre" || nomCA === "absorption") {
+        const part = [25, 40][Math.min(2, Math.max(1, Math.round(stacks) || 1)) - 1];
+        return nomCA === "contre"
+            ? `Renvoie ${part}% des dégâts physiques subis (après l'armure) à l'attaquant.`
+            : `Soigne de ${part}% des dégâts magiques subis (après la résistance magique).`;
+    }
     let texte = effet.Effet_Base || "";
     const val = parseFrenchFloat(effet.Valeur);
     const pBase = parseFrenchFloat(effet.Pourcent_Base);
@@ -1386,13 +1387,22 @@ function formatterTexteEffet(effet, stacks, action) {
         // (une fonction du même fichier, lue par window : les bancs qui
         // n'extraient que formatterTexteEffet s'en passent.)
         const offert = typeof window.chanceOfferteForge === "function" ? window.chanceOfferteForge(effet, action) : 0;
-        const calcP = offert > 0 && pMax > 0 ? Math.min(pMax, pBase * stacks + offert) : pBase * stacks + offert;
+        let calcP = offert > 0 && pMax > 0 ? Math.min(pMax, pBase * stacks + offert) : pBase * stacks + offert;
+        // (v431) LES AUGMENTATIONS MAX du personnage (pas celles des armes) : Nico, « tu ajoutes
+        // chaque max à la limite et tu mets sur l'effet l'augmentation : Peur avec 5 % d'augmentation
+        // max, au premier niveau 15 % (10 + 5), avec à côté (max 65 %) ». Sur un sort en
+        // construction seulement (`action`), et sur un effet qu'il porte.
+        const augMax = action && pMax > 0 && (stacks > 0 || offert > 0) && typeof window.augmentationsMaxForge === "function"
+            ? window.augmentationsMaxForge(effet, action) : 0;
+        const maxAffiche = pMax > 0 ? Math.min(100, pMax + augMax) : pMax;
+        if (augMax > 0) calcP = Math.min(100, Math.min(pMax, calcP) + augMax);
+        const ecrireP = (v) => String(Math.round(v * 100) / 100).replace(".", ",");
         if (/\d+(?:[.,]\d+)?\s*%/.test(texte)) {
-            texte = texte.replace(/\d+(?:[.,]\d+)?\s*%/, calcP + "%");
+            texte = texte.replace(/\d+(?:[.,]\d+)?\s*%/, (augMax > 0 ? ecrireP(calcP) : calcP) + "%");
         }
         if (pMax > 0 && /[Mm]ax\s*\d+(?:[.,]\d+)?\s*%?/.test(texte)) {
-            texte = texte.replace(/([Mm]ax\s*)\d+(?:[.,]\d+)?(\s*%?)/i, `$1${pMax}$2`);
-        }
+            texte = texte.replace(/([Mm]ax\s*)\d+(?:[.,]\d+)?(\s*%?)/i, `$1${augMax > 0 ? ecrireP(maxAffiche) : pMax}$2`);
+        } else if (augMax > 0) texte += ` (max ${ecrireP(maxAffiche)}%)`;
     }
     
     // 2. Remplacement de la Valeur (Dégâts, Initiative, etc.)
@@ -1498,17 +1508,19 @@ function texteDegatsPersistance(act) {
         + (premiere === act ? ` <span class="forge-persistance-zone">(${ecrire(valeurDe(act) * r.zone / 100)} dans la zone)</span>` : "");
 }
 
-// (v429) LA CHANCE QU'AURA VRAIMENT L'EFFET EN COMBAT, surpuissance comprise :
-// ses +5 (70+) ou +8 (100+) points s'ajoutent par-dessus le max (« → 65 % avec la
-// surpuissance »). Les effets à chance seulement (un % de base et un max).
-function texteChanceSurpuissante(effet, stacks, act) {
-    const bonus = surpuissanceEffetsForge().bonus;
-    const pBase = parseFrenchFloat(effet && effet.Pourcent_Base);
-    const pMax = parseFrenchFloat(effet && effet.Pourcent_Max);
-    if (!(bonus > 0) || !(pBase > 0 && pMax > 0) || !(stacks > 0)) return "";
-    const chance = Math.min(100, Math.min(pMax, pBase * stacks + chanceOfferteSur(effet, act)) + bonus);
-    return `<span class="forge-chance-surpuissante">→ ${String(Math.round(chance * 100) / 100).replace(".", ",")} % avec la surpuissance</span>`;
+// (v431) LES AUGMENTATIONS MAX d'un effet sur la carte en construction (app.js,
+// augmentationsMax) : la surpuissance de la carte, les talents et la classe du
+// personnage — jamais les armes (elles jouent en combat, sans s'afficher ici). Le
+// Pugiliste lit si la carte frappe physiquement (une de ses attaques n'est pas magique).
+function augmentationsMaxForge(effet, act) {
+    const fs = window.forgeState || {};
+    if (!effet || typeof window.augmentationsMax !== "function") return 0;
+    const attaques = (fs.actions || []).filter(a => a && a.baseEffet && estUneAttaqueDeBase(a.baseEffet.Nom));
+    const physique = attaques.some(a => !(typeof window.actionEstMagique === "function" && window.actionEstMagique(a.baseEffet.Nom)));
+    const fatigue = fs.bilan ? fs.bilan.fatigueSurpuissance : 0;
+    return window.augmentationsMax(fs.statsPerso, effet.Nom, { fatigue, physique }).total;
 }
+window.augmentationsMaxForge = augmentationsMaxForge;
 
 // === OUTILS POUR LA ZONE ===
 function actionHasDistance(act) {
@@ -3060,7 +3072,7 @@ window.rafraichirForge = function() {
                     <div class="forge-ligne forge-sous-effet">
                         <div class="forge-ligne-texte">
                             <span class="forge-nom-effet" data-bulle-effet="${modEff.id}" data-action="${act.idInst}">${offertIci > 0 ? elementAct.icone + " " : ""}${nettoyerNomEffet(modEff.Nom)}</span>${modEff.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${modEff.Modificateur}</span>` : ""}${offertIci > 0 ? `<span class="forge-tag-offert">+${offertIci} % OFFERTS</span>` : ""}
-                            <div class="forge-desc">${formatterTexteEffet(modEff, modCount, act)}${texteChanceSurpuissante(modEff, modCount, act)}${currentModDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentModDuree} tour(s) (+${(currentModDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
+                            <div class="forge-desc">${formatterTexteEffet(modEff, modCount, act)}${currentModDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentModDuree} tour(s) (+${(currentModDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
                         </div>
                         <div class="forge-controles">
                             ${modHasDuree ? `
@@ -3086,7 +3098,7 @@ window.rafraichirForge = function() {
                     <div class="forge-ligne">
                         <div class="forge-ligne-texte">
                             <span class="forge-nom-effet" data-bulle-effet="${act.baseEffet.id}" data-action="${act.idInst}">${nettoyerNomEffet(act.baseEffet.Nom)}</span>${act.baseEffet.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${act.baseEffet.Modificateur}</span>` : ""}${genreDuLien(act) ? `<button type="button" class="forge-element-pastille${elementAct ? "" : " manquant"}" data-genre="${genreDuLien(act)}" title="Changer d'élément" ${elementAct ? `style="--el-couleur: ${elementAct.couleur}; --el-fond: ${elementAct.fond};"` : ""} onclick="window.changerElementForge('${act.idInst}')">${elementAct ? `${elementAct.dessin ? `<span class="forge-pastille-dessin">${iconeDuLien(elementAct)}</span>` : elementAct.icone} ${elementAct.nom}` : "Choisir un élément"}</button>` : ""}
-                            <div class="forge-desc">${formatterTexteEffet(act.baseEffet, act.count, act)}${texteDegatsPersistance(act)}${texteValeurSurpuissante(act, fatigueSurpuissance)}${texteChanceSurpuissante(act.baseEffet, act.count, act)}${currentBaseDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentBaseDuree} tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
+                            <div class="forge-desc">${formatterTexteEffet(act.baseEffet, act.count, act)}${texteDegatsPersistance(act)}${texteValeurSurpuissante(act, fatigueSurpuissance)}${currentBaseDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentBaseDuree} tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
                         </div>
                         <div class="forge-controles">
                             ${baseHasDuree ? `

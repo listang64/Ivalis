@@ -17,7 +17,7 @@
 // Le VRAI objets.js, le VRAI noyau (moteur_pur, combat_etat, cerveau_combat).
 import fs from 'fs';
 import { construireEtatCombat, clonerEtat } from '../combat_etat.js';
-import { resoudreCarte, chaineDeDegats, partRendue, REGLES_ETATS, POISON } from '../moteur_pur.js';
+import { resoudreCarte, chaineDeDegats, partContreAbsorption, REGLES_ETATS, POISON } from '../moteur_pur.js';
 import { ticsDeFinDeManche } from '../cerveau_combat.js';
 
 let echecs = 0;
@@ -110,25 +110,27 @@ console.log("\n2. LE POISON : 10 % DE L'ÉNERGIE MAX, 8 % DES PV MAX EN BRUT");
 }
 
 // =========================================================================
-console.log("\n3. CONTRE ET ABSORPTION : LA PART RENDUE MONTE JUSQU'À 30 %");
+console.log("\n3. (v431) CONTRE ET ABSORPTION : 25 %, PUIS 40 % AU 2e CRAN, SUR LES DÉGÂTS SUBIS");
 // =========================================================================
+// Nico : « Contre : inflige 25 % puis 40 % à la deuxième obtention (2 cumuls max) des dégâts physiques subis après
+// réduction de l'armure ; Absorption : se guérit de 25 % puis de 40 % des dégâts magiques subis après la résistance
+// magique » ; « plus de bonus d'armure dû au sort ».
 {
-    verifier("la moitié de ce qui est annulé, plafonnée à 30",
-             partRendue(20) === 10 && partRendue(40) === 20 && partRendue(60) === 30 && partRendue(80) === 30,
-             [20, 40, 60, 80].map(partRendue).join(" / "));
+    verifier("1 cran : 25 % ; 2 crans : 40 % ; au-delà, 40 %",
+             partContreAbsorption(1) === 25 && partContreAbsorption(2) === 40 && partContreAbsorption(3) === 40,
+             [1, 2, 3].map(partContreAbsorption).join(" / "));
     const cible = (etat) => ({ pv: 100, pvMax: 100, bouclier: 0, etats: [etat], def: {}, mod: {} });
     const contre = (pct) => chaineDeDegats(cible({ nom: "Contre", valeurContre: pct }), { valeurBrute: 50, typeRes: "Physique" }, {});
     const absorb = (pct) => chaineDeDegats(cible({ nom: "Absorption", valeurAbs: pct }), { valeurBrute: 50, typeRes: "Magique" }, {});
-    verifier("Contre 20 % : 40 encaissés, 5 renvoyés (10 %)", contre(20).degats === 40 && contre(20).renvoi === 5,
-             JSON.stringify(contre(20)));
-    verifier("Contre 40 % : 10 renvoyés (20 %)", contre(40).renvoi === 10 && contre(40).degats === 30);
-    verifier("Contre 60 % : 15 renvoyés (30 %, le maximum)", contre(60).renvoi === 15 && contre(60).degats === 20);
-    verifier("Absorption 20 / 40 / 60 % : soigne 5 / 10 / 15",
-             absorb(20).soinAbsorption === 5 && absorb(40).soinAbsorption === 10 && absorb(60).soinAbsorption === 15,
-             [20, 40, 60].map(p => absorb(p).soinAbsorption).join(" / "));
+    verifier("Contre 25 % : les 50 passent, 13 renvoyés (12,5 arrondi)", contre(25).degats === 50 && contre(25).renvoi === 13,
+             JSON.stringify(contre(25)));
+    verifier("Contre 40 % : les 50 passent, 20 renvoyés", contre(40).renvoi === 20 && contre(40).degats === 50);
+    verifier("Absorption 25 / 40 % : soigne 13 / 20, rien d'annulé",
+             absorb(25).soinAbsorption === 13 && absorb(40).soinAbsorption === 20 && absorb(40).degats === 50,
+             [25, 40].map(p => absorb(p).soinAbsorption).join(" / "));
     const src = fs.readFileSync('/home/user/Ivalis/moteur_effets.js', 'utf-8');
-    verifier("les cartes l'annoncent (« renvoie … % », « soigne de … % »)",
-             src.includes("renvoie ${Math.min(30, contreValeur / 2)}%") && src.includes("soigne de ${Math.min(30, absorptionValeur / 2)}%"));
+    verifier("les cartes l'annoncent (« Renvoie … % des dégâts physiques subis », « Soigne de … % des dégâts magiques subis »)",
+             src.includes("Renvoie ${contreValeur}% des dégâts physiques subis") && src.includes("Soigne de ${absorptionValeur}% des dégâts magiques subis"));
 }
 
 // =========================================================================

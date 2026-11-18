@@ -124,7 +124,7 @@ console.log("\n2. CE QU'ILS DONNENT (atoutRace, les stats du jeu)");
              && !pug({ equipMainDroite: epee }).degatsPhysiques);
     const vamp = pug({ classe: "Vampire" }), varg = pug({ race: "Vargen" });
     verifier("Vampire : +5 d'initiative, +3 dégâts physiques en tout", vamp.initiative === 5 && vamp.degatsPhysiques === 3, JSON.stringify(vamp));
-    verifier("Vargen : +15 % de faire saigner, +6 % de critique (en plus, v416)", varg.chanceSaignementPhysique === 15 && !varg.chancePoisonPhysique && varg.critique === 6);
+    verifier("(v431) Vargen : +10 % max de Saignement, +6 % de critique (en plus, v416)", varg.chanceSaignementPhysique === 10 && !varg.chancePoisonPhysique && varg.critique === 6);
     const bouclier = { nom: "Bouclier", modele: "Bouclier léger", type: "Bouclier" };
     verifier("Art de la parade : seulement bouclier en main (2 × 3 = +6)",
              !w.atoutRace(heros({ talents: { TAL_ART_PARADE: 1 } })).parade

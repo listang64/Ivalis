@@ -101,7 +101,10 @@ titre("2. LE CONTRE RENVOIE TOUJOURS QUELQUE CHOSE");
            renvoi ? `-${renvoi.montant} → ${r.etat.combattants.M1.pv} PV` : "aucun renvoi");
   const r2 = resoudre(e0, "M1", "GRIFFE", [coup(["H1"], { valeurBrute: 40 })]);
   const renvoi2 = (r2.etapes || []).find(x => x.type === "degats" && x.renvoi);
-  verifier("un coup de 40 : 10 % (4) repartent", !!renvoi2 && renvoi2.montant === 4, renvoi2 ? `${renvoi2.montant}` : "aucun");
+  // (v431) la part d'un Contre est celle de l'état (25 / 40 %), sur les dégâts subis : 20 % de 40 = 8.
+  const subi2 = (r2.etapes || []).find(x => x.type === "degats" && x.cible === "H1" && !x.renvoi);
+  verifier("(v431) un coup de 40 : sa part (20 %) des dégâts subis repart", !!renvoi2 && !!subi2 && renvoi2.montant === Math.round(subi2.montant * 0.2),
+           renvoi2 && subi2 ? `${subi2.montant} subis → ${renvoi2.montant}` : "aucun");
 }
 
 titre("3. L'ÉTALEMENT : UNE MÊME COMPÉTENCE NE SE CUMULE PAS, SON TEMPS REPART ; JAMAIS DE CRITIQUE");

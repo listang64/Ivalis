@@ -1280,12 +1280,14 @@ export function partageTenebres(energie, montant) {
              surplus: reste > 0 ? Math.floor(reste * MULTIPLICATEUR_TENEBRES) : 0 };
 }
 
-// LA PART QU'UN CONTRE RENVOIE (ou qu'une ABSORPTION soigne), en % du coup :
-// la moitié de ce qui est annulé, jamais plus de 30 %.
-export const PART_RENDUE_MAX = 30;
-export function partRendue(pctAnnule) {
-    return Math.min(PART_RENDUE_MAX, Math.max(0, nombre(pctAnnule)) / 2);
-}
+// (v431) CONTRE ET ABSORPTION. Nico : « Contre : inflige 25 %, puis 40 % à la deuxième
+// obtention de Contre (2 cumuls max), des dégâts physiques subis après réduction de
+// l'armure. Absorption : se guérit de 25 %, puis de 40 % au 2e cumul, des dégâts magiques
+// subis après réduction de la résistance magique » ; « il n'y a plus de bonus d'armure dû
+// au sort : Absorption et Contre font seulement ces effets ». Les crans se prennent dans la
+// Forge (2 au plus) ; en combat, un second Contre sur la même cible ne s'ajoute pas.
+export const PARTS_CONTRE_ABSORPTION = [25, 40];
+export const partContreAbsorption = (crans) => PARTS_CONTRE_ABSORPTION[Math.max(1, Math.min(PARTS_CONTRE_ABSORPTION.length, Math.round(nombre(crans) || 1))) - 1];
 
 // Ce qu'un sort perd contre qui résiste à son élément (chaineDeDegats) : 20 %,
 // puis 15 % depuis la v260 (Nico : « résister au Brûlé = −25 % de chance
@@ -1375,35 +1377,9 @@ export function chaineDeDegats(cible, attaque, options) {
         }
     }
 
-    // 3. Absorption et Contre : la cible annule une part du coup — un
-    //    POURCENTAGE de ce qui arrive, jamais un nombre fixe. Le grimoire les
-    //    sépare par type : l'Absorption ne boit que la magie (et en soigne une
-    //    part), le Contre ne pare que le physique (et en renvoie une part à
-    //    l'attaquant — voir compte.renvoi dans resoudreCarte).
-    //
-    //    CETTE PART MONTE AVEC LA PROTECTION (tableau de Nico) : la moitié de
-    //    ce qui est annulé, plafonnée à 30 % — 20 % annulés en rendent 10, 40
-    //    en rendent 20, 60 (le maximum) en rendent 30. Toujours calculée sur
-    //    le coup AVANT l'armure.
+    // 3. (v431) Absorption et Contre n'annulent plus rien : ils se lisent sur les dégâts
+    //    subis, une fois l'armure (ou la résistance magique) passée — voir 4 bis.
     const estMagique = attaque.typeRes === "Magique";
-    const abs = !brut && estMagique && (cible.etats || []).find(e => e && e.nom === "Absorption");
-    if (abs) {
-        const pctAnnule = nombre(abs.valeurAbs, 20);
-        const aAnnuler = Math.floor(degats * (pctAnnule / 100));
-        compte.soinAbsorption = Math.floor(degats * (partRendue(pctAnnule) / 100));
-        degats = Math.max(0, degats - aAnnuler);
-    }
-    const contre = !brut && !estMagique && (cible.etats || []).find(e => e && e.nom === "Contre");
-    if (contre) {
-        const pctAnnule = nombre(contre.valeurContre, 20);
-        const aAnnuler = Math.floor(degats * (pctAnnule / 100));
-        // UN CONTRE RENVOIE TOUJOURS QUELQUE CHOSE (v267, Nico : « quand mon
-        // perso fait un contre, l'ennemi ne prend pas les dégâts ») : 10 % d'un
-        // coup de 9, arrondis à l'inférieur, ne renvoyaient rien. Au moins 1.
-        const renvoi = degats * (partRendue(pctAnnule) / 100);
-        compte.renvoi = degats > 0 && renvoi > 0 ? Math.max(1, Math.round(renvoi)) : 0;
-        degats = Math.max(0, degats - aAnnuler);
-    }
 
     // 4. La résistance. « Ignorer l'armure » ne vaut que contre la résistance
     //    physique ; « ignorer les résistances » balaie les deux — le jet a été
@@ -1414,6 +1390,19 @@ export function chaineDeDegats(cible, attaque, options) {
     if (percee || attaque.versEnergie || brut) resistance = 0;
     const reduction = Math.min(1, resistance / 100);
     let degatsFinaux = Math.max(0, Math.round(degats * (1 - reduction)));
+
+    // 4 bis. (v431) LE CONTRE ET L'ABSORPTION, sur les dégâts subis après l'armure (ou la
+    //    résistance magique) : l'Absorption soigne sa part (25 / 40 %) des dégâts magiques ;
+    //    le Contre renvoie sa part des dégâts physiques à l'attaquant (au moins 1 — v267,
+    //    Nico : « quand mon perso fait un contre, l'ennemi ne prend pas les dégâts »). Les
+    //    dégâts reçus, eux, ne bougent pas.
+    const abs = !brut && estMagique && (cible.etats || []).find(e => e && e.nom === "Absorption");
+    if (abs && degatsFinaux > 0) compte.soinAbsorption = Math.round(degatsFinaux * nombre(abs.valeurAbs, PARTS_CONTRE_ABSORPTION[0]) / 100);
+    const contre = !brut && !estMagique && (cible.etats || []).find(e => e && e.nom === "Contre");
+    if (contre && degatsFinaux > 0) {
+        const renvoi = degatsFinaux * nombre(contre.valeurContre, PARTS_CONTRE_ABSORPTION[0]) / 100;
+        compte.renvoi = renvoi > 0 ? Math.max(1, Math.round(renvoi)) : 0;
+    }
 
     // 5. L'ÉTALEMENT NE FRAPPE PLUS TOUT DE SUITE. Une technique étalée ne fait
     //    RIEN au moment où elle part : ses dégâts sont DIVISÉS PAR LE NOMBRE DE
@@ -3335,6 +3324,9 @@ export function resoudreCarte(etat, action, plateau) {
             }
             if (existant) {
                 existant.duree = Math.max(nombre(existant.duree), duree);
+                // (v431) un second Contre (ou Absorption) ne s'ajoute pas : sa part remplace l'autre
+                if (alt.valeurAbs !== undefined) existant.valeurAbs = alt.valeurAbs;
+                if (alt.valeurContre !== undefined) existant.valeurContre = alt.valeurContre;
                 if (ronge) existant.idSource = idLanceur;
                 if (maitre) { existant.maitre = true; existant.desc = DESC_POISON_MAITRE; }
                 // Une brûlure ravivée par une autre carte reprend le type de
@@ -3589,6 +3581,8 @@ if (typeof window !== "undefined") {
         // Le leader (v262), réglé depuis le même tableau.
         reglerLeader, leaderActuel, LEADER_DEFAUT, chanceEtatDe,
         // La réserve maintenue (v347), lue par l'écran de préparation.
-        RESERVES_TECHNIQUES, reserveMaintenueDe, coutLancementReserve
+        RESERVES_TECHNIQUES, reserveMaintenueDe, coutLancementReserve,
+        // (v431) Contre et Absorption : 25 %, puis 40 % au 2e cran (la Forge, l'extraction).
+        PARTS_CONTRE_ABSORPTION, partContreAbsorption
     };
 }

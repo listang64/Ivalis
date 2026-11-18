@@ -88,12 +88,13 @@ console.log("\n1. LE PROTECTEUR (v347) : +8 PARADE, 10 % DE PROVOCATION ; NIV. 3
 {
     const a1 = w.atoutClasse(hoplite(1)), a2 = w.atoutClasse(hoplite(2)), a3 = w.atoutClasse(hoplite(3)), a4 = w.atoutClasse(hoplite(4));
     const a5 = w.atoutClasse(hoplite(5)), a8 = w.atoutClasse(hoplite(8)), a9 = w.atoutClasse(hoplite(9)), a10 = w.atoutClasse(hoplite(10));
-    verifier("niveau 1 : +8 parade, 10 % de provocation, pas de technique",
-             a1.parade === 8 && a1.provocationAttaques === 10 && !a1.defPhysique && !(a1.techniques || []).length && !a1.bouclierLourdSansMalus, JSON.stringify(a1));
+    // (v431) Nico : « niveau 1 et niveau 5 : le bonus passe de 10 % à 5 %, mais devient une augmentation max ».
+    verifier("(v431) niveau 1 : +8 parade, +5 % max de provocation, pas de technique",
+             a1.parade === 8 && a1.provocationAttaques === 5 && !a1.defPhysique && !(a1.techniques || []).length && !a1.bouclierLourdSansMalus, JSON.stringify(a1));
     verifier("niveau 2 : rien de plus ; niveau 3 : le Rempart (plus de Mur de bouclier)",
              !(a2.techniques || []).length && JSON.stringify(a3.techniques) === '["CLASSE_REMPART"]', JSON.stringify(a3.techniques));
-    verifier("niveau 4 : encore 10 % ; niveau 5 : 20 % de provocation, boucliers lourds sans malus",
-             a4.provocationAttaques === 10 && a5.provocationAttaques === 20 && a5.bouclierLourdSansMalus === true && a5.parade === 8, JSON.stringify(a5));
+    verifier("(v431) niveau 4 : encore 5 % ; niveau 5 : +10 % max en tout, boucliers lourds sans malus",
+             a4.provocationAttaques === 5 && a5.provocationAttaques === 10 && a5.bouclierLourdSansMalus === true && a5.parade === 8, JSON.stringify(a5));
     verifier("niveau 8 : pas encore la Résonance ; niveau 9 : + la Résonance du bouclier",
              JSON.stringify(a8.techniques) === '["CLASSE_REMPART"]'
              && JSON.stringify(a9.techniques) === '["CLASSE_REMPART","CLASSE_RESONANCE_BOUCLIER"]', JSON.stringify(a9.techniques));
@@ -525,11 +526,11 @@ console.log("\n7. LA FICHE DE CLASSE : LE DESCRIPTIF DU PROTECTEUR");
            JSON.stringify(r.niveaux));
   verifier("Rempart, Résonance, +8 % de parade, provocation, boucliers lourds y sont dits — plus de Mur",
            /Rempart/.test(r.texte) && /Résonance du bouclier/.test(r.texte) && /\+8 % de parade/.test(r.texte)
-           && /provoquer/.test(r.texte) && /boucliers lourds/.test(r.texte) && /réserve de 15/.test(r.texte) && !/Mur de bouclier/.test(r.texte));
+           && /\+5 % max de Provocation/.test(r.texte) && /boucliers lourds/.test(r.texte) && /réserve de 15/.test(r.texte) && !/Mur de bouclier/.test(r.texte));
 }
 
 // =========================================================================
-console.log("\n8. 10 % DE PROVOCATION SUR CHACUNE DE SES ATTAQUES (20 % AU NIVEAU 5)");
+console.log("\n8. (v431) +5 % MAX DE PROVOCATION (+10 % AU NIVEAU 5), SEULEMENT SUR SES SORTS QUI PROVOQUENT");
 // =========================================================================
 {
   const r = await p.evaluate(() => {
@@ -542,22 +543,24 @@ console.log("\n8. 10 % DE PROVOCATION SUR CHACUNE DE SES ATTAQUES (20 % AU NIVEA
     const dejaFaible = enrichir({ ...coup(), alterations: [{ nom: "Provocation", chance: 5, cibles: ["M1"] }] });
     const dejaForte = enrichir({ ...coup(), alterations: [{ nom: "Provocation", chance: 40, cibles: ["M1"] }] });
     const soin = enrichir({ attaques: [{ nom: "Soin", valeurBrute: 5, isHeal: true, cibles: ["A1"] }], alterations: [] });
-    const autre = enrichir(coup(), { idPersonnage: "X", camp: "Allié", classe: "Oracle", xp: 0 });
-    const ancien = enrichir(coup(), { idPersonnage: "H2", camp: "Allié", classe: "Hoplite", xp: 0 });
+    const provoquant = (c) => ({ ...coup(), alterations: [{ nom: "Provocation", chance: c, cibles: ["M1"] }] });
+    const autre = enrichir(provoquant(20), { idPersonnage: "X", camp: "Allié", classe: "Oracle", xp: 0 });
+    const ancien = enrichir(provoquant(20), { idPersonnage: "H2", camp: "Allié", classe: "Hoplite", xp: 0 });
     const niv5 = enrichir(coup(), { idPersonnage: "H3", camp: "Allié", classe: "Protecteur", xp: 2500 });
-    return { simple, dejaFaible, dejaForte, soin, autre, ancien, niv5 };
+    const niv5Forte = enrichir(provoquant(40), { idPersonnage: "H3", camp: "Allié", classe: "Protecteur", xp: 2500 });
+    return { simple, dejaFaible, dejaForte, soin, autre: autre.filter(a => a.chance !== 20), ancien, niv5, niv5Forte };
   });
   const prov = (l) => l.find(a => a.nom === "Provocation");
-  verifier("une attaque : Provocation 10 %, sur l'ennemi frappé seulement, au nom du Protecteur",
-           prov(r.simple) && prov(r.simple).chance === 10 && JSON.stringify(prov(r.simple).cibles) === '["M1"]'
-           && prov(r.simple).idProvocateur === "H1" && prov(r.simple).duree === 2, JSON.stringify(r.simple));
-  // (v429) Nico : « en cas de bonus d'état multiples > somme, valable pour tout » : les chances s'ajoutent.
-  verifier("une carte qui provoquait à 5 % : 5 + 10 = 15", prov(r.dejaFaible).chance === 15 && r.dejaFaible.length === 1, JSON.stringify(r.dejaFaible));
-  verifier("niveau 5 : 20 % de provocation", prov(r.niv5) && prov(r.niv5).chance === 20, JSON.stringify(r.niv5));
-  verifier("une carte qui provoquait à 40 % : 40 + 10 = 50", prov(r.dejaForte).chance === 50, JSON.stringify(r.dejaForte));
+  // (v431) « Les augmentations max ne s'appliquent que sur les effets du même nom associés à un sort. »
+  verifier("(v431) une attaque sans Provocation : le Protecteur ne provoque plus", !prov(r.simple), JSON.stringify(r.simple));
+  verifier("(v431) une carte qui provoquait à 5 % : 5 + 5 = 10, au nom du Protecteur", prov(r.dejaFaible).chance === 10 && r.dejaFaible.length === 1
+           && prov(r.dejaFaible).idProvocateur === "H1", JSON.stringify(r.dejaFaible));
+  verifier("(v431) niveau 5, sans Provocation sur la carte : rien", !prov(r.niv5), JSON.stringify(r.niv5));
+  verifier("(v431) niveau 5, une carte à 40 % : 50 (au-delà de la limite)", prov(r.niv5Forte) && prov(r.niv5Forte).chance === 50, JSON.stringify(r.niv5Forte));
+  verifier("(v431) une carte qui provoquait à 40 % : 40 + 5 = 45", prov(r.dejaForte).chance === 45, JSON.stringify(r.dejaForte));
   verifier("un soin : aucune provocation", !prov(r.soin));
   verifier("une autre classe : rien", !prov(r.autre));
-  verifier("un héros resté « Hoplite » sur sa fiche provoque aussi", prov(r.ancien) && prov(r.ancien).chance === 10);
+  verifier("(v431) un héros resté « Hoplite » sur sa fiche : +5 aussi", prov(r.ancien) && prov(r.ancien).chance === 25);
 }
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

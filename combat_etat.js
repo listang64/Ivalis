@@ -234,6 +234,8 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         totemsAlleges: !!race.totemsAlleges,
         totemPvBonus: nombre(race.totemPvBonus),
         auraSoin: nombre(race.auraSoin),
+        // (v431) L'Inquisiteur, niveau 5 : l'Aura brûlante (auraBrulanteDebutDeTour, cerveau_combat.js).
+        auraBrulante: nombre(race.auraBrulante),
         // …et désormais, à la place, le feu le PREND plus facilement : +20 %
         // de chance d'être Brûlé par un sort qui brûle (tirerDesCarte).
         brulureFacile: nombre(race.brulureFacile),

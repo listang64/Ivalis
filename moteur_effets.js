@@ -2216,39 +2216,35 @@ window.demarrerCiblage = async function(idCarte, options) {
             }
 
             // 🔻 NOUVEAU : DÉTECTION ABSORPTION 🔻
+            // (v431) Nico : « se guérit de 25 %, puis de 40 % au 2e cumul, des dégâts magiques
+            // subis après réduction de la résistance magique ; 2 cumuls max ». Les crans
+            // (effet de base et modificateurs) donnent la part : 1 → 25 %, 2 et plus → 40 %.
+            const partCA = (crans) => (window.moteurPur && typeof window.moteurPur.partContreAbsorption === "function")
+                ? window.moteurPur.partContreAbsorption(crans) : [25, 40][Math.min(2, Math.max(1, Math.round(crans) || 1)) - 1];
             let isAbsorption = false;
-            let absorptionValeur = 0;
+            let absorptionCrans = 0;
 
             if (nomLower.includes("absorption")) {
                 isAbsorption = true;
-                absorptionValeur += (parseFrFloat(effBase.Valeur) || 20) * (act.count || 1);
+                absorptionCrans += (act.count || 1);
             }
 
             listeMods.forEach(m => {
                 const modEff = window.EFFETS_BDD_CACHE[m.id];
                 if (modEff && (modEff.Nom || "").toLowerCase().includes("absorption")) {
                     isAbsorption = true;
-                    absorptionValeur += (parseFrFloat(modEff.Valeur) || 20) * m.count;
+                    absorptionCrans += m.count;
                 }
             });
 
-            // Le plafond est celui du grimoire (« Pourcentage max »), jamais
-            // plus de 100 % de toute façon.
-            const plafondDe = (nom) => {
-                const e = Object.values(window.EFFETS_BDD_CACHE || {})
-                    .find(x => x && (x.Nom || "").toLowerCase().includes(nom));
-                const p = e ? parseFrFloat(e.Pourcent_Max) : 0;
-                return p > 0 ? Math.min(100, p) : 100;
-            };
-
             if (isAbsorption) {
-                absorptionValeur = Math.min(absorptionValeur, plafondDe("absorption"));
+                const absorptionValeur = partCA(absorptionCrans);
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({
                     nom: "Absorption",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", // NOTE: Remplace par le lien d'une belle icône Cloudinary !
-                    desc: `Annule ${absorptionValeur}% des dégâts magiques subis et soigne de ${Math.min(30, absorptionValeur / 2)}% de la frappe.`,
+                    desc: `Soigne de ${absorptionValeur}% des dégâts magiques subis (après la résistance magique).`,
                     chance: 100, // Toujours 100% d'application pour un buff
                     duree: 1, // Dure uniquement le tour en cours !
                     valeurAbs: absorptionValeur,
@@ -2263,27 +2259,29 @@ window.demarrerCiblage = async function(idCarte, options) {
             // part dans le moteur : une carte « Contre » ne faisait rien. Il
             // annule sa part des dégâts PHYSIQUES reçus, et renvoie 10 % de la
             // frappe à celui qui l'a portée (moteur_pur.js, chaineDeDegats).
+            // (v431) « inflige 25 % puis 40 % à la deuxième obtention de Contre (2 cumuls max)
+            // des dégâts physiques subis après réduction de l'armure » : plus rien d'annulé.
             let isContre = false;
-            let contreValeur = 0;
+            let contreCrans = 0;
             const estContre = (nom) => (nom || "").toLowerCase().trim() === "contre";
             if (estContre(effBase.Nom)) {
                 isContre = true;
-                contreValeur += (parseFrFloat(effBase.Valeur) || 20) * (act.count || 1);
+                contreCrans += (act.count || 1);
             }
             listeMods.forEach(m => {
                 const modEff = window.EFFETS_BDD_CACHE[m.id];
                 if (modEff && estContre(modEff.Nom)) {
                     isContre = true;
-                    contreValeur += (parseFrFloat(modEff.Valeur) || 20) * m.count;
+                    contreCrans += m.count;
                 }
             });
             if (isContre) {
-                contreValeur = Math.min(contreValeur, plafondDe("contre"));
+                const contreValeur = partCA(contreCrans);
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
                 alterationsExtraites.push({
                     nom: "Contre",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png",
-                    desc: `Annule ${contreValeur}% des dégâts physiques subis et renvoie ${Math.min(30, contreValeur / 2)}% de la frappe à l'attaquant.`,
+                    desc: `Renvoie ${contreValeur}% des dégâts physiques subis (après l'armure) à l'attaquant.`,
                     chance: 100,
                     duree: 1,
                     valeurContre: contreValeur,
@@ -3795,28 +3793,15 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
         if (bonusDegatsPct > 0) attaque.valeurBrute = Math.round(attaque.valeurBrute * (1 + bonusDegatsPct / 100));
     });
 
-    // LE PROTECTEUR PROVOQUE : chacune de ses attaques a 10 % de chance de
-    // provoquer les ennemis qu'elle frappe (20 % dès le niveau 5, v347). Une carte qui provoquait déjà
-    // ajoute les deux chances (v429, Nico : « en cas de bonus d'état multiples > somme,
-    // et c'est valable pour tout sur ce jeu »).
+    // LE PROTECTEUR PROVOQUE (v431) : Nico, « niveau 1 et niveau 5, le bonus passe de 10 %
+    // à 5 %, mais devient une augmentation max ». Une augmentation max ne sert QUE l'effet du
+    // même nom que porte le sort : +5 % (+10 % au niveau 5) par-dessus le max, sur une carte
+    // qui provoque déjà ; une carte sans Provocation ne provoque plus.
     const provoc = Number(atouts.provocationAttaques) || 0;
-    if (provoc > 0) {
-        const camp = (id) => ((window.PERSOS_PARTIE || []).find(p => p.idPersonnage === id) || {}).camp || "Allié";
-        const visees = [...new Set(attaquesFrappantes(state).flatMap(a => a.cibles || []))]
-            .filter(id => id !== lanceur.idPersonnage && camp(id) !== (lanceur.camp || "Allié"));
-        if (visees.length > 0) {
-            state.alterations = state.alterations || [];
-            const deja = state.alterations.find(a => a.nom === "Provocation");
-            if (deja) {
-                deja.chance = (Number(deja.chance) || 0) + provoc;
-                deja.idProvocateur = lanceur.idPersonnage;
-                deja.cibles = [...new Set([...(deja.cibles || []), ...visees])];
-            } else {
-                state.alterations.push({ nom: "Provocation", ...GABARITS_ETATS_EQUIPEMENT["Provocation"], chance: provoc,
-                    venuDeLaClasse: true, isRanged: false, rangeMax: 1, cibles: visees,
-                    idProvocateur: lanceur.idPersonnage });
-            }
-        }
+    const dejaProvoc = provoc > 0 ? (state.alterations || []).find(a => a.nom === "Provocation" && (Number(a.chance) || 0) > 0) : null;
+    if (dejaProvoc) {
+        dejaProvoc.chance = Number(dejaProvoc.chance) + provoc;
+        dejaProvoc.idProvocateur = lanceur.idPersonnage;
     }
 
     // LES TALENTS QUI POUSSENT LES ÉTATS (talents.js) : le Maître des éléments
@@ -3846,15 +3831,12 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
     const frappes = talentSaignement ? attaquesFrappantes(state) : [];
     const physique = frappes.some(a => a.typeRes !== "Magique");
     const saignementTalent = physique ? (Number(atouts.chanceSaignementPhysique) || 0) : (Number(atouts.chanceSaignementSort) || 0);
+    // (v431) Nico : « pugilat : retire l'augmentation de 15 % de saignement et mets à la place
+    // une augmentation max de 10 % » — seulement sur le Saignement que porte le sort (plus de
+    // Saignement ajouté à une carte qui n'en a pas).
     if (saignementTalent > 0 && frappes.length > 0) {
-        state.alterations = state.alterations || [];
-        const saignement = state.alterations.find(a => a.nom === "Saignement");
-        const visees = [...new Set(frappes.flatMap(a => a.cibles || []))];
-        if (saignement) saignement.chance = (Number(saignement.chance) || 0) + saignementTalent;
-        else if (visees.length > 0 && GABARITS_ETATS_EQUIPEMENT["Saignement"]) {
-            state.alterations.push({ nom: "Saignement", ...GABARITS_ETATS_EQUIPEMENT["Saignement"], chance: saignementTalent,
-                venuDuTalent: true, isRanged: false, rangeMax: 1, cibles: visees });
-        }
+        const saignement = (state.alterations || []).find(a => a.nom === "Saignement" && (Number(a.chance) || 0) > 0);
+        if (saignement) saignement.chance = Number(saignement.chance) + saignementTalent;
     }
 
     // Les états de l'arme visent exactement ce que la carte a frappé — et seule

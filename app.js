@@ -951,10 +951,13 @@ window.ATOUTS_CLASSES = {
     // niveau 5, 10 % de provocation en plus (20 % en tout) et plus aucun malus
     // des boucliers lourds (bouclierLourdSansMalus, objets.js) ; la Résonance
     // du bouclier au niveau 9. (Le Mur de bouclier n'est plus donné.)
+    // (v431) Nico : « Protecteur niveau 1 et niveau 5 : le bonus passe de 10 % à 5 %, mais
+    // devient une augmentation max » : +5 % par-dessus le max, et seulement sur ses sorts qui
+    // provoquent déjà (augmentationsMax, plus bas ; appliquerEquipementALaCarte).
     "Protecteur": [
-        { niveau: 1,  parade: 8, provocationAttaques: 10 },
+        { niveau: 1,  parade: 8, provocationAttaques: 5 },
         { niveau: 3,  techniques: ["CLASSE_REMPART"] },
-        { niveau: 5,  provocationAttaques: 10, bouclierLourdSansMalus: true },
+        { niveau: 5,  provocationAttaques: 5, bouclierLourdSansMalus: true },
         { niveau: 9,  techniques: ["CLASSE_RESONANCE_BOUCLIER"] }
     ],
     // L'ASSASSIN. v348, la refonte des classes (Nico) : un KO lui donne +15 de
@@ -1049,10 +1052,14 @@ window.ATOUTS_CLASSES = {
         { niveau: 5,  techniques: ["CLASSE_APPEL_LUMIERE"] },
         { niveau: 9,  auraSoin: 3, techniques: ["CLASSE_DESINTEGRATION"] }
     ],
+    // (v431) Nico : « Inquisiteur niveau 1 : compétence +1, résistance au feu (immunité
+    // Brûlure si Ondari), +1 dégât avec ses compétences de feu ; niveau 3 : Combustion
+    // instantanée (une fois par combat) ; niveau 5 : le passif Aura brûlante ; niveau 9 : la
+    // Terreur ardente (une fois par combat) ». Plus de 10 % de Brûlé offerts (5 %, comme tous).
     "Inquisiteur": [
-        { niveau: 1,  brulureOfferte: 10, degatsFeu: 1 },
-        { niveau: 3,  competences: 1, resistances: ["Brûlé"], immuniteBrulureOndari: true },
-        { niveau: 5,  techniques: ["CLASSE_COMBUSTION"] },
+        { niveau: 1,  competences: 1, resistances: ["Brûlé"], immuniteBrulureOndari: true, degatsFeu: 1 },
+        { niveau: 3,  techniques: ["CLASSE_COMBUSTION"] },
+        { niveau: 5,  auraBrulante: 3 },
         { niveau: 9,  techniques: ["CLASSE_TERREUR_ARDENTE"] }
     ],
     "Chasseur de mages": [
@@ -1290,7 +1297,7 @@ window.TECHNIQUES_CLASSE = {
     // chaque ennemi Brûlé est pris de Peur — il fuit (combustionInstantanee,
     // cerveau_combat.js ; resoudrePeur, mouvement_pur.js).
     CLASSE_COMBUSTION: {
-        Nom: "Combustion instantanée", classe: "Inquisiteur", niveau: 5, Initiative: 0, Fatigue: 0, cible: "soi",
+        Nom: "Combustion instantanée", classe: "Inquisiteur", niveau: 3, Initiative: 0, Fatigue: 0, cible: "soi",
         desc: "Chaque ennemi sur la carte a 75 % de chance d'être Brûlé (2 manches ; 50 % s'il résiste au feu). "
             + "Une fois par combat."
     },
@@ -1615,12 +1622,10 @@ window.ELEMENTS_MAGIQUES = [
       couleur: "#b98cff", fond: "#3a1a66" }
 ];
 window.CHANCE_ELEMENT_OFFERTE = 5;
-// (v358) La chance qu'offre l'élément sur SON état, pour ce personnage :
-// 5 %, ou 10 % de Brûlé pour l'Inquisiteur (brulureOfferte).
-window.chanceElementOfferte = function(perso, etat) {
-    const base = window.CHANCE_ELEMENT_OFFERTE || 5;
-    if (etat !== "Brûlé" || !perso || typeof window.atoutRace !== "function") return base;
-    return Math.max(base, Number((window.atoutRace(perso) || {}).brulureOfferte) || 0);
+// (v358) La chance qu'offre l'élément sur SON état, pour ce personnage : 5 %.
+// (v431 : plus de 10 % de Brûlé pour l'Inquisiteur.)
+window.chanceElementOfferte = function() {
+    return window.CHANCE_ELEMENT_OFFERTE || 5;
 };
 window.REDUCTION_SORT_RESISTE = 15;
 window.elementMagique = function(id) {
@@ -1809,17 +1814,17 @@ window.texteAtout = function(cle, valeur) {
         case "maitrePoisons":  return "Maître des poisons : ses poisons mordent à chaque manche (15 % de fatigue, 9 % des PV max), 2 manches";
         case "critiqueSurKOCumulable": return `Instinct du tueur : ${plus(n)} % de critique pendant 2 manches à chaque KO, cumulable`;
         case "lumiereAveugle": return `Sorts de lumière : ${n} % de chance d'aveugler la cible`;
-        case "provocationAttaques": return `${n} % de chance de provoquer la cible de chacune de ses attaques`;
+        case "provocationAttaques": return `+${n} % max de Provocation sur ses sorts qui provoquent`;
         case "bouclierLourdSansMalus": return "Les boucliers lourds ne lui donnent plus aucun malus";
         case "bonusSoin":      return `${plus(n)} à chacun de ses soins`;
         // Les clés des talents (talents.js).
         case "degatsPhysiques": return `${plus(n)} dégât${Math.abs(n) > 1 ? "s" : ""} physique${Math.abs(n) > 1 ? "s" : ""}`;
         case "degatsMagiques":  return `${plus(n)} dégât${Math.abs(n) > 1 ? "s" : ""} magique${Math.abs(n) > 1 ? "s" : ""}`;
         case "degatsMotsPouvoir": return `${plus(n)} dégât à la Distorsion mentale`;
-        case "chanceElementaire": return `${plus(n)} % de chance sur Brûlé, Électrifié et Glacé`;
-        case "chanceEtatsCharisme": return `${plus(n)} % de chance sur Confusion, Peur et Immobilisation`;
-        case "chanceSaignementPhysique": return `${plus(n)} % de chance de faire saigner (attaques physiques, à mains nues)`;
-        case "chanceSaignementSort": return `${plus(n)} % de chance de faire saigner (sorts magiques)`;
+        case "chanceElementaire": return `${plus(n)} % max sur Brûlé, Électrifié et Glacé`;
+        case "chanceEtatsCharisme": return `${plus(n)} % max sur Confusion, Peur et Immobilisation`;
+        case "chanceSaignementPhysique": return `${plus(n)} % max de Saignement (attaques physiques, à mains nues)`;
+        case "chanceSaignementSort": return `${plus(n)} % max de Saignement (sorts magiques)`;
         case "testsCarac":      return Object.keys(valeur || {}).map(c => `${plus(Number(valeur[c]) || 0)} aux tests de ${NOMS_CARACS_ATOUT[c] || c}`).join(" · ");
         case "fatigueSurKO":    return `${plus(n)} de fatigue à chaque ennemi abattu`;
         case "inertieMartiale": return `−${n} de fatigue sur la mêlée après 4 cases en ligne droite`;
@@ -1866,7 +1871,7 @@ window.texteAtout = function(cle, valeur) {
         case "gardePurification": return "Purification par la lumière : l'allié qu'il purifie annule le prochain état néfaste qu'il devrait subir";
         case "insensibleA":    return `Insensible à : ${(valeur || []).join(", ")}`;
         case "auraSoin":       return `Les alliés à son contact reprennent ${n} PV à chaque fin de manche`;
-        case "brulureOfferte": return `Ses Attaques Magiques de feu ont ${n} % de chance de brûler (au lieu de 5 %)`;
+        case "auraBrulante":   return `Aura brûlante : un ennemi Brûlé à son contact prend ${n} dégâts de feu au début de son tour (sans résistance magique ; rien s'il résiste au feu)`;
         case "degatsFeu":      return `${plus(n)} dégât magique à ses attaques de feu`;
         case "immuniteBrulureOndari": return "Un Ondari devient totalement immunisé au Brûlé";
         case "brulureFacile":  return `Craint le feu : +${n} % de chance d'être Brûlé par les sorts qui brûlent`;
@@ -2034,6 +2039,38 @@ window.surpuissanceDesEffets = function(fatigue, perso) {
     const f = Number(fatigue) || 0;
     const palier = window.PALIERS_SURPUISSANCE.find(p => f >= p.fatigue);
     return palier ? { bonus: Number(palier.bonusEffets) || 0 } : rien;
+};
+// (v431) LES AUGMENTATIONS MAX. Nico : « pour les augmentations d'effet, 2 cas de figure :
+// l'augmentation, une simple augmentation de pourcentage dans la limite établie (chaque
+// point investi dans Peur sur un sort : +10 % dans la limite) ; l'augmentation max, qui
+// s'additionne à la toute fin, sans prendre en compte la limite (60 % de Peur, limite 60 %,
+// une augmentation max de 5 % : 65 %). Toutes les augmentations s'additionnent ; les max
+// ne s'appliquent que sur les effets du même nom associés à un sort. »
+//   chance finale = min(limite, crans + chance offerte) + somme des augmentations max
+// Ici, celles du personnage (pas celles des armes : elles jouent en combat, sans
+// s'afficher sur la fiche du sort) : la surpuissance (+5 / +8), le Maître des éléments
+// (Brûlé, Électrifié, Glacé), le Maître illusionniste (Confusion, Peur, Immobilisation), le
+// Pugiliste Vargen (Saignement), le Protecteur (Provocation).
+// `o` : { fatigue (la puissance de la carte, pour la surpuissance), physique (la carte
+// frappe physiquement) }. Rend { total, details: [{ source, valeur }] }.
+window.etatDeLEffet = function(nom) {
+    const n = String(nom || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const table = [["saign", "Saignement"], ["provoc", "Provocation"], ["peur", "Peur"], ["confus", "Confusion"], ["immobil", "Immobilisation"],
+                   ["brul", "Brûlé"], ["electrif", "Électrifié"], ["glac", "Glacé"]];
+    const t = table.find(([cle]) => n.includes(cle));
+    return t ? t[1] : String(nom || "").trim();
+};
+window.augmentationsMax = function(perso, nomEffet, o) {
+    const x = o || {}, details = [];
+    const etat = window.etatDeLEffet(nomEffet);
+    const ajouter = (source, v) => { const n = Number(v) || 0; if (n > 0) details.push({ source, valeur: n }); };
+    ajouter("surpuissance", window.surpuissanceDesEffets(x.fatigue, perso).bonus);
+    const a = perso && typeof window.atoutRace === "function" ? (window.atoutRace(perso) || {}) : {};
+    if ((window.ELEMENTS_MAGIQUES || []).some(e => e.etat === etat)) ajouter("Maître des éléments", a.chanceElementaire);
+    if ((window.ETATS_CHARISME_TALENT || ["Confusion", "Peur", "Immobilisation"]).includes(etat)) ajouter("Maître illusionniste", a.chanceEtatsCharisme);
+    if (etat === "Saignement") ajouter("Pugiliste", x.physique ? a.chanceSaignementPhysique : a.chanceSaignementSort);
+    if (etat === "Provocation") ajouter("Protecteur", a.provocationAttaques);
+    return { total: details.reduce((s, d) => s + d.valeur, 0), details };
 };
 // « effets +5 % (max +5 %) » — ce que la Forge et la carte en disent.
 window.texteSurpuissanceEffets = function(fatigue, perso) {

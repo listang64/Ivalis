@@ -276,6 +276,8 @@ function estDistorsionMonstre(nom) {
 
 // ⚖️ règle Forge : getMaxStacks — combien de fois un effet peut être empilé.
 function maxEmpilements(effet) {
+    // (v431) Contre et Absorption : 2 crans au plus (25 %, puis 40 %).
+    if (["contre", "absorption"].includes(String(effet.Nom || "").toLowerCase().trim())) return 2;
     const pBase = nombreFr(effet.Pourcent_Base);
     const pMax  = nombreFr(effet.Pourcent_Max);
     const val   = nombreFr(effet.Valeur);

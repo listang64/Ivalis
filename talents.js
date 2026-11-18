@@ -82,25 +82,27 @@
           resume: (m, p, n, choix) => choix ? `+2 aux tests de ${NOM_CARAC[choix] || choix}` : "+2 aux tests (carac à choisir)" },
         { id: "TAL_PUGILISTE", nom: "Pugiliste", carac: null, min: null, max: 1,
           texte: "Sans arme équipée (ou seulement des bagues) : +1 dégât physique, +5 % d'esquive. "
-               + "Vampire : en plus +5 d'initiative et +2 dégâts physiques. Vargen : en plus +15 % de chance de faire saigner sur tous ses sorts, "
-               + "au-delà du max (à mains nues pour une attaque physique, même armé pour un sort magique), et +6 % de critique.",
+               + "Vampire : en plus +5 d'initiative et +2 dégâts physiques. Vargen : en plus +10 % max de Saignement sur ses sorts qui font saigner, "
+               + "au-delà de la limite (à mains nues pour une attaque physique, même armé pour un sort magique), et +6 % de critique.",
           effet: (m, p) => {
               // (v429) Nico : « retire la condition pour les sorts : c'est juste quand il y a
               // un dégât physique, avec mains nues » : le saignement d'un sort magique ne
               // demande pas les mains nues (appliquerEquipementALaCarte, moteur_effets.js).
-              const a = estVargen(p) ? { chanceSaignementSort: 15 } : {};
+              // (v431) Nico : « retire l'augmentation de 15 % de saignement et mets à la place une
+              // augmentation max de 10 % » : seulement sur les sorts qui font déjà saigner.
+              const a = estVargen(p) ? { chanceSaignementSort: 10 } : {};
               if (!sansArme(p)) return a;
               Object.assign(a, { degatsPhysiques: 1, esquive: 5 });
               if (estVampire(p)) { a.initiative = 5; a.degatsPhysiques += 2; }
               // (v427) Nico : « Wargen, talent pugilat > +15 % de saignement (pas max) sur tous les sorts ».
-              if (estVargen(p)) { a.chanceSaignementPhysique = 15; a.critique = 6; }
+              if (estVargen(p)) { a.chanceSaignementPhysique = 10; a.critique = 6; }
               return a;
           },
           resume: (m, p) => {
-              if (!sansArme(p)) return estVargen(p) ? "Une arme est en main : seulement +15 % de faire saigner sur ses sorts magiques" : "Inactif : une arme est en main";
+              if (!sansArme(p)) return estVargen(p) ? "Une arme est en main : seulement +10 % max de Saignement sur ses sorts magiques" : "Inactif : une arme est en main";
               const morceaux = [`+${1 + (estVampire(p) ? 2 : 0)} dégât(s) physique(s)`, "+5 % d'esquive"];
               if (estVampire(p)) morceaux.push("+5 d'initiative");
-              if (estVargen(p)) morceaux.push("+15 % de faire saigner sur tous ses sorts", "+6 % de critique");
+              if (estVargen(p)) morceaux.push("+10 % max de Saignement sur ses sorts qui font saigner", "+6 % de critique");
               return morceaux.join(", ");
           } },
         { id: "TAL_ADRENALINE", nom: "Adrénaline du Bourreau", carac: null, min: null, max: 1,

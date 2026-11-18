@@ -249,18 +249,22 @@ await section(async () => {
     window.modifierModCount("A1", "EFF_BRULE", 1); res.p1plus = lire();   // pas de 7e cran
     poser(7, 6); res.p2 = lire();                          // 70 + 30 = 100
     window.modifierModCount("A1", "EFF_BRULE", 1); res.p2plus = lire();   // 105
+    poser(7, 1); res.unCran = lire();                      // (v431) 70 + 5 : 1re surpuissance, 1 cran de Brûlé
     window.fermerForgeCompetence();
     return res;
   });
   verifier("sans surpuissance (60) : Brûlé ×6 = 60 %, « + » fermé, rien en plus",
     r.sans.fatigue === "60" && /60%/.test(r.sans.desc) && /max 60%/.test(r.sans.desc) && !r.sans.plusActif && r.sans.chance === ""
     && !/effets/.test(r.sans.bandeau), JSON.stringify(r.sans));
-  verifier("1re surpuissance (70) : « → 65 % avec la surpuissance », bandeau « effets +5 % (max +5 %) »",
-    r.p1.fatigue === "70" && /max 60%/.test(r.p1.desc) && /→ 65 % avec la surpuissance/.test(r.p1.chance) && /effets \+5 % \(max \+5 %\)/.test(r.p1.bandeau), JSON.stringify(r.p1));
+  // (v431) Nico : « tu ajoutes chaque max à la limite et tu mets sur l'effet l'augmentation : Peur avec 5 % d'augmentation
+  // max, au premier niveau 15 % (10 + 5), avec à côté (max 65 %) ». Plus de « → 65 % avec la surpuissance ».
+  verifier("(v431) 1re surpuissance (70) : l'effet dit « 65 % … (max 65 %) », bandeau « effets +5 % (max +5 %) »",
+    r.p1.fatigue === "70" && /^65% /.test(r.p1.desc) && /max 65%/.test(r.p1.desc) && r.p1.chance === "" && /effets \+5 % \(max \+5 %\)/.test(r.p1.bandeau), JSON.stringify(r.p1));
+  verifier("(v431) …un seul cran de Brûlé (10 %) : 15 % (10 + 5), « (max 65 %) »", r.unCran.crans === 1 && /^15% /.test(r.unCran.desc) && /max 65%/.test(r.unCran.desc), JSON.stringify(r.unCran));
   verifier("…le « + » reste fermé au max du grimoire : pas de 7e cran", !r.p1.plusActif && r.p1plus.crans === 6 && r.p1plus.fatigue === "70", JSON.stringify(r.p1plus));
-  verifier("2e surpuissance (100) : « → 68 % avec la surpuissance », bandeau « effets +8 % (max +8 %) »",
-    r.p2.fatigue === "100" && /→ 68 % avec la surpuissance/.test(r.p2.chance) && /effets \+8 % \(max \+8 %\)/.test(r.p2.bandeau), JSON.stringify(r.p2));
-  verifier("2e surpuissance : toujours pas de 7e cran", r.p2plus.crans === 6 && /→ 68 %/.test(r.p2plus.chance), JSON.stringify(r.p2plus));
+  verifier("(v431) 2e surpuissance (100) : « 68 % … (max 68 %) », bandeau « effets +8 % (max +8 %) »",
+    r.p2.fatigue === "100" && /^68% /.test(r.p2.desc) && /max 68%/.test(r.p2.desc) && /effets \+8 % \(max \+8 %\)/.test(r.p2.bandeau), JSON.stringify(r.p2));
+  verifier("2e surpuissance : toujours pas de 7e cran", r.p2plus.crans === 6 && /^68% /.test(r.p2plus.desc), JSON.stringify(r.p2plus));
 });
 
 // =========================================================================

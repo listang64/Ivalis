@@ -72,7 +72,8 @@ export const COULEURS_CHIFFRE = {
 // en magique, le saignement en physique, le poison et la vieille plaie en brut.
 const NATURE_DU_TIC = {
     "Brûlure": "magique", "Saignement": "physique", "Hémorragie interne": "physique",
-    "Empoisonnement": "brut", "Plaie rouverte": "brut", "Ténèbres étalées": "magique"
+    "Empoisonnement": "brut", "Plaie rouverte": "brut", "Ténèbres étalées": "magique",
+    "Aura brûlante": "magique"           // (v431) l'aura de l'Inquisiteur
 };
 export function natureDuChiffre(e, etat) {
     if (!e) return "physique";
@@ -131,7 +132,7 @@ const GESTE_DE_L_ETAT = {
 // Brûlure, Empoisonnement).
 const GESTE_DU_TIC = {
     "Étalement": "etalement-tic", "Plaie rouverte": "plaie-rouverte",
-    "Brûlure": "brule-tic", "Empoisonnement": "poison-tic"
+    "Brûlure": "brule-tic", "Empoisonnement": "poison-tic", "Aura brûlante": "brule-tic"
 };
 // Qui a posé l'état : la Provocation le garde dans l'état lui-même (celui qui a
 // crié) ; sinon l'étape le dit (`acteur`).
