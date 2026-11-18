@@ -12215,3 +12215,10 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - **Les encarts du tableau (DEV)** : dans l'onglet « Nouveau » du bouton rouge, « Afficher les encarts », « + Nouvel encart », l'inclinaison au degré près, « Supprimer cet encart » ; sur la double page, un encart se glisse, s'étire par son coin et penche par le rond du haut. Les mêmes pour toutes les parties : `Carte_Livre/Tableau_Missions`. Leur texte viendra plus tard (cachés, ils sont là, invisibles).
 - **Le défilement rapide** : 0,07 s la page (0,12 s avant), presque sans pause entre deux.
 - corrections_v434.mjs le vérifie ; les bancs v313, v418_livre et v433_livre suivent.
+
+## v435 — « Clan » devant le nom ; le fanion plus long ; le tableau des missions ne déborde plus
+
+- **La popup du clan** (Nico : « quand on tape le clan, mettre Clan … pour faire comprendre qu'il sera affiché comme ça ») : « Clan » est écrit juste devant le champ du nom (exemple : « Clan des Loups d'Argent ») ; tapé quand même, il ne compte pas deux fois.
+- **Le fanion** (« fais-le descendre encore un peu plus sur sa page ») : toujours collé en haut de la page, il en prend environ 74 % de la hauteur (67 % avant) ; le nom du clan dessous.
+- **Le Panneau des missions** (« il déborde de la page ») : l'image tient dans la double page avec une marge de papier autour (4,5 % de large, 5,5 % de haut), toujours étirée pour la remplir sans rien couper. Les encarts se mesurent désormais en parts de l'image (et non plus de la double page).
+- corrections_v434.mjs le vérifie (ses contrôles « v435 »).

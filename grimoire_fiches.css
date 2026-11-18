@@ -29,12 +29,13 @@
 .fleuron-clan { width: 46%; height: auto; margin: calc(var(--u) * 1) 0 calc(var(--u) * 3); }
 /* (v433) LE LIVRE DES CLANS : à droite, la bannière du clan (vide en attendant l'IA) et,
    dessous, son nom en gros titre. */
-/* (v434) Le fanion, en grand, collé en haut de la page ; le nom du clan dessous. */
-.page-fiches .page-banniere-du-clan { align-items: center; justify-content: flex-start; padding-top: 0 !important; padding-bottom: calc(var(--u) * 6) !important; }
-.cadre-banniere-clan { width: 80%; height: 70%; flex: none; min-height: 0; display: flex; align-items: flex-start; justify-content: center; }
+/* (v434) Le fanion, en grand, collé en haut de la page ; le nom du clan dessous.
+   (v435) « Fais-la descendre encore un peu plus sur sa page » : environ 74 % de la page (67 % avant). */
+.page-fiches .page-banniere-du-clan { align-items: center; justify-content: flex-start; padding-top: 0 !important; padding-bottom: calc(var(--u) * 3) !important; }
+.cadre-banniere-clan { width: 80%; height: 76%; flex: none; min-height: 0; display: flex; align-items: flex-start; justify-content: center; }
 .cadre-banniere-clan img { max-width: 100%; height: 100%; object-fit: contain; object-position: center top; -webkit-user-drag: none; user-select: none;
   filter: drop-shadow(0 calc(var(--u) * 0.6) calc(var(--u) * 0.8) rgba(40, 22, 8, 0.25)); }
-.cadre-banniere-clan.vide { width: 56%; height: 64%; border: calc(var(--u) * 0.35) dashed rgba(58, 34, 16, 0.22); border-top: 0; border-radius: 0 0 calc(var(--u) * 2) calc(var(--u) * 2); }
+.cadre-banniere-clan.vide { width: 56%; height: 68%; border: calc(var(--u) * 0.35) dashed rgba(58, 34, 16, 0.22); border-top: 0; border-radius: 0 0 calc(var(--u) * 2) calc(var(--u) * 2); }
 .nom-clan { margin-top: calc(var(--u) * 3); font-size: calc(var(--u) * 10 * var(--echelle-titres, 1)); color: #24150a; text-align: center; line-height: 1.05; }
 .page-fiches .fleuron path { fill: none; stroke: #2b1a0e; stroke-width: 1.4; }
 .page-fiches .fleuron circle { fill: #2b1a0e; }

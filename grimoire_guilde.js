@@ -23,7 +23,7 @@
 //      Quittées, elles ressortent du livre.
 //    · Le Livre des clans : les pages des clans (grimoire_fiches.js), sur le sien.
 //    · LES ENCARTS DU TABLEAU (DEV, onglet « Nouveau » du bouton rouge) : des
-//      boîtes posées sur l'image, en parts de la double page (x, y : le coin haut
+//      boîtes posées sur l'image, en parts de l'image (x, y : le coin haut
 //      gauche ; l, h : la taille ; angle : l'inclinaison, en degrés). Les mêmes pour
 //      toutes les parties : Carte_Livre/Tableau_Missions — { Prochain_Numero,
 //      Encarts: { "<n>": { Numero, x, y, l, h, angle } } }. Leur texte viendra plus tard.
@@ -128,10 +128,18 @@ function htmlEncarts() {
             style="left:${pct(e.x)};top:${pct(e.y)};width:${pct(e.l)};height:${pct(e.h)};transform:rotate(${e.angle}deg)">${ed ? `<span class="encart-numero">${e.numero}</span>
             <span class="encart-poignee encart-taille" data-geste="taille"></span><span class="encart-poignee encart-rotation" data-geste="rotation"></span>` : ""}</div>`).join("");
 }
+// (v435) Nico : « il déborde de la page, règle-le pour qu'il ne déborde pas » : l'image
+// tient dans la double page avec une marge de papier autour (comme le village), toujours
+// étirée pour la remplir sans rien couper. En largeurs de page : une page fait 1 de large.
+const MARGE_TABLEAU = { x: 0.045, y: 0.055 };
+function boiteTableau(cote) {
+    const { x, y } = MARGE_TABLEAU;
+    return `left:${((cote === "gauche" ? x : x - 1) * 100).toFixed(3)}%;top:${(y * 100).toFixed(3)}%;width:${((2 - 2 * x) * 100).toFixed(3)}%;height:${((1 - 2 * y) * 100).toFixed(3)}%`;
+}
 function rendreTableau() {
     if (!salle || piece !== "missions") return;
     [["g", "gauche"], ["d", "droite"]].forEach(([k, cote]) => {
-        salle[k].innerHTML = `<div class="contenu-tableau"><div class="calque-tableau" style="left:${cote === "gauche" ? "0" : "-100%"}">`
+        salle[k].innerHTML = `<div class="contenu-tableau"><div class="calque-tableau" style="${boiteTableau(cote)}">`
             + `<img class="image-tableau" src="${IMAGE_TABLEAU}" alt="${cote === "gauche" ? "Le tableau des missions" : ""}" draggable="false">${htmlEncarts()}</div></div>`;
     });
 }
@@ -196,10 +204,11 @@ async function incliner(angle) {
 }
 
 // Les gestes (DEV, encarts visibles) : glisser l'encart le déplace ; le carré du coin
-// l'étire ; le rond du haut le fait tourner. En parts de la double page (le livre).
+// l'étire ; le rond du haut le fait tourner. En parts de l'image du tableau (v435 : elle
+// ne couvre plus toute la double page).
 function pointDouble(ev) {
-    const livre = G() && G().livre();
-    const r = livre ? livre.getBoundingClientRect() : { left: 0, top: 0, width: 1, height: 1 };
+    const calque = salle && salle.g.querySelector(".calque-tableau");
+    const r = calque ? calque.getBoundingClientRect() : { left: 0, top: 0, width: 1, height: 1 };
     return { x: (ev.clientX - r.left) / (r.width || 1), y: (ev.clientY - r.top) / (r.height || 1), r };
 }
 function surAppui(ev) {

@@ -9,6 +9,7 @@
 // on tourne la page en arrière ; les pièces sont une nouvelle double page. » « Pas de numéros, pas de
 // soulignage. » « Membres du clan. » « Fais tourner les pages plus rapidement. »
 // Sur la vraie page (le décor du banc v424), avec de faux OpenAI et Cloudinary.
+// (v435) Nico : « mettre Clan devant le champ du nom » ; « la bannière, fais-la descendre encore un peu » ; « le panneau des missions déborde de la page ».
 // Lancer : node tests_monstres/corrections_v434.mjs
 import fs from 'fs';
 import http from 'http';
@@ -376,9 +377,12 @@ await section(async () => {
                img: [Math.round(ir.left), Math.round(ir.top), Math.round(ir.width), Math.round(ir.height)], src: img.getAttribute("src") }; }); });
   const [g, d] = r;
   verifier("l'image de Nico (Cloudinary), sur les deux pages", tableauDemande.length > 0 && /okyu3f/.test(g.src) && g.src === d.src, g.src);
-  verifier("…étirée sur toute la double page, sans rien couper (deux pages de large, toute la hauteur)",
-           Math.abs(g.img[0] - g.page[0]) <= 1 && Math.abs(g.img[1] - g.page[1]) <= 1 && Math.abs(g.img[2] - 2 * g.page[2]) <= 2 && Math.abs(g.img[3] - g.page[3]) <= 1
-           && Math.abs(d.img[0] - (d.page[0] - d.page[2])) <= 1 && Math.abs(d.img[2] - 2 * d.page[2]) <= 2, JSON.stringify(r.map(x => [x.page, x.img])));
+  // (v435) « Il déborde de la page, règle-le » : une marge de papier autour (4,5 % de large, 5,5 % de haut), étirée dedans.
+  const pw = g.page[2], ph = g.page[3];
+  verifier("(v435) étirée sur la double page sans rien couper, mais dans une marge de papier : elle ne déborde plus",
+           Math.abs(g.img[0] - (g.page[0] + 0.045 * pw)) <= 2 && Math.abs(g.img[1] - (g.page[1] + 0.055 * ph)) <= 2 && Math.abs(g.img[2] - 1.91 * pw) <= 3 && Math.abs(g.img[3] - 0.89 * ph) <= 2
+           && Math.abs(d.img[0] - (d.page[0] - 0.955 * pw)) <= 2 && d.img[0] + d.img[2] <= d.page[0] + d.page[2] - 0.04 * pw && g.img[1] + g.img[3] <= g.page[1] + ph - 0.05 * ph,
+           JSON.stringify(r.map(x => [x.page, x.img])));
   verifier("…sans l'ombre de la pliure", g.pli === "none" && d.pli === "none", g.pli + "," + d.pli);
   await cap("v434-tableau");
 });
@@ -404,7 +408,8 @@ await section(async () => {
   let c = await boite();
   await p.mouse.move(c.x, c.y); await p.mouse.down(); await p.mouse.move(c.x + 80, c.y + 40, { steps: 6 }); await p.mouse.up(); await p.waitForTimeout(300);
   d = await base();
-  const livre = await G(() => { const r = window.GRIMOIRE.livre().getBoundingClientRect(); return { w: r.width, h: r.height }; });
+  // (v435) Les encarts : en parts de l'image du tableau (elle ne couvre plus toute la double page).
+  const livre = await G(() => { const r = window.GRIMOIRE_GUILDE.pagesPiece()[0].querySelector(".calque-tableau").getBoundingClientRect(); return { w: r.width, h: r.height }; });
   verifier("glisser l'encart le déplace (enregistré), la page ne tourne pas", Math.abs(d.Encarts[1].x - (0.2 + 80 / livre.w)) < 0.01 && Math.abs(d.Encarts[1].y - (0.25 + 40 / livre.h)) < 0.01 && (await ici()) === pageAvant, JSON.stringify(d.Encarts[1]));
   // Étirer par le coin.
   const coin = await G(() => { const h = [...document.querySelectorAll(".encart-tableau.edition .encart-taille")].map(x => x.getBoundingClientRect()).find(r => r.width > 0 && document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) && document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2).classList.contains("encart-taille")); return h ? { x: h.left + h.width / 2, y: h.top + h.height / 2 } : null; });
@@ -446,6 +451,9 @@ await section(async () => {
   const r = await G(() => ({ nom: !!document.getElementById("clan-nom"), desc: document.getElementById("clan-description") && document.getElementById("clan-description").tagName, titre: document.querySelector(".titre-popup-clan").textContent,
     ordre: (() => { const a = document.getElementById("clan-nom").getBoundingClientRect(), b = document.getElementById("clan-description").getBoundingClientRect(); return b.top > a.bottom; })() }));
   verifier("…le nom du clan, et dessous la description de sa bannière", r.nom && r.desc === "TEXTAREA" && r.ordre, JSON.stringify(r));
+  const pre = await G(() => { const p = document.querySelector("#popup-clan .prefixe-clan"), i = document.getElementById("clan-nom"); if (!p) return null; const a = p.getBoundingClientRect(), b = i.getBoundingClientRect();
+    return { texte: p.textContent.trim(), avant: a.right <= b.left + 1 && Math.abs((a.top + a.bottom) / 2 - (b.top + b.bottom) / 2) < 8 }; });
+  verifier("(v435) « Clan » écrit juste devant le champ du nom (il s'affichera ainsi)", pre && pre.texte === "Clan" && pre.avant, JSON.stringify(pre));
   await cap("v434-popup");
   await cliquer('#popup-clan [data-clan="fermer"]');
   await p.waitForTimeout(3500);
@@ -461,7 +469,7 @@ titre("6. FONDER LE CLAN : LE FANION PEINT PAR L'IA, LE BLANC RETIRÉ, CLOUDINAR
 // =========================================================================
 await section(async () => {
   await G(() => window.CLANS_IVALIS.ouvrirPopup());
-  await p.fill("#clan-nom", "Les Lames d'Héra");
+  await p.fill("#clan-nom", "clan  Les Lames d'Héra");   // (v435) « Clan » tapé quand même : il ne compte pas deux fois
   await p.fill("#clan-description", "Une épée d'or croisée d'une plume rouge, sur fond pourpre.");
   await cliquer(".valider-clan");
   verifier("validé : la popup se ferme", await attendreQue(() => G(() => !document.getElementById("popup-clan")), 4000));
@@ -487,7 +495,7 @@ await section(async () => {
     const rendu = img ? (() => { const r = img.naturalWidth / img.naturalHeight, boite = ir.width / ir.height; const h = r < boite ? ir.height : ir.width / r; return { top: ir.top, h }; })() : null;
     return { src: img && img.getAttribute("src"), haut: rendu ? Math.round(rendu.top - pr.top) : -1, part: rendu ? rendu.h / pr.height : 0, nom: nom.textContent.trim(), sous: rendu ? nr.top >= rendu.top + rendu.h - 2 : false,
              gauche: g.querySelector(".titre-clan").textContent.trim() }; });
-  verifier("à droite : le fanion en grand, collé en haut de la page", /Clans\/fanion_/.test(pg.src || "") && pg.haut <= 1 && pg.part > 0.55, JSON.stringify(pg));
+  verifier("à droite : le fanion en grand, collé en haut de la page ; (v435) il descend plus bas (74 % de la page)", /Clans\/fanion_/.test(pg.src || "") && pg.haut <= 1 && pg.part > 0.72, JSON.stringify(pg));
   verifier("…dessous « Clan Les Lames d'Héra »", pg.nom === "Clan Les Lames d'Héra" && pg.sous, pg.nom);
   verifier("à gauche, le titre « Membres du clan »", pg.gauche === "Membres du clan", pg.gauche);
   const autre = await G(() => (document.querySelector("#grimoire-fiches-clan-banniere-1 .nom-clan") || {}).textContent);

@@ -75,7 +75,7 @@ export function ouvrirPopup() {
         <div class="titre-popup-clan">Fonde ton clan</div>
         <p class="texte-popup-clan">Chaque aventurier d'Ivalis porte les couleurs de son clan. Donne-lui un nom, puis décris sa bannière : l'emblème qu'on brodera sur son fanion.</p>
         <label class="champ-clan">Le nom de ton clan
-          <input type="text" id="clan-nom" class="input-parchemin" maxlength="${NOM_MAX}" autocomplete="off" placeholder="Les Lames d'Héra">
+          <span class="ligne-nom-clan"><span class="prefixe-clan" aria-hidden="true">Clan</span><input type="text" id="clan-nom" class="input-parchemin" maxlength="${NOM_MAX}" autocomplete="off" placeholder="des Loups d'Argent"></span>
         </label>
         <label class="champ-clan">La bannière de ton clan
           <textarea id="clan-description" class="input-parchemin" maxlength="${DESCRIPTION_MAX}" rows="4" placeholder="Un loup d'argent hurlant sous un croissant de lune, sur un fond bleu nuit bordé d'or."></textarea>
@@ -90,7 +90,8 @@ export function ouvrirPopup() {
 }
 export function fermerPopup() { const v = document.getElementById("popup-clan"); if (v) v.remove(); }
 async function valider() {
-    const nom = (document.getElementById("clan-nom").value || "").trim().replace(/\s+/g, " ");
+    // (v435) « Clan » est déjà écrit devant le champ (il s'affichera ainsi) : tapé quand même, il ne compte pas deux fois.
+    const nom = (document.getElementById("clan-nom").value || "").trim().replace(/\s+/g, " ").replace(/^clan\s+/i, "");
     const description = (document.getElementById("clan-description").value || "").trim();
     const msg = document.getElementById("clan-message");
     if (nom.length < 2) { msg.textContent = "Donne un nom à ton clan."; return; }
