@@ -134,10 +134,12 @@ function htmlEncarts() {
             style="left:${pct(e.x)};top:${pct(e.y)};width:${pct(e.l)};height:${pct(e.h)};transform:rotate(${e.angle}deg)">${ed ? `<span class="encart-numero">${e.numero}</span>
             <span class="encart-poignee encart-taille" data-geste="taille"></span><span class="encart-poignee encart-rotation" data-geste="rotation"></span>` : ""}</div>`).join("");
 }
-// (v435) Nico : « il déborde de la page, règle-le pour qu'il ne déborde pas » : l'image
-// tient dans la double page avec une marge de papier autour (comme le village), toujours
-// étirée pour la remplir sans rien couper. En largeurs de page : une page fait 1 de large.
-const MARGE_TABLEAU = { x: 0.045, y: 0.055 };
+// (v435) Nico : « il déborde de la page, règle-le pour qu'il ne déborde pas » : une marge
+// de papier autour. (v437) « Ça va toujours pas : mets-le partout dans les deux pages du
+// livre, qu'il prenne toute la place, quitte à déformer / étirer l'image ; sur le bord, un
+// léger fondu d'opacité, vraiment léger » : plus de marge (le fondu : grimoire_guilde.css).
+// En largeurs de page : une page fait 1 de large.
+const MARGE_TABLEAU = { x: 0, y: 0 };
 function boiteTableau(cote) {
     const { x, y } = MARGE_TABLEAU;
     return `left:${((cote === "gauche" ? x : x - 1) * 100).toFixed(3)}%;top:${(y * 100).toFixed(3)}%;width:${((2 - 2 * x) * 100).toFixed(3)}%;height:${((1 - 2 * y) * 100).toFixed(3)}%`;

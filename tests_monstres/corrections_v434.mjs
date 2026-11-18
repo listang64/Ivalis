@@ -11,6 +11,7 @@
 // Sur la vraie page (le décor du banc v424), avec de faux OpenAI et Cloudinary.
 // (v435) Nico : « mettre Clan devant le champ du nom » ; « la bannière, fais-la descendre encore un peu » ; « le panneau des missions déborde de la page ».
 // (v436) Nico : « cette image en fond dans la page Hall de guilde, de la même manière que les images en fond de race ».
+// (v437) « Le tableau, mets-le partout dans les deux pages, quitte à étirer ; un léger fondu sur sa bordure. »
 // Lancer : node tests_monstres/corrections_v434.mjs
 import fs from 'fs';
 import http from 'http';
@@ -326,7 +327,9 @@ const FOND_HALL = process.env.V436_IMAGE ? fs.readFileSync(process.env.V436_IMAG
 const hallDemande = [];
 await p.route(/BE4AA9CB-5F9D-4AA1-BC61-38390295F166_ncq5cc/, r => { hallDemande.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: FOND_HALL }); });
 const tableauDemande = [];
-await p.route(/486DA9A4-10CC-430C-B103-A9E7B9EE1787_okyu3f/, r => { tableauDemande.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: TABLEAU }); });
+// (la vraie image, V437_TABLEAU=chemin, pour une capture)
+const IMAGE_TABLEAU_BANC = process.env.V437_TABLEAU ? fs.readFileSync(process.env.V437_TABLEAU) : TABLEAU;
+await p.route(/486DA9A4-10CC-430C-B103-A9E7B9EE1787_okyu3f/, r => { tableauDemande.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: IMAGE_TABLEAU_BANC }); });
 await G(() => { localStorage.setItem("ivalis_OPENAI_API_KEY", "sk-banc"); localStorage.setItem("ivalis_CLOUDINARY_CLOUD_NAME", "banc");
   localStorage.setItem("ivalis_CLOUDINARY_API_KEY", "k"); localStorage.setItem("ivalis_CLOUDINARY_API_SECRET", "s"); });
 
@@ -393,14 +396,15 @@ await section(async () => {
                img: [Math.round(ir.left), Math.round(ir.top), Math.round(ir.width), Math.round(ir.height)], src: img.getAttribute("src") }; }); });
   const [g, d] = r;
   verifier("l'image de Nico (Cloudinary), sur les deux pages", tableauDemande.length > 0 && /okyu3f/.test(g.src) && g.src === d.src, g.src);
-  // (v435) « Il déborde de la page, règle-le » : une marge de papier autour (4,5 % de large, 5,5 % de haut), étirée dedans.
-  const pw = g.page[2], ph = g.page[3];
-  verifier("(v435) étirée sur la double page sans rien couper, mais dans une marge de papier : elle ne déborde plus",
-           Math.abs(g.img[0] - (g.page[0] + 0.045 * pw)) <= 2 && Math.abs(g.img[1] - (g.page[1] + 0.055 * ph)) <= 2 && Math.abs(g.img[2] - 1.91 * pw) <= 3 && Math.abs(g.img[3] - 0.89 * ph) <= 2
-           && Math.abs(d.img[0] - (d.page[0] - 0.955 * pw)) <= 2 && d.img[0] + d.img[2] <= d.page[0] + d.page[2] - 0.04 * pw && g.img[1] + g.img[3] <= g.page[1] + ph - 0.05 * ph,
-           JSON.stringify(r.map(x => [x.page, x.img])));
+  // (v437) « Mets-le partout dans les deux pages, qu'il prenne toute la place, quitte à l'étirer » (la marge de la v435 est partie).
+  verifier("(v437) étirée sur les deux pages entières, sans rien couper (deux pages de large, toute la hauteur)",
+           Math.abs(g.img[0] - g.page[0]) <= 1 && Math.abs(g.img[1] - g.page[1]) <= 1 && Math.abs(g.img[2] - 2 * g.page[2]) <= 2 && Math.abs(g.img[3] - g.page[3]) <= 1
+           && Math.abs(d.img[0] - (d.page[0] - d.page[2])) <= 1 && Math.abs(d.img[2] - 2 * d.page[2]) <= 2, JSON.stringify(r.map(x => [x.page, x.img])));
+  const fondu = await G(() => { const c = window.GRIMOIRE_GUILDE.pagesPiece()[0].querySelector(".calque-tableau"), cs = getComputedStyle(c); return (cs.maskImage || cs.webkitMaskImage || "").replace(/\s+/g, " "); });
+  verifier("(v437) sur le seul bord de l'image, un fondu très léger (55 % → plein, sur une bande étroite)",
+           /rgba\(0, 0, 0, 0\.55\) 0%, rgb\(0, 0, 0\) 1\.2%, rgb\(0, 0, 0\) 98\.8%, rgba\(0, 0, 0, 0\.55\) 100%/.test(fondu) && /linear-gradient\((to bottom, )?rgba\(0, 0, 0, 0\.55\) 0%, rgb\(0, 0, 0\) 2%/.test(fondu), fondu.slice(0, 160));
   verifier("…sans l'ombre de la pliure", g.pli === "none" && d.pli === "none", g.pli + "," + d.pli);
-  await cap("v434-tableau");
+  await p.waitForTimeout(600); await cap("v434-tableau");
 });
 
 // =========================================================================

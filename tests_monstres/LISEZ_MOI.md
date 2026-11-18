@@ -12227,3 +12227,9 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 
 - Nico : « cette image en fond dans la page Hall de guilde, de la même manière que les images en fond de race ». La salle du Hall (IMAGE_HALL, grimoire_guilde.js) couvre toute la double page, comme les peuples de la création : à gauche, voilée en dégradé sous le menu (presque effacée au bord, entière vers la pliure) ; à droite, entière, sous le titre.
 - corrections_v434.mjs le vérifie (ses contrôles « v436 »).
+
+## v437 — Le tableau des missions sur les deux pages entières
+
+- Nico : « l'image du tableau des missions, ça va toujours pas : mets-la partout dans les deux pages du livre, qu'elle prenne toute la place, quitte à déformer / étirer l'image ; sur le bord, un léger fondu d'opacité, vraiment léger, que sur la bordure de l'image ». Plus de marge (v435) : l'image couvre les deux pages entières, étirée ; sur son seul bord, un fondu d'opacité très léger (de 55 % à plein, sur 1,2 % de la largeur et 2 % de la hauteur).
+- Les encarts suivent l'image (en parts de l'image) : ceux posés en v435-v436 se retrouvent un peu plus grands et décalés vers les bords, à replacer.
+- corrections_v434.mjs le vérifie (ses contrôles « v437 ») ; V437_TABLEAU=chemin y sert la vraie image pour une capture.
