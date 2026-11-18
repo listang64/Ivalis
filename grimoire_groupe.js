@@ -157,7 +157,6 @@ function htmlGauche() {
         ${FLEURON}
         <div class="infos-groupe">
           ${lieu ? `<div><span class="cle-groupe">Où</span> ${echapper(lieu)}</div>` : ""}
-          ${dateDuJeu() ? `<div><span class="cle-groupe">Quand</span> ${echapper(dateDuJeu())}</div>` : ""}
         </div>
         ${!l.nature && l.reputation != null ? htmlReputation(l) : ""}
         <div class="sous-titre-groupe compagnie-groupe">${lavis(TEINTE_SOUS_TITRES, "groupe-compagnie")}<span>La compagnie</span></div>

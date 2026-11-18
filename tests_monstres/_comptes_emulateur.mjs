@@ -99,8 +99,9 @@ if (!OUVERT) {
   await refuse("Ben en simple demande sous son ancien nom", profil(ben, 'u-ben', 'ben@ivalis.fr', 'Ben', 'ben', { Statut: 'En_attente', Role: 'joueur', ID_Joueur: '' }));
   await passe("Ben avec la Clé", profil(ben, 'u-ben', 'ben@ivalis.fr', 'Ben', 'ben', { Statut: 'Valide', Role: 'admin', ID_Joueur: 'P_02', Cle: 'Rune 42' }, 'P_02'));
   const adrien = ctx('u-adrien', 'adrien@ivalis.fr');
-  await refuse("Adrien qui se ferait admin", profil(adrien, 'u-adrien', 'adrien@ivalis.fr', 'Adrien', 'adrien', { Statut: 'Valide', Role: 'admin', ID_Joueur: 'P_03', Cle: 'Rune 42' }, 'P_03'));
-  await passe("Adrien avec la Clé, joueur", profil(adrien, 'u-adrien', 'adrien@ivalis.fr', 'Adrien', 'adrien', { Statut: 'Valide', Role: 'joueur', ID_Joueur: 'P_03', Cle: 'Rune 42' }, 'P_03'));
+  // (v439) Adrien a les mêmes droits que Nico et Ben : repris en admin.
+  await refuse("Adrien repris en simple joueur", profil(adrien, 'u-adrien', 'adrien@ivalis.fr', 'Adrien', 'adrien', { Statut: 'Valide', Role: 'joueur', ID_Joueur: 'P_03', Cle: 'Rune 42' }, 'P_03'));
+  await passe("Adrien avec la Clé, admin", profil(adrien, 'u-adrien', 'adrien@ivalis.fr', 'Adrien', 'adrien', { Statut: 'Valide', Role: 'admin', ID_Joueur: 'P_03', Cle: 'Rune 42' }, 'P_03'));
   const gaston = ctx('u-gaston', 'gaston@ivalis.fr');
   await refuse("Gaston qui se validerait lui-même", profil(gaston, 'u-gaston', 'gaston@ivalis.fr', 'Gaston', 'gaston', { Statut: 'Valide', Role: 'joueur', ID_Joueur: 'P_09' }));
   await passe("Gaston demande à entrer", profil(gaston, 'u-gaston', 'gaston@ivalis.fr', 'Gaston', 'gaston', { Statut: 'En_attente', Role: 'joueur', ID_Joueur: '' }));
@@ -110,10 +111,8 @@ if (!OUVERT) {
   await refuse("ni les joueurs, ni la Clé de Rune", F.getDoc(F.doc(gaston, 'Joueurs', 'P_01')));
   await refuse("…la Clé de Rune non plus", F.getDoc(F.doc(gaston, 'MDP_Nouvelle_Partie', 'config')));
   await refuse("il ne change pas son statut", F.updateDoc(F.doc(gaston, 'Comptes', 'u-gaston'), { Statut: 'Valide', ID_Joueur: 'P_09' }));
-  await refuse("Adrien (joueur) ne liste pas les demandes", F.getDocs(F.query(F.collection(adrien, 'Comptes'), F.where('Statut', '==', 'En_attente'))));
-  await refuse("Adrien ne valide pas", F.updateDoc(F.doc(adrien, 'Comptes', 'u-gaston'), { Statut: 'Valide', ID_Joueur: 'P_04' }));
-  await refuse("ni par la porte du jeu", F.setDoc(F.doc(adrien, 'Comptes', 'u-gaston'), { Statut: 'Valide' }, { merge: true }));
-  await refuse("ni sur un joueur", F.setDoc(F.doc(adrien, 'Joueurs', 'P_01'), { Uid: 'u-adrien' }, { merge: true }));
+  await passe("Adrien (admin, v439) liste les demandes", F.getDocs(F.query(F.collection(adrien, 'Comptes'), F.where('Statut', '==', 'En_attente'))));
+  await refuse("Adrien ne change pas l'e-mail d'un compte", F.updateDoc(F.doc(adrien, 'Comptes', 'u-gaston'), { Email: 'x@y.fr' }));
   await passe("Nico liste les demandes", F.getDocs(F.query(F.collection(nico, 'Comptes'), F.where('Statut', '==', 'En_attente'))));
   await refuse("Nico ne change pas l'e-mail d'un compte", F.updateDoc(F.doc(nico, 'Comptes', 'u-gaston'), { Email: 'x@y.fr' }));
 }

@@ -11,7 +11,7 @@ rules_version = '2';
 //    · Le jeu entier (personnages, parties, combats…) n'est lisible et
 //      modifiable que par un compte VALIDÉ (Comptes/{uid}, Statut "Valide").
 //    · Un compte en attente ne voit que son propre compte.
-//    · Seuls Nico et Ben (Role "admin") valident ou refusent une demande.
+//    · Seuls Nico, Ben et Adrien (Role "admin", v439) valident ou refusent une demande.
 //    · Un nom d'utilisateur ne sert qu'une fois (Noms_Utilisateurs).
 //    · Reprendre Nico (P_01), Ben (P_02) ou Adrien (P_03) demande la Clé de
 //      Rune — comparée ici à MDP_Nouvelle_Partie/config, que le navigateur
@@ -34,7 +34,7 @@ service cloud.firestore {
     function ancienValide(d) {
       return (d.Nom_Normalise == "nico"   && d.ID_Joueur == "P_01" && d.Role == "admin")
           || (d.Nom_Normalise == "ben"    && d.ID_Joueur == "P_02" && d.Role == "admin")
-          || (d.Nom_Normalise == "adrien" && d.ID_Joueur == "P_03" && d.Role == "joueur");
+          || (d.Nom_Normalise == "adrien" && d.ID_Joueur == "P_03" && d.Role == "admin");   // (v439) les mêmes droits que Nico et Ben
     }
     function estAncienNom(nom) { return nom in ["nico", "ben", "adrien"]; }
 

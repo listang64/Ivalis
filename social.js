@@ -530,7 +530,7 @@ export const estAdminSocial = () => !!(window.COMPTE_JOUEUR && window.COMPTE_JOU
 // ANNULER un événement : ses écarts sont retirés des liens (ce qui est venu
 // après reste), et il est marqué annulé, avec qui l'a annulé.
 export async function annulerEvenement(p, numero) {
-    if (!estAdminSocial()) throw new Error("Réservé à Nico et Ben.");
+    if (!estAdminSocial()) throw new Error("Réservé à Nico, Ben et Adrien.");
     const ref = refEvenement(p, numero), s = await getDoc(ref);
     if (!s.exists()) throw new Error("Événement introuvable.");
     const ev = s.data();

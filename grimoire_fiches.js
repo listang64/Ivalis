@@ -65,6 +65,10 @@ const classeDe = (h) => {
     return (typeof window.nomClasseGenre === "function" ? window.nomClasseGenre(c, h.genre) : c) || "";
 };
 const idJoueurCourant = () => { try { return localStorage.getItem("ID_JOUEUR_COURANT") || ""; } catch (e) { return ""; } };
+// (v439) Nico, Ben et Adrien (les admins ; les trois anciens joueurs, P_01 à P_03, même avant que
+// la base ait donné le rôle admin à Adrien) cochent le héros actif dans tous les clans.
+const GARDIENS_DES_CLANS = ["P_01", "P_02", "P_03"];
+const gardienDesClans = () => !!((window.COMPTE_JOUEUR && window.COMPTE_JOUEUR.admin) || GARDIENS_DES_CLANS.includes(idJoueurCourant()));
 
 // Les noms des joueurs (Joueurs), lus une fois ; (v434) et leurs clans (Clans,
 // grimoire_clans.js : le nom donné par le joueur, son fanion).
@@ -181,6 +185,9 @@ function aller(el, essai) {
 function pageClan(c, cote, i) {
     const el = page("clan-" + i, cote, "page-clan");
     const moi = c.id === idJoueurCourant();
+    // (v439) Nico : « pour Nico, Ben et Adrien : qu'ils puissent changer le personnage actif dans
+    // les différents clans, même si ce n'est pas le leur ».
+    const cases = moi || gardienDesClans();
     const lignes = c.heros.map((h, k) => {
         const r = hasard("clan-" + h.idPersonnage);
         const penche = ((r() * 2 - 1) * 1.6).toFixed(2);
@@ -188,9 +195,9 @@ function pageClan(c, cote, i) {
         // groupe, comme une case à cocher ») : sur son propre clan, une case par héros ;
         // un seul actif à la fois (cocher l'un met les autres au repos).
         const actif = h.actif !== false;
-        const caseActif = moi ? `<button type="button" class="case-actif${actif ? " cochee" : ""}" data-action="fiches" data-fa="actif" data-id="${echapper(h.idPersonnage)}"
+        const caseActif = cases ? `<button type="button" class="case-actif${actif ? " cochee" : ""}" data-action="fiches" data-fa="actif" data-id="${echapper(h.idPersonnage)}"
                   aria-pressed="${actif}" title="${actif ? "Le héros que tu joues" : "Jouer ce héros"}"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="boite" d="M 4 5 Q 12 3.6 20 4.6 L 19.4 19.6 Q 12 20.6 4.6 19.4 Z"/>${actif ? `<path class="coche" d="M 7 12.5 L 10.6 16 L 18 7"/>` : ""}</svg></button>` : "";
-        return `<li style="--penche:${penche}deg"${moi ? ` class="avec-case"` : ""}>${caseActif}<button type="button" class="ligne-aventurier" data-action="fiches" data-fa="heros" data-id="${echapper(h.idPersonnage)}">
+        return `<li style="--penche:${penche}deg"${cases ? ` class="avec-case"` : ""}>${caseActif}<button type="button" class="ligne-aventurier" data-action="fiches" data-fa="heros" data-id="${echapper(h.idPersonnage)}">
                   <span class="nom-aventurier">${echapper(nomHeros(h))}</span>${classeDe(h) ? ` <span class="tiret-aventurier">-</span> <span class="classe-aventurier">${echapper(classeDe(h))}</span>` : ""}
                   ${h.actif === false ? `<span class="aventurier-absent">(au repos)</span>` : ""}</button></li>`;
     }).join("");
@@ -238,7 +245,7 @@ function pageBanniereClan(c, i) {
 }
 function construireClans() {
     const cs = clans();
-    const sig = JSON.stringify(cs.map(c => [c.id, c.nom, c.nomClan || "", c.banniere || "", c.heros.map(h => [h.idPersonnage, nomHeros(h), classeDe(h), h.actif !== false])]));
+    const sig = JSON.stringify([gardienDesClans(), cs.map(c => [c.id, c.nom, c.nomClan || "", c.banniere || "", c.heros.map(h => [h.idPersonnage, nomHeros(h), classeDe(h), h.actif !== false])])]);
     if (sig === signatures.clans && pagesClans.length) return false;
     signatures.clans = sig;
     const nouvelles = cs.flatMap((c, i) => [pageClan(c, "gauche", i), pageBanniereClan(c, i)]);

@@ -133,8 +133,8 @@ console.log("\n2. UN BANC (faux Firebase, sans Auth) : comme un compte déjà va
   verifier("2 à 20 caractères, lettres latines, chiffres, espaces, tirets, apostrophes",
            !!n.court && !!n.long && !!n.bizarre && n.bon === "", JSON.stringify([n.court, n.bizarre, n.bon]));
   verifier("les erreurs en français", /E-mail ou mot de passe incorrect/.test(n.mdp) && /connecte-toi plutôt/.test(n.pris));
-  verifier("les anciens : Nico P_01 et Ben P_02 (admins), Adrien P_03",
-           n.anciens === '{"nico":{"id":"P_01","nom":"Nico","role":"admin"},"ben":{"id":"P_02","nom":"Ben","role":"admin"},"adrien":{"id":"P_03","nom":"Adrien","role":"joueur"}}', n.anciens);
+  verifier("les anciens : Nico P_01, Ben P_02 et (v439) Adrien P_03, tous trois admins",
+           n.anciens === '{"nico":{"id":"P_01","nom":"Nico","role":"admin"},"ben":{"id":"P_02","nom":"Ben","role":"admin"},"adrien":{"id":"P_03","nom":"Adrien","role":"admin"}}', n.anciens);
   await p.close();
 }
 
@@ -185,7 +185,7 @@ console.log("\n5. LES RÈGLES ET LE CODE DISENT LA MÊME CHOSE");
 {
   const regles = lire('firestore.rules');
   const comptes = lire('comptes.js');
-  const anciens = [["nico", "P_01", "admin"], ["ben", "P_02", "admin"], ["adrien", "P_03", "joueur"]];
+  const anciens = [["nico", "P_01", "admin"], ["ben", "P_02", "admin"], ["adrien", "P_03", "admin"]];   // (v439) Adrien a les mêmes droits que Nico et Ben
   verifier("les trois anciens, avec leur numéro et leur rôle, dans les règles comme dans comptes.js",
            anciens.every(([n, id, r]) => new RegExp(`d\\.Nom_Normalise == "${n}"\\s*&& d\\.ID_Joueur == "${id}" && d\\.Role == "${r}"`).test(regles)
                                        && new RegExp(`${n}:\\s*Object\\.freeze\\(\\{ id: "${id}",[^}]*role: "${r}"`).test(comptes)));

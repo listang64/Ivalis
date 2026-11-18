@@ -45,7 +45,8 @@ const URL_FIRESTORE = "https://www.gstatic.com/firebasejs/9.23.0/firebase-firest
 export const ANCIENS_JOUEURS = Object.freeze({
     nico:   Object.freeze({ id: "P_01", nom: "Nico",   role: "admin" }),
     ben:    Object.freeze({ id: "P_02", nom: "Ben",    role: "admin" }),
-    adrien: Object.freeze({ id: "P_03", nom: "Adrien", role: "joueur" })
+    // (v439) Nico : « fais en sorte qu'Adrien ait les mêmes droits que Ben et Nico ».
+    adrien: Object.freeze({ id: "P_03", nom: "Adrien", role: "admin" })
 });
 
 // Un nom tel qu'on le compare : sans accents, en minuscules, les espaces tassés.
@@ -309,7 +310,7 @@ function vueInscription(incomplet) {
           <input type="password" id="inscription-mdp2" class="input-parchemin" autocomplete="new-password">
         </label>`}
         ${champCle(false)}
-        <p class="note-connexion" id="note-inscription">Nico ou Ben validera ta demande.</p>
+        <p class="note-connexion" id="note-inscription">Nico, Ben ou Adrien validera ta demande.</p>
         <button type="submit" class="btn-modale">${incomplet ? "Terminer l'inscription" : "Créer mon compte"}</button>
         ${incomplet ? lienDeconnexion : ""}
       </form>`;
@@ -348,7 +349,7 @@ function rendrePanneau() {
         case "attente":
             html = `<p class="texte-connexion">Ta demande d'inscription est envoyée,
                       <b>${echapper(etat.compte && etat.compte.Nom)}</b>.</p>
-                    <p class="texte-connexion">Nico ou Ben doit l'accepter : cette page s'ouvrira d'elle-même.</p>
+                    <p class="texte-connexion">Nico, Ben ou Adrien doit l'accepter : cette page s'ouvrira d'elle-même.</p>
                     ${lienDeconnexion}`;
             break;
         case "refuse":
@@ -413,7 +414,7 @@ function brancherPanneau(panneau) {
             if (champ) champ.hidden = !ancien;
             if (note) note.textContent = ancien
                 ? `Tu reprends ${ancien.nom} et ses personnages : entre la Clé de Rune.`
-                : "Nico ou Ben validera ta demande.";
+                : "Nico, Ben ou Adrien validera ta demande.";
         };
         nom.addEventListener("input", montrerCle);
         montrerCle();

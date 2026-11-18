@@ -12239,3 +12239,10 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - Nico : « enlève le titre Le groupe ; mets le nom du groupe en plus gros et remonte-le en haut » : le titre « Le groupe » est parti ; le nom du groupe prend sa place, tout en haut de la page de gauche, plus gros (7 % de la page), sur le lavis rouge du titre.
 - « Sous la barre qui jauge la réputation, simplifier le texte : juste les mots clés, avec une aquarelle grise légère en dessous de chacun, comme des bulles » : plus de « +3 — bien vus (généreux) » ; le mot de la jauge (Honnis, Mal vus, Inconnus ou neutres, Bien vus, Adulés) puis les étiquettes du lieu (trois au plus), chacun sur sa bulle d'aquarelle grise.
 - corrections_v418_livre.mjs le vérifie (ses contrôles « v438 »).
+
+## v439 — Le Groupe sans « Quand » ; Adrien admin ; le héros actif dans tous les clans
+
+- **La page du Groupe** (Nico : « enlève la ligne Quand, on s'en fout ») : il ne reste que « Où ».
+- **Adrien a les mêmes droits que Nico et Ben** : repris en admin (comptes.js, ANCIENS_JOUEURS ; firestore.rules, ancienValide, la même table). Il valide les demandes d'inscription, corrige les fils invisibles, etc. Les messages disent « Nico, Ben ou Adrien ». ⚠ Son compte existe déjà avec le rôle « joueur » : dans la console Firebase, mettre `Role` à `admin` sur son document `Comptes/{uid}` (les règles interdisent qu'un poste le fasse), puis republier firestore.rules.
+- **Le héros actif dans tous les clans** (« pour ces trois-là, qu'ils puissent changer le personnage actif dans les différents clans, même si ce n'est pas le leur ») : dans le Livre des clans, les admins — et les trois anciens joueurs P_01 à P_03, même avant que la base ait donné le rôle à Adrien — ont les cases du héros actif dans chaque clan ; cocher un héros met au repos les autres de son joueur. « + Un nouvel aventurier » reste sur son propre clan.
+- corrections_v439.mjs le vérifie ; v259, v418_livre et _comptes_emulateur suivent.
