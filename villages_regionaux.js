@@ -49,6 +49,7 @@ const COLLECTION_LIEUX = "Monde_Lieux";
 // entier (MASQUE_DESSIN) au lieu de son centre.
 const TAILLE_DEFAUT = 0.04;          // le côté d'une pastille, en part de la hauteur de la carte
 const TAILLE_MIN = 0.02, TAILLE_MAX = 0.3;
+const TAILLE_ERALDUR = 0.06;         // (v433) la pastille d'Eraldur, un peu plus grande qu'un hameau
 const MASQUE_DESSIN = 0.86;          // jusqu'où le modèle peint (distance « carrée arrondie » au centre)
 const CALQUE_PLEIN = 0.8, CALQUE_FONDU = 0.97;   // le calque : plein, puis fondu vers le bord
 const MAX_PAR_LOT = 12;
@@ -86,7 +87,9 @@ function lireVillage(id, d) {
              x: Number(pos.x), y: Number(pos.y), taille: Number(pos.taille), calque: d.URL_Calque_Region || "",
              // Un calque d'avant v281 : son dessin au milieu d'un carré deux fois plus grand.
              plein: !!d.Calque_Plein,
-             type: d.Type_Lieu || "Village", image: d.URL_Cloudinary || "" };
+             type: d.Type_Lieu || "Village", image: d.URL_Cloudinary || "",
+             // (v433) Eraldur, le village des aventuriers (le hub) : sa page est « Le village » du livre.
+             hub: !!d.Hub_Aventuriers };
 }
 // Ce que l'écoute (ou un banc) reçoit : [{ id, data }].
 window.appliquerVillagesDeLaBase = function(liste) {
@@ -172,10 +175,10 @@ function dessiner() {
         pastilles.forEach(p => {
             const b = boite(p, c);
             const el = document.createElement("div");
-            el.className = "pastille-village";
+            el.className = "pastille-village" + (p.eraldur ? " eraldur" : "");
             el.dataset.id = p.id;
             Object.assign(el.style, { left: b.gauche + "px", top: b.haut + "px", width: b.cote + "px", height: b.cote + "px" });
-            el.innerHTML = `<span class="pastille-village-poignee" title="Agrandir ou rétrécir"></span>`;
+            el.innerHTML = `<span class="pastille-village-poignee" title="Agrandir ou rétrécir"></span>${p.eraldur ? `<span class="pastille-eraldur-nom">Eraldur</span>` : ""}`;
             brancherPastille(el, p);
             couchePastilles.appendChild(el);
         });
@@ -322,8 +325,9 @@ function brancherVillage(el, v) {
         if (enCours || (typeof window.modeChoixCarte === "function" && window.modeChoixCarte())) return;
         if (!estDev()) {
             // En jeu, un toucher sur un lieu qui a son image l'ouvre (v277) ; la
-            // carte glisse toujours (on ne retient pas le doigt).
-            if (v.image) appuiApercu = { id: v.id, x: e.clientX, y: e.clientY };
+            // carte glisse toujours (on ne retient pas le doigt). (v433) Eraldur, lui,
+            // ouvre la double page du village (« Le village » du livre).
+            if (v.hub || v.image) appuiApercu = { id: v.id, x: e.clientX, y: e.clientY };
             return;
         }
         e.stopPropagation();
@@ -335,7 +339,10 @@ window.addEventListener("pointerup", (e) => {
     if (appuiApercu) {
         const a = appuiApercu;
         appuiApercu = null;
-        if (Math.hypot(e.clientX - a.x, e.clientY - a.y) <= 6 && villages[a.id]) window.afficherApercuLieu(villages[a.id]);
+        if (Math.hypot(e.clientX - a.x, e.clientY - a.y) <= 6 && villages[a.id]) {
+            if (villages[a.id].hub) { if (window.GRIMOIRE && typeof window.GRIMOIRE.allerAuVillage === "function") window.GRIMOIRE.allerAuVillage(); }
+            else window.afficherApercuLieu(villages[a.id]);
+        }
     }
     if (!appuiVillage) return;
     const a = appuiVillage;
@@ -464,6 +471,27 @@ window.genererPastillesVillages = function(nombre, alea) {
     dessiner();
     return posees.map(p => ({ ...p }));
 };
+// (v433) Les pastilles des villages ordinaires (celle d'Eraldur a son bouton).
+const pastillesNormales = () => pastilles.filter(p => !p.eraldur);
+const villageEraldur = () => Object.values(villages).find(v => v.hub) || null;
+window.villageEraldur = villageEraldur;
+// ERALDUR (v433). Nico : « dans le bouton DEV des maps, un bouton pour créer spécialement le
+// village d'Eraldur ; une box pour choisir son emplacement ; ça dessine un petit village
+// antique sans murs sur la carte avec son nom, et ça le crée dans la base. Ce village
+// servira de hub pour les joueurs. » Un seul Eraldur : la pastille dorée se pose au centre
+// de la carte ouverte (ou là où il est déjà) ; on la glisse, on la règle, puis « Créer ».
+window.poserPastilleEraldur = function() {
+    const numero = carteOuverte(), c = cadrage();
+    if (!numero || !c || !estDev() || enCours) return null;
+    pastilles = pastilles.filter(p => !p.eraldur);
+    const e = villageEraldur();
+    const p = e && e.numero === Number(numero) ? { id: "ERALDUR", eraldur: true, x: e.x, y: e.y, taille: coteAffiche(e) }
+                                                : { id: "ERALDUR", eraldur: true, x: 0.5, y: 0.5, taille: TAILLE_ERALDUR };
+    garderDansLaCarte(p, c);
+    pastilles.push(p);
+    dessiner();
+    return { ...p };
+};
 window.retirerPastillesVillages = function() {
     if (enCours) return false;
     pastilles = [];
@@ -543,6 +571,52 @@ async function inventerVillage(cles, numero, nomsExistants, terrain) {
     return { nom: String(v.nom).trim(), description: String(v.description || "").trim(),
              securite: SECURITES.includes(v.securite) ? v.securite : "Inconnue",
              peuple: String(v.peuple || "").trim(), visuel: String(v.visuel || "a small ancient village").trim() };
+}
+
+// (v433) ERALDUR, LE VILLAGE DES AVENTURIERS. Nico : « un village tranquille, sans rien de
+// trop particulier, où il fait bon vivre ; les joueurs y seront toujours bien vus, avec une
+// bonne réputation ; il est dirigé par la guilde d'Ivalis, en place dans le village ; un
+// village où l'on trouve toutes les races » ; « un petit village antique sans murs ».
+const SUJET_ERALDUR = "a small, open, peaceful ancient village WITHOUT ANY WALLS OR PALISADE (houses, gardens, a few lanes and a small central square with a larger guild hall), nestled into the existing landscape";
+const REPUTATION_MIN_ERALDUR = 5;     // « bien vus » au moins (motReputation : 3 et plus)
+function promptEraldur(numero, terrain) {
+    const carte = (window.CARTES_REGIONALES || {})[numero] || {};
+    const lore = typeof window.loreDeLaRegion === "function" ? window.loreDeLaRegion(numero) : "";
+    const t = texteTerrain(terrain);
+    return `Tu es MIA_VILLAGE, l'IA qui peuple les cartes régionales du monde d'Ivalis.
+
+LE LORE de la région (à respecter) :
+${lore}
+
+La carte : « ${carte.nom || "région inconnue"} ». LE TERRAIN à cet endroit : ${t || "inconnu"}.
+
+Ta mission : décris ERALDUR, le village des aventuriers (le nom est imposé : Eraldur).
+- Un village tranquille, sans rien de trop particulier, où il fait bon vivre. Pas de mystère sombre, pas de menace.
+- Il est dirigé par la guilde d'Ivalis, installée dans le village (son Hall de guilde est au cœur du village).
+- On y trouve TOUTES les races du monde, qui y vivent en bonne entente.
+- Les aventuriers y sont toujours bien accueillis.
+- Un petit village antique OUVERT, SANS MURS ni palissade ; ses matériaux suivent le terrain à cet endroit.
+
+Réponds OBLIGATOIREMENT avec un JSON valide, exactement dans ce format :
+{
+  "description": "Une description riche et chaleureuse : atmosphère, architecture, habitants de toutes races, métiers, la guilde d'Ivalis et son Hall, la vie de tous les jours.",
+  "visuel": "A very short ENGLISH description of what Eraldur looks like seen from above on a map, built INTO the terrain at this spot: an open village WITHOUT walls, houses and gardens around a small square with a larger guild hall, materials suited to that terrain. Physical elements only, no style words."
+}`;
+}
+async function inventerEraldur(cles, numero, terrain) {
+    const corps = {
+        systemInstruction: { parts: [{ text: promptEraldur(numero, terrain) }] },
+        contents: [{ role: "user", parts: [{ text: "Décris Eraldur." }] }],
+        generationConfig: { temperature: 0.8, responseMimeType: "application/json" }
+    };
+    const rep = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cles.gemini}`,
+                            { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) });
+    if (!rep.ok) throw new Error(`Gemini a répondu ${rep.status}`);
+    const json = await rep.json();
+    const texte = json && json.candidates && json.candidates[0] && json.candidates[0].content.parts[0].text;
+    const v = JSON.parse(texte);
+    return { nom: "Eraldur", description: String((v && v.description) || "").trim(),
+             visuel: String((v && v.visuel) || "an open ancient village without walls, houses and gardens around a small square with a guild hall").trim() };
 }
 
 // 2. LE CARRÉ, découpé dans l'image de la carte, agrandi au format du dessin.
@@ -735,14 +809,14 @@ function nouvelId(nom) {
 // --- LA CRÉATION -------------------------------------------------------------
 window.creerVillagesRegion = async function() {
     const numero = carteOuverte();
-    if (!numero || !estDev() || enCours || pastilles.length === 0) return { crees: [], echecs: [] };
+    if (!numero || !estDev() || enCours || pastillesNormales().length === 0) return { crees: [], echecs: [] };
     const cles = lireCles();
     const manque = clesManquantes(cles);
     if (manque.length) { message(`Clés manquantes (Paramètres) : ${manque.join(", ")}`); return { crees: [], echecs: [], manque }; }
     const urlImage = typeof window.imageCarteRegionaleOuverte === "function" ? window.imageCarteRegionaleOuverte() : null;
     enCours = true;
     actualiserDev();
-    const lot = pastilles.slice();
+    const lot = pastillesNormales();          // (v433) la pastille d'Eraldur a son bouton
     const crees = [], echecs = [];
     attente(true, "Création des villages… Patientez", `Village 1 sur ${lot.length}`);
     for (let i = 0; i < lot.length; i++) {
@@ -783,6 +857,54 @@ window.creerVillagesRegion = async function() {
     return { crees, echecs };
 };
 
+// (v433) ERALDUR : créé (ou déplacé, redessiné) à la place de sa pastille dorée. Un seul
+// Eraldur dans le monde : s'il existe, sa fiche garde son identifiant, sa réputation et ses
+// habitants ; il change de place (et de carte s'il le faut) et de dessin.
+window.creerEraldur = async function() {
+    const numero = carteOuverte();
+    const p = pastilles.find(q => q.eraldur);
+    if (!numero || !p || !estDev() || enCours) return null;
+    const cles = lireCles();
+    const manque = clesManquantes(cles);
+    if (manque.length) { message(`Clés manquantes (Paramètres) : ${manque.join(", ")}`); return null; }
+    const urlImage = typeof window.imageCarteRegionaleOuverte === "function" ? window.imageCarteRegionaleOuverte() : null;
+    const ancien = villageEraldur();
+    enCours = true;
+    actualiserDev();
+    try {
+        attente(true, "Eraldur… Patientez", "MIA_TERRAIN lit le terrain");
+        const terrain = await terrainDuVillage(numero, p);
+        attente(true, "Eraldur… Patientez", "MIA_VILLAGE décrit Eraldur");
+        const v = ancien && ancien.description ? { nom: "Eraldur", description: ancien.description, visuel: ancien.visuel } : await inventerEraldur(cles, numero, terrain);
+        attente(true, "Eraldur… Patientez", "MIA_VILLAGE dessine Eraldur");
+        const calque = await fabriquerCalque(cles, urlImage, p, v.visuel, SUJET_ERALDUR);
+        const id = ancien ? ancien.id : nouvelId("Eraldur");
+        const fiche = {
+            Nom_Du_Lieu: "Eraldur", Description_Global: v.description, Niveau_De_Securite: "Élevée",
+            Peuple_Dominant: "Toutes les races", Visuel_Village: v.visuel, Type_Lieu: "Village",
+            Hub_Aventuriers: true, Dirige_Par: "La guilde d'Ivalis", Reputation_Min: REPUTATION_MIN_ERALDUR,
+            Carte_Regionale: Number(numero),
+            Position_Region: { x: Math.round(p.x * 1e5) / 1e5, y: Math.round(p.y * 1e5) / 1e5, taille: Math.round(p.taille * 1e5) / 1e5 },
+            URL_Calque_Region: calque, Calque_Plein: true,
+            ...(terrain && terrain.terrain ? { Terrain_Village: String(terrain.terrain) } : {})
+        };
+        if (ancien) await setDoc(doc(db, COLLECTION_LIEUX, id), fiche, { merge: true });
+        else await setDoc(doc(db, COLLECTION_LIEUX, id), { ...fiche, Reputations: {}, Stigmates: "", URL_Cloudinary: "" });
+        villages[id] = lireVillage(id, { ...(ancien ? { URL_Cloudinary: ancien.image } : {}), ...fiche });
+        pastilles = pastilles.filter(q => !q.eraldur);
+        message(ancien ? "✔️ Eraldur redessiné à sa nouvelle place" : "✔️ Eraldur créé : le village des aventuriers");
+        return villages[id];
+    } catch (e) {
+        console.error("[MIA_VILLAGE] Eraldur :", e);
+        message("Eraldur n'a pas pu être créé : " + String(e && e.message || e).slice(0, 120));
+        return null;
+    } finally {
+        enCours = false;
+        attente(false);
+        dessiner();
+    }
+};
+
 // Même village, nouveau dessin (le nom, la description, la place restent).
 window.redessinerVillageRegion = async function(id) {
     const v = villages[id || selection];
@@ -796,7 +918,7 @@ window.redessinerVillageRegion = async function(id) {
     try {
         // Un village d'avant v281 se redessine dans son nouveau carré (la moitié).
         const taille = Math.round(coteAffiche(v) * 1e5) / 1e5;
-        const calque = await fabriquerCalque(cles, window.imageCarteRegionaleOuverte(), { ...v, taille }, v.visuel || "a small ancient village", SUJET_VILLAGE);
+        const calque = await fabriquerCalque(cles, window.imageCarteRegionaleOuverte(), { ...v, taille }, v.visuel || "a small ancient village", v.hub ? SUJET_ERALDUR : SUJET_VILLAGE);
         await setDoc(doc(db, COLLECTION_LIEUX, v.id), { URL_Calque_Region: calque, Calque_Plein: true,
                                                         Position_Region: { x: v.x, y: v.y, taille } }, { merge: true });
         Object.assign(v, { calque, plein: true, taille });
@@ -903,10 +1025,16 @@ function actualiserDev() {
     if (!bloc) return;
     bloc.style.display = numero && estDev() ? "block" : "none";
     if (!numero) return;
-    const nb = $("villages-dev-pastilles");
-    if (nb) nb.textContent = pastilles.length ? `${pastilles.length} pastille${pastilles.length > 1 ? "s" : ""} à valider` : "";
+    const nb = $("villages-dev-pastilles"), lot = pastillesNormales();
+    if (nb) nb.textContent = lot.length ? `${lot.length} pastille${lot.length > 1 ? "s" : ""} à valider` : "";
     const valider = $("btn-valider-villages"), retirer = $("btn-retirer-pastilles"), generer = $("btn-generer-villages");
-    if (valider) { valider.disabled = enCours || pastilles.length === 0; valider.textContent = pastilles.length > 1 ? `Créer ces ${pastilles.length} villages` : "Créer ce village"; }
+    if (valider) { valider.disabled = enCours || lot.length === 0; valider.textContent = lot.length > 1 ? `Créer ces ${lot.length} villages` : "Créer ce village"; }
+    // (v433) Eraldur : sa pastille à placer, puis sa création (ou son déplacement, son redessin).
+    const eraldur = villageEraldur(), saPastille = pastilles.find(p => p.eraldur);
+    const poserE = $("btn-eraldur-poser"), creerE = $("btn-eraldur-creer"), infoE = $("eraldur-dev-etat");
+    if (poserE) { poserE.disabled = enCours; poserE.textContent = eraldur ? "Déplacer Eraldur" : "Placer Eraldur"; }
+    if (creerE) { creerE.disabled = enCours || !saPastille; creerE.textContent = eraldur ? "Redessiner Eraldur ici" : "Créer Eraldur"; }
+    if (infoE) infoE.textContent = eraldur ? `Eraldur existe (carte ${eraldur.numero}).` : (saPastille ? "Glisse la pastille dorée où tu veux Eraldur, puis crée-le." : "");
     if (retirer) retirer.disabled = enCours || pastilles.length === 0;
     if (generer) generer.disabled = enCours;
     const v = selection && villages[selection];

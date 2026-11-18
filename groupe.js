@@ -422,7 +422,9 @@ async function lieuDuGroupe(p) {
         const ld = l && l.exists() ? l.data() : {};
         const rep = (ld.Reputations || {})[p] || {};
         return { nom: nom ? `${nom}${ld.Nom_Du_Lieu ? `, ${ld.Nom_Du_Lieu}` : ""}` : (ld.Nom_Du_Lieu || ""), nature: false,
-                 reputation: Number.isFinite(Number(rep.Score)) ? Number(rep.Score) : 0, tags: rep.Tags || [] };
+                 // (v433) Eraldur : les aventuriers y sont toujours bien vus (Reputation_Min).
+                 reputation: Math.max(Number.isFinite(Number(rep.Score)) ? Number(rep.Score) : 0, Number.isFinite(Number(ld.Reputation_Min)) ? Number(ld.Reputation_Min) : -10),
+                 tags: rep.Tags || [] };
     } catch (e) { return { nom: "", nature: false, reputation: null, tags: [] }; }
 }
 

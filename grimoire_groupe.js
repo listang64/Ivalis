@@ -125,14 +125,11 @@ function htmlGauche() {
     const heros = herosDuGroupe();
     const l = donnees.lieu || {};
     const lieu = l.nature ? "Dans la nature" : (l.nom || "");
-    // (v419) Nico : « un petit symbole de double flèche à côté du nom de notre personnage
-    // ouvre la page Aventuriers avec la liste de ses personnages » (pour en changer).
-    const moi = (() => { try { return localStorage.getItem("ID_JOUEUR_COURANT") || ""; } catch (e) { return ""; } })();
+    // (v433) Nico : « enlève le bouton pour changer le personnage sous l'avatar » (la double
+    // flèche de la v419) : on change de héros dans le Livre des clans.
     const ligneHeros = heros.map(h => {
         const url = h.urlCloudinary || h.urlAvatarEquipe || h.urlPortraitReference || "";
         const id = echapper(h.idPersonnage);
-        const changer = moi && h.idJoueur === moi
-            ? `<button type="button" class="changer-heros-groupe" data-action="groupe" data-gp="changer" title="Changer de personnage" aria-label="Changer de personnage">⇄</button>` : "";
         // (v428) Nico : « à gauche, l'avatar des personnages les uns à côté des autres, avec en
         // dessous leurs noms, et un dégradé noir faible opacité pour masquer la coupe du bas de
         // leurs images ; adapte la taille des avatars au nombre de personnages » (--n, le CSS).
@@ -142,7 +139,7 @@ function htmlGauche() {
         return `<div class="heros-groupe">
             <button type="button" class="portrait-heros-groupe" data-action="groupe" data-gp="heros" data-id="${id}">${avatarEnPied(url, nomHeros(h), "avatar-heros-groupe")}</button>
             ${SEPARATION_DOREE}
-            <span class="ligne-nom-groupe"><button type="button" class="nom-groupe" data-action="groupe" data-gp="heros" data-id="${id}">${echapper(nomHeros(h))}</button>${changer}</span>
+            <span class="ligne-nom-groupe"><button type="button" class="nom-groupe" data-action="groupe" data-gp="heros" data-id="${id}">${echapper(nomHeros(h))}</button></span>
             <span class="role-groupe">${echapper(classeDe(h))}${h.niveau ? ` · niv. ${echapper(h.niveau)}` : ""}</span></div>`;
     }).join("");
     return `<div class="contenu-page page-groupe-gauche">${DEFS_OR}
@@ -156,7 +153,7 @@ function htmlGauche() {
         ${!l.nature && l.reputation != null ? htmlReputation(l) : ""}
         <div class="sous-titre-groupe compagnie-groupe">${lavis(TEINTE_SOUS_TITRES, "groupe-compagnie")}<span>La compagnie</span></div>
         <div class="liste-heros-groupe" style="--n:${Math.max(1, heros.length)}">${ligneHeros || `<p class="fiche-attente">Aucun héros dans le groupe.</p>`}</div>
-        <button type="button" class="bouton-aventuriers-groupe" data-action="groupe" data-gp="aventuriers">${lavis(TEINTE_AVENTURIERS, "aventuriers-groupe")}${cadre("aventuriers-groupe", 1.3)}<span>Les aventuriers ›</span></button>
+        <button type="button" class="bouton-aventuriers-groupe" data-action="groupe" data-gp="aventuriers">${lavis(TEINTE_AVENTURIERS, "aventuriers-groupe")}${cadre("aventuriers-groupe", 1.3)}<span>Les clans ›</span></button>
       </div>`;
 }
 
@@ -233,8 +230,7 @@ async function agir(cible) {
     const gp = cible.dataset.gp;
     if (gp === "heros") { son(); if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.ouvrir(cible.dataset.id); return; }
     if (gp === "revenir") { son(); ouvrir(); return; }
-    // (v419) La liste de nos personnages (notre clan, dans les Aventuriers), pour en changer.
-    if (gp === "changer") { son(); if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.allerAuxAventuriers(); return; }
+    // (v433) « Les clans › » : le Livre des clans, sur le sien.
     if (gp === "aventuriers") { son(); if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.allerAuxAventuriers(); return; }
     if (gp === "ame") { son(); if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id: cible.dataset.id, nom: cible.dataset.nom, depuisGroupe: true }); return; }
     // (v422) Parler en privé avec un suiveur.

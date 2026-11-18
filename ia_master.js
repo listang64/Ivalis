@@ -72,7 +72,8 @@ async function preparerEnvironnement(lieuActuelId) {
             env.details = snapLieu.data();
             const repMap = env.details.Reputations || {};
             const repGroupe = repMap[idPartieCourante] || {};
-            env.reputationScore = repGroupe.Score || 0;
+            // (v433) Eraldur : les aventuriers y sont toujours bien vus (Reputation_Min).
+            env.reputationScore = Math.max(repGroupe.Score || 0, Number(env.details.Reputation_Min) || -10);
             env.reputationTags = repGroupe.Tags || [];
         }
 
@@ -108,7 +109,7 @@ async function preparerEnvironnement(lieuActuelId) {
             if (snapLieu.exists()) {
                 const repMap = snapLieu.data().Reputations || {};
                 const repGroupe = repMap[idPartieCourante] || {};
-                env.reputationScore = repGroupe.Score || 0;
+                env.reputationScore = Math.max(repGroupe.Score || 0, Number(snapLieu.data().Reputation_Min) || -10);
                 env.reputationTags = repGroupe.Tags || [];
             }
         }
@@ -1215,7 +1216,9 @@ async function analyserReputation(idPartie, idLieuActuel, texteMJ) {
         
         const repMap = snapLieu.data().Reputations || {};
         const repGroupe = repMap[idPartie] || {};
-        const scoreActuel = repGroupe.Score || 0;
+        // (v433) Eraldur : jamais sous son plancher (les aventuriers y sont toujours bien vus).
+        const plancher = Number(snapLieu.data().Reputation_Min) || -10;
+        const scoreActuel = Math.max(repGroupe.Score || 0, plancher);
         const tagsActuels = repGroupe.Tags || [];
 
         const promptSysteme = `Tu es MIA_REPUTATION, l'IA qui gère la renommée du groupe.
@@ -1262,7 +1265,7 @@ Si l'action est banale, ne fais rien.`;
         const appelsOutils = data.candidates?.[0]?.content?.parts?.filter(p => p.functionCall).map(p => p.functionCall);
         
         if (appelsOutils && appelsOutils.length > 0 && appelsOutils[0].name === "mettreAJourReputation") {
-            const nouveauScore = appelsOutils[0].args.nouveau_score;
+            const nouveauScore = Math.max(Number(appelsOutils[0].args.nouveau_score) || 0, plancher);
             const tagsAjout = appelsOutils[0].args.tags_a_ajouter || [];
             const tagsSuppr = appelsOutils[0].args.tags_a_supprimer || [];
             

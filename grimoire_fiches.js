@@ -189,8 +189,10 @@ function pageClan(c, cote, i) {
     }).join("");
     // (v418) Les Aventuriers sont les sous-pages du Groupe : on y revient d'ici.
     const retourGroupe = i === 0 && window.GRIMOIRE_GROUPE ? `<button type="button" class="lien-fiche retour-groupe-clan" data-action="groupe" data-gp="revenir">‹ Le groupe</button>` : "";
+    // (v433) Le Livre des clans : à gauche, les aventuriers du clan (le nom du clan est
+    // sur la page de droite, sous sa bannière).
     el.innerHTML = `<div class="contenu-page page-liste-clan">${retourGroupe}
-        <div class="titre-clan">${echapper(titreClan(c))}</div>
+        <div class="titre-clan titre-aventuriers-clan">Les aventuriers</div>
         <svg class="fleuron fleuron-clan" viewBox="0 0 200 24" aria-hidden="true">
           <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>
         ${lignes ? `<ol class="liste-aventuriers">${lignes}</ol>` : `<p class="clan-vide">Aucun aventurier pour l'instant.</p>`}
@@ -212,19 +214,27 @@ async function choisirHerosActif(id) {
     signatures.clans = "";
     majPlus(true);
 }
-function pageClanVide(i) {
-    const el = page("clan-" + i, "droite", "page-clan page-clan-vide");
-    el.innerHTML = `<div class="contenu-page page-liste-clan"><svg class="fleuron fleuron-fin" viewBox="0 0 200 24" aria-hidden="true">
-        <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg></div>`;
+// (v433) LE LIVRE DES CLANS. Nico : « sur la page clan, page de droite, l'image de la
+// bannière du clan, et en bas de celle-ci en gros titre le nom du clan ; page de gauche la
+// liste des aventuriers avec la case à cocher » ; « on peut changer de page pour voir les
+// autres clans ». Une double page par clan. La bannière viendra d'une IA plus tard : sa
+// place reste vide (`c.banniere` : son adresse, quand elle existera).
+function pageBanniereClan(c, i) {
+    const el = page("clan-banniere-" + i, "droite", "page-clan page-banniere-clan");
+    el.innerHTML = `<div class="contenu-page page-banniere-du-clan">
+        <div class="cadre-banniere-clan${c.banniere ? "" : " vide"}">${c.banniere ? `<img src="${echapper(c.banniere)}" alt="" draggable="false">` : ""}</div>
+        <div class="nom-clan">${echapper(titreClan(c))}</div>
+        <svg class="fleuron fleuron-clan" viewBox="0 0 200 24" aria-hidden="true">
+          <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>
+      </div>`;
     return el;
 }
 function construireClans() {
     const cs = clans();
-    const sig = JSON.stringify(cs.map(c => [c.id, c.nom, c.heros.map(h => [h.idPersonnage, nomHeros(h), classeDe(h), h.actif !== false])]));
+    const sig = JSON.stringify(cs.map(c => [c.id, c.nom, c.banniere || "", c.heros.map(h => [h.idPersonnage, nomHeros(h), classeDe(h), h.actif !== false])]));
     if (sig === signatures.clans && pagesClans.length) return false;
     signatures.clans = sig;
-    const nouvelles = cs.map((c, i) => pageClan(c, i % 2 === 0 ? "gauche" : "droite", i));
-    if (nouvelles.length % 2) nouvelles.push(pageClanVide(nouvelles.length));
+    const nouvelles = cs.flatMap((c, i) => [pageClan(c, "gauche", i), pageBanniereClan(c, i)]);
     // Les mêmes pages gardent leur place si leur nombre ne change pas (le livre ne bouge pas).
     if (nouvelles.length === pagesClans.length) {
         nouvelles.forEach((el, i) => { pagesClans[i].className = el.className; pagesClans[i].innerHTML = el.innerHTML; });

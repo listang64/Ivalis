@@ -314,6 +314,26 @@
 .page-village.page-papier::after { display: none; }
 .page-village .contenu-village { position: absolute; inset: 0; overflow: hidden; z-index: 1; pointer-events: none; }
 .page-village .image-village { position: absolute; max-width: none; object-fit: fill; pointer-events: none; -webkit-user-drag: none; user-select: none; }
+/* (v433) L'image et ses lieux dans la même boîte (boiteVillage) : la boîte d'un lieu et son
+   nom sur un petit parchemin déplié, en parts de l'image. */
+.page-village .calque-village { position: absolute; }
+.page-village .calque-village .image-village { left: 0; top: 0; width: 100%; height: 100%; }
+.page-village .lieu-village { position: absolute; padding: 0; margin: 0; border: 0; border-radius: 18%; background: transparent; cursor: pointer;
+  pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: box-shadow 0.25s ease, background 0.25s ease; }
+.page-village .lieu-village:hover, .page-village .lieu-village:focus-visible { outline: none; background: rgba(255, 236, 170, 0.14);
+  box-shadow: 0 0 calc(var(--u) * 2.4) rgba(255, 214, 120, 0.55); }
+.page-village .parchemin-lieu-village { position: absolute; transform: translateX(-50%); pointer-events: none; white-space: nowrap; z-index: 1;
+  padding: calc(var(--u) * 0.45) calc(var(--u) * 2.4);
+  background: linear-gradient(180deg, #f3e3bd 0%, #e8d29f 55%, #d9bd83 100%);
+  border-radius: calc(var(--u) * 0.5); box-shadow: 0 calc(var(--u) * 0.25) calc(var(--u) * 0.6) rgba(40, 22, 8, 0.45); }
+/* les deux bouts roulés du parchemin */
+.page-village .parchemin-lieu-village::before, .page-village .parchemin-lieu-village::after {
+  content: ""; position: absolute; top: calc(var(--u) * -0.35); bottom: calc(var(--u) * -0.35); width: calc(var(--u) * 1.1); border-radius: calc(var(--u) * 0.6);
+  background: linear-gradient(90deg, #b8935a 0%, #ecd7a6 45%, #a8824a 100%); box-shadow: 0 calc(var(--u) * 0.2) calc(var(--u) * 0.4) rgba(40, 22, 8, 0.4); }
+.page-village .parchemin-lieu-village::before { left: calc(var(--u) * -0.5); }
+.page-village .parchemin-lieu-village::after { right: calc(var(--u) * -0.5); }
+.page-village .parchemin-lieu-village span { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important;
+  font-size: calc(var(--u) * 3.4 * var(--echelle-titres, 1)); color: #3a2210; letter-spacing: 0.02em; }
 /* LE MARQUE-PAGE DE LA MARCHE (v310), en haut à droite du livre : rangé sous
    les pages tant qu'on ne peut pas voyager ; il sort sur les cartes du livre. */
 .marque-page.marque-marche { left: calc(1636px * var(--s, 1)); top: calc(-22px * var(--s, 1)); width: calc(62px * var(--s, 1)); height: calc(190px * var(--s, 1)); transform: rotate(-8deg); }

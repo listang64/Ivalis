@@ -1,0 +1,40 @@
+/* =========================================================================
+   v433 — LE HALL DE GUILDE (grimoire_guilde.js) : à gauche le menu, écrit comme
+   le sommaire (penché, souligné à la plume, sur un lavis) ; à droite le titre.
+   --u : 1 % d'une page.
+   ========================================================================= */
+.page-guilde .page-guilde-menu { justify-content: flex-start; align-items: center; padding-top: calc(var(--u) * 10) !important; }
+.page-guilde .page-guilde-titre { justify-content: flex-start; align-items: center; padding-top: calc(var(--u) * 16) !important; }
+.retour-guilde { align-self: flex-start; }
+.entrees-guilde { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; width: 100%; padding-bottom: calc(var(--u) * 8); }
+.entree-guilde {
+  position: relative; isolation: isolate; border: 0; background: transparent; cursor: pointer; padding: calc(var(--u) * 1) calc(var(--u) * 2);
+  max-width: 100%; color: #1a0f07; text-align: center; line-height: 1.25;
+  font-size: calc(var(--u) * 7 * var(--echelle-titres, 1));
+  transform: translateX(calc(var(--u) * var(--decale, 0))) rotate(var(--penche, 0deg));
+  transition: transform 0.25s ease, color 0.25s ease;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  text-shadow: 0 0 0.02em rgba(18, 11, 6, 0.6);
+}
+.entree-guilde > .lavis { left: -4%; top: -6%; width: 108%; height: 112%; }
+.entree-guilde-texte {
+  position: relative; padding: 0 0.12em 0.1em; background-repeat: no-repeat; background-size: 100% 0.32em; background-position: 0 100%;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
+.entree-guilde:hover, .entree-guilde:focus-visible {
+  transform: translateX(calc(var(--u) * var(--decale, 0))) rotate(calc(var(--penche, 0deg) * 0.4)) scale(1.05); color: #000; outline: none;
+}
+.entree-guilde:active { transform: translateX(calc(var(--u) * var(--decale, 0))) rotate(var(--penche, 0deg)) scale(0.97); }
+.numero-guilde { color: inherit; margin-right: 0.15em; }
+.titre-guilde { position: relative; isolation: isolate; text-align: center; line-height: 1.05; color: #24150a;
+  font-size: calc(var(--u) * 12 * var(--echelle-titres, 1)); padding: calc(var(--u) * 1) calc(var(--u) * 4); }
+.titre-guilde.titre-piece { font-size: calc(var(--u) * 9 * var(--echelle-titres, 1)); }
+.titre-guilde > .lavis { left: -10%; top: -14%; width: 120%; height: 128%; }
+.titre-guilde > span { position: relative; }
+.entree-guilde, .entree-guilde *, .titre-guilde, .titre-guilde * {
+  /* (!important : style.css impose Almendra à tout) */
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-style: normal;
+  font-weight: var(--poids-titres, 400) !important; letter-spacing: 0.01em; }
+.fleuron-guilde { width: calc(var(--u) * 40); height: auto; margin: calc(var(--u) * 2) 0 calc(var(--u) * 3); fill: none; stroke: #3a2210; stroke-width: 1.2; }
+.fleuron-guilde circle { fill: #3a2210; }
+.guilde-developpement { margin: calc(var(--u) * 6) 0 0; font-style: italic; font-size: calc(var(--u) * 3.6); color: #6b4a2b; text-align: center; }

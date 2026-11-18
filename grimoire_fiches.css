@@ -11,7 +11,7 @@
 .page-fiches button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; touch-action: manipulation; }
 
 /* LES TITRES : Berkshire Swash (le global « * { Almendra !important } » l'écraserait). */
-.titre-clan, .titre-page-fiche, .nom-heros-fiche, .niveau-fiche, .titre-encart, .carte-titre, .separation-classe span {
+.titre-clan, .nom-clan, .titre-page-fiche, .nom-heros-fiche, .niveau-fiche, .titre-encart, .carte-titre, .separation-classe span {
   font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important; }
 
 .fiche-attente { margin: 0; font-style: italic; color: #6b4a2b; font-size: calc(var(--u) * 3.2); }
@@ -26,8 +26,14 @@
 /* ---------------------------- LES CLANS ---------------------------- */
 .page-fiches .page-liste-clan { align-items: center; padding-top: calc(var(--u) * 11) !important; }
 .titre-clan { font-size: calc(var(--u) * 8.4 * var(--echelle-titres, 1)); color: #24150a; text-align: center; line-height: 1.1; }
-.fleuron-clan, .fleuron-fin { width: 46%; height: auto; margin: calc(var(--u) * 1) 0 calc(var(--u) * 3); }
-.fleuron-fin { margin-top: 40%; opacity: 0.5; }
+.fleuron-clan { width: 46%; height: auto; margin: calc(var(--u) * 1) 0 calc(var(--u) * 3); }
+/* (v433) LE LIVRE DES CLANS : à droite, la bannière du clan (vide en attendant l'IA) et,
+   dessous, son nom en gros titre. */
+.page-fiches .page-banniere-du-clan { align-items: center; justify-content: flex-end; padding-bottom: calc(var(--u) * 14) !important; }
+.cadre-banniere-clan { width: 58%; flex: 1 1 auto; max-height: 64%; min-height: 0; display: flex; align-items: flex-end; justify-content: center; }
+.cadre-banniere-clan img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.cadre-banniere-clan.vide { border: calc(var(--u) * 0.35) dashed rgba(58, 34, 16, 0.22); border-radius: calc(var(--u) * 2); margin-bottom: calc(var(--u) * 3); }
+.nom-clan { margin-top: calc(var(--u) * 3); font-size: calc(var(--u) * 10 * var(--echelle-titres, 1)); color: #24150a; text-align: center; line-height: 1.05; }
 .page-fiches .fleuron path { fill: none; stroke: #2b1a0e; stroke-width: 1.4; }
 .page-fiches .fleuron circle { fill: #2b1a0e; }
 .liste-aventuriers { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: calc(var(--u) * 2.4); counter-reset: av; }
