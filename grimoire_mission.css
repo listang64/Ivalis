@@ -38,11 +38,11 @@
 .notes-mission::placeholder { color: rgba(60, 38, 18, 0.5); font-style: italic; }
 .notes-mission:disabled { opacity: 0.8; }
 
-/* v444 — LA FICHE : les missions réussies du héros, en bas à gauche, en petit, à la belle écriture. */
-.missions-reussies-fiche { position: absolute; left: calc(var(--u) * 4); bottom: calc(var(--u) * 2); z-index: 2; max-width: 40%;
-  color: #f6e3b0; font-size: calc(var(--u) * 2.9); line-height: 1.2; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 6px rgba(0, 0, 0, 0.7); }
+/* v444 — LA FICHE : les missions réussies du héros, à la belle écriture. */
+/* (v448) Sous l'encart Blessures, sur la page de droite, centré, à l'encre noire. */
+.missions-reussies-fiche { align-self: center; text-align: center; margin-top: calc(var(--u) * 2); color: #1b1009; font-size: calc(var(--u) * 3.4); line-height: 1.25; }
 .missions-reussies-fiche, .missions-reussies-fiche * { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; }
-.titre-missions-reussies { font-size: 1.05em; }
+.titre-missions-reussies { font-size: 1.1em; }
 .missions-reussies-fiche ul { list-style: none; margin: 0.15em 0 0; padding: 0; }
 .missions-reussies-fiche li::before { content: "– "; }
-.aucune-mission-reussie { margin: 0.1em 0 0; font-style: italic; opacity: 0.85; }
+.aucune-mission-reussie { margin: 0.1em 0 0; font-style: italic; color: #4a3018; }

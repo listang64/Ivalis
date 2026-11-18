@@ -480,9 +480,9 @@ function htmlAvatar(h) {
         ${url ? `<img class="avatar-heros" src="${echapper(url)}" alt="" draggable="false">` : `<div class="avatar-absent">Pas encore de portrait</div>`}
         <div class="pied-avatar"></div>
         <div class="nom-heros-fiche" id="fiche-nom-heros">${echapper(nomHeros(h))}</div>
-        ${htmlMissionsReussies(h)}
       </div>`;
 }
+// (v448) « Mets les missions réussies en dessous de l'encart Blessures, à droite, centrées, en noir. »
 // (v444) Nico : « dans la fiche de personnage, sur la page de l'avatar, en bas à gauche en petit :
 // Missions réussies : 2 Rang B, 1 Rang C — en belle écriture et en rapport avec leurs vraies
 // stats » (les missions terminées réussies où le héros était, missions_guilde.js).
@@ -686,6 +686,7 @@ function htmlFicheDroite(h) {
           </div>
         </div>
         ${htmlBlessures(h)}
+        ${htmlMissionsReussies(h)}
       </div>`;
 }
 

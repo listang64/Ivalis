@@ -12302,3 +12302,9 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - **La page du Groupe** (Nico : « vire le titre La compagnie ») : les héros suivent directement la réputation.
 - **Le fanion des clans** (« que l'image se fasse sur fond magenta fluo et que l'algo vire toute cette couleur, comme pour les personnages ») : MIA peint le fanion sur un fond magenta fluo uni (#FF00FF), sans reflet magenta sur le tissu ; le détourage est celui des personnages (app.js, detourerFondMagenta), puis le fanion est recadré (grimoire_clans.js, detourerFanion). Le blanc du tissu et des emblèmes ne risque plus d'être pris pour le fond.
 - corrections_v434.mjs (ses contrôles « v447 »), v418_livre et v432 le vérifient.
+
+## v448 — Les missions réussies sous les blessures ; forcer le vote d'une mission (DEV)
+
+- **La fiche** (Nico : « mettre les missions réussies en dessous de l'encart Blessures, à droite, centrées, en noir ») : « Missions réussies : – 1 Rang A… » quitte la page de l'avatar pour la page de droite, sous l'encart Blessures, centré, à l'encre noire (l'écriture des titres).
+- **Forcer le vote** (« en mode DEV, un bouton pour forcer le vote de mission sur le parchemin ») : en DEV, la feuille d'une mission porte « Forcer le vote (DEV) » ; un toucher et tous les votants disent oui, la mission est acceptée (voterMission, options.forcer — refusé hors DEV).
+- corrections_v444.mjs le vérifie (ses contrôles « v448 »).

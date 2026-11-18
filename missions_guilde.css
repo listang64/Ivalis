@@ -44,6 +44,8 @@
 
 /* v443 — SOUS LE SCEAU : ce qui empêche d'accepter (ou l'attente des autres), « Refuser ». */
 .aide-sceau { align-self: center; margin: 0 0 0.4em; text-align: center !important; font-style: italic; color: #6b4a2b; }
+.forcer-mission { align-self: center; margin: 0 0 1em; padding: 0.3em 0.9em; border: 1px dashed #b02a1c; border-radius: 4px; background: rgba(255, 240, 220, 0.6);
+  color: #b02a1c; font: inherit; font-size: 0.85em; cursor: pointer; }
 .refuser-mission { align-self: center; border: 0; background: none; cursor: pointer; font: inherit; font-size: 0.95em; color: #7a1a12; text-decoration: underline; margin-bottom: 1em; }
 
 /* v443 — LE POST-IT DU VOTE : le papier d'écriture du livre, sorti par le haut, au milieu. */

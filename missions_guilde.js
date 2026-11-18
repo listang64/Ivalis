@@ -283,6 +283,7 @@ export function ouvrirFeuille(slot) {
         voile.addEventListener("click", (e) => {
             if (e.target.closest(".sceau-mission")) { e.stopPropagation(); if (!e.target.closest(".sceau-mission").disabled) accepter(Number(voile.dataset.slot)); return; }
             if (e.target.closest(".refuser-mission")) { e.stopPropagation(); refuserMission(); fermerFeuille(); return; }
+            if (e.target.closest(".forcer-mission")) { e.stopPropagation(); forcerMission(Number(voile.dataset.slot)); return; }
             if (!e.target.closest(".feuille-mission")) fermerFeuille();
         });
         document.body.appendChild(voile);
@@ -368,9 +369,17 @@ function htmlSceau(m) {
     else if (surElle) aide = `${(v.Initiateur || {}).nom || "Un joueur"} propose cette mission : tous doivent l'accepter.`;
     return `<button type="button" class="sceau-mission${etat ? " " + etat : ""}" title="Accepter la mission" aria-label="Accepter la mission"${etat ? " disabled" : ""}>${SCEAU_CIRE}<span class="texte-cache">Accepter la mission</span></button>
         ${aide ? `<p class="aide-sceau">${echapper(aide)}</p>` : ""}
-        ${surElle ? `<button type="button" class="refuser-mission">Refuser</button>` : ""}`;
+        ${surElle ? `<button type="button" class="refuser-mission">Refuser</button>` : ""}
+        ${estDevMission() && !enCours && !(v && v.Id && !surElle) ? `<button type="button" class="forcer-mission">Forcer le vote (DEV)</button>` : ""}`;
 }
 const compterOui = (v) => (v.Votants || []).filter(x => (v.Votes || {})[x.id] === "oui").length;
+async function forcerMission(slot) {
+    const v = partie.Vote_Mission;
+    const m = missionDe(slot) || (v && v.Mission && Number(v.Slot) === slot ? v.Mission : null);
+    if (!m) return;
+    const r = await voterMission(slot, m, "oui", { forcer: true });
+    if (r && r.acceptee) fermerFeuille(); else rafraichirFeuille();
+}
 async function accepter(slot) {
     const v = partie.Vote_Mission;
     const m = missionDe(slot) || (v && v.Mission && Number(v.Slot) === slot ? v.Mission : null);
@@ -385,7 +394,7 @@ function rafraichirFeuille() {
     const m = missionDe(slot) || (v && v.Mission && Number(v.Slot) === slot ? v.Mission : null);
     const zone = voile.querySelector(".contenu-feuille-mission");
     if (!m || !zone) return;
-    zone.querySelectorAll(".sceau-mission, .aide-sceau, .refuser-mission").forEach(e => e.remove());
+    zone.querySelectorAll(".sceau-mission, .aide-sceau, .refuser-mission, .forcer-mission").forEach(e => e.remove());
     zone.insertAdjacentHTML("beforeend", htmlSceau(m));
 }
 
@@ -433,10 +442,12 @@ window.appliquerMissionDeLaPartie = function(data) {
 };
 
 // LE VOTE : « oui » (le premier propose), « non » (le vote disparaît). Tous oui : acceptée.
-export async function voterMission(slot, m, reponse) {
+export async function voterMission(slot, m, reponse, options) {
     const id = idPartie();
     if (!id || !m) return null;
     const moi = idJoueur(), votants = votantsGroupe();
+    // (v448) Nico : « en mode DEV, un bouton pour forcer le vote de mission » : tous les votants disent oui.
+    const forcer = !!(options && options.forcer) && estDevMission();
     let r;
     try {
         r = await runTransaction(db, async (tx) => {
@@ -447,6 +458,7 @@ export async function voterMission(slot, m, reponse) {
             if (reponse === "non") { if (v && v.Id === m.Id) tx.update(refPartie(id), { Vote_Mission: deleteField() }); return { refuse: true }; }
             if (!v || !v.Id) v = { Id: m.Id, Slot: slot, Titre: m.Titre, Rang: m.Rang, Mission: m, Initiateur: { id: moi, nom: (votants.find(x => x.id === moi) || {}).nom || "Un joueur" }, Votants: votants, Votes: {}, Le: Date.now() };
             const votes = { ...(v.Votes || {}), [moi]: "oui" };
+            if (forcer) (v.Votants || []).forEach(x => { votes[x.id] = "oui"; });
             if (!(v.Votants || []).every(x => votes[x.id] === "oui")) { tx.set(refPartie(id), { Vote_Mission: { ...v, Votes: votes } }, { merge: true }); return { vote: true }; }
             const enCours = { Id: m.Id, Titre: m.Titre, Rang: m.Rang, Lieu_Id: (m.Lieu && m.Lieu.Id) || null, Region: m.Region, Le: Date.now() };
             tx.update(refPartie(id), { Vote_Mission: deleteField(), Mission_En_Cours: enCours });
@@ -457,6 +469,7 @@ export async function voterMission(slot, m, reponse) {
     if (r && r.acceptee) await installerMission(m, r);
     return r;
 }
+const estDevMission = () => { try { return localStorage.getItem("ivalis_DEV_MODE") === "on"; } catch (e) { return false; } };
 export const refuserMission = () => { const v = partie.Vote_Mission; return v && v.Mission ? voterMission(Number(v.Slot), v.Mission, "non") : null; };
 
 // La mission acceptée : sa fiche du groupe, l'encart vidé, la place de son lieu ; puis, en

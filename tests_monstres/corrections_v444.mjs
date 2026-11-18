@@ -6,6 +6,7 @@
 // ça met aucune mission en cours. » « Voter pour mettre fin à la mission : si tous les joueurs sont OK, elle est
 // abandonnée. » « Dans la fiche, sur la page de l'avatar, en bas à gauche en petit : Missions réussies : 2 Rang B,
 // 1 Rang C, en belle écriture, en rapport avec leurs vraies stats. » Sur la vraie page (le décor du banc v424).
+// (v448) « Les missions réussies sous l'encart Blessures, à droite, centrées, en noir » ; « en DEV, forcer le vote sur la feuille ».
 // Lancer : node tests_monstres/corrections_v444.mjs
 import fs from 'fs';
 import http from 'http';
@@ -471,20 +472,37 @@ await section(async () => {
 titre("7. LA FICHE : « MISSIONS RÉUSSIES », EN BAS À GAUCHE, SES VRAIS CHIFFRES");
 await section(async () => {
   await G(() => window.GRIMOIRE_FICHES.ouvrir("H1")); await attendreQue(() => G(() => window.GRIMOIRE_FICHES.herosAffiche() === "H1"), 6000); await pose();
-  const avant = await texte("#grimoire-fiches-fiche-g .missions-reussies-fiche");
+  const avant = await texte("#grimoire-fiches-fiche-d .missions-reussies-fiche");
   verifier("pas encore de mission réussie (l'abandonnée ne compte pas) : « aucune pour l'instant »", /Missions réussies :/.test(avant) && /aucune pour l'instant/.test(avant), avant);
   const m1 = await accepter(1);
   reponsesSuivi = [{ etapes_accomplies: [1, 2], indices_trouves: [], statut: "reussie", resume: "Réussie." }];
   await G(() => window.MISSIONS_GUILDE.suivreApresMJ("Victoire."));
   // Une mission réussie plus ancienne, sans Thorin (H1) : elle ne compte pas pour lui.
   await G(() => { window.__docs["Systeme_Parties/P1/Missions_Terminees/ANCIENNE"] = { Statut: "reussie", Heros: ["H2"], Mission: { Rang: "A" } }; window.MISSIONS_GUILDE.relireTerminees(); });
-  await attendreQue(async () => new RegExp(`1 Rang ${m1.Rang}`).test(await texte("#grimoire-fiches-fiche-g .missions-reussies-fiche")), 5000);
-  const r = await G(() => { const el = document.querySelector("#grimoire-fiches-fiche-g .missions-reussies-fiche"), pg = document.getElementById("grimoire-fiches-fiche-g");
-    const a = el.getBoundingClientRect(), b = pg.getBoundingClientRect(); return { texte: el.textContent.replace(/\s+/g, " ").trim(), gauche: (a.left - b.left) / b.width, bas: (b.bottom - a.bottom) / b.height, police: getComputedStyle(el).fontFamily, taille: parseFloat(getComputedStyle(el).fontSize) / (b.width / 100) }; });
+  await attendreQue(async () => new RegExp(`1 Rang ${m1.Rang}`).test(await texte("#grimoire-fiches-fiche-d .missions-reussies-fiche")), 5000);
+  const r = await G(() => { const el = document.querySelector("#grimoire-fiches-fiche-d .missions-reussies-fiche"), pg = document.getElementById("grimoire-fiches-fiche-d");
+    const bl = [...pg.querySelectorAll(".titre-encart")].find(t => /Blessures/.test(t.textContent)).closest(".encart-fiche") || null;
+    const a = el.getBoundingClientRect(), b = pg.getBoundingClientRect(), c = bl ? bl.getBoundingClientRect() : null;
+    return { texte: el.textContent.replace(/\s+/g, " ").trim(), sousBlessures: !!c && a.top >= c.bottom - 1, centre: Math.abs((a.left + a.width / 2) - (b.left + b.width / 2)) / b.width,
+             couleur: getComputedStyle(el).color, police: getComputedStyle(el).fontFamily, avatar: !!document.querySelector("#grimoire-fiches-fiche-g .missions-reussies-fiche") }; });
   verifier(`une mission réussie (Rang ${m1.Rang}) : « Missions réussies : – 1 Rang ${m1.Rang} »`, new RegExp(`Missions réussies : 1 Rang ${m1.Rang}`).test(r.texte) && !/Rang A.*Rang A/.test(r.texte), r.texte);
   verifier("…celle d'un autre héros ne compte pas pour lui", m1.Rang === "A" ? /1 Rang A/.test(r.texte) && !/2 Rang A/.test(r.texte) : !/Rang A/.test(r.texte), r.texte);
-  verifier("…en bas à gauche, en petit, à la belle écriture (celle des titres)", r.gauche < 0.1 && r.bas < 0.08 && r.taille < 3.5 && /Berkshire|Shadows|var|Almendra/.test(r.police), JSON.stringify(r));
+  verifier("(v448) sur la page de droite, sous l'encart Blessures, centré, à l'encre noire (plus sur l'avatar)", r.sousBlessures && r.centre < 0.06 && r.couleur === "rgb(27, 16, 9)" && !r.avatar && /Berkshire|Shadows|var|Almendra/.test(r.police), JSON.stringify(r));
   await cap("v444-fiche");
+});
+
+titre("8. (v448) EN MODE DEV : FORCER LE VOTE DE LA MISSION, SUR SA FEUILLE");
+await section(async () => {
+  await G(() => { localStorage.setItem("ivalis_DEV_MODE", "off"); window.MISSIONS_GUILDE.ouvrirFeuille(2); }); await p.waitForTimeout(600);
+  verifier("hors DEV : pas de bouton pour forcer", await G(() => !document.querySelector("#feuille-mission .forcer-mission")));
+  await G(() => { window.MISSIONS_GUILDE.fermerFeuille(); localStorage.setItem("ivalis_DEV_MODE", "on"); window.MISSIONS_GUILDE.ouvrirFeuille(2); }); await p.waitForTimeout(600);
+  verifier("en DEV : « Forcer le vote (DEV) » sur la feuille", await G(() => /Forcer le vote/.test((document.querySelector("#feuille-mission .forcer-mission") || {}).textContent || "")));
+  const m2 = (await tableau()).Missions[2];
+  await cliquer("#feuille-mission .forcer-mission"); await p.waitForTimeout(800);
+  await G(() => window.__surPartie(window.__docs["Systeme_Parties/P1"]));
+  const pd = await partieDoc();
+  verifier("un toucher : tous les votants d'accord, la mission acceptée, la feuille fermée", pd.Mission_En_Cours && pd.Mission_En_Cours.Id === m2.Id && !pd.Vote_Mission && !(await G(() => document.getElementById("feuille-mission").classList.contains("ouverte"))), JSON.stringify(pd.Mission_En_Cours));
+  await G(() => localStorage.setItem("ivalis_DEV_MODE", "off"));
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
