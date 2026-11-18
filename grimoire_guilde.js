@@ -51,7 +51,8 @@ export const PIECES = [
     ["patriarche", "Bureau du patriarche", { couleurs: ["#8a5fb0", "#a37cc4", "#6d4890"], opacite: 0.26, nom: "guilde-patriarche" }],
     ["clans", "Livre des clans", { couleurs: ["#6fa64f", "#8dbb6a", "#567f3c"], opacite: 0.3, nom: "guilde-clans" }]
 ];
-const TEINTE_TITRE = { couleurs: ["#d9a93a", "#e8c25a", "#b8862a"], opacite: 0.46, nom: "guilde-titre" };
+// (v440) Nico : « sous le titre Hall de guilde, rends l'aquarelle un peu plus opaque pour mieux voir le titre » (0,46 avant).
+const TEINTE_TITRE = { couleurs: ["#d9a93a", "#e8c25a", "#b8862a"], opacite: 0.72, nom: "guilde-titre" };
 
 let hall = null, salle = null;   // les deux doubles pages : { g, d }
 let piece = null;                // la pièce ouverte après le Hall (son id), ou null
@@ -320,7 +321,7 @@ export function ouvrir(id) {
     const g = G();
     if (!g || !g.enPartie || !g.enPartie() || typeof g.definirGuilde !== "function") return false;
     creer();
-    rendreHall();
+    if (!hallEcrit()) rendreHall();     // (v440) déjà écrit depuis le village : son image est déjà là
     const voulue = id && PIECES.some(p => p[0] === id && p[0] !== "clans") ? id : null;
     if (voulue) { piece = voulue; rendrePiece(); }
     else if (!surLesPages()) piece = null;     // depuis le village : le Hall seul
@@ -346,6 +347,39 @@ function vueActuelle() {
     return "";
 }
 const surLesPages = () => vueActuelle() !== "";
+
+// (v440) Nico : « quand on est sur le village et qu'on clique sur le Hall, il y a un petit délai
+// avant qu'il affiche l'image du Hall : quand on est sur le village, charge-la, comme ça, si on
+// tourne la page, elle sera affichée direct ». Sur la double page du village, la double page du
+// Hall s'écrit d'avance (hors du livre) et sa grande image se charge et se décode.
+let imageHallPrete = null;
+const hallEcrit = () => !!(hall && hall.g.querySelector(".fond-guilde img") && hall.d.querySelector(".titre-guilde .lavis"));
+function surLeVillage() {
+    const g = G(), pf = g && g.pageFlip && g.pageFlip();
+    if (!pf || typeof g.pagesVillage !== "function" || !g.enPartie || !g.enPartie()) return false;
+    const [v] = g.pagesVillage(), i = v ? g.indexDe(v) : -1, ici = pf.getCurrentPageIndex();
+    return i > 0 && (ici === i || ici === i + 1);
+}
+export function preparerHall() {
+    if (!imageHallPrete) {
+        imageHallPrete = new Image();
+        imageHallPrete.decoding = "async";
+        imageHallPrete.src = IMAGE_HALL;
+        if (imageHallPrete.decode) imageHallPrete.decode().catch(() => {});
+    }
+    creer();
+    if (!hallEcrit() && window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.dessins) rendreHall();
+    return hallEcrit();
+}
+let ecouteVillage = false;
+function veillerVillage() {
+    const g = G();
+    if (!ecouteVillage && g && typeof g.ecran === "function" && g.ecran()) {
+        ecouteVillage = true;
+        g.ecran().addEventListener("grimoire-page", () => { try { if (surLeVillage()) preparerHall(); } catch (e) {} });
+    }
+    if (surLeVillage()) preparerHall();
+}
 export const ouverte = () => surLesPages();
 // Ouvertes, elles restent (la pièce aussi, depuis le Hall : on y retourne en tournant la
 // page) ; quittées (et plus en route depuis 8 secondes), elles sortent du livre.
@@ -353,6 +387,7 @@ setInterval(() => {
     if (document.hidden) return;
     try {
         poserOutil();
+        veillerVillage();
         const g = G();
         if (!g || typeof g.pagesGuilde !== "function") return;
         if (surLesPages()) enRoute = Date.now();        // (lues à l'instant : 8 secondes de grâce une fois quittées)
@@ -361,7 +396,7 @@ setInterval(() => {
 }, 1000);
 
 window.GRIMOIRE_GUILDE = {
-    ouvrir, agir, ouverte, vue: () => vueActuelle() || "hall", piece: () => piece,
+    ouvrir, agir, ouverte, vue: () => vueActuelle() || "hall", piece: () => piece, preparerHall, hallPret: () => hallEcrit() && !!(imageHallPrete && imageHallPrete.complete),
     pages: () => (hall ? [hall.g, hall.d] : []), pagesPiece: () => (salle && piece ? [salle.g, salle.d] : []), PIECES, IMAGE_TABLEAU, IMAGE_HALL,
     encarts: () => JSON.parse(JSON.stringify(encarts)), creerEncart, supprimerEncart, selection: () => selection,
     choisirEncart: (n) => { selection = encarts[n] ? n : null; rendreTableau(); majPopup(); }, incliner

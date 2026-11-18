@@ -12,6 +12,7 @@
 // (v435) Nico : « mettre Clan devant le champ du nom » ; « la bannière, fais-la descendre encore un peu » ; « le panneau des missions déborde de la page ».
 // (v436) Nico : « cette image en fond dans la page Hall de guilde, de la même manière que les images en fond de race ».
 // (v437) « Le tableau, mets-le partout dans les deux pages, quitte à étirer ; un léger fondu sur sa bordure. »
+// (v440) « Sur le village, charge l'image du Hall d'avance » ; « l'aquarelle sous le titre Hall de guilde un peu plus opaque ».
 // Lancer : node tests_monstres/corrections_v434.mjs
 import fs from 'fs';
 import http from 'http';
@@ -338,8 +339,17 @@ titre("1. LE HALL : NI NUMÉRO, NI TRAIT, NI BOUTON RETOUR");
 // =========================================================================
 await section(async () => {
   await G(() => window.GRIMOIRE.allerAuVillage()); await attendreQue(surVillage, 8000); await pose();
+  // (v440) « Quand on est sur le village, charge l'image du Hall : si on tourne la page, elle sera affichée direct. »
+  verifier("(v440) sur le village, avant tout toucher : la double page du Hall est déjà écrite, son image chargée",
+           await attendreQue(() => G(() => window.GRIMOIRE_GUILDE.hallPret()), 5000) && hallDemande.length > 0 && await G(() => window.GRIMOIRE.pagesGuilde().length === 0), String(hallDemande.length));
+  const demandesAvant = hallDemande.length;
+  await G(() => { window.__imageAuPassage = null; const o = new MutationObserver(() => { const [g] = window.GRIMOIRE.pagesGuilde(); const i = g && g.querySelector(".fond-guilde img");
+    if (i && window.__imageAuPassage === null) { window.__imageAuPassage = i.complete && i.naturalWidth > 0; o.disconnect(); } }); o.observe(window.GRIMOIRE.livre(), { childList: true, subtree: true }); });
   await cliquer("#lieu-village-hall");
   verifier("le bâtiment ouvre le Hall", await attendreQue(surHall, 8000)); await pose();
+  verifier("(v440) …et son image est déjà là quand la page entre dans le livre (rien de nouveau à télécharger)", await G(() => window.__imageAuPassage === true) && hallDemande.length === demandesAvant, `${await G(() => window.__imageAuPassage)} ${hallDemande.length - demandesAvant}`);
+  verifier("(v440) l'aquarelle sous « Hall de guilde » plus opaque (0,72, 0,46 avant)", /const TEINTE_TITRE = \{ couleurs: \[[^\]]+\], opacite: 0\.72,/.test(lire("grimoire_guilde.js"))
+           && await G(() => [...document.querySelectorAll(".titre-guilde .lavis [fill-opacity]")].some(x => Number(x.getAttribute("fill-opacity")) > 0.5)));
   const r = await G(() => { const [g, d] = window.GRIMOIRE_GUILDE.pages();
     return { entrees: [...g.querySelectorAll(".entree-guilde")].map(e => e.textContent.replace(/\s+/g, " ").trim()),
       traits: [...g.querySelectorAll(".entree-guilde-texte")].map(s => getComputedStyle(s).backgroundImage), numeros: g.querySelectorAll(".numero-guilde").length,

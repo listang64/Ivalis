@@ -12246,3 +12246,9 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - **Adrien a les mêmes droits que Nico et Ben** : repris en admin (comptes.js, ANCIENS_JOUEURS ; firestore.rules, ancienValide, la même table). Il valide les demandes d'inscription, corrige les fils invisibles, etc. Les messages disent « Nico, Ben ou Adrien ». ⚠ Son compte existe déjà avec le rôle « joueur » : dans la console Firebase, mettre `Role` à `admin` sur son document `Comptes/{uid}` (les règles interdisent qu'un poste le fasse), puis republier firestore.rules.
 - **Le héros actif dans tous les clans** (« pour ces trois-là, qu'ils puissent changer le personnage actif dans les différents clans, même si ce n'est pas le leur ») : dans le Livre des clans, les admins — et les trois anciens joueurs P_01 à P_03, même avant que la base ait donné le rôle à Adrien — ont les cases du héros actif dans chaque clan ; cocher un héros met au repos les autres de son joueur. « + Un nouvel aventurier » reste sur son propre clan.
 - corrections_v439.mjs le vérifie ; v259, v418_livre et _comptes_emulateur suivent.
+
+## v440 — Le Hall prêt dès le village ; son titre plus lisible
+
+- Nico : « quand on est sur le village et qu'on clique sur le Hall de guilde, il y a un petit délai avant qu'il affiche l'image du Hall ; quand on est sur le village, charge-la ». Sur la double page du village, la double page du Hall s'écrit d'avance (hors du livre) et sa grande image se charge et se décode (preparerHall, grimoire_guilde.js) : au toucher, elle entre dans le livre déjà affichée. Le Hall n'est plus réécrit à chaque ouverture.
+- « Sous le titre Hall de guilde, l'aquarelle un peu plus opaque » : 0,72 (0,46 avant).
+- corrections_v434.mjs le vérifie (ses contrôles « v440 »).
