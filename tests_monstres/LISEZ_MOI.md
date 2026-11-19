@@ -12335,3 +12335,14 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - **Un personnage seul** (« un homme parti seul faire des signaux avec une lampe à huile ; l'IA a mis mon personnage à côté ») : l'agent apprend que deux figures sont un maximum, pas un objectif. Un « personnage » se dessine seul : sa figure, et un héros seulement si la phrase du moment le nomme (illustrations_recit.js, acteursDuCroquis).
 - **La page avant un portrait** (« un peu d'écriture en haut de page, beaucoup d'espace libre ; de l'autre côté l'avatar d'un PNJ ; le récit a continué après la photo ») : un portrait qui ne peut pas aller en face attend la prochaine page libre, et le texte finit de remplir sa page (grimoire_recit.js, paginer).
 - corrections_v443 et v428 le vérifient (leurs contrôles « v451 »).
+
+## v452 — Des missions normales ou difficiles (plus de rangs) ; plus d'indices sur la page de mission
+
+- **La difficulté** (Nico : « on enlève les Rang A, B et C. Sur le panneau, des missions normales ou difficiles (deux au plus). Les niveaux des monstres par rapport au groupe : normale −1 / 0 / +1, difficile +2 / +3 / +4, tirés au hasard pour chaque mission ; les joueurs ne sauront pas le degré de difficulté. Pour les difficiles, le sceau en petit sous le texte, sur le panneau et sur la feuille ») : missions_guilde.js (DIFFICULTES, DECALAGES, tirerDifficultes, tirerDecalage).
+  - Chaque mission porte une Difficulte et un Decalage caché ; le panneau compte de 0 à 2 difficiles, au hasard.
+  - Une mission difficile montre le sceau au dragon (IMAGE_SCEAU_DIFFICILE) sous son texte : dans son encart, sur sa feuille et sur la page « Mission en cours ».
+  - La fiche affiche « Missions réussies : – 3 normales – 1 difficile ».
+  - Le rythme du Narrateur : 3 passages par étape pour une normale, 4 pour une difficile.
+  - L'existant : un panneau aux rangs d'avant se refait tout seul (aRenouveler). Une mission d'avant (en cours ou terminée) se lit ainsi : C normale, B et A difficiles, avec un décalage tiré de son identifiant (decalageDe), toujours le même.
+- **Les indices** (« vire les indices et leurs créations dans la page de mission en cours ») : plus de liste sur la page, et MIA_SUIVI_MISSION ne les relève plus. Le Narrateur garde ceux de son plan, pour lui seul.
+- corrections_v442, v443 et v444 le vérifient (leurs contrôles « v452 »).

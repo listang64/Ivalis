@@ -344,7 +344,7 @@ await p.route('**/generativelanguage.googleapis.com/**', r => {
   if (/MIA_SUIVI_MISSION/.test(sys)) { appelsSuivi.push(sys); return repondre(reponsesSuivi.shift() || { etapes_accomplies: [], indices_trouves: [], statut: "en_cours", resume: "" }); }
   if (!/MIA_MISSIONS/.test(sys)) return r.fallback();
   appelsMissions.push(sys);
-  const rangs = (/dans cet ordre de rangs : ([ABC, ]+)\./.exec(sys) || [, ""])[1].split(", ");
+  const rangs = (/dans cet ordre de difficultés : ([a-z, ]+)\./.exec(sys) || [, ""])[1].split(", ");   // (v452) normale / difficile
   return repondre(rangs.map((rg, k) => ({ rang: rg, titre: `Mission ${k + 1} (${rg})`, resume: `Résumé ${k + 1}.`, region: 5,
     commanditaire: `Commanditaire ${k + 1}`, details: `Détails ${k + 1}.`, objectif: `Objectif ${k + 1}.`, lettre: `Je vous écris ${k + 1}.`,
     lieu: k === 0 ? { id_existant: "L_KESH", nom: "Kesh", type: "village", description: "Un village de toile." }
@@ -463,32 +463,36 @@ await section(async () => {
   verifier("au lieu de la mission : le plan pour lui seul, ce qu'il ne doit jamais révéler", /LE PLAN DE LA MISSION \(POUR TOI SEUL, MJ\)/.test(ici) && /À NE JAMAIS RÉVÉLER DIRECTEMENT :\n\s+- Le commanditaire est le voleur/.test(ici) && /Dame Sira/.test(ici), ici.slice(0, 160));
   // (v451) « Le narrateur fait avancer trop vite la mission : le traître, on le sait en deux tours. » Le plan se donne
   // petit à petit : l'étape en cours seule, ni la vérité cachée ni les secrets des personnages avant la dernière étape.
-  const min = await G(() => window.MISSIONS_GUILDE.TOURS_MIN_ETAPE[window.__docs["Systeme_Parties/P1"].Mission_En_Cours.Rang]);
+  const min = await G(() => window.MISSIONS_GUILDE.TOURS_MIN_ETAPE[window.__docs["Systeme_Parties/P1"].Mission_En_Cours.Difficulte]);
   verifier("(v451) à la 1re étape : elle seule (la suivante cachée), ni la vérité cachée, ni le secret de Dame Sira", /L'étape à jouer maintenant : 1\. Trouver la lettre/.test(ici) && !/Confondre le voleur/.test(ici) && /Encore 1 étape après celle-ci/.test(ici)
            && !/Le commanditaire ment/.test(ici) && !/elle aime le voleur/.test(ici) && /ne désigne aucun coupable, aucun traître/.test(ici), ici.slice(0, 400));
-  verifier(`(v451) …le rythme : au moins ${min} passages par étape (selon le rang), un indice au plus par passage, une révélation à la fois`, new RegExp(`au moins ${min} de tes passages \\(celle-ci en est à 0\\)`).test(ici) && /un au plus par passage/.test(ici) && /Une révélation à la fois/.test(ici), ici.split("LE RYTHME")[1]);
+  verifier(`(v451) …le rythme : au moins ${min} passages par étape (selon la difficulté), un indice au plus par passage, une révélation à la fois`, new RegExp(`au moins ${min} de tes passages \\(celle-ci en est à 0\\)`).test(ici) && /un au plus par passage/.test(ici) && /Une révélation à la fois/.test(ici), ici.split("LE RYTHME")[1]);
   const ia = lire("ia_master.js");
   verifier("le Narrateur le lit avant chaque tour, et MIA_SUIVI_MISSION suit après", /window\.contexteMissionMJ\(dataPartieMJ, lieuActuel\)/.test(ia) && /window\.MISSIONS_GUILDE\.suivreApresMJ\(reponseTexte\)/.test(ia));
 });
 
-titre("6. LES CRÉATURES AU LIEU DE LA MISSION : C −2, B +0, A +2 (AILLEURS, LE NIVEAU DU GROUPE)");
+titre("6. LES CRÉATURES AU LIEU DE LA MISSION : (v452) LE DÉCALAGE CACHÉ DE LA MISSION (AILLEURS, LE NIVEAU DU GROUPE)");
 await section(async () => {
-  const r = await G(async () => { const d = window.MISSIONS_GUILDE.DECALAGE_NIVEAU[window.__docs["Systeme_Parties/P1"].Mission_En_Cours.Rang];
+  const r = await G(async () => { const mc = window.__docs["Systeme_Parties/P1"].Mission_En_Cours, d = mc.Decalage;
     window.NIVEAU_GROUPE = 5;
     const ailleurs = { n: window.niveauDesCreatures(), t: window.tricheActuelle().pv, res: window.nbResistancesCreature("Normal") };
     window.__docs["Systeme_Parties/P1"].Lieu_Actuel = "L_KESH"; window.__surPartie(window.__docs["Systeme_Parties/P1"]);
     const ici = { n: window.niveauDesCreatures(), t: window.tricheActuelle().pv, attendu: window.tricheDeNiveau(5 + d).pv };
     window.__docs["Systeme_Parties/P1"].Lieu_Actuel = ""; window.__surPartie(window.__docs["Systeme_Parties/P1"]);
-    return { d, rang: window.__docs["Systeme_Parties/P1"].Mission_En_Cours.Rang, ailleurs, ici, apres: window.niveauDesCreatures() }; });
+    return { d, difficulte: mc.Difficulte, ailleurs, ici, apres: window.niveauDesCreatures() }; });
   verifier(`ailleurs : le niveau du groupe (5)`, r.ailleurs.n === 5, JSON.stringify(r));
-  verifier(`au lieu de la mission (Rang ${r.rang}) : ${5 + r.d} — la triche des créatures suit`, r.ici.n === 5 + r.d && r.ici.t === r.ici.attendu && r.apres === 5, JSON.stringify(r));
-  verifier("le décalage des rangs : C −2, B 0, A +2", JSON.stringify(await G(() => window.MISSIONS_GUILDE.DECALAGE_NIVEAU)) === '{"C":-2,"B":0,"A":2}');
+  verifier(`au lieu de la mission (${r.difficulte}, décalage caché ${r.d}) : ${5 + r.d} — la triche des créatures suit`, ((r.difficulte === "normale" && [-1, 0, 1].includes(r.d)) || (r.difficulte === "difficile" && [2, 3, 4].includes(r.d))) && r.ici.n === 5 + r.d && r.ici.t === r.ici.attendu && r.apres === 5, JSON.stringify(r));
+  verifier("(v452) les décalages : normale −1 / 0 / +1, difficile +2 / +3 / +4", JSON.stringify(await G(() => window.MISSIONS_GUILDE.DECALAGES)) === '{"normale":[-1,0,1],"difficile":[2,3,4]}');
+  // Une mission d'avant v452 (à rang, sans décalage écrit) : le sien, tiré de son identifiant, dans sa difficulté.
+  const anc = await G(() => { const p = window.__docs["Systeme_Parties/P1"], avant = p.Mission_En_Cours; p.Mission_En_Cours = { Id: avant.Id, Titre: avant.Titre, Rang: "A", Lieu_Id: avant.Lieu_Id };
+    p.Lieu_Actuel = "L_KESH"; window.__surPartie(p); const n = window.niveauDesCreatures(); p.Mission_En_Cours = avant; p.Lieu_Actuel = ""; window.__surPartie(p); return n; });
+  verifier("(v452) une mission en cours d'avant (Rang A) : difficile, +2 à +4 au lieu de la mission", [7, 8, 9].includes(anc), String(anc));
 });
 
 titre("7. LE SUIVI : LES ÉTAPES, LES INDICES ; LE NARRATEUR DIT QUE C'EST RÉUSSI : LA MISSION S'ACHÈVE");
 await section(async () => {
-  // (v451) Le rythme : une étape au plus par tour, jamais avant son nombre de tours minimum (C 2, B 3, A 4).
-  const min = await G(() => window.MISSIONS_GUILDE.TOURS_MIN_ETAPE[window.__docs["Systeme_Parties/P1"].Mission_En_Cours.Rang]);
+  // (v451) Le rythme : une étape au plus par tour, jamais avant son nombre de tours minimum ((v452) normale 3, difficile 4).
+  const min = await G(() => window.MISSIONS_GUILDE.TOURS_MIN_ETAPE[window.__docs["Systeme_Parties/P1"].Mission_En_Cours.Difficulte]);
   const tot = Array.from({ length: min - 1 }, () => ({ etapes_accomplies: [1, 2], indices_trouves: [], statut: "reussie", resume: "Tout va trop vite." }));
   reponsesSuivi = [...tot, { etapes_accomplies: [1, 9], indices_trouves: ["La lettre du voleur"], statut: "en_cours", resume: "La lettre est trouvée." }];
   for (let k = 0; k < min - 1; k++) await G(() => window.MISSIONS_GUILDE.suivreApresMJ("Tout se dénoue d'un coup."));
@@ -496,7 +500,7 @@ await section(async () => {
   verifier(`(v451) avant ${min} tours, rien n'avance (ni étape, ni « réussie » sans toutes les étapes)`, md && !md.Avancement.Etapes["1"] && !md.Avancement.Etapes["2"] && md.Avancement.Tours_Etape === min - 1, JSON.stringify(md && md.Avancement).slice(0, 200));
   await G(() => window.MISSIONS_GUILDE.suivreApresMJ("Les héros trouvent la lettre au fond du puits."));
   md = await missionDoc();
-  verifier("une étape accomplie (l'étape inconnue ignorée), un indice, le journal", md.Avancement.Etapes["1"] === true && !md.Avancement.Etapes["9"] && md.Avancement.Indices.includes("La lettre du voleur") && md.Avancement.Journal.some(j => /La lettre est trouvée/.test(j.Texte)) && md.Avancement.Tours_Etape === 0, JSON.stringify(md.Avancement));
+  verifier("une étape accomplie (l'étape inconnue ignorée), le journal ; (v452) plus d'indices relevés", md.Avancement.Etapes["1"] === true && !md.Avancement.Etapes["9"] && !md.Avancement.Indices && !/indices_trouves/.test(appelsSuivi[appelsSuivi.length - 1]) && md.Avancement.Journal.some(j => /La lettre est trouvée/.test(j.Texte)) && md.Avancement.Tours_Etape === 0, JSON.stringify(md.Avancement));
   verifier("MIA_SUIVI_MISSION lit l'objectif et les étapes", /Objectif 1\./.test(appelsSuivi[0]) && /1\. Trouver la lettre/.test(appelsSuivi[0]));
   // (v451) La dernière étape : la vérité cachée et les secrets des personnages viennent au Narrateur.
   const fin2 = await G(() => window.contexteMissionMJ({}, "L_KESH"));

@@ -486,10 +486,12 @@ function htmlAvatar(h) {
 // (v444) Nico : « dans la fiche de personnage, sur la page de l'avatar, en bas à gauche en petit :
 // Missions réussies : 2 Rang B, 1 Rang C — en belle écriture et en rapport avec leurs vraies
 // stats » (les missions terminées réussies où le héros était, missions_guilde.js).
-const missionsDe = (h) => (window.MISSIONS_GUILDE && typeof window.MISSIONS_GUILDE.missionsReussies === "function") ? window.MISSIONS_GUILDE.missionsReussies(h.idPersonnage) : { A: 0, B: 0, C: 0 };
+// (v452) Plus de rangs : « – 3 normales – 1 difficile ».
+const missionsDe = (h) => (window.MISSIONS_GUILDE && typeof window.MISSIONS_GUILDE.missionsReussies === "function") ? window.MISSIONS_GUILDE.missionsReussies(h.idPersonnage) : { normale: 0, difficile: 0 };
 function htmlMissionsReussies(h) {
     const n = missionsDe(h);
-    const lignes = ["A", "B", "C"].filter(r => n[r] > 0).map(r => `<li>${n[r]} Rang ${r}</li>`).join("");
+    const lignes = [["normale", "normale", "normales"], ["difficile", "difficile", "difficiles"]].filter(([k]) => n[k] > 0)
+        .map(([k, un, plusieurs]) => `<li>${n[k]} ${n[k] > 1 ? plusieurs : un}</li>`).join("");
     return `<div class="missions-reussies-fiche"><div class="titre-missions-reussies">Missions réussies :</div>
         ${lignes ? `<ul>${lignes}</ul>` : `<p class="aucune-mission-reussie">aucune pour l'instant</p>`}</div>`;
 }

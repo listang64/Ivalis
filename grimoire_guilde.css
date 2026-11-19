@@ -83,10 +83,9 @@
 /* (v445) Le texte centré par ses marges (auto) : s'il déborde, c'est par le bas, et ça se mesure ;
    toutes les tailles × --ajuste (l'échelle qui le fait tenir dans l'encart, missions_guilde.js). */
 .texte-mission-encart { margin: auto 0; width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; }
-.rang-mission { font-size: calc(min(15cqh, 18cqw) * var(--ajuste, 1)); font-weight: 700; letter-spacing: 0.02em; line-height: 1; }
-.rang-mission.rang-A { color: #8f1d15; }
-.rang-mission.rang-B { color: #4a3a12; }
-.rang-mission.rang-C { color: #2f4a22; }
+/* (v452) Plus de rang en tête : le titre, le trait, le résumé ; une mission difficile, son sceau en petit dessous. */
+.sceau-difficile-encart { display: block; flex: none; width: calc(min(24cqh, 30cqw) * var(--ajuste, 1)); height: auto; aspect-ratio: 1; margin-top: calc(3cqh * var(--ajuste, 1));
+  -webkit-user-drag: none; user-select: none; pointer-events: none; filter: drop-shadow(0 0.4cqh 0.5cqh rgba(40, 10, 4, 0.45)); }
 .separateur-mission { width: 62%; height: calc(min(5cqh, 9cqw) * var(--ajuste, 1)); margin: calc(2.5cqh * var(--ajuste, 1)) 0 calc(3cqh * var(--ajuste, 1)); flex: none; }
 .separateur-mission path { fill: none; stroke: #3a2210; stroke-width: 1.3; }
 .separateur-mission path:last-child { fill: #3a2210; }

@@ -8,8 +8,8 @@
 .page-mission-vide { justify-content: center; align-items: center !important; text-align: center; }
 .titre-mission-en-cours { text-align: center; color: #24150a; line-height: 1.1; font-size: calc(var(--u) * 7 * var(--echelle-titres, 1));
   font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important; }
-.rang-mission-en-cours { text-align: center; font-family: 'Cinzel', serif; font-weight: 700; letter-spacing: 0.12em; font-size: calc(var(--u) * 3); color: #5c3a12; }
-.rang-mission-en-cours.rang-A { color: #8f1d15; } .rang-mission-en-cours.rang-C { color: #2f4a22; }
+/* (v452) Le sceau des missions difficiles, en petit sous le titre. */
+.sceau-difficile-page { display: block; align-self: center; width: calc(var(--u) * 9); height: auto; aspect-ratio: 1; margin: calc(var(--u) * 0.8) 0 0; -webkit-user-drag: none; user-select: none; filter: drop-shadow(0 calc(var(--u) * 0.2) calc(var(--u) * 0.3) rgba(40, 10, 4, 0.45)); }
 .fleuron-mission { align-self: center; width: 46%; height: auto; margin: calc(var(--u) * 1) 0 calc(var(--u) * 2.4); fill: none; stroke: #3a2210; stroke-width: 1.2; }
 .fleuron-mission circle { fill: #3a2210; }
 .aucune-mission { font-size: calc(var(--u) * 4.4); font-style: italic; color: #4a3018; margin: calc(var(--u) * 4) 0 calc(var(--u) * 1.5); }
@@ -22,8 +22,8 @@
 .faits-mission-en-cours dd { margin: 0; }
 .sous-titre-mission { margin: calc(var(--u) * 1.4) 0 calc(var(--u) * 0.5); font-family: 'Cinzel', serif; font-weight: 700; font-size: 0.8em; letter-spacing: 0.1em; text-transform: uppercase; color: #7a5228; }
 .objectif-en-cours { font-weight: 700; }
-.indices-mission, .journal-mission { margin: 0 0 calc(var(--u) * 1); padding-left: 1.1em; }
-.indices-mission li, .journal-mission li { margin-bottom: calc(var(--u) * 0.4); }
+.journal-mission { margin: 0 0 calc(var(--u) * 1); padding-left: 1.1em; }
+.journal-mission li { margin-bottom: calc(var(--u) * 0.4); }
 .abandon-mission { margin-top: auto; padding-top: calc(var(--u) * 2.4); text-align: center; }
 .vote-abandon p { margin: 0 0 calc(var(--u) * 0.8); text-align: center; }
 .vote-abandon .discret { color: #6b4a2b; font-style: italic; }

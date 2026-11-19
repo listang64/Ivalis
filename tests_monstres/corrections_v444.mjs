@@ -346,7 +346,7 @@ await p.route('**/generativelanguage.googleapis.com/**', r => {
   if (/MIA_SUIVI_MISSION/.test(sys)) { appelsSuivi.push(sys); return repondre(reponsesSuivi.shift() || { etapes_accomplies: [], indices_trouves: [], statut: "en_cours", resume: "" }); }
   if (!/MIA_MISSIONS/.test(sys)) return r.fallback();
   appelsMissions.push(sys);
-  const rangs = (/dans cet ordre de rangs : ([ABC, ]+)\./.exec(sys) || [, ""])[1].split(", ");
+  const rangs = (/dans cet ordre de difficultés : ([a-z, ]+)\./.exec(sys) || [, ""])[1].split(", ");   // (v452) normale / difficile
   return repondre(rangs.map((rg, k) => ({ rang: rg, titre: `Mission ${k + 1} (${rg})`, resume: `Résumé ${k + 1}.`, region: 5,
     commanditaire: `Commanditaire ${k + 1}`, details: `Détails ${k + 1}.`, objectif: `Objectif ${k + 1}.`, lettre: `Je vous écris ${k + 1}.`,
     lieu: k === 0 ? { id_existant: "L_KESH", nom: "Kesh", type: "village", description: "Un village de toile." }
@@ -420,7 +420,7 @@ await section(async () => {
   await G(() => window.GRIMOIRE_MISSION.ouvrir()); await attendreQue(surMission, 8000); await pose();
   await attendreQue(async () => /Commanditaire 1/.test(await gauche()), 4000);
   const g = await gauche();
-  verifier("le rang, le titre, le commanditaire, la région, le lieu, l'objectif, ce qu'on en sait", new RegExp(`Rang ${m0.Rang}`).test(g) && /Mission 1/.test(g) && /Commanditaire 1/.test(g) && /Le désert d'Etheria/.test(g) && /Kesh/.test(g) && /Objectif 1\./.test(g) && /Détails 1\./.test(g), g.slice(0, 260));
+  verifier("(v452) le titre (plus de rang), le commanditaire, la région, le lieu, l'objectif, ce qu'on en sait", !/Rang [ABC]/.test(g) && /Mission 1/.test(g) && /Commanditaire 1/.test(g) && /Le désert d'Etheria/.test(g) && /Kesh/.test(g) && /Objectif 1\./.test(g) && /Détails 1\./.test(g), g.slice(0, 260));
   verifier("…rien du plan du MJ (la vérité cachée, ce qu'il ne faut pas révéler)", !/ment/.test(g) && !/voleur/.test(g), "");
   verifier("…et le vote pour l'abandonner", /Voter pour abandonner la mission/.test(g));
   // (v450) « Le bouton voter pour abandonner, dans le même design que le reste du livre. »
@@ -447,13 +447,14 @@ await section(async () => {
   verifier("les notes d'un autre joueur apparaissent", /le puits est à l'est/.test((await droite()).valeur), (await droite()).valeur);
 });
 
-titre("5. L'AVANCEMENT : LES INDICES, CE QUI S'EST PASSÉ");
+titre("5. L'AVANCEMENT : CE QUI S'EST PASSÉ ; (v452) PLUS D'INDICES");
 await section(async () => {
+  // (v452) Nico : « vire les indices et leurs créations dans la page de mission en cours ».
   reponsesSuivi = [{ etapes_accomplies: [1], indices_trouves: ["Une lettre signée d'un sceau noir"], statut: "en_cours", resume: "Le groupe a trouvé une lettre au fond du puits." }];
   await G(() => window.MISSIONS_GUILDE.suivreApresMJ("Ils trouvent une lettre."));
-  await attendreQue(async () => /sceau noir/.test(await gauche()), 4000);
-  const g = await gauche();
-  verifier("les indices trouvés et ce qui s'est passé s'écrivent sur la page", /Les indices/.test(g) && /sceau noir/.test(g) && /Ce qui s'est passé/.test(g) && /au fond du puits/.test(g), g.slice(-260));
+  await attendreQue(async () => /au fond du puits/.test(await gauche()), 4000);
+  const g = await gauche(), md = await missionDoc();
+  verifier("(v452) ce qui s'est passé s'écrit sur la page ; plus d'indices (ni sur la page, ni relevés en base)", /Ce qui s'est passé/.test(g) && /au fond du puits/.test(g) && !/Les indices/.test(g) && !/sceau noir/.test(g) && !(md.Avancement || {}).Indices, g.slice(-260));
 });
 
 titre("6. L'ABANDON : UN VOTE ; UN « NON » L'EFFACE ; TOUS D'ACCORD, LA MISSION EST ABANDONNÉE");
@@ -488,15 +489,20 @@ await section(async () => {
     await G(() => window.MISSIONS_GUILDE.suivreApresMJ("Victoire."));
   }
   // Une mission réussie plus ancienne, sans Thorin (H1) : elle ne compte pas pour lui.
-  await G(() => { window.__docs["Systeme_Parties/P1/Missions_Terminees/ANCIENNE"] = { Statut: "reussie", Heros: ["H2"], Mission: { Rang: "A" } }; window.MISSIONS_GUILDE.relireTerminees(); });
-  await attendreQue(async () => new RegExp(`1 Rang ${m1.Rang}`).test(await texte("#grimoire-fiches-fiche-d .missions-reussies-fiche")), 5000);
+  // (v452) et une d'avant, à rang (A : difficile), où Thorin était : elle compte en « difficile ».
+  await G(() => { window.__docs["Systeme_Parties/P1/Missions_Terminees/ANCIENNE"] = { Statut: "reussie", Heros: ["H2"], Mission: { Rang: "A" } };
+    window.__docs["Systeme_Parties/P1/Missions_Terminees/ANCIENNE_THORIN"] = { Statut: "reussie", Heros: ["H1"], Mission: { Rang: "A" } }; window.MISSIONS_GUILDE.relireTerminees(); });
+  const d1 = await G((id) => window.MISSIONS_GUILDE.difficulteDe(window.__docs["Systeme_Parties/P1/Missions_Terminees/" + id].Mission), m1.Id);
+  const attendu = d1 === "difficile" ? "Missions réussies : 2 difficiles" : "Missions réussies : 1 normale 1 difficile";
+  const sansBlanc = (t) => String(t || "").replace(/\s+/g, "");
+  await attendreQue(async () => sansBlanc(await texte("#grimoire-fiches-fiche-d .missions-reussies-fiche")) === sansBlanc(attendu), 5000);
   const r = await G(() => { const el = document.querySelector("#grimoire-fiches-fiche-d .missions-reussies-fiche"), pg = document.getElementById("grimoire-fiches-fiche-d");
     const bl = [...pg.querySelectorAll(".titre-encart")].find(t => /Blessures/.test(t.textContent)).closest(".encart-fiche") || null;
     const a = el.getBoundingClientRect(), b = pg.getBoundingClientRect(), c = bl ? bl.getBoundingClientRect() : null;
     return { texte: el.textContent.replace(/\s+/g, " ").trim(), sousBlessures: !!c && a.top >= c.bottom - 1, centre: Math.abs((a.left + a.width / 2) - (b.left + b.width / 2)) / b.width,
              couleur: getComputedStyle(el).color, police: getComputedStyle(el).fontFamily, avatar: !!document.querySelector("#grimoire-fiches-fiche-g .missions-reussies-fiche") }; });
-  verifier(`une mission réussie (Rang ${m1.Rang}) : « Missions réussies : – 1 Rang ${m1.Rang} »`, new RegExp(`Missions réussies : 1 Rang ${m1.Rang}`).test(r.texte) && !/Rang A.*Rang A/.test(r.texte), r.texte);
-  verifier("…celle d'un autre héros ne compte pas pour lui", m1.Rang === "A" ? /1 Rang A/.test(r.texte) && !/2 Rang A/.test(r.texte) : !/Rang A/.test(r.texte), r.texte);
+  verifier(`(v452) une mission réussie (${d1}) et une d'avant (Rang A) : « ${attendu} »`, sansBlanc(r.texte) === sansBlanc(attendu) && !/Rang/.test(r.texte), r.texte);
+  verifier("…celle d'un autre héros ne compte pas pour lui", !/3/.test(r.texte), r.texte);
   verifier("(v448) sur la page de droite, sous l'encart Blessures, centré, à l'encre noire (plus sur l'avatar)", r.sousBlessures && r.centre < 0.06 && r.couleur === "rgb(27, 16, 9)" && !r.avatar && /Berkshire|Shadows|var|Almendra/.test(r.police), JSON.stringify(r));
   await cap("v444-fiche");
 });

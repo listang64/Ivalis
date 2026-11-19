@@ -128,6 +128,8 @@ const VILLAGE = await (async () => { const pg = await b.newPage(); const u = awa
   return c.toDataURL("image/png"); }); await pg.close(); return Buffer.from(u.split(",")[1], "base64"); })();
 const villageDemande = [];
 await p.route(/res\.cloudinary\.com\/.*IMG_2275_ncxeo8/, r => { villageDemande.push(r.request().url()); r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: VILLAGE }); });
+// (v452) Le sceau des missions difficiles (la vraie image, V452_SCEAU=chemin, pour une capture ; sinon le petit carré du banc).
+await p.route(/res\.cloudinary\.com\/.*IMG_2294_ghiayl/, r => r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: process.env.V452_SCEAU ? fs.readFileSync(process.env.V452_SCEAU) : VILLAGE }));
 await p.route('**/firebase-app.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_APP }));
 await p.route('**/firebase-firestore.js', r => r.fulfill({ contentType: 'text/javascript', headers: {'Access-Control-Allow-Origin':'*'}, body: FAUX_FIRESTORE }));
 await p.route('**/generativelanguage.googleapis.com/**', r => {
@@ -337,7 +339,7 @@ await p.route('**/generativelanguage.googleapis.com/**', r => {
   const sys = ((corps.systemInstruction || {}).parts || [{}])[0].text || "";
   if (!/MIA_MISSIONS/.test(sys)) return r.fallback();
   appelsMissions.push(sys);
-  const rangs = (/dans cet ordre de rangs : ([ABC, ]+)\./.exec(sys) || [, ""])[1].split(", ");
+  const rangs = (/dans cet ordre de difficultés : ([a-z, ]+)\./.exec(sys) || [, ""])[1].split(", ");   // (v452) normale / difficile
   const n = appelsMissions.length;
   const liste = rangs.map((rg, k) => ({ rang: rg, titre: `Mission ${k + 1} (${rg}) — tirage ${n}`, resume: `Résumé court de la mission ${k + 1}.`, region: k === 2 ? 99 : 5,
     commanditaire: `Commanditaire ${k + 1}, marchand d'huile`, details: `Les détails de la mission ${k + 1}. Une deuxième phrase.`, objectif: `Objectif ${k + 1}.`,
@@ -360,15 +362,23 @@ await G((E) => {
   window.NIVEAU_GROUPE = 3;
 }, ENCARTS);
 const tableau = () => G(() => window.__docs["Systeme_Parties/P1/Guilde/Tableau"] || null);
+// (v452) la difficulté d'une mission et son décalage caché, cohérents
+const decalageOk = (x) => (x.Difficulte === "normale" && [-1, 0, 1].includes(x.Decalage)) || (x.Difficulte === "difficile" && [2, 3, 4].includes(x.Decalage));
 
-titre("1. LES RANGS : SIX MISSIONS, UNE A (DEUX AU PLUS), UN PEU PLUS DE C QUE DE B");
+// (v452) Nico : « on enlève les Rang A, B et C : des missions normales ou difficiles (deux au plus) ; les monstres
+// par rapport au niveau du groupe : normale −1 / 0 / +1, difficile +2 / +3 / +4, tirés au hasard pour chaque mission. »
+titre("1. LES DIFFICULTÉS : SIX MISSIONS, DE 0 À 2 DIFFICILES ; LEUR DÉCALAGE CACHÉ, TIRÉ AU HASARD");
 await section(async () => {
-  const r = await G(() => { const t = { n: 0, six: true, a12: true, unB: true, C: 0, B: 0, A: 0, deuxA: 0 };
-    for (let i = 0; i < 2000; i++) { const x = window.MISSIONS_GUILDE.tirerRangs(); const c = (k) => x.filter(v => v === k).length;
-      t.six = t.six && x.length === 6; t.a12 = t.a12 && c("A") >= 1 && c("A") <= 2; t.unB = t.unB && c("B") >= 1; t.C += c("C"); t.B += c("B"); t.A += c("A"); if (c("A") === 2) t.deuxA++; }
-    return t; });
-  verifier("toujours six missions ; une A, deux au plus ; au moins une B", r.six && r.a12 && r.unB, JSON.stringify(r));
-  verifier("…un peu plus de C que de B ; deux A seulement de temps en temps", r.C > r.B * 1.1 && r.deuxA > 200 && r.deuxA < 800, JSON.stringify(r));
+  const r = await G(() => { const t = { six: true, max2: true, parNb: [0, 0, 0], normale: new Set(), difficile: new Set(), autre: false };
+    for (let i = 0; i < 2000; i++) { const x = window.MISSIONS_GUILDE.tirerDifficultes(); const nd = x.filter(v => v === "difficile").length;
+      t.six = t.six && x.length === 6 && x.every(v => v === "normale" || v === "difficile"); t.max2 = t.max2 && nd <= 2; t.parNb[nd]++; }
+    for (let i = 0; i < 300; i++) { ["normale", "difficile"].forEach(d => t[d].add(window.MISSIONS_GUILDE.tirerDecalage(d))); }
+    return { ...t, normale: [...t.normale].sort(), difficile: [...t.difficile].sort() }; });
+  verifier("(v452) toujours six missions, normales ou difficiles ; deux difficiles au plus (0, 1 ou 2, au hasard)", r.six && r.max2 && r.parNb.every(n => n > 400), JSON.stringify(r.parNb));
+  verifier("(v452) le décalage des créatures : normale −1 / 0 / +1, difficile +2 / +3 / +4", JSON.stringify(r.normale) === "[-1,0,1]" && JSON.stringify(r.difficile) === "[2,3,4]", JSON.stringify([r.normale, r.difficile]));
+  const anc = await G(() => { const M = window.MISSIONS_GUILDE; return { c: M.difficulteDe({ Rang: "C" }), b: M.difficulteDe({ Rang: "B" }), a: M.difficulteDe({ Rang: "A" }),
+    fixe: M.decalageDe({ Id: "M_X", Rang: "A" }) === M.decalageDe({ Id: "M_X", Rang: "A" }), dans: [2, 3, 4].includes(M.decalageDe({ Id: "M_X", Rang: "A" })) && [-1, 0, 1].includes(M.decalageDe({ Id: "M_Y", Rang: "C" })) }; });
+  verifier("(v452) une mission d'avant (à rang) : C normale, B et A difficiles ; son décalage, toujours le même", anc.c === "normale" && anc.b === "difficile" && anc.a === "difficile" && anc.fixe && anc.dans, JSON.stringify(anc));
 });
 
 titre("2. LA PARTIE CHARGÉE, LE TABLEAU VIDE : MIA_MISSIONS ÉCRIT LES SIX MISSIONS");
@@ -377,11 +387,11 @@ await section(async () => {
   const t = await tableau(), sys = appelsMissions[0] || "";
   verifier("une seule IA appelée", appelsMissions.length === 1, String(appelsMissions.length));
   verifier("le jour de leur arrivée (an 3, jour 12 : 3 × 365 + 12), le verrou levé", t.Jour_Absolu === 3 * 365 + 12 && !t.Generation_En_Cours, JSON.stringify([t.Jour_Absolu, t.Generation_En_Cours]));
-  verifier("le prompt : les trois rangs, les régions, les lieux existants (Eraldur à part), le niveau du groupe", /Rang C : le rang le plus faible/.test(sys) && /Rang A : les missions les plus dures/.test(sys)
+  verifier("le prompt : les deux difficultés (jamais écrites dans les textes), les régions, les lieux existants (Eraldur à part), le niveau du groupe", /- normale : des missions à la portée du groupe/.test(sys) && /- difficile : des missions dures/.test(sys) && /N'écris jamais la difficulté/.test(sys) && !/Rang [ABC]/.test(sys)
            && /Région 5/.test(sys) && /L_KESH : Kesh/.test(sys) && /Eraldur, le village de la guilde : pas de mission dedans/.test(sys) && /niveau 3/.test(sys), sys.slice(0, 120));
   const m = t.Missions;
-  verifier("chaque mission : rang, titre, résumé, région, commanditaire, détails, objectif, le mot du commanditaire", m.every(x => x.Id && /^[ABC]$/.test(x.Rang) && x.Titre && x.Resume && x.Region && x.Commanditaire && x.Details && x.Objectif && /Je vous écris/.test(x.Lettre)), JSON.stringify(m[0]).slice(0, 200));
-  verifier("les rangs suivent le tirage (une A au moins)", m.filter(x => x.Rang === "A").length >= 1 && m.every((x, k) => x.Titre.includes(`(${x.Rang})`)), JSON.stringify(m.map(x => x.Rang)));
+  verifier("chaque mission : difficulté et décalage caché, titre, résumé, région, commanditaire, détails, objectif, le mot du commanditaire", m.every(x => x.Id && !x.Rang && decalageOk(x) && x.Titre && x.Resume && x.Region && x.Commanditaire && x.Details && x.Objectif && /Je vous écris/.test(x.Lettre)), JSON.stringify(m[0]).slice(0, 200));
+  verifier("les difficultés suivent le tirage (deux difficiles au plus)", m.filter(x => x.Difficulte === "difficile").length <= 2 && m.every(x => x.Titre.includes(`(${x.Difficulte})`)), JSON.stringify(m.map(x => [x.Difficulte, x.Decalage])));
   verifier("un lieu existant est repris (Kesh : son identifiant, sa région)", m[0].Lieu.Id === "L_KESH" && m[0].Lieu.Nom === "Kesh" && m[0].Region === 5, JSON.stringify(m[0].Lieu));
   verifier("…un identifiant inconnu devient un nouveau lieu ; une région inconnue (99) est corrigée", m[1].Lieu.Id === null && m[1].Lieu.Nom === "La grotte des Murmures" && m[2].Region !== 99, JSON.stringify([m[1].Lieu, m[2].Region]));
   verifier("six écritures à la main, toutes différentes", new Set(m.map(x => x.Ecriture)).size === 6 && m.every(x => ["Caveat", "Dancing Script", "Kalam", "Homemade Apple", "Indie Flower", "Satisfy"].includes(x.Ecriture)), JSON.stringify(m.map(x => x.Ecriture)));
@@ -405,19 +415,22 @@ await section(async () => {
   verifier("30 jours : les six missions sont remplacées en base", appelsMissions.length === 2 && t.Missions.length === 6 && t.Missions.every(x => /tirage 2/.test(x.Titre)) && t.Jour_Absolu === 3 * 365 + 42, JSON.stringify([appelsMissions.length, t.Jour_Absolu, t.Missions[0].Titre]));
 });
 
-titre("4. LES ENCARTS : LE RANG, LE SÉPARATEUR, LE TITRE, LE RÉSUMÉ ; À LA MAIN ; PENCHÉS COMME L'ENCART");
+titre("4. LES ENCARTS : LE TITRE, LE SÉPARATEUR, LE RÉSUMÉ (PLUS DE RANG) ; LE SCEAU D'UNE DIFFICILE ; À LA MAIN ; PENCHÉS");
 await section(async () => {
+  // (v452) une difficile et une normale connues, pour les voir
+  await G(() => { const t = window.__docs["Systeme_Parties/P1/Guilde/Tableau"]; t.Missions[0].Difficulte = "difficile"; t.Missions[0].Decalage = 3; t.Missions[1].Difficulte = "normale"; t.Missions[1].Decalage = 0; return window.MISSIONS_GUILDE.relireTableau(); });
   await G(() => window.GRIMOIRE.allerAuVillage()); await attendreQue(surVillage, 8000); await pose();
   await cliquer("#lieu-village-hall"); await attendreQue(surHall, 8000); await pose();
   await cliquer("#guilde-missions"); await attendreQue(() => surPiece("missions"), 8000); await pose();
   await attendreQue(() => G(() => document.querySelectorAll(".page-tableau-missions.gauche .encart-tableau.avec-mission").length === 6), 6000);
   const r = await G(() => { const t = window.__docs["Systeme_Parties/P1/Guilde/Tableau"].Missions;
     return [...document.querySelectorAll(".page-tableau-missions.gauche .encart-tableau")].map((e, k) => { const m = e.querySelector(".mission-encart");
-      return { rang: (e.querySelector(".rang-mission") || {}).textContent, sep: !!e.querySelector("svg.separateur-mission"), titre: (e.querySelector(".titre-mission") || {}).textContent,
+      return { rang: (e.querySelector(".rang-mission") || {}).textContent, sceau: !!e.querySelector("img.sceau-difficile-encart[src*='IMG_2294_ghiayl']"), difficile: t[k].Difficulte === "difficile", sep: !!e.querySelector("svg.separateur-mission"), titre: (e.querySelector(".titre-mission") || {}).textContent,
                resume: (e.querySelector(".resume-mission") || {}).textContent, police: m ? getComputedStyle(m).fontFamily : "", attendu: t[k].Titre, angle: e.style.transform, doigt: getComputedStyle(e).pointerEvents,
                ordre: m ? [...(m.querySelector(".texte-mission-encart") || m).children].map(c => c.className.baseVal !== undefined ? c.className.baseVal : c.className) : [] }; }); });
   verifier("six encarts écrits, chacun avec sa mission (dans l'ordre des encarts)", r.length === 6 && r.every(x => x.titre === x.attendu), JSON.stringify(r.map(x => x.titre)).slice(0, 200));
-  verifier("…en haut le rang, dessous un petit séparateur dessiné, puis le titre, puis le résumé", r.every(x => /^Rang [ABC]$/.test(x.rang) && x.sep && x.resume && JSON.stringify(x.ordre) === JSON.stringify(["rang-mission rang-" + x.rang.slice(-1), "separateur-mission", "titre-mission", "resume-mission"])), JSON.stringify(r[0]));
+  verifier("(v452) …plus de rang : le titre, un petit séparateur dessiné, le résumé", r.every(x => x.rang === undefined && x.sep && x.resume && JSON.stringify(x.ordre.slice(0, 3)) === JSON.stringify(["titre-mission", "separateur-mission", "resume-mission"])), JSON.stringify(r[0]));
+  verifier("(v452) …une mission difficile : le sceau en petit sous le texte ; une normale, rien", r[0].difficile && r[0].sceau && r[0].ordre[3] === "sceau-difficile sceau-difficile-encart" && !r[1].sceau && r.every(x => x.sceau === x.difficile), JSON.stringify(r.map(x => [x.difficile, x.sceau])));
   verifier("…six écritures différentes, à la main", new Set(r.map(x => x.police.split(",")[0])).size === 6, JSON.stringify(r.map(x => x.police.split(",")[0])));
   verifier("…le texte penche avec son encart (il est dedans, l'encart tourné)", r.every(x => /rotate\(/.test(x.angle)) && r[0].angle === "rotate(-6deg)", JSON.stringify(r.map(x => x.angle)));
   verifier("…et l'encart se touche", r.every(x => x.doigt === "auto"));
@@ -438,6 +451,10 @@ await section(async () => {
   verifier("…une page de parchemin (la texture des pages du livre), en haut à 5 % ; son bas caché sous le bord de l'écran", f.fond.includes("images/grimoire/page.webp") && Math.abs(f.haut - 0.05) < 0.01 && f.bas > 10, JSON.stringify([f.haut, f.bas]));
   verifier("…la région, le lieu, le commanditaire, la mission, l'objectif, le mot du commanditaire", /Région\s*La région|Région/.test(f.texte) && /Kesh/.test(f.texte) && /Commanditaire 1, marchand d'huile/.test(f.texte) && /Les détails de la mission 1/.test(f.texte) && /Objectif 1\./.test(f.texte) && /Je vous écris, braves gens/.test(f.texte), f.texte.slice(0, 260));
   verifier("…en bas, le sceau « Accepter la mission », visible", f.sceau === "Accepter la mission|Accepter la mission" && f.sceauVu, JSON.stringify([f.sceau, f.sceauVu]));
+  // (v452) La mission difficile (l'encart 1) : le sceau au dragon en petit sous le texte ; plus de rang.
+  const sd = await G(() => { const fe = document.querySelector("#feuille-mission .feuille-mission"), img = fe.querySelector("img.sceau-difficile-feuille");
+    return { img: !!img && /IMG_2294_ghiayl/.test(img.src), apresLettre: !!img && img.previousElementSibling && img.previousElementSibling.classList.contains("lettre-mission"), rang: /Rang [ABC]/.test(fe.textContent), largeur: img ? Math.round(img.getBoundingClientRect().width) : 0 }; });
+  verifier("(v452) …mission difficile : le sceau en petit sous le texte de la feuille ; plus de rang", sd.img && sd.apresLettre && !sd.rang && sd.largeur > 20 && sd.largeur < 120, JSON.stringify(sd));
   // (v445) « Refais le dessin du sceau : un sceau de cire réaliste. »
   const sc = await G(() => { const b = document.querySelector("#feuille-mission .sceau-mission"), svg = b.querySelector("svg.dessin-sceau");
     return svg ? { cire: b.querySelector(".cire-sceau").getAttribute("fill"), relief: !!svg.querySelector("filter feSpecularLighting") && !!svg.querySelector("filter feTurbulence"),

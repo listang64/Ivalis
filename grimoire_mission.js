@@ -19,7 +19,6 @@ const M = () => window.MISSIONS_GUILDE;
 const echapper = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const son = () => { try { if (typeof window.jouerSonClic === "function") window.jouerSonClic(); } catch (e) {} };
 const FLEURON = `<svg class="fleuron fleuron-mission" viewBox="0 0 200 24" aria-hidden="true"><path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>`;
-const NOMS_RANGS = { A: "Rang A", B: "Rang B", C: "Rang C" };
 // (v450) « Le bouton voter pour abandonner, dans le même design que le reste du livre » : le cadre
 // tracé à la plume et le lavis d'aquarelle (le procédé de « + Un nouvel aventurier » et de « Forger »).
 const DESSINS = () => (window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.dessins) || {};
@@ -63,7 +62,9 @@ function htmlGauche(d) {
     if (!d || !d.Mission) return `<div class="contenu-page page-mission-vide"><div class="titre-mission-en-cours">Mission en cours</div>${FLEURON}
         <p class="aucune-mission">Aucune mission en cours.</p>
         <p class="aide-mission">Le panneau des missions, au Hall de guilde d'Eraldur, en propose.</p></div>`;
-    const m = d.Mission, av = d.Avancement || {}, journal = liste(av.Journal), indices = liste(av.Indices);
+    // (v452) Nico : « vire les indices et leurs créations dans la page de mission en cours » : plus de liste
+    // d'indices (le Narrateur garde ceux de son plan, pour lui seul).
+    const m = d.Mission, av = d.Avancement || {}, journal = liste(av.Journal);
     const v = d.Vote_Abandon, moi = M() ? M().idJoueur() : "";
     const oui = v ? liste(v.Votants).filter(x => (v.Votes || {})[x.id] === "oui").length : 0;
     const abandon = !v
@@ -72,8 +73,8 @@ function htmlGauche(d) {
             <div class="boutons-abandon">${(v.Votes || {})[moi] === "oui" ? `<p class="discret">En attente des autres joueurs.</p>` : boutonLivre("abandon-oui", "J'accepte", TEINTE_ABANDON, "abandon-accepte-" + m.Id)}
             ${boutonLivre("abandon-non", "Non, on continue", TEINTE_CONTINUER, "abandon-continue-" + m.Id)}</div></div>`;
     return `<div class="contenu-page page-mission-infos defile-fiche">
-        <div class="rang-mission-en-cours rang-${echapper(m.Rang)}">${echapper(NOMS_RANGS[m.Rang] || m.Rang)}</div>
         <div class="titre-mission-en-cours">${echapper(m.Titre)}</div>
+        ${M() && M().difficulteDe(m) === "difficile" ? M().htmlSceauDifficile("sceau-difficile-page") : ""}
         ${FLEURON}
         <dl class="faits-mission-en-cours">
           <div><dt>Commanditaire</dt><dd>${echapper(m.Commanditaire)}</dd></div>
@@ -82,7 +83,6 @@ function htmlGauche(d) {
         </dl>
         <div class="sous-titre-mission">L'objectif</div><p class="objectif-en-cours">${echapper(m.Objectif)}</p>
         <div class="sous-titre-mission">Ce qu'on en sait</div><p>${echapper(m.Details)}</p>
-        ${indices.length ? `<div class="sous-titre-mission">Les indices</div><ul class="indices-mission">${indices.map(x => `<li>${echapper(x)}</li>`).join("")}</ul>` : ""}
         ${journal.length ? `<div class="sous-titre-mission">Ce qui s'est passé</div><ul class="journal-mission">${journal.slice(-8).map(x => `<li>${echapper(x.Texte)}</li>`).join("")}</ul>` : ""}
         <div class="abandon-mission">${abandon}</div>
       </div>`;

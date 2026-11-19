@@ -13,8 +13,6 @@
 .contenu-feuille-mission { position: absolute; inset: 0 0 5vh 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
   padding: 7vh 11% 4vh; box-sizing: border-box; color: #2b1a0e; font-family: 'IM Fell English', 'Almendra', serif; font-size: clamp(15px, 2.1vh, 19px); line-height: 1.42;
   display: flex; flex-direction: column; align-items: stretch; }
-.rang-feuille { align-self: center; font-family: 'Cinzel', serif; font-weight: 700; letter-spacing: 0.12em; font-size: 1.05em; color: #5c3a12; }
-.rang-feuille.rang-A { color: #8f1d15; } .rang-feuille.rang-C { color: #2f4a22; }
 .titre-feuille { margin: 0.2em 0 0; text-align: center; font-weight: 400; font-size: 2em; line-height: 1.1; color: #24150a;
   font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; }
 .feuille-mission .separateur-mission { align-self: center; width: 40%; height: 12px; margin: 0.6em 0 0.9em; }
@@ -30,6 +28,9 @@
 .lettre-mission, .lettre-mission * { font-family: var(--ecriture, 'Caveat'), 'Almendra', cursive !important; }
 .lettre-mission { font-size: 1.22em; line-height: 1.32; color: #2a1608; padding: 0.2em 0.4em; }
 .lettre-mission p { text-align: left; }
+/* (v452) Le sceau des missions difficiles, en petit sous le texte de la feuille. */
+.sceau-difficile-feuille { display: block; align-self: center; flex: none; width: 4.2em; height: auto; aspect-ratio: 1; margin: 0.8em 0 0; -webkit-user-drag: none; user-select: none;
+  filter: drop-shadow(0 0.1em 0.12em rgba(40, 10, 4, 0.45)); }
 /* LE SCEAU (v445) : un cachet de cire dessiné (missions_guilde.js, SCEAU_CIRE) ; son ombre portée sur la feuille. */
 .sceau-mission { position: relative; align-self: center; flex: none; margin: 1.2em 0 0.6em; width: 10.5em; height: 10.5em; border: 0; padding: 0; cursor: pointer;
   background: none; border-radius: 50%; transition: transform 0.2s ease; -webkit-tap-highlight-color: transparent; }
