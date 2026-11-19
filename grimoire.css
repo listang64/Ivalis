@@ -468,6 +468,8 @@ body > #conteneur-parametres { z-index: 95; }
   filter: drop-shadow(0 calc(var(--u) * 0.15) 0 rgba(0, 0, 0, 0.55)); }
 #grimoire-marque-menu .dessin-marque path, #grimoire-marque-page .dessin-marque path, #grimoire-marque-recit .dessin-marque path, #grimoire-marque-mission .dessin-marque path { stroke: var(--fil) !important; }
 #grimoire-marque-mission .dessin-marque .feuille { fill: rgba(233, 207, 142, 0.22) !important; }
+/* (v449) « Réduis un peu la taille du logo dans le marque-page mission » : 72 % de la largeur (88 % avant), centré. */
+#grimoire-marque-mission .dessin-marque { left: 14%; top: 14%; width: 72%; }
 #grimoire-marque-page .dessin-marque .feuille, #grimoire-marque-recit .dessin-marque path.plein { fill: rgba(233, 207, 142, 0.22) !important; }
 
 /* =========================================================================

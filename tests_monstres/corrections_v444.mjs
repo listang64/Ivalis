@@ -395,6 +395,9 @@ await section(async () => {
     return { inactif: m.classList.contains("inactif"), tissu: cs.getPropertyValue("--tissu").trim(), rouleau: !!m.querySelector("svg.dessin-rouleau"), aDroite: a.left > b.right - 4 && a.left - b.right < 60, haut: Math.abs(a.top - b.top) < 40 }; });
   verifier("en partie, il est là, actif, en tissu ambre, brodé d'un parchemin roulé", r && !r.inactif && r.tissu === "#7a4a12" && r.rouleau, JSON.stringify(r));
   verifier("…juste à droite du marque-page du récit", r && r.aDroite && r.haut, JSON.stringify(r));
+  // (v449) « Réduis un peu la taille du logo dans le marque-page mission. »
+  const lg = await G(() => { const m = document.getElementById("grimoire-marque-mission"), d = m.querySelector(".dessin-rouleau").getBoundingClientRect(), b = m.getBoundingClientRect(); return { part: +(d.width / b.width).toFixed(2), centre: Math.abs((d.left + d.right) / 2 - (b.left + b.right) / 2) < 3 }; });
+  verifier("(v449) le parchemin brodé, plus petit (72 % du ruban, 88 % avant), centré", lg.part > 0.58 && lg.part < 0.74 && lg.centre, JSON.stringify(lg));
   // (sous les pages comme les autres, il dépasse en haut ; il se touche, sans battre comme le « ? » de la carte)
   const z = await G(() => { const m = document.getElementById("grimoire-marque-mission"), b = m.getBoundingClientRect(), e = document.elementFromPoint(b.left + b.width / 2, b.bottom - 8), cs = getComputedStyle(m);
     return { sous: e ? (e.closest("#grimoire-marque-mission") ? "ruban" : "page") : "", doigt: cs.pointerEvents, anim: cs.animationName }; });

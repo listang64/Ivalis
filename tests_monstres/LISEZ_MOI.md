@@ -12308,3 +12308,9 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - **La fiche** (Nico : « mettre les missions réussies en dessous de l'encart Blessures, à droite, centrées, en noir ») : « Missions réussies : – 1 Rang A… » quitte la page de l'avatar pour la page de droite, sous l'encart Blessures, centré, à l'encre noire (l'écriture des titres).
 - **Forcer le vote** (« en mode DEV, un bouton pour forcer le vote de mission sur le parchemin ») : en DEV, la feuille d'une mission porte « Forcer le vote (DEV) » ; un toucher et tous les votants disent oui, la mission est acceptée (voterMission, options.forcer — refusé hors DEV).
 - corrections_v444.mjs le vérifie (ses contrôles « v448 »).
+
+## v449 — Une ombre sous le fanion des clans ; le logo du marque-page mission plus petit
+
+- **Le fanion** (Nico : « sous l'image des bannières de clans, un effet d'ombrage sympa ») : le fanion décolle de la page. Son ombre portée tombe en bas à droite, une flaque d'ombre ovale s'étale sous sa pointe et une lueur dorée le détache du fond sombre (grimoire_fiches.css, .cadre-banniere-clan).
+- **Le marque-page mission** (« réduis un peu la taille du logo ») : le parchemin brodé occupe 72 % de la largeur du ruban (88 % avant), toujours centré (grimoire.css).
+- corrections_v434.mjs et corrections_v444.mjs le vérifient (leurs contrôles « v449 »).

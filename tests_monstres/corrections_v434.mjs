@@ -548,6 +548,10 @@ await section(async () => {
   verifier("(v446) …voilée à gauche sous la liste, entière à droite ; toute l'image à 90 % d'opacité", /rgba\(0, 0, 0, 0\.07\) 0%/.test(fc[0].voile) && /rgb\(0, 0, 0\) 88%/.test(fc[1].voile) && fc[0].opacite === "0.9" && fc[1].opacite === "0.9", JSON.stringify(fc.map(x => [x.opacite, x.voile.slice(0, 50)])));
   const or = await G(() => { const n = document.querySelector("#grimoire-fiches-clan-banniere-0 .nom-clan"), cs = getComputedStyle(n); return { fond: cs.backgroundImage, remplissage: cs.webkitTextFillColor, clip: cs.webkitBackgroundClip || cs.backgroundClip }; });
   verifier("(v446) le nom du clan en doré", /linear-gradient/.test(or.fond) && /240, 207, 99|f0cf63/i.test(or.fond) && or.clip === "text" && /rgba\(0, 0, 0, 0\)|transparent/.test(or.remplissage), JSON.stringify(or));
+  // (v449) « Sous l'image des bannières de clans, un effet d'ombrage sympa. »
+  const om = await G(() => { const f = document.querySelector("#grimoire-fiches-clan-banniere-0 .cadre-banniere-clan"), i = f.querySelector("img"), a = getComputedStyle(f, "::after"), fb = f.getBoundingClientRect();
+    return { filtre: getComputedStyle(i).filter, flaque: a.content !== "none" && /radial-gradient/.test(a.backgroundImage), sous: parseFloat(a.top) + parseFloat(a.height) > fb.height, lueur: /radial-gradient/.test(getComputedStyle(f, "::before").backgroundImage) }; });
+  verifier("(v449) sous le fanion, une ombre : portée en bas à droite, une flaque d'ombre sous sa pointe, une lueur dorée qui le détache", (om.filtre.match(/drop-shadow/g) || []).length >= 3 && /rgba\(0, 0, 0, 0\.8\)/.test(om.filtre) && om.flaque && om.sous && om.lueur, JSON.stringify(om).slice(0, 200));
   await p.waitForTimeout(400);
   await cap("v434-clan");
 });
