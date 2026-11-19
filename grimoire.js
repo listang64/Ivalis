@@ -87,7 +87,11 @@
     // v301 : au-dessus des pages sortent aussi le marque-page où l'on écrit, la
     // bande du portrait et les notes des dés (grimoire_recit.css) : jusqu'à
     // 175 unités au-dessus de l'image du livre. La place leur est gardée.
-    const HAUT_DES_MARQUES = 175;
+    // (v450) Nico : « sur PC, le post-it qui demande d'accepter la mission sort complètement du livre,
+    // hors écran en haut ; pareil pour celui des voyages — quitte à réduire un peu la taille du
+    // livre ». Les post-its montent jusqu'à 300 unités : 260 leur sont gardées (le livre perd un peu
+    // sur un écran large) et ils ne montent jamais plus haut que la place qui reste (--place-haut).
+    const HAUT_DES_MARQUES = 260;
     // LE SOMMAIRE (v299, l'index ; v312 : Nico, « Index renommé Sommaire ; devant
     // chaque titre le numéro en chiffres romains ; dans cet ordre : Aventuriers
     // (qui remplace Fiches persos), Carte du monde, Le village, Les combats, Le
@@ -567,6 +571,7 @@
         if (ombre) Object.assign(ombre.style, { left: (ZONE.x + PAGE.w) * m.s + "px", top: ZONE.y * m.s + "px", height: PAGE.h * m.s + "px" });
         scene.style.setProperty("--s", String(m.s));
         scene.style.setProperty("--marge-gauche", m.gauche + "px");   // (v306) la place à gauche du livre ouvert
+        scene.style.setProperty("--place-haut", Math.max(0, m.haut) + "px");   // (v450) la place au-dessus du livre
         livre.style.left = ZONE.x * m.s + "px";
         livre.style.top = ZONE.y * m.s + "px";
         livre.style.width = ZONE.w * m.s + "px";

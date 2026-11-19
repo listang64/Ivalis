@@ -400,6 +400,14 @@ await section(async () => {
   const pi = await postit();
   verifier("le post-it : « Ben, Thorin… propose une mission », « Voir la mission »", pi && pi.sorti && /propose une mission/.test(pi.texte) && pi.voir, JSON.stringify(pi));
   await cap("v443-postit");
+  // (v450) « Sur PC le post-it sort complètement du livre, hors écran en haut : l'écran PC est moins haut
+  // que celui d'un iPad — quitte à réduire un peu le livre. » En 1920 × 1080 (et 1366 × 768), il tient à l'écran.
+  for (const [w, h] of [[1920, 1080], [1366, 768]]) {
+    await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(900);
+    const pc = await G(() => { const r = document.querySelector("#postit-mission .papier-ecriture").getBoundingClientRect(); return { haut: Math.round(r.top), bas: Math.round(r.bottom), visible: document.getElementById("postit-mission").classList.contains("sortie") }; });
+    verifier(`(v450) en ${w} × ${h}, le post-it du vote tient à l'écran (son haut sous le bord)`, pc.visible && pc.haut >= 0 && pc.bas > pc.haut + 50, JSON.stringify(pc));
+  }
+  await p.setViewportSize({ width: 1194, height: 834 }); await p.waitForTimeout(900);
   await cliquer('#postit-mission [data-mission="voir"]'); await p.waitForTimeout(800);
   const f = await feuille();
   verifier("le lien : la feuille de la mission glisse du bas, le sceau allumé, « Refuser » dessous", f.ouverte && f.slot === 0 && !f.sceauEteint && f.refuser, JSON.stringify(f));
@@ -441,6 +449,10 @@ await section(async () => {
   const mq = await G(() => { const el = [...document.querySelectorAll(".marque-mission-carte")].find(e => e.getBoundingClientRect().width > 0); const k = [...document.querySelectorAll('.village-region[data-id="L_KESH"]')].find(e => e.getBoundingClientRect().width > 0);
     if (!el || !k) return null; const a = el.getBoundingClientRect(), b = k.getBoundingClientRect(); return { dx: Math.abs((a.left + a.width / 2) - (b.left + b.width / 2)), dy: Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)), w: a.width, svg: !!el.querySelector("svg text") }; });
   verifier("sur la carte de la région 5 : un « ? » doré posé sur Kesh, le lieu de la mission", mq && mq.dx < 2 && mq.dy < 2 && mq.w > 5 && mq.svg, JSON.stringify(mq));
+  // (v450) « Dans le même style que le point d'exclamation des POI, et ne le fais pas bouger. »
+  const st = await G(() => { const el = [...document.querySelectorAll(".marque-mission-carte")].find(e => e.getBoundingClientRect().width > 0), t = el && el.querySelector("text");
+    return el && { anim: getComputedStyle(el).animationName, rond: !!el.querySelector("circle"), degrade: !!el.querySelector("linearGradient stop[stop-color='#f7d35a']"), police: t && getComputedStyle(t).fontFamily, signe: t && t.textContent }; });
+  verifier("(v450) …le style du « ! » des POI (le signe seul, Cinzel, l'or en dégradé), et il ne bouge pas", st && st.anim === "none" && !st.rond && st.degrade && /Cinzel/.test(st.police) && st.signe === "?", JSON.stringify(st));
   await cap("v443-carte");
 });
 

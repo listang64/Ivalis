@@ -12314,3 +12314,12 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - **Le fanion** (Nico : « sous l'image des bannières de clans, un effet d'ombrage sympa ») : le fanion décolle de la page. Son ombre portée tombe en bas à droite, une flaque d'ombre ovale s'étale sous sa pointe et une lueur dorée le détache du fond sombre (grimoire_fiches.css, .cadre-banniere-clan).
 - **Le marque-page mission** (« réduis un peu la taille du logo ») : le parchemin brodé occupe 72 % de la largeur du ruban (88 % avant), toujours centré (grimoire.css).
 - corrections_v434.mjs et corrections_v444.mjs le vérifient (leurs contrôles « v449 »).
+
+## v450 — Les post-its tiennent à l'écran sur PC ; le fanion sans halo ; l'abandon, la marque de mission, l'image d'un POI
+
+- **Les post-its sur PC** (Nico : « sur PC le post-it qui demande d'accepter la mission sort complètement du livre, hors écran en haut, pareil pour celui des voyages — quitte à réduire un peu la taille du livre ») : le livre garde 260 unités de place au-dessus de lui (175 avant). Sur un écran large, il perd donc un peu de taille ; sur iPad, rien ne change. Les post-its (vote de mission, voyage) ne montent jamais plus haut que la place qui reste (--place-haut, grimoire.js) : ils descendent un peu sur les pages plutôt que de sortir de l'écran.
+- **Le fanion des clans** (« enlève le halo doré, garde juste l'ombre portée ») : ni liseré doré, ni lueur derrière ; restent l'ombre portée et la flaque d'ombre sous la pointe.
+- **L'abandon d'une mission** (« dans le même design que le reste du livre ») : « Voter pour abandonner la mission », « J'accepte » et « Non, on continue » deviennent des boutons du livre, avec un cadre à la plume et un lavis d'aquarelle (grimoire_mission.js, boutonLivre).
+- **Le « ? » du lieu de mission** (« dans le même style que le point d'exclamation des POI, et ne le fais pas bouger ») : le signe seul, en Cinzel, l'or en dégradé, cerné de brun, avec l'ombre et la lueur du « ! » ; plus de rond derrière, plus de battement (villages_regionaux.js).
+- **L'image d'un POI dans le récit** (« je suis allé voir un POI et ça ne m'a pas mis l'image du lieu dans le RP ») : le lieu naît à peine quand le groupe y arrive, et son image se fait encore. Dès qu'elle est prête, elle rejoint le message d'arrivée du Destin, et le livre la pose en double page, comme à l'arrivée dans un lieu (voyage_groupe.js, illustrerArriveePoi).
+- corrections_v281, v434, v443 et v444 le vérifient (leurs contrôles « v450 »).

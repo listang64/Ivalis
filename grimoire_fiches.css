@@ -34,15 +34,12 @@
 .page-fiches .page-banniere-du-clan { align-items: center; justify-content: flex-start; padding-top: 0 !important; padding-bottom: calc(var(--u) * 3) !important; }
 .cadre-banniere-clan { position: relative; width: 80%; height: 76%; flex: none; min-height: 0; display: flex; align-items: flex-start; justify-content: center; }
 /* (v449) « Sous l'image des bannières, un effet d'ombrage sympa » : le fanion décolle un peu de la page
-   (son ombre portée, plus large et douce, tombe en bas à droite ; un liseré doré le détache du fond
-   sombre) et, sous sa pointe, une flaque d'ombre ovale. */
+   (son ombre portée, plus large et douce, tombe en bas à droite) et, sous sa pointe, une flaque d'ombre
+   ovale. (v450) « Enlève le halo doré, garde juste l'ombre portée. » */
 .cadre-banniere-clan img { position: relative; z-index: 1; max-width: 100%; height: 100%; object-fit: contain; object-position: center top; -webkit-user-drag: none; user-select: none;
-  filter: drop-shadow(0 0 calc(var(--u) * 0.45) rgba(255, 214, 130, 0.55))
-          drop-shadow(calc(var(--u) * 0.8) calc(var(--u) * 1.6) calc(var(--u) * 0.9) rgba(0, 0, 0, 0.8))
+  filter: drop-shadow(calc(var(--u) * 0.8) calc(var(--u) * 1.6) calc(var(--u) * 0.9) rgba(0, 0, 0, 0.8))
           drop-shadow(calc(var(--u) * 2.2) calc(var(--u) * 4.5) calc(var(--u) * 3) rgba(0, 0, 0, 0.6)); }
-/* Derrière le fanion, une lueur chaude qui le fait ressortir ; sous sa pointe, la flaque d'ombre. */
-.cadre-banniere-clan:not(.vide)::before { content: ""; position: absolute; left: -6%; right: -6%; top: 4%; bottom: -4%; pointer-events: none;
-  background: radial-gradient(ellipse 50% 52% at 50% 48%, rgba(255, 214, 140, 0.34) 0%, rgba(255, 200, 120, 0.12) 55%, rgba(255, 200, 120, 0) 100%); }
+/* Sous sa pointe, la flaque d'ombre. */
 .cadre-banniere-clan:not(.vide)::after { content: ""; position: absolute; left: 6%; right: 6%; top: calc(100% - var(--u) * 2); height: calc(var(--u) * 7); pointer-events: none;
   background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.6) 35%, rgba(0, 0, 0, 0) 70%); filter: blur(calc(var(--u) * 0.6)); }
 .cadre-banniere-clan.vide { width: 56%; height: 68%; border: calc(var(--u) * 0.35) dashed rgba(58, 34, 16, 0.22); border-top: 0; border-radius: 0 0 calc(var(--u) * 2) calc(var(--u) * 2); }

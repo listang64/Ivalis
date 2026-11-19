@@ -20,6 +20,15 @@ const echapper = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "
 const son = () => { try { if (typeof window.jouerSonClic === "function") window.jouerSonClic(); } catch (e) {} };
 const FLEURON = `<svg class="fleuron fleuron-mission" viewBox="0 0 200 24" aria-hidden="true"><path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>`;
 const NOMS_RANGS = { A: "Rang A", B: "Rang B", C: "Rang C" };
+// (v450) « Le bouton voter pour abandonner, dans le même design que le reste du livre » : le cadre
+// tracé à la plume et le lavis d'aquarelle (le procédé de « + Un nouvel aventurier » et de « Forger »).
+const DESSINS = () => (window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.dessins) || {};
+const TEINTE_ABANDON = { couleurs: ["#a3352a", "#c25a3a", "#7d2218"], opacite: 0.42, nom: "abandon" };
+const TEINTE_CONTINUER = { couleurs: ["#6f6c66", "#8d8981", "#5b5852"], opacite: 0.26, nom: "continuer" };
+function boutonLivre(action, texte, teinte, graine) {
+    const d = DESSINS(), cadre = d.cadre ? d.cadre(graine, 1.4) : (G() && G().dessins ? G().dessins.cadreMain(graine, 1.4) : "");
+    return `<button type="button" class="bouton-mission" data-mi="${action}">${d.lavis ? d.lavis(teinte, graine) : ""}${cadre}<span>${echapper(texte)}</span></button>`;
+}
 
 let pages = null;
 function creer() {
@@ -58,10 +67,10 @@ function htmlGauche(d) {
     const v = d.Vote_Abandon, moi = M() ? M().idJoueur() : "";
     const oui = v ? liste(v.Votants).filter(x => (v.Votes || {})[x.id] === "oui").length : 0;
     const abandon = !v
-        ? `<button type="button" class="lien-fiche bouton-abandon" data-mi="abandon-oui">Voter pour abandonner la mission</button>`
+        ? boutonLivre("abandon-oui", "Voter pour abandonner la mission", TEINTE_ABANDON, "abandon-" + m.Id)
         : `<div class="vote-abandon"><p><b>${echapper((v.Initiateur || {}).nom || "Un joueur")}</b> propose d'abandonner la mission (${oui}/${liste(v.Votants).length}).</p>
-            ${(v.Votes || {})[moi] === "oui" ? `<p class="discret">En attente des autres joueurs.</p>` : `<button type="button" class="lien-fiche" data-mi="abandon-oui">J'accepte</button>`}
-            <button type="button" class="lien-fiche discret" data-mi="abandon-non">Non, on continue</button></div>`;
+            <div class="boutons-abandon">${(v.Votes || {})[moi] === "oui" ? `<p class="discret">En attente des autres joueurs.</p>` : boutonLivre("abandon-oui", "J'accepte", TEINTE_ABANDON, "abandon-accepte-" + m.Id)}
+            ${boutonLivre("abandon-non", "Non, on continue", TEINTE_CONTINUER, "abandon-continue-" + m.Id)}</div></div>`;
     return `<div class="contenu-page page-mission-infos defile-fiche">
         <div class="rang-mission-en-cours rang-${echapper(m.Rang)}">${echapper(NOMS_RANGS[m.Rang] || m.Rang)}</div>
         <div class="titre-mission-en-cours">${echapper(m.Titre)}</div>

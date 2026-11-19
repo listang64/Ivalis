@@ -804,11 +804,15 @@ window.choisirHalteGroupe = async function(reponse, options) {
 // LA CRÉATION DU LIEU (poi_creation.js) : par le poste du dernier oui s'il a
 // les clés, sinon par un poste qui les a (il la réclame en transaction).
 const creationsIci = new Set(), reclamations = new Set(), arriveesVues = new Set();
+// (v450) Les images d'un lieu qui vient de naître se font en fond (poi_creation.js) : on garde
+// leur promesse pour poser l'image du lieu dans le récit dès qu'elle est prête.
+const imagesPoi = new Map();
 async function lancerCreationPoi(id, poi) {
     if (!poi || creationsIci.has(poi.Id) || typeof window.creerLieuPoi !== "function") return;
     creationsIci.add(poi.Id);
     try {
         const lieu = await window.creerLieuPoi({ region: Number(voyage && voyage.Arrivee ? voyage.Arrivee.Region : poi.Region), x: poi.x, y: poi.y });
+        if (lieu && lieu.images) imagesPoi.set(poi.Id, lieu.images);
         await transaction((data) => {
             const v = data.Voyage_Groupe;
             if (!memeVoyage(v, id) || !v.Poi || v.Poi.Id !== poi.Id) return null;
@@ -876,14 +880,34 @@ async function arriverAuPoi(poi) {
     }
     if (!creationsIci.has(poi.Id)) return;
     const date = window.DATE_EN_JEU_ACTUELLE || {};
+    let ref = null;
     try {
-        await addDoc(collection(db, "Messages_Chat"), {
+        ref = await addDoc(collection(db, "Messages_Chat"), {
             ID_Partie: window.ID_PARTIE_COURANTE, ...AUTEUR_DESTIN,
             Texte: `*Le groupe quitte un instant sa route et s'approche de ${poi.Nom || "ce qu'il a aperçu"}.* (Narrateur, décris de manière immersive leur arrivée en ce lieu, l'atmosphère et ce qu'ils voient en premier ; le récit tourne autour de ce lieu, sans ajouter d'autre lieu ni d'autre rencontre.)`,
             Date_Jour: date.jour || "", Date_An: date.annee || "", Timestamp: Date.now()
         });
     } catch (e) { console.error("Message d'arrivée au POI :", e); }
     if (typeof window.declencherTourIA === "function") setTimeout(() => window.declencherTourIA({ auto: true }), 300);
+    if (ref) illustrerArriveePoi(ref, poi).catch(e => console.warn("[Voyage] L'image du POI dans le récit :", e));
+}
+// (v450) Nico : « je suis allé voir un POI et ça ne m'a pas mis l'image du lieu dans le RP ». Le lieu
+// naît à peine quand le groupe y arrive : son image se fait encore (poi_creation.js). Dès qu'elle est
+// là, elle rejoint le message d'arrivée, et le livre la pose en double page, comme à l'arrivée dans un
+// lieu (annoncerArrivee, v428).
+async function illustrerArriveePoi(ref, poi) {
+    const lire = async () => {
+        if (!poi.Lieu) return "";
+        try { const s = await getDoc(doc(db, "Monde_Lieux", poi.Lieu)); return (s.exists() && s.data().URL_Cloudinary) || ""; } catch (e) { return ""; }
+    };
+    let url = await lire();
+    if (!url && imagesPoi.has(poi.Id)) {
+        const maj = await Promise.resolve(imagesPoi.get(poi.Id)).catch(() => null);
+        url = (maj && maj.URL_Cloudinary) || await lire();
+    }
+    if (!url || String(url).startsWith("data:")) return false;
+    await updateDoc(doc(db, "Messages_Chat", ref.id), { Illustration: { Url: url, Ratio: +(1792 / 1024).toFixed(4), Format: "double-page", Sujet: "lieu", Lieu: poi.Lieu || "", Le: Date.now() } });
+    return true;
 }
 
 // LA NUIT : repartir ou rester ici. Rien ne bouge tant que tous ne sont pas

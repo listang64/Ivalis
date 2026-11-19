@@ -19,17 +19,17 @@
   <link rel="stylesheet" href="grimoire.css?v=29">
   <link rel="stylesheet" href="grimoire_recit.css?v=28">
   <link rel="stylesheet" href="grimoire_carte.css?v=2">
-  <link rel="stylesheet" href="grimoire_regions.css?v=8">
+  <link rel="stylesheet" href="grimoire_regions.css?v=9">
   <link rel="stylesheet" href="loupe_cartes.css?v=5">
-  <link rel="stylesheet" href="grimoire_fiches.css?v=15">
+  <link rel="stylesheet" href="grimoire_fiches.css?v=16">
   <link rel="stylesheet" href="grimoire_creation.css?v=9">
   <link rel="stylesheet" href="grimoire_combats.css?v=1">
   <link rel="stylesheet" href="grimoire_liens.css?v=6">
   <link rel="stylesheet" href="grimoire_groupe.css?v=9">
   <link rel="stylesheet" href="grimoire_guilde.css?v=7">
 <link rel="stylesheet" href="grimoire_clans.css?v=2">
-<link rel="stylesheet" href="missions_guilde.css?v=5">
-<link rel="stylesheet" href="grimoire_mission.css?v=2">
+<link rel="stylesheet" href="missions_guilde.css?v=6">
+<link rel="stylesheet" href="grimoire_mission.css?v=3">
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Dancing+Script:wght@400;700&family=Homemade+Apple&family=Indie+Flower&family=Kalam:wght@400;700&family=Satisfy&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="discussion_privee.css?v=3">
   <link rel="stylesheet" href="grimoire_parametres.css?v=3">
@@ -2230,7 +2230,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=339"></script>
+<script src="trace_combat.js?v=340"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2240,7 +2240,7 @@
 <!-- LE GRIMOIRE (v297) : StPageFlip 2.0.7 (MIT, dans vendor/), puis le livre -->
 <script src="vendor/page-flip/page-flip.browser.js?v=2.0.7"></script>
 <script src="police_titres.js?v=2"></script>
-<script src="grimoire.js?v=41"></script>
+<script src="grimoire.js?v=42"></script>
 <script src="grimoire_parametres.js?v=7"></script>
 <!-- LES DÉPENSES DU MJ (v293) : tokens et coût en euros de chaque réponse -->
 <script src="depenses_ia.js?v=4"></script>
@@ -2326,7 +2326,7 @@
 <!-- LE HALL DE GUILDE (v433) : le bâtiment du village, sa double page, le Livre des clans. -->
 <script type="module" src="missions_guilde.js?v=5"></script>
 <script type="module" src="grimoire_guilde.js?v=8"></script>
-<script type="module" src="grimoire_mission.js?v=1"></script>
+<script type="module" src="grimoire_mission.js?v=2"></script>
 <script type="module" src="grimoire_clans.js?v=3"></script>
 <!-- LA DISCUSSION PRIVÉE (v422) : parler en tête-à-tête avec un suiveur, depuis la page du Groupe. -->
 <script type="module" src="discussion_privee.js?v=3"></script>
@@ -2338,13 +2338,13 @@
 <script type="module" src="cartes_regionales.js?v=25"></script>
 <!-- Le lore du monde, par région (v273), puis les villages des cartes régionales et MIA_VILLAGE. -->
 <script src="lore_ivalis.js?v=4"></script>
-<script type="module" src="villages_regionaux.js?v=16"></script>
+<script type="module" src="villages_regionaux.js?v=17"></script>
 <!-- Les descriptifs RP des régions (v274) : le mode DEV et sa fenêtre pleine page. -->
 <script type="module" src="descriptifs_regions.js?v=2"></script>
 <!-- Le déplacement des PJ (v275) : les terrains praticables des cartes régionales,
      puis le groupe, son bouton voyage, les tracés, les votes, la marche et les nuits. -->
 <script type="module" src="terrains_regionaux.js?v=3"></script>
-<script type="module" src="voyage_groupe.js?v=23"></script>
+<script type="module" src="voyage_groupe.js?v=24"></script>
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
 <script type="module" src="environnement_mj.js?v=5"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->

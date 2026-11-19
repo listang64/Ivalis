@@ -333,6 +333,14 @@ titre("4. LES CARRÉS DES VILLAGES ET DES POI : DEUX FOIS PLUS PETITS, LE DESSIN
 await section(async () => {
   await p.evaluate(() => { window.fermerToutesLesFenetres && window.fermerToutesLesFenetres(); });
   await attendreQue(async () => !!(await p.evaluate((id) => (window.__docs["Monde_Lieux/" + id] || {}).URL_Calque_Region, idPoi)), 6000);
+  // (v450) « Je suis allé voir un POI et ça ne m'a pas mis l'image du lieu dans le RP » : l'image du lieu, faite
+  // en fond après sa naissance, rejoint le message d'arrivée du Destin (le livre la pose en double page).
+  await attendreQue(async () => !!(await p.evaluate((id) => (window.__docs["Monde_Lieux/" + id] || {}).URL_Cloudinary, idPoi)), 8000);
+  const ill = await attendreQue(async () => p.evaluate((id) => { const url = (window.__docs["Monde_Lieux/" + id] || {}).URL_Cloudinary;
+    const m = Object.entries(window.__docs).find(([k, d]) => k.startsWith("Messages_Chat/") && d && d.Auteur_ID === "DESTIN" && /s'approche de/.test(d.Texte || ""));
+    const i = m && m[1].Illustration; return i && i.Url && i.Url === url && i.Format === "double-page" && i.Sujet === "lieu" && i.Lieu === id ? i : null; }, idPoi), 8000);
+  verifier("(v450) l'image du POI, prête après l'arrivée, rejoint le message d'arrivée (double page, sujet « lieu »)", !!ill,
+           JSON.stringify(await p.evaluate((id) => [(window.__docs["Monde_Lieux/" + id] || {}).URL_Cloudinary, Object.entries(window.__docs).filter(([k, d]) => k.startsWith("Messages_Chat/") && d.Auteur_ID === "DESTIN").map(([k, d]) => d.Illustration || null)], idPoi)).slice(0, 300));
   // Un village d'avant (8 %, sans Calque_Plein) et le POI né (4 %, plein).
   await p.evaluate(() => window.appliquerLieuLocal("L_00042_Brumefosse", { Nom_Du_Lieu: "Brumefosse", Carte_Regionale: 2, Position_Region: { x: 0.7, y: 0.66, taille: 0.08 },
     URL_Calque_Region: "https://res.cloudinary.com/demo/image/upload/v1/Villages_Regions/ancien.png" }));

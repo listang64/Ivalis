@@ -202,9 +202,12 @@ function elementMarqueMission(mq, b) {
     el.title = "Le lieu de la mission de guilde";
     Object.assign(el.style, { left: b.gauche + "px", top: b.haut + "px", width: b.cote + "px", height: b.cote + "px" });
     // (en SVG : il suit la taille de sa boîte, sur la carte vivante comme sur les pages du livre)
-    el.innerHTML = `<svg class="marque-mission-signe" viewBox="0 0 100 100" aria-hidden="true"><defs><radialGradient id="or-mission" cx="40%" cy="35%" r="70%">
-        <stop offset="0" stop-color="#fff2b8"/><stop offset="0.45" stop-color="#f0c95e"/><stop offset="1" stop-color="#a87c26"/></radialGradient></defs>
-        <circle cx="50" cy="50" r="40" fill="rgba(40, 24, 6, 0.28)"/><text x="50" y="72" text-anchor="middle" font-size="70" font-weight="700" fill="url(#or-mission)" stroke="#5c3a12" stroke-width="2.4">?</text></svg>`;
+    // (v450) « Dans le même style que le point d'exclamation des POI, et qu'il ne bouge pas » : le signe
+    // seul, en Cinzel, l'or en dégradé du haut vers le bas, cerné de brun, son ombre et sa lueur (style.css,
+    // .poi-voyage-signe) ; ni rond derrière, ni battement.
+    el.innerHTML = `<svg class="marque-mission-signe" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="or-mission" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#fff6c2"/><stop offset="0.34" stop-color="#f7d35a"/><stop offset="0.62" stop-color="#d9a028"/><stop offset="1" stop-color="#8f5b0b"/></linearGradient></defs>
+        <text x="50" y="86" text-anchor="middle" font-size="96" font-weight="700" fill="url(#or-mission)" stroke="#5a3608" stroke-width="2.2" paint-order="stroke">?</text></svg>`;
     return el;
 }
 window.marqueMissionRegion = marqueDeMission;

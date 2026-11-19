@@ -423,6 +423,9 @@ await section(async () => {
   verifier("le rang, le titre, le commanditaire, la région, le lieu, l'objectif, ce qu'on en sait", new RegExp(`Rang ${m0.Rang}`).test(g) && /Mission 1/.test(g) && /Commanditaire 1/.test(g) && /Le désert d'Etheria/.test(g) && /Kesh/.test(g) && /Objectif 1\./.test(g) && /Détails 1\./.test(g), g.slice(0, 260));
   verifier("…rien du plan du MJ (la vérité cachée, ce qu'il ne faut pas révéler)", !/ment/.test(g) && !/voleur/.test(g), "");
   verifier("…et le vote pour l'abandonner", /Voter pour abandonner la mission/.test(g));
+  // (v450) « Le bouton voter pour abandonner, dans le même design que le reste du livre. »
+  const ba = await G(() => { const b = document.querySelector('#grimoire-mission-g [data-mi="abandon-oui"]'); return b && { classe: b.className, lavis: !!b.querySelector("svg.lavis"), cadre: !!b.querySelector("svg.cadre-main path"), souligne: getComputedStyle(b).textDecorationLine }; });
+  verifier("(v450) …un bouton du livre : le cadre tracé à la plume et le lavis d'aquarelle (plus un lien souligné)", ba && ba.classe === "bouton-mission" && ba.lavis && ba.cadre && ba.souligne === "none", JSON.stringify(ba));
   await p.waitForTimeout(300);
   verifier("le vote fini, son post-it est rentré (chez chacun)", await G(() => { const el = document.getElementById("postit-mission"); return !el || !el.classList.contains("sortie"); }));
   const d = await droite();

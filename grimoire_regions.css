@@ -135,11 +135,13 @@ body:not(.loupe-voyage) #ecran-jeu.livre-carte > #annonce-jour-voyage { visibili
 .voyage-livre .boite-voyage.etat-nuit .boite-voyage-tete, .voyage-livre .boite-voyage.etat-nuit .boite-voyage-texte b { color: #1d1209 !important; }
 
 /* LE POST-IT DE LA CARTE DU MONDE : le papier d'écriture du récit (grimoire_recit.css),
-   au-dessus du milieu du livre ; il sort par le haut quand une fenêtre s'y écrit. */
-.recit-ecriture.voyage-postit { left: calc(700px * var(--s, 1)); width: calc(600px * var(--s, 1)); top: calc(-250px * var(--s, 1)); height: calc(330px * var(--s, 1)); }
+   au-dessus du milieu du livre ; il sort par le haut quand une fenêtre s'y écrit.
+   (v450) Jamais plus haut que la place au-dessus du livre (--place-haut, grimoire.js) : sur un écran
+   de PC, il descend un peu sur les pages plutôt que de sortir de l'écran. */
+.recit-ecriture.voyage-postit { left: calc(700px * var(--s, 1)); width: calc(600px * var(--s, 1)); top: max(calc(-250px * var(--s, 1)), calc(12px - var(--place-haut, 999px))); height: calc(330px * var(--s, 1)); }
 /* (v428) Ailleurs que sur les cartes (le récit, le groupe…) : le même post-it, en haut à
    gauche du livre (le papier où l'on écrit sort à droite), un peu plus haut. */
-.recit-ecriture.voyage-postit.a-gauche { left: calc(270px * var(--s, 1)); width: calc(640px * var(--s, 1)); top: calc(-300px * var(--s, 1)); height: calc(400px * var(--s, 1)); }
+.recit-ecriture.voyage-postit.a-gauche { left: calc(270px * var(--s, 1)); width: calc(640px * var(--s, 1)); top: max(calc(-300px * var(--s, 1)), calc(12px - var(--place-haut, 999px))); height: calc(400px * var(--s, 1)); }
 .voyage-postit.a-gauche .papier-voyage { overflow-y: auto; overscroll-behavior: contain; }
 .papier-ecriture.papier-voyage { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: calc(var(--u) * 1.4);
   padding: calc(var(--u) * 3.2) calc(var(--u) * 3) calc(var(--u) * 2) !important; overflow: hidden; }
