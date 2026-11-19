@@ -540,6 +540,26 @@ await section(async () => {
   }
   verifier("jamais de page blanche laissée avant le portrait (8 longueurs de texte)", sautes.length === 0, JSON.stringify(sautes));
   verifier("…il se pose aussi sur une page de gauche quand c'est la première libre", aGauche >= 1, `${aGauche} fois à gauche`);
+  // (v451) « Un peu d'écriture en haut de page, beaucoup d'espace libre ; de l'autre côté l'avatar d'un PNJ ; au lieu de
+  // continuer le récit dans l'espace vide, il a écrit sur la page après la photo. » La suite du récit remplit d'abord
+  // la page où il s'écrit ; le portrait prend la page libre suivante.
+  const trous = [];
+  for (const n of [2, 5, 8, 11, 14, 17, 20, 23]) {
+    const para = (i, quoi) => `<p>${quoi}, la ${i + 1}e fois, le vent pousse les barques contre le quai et les cordages grincent dans la nuit sans lune.</p>`;
+    const msgs = [{ idDoc: "t0", ID_Partie: "P1", Auteur_ID: "MJ", Auteur_Nom: "MJ", Est_Narration_IA: true, Timestamp: 100,
+      Texte: Array.from({ length: n }, (_, i) => para(i, "Sur les quais")).join(""), Portraits_PNJ: [{ Nom: "Doros", Url: URL_PNJ, Ratio: 0.5714, Format: "avatar" }] },
+      { idDoc: "t1", ID_Partie: "P1", Auteur_ID: "MJ", Auteur_Nom: "MJ", Est_Narration_IA: true, Timestamp: 200, Texte: Array.from({ length: 14 }, (_, i) => para(i, "Plus tard")).join("") }];
+    await relayer(msgs, true); await p.waitForTimeout(250);
+    const r = await G(() => { const pages = [...document.querySelectorAll(".page-suite")]; const i = pages.findIndex(x => x.querySelector(".portrait-avatar"));
+      const premiere = pages.findIndex(x => x.querySelector('.mot[data-e="t1"]'));
+      if (i < 1) return { i, premiere };
+      const av = pages[i - 1], mots = [...av.querySelectorAll(".mot")], rp = av.getBoundingClientRect();
+      const bas = mots.length ? mots[mots.length - 1].getBoundingClientRect().bottom : rp.top;
+      return { i, premiere, libre: +((rp.bottom - bas) / rp.height).toFixed(2), avantPortrait: !!av.querySelector('.mot[data-e="t1"]') || premiere < i }; });
+    // un trou : la suite commence après le portrait alors que la page d'avant gardait plus d'un quart de page libre
+    if (r.i >= 1 && !r.avantPortrait && r.libre > 0.25) trous.push({ n, ...r });
+  }
+  verifier("(v451) la suite du récit remplit l'espace vide de la page avant le portrait du PNJ (8 longueurs)", trous.length === 0, JSON.stringify(trous));
   // Le portrait : on va à sa page.
   await G(() => { const el = [...document.querySelectorAll(".page-suite")].find(x => x.querySelector(".portrait-avatar")); window.GRIMOIRE.allerALaPage(window.GRIMOIRE.indexDe(el)); });
   await pose(); await p.waitForTimeout(1500);
@@ -584,6 +604,19 @@ await section(async () => {
   n = imagesIA.length;
   const r2 = await illustrer(AVIS, {});
   verifier("…même absent des PNJ connus du tour : sa fiche de la base donne son portrait", r2.blobs.includes("https://res.cloudinary.com/x/image/upload/v1/PNJ/kore.png"), JSON.stringify(r2.blobs));
+  // (v451) « Un homme parti seul faire des signaux avec une lampe à huile : l'IA a mis mon personnage à côté de lui. »
+  verifier("(v451) l'agent sait que deux est un maximum : un personnage seul se dessine seul, sans héros ajouté", /Deux est un MAXIMUM, pas un objectif/.test(sys) && /N'ajoute JAMAIS un héros qui n'est pas physiquement à ses côtés/.test(sys));
+  const seul = await G(() => {
+    const f = window.acteursDuCroquisIllustrateur;
+    const a = f({ sujet: "personnage", extrait: "Plus loin, seul sur la crête, un homme agite une lampe à huile.", acteurs: [{ id: "H1", nom: "Thorin", type: "heros", place: "right" }, { nom: "a man with an oil lamp", type: "autre", place: "far right" }] }, "");
+    const b = f({ sujet: "personnage", extrait: "Thorin lève sa lampe vers la crête.", acteurs: [{ nom: "a man with an oil lamp", type: "autre" }, { id: "H1", nom: "Thorin", type: "heros" }] }, "");
+    const c = f({ sujet: "personnage", extrait: "Un homme agite une lampe.", description: "the group watches a man", heros: ["Thorin"], autres: ["a man with an oil lamp"] }, "Thorin regarde.");
+    const d = f({ sujet: "scene", acteurs: [{ id: "H1", nom: "Thorin", type: "heros" }, { nom: "Dame Koré", type: "pnj" }] }, "");
+    const n = (x) => ({ heros: x.heros.map(h => h.prenom), pnj: x.pnj, autres: x.autres.map(s => s.split(" (")[0]) });
+    return { a: n(a), b: n(b), c: n(c), d: n(d) }; });
+  verifier("(v451) un personnage seul : sa seule figure (pas le héros à côté) ; le héros, seulement si la phrase du moment le nomme",
+           JSON.stringify(seul.a) === '{"heros":[],"pnj":[],"autres":["a man with an oil lamp"]}' && JSON.stringify(seul.b) === '{"heros":["Thorin"],"pnj":[],"autres":[]}'
+           && JSON.stringify(seul.c) === '{"heros":[],"pnj":[],"autres":["a man with an oil lamp"]}' && JSON.stringify(seul.d) === '{"heros":["Thorin"],"pnj":["Dame Koré"],"autres":[]}', JSON.stringify(seul));
 });
 
 // =========================================================================

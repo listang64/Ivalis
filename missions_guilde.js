@@ -674,13 +674,25 @@ export function marqueMission() {
 }
 
 // LE NARRATEUR : un rappel partout ; au lieu de la mission, le plan (ses secrets gardés).
+// (v451) Nico : « le narrateur fait avancer trop vite le déroulé de la mission : en secret il y a un
+// traître, et en deux tours du Narrateur on sait qui c'est ; pas de suspens, pas de possibilité de
+// faire avancer plus tranquillement le récit ». Le Narrateur ne reçoit plus tout le plan d'un coup :
+//   · l'étape en cours seulement (les suivantes restent cachées, même à lui) ;
+//   · les personnages sans leurs secrets, et la vérité cachée, seulement à la dernière étape ;
+//   · un rythme : un nombre de tours minimum par étape (selon le rang), un indice au plus par
+//     passage, et seulement si les héros cherchent.
+// MIA_SUIVI_MISSION tient le même rythme : une étape au plus par tour, jamais avant ce minimum.
+export const TOURS_MIN_ETAPE = { C: 2, B: 3, A: 4 };
+const toursMin = (rang) => TOURS_MIN_ETAPE[rang] || 3;
 const liste = (l, f) => (Array.isArray(l) ? l : []).map(f).filter(Boolean).join("\n");
 export function contexteMissionMJ(dataPartie, lieuActuel) {
     const d = missionEnCours;
     if (!d || d.Statut !== "en_cours" || !d.Mission) return "";
-    const m = d.Mission, plan = d.Plan || {}, faites = (d.Avancement && d.Avancement.Etapes) || {};
+    const m = d.Mission, plan = d.Plan || {}, av = d.Avancement || {}, faites = av.Etapes || {};
     const etapes = Array.isArray(plan.etapes) ? plan.etapes : [];
     const courante = etapes.find(e => !faites[String(e.numero)]);
+    const derniere = !!courante && courante === etapes[etapes.length - 1];
+    const tours = Number(av.Tours_Etape) || 0, min = toursMin(m.Rang);
     const lignes = ["--- MISSION DE GUILDE EN COURS ---",
         `${(RANGS[m.Rang] || {}).nom || m.Rang} — « ${m.Titre} », confiée par ${m.Commanditaire}.`,
         `Objectif : ${m.Objectif}`,
@@ -688,19 +700,28 @@ export function contexteMissionMJ(dataPartie, lieuActuel) {
     if (courante) lignes.push(`Étape en cours : ${courante.numero}. ${courante.titre}.`);
     const ici = lieuActuel && d.Lieu_Id && lieuActuel === d.Lieu_Id;
     if (ici && d.Plan) {
+        const passees = etapes.filter(e => faites[String(e.numero)]);
+        const restent = courante ? etapes.length - etapes.indexOf(courante) - 1 : 0;
         lignes.push("", "--- LE PLAN DE LA MISSION (POUR TOI SEUL, MJ) ---",
-            "Les héros sont sur le lieu de la mission. Sers-toi de ce plan pour mener la scène ; ne révèle rien qu'ils n'aient découvert eux-mêmes.",
-            `Ce que les héros savent : ${plan.connu_des_joueurs || ""}`,
-            `La vérité cachée : ${plan.verite_cachee || ""}`,
-            "Les étapes :", liste(etapes, e => `  ${e.numero}. ${e.titre} — ${e.description} (accomplie quand : ${e.validation})${faites[String(e.numero)] ? " [ACCOMPLIE]" : ""}`),
-            "Les personnages :", liste(plan.personnages, p => `  - ${p.nom} (${p.role}) : sait « ${p.sait} » ; secret « ${p.secret} » ; ${p.attitude}`),
+            "Les héros sont sur le lieu de la mission. Tu ne connais du plan que ce dont tu as besoin maintenant : la suite te sera donnée quand les héros y arriveront.",
+            `Ce que les héros savent : ${plan.connu_des_joueurs || ""}`);
+        if (passees.length) lignes.push("Déjà accompli :", liste(passees, e => `  ${e.numero}. ${e.titre}`));
+        if (courante) lignes.push(`L'étape à jouer maintenant : ${courante.numero}. ${courante.titre} — ${courante.description} (accomplie quand : ${courante.validation})`,
+            restent ? `(Encore ${restent} étape${restent > 1 ? "s" : ""} après celle-ci : tu ne les connais pas encore, ne les devance pas.)` : "(C'est la dernière étape : celle qui accomplit l'objectif.)");
+        lignes.push("Les personnages :", liste(plan.personnages, p => `  - ${p.nom} (${p.role}) : sait « ${p.sait} » ; ${p.attitude}${derniere ? ` ; secret « ${p.secret} »` : ""}`),
             "Les lieux :", liste(plan.lieux, l => `  - ${l.nom} : ${l.description} (on y trouve : ${l.ce_qu_on_y_trouve})`),
-            "Les indices :", liste(plan.indices, x => `  - ${x.nom} : ${x.ou} → ${x.revele}${x.necessaire ? " (nécessaire)" : ""}`),
-            "Les rencontres :", liste(plan.rencontres, x => `  - ${x.quoi} (${x.ou}, danger ${x.danger})`),
-            "Les rebondissements :", liste(plan.rebondissements, x => `  - ${x}`),
-            "À NE JAMAIS RÉVÉLER DIRECTEMENT :", liste(plan.a_ne_pas_reveler, x => `  - ${x}`),
+            "Les indices (un au plus par passage, et seulement si les héros cherchent activement à cet endroit) :", liste(plan.indices, x => `  - ${x.nom} : ${x.ou} → ${x.revele}${x.necessaire ? " (nécessaire)" : ""}`),
+            "Les rencontres :", liste(plan.rencontres, x => `  - ${x.quoi} (${x.ou}, danger ${x.danger})`));
+        if (passees.length && Array.isArray(plan.rebondissements) && plan.rebondissements.length) lignes.push("Un rebondissement possible, à amener quand le moment s'y prête :", `  - ${plan.rebondissements[Math.min(passees.length - 1, plan.rebondissements.length - 1)]}`);
+        if (derniere) lignes.push(`La vérité cachée (à ne dévoiler que par ce que les héros découvrent ou prouvent eux-mêmes) : ${plan.verite_cachee || ""}`,
             `Les issues : réussite — ${(plan.issues || {}).reussite || ""} ; réussite partielle — ${(plan.issues || {}).reussite_partielle || ""} ; échec — ${(plan.issues || {}).echec || ""}`);
-        if (d.Avancement && (d.Avancement.Indices || []).length) lignes.push(`Indices déjà trouvés : ${d.Avancement.Indices.join(" ; ")}`);
+        else lignes.push("Il existe une vérité cachée derrière cette mission : tu la connaîtras à la dernière étape. D'ici là, ne désigne aucun coupable, aucun traître : sème seulement des détails ambigus, des fausses pistes, des silences.");
+        lignes.push("À NE JAMAIS RÉVÉLER DIRECTEMENT :", liste(plan.a_ne_pas_reveler, x => `  - ${x}`));
+        if ((av.Indices || []).length) lignes.push(`Indices déjà trouvés : ${av.Indices.join(" ; ")}`);
+        lignes.push("", "--- LE RYTHME DE LA MISSION ---",
+            `Prends ton temps : une étape se joue sur au moins ${min} de tes passages (celle-ci en est à ${tours}). ${tours < min ? "Ne la conclus pas encore : installe l'ambiance, fais parler les personnages, laisse les héros chercher, douter, se tromper." : "Elle peut se conclure si les héros font ce qu'il faut."}`,
+            "Ne fais jamais avancer l'intrigue à la place des héros : c'est leurs actions qui la font avancer. Une révélation à la fois, jamais deux dans le même passage.",
+            "Garde le suspens : ne résous pas un mystère dès qu'il apparaît, ne fais pas avouer un personnage sans preuve ni pression des héros.");
     }
     lignes.push("Quand les héros accomplissent l'objectif de la mission, ou qu'ils échouent sans retour possible, dis-le clairement dans ton récit.");
     return lignes.join("\n");
@@ -722,11 +743,19 @@ Réponds en JSON : { "etapes_accomplies": [numéros], "indices_trouves": ["…"]
 "reussie" seulement si l'objectif est accompli ; "echouee" seulement si la mission est perdue sans retour possible.`;
     let r;
     try { r = await appelJson(prompt, `Le passage du Narrateur :\n${String(texteMJ).slice(0, 6000)}`); } catch (e) { console.warn("MIA_SUIVI_MISSION :", e); return null; }
-    const nouvelles = (Array.isArray(r.etapes_accomplies) ? r.etapes_accomplies : []).map(String).filter(n => etapes.some(e => String(e.numero) === n) && !faites[n]);
-    const indices = (Array.isArray(r.indices_trouves) ? r.indices_trouves : []).map(x => String(x).trim()).filter(Boolean);
+    // (v451) Le rythme : une étape au plus par tour — celle en cours —, et pas avant son nombre de tours minimum.
     const av = d.Avancement || { Etapes: {}, Indices: [], Journal: [] };
-    const maj = { Avancement: { Etapes: { ...(av.Etapes || {}) }, Indices: [...new Set([...(av.Indices || []), ...indices])].slice(-40), Journal: [...(av.Journal || [])] } };
+    const tours = (Number(av.Tours_Etape) || 0) + 1;
+    const courante = etapes.find(e => !faites[String(e.numero)]);
+    const dites = (Array.isArray(r.etapes_accomplies) ? r.etapes_accomplies : []).map(String);
+    const nouvelles = courante && tours >= toursMin(m.Rang) && dites.includes(String(courante.numero)) ? [String(courante.numero)] : [];
+    const indices = (Array.isArray(r.indices_trouves) ? r.indices_trouves : []).map(x => String(x).trim()).filter(Boolean);
+    const maj = { Avancement: { Etapes: { ...(av.Etapes || {}) }, Indices: [...new Set([...(av.Indices || []), ...indices])].slice(-40), Journal: [...(av.Journal || [])],
+                                Tours_Etape: nouvelles.length ? 0 : tours } };
     nouvelles.forEach(n => { maj.Avancement.Etapes[n] = true; });
+    // « Réussie » : seulement toutes les étapes accomplies (sans plan, le Narrateur fait foi).
+    const toutesFaites = etapes.every(e => maj.Avancement.Etapes[String(e.numero)]);
+    if (r.statut === "reussie" && !toutesFaites) r.statut = "en_cours";
     if (r.resume) maj.Avancement.Journal = [...maj.Avancement.Journal, { Le: Date.now(), Jour: jourAbsolu(), Texte: String(r.resume).slice(0, 300) }].slice(-60);
     try { await setDoc(refMission(id), maj, { merge: true }); } catch (e) { console.warn("Missions : l'avancement", e); }
     await relireMission(id);
@@ -827,7 +856,7 @@ setInterval(async () => {
     if (missionEnCours.Statut === "en_cours" && (!missionEnCours.Plan || !missionEnCours.Lieu_Id)) preparerMission();
 }, 5000);
 
-window.MISSIONS_GUILDE = { RANGS, ECRITURES, NB_MISSIONS, DUREE_JOURS, DECALAGE_NIVEAU, jourAbsolu, tirerRangs, promptMissions, genererMissions, renouveler, aRenouveler,
+window.MISSIONS_GUILDE = { RANGS, ECRITURES, NB_MISSIONS, DUREE_JOURS, DECALAGE_NIVEAU, TOURS_MIN_ETAPE, jourAbsolu, tirerRangs, promptMissions, genererMissions, renouveler, aRenouveler,
                           lireTableau, relireTableau, surChangement, htmlEncart, missionDe, ouvrirFeuille, fermerFeuille,
                           voterMission, refuserMission, lireMission, relireLaMission, surMission, preparerMission, promptPlan, marqueMission, decalageNiveauMission,
                           contexteMissionMJ, suivreApresMJ, terminerMission, partie: () => partie,

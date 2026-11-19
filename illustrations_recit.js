@@ -137,12 +137,27 @@ window.MAX_FIGURES_ILLUSTRATEUR = MAX_FIGURES;
 // rien qu'un inconnu à sa place).
 function acteursDuCroquis(avis, texteMJ) {
     const tous = herosDeLaPartie();
-    const liste = Array.isArray(avis.acteurs) ? avis.acteurs.filter(a => a && (a.nom || a.id)) : [];
+    let liste = Array.isArray(avis.acteurs) ? avis.acteurs.filter(a => a && (a.nom || a.id)) : [];
     const res = { heros: [], pnj: [], autres: [], perdus: [], scene: {} };
     const enScene = (a) => [a.place, a.action, a.expression].map(x => String(x || "").trim()).filter(Boolean).join("; ");
-    const place = () => res.heros.length + res.pnj.length + res.autres.length < MAX_FIGURES;
+    // (v451) Nico : « un homme est allé plus loin, seul, faire des signaux avec une lampe à huile ; l'IA m'a
+    // fait une image de lui, mais à côté il y a mon personnage, comme si elle se sentait obligée de mettre
+    // deux personnes ». UN personnage (« sujet » : « personnage ») se dessine seul : une figure, la sienne —
+    // un héros seulement si la phrase du moment le nomme, sinon le PNJ ou l'être sans nom.
+    const seul = String(avis.sujet || "") === "personnage";
+    const max = seul ? 1 : MAX_FIGURES;
+    const estHeros = (a) => { const id = String(a.id || "").trim().toUpperCase(), type = String(a.type || "").toLowerCase();
+        return /^H\d+$/.test(id) || type === "heros" || (type !== "pnj" && type !== "autre" && tous.some(x => memeNom(x.prenom, String(a.nom || "")))); };
+    if (seul && liste.length > 1) {
+        const extrait = String(avis.extrait || "");
+        liste = [liste.find(a => estHeros(a) && nommeDans(extrait, String(a.nom || ""))) || liste.find(a => !estHeros(a)) || liste[0]];
+    }
+    const place = () => res.heros.length + res.pnj.length + res.autres.length < max;
     if (!liste.length) {
         res.heros = herosDuCroquis(avis, texteMJ);
+        if (seul && ((avis.pnj_dans_le_croquis || []).filter(Boolean).length || (Array.isArray(avis.autres) ? avis.autres : []).filter(Boolean).length))
+            res.heros = res.heros.filter(h => nommeDans(String(avis.extrait || ""), h.prenom));
+        res.heros = res.heros.slice(0, max);
         (avis.pnj_dans_le_croquis || []).filter(Boolean).map(String).forEach(n => { if (place()) res.pnj.push(n); });
         (Array.isArray(avis.autres) ? avis.autres : []).filter(Boolean).map(String).forEach(n => { if (place()) res.autres.push(n); });
         return res;
@@ -239,7 +254,7 @@ QUOI DESSINER : soit une SCÈNE (les personnages en action), soit UN PERSONNAGE 
 
 LE NARRATEUR N'APPARAÎT JAMAIS : la réponse est écrite à la première personne par le chroniqueur du groupe (le « je », le « nous »). Ce chroniqueur ne se dessine JAMAIS : ne le décris pas, ne le compte pas, n'écris jamais « the narrator », « I », « me », « we » ni « us » dans la description. « Nous » ne désigne que les héros présents.
 
-DEUX PERSONNAGES AU PLUS (v428) : jamais plus de DEUX figures dans l'image (héros, PNJ et êtres sans nom confondus) — choisis les deux qui portent le moment. Des plans RAPPROCHÉS et DYNAMIQUES (gros plan, plan rapproché, plan taille en mouvement), des prises de vue originales : contre-plongée, plongée, angle hollandais, par-dessus l'épaule, à travers un premier plan (feuillage, fumée, étincelles), profil en contre-jour, courte focale… Chaque personnage porte TOUT son équipement du moment (armure, vêtements, armes, accessoires), tel que sur son portrait.
+DEUX PERSONNAGES AU PLUS (v428) : jamais plus de DEUX figures dans l'image (héros, PNJ et êtres sans nom confondus) — choisis les deux qui portent le moment. Deux est un MAXIMUM, pas un objectif (v451) : quand le moment ne montre qu'UN personnage (quelqu'un parti seul à l'écart, isolé, qui agit sans les autres), dessine-le SEUL ("sujet": "personnage", une seule figure dans "acteurs", "nombre": 1). N'ajoute JAMAIS un héros qui n'est pas physiquement à ses côtés dans ce passage, juste pour remplir l'image. Des plans RAPPROCHÉS et DYNAMIQUES (gros plan, plan rapproché, plan taille en mouvement), des prises de vue originales : contre-plongée, plongée, angle hollandais, par-dessus l'épaule, à travers un premier plan (feuillage, fumée, étincelles), profil en contre-jour, courte focale… Chaque personnage porte TOUT son équipement du moment (armure, vêtements, armes, accessoires), tel que sur son portrait.
 
 PERSONNE D'AUTRE : le croquis ne montre QUE les héros que tu cites, les PNJ que tu cites et, seulement s'ils sont indispensables et décrits dans la réponse, des êtres sans nom (« a wolf », « two guards ») que tu listes dans "autres". Aucun figurant, aucune foule, aucun témoin, aucune silhouette au loin. Indique le nombre total de personnages et de créatures dessinés dans "nombre".
 

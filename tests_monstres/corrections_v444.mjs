@@ -481,8 +481,12 @@ await section(async () => {
   const avant = await texte("#grimoire-fiches-fiche-d .missions-reussies-fiche");
   verifier("pas encore de mission réussie (l'abandonnée ne compte pas) : « aucune pour l'instant »", /Missions réussies :/.test(avant) && /aucune pour l'instant/.test(avant), avant);
   const m1 = await accepter(1);
-  reponsesSuivi = [{ etapes_accomplies: [1, 2], indices_trouves: [], statut: "reussie", resume: "Réussie." }];
-  await G(() => window.MISSIONS_GUILDE.suivreApresMJ("Victoire."));
+  // (v451) Le rythme des missions : une étape par tour au plus, après son nombre de tours minimum ; on joue
+  // les tours jusqu'à la réussite (le Narrateur la dit à chaque tour).
+  for (let k = 0; k < 12 && (await G(() => !!(window.MISSIONS_GUILDE.lireMission() || {}).Mission)); k++) {
+    reponsesSuivi = [{ etapes_accomplies: [1, 2, 3, 4, 5], indices_trouves: [], statut: "reussie", resume: "Réussie." }];
+    await G(() => window.MISSIONS_GUILDE.suivreApresMJ("Victoire."));
+  }
   // Une mission réussie plus ancienne, sans Thorin (H1) : elle ne compte pas pour lui.
   await G(() => { window.__docs["Systeme_Parties/P1/Missions_Terminees/ANCIENNE"] = { Statut: "reussie", Heros: ["H2"], Mission: { Rang: "A" } }; window.MISSIONS_GUILDE.relireTerminees(); });
   await attendreQue(async () => new RegExp(`1 Rang ${m1.Rang}`).test(await texte("#grimoire-fiches-fiche-d .missions-reussies-fiche")), 5000);

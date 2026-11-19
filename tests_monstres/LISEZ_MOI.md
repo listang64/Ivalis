@@ -12323,3 +12323,15 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - **Le « ? » du lieu de mission** (« dans le même style que le point d'exclamation des POI, et ne le fais pas bouger ») : le signe seul, en Cinzel, l'or en dégradé, cerné de brun, avec l'ombre et la lueur du « ! » ; plus de rond derrière, plus de battement (villages_regionaux.js).
 - **L'image d'un POI dans le récit** (« je suis allé voir un POI et ça ne m'a pas mis l'image du lieu dans le RP ») : le lieu naît à peine quand le groupe y arrive, et son image se fait encore. Dès qu'elle est prête, elle rejoint le message d'arrivée du Destin, et le livre la pose en double page, comme à l'arrivée dans un lieu (voyage_groupe.js, illustrerArriveePoi).
 - corrections_v281, v434, v443 et v444 le vérifient (leurs contrôles « v450 »).
+
+## v451 — Une mission qui prend son temps ; un personnage seul dessiné seul ; le récit remplit la page avant un portrait
+
+- **Le rythme des missions** (Nico : « le narrateur fait avancer trop vite le déroulé de la mission ; en secret il y a un traître et en deux tours on sait qui c'est, pas de suspens ») : le Narrateur ne reçoit plus tout le plan d'un coup (missions_guilde.js, contexteMissionMJ).
+  - Il voit seulement l'étape en cours ; les suivantes lui restent cachées.
+  - Les personnages lui arrivent sans leurs secrets. La vérité cachée, les secrets et les issues lui viennent seulement à la dernière étape ; avant, la consigne est de ne désigner aucun coupable et de semer seulement des détails ambigus.
+  - Un rythme est imposé : au moins 2, 3 ou 4 passages par étape (rang C, B, A), un indice au plus par passage et seulement si les héros cherchent, une révélation à la fois.
+  - MIA_SUIVI_MISSION tient le même rythme : une étape au plus par tour, jamais avant le minimum, et « réussie » seulement quand toutes les étapes sont faites (Avancement.Tours_Etape).
+  - Le rythme est dans le contexte de la mission plutôt que dans le cerveau du Narrateur : celui de la base (INST_10895) remplace le cerveau par défaut, et le contexte, lui, part à chaque tour quel que soit le cerveau.
+- **Un personnage seul** (« un homme parti seul faire des signaux avec une lampe à huile ; l'IA a mis mon personnage à côté ») : l'agent apprend que deux figures sont un maximum, pas un objectif. Un « personnage » se dessine seul : sa figure, et un héros seulement si la phrase du moment le nomme (illustrations_recit.js, acteursDuCroquis).
+- **La page avant un portrait** (« un peu d'écriture en haut de page, beaucoup d'espace libre ; de l'autre côté l'avatar d'un PNJ ; le récit a continué après la photo ») : un portrait qui ne peut pas aller en face attend la prochaine page libre, et le texte finit de remplir sa page (grimoire_recit.js, paginer).
+- corrections_v443 et v428 le vérifient (leurs contrôles « v451 »).

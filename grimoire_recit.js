@@ -527,10 +527,20 @@ function paginer(entrees) {
     // gauche est pleine ; les images qui attendent leur double page, dans l'ordre.
     let reservee = null;
     const enAttente = [];
+    // (v451) Nico : « un peu d'écriture en haut de page et beaucoup d'espace libre ; de l'autre côté a
+    // poppé l'avatar d'un PNJ, et au lieu de continuer le récit dans l'espace vide, il a écrit sur la
+    // page après la photo ». Le portrait d'un PNJ qui ne peut pas aller en face attend la prochaine page
+    // libre : le texte finit de remplir la page où il s'écrit, puis le portrait prend la page suivante.
+    const portraitsEnAttente = [];
     const ouvrirGauche = () => { const im = enAttente.shift(); if (!im) return; if (im.gauche) boite.innerHTML = im.gauche; reservee = im.droite; };
     const fermer = () => {
         pages.push(boite.innerHTML); j++;
         if (j % 2 === 1 && reservee !== null) { pages.push(reservee); reservee = null; j++; }
+        // (une page de gauche promise au dégradé d'une double page passe avant le portrait)
+        while (portraitsEnAttente.length && !(j % 2 === 0 && enAttente.length)) {
+            pages.push(portraitsEnAttente.shift()); j++;
+            if (j % 2 === 1 && reservee !== null) { pages.push(reservee); reservee = null; j++; }
+        }
         boite = boiteDeMesure(j % 2 === 0); boite.innerHTML = "";
         if (j % 2 === 0) ouvrirGauche();
     };
@@ -559,7 +569,7 @@ function paginer(entrees) {
                 const html = htmlPortraitPleinePage(para);
                 if (!boite.innerHTML.trim()) { boite.innerHTML = html; fermer(); }
                 else if (j % 2 === 0 && reservee === null) reservee = html;
-                else { fermer(); if (!boite.innerHTML.trim()) { boite.innerHTML = html; fermer(); } else placer({ gauche: "", droite: html }); }
+                else portraitsEnAttente.push(html);
                 continue;
             }
             if (para.image.Format === "double-page") { placer({ gauche: htmlFondRecit(para, "gauche"), droite: htmlFondRecit(para, "droite") }); continue; }
@@ -608,7 +618,12 @@ function paginer(entrees) {
     }
     if (boite.innerHTML.trim() || !pages.length) {
         pages.push(boite.innerHTML || `<p class="page-blanche"></p>`);
-        if (reservee !== null && pages.length % 2) pages.push(reservee);
+        if (reservee !== null && pages.length % 2) { pages.push(reservee); reservee = null; }
+    }
+    // (v451) Les portraits qui attendaient leur page libre : chacun la sienne, à la suite.
+    while (portraitsEnAttente.length) {
+        pages.push(portraitsEnAttente.shift());
+        if (reservee !== null && pages.length % 2) { pages.push(reservee); reservee = null; }
     }
     // (v346) Les images qui attendaient : chacune sa double page, à la suite.
     while (enAttente.length) { const im = enAttente.shift(); if (pages.length % 2) pages.push(""); pages.push(im.gauche, im.droite); }

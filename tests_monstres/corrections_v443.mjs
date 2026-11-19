@@ -460,7 +460,13 @@ titre("5. LE NARRATEUR : UN RAPPEL PARTOUT ; AU LIEU DE LA MISSION, LE PLAN ET S
 await section(async () => {
   const ailleurs = await G(() => window.contexteMissionMJ({}, "L_AILLEURS")), ici = await G(() => window.contexteMissionMJ({}, "L_KESH"));
   verifier("ailleurs : la mission, son objectif, son lieu, l'étape en cours — sans le plan", /MISSION DE GUILDE EN COURS/.test(ailleurs) && /Objectif 1\./.test(ailleurs) && /Kesh/.test(ailleurs) && /Étape en cours : 1\. Trouver la lettre/.test(ailleurs) && !/vérité cachée/i.test(ailleurs), ailleurs.slice(0, 200));
-  verifier("au lieu de la mission : le plan pour lui seul, la vérité cachée, ce qu'il ne doit jamais révéler", /LE PLAN DE LA MISSION \(POUR TOI SEUL, MJ\)/.test(ici) && /Le commanditaire ment/.test(ici) && /À NE JAMAIS RÉVÉLER DIRECTEMENT :\n\s+- Le commanditaire est le voleur/.test(ici) && /Dame Sira/.test(ici), ici.slice(0, 160));
+  verifier("au lieu de la mission : le plan pour lui seul, ce qu'il ne doit jamais révéler", /LE PLAN DE LA MISSION \(POUR TOI SEUL, MJ\)/.test(ici) && /À NE JAMAIS RÉVÉLER DIRECTEMENT :\n\s+- Le commanditaire est le voleur/.test(ici) && /Dame Sira/.test(ici), ici.slice(0, 160));
+  // (v451) « Le narrateur fait avancer trop vite la mission : le traître, on le sait en deux tours. » Le plan se donne
+  // petit à petit : l'étape en cours seule, ni la vérité cachée ni les secrets des personnages avant la dernière étape.
+  const min = await G(() => window.MISSIONS_GUILDE.TOURS_MIN_ETAPE[window.__docs["Systeme_Parties/P1"].Mission_En_Cours.Rang]);
+  verifier("(v451) à la 1re étape : elle seule (la suivante cachée), ni la vérité cachée, ni le secret de Dame Sira", /L'étape à jouer maintenant : 1\. Trouver la lettre/.test(ici) && !/Confondre le voleur/.test(ici) && /Encore 1 étape après celle-ci/.test(ici)
+           && !/Le commanditaire ment/.test(ici) && !/elle aime le voleur/.test(ici) && /ne désigne aucun coupable, aucun traître/.test(ici), ici.slice(0, 400));
+  verifier(`(v451) …le rythme : au moins ${min} passages par étape (selon le rang), un indice au plus par passage, une révélation à la fois`, new RegExp(`au moins ${min} de tes passages \\(celle-ci en est à 0\\)`).test(ici) && /un au plus par passage/.test(ici) && /Une révélation à la fois/.test(ici), ici.split("LE RYTHME")[1]);
   const ia = lire("ia_master.js");
   verifier("le Narrateur le lit avant chaque tour, et MIA_SUIVI_MISSION suit après", /window\.contexteMissionMJ\(dataPartieMJ, lieuActuel\)/.test(ia) && /window\.MISSIONS_GUILDE\.suivreApresMJ\(reponseTexte\)/.test(ia));
 });
@@ -481,12 +487,22 @@ await section(async () => {
 
 titre("7. LE SUIVI : LES ÉTAPES, LES INDICES ; LE NARRATEUR DIT QUE C'EST RÉUSSI : LA MISSION S'ACHÈVE");
 await section(async () => {
-  reponsesSuivi = [{ etapes_accomplies: [1, 9], indices_trouves: ["La lettre du voleur"], statut: "en_cours", resume: "La lettre est trouvée." },
-                   { etapes_accomplies: [2], indices_trouves: [], statut: "reussie", resume: "Le voleur est démasqué." }];
-  await G(() => window.MISSIONS_GUILDE.suivreApresMJ("Les héros trouvent la lettre au fond du puits."));
+  // (v451) Le rythme : une étape au plus par tour, jamais avant son nombre de tours minimum (C 2, B 3, A 4).
+  const min = await G(() => window.MISSIONS_GUILDE.TOURS_MIN_ETAPE[window.__docs["Systeme_Parties/P1"].Mission_En_Cours.Rang]);
+  const tot = Array.from({ length: min - 1 }, () => ({ etapes_accomplies: [1, 2], indices_trouves: [], statut: "reussie", resume: "Tout va trop vite." }));
+  reponsesSuivi = [...tot, { etapes_accomplies: [1, 9], indices_trouves: ["La lettre du voleur"], statut: "en_cours", resume: "La lettre est trouvée." }];
+  for (let k = 0; k < min - 1; k++) await G(() => window.MISSIONS_GUILDE.suivreApresMJ("Tout se dénoue d'un coup."));
   let md = await missionDoc();
-  verifier("une étape accomplie (l'étape inconnue ignorée), un indice, le journal", md.Avancement.Etapes["1"] === true && !md.Avancement.Etapes["9"] && md.Avancement.Indices.includes("La lettre du voleur") && /La lettre est trouvée/.test(md.Avancement.Journal[0].Texte), JSON.stringify(md.Avancement));
+  verifier(`(v451) avant ${min} tours, rien n'avance (ni étape, ni « réussie » sans toutes les étapes)`, md && !md.Avancement.Etapes["1"] && !md.Avancement.Etapes["2"] && md.Avancement.Tours_Etape === min - 1, JSON.stringify(md && md.Avancement).slice(0, 200));
+  await G(() => window.MISSIONS_GUILDE.suivreApresMJ("Les héros trouvent la lettre au fond du puits."));
+  md = await missionDoc();
+  verifier("une étape accomplie (l'étape inconnue ignorée), un indice, le journal", md.Avancement.Etapes["1"] === true && !md.Avancement.Etapes["9"] && md.Avancement.Indices.includes("La lettre du voleur") && md.Avancement.Journal.some(j => /La lettre est trouvée/.test(j.Texte)) && md.Avancement.Tours_Etape === 0, JSON.stringify(md.Avancement));
   verifier("MIA_SUIVI_MISSION lit l'objectif et les étapes", /Objectif 1\./.test(appelsSuivi[0]) && /1\. Trouver la lettre/.test(appelsSuivi[0]));
+  // (v451) La dernière étape : la vérité cachée et les secrets des personnages viennent au Narrateur.
+  const fin2 = await G(() => window.contexteMissionMJ({}, "L_KESH"));
+  verifier("(v451) à la dernière étape : la vérité cachée et les secrets lui sont donnés", /L'étape à jouer maintenant : 2\. Confondre le voleur/.test(fin2) && /C'est la dernière étape/.test(fin2) && /Le commanditaire ment/.test(fin2) && /elle aime le voleur/.test(fin2), fin2.slice(0, 300));
+  reponsesSuivi = [...Array.from({ length: min - 1 }, () => ({ etapes_accomplies: [], indices_trouves: [], statut: "en_cours", resume: "" })), { etapes_accomplies: [2], indices_trouves: [], statut: "reussie", resume: "Le voleur est démasqué." }];
+  for (let k = 0; k < min - 1; k++) await G(() => window.MISSIONS_GUILDE.suivreApresMJ("On cherche encore."));
   await G(() => window.MISSIONS_GUILDE.suivreApresMJ("Le voleur est démasqué devant tout le village."));
   await G(() => window.__surPartie(window.__docs["Systeme_Parties/P1"]));
   const fin = await G((id) => window.__docs["Systeme_Parties/P1/Missions_Terminees/" + id] || null, m0.Id), pd = await partieDoc();
