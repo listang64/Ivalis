@@ -339,6 +339,33 @@ await section(async () => {
   const narr3 = requetes.filter(q => /Continue l.histoire/.test(q.systeme)).pop();
   verifier("dans un lieu : sa fiche, sa réputation, et la région", /Type : Lieu/.test(narr3.systeme) && /charbonniers/.test(narr3.systeme)
            && /RÉPUTATION DU GROUPE DANS CE LIEU/.test(narr3.systeme) && /lieu connu : Brumefosse/.test(narr3.systeme) && !/AUCUN bâtiment/.test(narr3.systeme));
+  // (v454) « Quand on fait un déplacement de groupe et que l'IA marque le RP, qu'elle prenne en compte les derniers
+  // messages du RP d'avant pour faire la continuité. » Le chat archivé au départ : sa fin se garde dans la partie.
+  const arch = await p.evaluate(async () => {
+    const m = (i, extra) => ({ id: "a" + i, ID_Partie: "P1", Timestamp: 100 + i, ...extra });
+    const messages = [m(0, { Auteur_ID: "SYSTEME_TEMPS", Auteur_Nom: "Système", Texte: "Jour 3" }),
+      ...Array.from({ length: 12 }, (_, i) => m(i + 1, i % 2 ? { Auteur_ID: "MJ", Auteur_Nom: "MJ", Est_Narration_IA: true, Texte: `<p>Passage ${i + 1} : la vieille Ossa nous confie la clef du puits.</p>` }
+                                                          : { Auteur_ID: "H1", Auteur_Nom: "Thorin", Texte: `Réplique ${i + 1}`, Texte_Livre: `Thorin promet de revenir (${i + 1}).` }))];
+    messages.forEach(x => { window.__docs["Messages_Chat/" + x.id] = x; });
+    window.__docs["Systeme_Parties/P1"].IA_En_Cours = false;
+    await window.processusArchivageChat({ messages, cimetiere: false });
+    return { recit: window.__docs["Systeme_Parties/P1"].Recit_Precedent || null, restants: messages.filter(x => window.__docs["Messages_Chat/" + x.id]).length };
+  });
+  const rp = arch.recit || {};
+  verifier("(v454) au départ, le chat archivé : ses 10 dernières lignes (sans le compteur du temps ni balises) et le résumé de la chronique gardés dans la partie",
+           !!arch.recit && rp.Texte.split("\n").length === 10 && /Passage 12 : la vieille Ossa/.test(rp.Texte) && !/Passage 2 /.test(rp.Texte) && !/<p>|Jour 3/.test(rp.Texte)
+           && /Le livre \(Thorin\) : Thorin promet de revenir \(11\)/.test(rp.Texte) && /odeur de soufre/.test(rp.Resume) && arch.restants === 0, JSON.stringify(arch).slice(0, 300));
+  // À l'arrivée, le nouveau récit commence : le Narrateur reçoit la fin du récit d'avant, et la consigne de continuité.
+  await p.evaluate(() => { window.__docs["Messages_Chat/n1"] = { ID_Partie: "P1", Auteur_ID: "DESTIN", Auteur_Nom: "Le Destin", Texte: "*Le groupe arrive à destination.*", Timestamp: 500 };
+    window.__docs["Systeme_Parties/P1"].IA_En_Cours = false; });
+  await p.evaluate(() => window.declencherTourIA());
+  await p.waitForTimeout(300);
+  const narr4 = requetes.filter(q => /Continue l.histoire/.test(q.systeme)).pop();
+  verifier("(v454) à l'arrivée, le Narrateur relit la fin du récit d'avant et fait la continuité", /--- LA FIN DU RÉCIT PRÉCÉDENT \(avant ce départ\) ---/.test(narr4.systeme)
+           && /Passage 12 : la vieille Ossa/.test(narr4.systeme) && /En bref : .*odeur de soufre/.test(narr4.systeme) && /Fais la continuité/.test(narr4.systeme), (narr4.systeme.split("LA FIN DU RÉCIT")[1] || "").slice(0, 200));
+  // Le nouveau récit a pris son élan (4 passages du Narrateur) : plus besoin.
+  const plusTard = await p.evaluate(() => window.contexteRecitPrecedent(window.__docs["Systeme_Parties/P1"], Array.from({ length: 4 }, () => ({ Est_Narration_IA: true }))));
+  verifier("(v454) …après quatre passages du nouveau récit, il ne la relit plus", plusTard === "", plusTard.slice(0, 80));
 });
 
 // =========================================================================

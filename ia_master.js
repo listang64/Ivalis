@@ -2219,6 +2219,39 @@ function ligneDuLivre(m) {
     return `${m.Auteur_Nom} : ${m.Texte}`;
 }
 
+// (v454) LA SUITE DU RÉCIT D'AVANT. Nico : « quand on fait un déplacement de groupe et que l'IA marque le RP,
+// qu'elle prenne en compte les derniers messages du RP d'avant pour faire la continuité ». Au départ d'un voyage,
+// le chat est archivé puis vidé : le Narrateur reprenait à l'arrivée sans rien de ce qui précédait. La fin du
+// récit (ses dernières lignes, et le résumé de MIA_CHRONIQUE) se garde dans la partie (Recit_Precedent) ; le
+// Narrateur la relit tant que le nouveau récit n'a que quelques passages.
+const LIGNES_RECIT_PRECEDENT = 10, PASSAGES_AVEC_RECIT_PRECEDENT = 4;
+const estLigneDuRecit = (m) => {
+    if (!m || m.Auteur_ID === "SYSTEME_TEMPS" || m.Auteur_ID === "Date") return false;
+    if (["Date", "Système", "Date_En_Jeu"].includes(m.Auteur_Nom || "")) return false;
+    return !!String(m.Texte_Livre || m.Texte || "").trim();
+};
+function recitPrecedentDepuis(messages, resume) {
+    const lignes = (messages || []).filter(estLigneDuRecit).slice(-LIGNES_RECIT_PRECEDENT)
+        .map(m => ligneDuLivre(m).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+    if (!lignes.length) return null;
+    let texte = lignes.join("\n");
+    if (texte.length > 6000) texte = "…" + texte.slice(-6000);
+    const date = window.DATE_EN_JEU_ACTUELLE || {};
+    return { Texte: texte, Resume: String(resume || "").trim().slice(0, 1200), Le: Date.now(), Jour: date.jour || "", An: date.annee || "" };
+}
+function contexteRecitPrecedent(dataPartie, messages) {
+    const r = dataPartie && dataPartie.Recit_Precedent;
+    if (!r || !r.Texte) return "";
+    const passages = (messages || []).filter(m => m && m.Est_Narration_IA).length;
+    if (passages >= PASSAGES_AVEC_RECIT_PRECEDENT) return "";
+    return `\n--- LA FIN DU RÉCIT PRÉCÉDENT (avant ce départ) ---\n`
+        + (r.Resume ? `En bref : ${r.Resume}\n` : "")
+        + `Les dernières lignes du livre :\n${r.Texte}\n`
+        + `CONSIGNE : le récit reprend là. Fais la continuité : ce qui vient de se passer, ce qui a été dit, promis ou laissé en suspens, l'humeur du groupe — sans le répéter ni le résumer au lecteur.\n`;
+}
+window.recitPrecedentDepuis = recitPrecedentDepuis;
+window.contexteRecitPrecedent = contexteRecitPrecedent;
+
 // LE CERVEAU DU NARRATEUR (v300), par défaut. Nico : « le MJ, que l'on va
 // nommer maintenant Narrateur, parlera comme si c'était un personnage du groupe
 // d'aventuriers qui suit les aventuriers dans leurs aventures. Il écrira à la
@@ -2463,6 +2496,8 @@ window.declencherTourIA = async function(options) {
             try { const cm = window.contexteMissionMJ(dataPartieMJ, lieuActuel); if (cm) contexte += `\n${cm}\n`; }
             catch (e) { console.error("Mission de guilde (le tour continue) :", e); }
         }
+        // (v454) La fin du récit d'avant le voyage : la continuité.
+        contexte += contexteRecitPrecedent(dataPartieMJ, messagesFiltres);
 
         // LES HÉROS (v312). Nico : « le narrateur n'a pas pris en compte le genre féminin
         // de mon personnage ; envoie-lui les fiches personnages avec ce genre d'infos ».
@@ -2773,6 +2808,7 @@ window.processusArchivageChat = async function(options) {
             const anEnJeu = window.DATE_EN_JEU_ACTUELLE?.annee || "?";
 
             // NOUVEAU PROMPT : On force l'IA à utiliser le MJ et le Destin
+            var texteResumeChronique = "";
             const promptChronique = `Tu es MIA_CHRONIQUE, l'archiviste silencieuse d'Ivalis.
 Voici la transcription exacte des événements récents. Tu y trouveras les actions des héros, mais aussi la narration du Maître du Jeu (MJ) et du Destin.
 
@@ -2795,6 +2831,7 @@ Ne mentionne JAMAIS les mécaniques de jeu (jets de dés, tours de parole). Écr
                 const texteResume = dataChronique.candidates?.[0]?.content?.parts?.[0]?.text;
 
                 if (texteResume) {
+                    texteResumeChronique = texteResume;
                     console.log(`📜 [MIA_Chronique] Résumé enregistré : ${texteResume}`);
                     // On enregistre ce fait marquant dans la base de données
                     await addDoc(collection(db, "Chroniques_Partie"), {
@@ -2825,6 +2862,12 @@ Ne mentionne JAMAIS les mécaniques de jeu (jets de dés, tours de parole). Écr
             try { await window.GRIMOIRE_RECIT.archiverChapitre(messages); }
             catch (e) { console.error("Le chapitre du livre (l'archivage continue) :", e); }
         }
+
+        // 4 ter. (v454) LA FIN DU RÉCIT, GARDÉE POUR LA SUITE : le Narrateur la relira au début du nouveau récit.
+        try {
+            const recit = recitPrecedentDepuis(messages, typeof texteResumeChronique !== "undefined" ? texteResumeChronique : "");
+            if (recit) await setDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { Recit_Precedent: recit }, { merge: true });
+        } catch (e) { console.error("La fin du récit (l'archivage continue) :", e); }
 
         // 5. Autodestruction du chat (EN LOT)
         console.log("🧹 [Nettoyage] Suppression de l'historique du chat en lot...");

@@ -12353,3 +12353,11 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   - Le pion est maintenant gardé jusqu'à sa chute, 20 s au plus (DUREE_PION_RETENU).
   - Déjà effacé, il revient le temps de tomber (animations_jeu.js, animerReactionCombat).
 - animations_en_jeu_4.mjs le vérifie (ses contrôles « v453 »).
+
+## v454 — Après un voyage, le Narrateur reprend le fil du récit d'avant
+
+- **La continuité** (Nico : « quand on fait un déplacement de groupe et que l'IA marque le RP, qu'elle prenne en compte les derniers messages du RP d'avant pour faire la continuité ») : au départ d'un voyage, le chat était archivé puis vidé. À l'arrivée, le Narrateur repartait sans rien, car le résumé de MIA_CHRONIQUE n'était relu par personne.
+  - La fin du récit (ses 10 dernières lignes, telles que le livre les raconte, et ce résumé) se garde maintenant dans la partie (Systeme_Parties/{id}.Recit_Precedent, ia_master.js, recitPrecedentDepuis).
+  - Le Narrateur la relit, avec une consigne de continuité, tant que le nouveau récit a moins de 4 passages (contexteRecitPrecedent).
+  - Les jours de marche sans un mot des joueurs ne l'effacent pas : seul un vrai archivage la remplace.
+- corrections_v276.mjs le vérifie (ses contrôles « v454 »).

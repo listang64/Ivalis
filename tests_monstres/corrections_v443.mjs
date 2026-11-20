@@ -484,7 +484,7 @@ await section(async () => {
   verifier(`au lieu de la mission (${r.difficulte}, décalage caché ${r.d}) : ${5 + r.d} — la triche des créatures suit`, ((r.difficulte === "normale" && [-1, 0, 1].includes(r.d)) || (r.difficulte === "difficile" && [2, 3, 4].includes(r.d))) && r.ici.n === 5 + r.d && r.ici.t === r.ici.attendu && r.apres === 5, JSON.stringify(r));
   verifier("(v452) les décalages : normale −1 / 0 / +1, difficile +2 / +3 / +4", JSON.stringify(await G(() => window.MISSIONS_GUILDE.DECALAGES)) === '{"normale":[-1,0,1],"difficile":[2,3,4]}');
   // Une mission d'avant v452 (à rang, sans décalage écrit) : le sien, tiré de son identifiant, dans sa difficulté.
-  const anc = await G(() => { const p = window.__docs["Systeme_Parties/P1"], avant = p.Mission_En_Cours; p.Mission_En_Cours = { Id: avant.Id, Titre: avant.Titre, Rang: "A", Lieu_Id: avant.Lieu_Id };
+  const anc = await G(() => { const p = window.__docs["Systeme_Parties/P1"], avant = p.Mission_En_Cours; p.Mission_En_Cours = { Id: "M_ANCIENNE_V451", Titre: avant.Titre, Rang: "A", Lieu_Id: avant.Lieu_Id };
     p.Lieu_Actuel = "L_KESH"; window.__surPartie(p); const n = window.niveauDesCreatures(); p.Mission_En_Cours = avant; p.Lieu_Actuel = ""; window.__surPartie(p); return n; });
   verifier("(v452) une mission en cours d'avant (Rang A) : difficile, +2 à +4 au lieu de la mission", [7, 8, 9].includes(anc), String(anc));
 });
