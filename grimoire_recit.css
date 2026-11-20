@@ -158,6 +158,13 @@
 .recit-postit.sortie { transform: translateX(0) rotate(4deg); }
 .recit-postit.sortie:not(.eteint):hover { transform: translateX(4%) rotate(2deg); }
 .recit-postit.eteint { filter: grayscale(0.7) brightness(0.92) drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.4) rgba(40, 20, 6, 0.3)); cursor: default; }
+/* (v456) Le Narrateur ne part que quand tous l'ont appelé : chez ceux qui ne l'ont pas encore fait, son papier
+   tremble un peu de temps en temps ; le mien, appelé, s'éteint en attendant les autres ; le compte à côté du nom. */
+.recit-postit.rappel .papier-postit { animation: rappel-narrateur 4.5s ease-in-out infinite; transform-origin: 30% 50%; }
+@keyframes rappel-narrateur { 0%, 78%, 100% { transform: rotate(0); } 81% { transform: rotate(-4deg); } 84% { transform: rotate(3.5deg); } 87% { transform: rotate(-2.5deg); } 90% { transform: rotate(1.5deg); } 93% { transform: rotate(0); } }
+@media (prefers-reduced-motion: reduce) { .recit-postit.rappel .papier-postit { animation: none; outline: 2px solid rgba(122, 26, 18, 0.5); } }
+.recit-postit.appele { filter: grayscale(0.55) brightness(0.95) drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.4) rgba(40, 20, 6, 0.3)); }
+.compte-narrateur { font-size: 0.8em; color: #7a1a12; margin-left: 0.15em; }
 /* (v307) rentré, il disparaît tout entier sous la page de droite. */
 .recit-postit:not(.sortie) { transform: translateX(-80%) rotate(0deg); pointer-events: none; }
 

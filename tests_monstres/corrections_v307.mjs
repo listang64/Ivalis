@@ -177,11 +177,20 @@ titre("2. LE NARRATEUR : SON POST-IT RENTRE TOUT ENTIER ; LE PAPIER SE REPLIE QU
 await section(async () => {
   await p.evaluate(() => { window.__tours = 0; });
   verifier("le post-it du Narrateur est sorti, prêt", await sorti("recit-postit"));
+  // (v456) Nico : « il faut que tous les joueurs aient cliqué sur le Narrateur pour l'envoyer ; dès qu'un premier joueur
+  // a cliqué, le marque-page tremble de temps en temps pour rappeler aux autres de cliquer ».
+  await p.evaluate(() => window.livreRecitPartie({ Appel_Narrateur: { J2: Date.now() - 50 } }));
+  await p.waitForTimeout(150);
+  const rap = await p.evaluate(() => { const el = document.getElementById("recit-postit"), papier = el.querySelector(".papier-postit");
+    return { rappel: el.classList.contains("rappel"), anim: getComputedStyle(papier).animationName, compte: document.getElementById("recit-compte-narrateur").textContent.trim(), tours: window.__tours, sortie: el.classList.contains("sortie") }; });
+  verifier("(v456) Lyra a appelé le Narrateur : chez Thorin, son post-it tremble de temps en temps (1/2), et rien ne part encore", rap.rappel && rap.anim === "rappel-narrateur" && rap.compte === "1/2" && rap.tours === 0 && rap.sortie, JSON.stringify(rap));
   await p.evaluate(() => document.getElementById("recit-postit").click());
   await p.waitForTimeout(700);
   const a = await p.evaluate(() => { const el = document.getElementById("recit-postit"), r = el.getBoundingClientRect(), d = document.getElementById("grimoire-suite-3").getBoundingClientRect();
     return { sortie: el.classList.contains("sortie"), depasse: r.right - d.right, tours: window.__tours }; });
-  verifier("touché : le Narrateur est appelé, le post-it rentre tout entier dans le livre", !a.sortie && a.depasse <= 1 && a.tours === 1, JSON.stringify(a));
+  verifier("touché par le dernier joueur : le Narrateur est appelé, le post-it rentre tout entier dans le livre", !a.sortie && a.depasse <= 1 && a.tours === 1, JSON.stringify(a));
+  const enBase = await p.evaluate(() => (window.__majs || []).filter(m => /^Systeme_Parties\//.test(m.chemin) && m.data && m.data["Appel_Narrateur.J1"] > 0).map(m => m.chemin));
+  verifier("(v456) l'appel de Thorin est rangé sur la partie (Appel_Narrateur)", enBase.length === 1, JSON.stringify(enBase));
   // Le Narrateur réfléchit (le verrou), puis écrit sa page.
   await p.evaluate(() => window.livreRecitPartie({ IA_En_Cours: true }));
   await p.waitForTimeout(600);

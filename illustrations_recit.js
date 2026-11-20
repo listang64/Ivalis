@@ -583,11 +583,15 @@ window.illustrerLeRecit = async function (options) {
     };
     // (v430) Un moment fort seulement : une force de 8 ou plus (un avis sans force reste permis).
     const fort = !(Number.isFinite(Number(avis.force)) && avis.force !== undefined && avis.force !== null) || Number(avis.force) >= (R.forceMin || 8);
-    if (avis.illustrer && fort && avis.description && ecart >= R.ecart) resultat.illustration = await croquer(avis, false);
+    // (v456) Nico : « s'il y a un nouveau PNJ qui se crée avec son image, qu'il n'y ait pas de génération d'image
+    // de scène dans le RP ». Un portrait posé à ce tour (par le Narrateur) ou peint ici : pas de croquis, même forcé.
+    const nouveauPortrait = (Array.isArray(o.portraitsPoses) && o.portraitsPoses.length > 0) || sansPortrait.length > 0;
+    if (nouveauPortrait) console.log(`🖋️ [MIA_ILLUSTRATEUR] Pas de croquis cette fois : un nouveau PNJ a son portrait (${[...(o.portraitsPoses || []).map(p => p.Nom), ...sansPortrait.map(p => p.nom)].join(", ")}).`);
+    else if (avis.illustrer && fort && avis.description && ecart >= R.ecart) resultat.illustration = await croquer(avis, false);
     else console.log(`🖋️ [MIA_ILLUSTRATEUR] Pas de croquis cette fois (${!avis.illustrer ? "l'agent n'a pas vu de moment" : !fort ? `moment pas assez fort (${avis.force})` : ecart < R.ecart ? "le dernier est trop récent" : "sans description"}) — ${ecartForce} réponse(s) du Narrateur sans croquis.`);
     // (v326) Nico : « s'il n'y a pas eu de dessin après 3 réponses du MJ, ça force le
     // dessin, sur un gros plan d'un des aventuriers ».
-    if (!resultat.illustration && R.forcerApres > 0 && ecartForce >= R.forcerApres) {
+    if (!resultat.illustration && !nouveauPortrait && R.forcerApres > 0 && ecartForce >= R.forcerApres) {
         const gros = grosPlanForce(o.texteMJ);
         if (gros) resultat.illustration = await croquer(gros, true);
     }

@@ -675,7 +675,7 @@ RÈGLES :
 - Tous les noms sont différents : 1 à 4 mots, en français, sans chiffre.
 - Chaque description physique commence par le peuple ou l'espèce, et décrit une tenue et des armes antiques.
 - L'APPARENCE D'UN PEUPLE (v309) : quand un peuple a une APPARENCE dans la liste (le Grimoire des Races), la description physique la suit fidèlement (peau, traits, taille, signes du peuple), puis y ajoute ce qui est propre à cet individu.
-- "visuel" : une clé courte, commune aux créatures qui se RESSEMBLENT (trois loups gris identiques partagent la même clé) ; au plus 5 visuels différents. Chaque visuel a une description physique précise de la tête et du haut du corps (elle servira à sculpter un médaillon).
+- "visuel" : une clé courte, commune aux créatures qui se RESSEMBLENT (trois loups gris identiques partagent la même clé) ; au plus 5 visuels différents. Un PNJ nommé a son propre visuel, que personne d'autre ne partage, et aucune autre créature ne lui ressemble. Chaque visuel a une description physique précise de la tête et du haut du corps (elle servira à sculpter un médaillon).
 - (v367) "peuple" : pour CHAQUE visuel, renforts compris, le nom EXACT d'un des peuples d'Elyria de la liste (« Vargen », « Ankylar »…), ou "bete" pour un animal de la faune, ou "mythe" pour une créature de la mythologie antique. Jamais un peuple inventé. Un membre d'un peuple a l'APPARENCE de ce peuple (la liste), pas celle d'un humain avec des cornes ou d'une race d'un autre univers.
 
 Réponds UNIQUEMENT en JSON : {"creatures": [{"numero": 1, "nom": "...", "visuel": "loup", "pnj": "", "lien": ""}], "visuels": [{"cle": "loup", "peuple": "bete", "description_physique": "..."}]}`;
@@ -763,7 +763,13 @@ function habiller(tous, habits, analyse, pnjs) {
         if (!cles.has(brute)) {
             // (v327) Plus de place pour un visuel : celui d'une créature du même rôle
             // (un soutien ne prend pas le dessin d'un molosse), sinon le premier.
-            if (cles.size >= R.visuelsMax) { const semblable = roleDuVisuel.get(x.m.archetype); brute = semblable || [...cles.keys()][0]; }
+            // (v456) Nico : « un ennemi a pris le même token qu'un ennemi qui a un avatar, un PNJ important ;
+            // que ça ne se fasse pas sur les PNJ qui ont un avatar ». Le visuel d'un PNJ nommé n'est jamais
+            // prêté ; un PNJ nommé a toujours le sien, quitte à dépasser la limite d'un visuel.
+            const libres = [...cles.keys()].filter(k => !k.startsWith("pnj:"));
+            const semblable = roleDuVisuel.get(x.m.archetype);
+            const emprunt = pnj ? null : (semblable && !semblable.startsWith("pnj:") ? semblable : libres[0] || null);
+            if (cles.size >= R.visuelsMax && emprunt) brute = emprunt;
             else {
                 const cle = "v" + (cles.size + 1);
                 cles.set(brute, cle);
@@ -777,7 +783,7 @@ function habiller(tous, habits, analyse, pnjs) {
             }
         }
         const cle = cles.get(brute);
-        if (!roleDuVisuel.has(x.m.archetype)) roleDuVisuel.set(x.m.archetype, brute);
+        if (!roleDuVisuel.has(x.m.archetype) && !brute.startsWith("pnj:")) roleDuVisuel.set(x.m.archetype, brute);
         const lien = String(h.lien || r.lien || "").trim();
         return { ...x.m, nom, visuel: cle, description: visuels[cle] ? visuels[cle].Description : "", ...(lien ? { lien } : {}), ...(pnj ? { pnj: pnj.Nom_PNJ, portrait: pnj.URL_Cloudinary || "" } : {}) };
     });

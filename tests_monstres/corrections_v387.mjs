@@ -309,6 +309,19 @@ await section(async () => {
   await p.keyboard.press("Enter"); await p.waitForTimeout(4000);
   const envoi = await p.evaluate(() => JSON.parse(JSON.stringify([window.__partie, (window.__ajouts || []).some(a => a.col === "Messages_Chat" && a.data.Texte === "Salut")])));
   verifier("envoyé : la plume redevient libre pour les autres", envoi[1] && envoi[0].Plume_Recit === null, JSON.stringify(envoi));
+  // (v456) Nico : « l'encart où écrivent les joueurs n'est disponible qu'une fois le texte du joueur précédent totalement
+  // écrit sur le livre ». Le texte de Lyra arrive : tant que la plume l'écrit, mon papier reste gris et fermé à l'écriture.
+  const long = Array.from({ length: 6 }, (_, i) => `Lyra pose sa main sur l'épaule du vieux marin et lui demande, pour la ${i + 1}e fois, d'où vient cette carte.`).join(" ");
+  await relayer([{ idDoc: "m1", ID_Partie: "P1", Auteur_ID: "MJ_IA", Auteur_Nom: "Narrateur", Est_Narration_IA: true, Texte: "La taverne est pleine.", Timestamp: Date.now() - 600000 },
+                 { idDoc: "m9", ID_Partie: "P1", Auteur_ID: "H2", Auteur_Nom: "Lyra", Texte: "je lui demande d'où vient la carte", Texte_Livre: long, Timestamp: Date.now() }], false);
+  await p.waitForTimeout(500);
+  const pendant = await p.evaluate(() => ({ grise: document.getElementById("recit-ecriture").classList.contains("grise"), lecture: document.getElementById("recit-saisie").readOnly,
+    texte: document.getElementById("recit-plume-occupee").textContent, reste: document.querySelectorAll('.mot.a-ecrire[data-e="m9"]').length }));
+  verifier("(v456) le texte de Lyra s'écrit encore : mon papier est gris et fermé, « la plume écrit le texte de Lyra »", pendant.reste > 0 && pendant.grise && pendant.lecture && /La plume écrit le texte de Lyra/.test(pendant.texte), JSON.stringify(pendant));
+  await p.waitForFunction(() => !document.querySelector('.mot.a-ecrire[data-e="m9"]'), null, { timeout: 30000 }).catch(() => {});
+  await p.waitForTimeout(400);
+  const apres = await p.evaluate(() => ({ grise: document.getElementById("recit-ecriture").classList.contains("grise"), lecture: document.getElementById("recit-saisie").readOnly }));
+  verifier("(v456) le texte entièrement écrit : le papier se rouvre", !apres.grise && !apres.lecture, JSON.stringify(apres));
 });
 
 // =========================================================================

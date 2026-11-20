@@ -285,13 +285,21 @@ await section(async () => {
     const six = [ ["SOUTIEN"], ["DPS CAC"], ["DPS DISTANCE"], ["TANK CAC"], ["DPS MAGE CAC"], ["SOUTIEN"] ].map(([a], i) => ({ m: m(a, "Normal"), moment: i < 2 ? "départ" : "renfort" }));
     const h6 = { creatures: six.map((x, i) => ({ numero: i + 1, nom: "N" + i, visuel: "k" + i })), visuels: six.map((x, i) => ({ cle: "k" + i, description_physique: "d" + i })) };
     const res6 = window.habillerEnnemisCombatRP(six, h6, { ennemis: [], renforts: [] }, []).creatures.map(c => c.visuel);
-    return { sansIA, avecIA, res6 };
+    // (v456) « Un ennemi a pris le même token qu'un PNJ qui a un avatar » : le premier soutien est un PNJ nommé (Dame Koré) ;
+    // le sixième, un soutien sans place pour un visuel, ne prend jamais le sien.
+    const h6p = { ...h6, creatures: h6.creatures.map((c, i) => i === 0 ? { ...c, nom: "Dame Koré", pnj: "Dame Koré" } : c) };
+    const kore = [{ Nom_PNJ: "Dame Koré", Race: "Humain", Description_Physique: "prêtresse au visage sévère", URL_Cloudinary: "https://res.cloudinary.com/x/kore.png" }];
+    const resPnj = window.habillerEnnemisCombatRP(six, h6p, { ennemis: [], renforts: [] }, kore);
+    const avecPnj = { visuels: resPnj.creatures.map(c => c.visuel), pnjVisuel: Object.entries(resPnj.visuels).filter(([, v]) => v.PNJ).map(([k]) => k) };
+    return { sansIA, avecIA, res6, avecPnj };
   });
   verifier("sans habillage, les renforts prennent les idées du récit (des alliés des ennemis), pas « Soigneur 3 »", r.sansIA[2].nom === "Guérisseuse des esclavagistes" && r.sansIA[3].nom === "Molosse des chasseurs" && !r.sansIA.some(c => /\d/.test(c.nom)), JSON.stringify(r.sansIA.map(c => c.nom)));
   verifier("… avec leur lien et leur apparence", r.sansIA[2].lien === "la sœur du chef, accourue à son cri" && /sacoche d'herbes/.test(r.sansIA[2].desc), JSON.stringify(r.sansIA[2]));
   verifier("les ennemis du départ gardent le récit", r.sansIA[0].nom === "Chasseur au nez cassé" && r.sansIA[1].nom === "Lanceur de filet");
   verifier("avec l'habillage, chaque renfort garde le lien que l'IA lui donne", r.avecIA[2].lien === "la sœur du chef" && r.avecIA[3].lien === "leur chien", JSON.stringify(r.avecIA));
   verifier("un sixième visuel (un soutien) prend celui du premier soutien, pas celui d'un autre", r.res6[5] === r.res6[0], JSON.stringify(r.res6));
+  verifier("(v456) le visuel d'un PNJ nommé (son avatar) n'est jamais prêté à une autre créature", r.avecPnj.pnjVisuel.length === 1
+           && r.avecPnj.visuels.filter(v => v === r.avecPnj.pnjVisuel[0]).length === 1 && r.avecPnj.visuels[0] === r.avecPnj.pnjVisuel[0], JSON.stringify(r.avecPnj));
 });
 
 // =========================================================================

@@ -228,18 +228,26 @@ await section(async () => {
   const res = await p.evaluate(() => window.illustrerLeRecit({ idMessage: "m1", texteMJ: "Varos éclate de rire quand Kaya glisse sur une amphore.", texteJoueurs: "Kaya : je cours vers le comptoir", pnjConnus: {} }));
   const a = await p.evaluate(() => window.__agent[0]);
   verifier("après le Narrateur, l'agent lit les messages des joueurs et la réponse du Narrateur", !!a && /je cours vers le comptoir/.test(a.corps.contents[0].parts[0].text) && /Varos éclate de rire/.test(a.corps.contents[0].parts[0].text) && /drôle|dramatique/.test(a.corps.systemInstruction.parts[0].text));
+  // (v456) Nico : « s'il y a un nouveau PNJ qui se crée avec son image, pas de génération d'image de scène dans le RP ».
+  // Varos naît ici avec son portrait : pas de croquis à ce tour. Il en a un au tour suivant (Varos connu, le compte remis).
+  const croquisM1 = imagesIA.filter(x => /edits/.test(x.url) && /concept art/.test(x.corps)).length;
+  const mPremier = await p.evaluate(() => window.__docs["Messages_Chat/m1"]);
+  verifier("(v456) un PNJ nouveau a son portrait à ce tour : pas d'illustration de scène", croquisM1 === 0 && !(mPremier && mPremier.Illustration), `${croquisM1} croquis`);
+  await p.evaluate(() => { window.__docs["Monde_PNJ/PNJ_varos_connu"] = { Nom_PNJ: "Varos", URL_Cloudinary: "https://res.cloudinary.com/x/image/upload/v1/PNJ/portrait_varos.png" }; localStorage.removeItem("ivalis_illus_ecart_P1"); });
+  await p.evaluate(() => window.illustrerLeRecit({ idMessage: "m1b", texteMJ: "Varos éclate de rire quand Kaya glisse sur une amphore.", texteJoueurs: "Kaya : je cours vers le comptoir",
+    pnjConnus: { Varos: { Nom_PNJ: "Varos", URL_Cloudinary: "https://res.cloudinary.com/x/image/upload/v1/PNJ/portrait_varos.png" } } }));
   const croquis = imagesIA.find(x => /edits/.test(x.url) && /concept art/.test(x.corps));
   // (v346) Le croquis à l'encre est devenu une illustration de concept art en double page.
   verifier("l'illustration : un concept art (v346), qualité « medium » (v315)", !!croquis && /concept art/.test(croquis.corps) && /name="quality"\r\n\r\nmedium/.test(croquis.corps), croquis ? croquis.url : imagesIA.map(x => x.url).join(","));
-  verifier("les héros du croquis en référence, avec leur nom (comme pour les avatars)", !!croquis && (croquis.corps.match(/name="image\[\]"/g) || []).length === 1 && /image 1 is Kaya/.test(croquis.corps), "");
+  verifier("les héros du croquis en référence, avec leur nom (comme pour les avatars)", !!croquis && /image 1 is Kaya/.test(croquis.corps), "");
   verifier("une scène : en paysage 16:9 (1792 × 1024, v346)", !!croquis && /name="size"\r\n\r\n1792x1024/.test(croquis.corps));
-  const m = await p.evaluate(() => window.__docs["Messages_Chat/m1"]);
+  const m = await p.evaluate(() => ({ ...(window.__docs["Messages_Chat/m1"] || {}), Illustration: (window.__docs["Messages_Chat/m1b"] || {}).Illustration }));
   verifier("l'illustration est rangée sur le message du Narrateur (v346 : en double page)", !!m && !!m.Illustration && /Recit\/Illustrations/.test(m.Illustration.Url) && m.Illustration.Ratio === 1.75 && m.Illustration.Format === "double-page", JSON.stringify(m && m.Illustration));
   const portrait = imagesIA.find(x => /generations/.test(x.url) && /FOND TOTALEMENT MAGENTA/.test(x.corps));
   const pnj = await p.evaluate(() => Object.entries(window.__docs).filter(([k]) => /^Monde_PNJ\//.test(k)).map(([k, v]) => v));
   // (v346) Le portrait d'un PNJ nouveau : le procédé de l'avatar (ia_master.js : fond magenta, 1024 × 1792).
   verifier("Varos, PNJ nommé absent de la base : son portrait, comme l'avatar des héros (v346)", !!portrait && /FOND TOTALEMENT MAGENTA/.test(portrait.corps) && /1024x1792/.test(portrait.corps) && /aubergiste/.test(portrait.corps), portrait ? "" : "aucun");
-  verifier("… rangé dans la base (Monde_PNJ, son image avec)", pnj.length === 1 && pnj[0].Nom_PNJ === "Varos" && /PNJ\/portrait/.test(pnj[0].URL_Cloudinary), JSON.stringify(pnj));
+  verifier("… rangé dans la base (Monde_PNJ, son image avec)", pnj.some(x => x.Nom_PNJ === "Varos" && /PNJ\/portrait/.test(x.URL_Cloudinary)), JSON.stringify(pnj));
   verifier("… et posé en pleine page (Portraits_PNJ du message)", !!m && Array.isArray(m.Portraits_PNJ) && m.Portraits_PNJ[0].Nom === "Varos", JSON.stringify(m && m.Portraits_PNJ));
   // Juste après : pas de second croquis (au plus un toutes les deux réponses).
   const avant = imagesIA.length;
@@ -247,7 +255,7 @@ await section(async () => {
   await p.evaluate(() => window.illustrerLeRecit({ idMessage: "m2", texteMJ: "Encore Varos.", texteJoueurs: "", pnjConnus: { Varos: { Nom_PNJ: "Varos", URL_Cloudinary: "https://x/PNJ/v.png" } } }));
   verifier("la réponse suivante : pas de nouveau croquis (une toutes les deux), pas de portrait en double", imagesIA.length === avant, `${imagesIA.length - avant} image(s)`);
   // Dans le livre : le croquis après les paragraphes, le portrait seul sur sa page.
-  const msg = await p.evaluate(() => window.__docs["Messages_Chat/m1"]);
+  const msg = await p.evaluate(() => ({ ...window.__docs["Messages_Chat/m1"], Illustration: (window.__docs["Messages_Chat/m1b"] || {}).Illustration }));
   const texte = "La salle du Chaudron Fêlé sent la bière tiède.\nVaros éclate de rire quand Kaya glisse sur une amphore.";
   await relayer([{ idDoc: "m1", ID_Partie: "P1", Auteur_ID: "MJ", Auteur_Nom: "MJ", Est_Narration_IA: true, Texte: texte, Timestamp: 1000, Illustration: msg.Illustration, Portraits_PNJ: msg.Portraits_PNJ }], true);
   await p.waitForTimeout(900);

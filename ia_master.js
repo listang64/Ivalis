@@ -2464,6 +2464,12 @@ window.declencherTourIA = async function(options) {
 
         const historiqueComplet = historiqueReduit.map(ligneDuLivre).join("\n");
         const historique4 = historiqueReduit.slice(-4).map(ligneDuLivre).join("\n");
+        // (v456) Nico : « que l'évolution des affinités des fils invisibles se fasse aussi sur les récits qu'ont
+        // faits les joueurs dans leur RP quand on lance le Narrateur ». Tout ce que les joueurs ont écrit depuis
+        // la dernière page du Narrateur (tel que le livre le raconte, avec les répliques des PNJ), pas seulement
+        // les quatre dernières lignes.
+        const derniereNarrationIdx = (() => { for (let i = messagesFiltres.length - 1; i >= 0; i--) if (messagesFiltres[i] && messagesFiltres[i].Est_Narration_IA) return i; return -1; })();
+        const rpDesJoueurs = messagesFiltres.slice(derniereNarrationIdx + 1).filter(m => m && !m.Est_Narration_IA && m.Auteur_ID !== "SYSTEME_TEMPS").map(ligneDuLivre).join("\n").slice(-8000) || historique4;
         // (v326) Les réponses du Narrateur depuis le dernier croquis (MIA_ILLUSTRATEUR) :
         // compté dans les messages, le même pour tous les postes.
         const narrationsSansCroquis = (() => { let n = 0; for (let i = messagesFiltres.length - 1; i >= 0; i--) { const m = messagesFiltres[i] || {};
@@ -2772,7 +2778,7 @@ window.declencherTourIA = async function(options) {
                             const listeHeros = (window.PERSOS_JOUEURS_PARTIE && window.PERSOS_JOUEURS_PARTIE.length ? window.PERSOS_JOUEURS_PARTIE : window.PERSOS_PARTIE) || [];
                             const herosSociaux = listeHeros.filter(h => h && !h.estMonstre && !h.estIllusion && h.actif !== false && h.prenom && h.idPersonnage);
                             await window.SOCIAL.apresLeTour({ idPartie: window.ID_PARTIE_COURANTE, pnjs: [...vus.values()], heros: herosSociaux,
-                                reputation: envFin.reputationScore || env.reputationScore || 0, texteJoueurs: historique4, texteMJ: reponseTexte, idMessage,
+                                reputation: envFin.reputationScore || env.reputationScore || 0, texteJoueurs: rpDesJoueurs, texteMJ: reponseTexte, idMessage,
                                 dateJeu: `Jour ${window.DATE_EN_JEU_ACTUELLE?.jour || "?"} de l'an ${window.DATE_EN_JEU_ACTUELLE?.annee || "?"}` });
                         }
                     }

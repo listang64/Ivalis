@@ -17,7 +17,7 @@
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
   <link rel="stylesheet" href="grimoire.css?v=29">
-  <link rel="stylesheet" href="grimoire_recit.css?v=28">
+  <link rel="stylesheet" href="grimoire_recit.css?v=29">
   <link rel="stylesheet" href="grimoire_carte.css?v=2">
   <link rel="stylesheet" href="grimoire_regions.css?v=9">
   <link rel="stylesheet" href="loupe_cartes.css?v=5">
@@ -2230,7 +2230,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=345"></script>
+<script src="trace_combat.js?v=346"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2297,18 +2297,18 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=57"></script>
 <!-- LES FILS INVISIBLES (v411) : les âmes des PNJ et des héros, leurs liens (social_pur.js calcule). -->
-<script type="module" src="social.js?v=12"></script>
+<script type="module" src="social.js?v=13"></script>
 <!-- LA COMPAGNIE (v418) : les PNJ qui suivent le groupe (groupe_pur.js calcule). -->
 <script type="module" src="groupe.js?v=5"></script>
 <!-- LES RENCONTRES RÉCENTES (v421) : les types de rencontre des derniers chapitres, pour que le Narrateur varie. -->
 <script type="module" src="rencontres_recit.js?v=1"></script>
-<script type="module" src="ia_master.js?v=43"></script>
-<script type="module" src="illustrations_recit.js?v=17"></script>
+<script type="module" src="ia_master.js?v=44"></script>
+<script type="module" src="illustrations_recit.js?v=18"></script>
 <script type="module" src="app.js?v=184"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=6"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
-<script type="module" src="grimoire_recit.js?v=35"></script>
+<script type="module" src="grimoire_recit.js?v=36"></script>
 <!-- v396 : le chat vocal de la table (WebRTC, signalé par Firestore). -->
 <script type="module" src="vocal.js?v=3"></script>
 <!-- LA CARTE DU MONDE DANS LE GRIMOIRE (v302) : sa double page, ses zones (DEV). -->
@@ -2401,7 +2401,7 @@
 <script type="module" src="objets_ia.js?v=18"></script>
 <script type="module" src="loot.js?v=37"></script>
 <!-- LES COMBATS DU RÉCIT (v278) : la détection, la préparation, le retour au récit. -->
-<script type="module" src="combat_rp.js?v=22"></script>
+<script type="module" src="combat_rp.js?v=23"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

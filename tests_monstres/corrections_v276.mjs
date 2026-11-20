@@ -339,6 +339,21 @@ await section(async () => {
   const narr3 = requetes.filter(q => /Continue l.histoire/.test(q.systeme)).pop();
   verifier("dans un lieu : sa fiche, sa réputation, et la région", /Type : Lieu/.test(narr3.systeme) && /charbonniers/.test(narr3.systeme)
            && /RÉPUTATION DU GROUPE DANS CE LIEU/.test(narr3.systeme) && /lieu connu : Brumefosse/.test(narr3.systeme) && !/AUCUN bâtiment/.test(narr3.systeme));
+  // (v456) « Que l'évolution des affinités des fils invisibles se fasse aussi sur les récits qu'ont faits les joueurs dans leur
+  // RP. » Les fils invisibles reçoivent tout ce que les joueurs ont écrit depuis la dernière page du Narrateur, pas 4 lignes.
+  const soc = await p.evaluate(async () => {
+    Object.keys(window.__docs).filter(k => k.startsWith("Messages_Chat/")).forEach(k => delete window.__docs[k]);
+    window.__docs["Messages_Chat/s0"] = { ID_Partie: "P1", Auteur_ID: "MJ", Auteur_Nom: "MJ", Est_Narration_IA: true, Texte: "Le charbonnier Orin vous regarde entrer.", Timestamp: 10 };
+    for (let i = 1; i <= 6; i++) window.__docs["Messages_Chat/s" + i] = { ID_Partie: "P1", Auteur_ID: "H1", Auteur_Nom: "Thorin", Texte: "ligne " + i, Texte_Livre: `Thorin dit à Orin la chose numéro ${i}.`, Timestamp: 10 + i };
+    window.__docs["Systeme_Parties/P1"].IA_En_Cours = false;
+    let recu = null; const vrai = window.SOCIAL && window.SOCIAL.apresLeTour;
+    if (window.SOCIAL) window.SOCIAL.apresLeTour = async (o) => { recu = o; };
+    await window.declencherTourIA();
+    for (let k = 0; k < 40 && !recu; k++) await new Promise(r => setTimeout(r, 100));
+    if (window.SOCIAL) window.SOCIAL.apresLeTour = vrai;
+    return recu ? recu.texteJoueurs : null; });
+  verifier("(v456) les fils invisibles lisent tout le RP des joueurs depuis la dernière page du Narrateur (6 lignes, pas 4)",
+           !!soc && [1, 2, 3, 4, 5, 6].every(i => soc.includes(`la chose numéro ${i}.`)) && !/Le charbonnier Orin vous regarde/.test(soc), String(soc).slice(0, 200));
   // (v454) « Quand on fait un déplacement de groupe et que l'IA marque le RP, qu'elle prenne en compte les derniers
   // messages du RP d'avant pour faire la continuité. » Le chat archivé au départ : sa fin se garde dans la partie.
   const arch = await p.evaluate(async () => {

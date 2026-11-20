@@ -351,9 +351,16 @@ await section(async () => {
   // Le livre a maintenant 5 lignes : le Narrateur lite n'a reçu que les 4 dernières.
   const lite2 = appelsIA.filter(a => /CE QU'ÉCRIT SON JOUEUR/.test(a.txt)).slice(-1)[0];
   const lignes = lite2 ? lite2.txt.split("LE HÉROS")[0].split("\n").filter(l => l.trim() && !/DERNIÈRES LIGNES/.test(l)) : [];
-  verifier("… le Narrateur lite ne reçoit que les 4 dernières lignes du livre", lignes.length === 4 && !/J'ai connu des tavernes/.test(lite2.txt) && /trinque/.test(lite2.txt), `${lignes.length} lignes`);
+  // (v456) Il reçoit maintenant les 6 dernières lignes (les répliques des PNJ ont besoin du fil du dialogue) : ici, les 5.
+  // (v456) La plume du Narrateur : les PNJ présents répondent au héros, elle ne fait pas avancer l'histoire, une action
+  // incertaine reste une tentative (le Narrateur dira le résultat, après les dés).
+  verifier("(v456) la consigne de la plume : la tentative et pas le résultat, les PNJ présents qui répondent, l'histoire qui n'avance pas", !!lite2 && /raconte la TENTATIVE, jamais le résultat/.test(lite2.sys)
+           && /LES PNJ PRÉSENTS PARLENT/.test(lite2.sys) && /TU NE FAIS PAS AVANCER L'HISTOIRE/.test(lite2.sys) && /cinq phrases au plus/.test(lite2.sys), (lite2 && lite2.sys || "").slice(0, 80));
+  verifier("… le Narrateur lite reçoit les dernières lignes du livre (6 au plus, ici les 5)", lignes.length === 5 && /J'ai connu des tavernes/.test(lite2.txt) && /trinque/.test(lite2.txt), `${lignes.length} lignes`);
   // Le post-it : le Narrateur écrit la suite.
   await p.evaluate(() => { window.__tours = 0; });
+  // (v456) Le Narrateur part quand tous les joueurs l'ont appelé : Lyra (J2) l'a déjà fait.
+  await p.evaluate(() => window.livreRecitPartie({ Appel_Narrateur: { J2: Date.now() - 50 } }));
   const pc = await centre("#recit-postit");
   await p.mouse.click(pc.x + pc.w * 0.3, pc.y);
   await p.waitForTimeout(200);

@@ -12373,3 +12373,17 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   - La palette se tire comme pour les héros. La tenue se garde sur la fiche (Tenue) et part au dessinateur, imposée.
   - Sans choix de l'IA (l'illustrateur du récit), une des tenues proposées est tirée au hasard.
 - corrections_v408.mjs le vérifie (ses contrôles « v455 »).
+
+## v456 — Le récit : le Narrateur appelé par tous, des PNJ qui répondent, des tentatives ; fils invisibles, pions, croquis
+
+- **Le Narrateur appelé par tous** (Nico : « il faut que les joueurs aient tous cliqué sur le Narrateur pour l'envoyer ; dès qu'un premier joueur a cliqué, le marque-page tremble de temps en temps pour rappeler aux autres de cliquer ») : les appels se rangent sur la partie (Appel_Narrateur). Seuls comptent ceux d'après la dernière page du Narrateur. Le poste du dernier appelant le lance. Chez les autres, le post-it tremble (rappel-narrateur) avec le compte (1/2…) ; en mode DEV, un second toucher l'envoie.
+- **La plume du RP joueur** (« envoyer les caractères des PNJ ; il les fait répondre du tac au tac, sans faire un roman ; ça ne fait pas avancer l'histoire ; une action à jet devient « je vois X tenter de… » ») :
+  - elle reçoit les PNJ du lieu (caractère, humeur, façon de parler) et les six dernières lignes du livre ;
+  - un PNJ interpellé répond en une ou deux répliques ;
+  - une action incertaine reste une tentative, et l'histoire n'avance pas (grimoire_recit.js, PROMPT_NARRATEUR_LITE, pnjsDeLaScene).
+- **Les fils invisibles** (« l'évolution des affinités aussi sur les récits des joueurs ») : MIA_SOCIAL reçoit tout le RP des joueurs depuis la dernière page du Narrateur, pas les quatre dernières lignes. Les paroles comptent, une tentative non résolue non (ia_master.js, social.js).
+- **L'encart d'écriture** (« disponible qu'une fois le texte du joueur précédent totalement écrit ») : tant que la plume écrit le texte d'un joueur, le papier reste gris et fermé (texteDeJoueurEnEcriture).
+- **Les pions ennemis** (« un ennemi a pris le même token qu'un PNJ qui a un avatar ») : le visuel d'un PNJ nommé n'est jamais prêté ; un PNJ nommé a toujours le sien (combat_rp.js, habiller). Vérifié par ailleurs : la description des pions suit l'Antiquité et l'apparence des peuples (consignes, descriptionDuPion, prompt du pion).
+- **Les croquis** (« un nouveau PNJ avec son image : pas d'image de scène ») : un portrait posé ou peint à ce tour empêche le croquis, même forcé (illustrations_recit.js).
+- **Les dés** (« quand c'est facile je fais de gros scores, quand c'est difficile de faibles ») : vérifié, sans changement. Le d20 est tiré au hasard (Math.random) avant tout et sans connaître la difficulté, que seul le Narrateur compare au total.
+- corrections_v276, v300, v307, v314, v327, v346 et v387 le vérifient (leurs contrôles « v456 »).

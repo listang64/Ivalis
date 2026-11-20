@@ -256,7 +256,7 @@ const refSouvenir = (p, id) => doc(db, PARTIES, p, "Souvenirs", id);
 function promptSocial(presents) {
     const catalogue = P.TYPES_ACTIONS.map(t => `- ${t} : ${P.ACTIONS[t].nom} (gravité max ${P.ACTIONS[t].gmax})`).join("\n");
     return `Tu es MIA_SOCIAL, l'IA qui observe les relations entre les personnages d'Ivalis.
-Lis les dernières actions des joueurs et la réponse du Maître du Jeu. Relève ce que les personnages PRÉSENTS se sont FAIT les uns aux autres, dans cette scène seulement.
+Lis le récit que les joueurs ont écrit depuis la dernière réponse du Maître du Jeu (leurs paroles, leurs gestes, et les répliques des PNJ qu'ils ont fait parler), puis la réponse du Maître du Jeu. Relève ce que les personnages PRÉSENTS se sont FAIT ou DIT les uns aux autres, dans l'un comme dans l'autre, dans cette scène seulement.
 
 Les présents (noms exacts) : ${presents.map(x => `${x.nom} (${x.type === "heros" ? "héros" : "PNJ"})`).join(", ")}.
 
@@ -266,9 +266,10 @@ ${catalogue}
 RÈGLES :
 - Un événement = un personnage (acteur) fait une de ces actions à un autre (cible), tous deux présents. Jamais entre deux héros.
 - Seulement ce qui s'est VRAIMENT passé dans ce texte (pas une intention, pas un souvenir, pas une menace imaginée, pas une action ratée qui n'a rien fait).
+- Dans le récit des joueurs, les paroles comptent (une promesse, un compliment, une insulte, un mensonge, une confidence) ; une action seulement TENTÉE (« Kaya tente de le plaquer au sol ») n'est pas encore un fait : c'est la réponse du Maître du Jeu qui dit si elle a réussi.
 - Gravité : 1 un petit geste, 2 un acte qui compte, 3 un événement fondateur (une vie sauvée, une trahison grave). Le plus souvent 1.
 - « discret » : vrai si personne d'autre ne pouvait le voir ou l'entendre.
-- « extrait » : quatre à huit mots EXACTS du texte du Maître du Jeu où cela se passe.
+- « extrait » : quatre à huit mots EXACTS du texte où cela se passe (celui du Maître du Jeu de préférence).
 - Six événements au plus ; s'il ne s'est rien passé entre eux, une liste vide.
 - Souvenirs : pour chaque PNJ marqué par la scène, UNE phrase à la première personne (ce qu'il en retiendra), et de qui elle parle.
 - Ne donne JAMAIS de chiffre de relation.
@@ -287,7 +288,7 @@ const OUTIL_SOCIAL = [{ functionDeclarations: [{ name: "noterScene", description
 async function demanderScene(presents, texteJoueurs, texteMJ) {
     if (typeof window.fetchGemini !== "function") return null;
     const corps = JSON.stringify({ systemInstruction: { parts: [{ text: promptSocial(presents) }] },
-        contents: [{ role: "user", parts: [{ text: `--- LES DERNIÈRES ACTIONS DES JOUEURS ---\n${texteJoueurs || ""}\n\n--- LA RÉPONSE DU MAÎTRE DU JEU ---\n${texteMJ || ""}` }] }],
+        contents: [{ role: "user", parts: [{ text: `--- LE RÉCIT DES JOUEURS DEPUIS LA DERNIÈRE RÉPONSE DU MAÎTRE DU JEU ---\n${texteJoueurs || ""}\n\n--- LA RÉPONSE DU MAÎTRE DU JEU ---\n${texteMJ || ""}` }] }],
         tools: OUTIL_SOCIAL, toolConfig: { functionCallingConfig: { mode: "ANY" } }, generationConfig: { temperature: 0.2 } });
     const rep = await window.fetchGemini("social", corps);
     const data = await rep.json();

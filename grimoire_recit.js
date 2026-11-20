@@ -854,7 +854,7 @@ function creerElements() {
     postit.className = "recit-postit";
     postit.id = "recit-postit";
     postit.setAttribute("aria-label", "Le Narrateur écrit la suite");
-    postit.innerHTML = `<span class="papier-postit">${SVG_PLUME}<span>Narrateur</span></span>`;
+    postit.innerHTML = `<span class="papier-postit">${SVG_PLUME}<span class="mot-narrateur">Narrateur<span class="compte-narrateur" id="recit-compte-narrateur"></span></span></span>`;
     avantLivre(postit);
     const ecriture = document.createElement("div");
     ecriture.className = "recit-ecriture";
@@ -1185,10 +1185,15 @@ function majInterface() {
     annoncerLecture(!!ecrit || (lecture.enAttente && lecture.attenduMoi && !lecture.luMoi));
     // (v387) Un autre joueur a pris la plume : le papier se grise, le temps qu'il envoie.
     const autre = plumeDUnAutre();
-    elts.ecriture.classList.toggle("grise", !!autre);
-    elts.saisie.readOnly = !!etat.envoi || !!autre;
+    // (v456) Nico : « l'encart où écrivent les joueurs n'est disponible qu'une fois le texte du joueur
+    // précédent totalement écrit sur le livre ». Tant que la plume écrit le texte d'un joueur, le papier
+    // reste gris et on n'y écrit pas.
+    const texteEnCours = texteDeJoueurEnEcriture();
+    elts.ecriture.classList.toggle("grise", !!autre || !!texteEnCours);
+    elts.saisie.readOnly = !!etat.envoi || !!autre || !!texteEnCours;
     const occupee = document.getElementById("recit-plume-occupee");
-    if (occupee) occupee.textContent = autre ? `${autre.Nom || "Un autre joueur"} écrit… attends la fin de son message.` : "";
+    if (occupee) occupee.textContent = autre ? `${autre.Nom || "Un autre joueur"} écrit… attends la fin de son message.`
+        : texteEnCours ? `La plume écrit le texte de ${texteEnCours.Auteur_Nom || "ton compagnon"}… attends qu'elle ait fini.` : "";
     if (autre && dictee.voulue) arreterDictee();
     clearTimeout(etat.revoirPlume);
     if (autre) etat.revoirPlume = setTimeout(majInterface, Math.max(500, (Number(autre.Depuis) || 0) + DELAI_PLUME_MS - Date.now() + 200));
@@ -1209,6 +1214,13 @@ function majInterface() {
     // (v370) Tant que tout le monde n'a pas fini de lire, on ne relance pas le Narrateur.
     const narrateurOccupe = !!etat.narrateurDemande || bloque || ecrit || lecture.enAttente;
     if (!fige) elts.postit.classList.toggle("sortie", recit && posee && !narrateurOccupe);
+    // (v456) Le compte des appels ; le rappel qui tremble chez ceux qui n'ont pas encore appelé ; le mien, éteint.
+    const appels = appelsNarrateur(), jAppele = appels.qui.includes(moi());
+    const compte = document.getElementById("recit-compte-narrateur");
+    if (compte) compte.textContent = appels.qui.length && appels.attendus.length > 1 ? ` ${appels.qui.length}/${appels.attendus.length}` : "";
+    elts.postit.classList.toggle("rappel", !narrateurOccupe && appels.qui.length > 0 && !jAppele);
+    elts.postit.classList.toggle("appele", !narrateurOccupe && jAppele && appels.manquants.length > 0);
+    elts.postit.title = jAppele && appels.manquants.length ? `En attente : ${appels.manquants.map(nomJoueurLecture).join(", ")}` : "";
     if (etat.narrateurDemande) { clearTimeout(etat.revoirNarrateur); etat.revoirNarrateur = setTimeout(majInterface, 15200); }
     // (v306) Son papier : sorti tant qu'on est dans le récit, avec l'avatar de son héros.
     if (heros) remplirPapier("recit-avatar-image", "recit-avatar-nom", heros.prenom, heros);
@@ -1414,14 +1426,43 @@ async function lancerLeDe(d, el) {
 }
 
 // LE POST-IT : le Narrateur écrit la suite (l'Arbitre des dés d'abord).
-function lancerNarrateur() {
-    if (!elts || elts.postit.disabled || etat.verrou) return;
-    son("page-prise", 0.6);
+// (v456) Nico : « il faut que les joueurs aient tous cliqué sur le Narrateur pour l'envoyer. Dès qu'un
+// premier joueur a cliqué dessus, le marque-page du Narrateur tremble un peu de temps en temps pour
+// rappeler aux autres de cliquer. » Chaque appel se range sur la partie (Appel_Narrateur : le joueur,
+// l'heure) ; seuls comptent ceux d'après la dernière page du Narrateur. Le dernier qui appelle lance.
+// En mode DEV, un second toucher l'envoie sans attendre les autres.
+function appelsNarrateur() {
+    const depuis = Number((derniereNarration() || {}).Timestamp) || 0;
+    const attendus = joueursAttendusLecture();
+    const appels = Object.entries(etat.appelsNarrateur || {}).filter(([j, t]) => Number(t) > depuis && attendus.includes(j));
+    const qui = appels.map(([j]) => j);
+    return { attendus, qui, manquants: attendus.filter(j => !qui.includes(j)), dernier: appels.reduce((a, [j, t]) => (!a || Number(t) > a.t ? { j, t: Number(t) } : a), null) };
+}
+function envoyerNarrateur() {
+    if (!elts || etat.verrou) return;
     etat.narrateurDemande = Date.now();         // (v307) il rentre dans le livre
     majInterface();
     if (typeof window.declencherTourIA === "function") {
         Promise.resolve(window.declencherTourIA()).catch(e => console.error("Le Narrateur :", e));
     }
+}
+function lancerNarrateur() {
+    if (!elts || elts.postit.disabled || etat.verrou) return;
+    const qui = moi(), avant = appelsNarrateur();
+    if (qui && avant.qui.includes(qui)) {
+        if (modeDevRecit()) { son("page-prise", 0.6); envoyerNarrateur(); }
+        return;
+    }
+    son("page-prise", 0.6);
+    const quand = Date.now();
+    if (qui) {
+        etat.appelsNarrateur = { ...(etat.appelsNarrateur || {}), [qui]: quand };
+        if (window.ID_PARTIE_COURANTE) updateDoc(doc(db, "Systeme_Parties", window.ID_PARTIE_COURANTE), { [`Appel_Narrateur.${qui}`]: quand })
+            .catch(e => console.error("Le livre : l'appel du Narrateur", e));
+    }
+    const apres = appelsNarrateur();
+    if (!qui || !apres.manquants.length) { etat.appelLance = quand; envoyerNarrateur(); return; }
+    majInterface();
 }
 
 // ---------------------------------------------------------------------
@@ -1433,7 +1474,7 @@ async function envoyer() {
     if (dictee.voulue) arreterDictee();          // (v312) on écrit : la dictée s'arrête
     const texte = elts.saisie.value.trim();
     const heros = monHeros();
-    if (!texte || !heros || !window.ID_PARTIE_COURANTE || plumeDUnAutre()) return;
+    if (!texte || !heros || !window.ID_PARTIE_COURANTE || plumeDUnAutre() || texteDeJoueurEnEcriture()) return;
     etat.envoi = true;
     const vol = poussiere(elts.saisie, pointDArrivee());
     elts.saisie.value = "";
@@ -1550,7 +1591,10 @@ Un joueur vient d'écrire ce que fait ou dit son héros. Écris la ou les phrase
 - Le Narrateur peut ensuite réagir en une demi-phrase, s'il le sent : une émotion, une sensation, la réaction visible des autres, une remarque complice (« À côté de moi, Lyra retient son souffle. », « Je ne peux pas m'empêcher de sourire. »). Son « je » n'est jamais pour dire qu'il voit ou qu'il entend : il ressent, il réagit.
 - Garde au mieux l'essence de ce que le joueur a voulu faire ou dire, ni plus ni moins. N'invente ni la suite, ni le résultat (on ne sait pas encore si ça réussit), ni de nouveaux personnages, ni les pensées du héros.
 - S'il parle, ses paroles restent entre guillemets « », à peine corrigées, avec le nom de celui qui parle dans la phrase.
-- Une écriture fluide et naturelle, sans poésie forcée ni dramatisation excessive. Une à trois phrases, sans mise en forme, sans titre, sans guillemets autour de l'ensemble.`;
+- UNE ACTION À L'ISSUE INCERTAINE (frapper, plaquer, désarmer, crocheter, escalader, se cacher, voler, tromper, convaincre par la ruse ou la force…) : raconte la TENTATIVE, jamais le résultat. Pas « Thorin attrape l'homme et le plaque au sol », mais « Thorin se jette sur l'homme pour tenter de le plaquer au sol ». Ni la cible ni personne ne réagit encore au résultat : le Narrateur le dira, après les dés.
+- LES PNJ PRÉSENTS PARLENT : si le héros s'adresse à un des PNJ présents (une question, une demande, une remarque, une provocation), fais répondre ce PNJ juste après, du tac au tac, en une ou deux répliques courtes, fidèles à son caractère, à sa façon de parler, à son humeur et à ce qu'il sait. Il garde ses secrets, ne fait aucune révélation majeure et ne prend aucune décision qui engage l'histoire.
+- TU NE FAIS PAS AVANCER L'HISTOIRE : pas de nouvel événement, pas d'arrivée, pas de départ, pas de combat, pas de scène qui change. Tu fais vivre le dialogue et les gestes ; c'est le Narrateur, à sa prochaine page, qui fait avancer le fil de l'histoire.
+- Une écriture fluide et naturelle, sans poésie forcée ni dramatisation excessive, et pas de roman : une à trois phrases pour le héros, et si un PNJ lui répond, une ou deux répliques de plus (cinq phrases au plus en tout). Sans mise en forme, sans titre, sans guillemets autour de l'ensemble.`;
 const PROMPT_ANNONCE_LITE = `Tu es la plume du Narrateur d'Ivalis : membre à part entière d'un groupe d'aventuriers, il écrit le livre de leurs aventures de l'intérieur, en prose, au présent, à la première personne (« je », « nous »).
 Une annonce du jeu (le temps qui passe, le destin, la route) doit entrer dans le livre. Écris-la en une ou deux phrases qui enchaînent avec la dernière ligne du livre, comme le groupe la vit (« Nous marchons jusqu'à la nuit… »), sans rien ajouter d'important, sans mise en forme, sans commencer par « Je vois ».`;
 function dernieresLignes(n) {
@@ -1583,13 +1627,50 @@ async function appelLite(systeme, texte, plume) {
         .filter(p => typeof p.text === "string" && !p.thought).map(p => p.text).join("").replace(/\*+/g, "").trim();
     return t || null;
 }
-function reformuler(texte, heros) {
+// (v456) Nico : « envoyer à l'IA qui retravaille le RP d'un joueur les caractères des PNJ : ces joueurs posent
+// des questions aux PNJ, il les fait répondre directement, sans faire un roman ». Les PNJ du lieu (ceux que
+// le livre ou le joueur vient de nommer d'abord, six au plus), avec leur caractère (leur âme, social.js),
+// leur métier et leur façon de parler. Gardés une minute par lieu.
+const cachePnjScene = { cle: "", t: 0, pnjs: [] };
+async function pnjsDeLaScene() {
+    const lieu = (window.PARTIE_DATA && window.PARTIE_DATA.Lieu_Actuel) || "";
+    const cle = (window.ID_PARTIE_COURANTE || "") + "|" + lieu;
+    if (cachePnjScene.cle === cle && Date.now() - cachePnjScene.t < 60000) return cachePnjScene.pnjs;
+    let pnjs = [];
+    try {
+        if (typeof window.preparerEnvironnementIvalis === "function") {
+            const env = await window.preparerEnvironnementIvalis(lieu || null);
+            pnjs = Object.values((env && env.pnjsPresents) || {}).filter(f => f && f.Nom_PNJ && f.Statut !== "Mort");
+            const ids = pnjs.map(f => f.idDoc).filter(Boolean);
+            if (ids.length && window.SOCIAL && typeof window.SOCIAL.lireAmes === "function" && window.ID_PARTIE_COURANTE) {
+                const ames = await window.SOCIAL.lireAmes(window.ID_PARTIE_COURANTE, ids).catch(() => ({}));
+                pnjs = pnjs.map(f => { const a = (ames || {})[f.idDoc]; return a && a.psyche ? { ...f, __caractere: window.SOCIAL.caractere(a.psyche), __humeur: a.humeur && a.humeur.emotion ? `${a.humeur.emotion}${a.humeur.cause ? ` (${a.humeur.cause})` : ""}` : "" } : f; });
+            }
+        }
+    } catch (e) { console.warn("[La plume du Narrateur] Les PNJ de la scène :", e); }
+    cachePnjScene.cle = cle; cachePnjScene.t = Date.now(); cachePnjScene.pnjs = pnjs;
+    return pnjs;
+}
+function textePnjsDeLaScene(pnjs, texte, lignes) {
+    const ici = sansAccent(texte + " " + lignes);
+    const nomme = (f) => ici.includes(sansAccent(String(f.Nom_PNJ).split(/\s+/)[0]));
+    const tries = pnjs.slice().sort((a, b) => Number(nomme(b)) - Number(nomme(a))).slice(0, 6);
+    return tries.map(f => `- ${f.Nom_PNJ} (${[f.Race, f.Occupation].filter(Boolean).join(", ") || "?"})`
+        + (f.__caractere ? ` — caractère : ${f.__caractere}` : "") + (f.__humeur ? ` — humeur : ${f.__humeur}` : "")
+        + (f.Style_De_Parole ? ` — façon de parler : ${f.Style_De_Parole}` : "")).join("\n");
+}
+async function reformuler(texte, heros) {
     // (v312) son genre aussi : la plume accorde (« elle », « il »).
     const fem = typeof window.estGenreFeminin === "function" ? window.estGenreFeminin(heros.genre) : /^f/i.test(String(heros.genre || ""));
     const genre = heros.genre ? (fem ? "une femme — accorde au féminin" : "un homme") : "";
     const details = [genre, heros.race, heros.classe && (typeof window.nomClasseGenre === "function" ? window.nomClasseGenre(heros.classe, heros.genre) : heros.classe)].filter(Boolean).join(", ");
     const qui = [heros.prenom, heros.nom].filter(Boolean).join(" ") + (details ? ` (${details})` : "");
-    return appelLite(PROMPT_NARRATEUR_LITE, `LES DERNIÈRES LIGNES DU LIVRE (tu continues la dernière) :\n${dernieresLignes(4) || "(le livre commence)"}\n\nLE HÉROS : ${qui}\nCE QU'ÉCRIT SON JOUEUR : ${texte}`, true);
+    const lignes = dernieresLignes(6);
+    const pnjs = await Promise.race([pnjsDeLaScene(), new Promise(r => setTimeout(() => r([]), 2500))]).catch(() => []);
+    const presents = textePnjsDeLaScene(pnjs || [], texte, lignes);
+    return appelLite(PROMPT_NARRATEUR_LITE, `LES DERNIÈRES LIGNES DU LIVRE (tu continues la dernière) :\n${lignes || "(le livre commence)"}\n\n`
+        + (presents ? `LES PNJ PRÉSENTS (s'il s'adresse à l'un d'eux, il lui répond) :\n${presents}\n\n` : "")
+        + `LE HÉROS : ${qui}\nCE QU'ÉCRIT SON JOUEUR : ${texte}`, true);
 }
 // Le Destin et le Maître du Temps : un seul poste récrit chaque annonce
 // (il la réserve d'abord), les autres attendent sa ligne.
@@ -1702,6 +1783,17 @@ window.livreRecitPartie = function (data) {
     const v = !!(data && data.IA_En_Cours === true);
     const c = (data && data.Combat_RP) || null;
     const pl = (data && data.Plume_Recit) || null;
+    // (v456) Les appels au Narrateur : tous là, c'est le poste du dernier qui l'a appelé qui l'envoie.
+    const appels = (data && data.Appel_Narrateur) || {};
+    const appelsChange = JSON.stringify(appels) !== JSON.stringify(etat.appelsNarrateur || {});
+    if (appelsChange) {
+        etat.appelsNarrateur = { ...appels };
+        const a = appelsNarrateur();
+        if (a.qui.length && !a.manquants.length && a.dernier && a.dernier.j === moi() && etat.appelLance !== a.dernier.t && !v) {
+            etat.appelLance = a.dernier.t;
+            envoyerNarrateur();
+        }
+    }
     const avant = JSON.stringify(etat.combat && [etat.combat.Etat, etat.combat.Adversaires]);
     const combatChange = avant !== JSON.stringify(c && [c.Etat, c.Adversaires]);
     const plumeChange = JSON.stringify(pl) !== JSON.stringify(etat.plume);
@@ -1709,7 +1801,7 @@ window.livreRecitPartie = function (data) {
     // (v387) La plume à mon nom dans la base, mais plus rien d'écrit ici (la page
     // rechargée) : elle est rendue, les autres n'attendent pas l'échéance.
     if (pl && pl.Joueur === moi() && !etat.plumeMoi && elts && !elts.saisie.value.trim()) rendrePlume(true);
-    if (v === etat.verrou && !combatChange && !plumeChange) return;
+    if (v === etat.verrou && !combatChange && !plumeChange && !appelsChange) return;
     etat.verrou = v;
     etat.combat = c;
     majInterface();
@@ -1729,6 +1821,12 @@ window.livreRecitPartie = function (data) {
 //  reste bloqué par un absent : sans une lettre pendant 90 s, elle est libre.
 const DELAI_PLUME_MS = 90 * 1000;
 const RAFRAICHIR_PLUME_MS = 20 * 1000;
+// (v456) Le message d'un joueur que la plume est encore en train d'écrire dans le livre (ou rien).
+function texteDeJoueurEnEcriture() {
+    const id = Object.keys(etat.ecrits).find(x => etat.ecrits[x] < (etat.totaux[x] || 0)
+        && etat.messages.some(m => idDe(m) === x && !m.Est_Narration_IA && (m.Texte_Livre || m.Livre)));
+    return id ? etat.messages.find(m => idDe(m) === id) : null;
+}
 function plumeDUnAutre() {
     const p = etat.plume;
     if (!p || !p.Joueur || p.Joueur === moi()) return null;

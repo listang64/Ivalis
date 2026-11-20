@@ -364,7 +364,7 @@ const PNG1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDw
 const imagesIA = [];
 await p.route('**/api.openai.com/**', async r => { const req = r.request(); imagesIA.push({ url: req.url(), corps: req.postDataBuffer() ? req.postDataBuffer().toString("utf-8") : "" });
   r.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ data: [{ b64_json: PNG1 }] }) }); });
-const illustrer = (avis, texteMJ, ecart) => p.evaluate(async ([avis, texteMJ, ecart]) => {
+const illustrer = (avis, texteMJ, ecart, connus) => p.evaluate(async ([avis, texteMJ, ecart, connus]) => {
   ["ivalis_OPENAI_API_KEY", "ivalis_CLOUDINARY_CLOUD_NAME", "ivalis_CLOUDINARY_API_KEY", "ivalis_CLOUDINARY_API_SECRET"].forEach(k => localStorage.setItem(k, "banc"));
   const kaya = { idPersonnage: "H1", idJoueur: "J1", prenom: "Kaya", genre: "Femme", race: "Humain", classe: "Pisteur", actif: true, urlCloudinary: "kaya.png", urlPortraitReference: "portrait-kaya.png" };
   const thorin = { idPersonnage: "H3", idJoueur: "J1", prenom: "Thorin", genre: "Homme", race: "Nain", classe: "Protecteur", actif: true, urlCloudinary: "thorin.png", urlPortraitReference: "portrait-thorin.png" };
@@ -378,15 +378,17 @@ const illustrer = (avis, texteMJ, ecart) => p.evaluate(async ([avis, texteMJ, ec
   window.fetchGemini = async () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(avis) }] } }] }), { status: 200 });
   localStorage.setItem("ivalis_illus_ecart_" + (window.ID_PARTIE_COURANTE || ""), String(ecart == null ? 5 : ecart));
   const id = "mi" + Math.random().toString(36).slice(2, 7);
-  await window.illustrerLeRecit({ idMessage: id, texteMJ, texteJoueurs: "", pnjConnus: {} });
+  await window.illustrerLeRecit({ idMessage: id, texteMJ, texteJoueurs: "", pnjConnus: connus || {} });
   return { doc: (window.__docs || {})["Messages_Chat/" + id] || null, depots: window.__depots.slice(), portraits: window.__portraits.slice() };
-}, [avis, texteMJ, ecart]);
+}, [avis, texteMJ, ecart, connus || null]);
+// (v456) Un PNJ déjà connu, avec son portrait : pas de portrait à peindre, le croquis reste permis.
+const VAROS_CONNU = { Varos: { Nom_PNJ: "Varos", URL_Cloudinary: "https://res.cloudinary.com/x/image/upload/v1/PNJ/varos.png", Statut: "Vivant" } };
 const champ = (corps, nom) => { const m = new RegExp(`name="${nom.replace(/[[\]]/g, "\\$&")}"\\r\\n\\r\\n([\\s\\S]*?)\\r\\n--`).exec(corps); if (m) return m[1]; try { return JSON.parse(corps)[nom]; } catch (e) { return ""; } };
 await section(async () => {
   const n0 = imagesIA.length;
   const r = await illustrer({ illustrer: true, moment: "drôle", sujet: "scene", description: "Kaya slips on a wet amphora while Varos the innkeeper laughs, in a smoky tavern.",
     acteurs: [{ id: "H1", nom: "Kaya", type: "heros", place: "center-right", action: "slipping", expression: "surprised" }, { nom: "Varos", type: "pnj", place: "far right", action: "laughing", expression: "amused" }],
-    mise_en_scene: "medium shot", extrait: "Kaya glisse sur l'amphore.", pnj_nommes: [{ nom: "Varos", present: true, race: "Humain", description_physique: "Un aubergiste ventru." }] }, "Kaya glisse sur l'amphore ; Varos éclate de rire.");
+    mise_en_scene: "medium shot", extrait: "Kaya glisse sur l'amphore.", pnj_nommes: [{ nom: "Varos", present: true, race: "Humain", description_physique: "Un aubergiste ventru." }] }, "Kaya glisse sur l'amphore ; Varos éclate de rire.", undefined, VAROS_CONNU);
   const req = imagesIA.slice(n0).find(x => /images\/(edits|generations)/.test(x.url));
   const prompt = req ? champ(req.corps, "prompt") : "";
   verifier("la consigne : concept art d'Antiquité fantastique, personnages sur la moitié droite, zone libre à gauche", /Créer une illustration de concept art dans un univers d'Antiquité fantastique/.test(prompt)
@@ -398,9 +400,15 @@ await section(async () => {
   verifier("…déposée telle quelle (pas de détourage)", r.depots.some(d => d.dossier === "Recit/Illustrations" && d.options && d.options.fond === "aucun"), JSON.stringify(r.depots));
   verifier("…rangée en double page sur le message du Narrateur", r.doc && r.doc.Illustration && r.doc.Illustration.Format === "double-page" && Math.abs(r.doc.Illustration.Ratio - 1.75) < 0.01 && !("Taille" in r.doc.Illustration),
            JSON.stringify(r.doc && r.doc.Illustration && { ...r.doc.Illustration, Consigne: "…" }));
-  verifier("Varos, PNJ nouveau : son portrait par le procédé de l'avatar (ia_master.js)", r.portraits.length === 1 && /aubergiste/.test(r.portraits[0][0]) && r.portraits[0][1] === "Humain", JSON.stringify(r.portraits));
-  verifier("…posé en pleine page (format avatar, 1024 × 1792)", r.doc && Array.isArray(r.doc.Portraits_PNJ) && r.doc.Portraits_PNJ[0].Format === "avatar" && Math.abs(r.doc.Portraits_PNJ[0].Ratio - 1024 / 1792) < 0.01,
-           JSON.stringify(r.doc && r.doc.Portraits_PNJ));
+  // (v456) Varos, cette fois inconnu : son portrait est peint, et alors pas de croquis à ce tour (« un nouveau PNJ avec son image : pas d'image de scène »).
+  const n1 = imagesIA.length;
+  const rNouveau = await illustrer({ illustrer: true, moment: "drôle", sujet: "scene", description: "Kaya slips on a wet amphora while Varos the innkeeper laughs, in a smoky tavern.",
+    acteurs: [{ id: "H1", nom: "Kaya", type: "heros", place: "center-right" }, { nom: "Varos", type: "pnj", place: "far right" }],
+    mise_en_scene: "medium shot", extrait: "Kaya glisse sur l'amphore.", pnj_nommes: [{ nom: "Varos", present: true, race: "Humain", description_physique: "Un aubergiste ventru." }] }, "Kaya glisse sur l'amphore ; Varos éclate de rire.");
+  verifier("Varos, PNJ nouveau : son portrait par le procédé de l'avatar (ia_master.js)", rNouveau.portraits.length === 1 && /aubergiste/.test(rNouveau.portraits[0][0]) && rNouveau.portraits[0][1] === "Humain", JSON.stringify(rNouveau.portraits));
+  verifier("(v456) …et pas d'illustration de scène à ce tour", !imagesIA.slice(n1).some(x => /images\/(edits|generations)/.test(x.url)) && !(rNouveau.doc && rNouveau.doc.Illustration), `${imagesIA.length - n1} image(s)`);
+  verifier("…posé en pleine page (format avatar, 1024 × 1792)", rNouveau.doc && Array.isArray(rNouveau.doc.Portraits_PNJ) && rNouveau.doc.Portraits_PNJ[0].Format === "avatar" && Math.abs(rNouveau.doc.Portraits_PNJ[0].Ratio - 1024 / 1792) < 0.01,
+           JSON.stringify(rNouveau.doc && rNouveau.doc.Portraits_PNJ));
 });
 await section(async () => {
   const n0 = imagesIA.length;
