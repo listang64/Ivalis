@@ -12457,3 +12457,16 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   - Une race qui est au Grimoire garde son nom.
   - La consigne de l'IA le dit aussi.
 - corrections_v327.mjs le vérifie (ses contrôles « v461 »).
+
+## v462 — Les PNJ connus ne sont plus recréés (Maël et Thalia après la mission)
+
+- Nico : « j'ai fini une mission avec Maël et Thalia, leurs avatars créés ; le récit continue avec eux, et l'IA me crée deux nouveaux PNJ avec les mêmes noms. Il n'est pas censé lire dans la BDD si leurs noms existent ? »
+- **Les causes :**
+  - La liste des PNJ de la partie (ia_master.js, pnjExistant) n'était lue qu'une fois par poste. Ceux nés après (sur un autre poste, ou par l'illustrateur du récit) n'y étaient pas.
+  - La recherche de secours voulait le nom exact : « Mael » ne trouve pas « Maël », ni « Thalia » « Thalia la Tisseuse ».
+  - Leurs fiches restaient au lieu de la mission : le Narrateur ne les avait pas parmi les présents, et les croyait nouveaux.
+- **Les corrections :**
+  - Un nom introuvable relit la liste de la partie (au plus toutes les 5 s) et la compare avec la tolérance des noms : accents, prénom, cœur du nom.
+  - Un PNJ connu que le récit fait revenir rejoint la scène : sa fiche prend le lieu du groupe (ramenerDansLaScene, pour MIA_PNJ et MIA_CASTING). MIA_DEPLACEMENT le cherche avec la même tolérance.
+  - L'illustrateur pose la fiche qu'il crée dans le lieu du groupe, et elle est aussitôt connue (illustrations_recit.js).
+- corrections_v330.mjs le vérifie (ses contrôles « v462 »).

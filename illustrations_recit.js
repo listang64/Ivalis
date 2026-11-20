@@ -452,12 +452,18 @@ async function portraitDuPnj(p, fiche) {
         if (id) await updateDoc(doc(db, "Monde_PNJ", id), { URL_Cloudinary: img.url, ...(tenue && !(fiche && fiche.Tenue) ? { Tenue: tenue } : {}) });
         else {
             id = `PNJ_${Math.floor(Math.random() * 10000).toString().padStart(4, "0")}_${p.nom.replace(/[^a-zA-Z0-9]/g, "_")}`;
-            await setDoc(doc(db, "Monde_PNJ", id), {
+            // (v462) Né dans la scène : dans le lieu du groupe (le Narrateur l'aura parmi les présents), et
+            // aussitôt connu de la recherche des PNJ de la partie (pas de double au passage suivant).
+            const lieuActuel = (window.PARTIE_DATA && window.PARTIE_DATA.Lieu_Actuel) || "";
+            const place = lieuActuel && typeof window.placeDuLieuPNJIvalis === "function" ? await window.placeDuLieuPNJIvalis(lieuActuel).catch(() => null) : null;
+            const fichePnj = {
                 Nom_PNJ: p.nom, Race: race, Description_Physique: description, URL_Cloudinary: img.url, ...(tenue ? { Tenue: tenue } : {}),
-                Statut: "Vivant", Occupation: "", Secret_Mental: "", Style_De_Parole: "", ID_Lieu: "", ID_Batiment: "",
+                Statut: "Vivant", Occupation: "", Secret_Mental: "", Style_De_Parole: "", ID_Lieu: (place && place.ID_Lieu) || "", ID_Batiment: (place && place.ID_Batiment) || "",
                 Origine: "MIA_ILLUSTRATEUR", ID_Partie: window.ID_PARTIE_COURANTE || "", Cree_Le: Date.now(),
                 Version_Creation: Number(window.VERSION_IVALIS) || 0   // (v409) né avec la refonte des PNJ
-            });
+            };
+            await setDoc(doc(db, "Monde_PNJ", id), fichePnj);
+            if (typeof window.retenirPnjDeLaPartieIvalis === "function") window.retenirPnjDeLaPartieIvalis({ ...fichePnj, __id: id });
         }
     } catch (e) { console.error("[MIA_ILLUSTRATEUR] La fiche du PNJ :", e); }
     return { Nom: p.nom, Url: img.url, Ratio: img.ratio, Format: "avatar" };

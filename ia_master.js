@@ -656,19 +656,27 @@ window.estDeLaPartiePNJ = estDeLaPartiePNJ;
 // UN PNJ DÉJÀ CONNU, OÙ QU'IL SOIT (v330) : les PNJ de cette partie (lus une
 // fois, puis gardés), et ceux du monde qui portent ce nom, son cœur ou un de ses
 // mots (« Maître Valerius » → « Valerius »). Rend sa fiche, ou null.
-let pnjDeLaPartie = null, pnjDeLaPartieId = "";
-async function lirePnjDeLaPartie() {
+let pnjDeLaPartie = null, pnjDeLaPartieId = "", pnjDeLaPartieLu = 0;
+// (v462) `forcer` : relue (les PNJ nés depuis, sur un autre poste ou par l'illustrateur du récit).
+async function lirePnjDeLaPartie(forcer) {
     const id = window.ID_PARTIE_COURANTE || "";
-    if (pnjDeLaPartie && pnjDeLaPartieId === id) return pnjDeLaPartie;
-    pnjDeLaPartie = []; pnjDeLaPartieId = id;
+    if (pnjDeLaPartie && pnjDeLaPartieId === id && !forcer) return pnjDeLaPartie;
+    if (!pnjDeLaPartie || pnjDeLaPartieId !== id) pnjDeLaPartie = [];
+    pnjDeLaPartieId = id; pnjDeLaPartieLu = Date.now();
     if (!id) return pnjDeLaPartie;
-    try { (await getDocs(query(collection(db, "Monde_PNJ"), where("ID_Partie", "==", id)))).forEach(d => pnjDeLaPartie.push({ ...d.data(), __id: d.id })); }
+    try { const l = []; (await getDocs(query(collection(db, "Monde_PNJ"), where("ID_Partie", "==", id)))).forEach(d => l.push({ ...d.data(), __id: d.id })); pnjDeLaPartie = l; }
     catch (e) { console.warn("[MIA_PNJ] Les PNJ de la partie :", e); }
     return pnjDeLaPartie;
 }
+// (v462) Nico : « une fois la mission terminée, le récit continue avec Maël et Thalia, et l'IA me crée deux
+// nouveaux PNJ avec les mêmes noms ». La liste des PNJ de la partie n'était lue qu'une fois par poste : ceux nés
+// après (sur un autre poste, ou par l'illustrateur du récit) n'y étaient pas, et la recherche de secours veut le
+// nom exact (« Mael » n'y trouve pas « Maël », ni « Thalia » « Thalia la Tisseuse »). Un nom introuvable relit
+// donc la liste (au plus toutes les 5 s), et la compare avec la même tolérance (accents, prénom, cœur du nom).
 async function pnjExistant(nom) {
     if (!nom) return null;
-    const dansLaPartie = (await lirePnjDeLaPartie()).find(x => memeNomPNJ(nom, x.Nom_PNJ));
+    let dansLaPartie = (await lirePnjDeLaPartie()).find(x => memeNomPNJ(nom, x.Nom_PNJ));
+    if (!dansLaPartie && Date.now() - pnjDeLaPartieLu > 5000) dansLaPartie = (await lirePnjDeLaPartie(true)).find(x => memeNomPNJ(nom, x.Nom_PNJ));
     if (dansLaPartie) return dansLaPartie;
     const mots = String(nom).split(/\s+/).filter(m => m.length >= 3 && !TITRES_PNJ.has(sansAccentPNJ(m).replace(/[^a-z0-9]/g, "")));
     const variantes = [...new Set([String(nom).trim(), mots.join(" "), ...mots].filter(Boolean))].slice(0, 10);
@@ -683,6 +691,31 @@ async function pnjExistant(nom) {
 }
 const retenirPnjDeLaPartie = (fiche) => { if (pnjDeLaPartie && fiche && fiche.Nom_PNJ) pnjDeLaPartie.push(fiche); };
 window.pnjExistantIvalis = pnjExistant;
+window.retenirPnjDeLaPartieIvalis = retenirPnjDeLaPartie;
+// (v462) La place d'une fiche de PNJ dans le lieu du groupe : { ID_Lieu, ID_Batiment } (un bâtiment : son lieu parent).
+async function placeDuLieuPNJ(idLieuActuel) {
+    const id = String(idLieuActuel || "");
+    if (id.startsWith("B")) {
+        let parent = "";
+        try { const b = await getDoc(doc(db, "Monde_Batiment", id)); if (b.exists()) parent = b.data().ID_Lieu || ""; } catch (e) {}
+        return { ID_Lieu: parent, ID_Batiment: id };
+    }
+    return { ID_Lieu: id, ID_Batiment: "" };
+}
+// (v462) Un PNJ connu que le récit fait revenir (« Maël » et « Thalia », restés au lieu de la mission) : sa fiche
+// suit le groupe, pour que le Narrateur l'ait parmi les présents (et ne le recrée pas).
+async function ramenerDansLaScene(fiche, idLieuActuel) {
+    if (!fiche || !fiche.__id || !idLieuActuel || fiche.Statut === "Mort" || !estDeLaPartiePNJ(fiche)) return false;
+    const place = await placeDuLieuPNJ(idLieuActuel);
+    if (!place.ID_Lieu && !place.ID_Batiment) return false;
+    if ((fiche.ID_Lieu || "") === place.ID_Lieu && (fiche.ID_Batiment || "") === place.ID_Batiment) return false;
+    try { await updateDoc(doc(db, "Monde_PNJ", fiche.__id), place); Object.assign(fiche, place); }
+    catch (e) { console.warn(`[MIA_PNJ] ${fiche.Nom_PNJ} ne rejoint pas la scène :`, e); return false; }
+    console.log(`[MIA_PNJ] 🚶 ${fiche.Nom_PNJ}, déjà connu, rejoint la scène des héros.`);
+    return true;
+}
+window.ramenerPnjDansLaSceneIvalis = ramenerDansLaScene;
+window.placeDuLieuPNJIvalis = placeDuLieuPNJ;
 // Le nom (ou son prénom, le premier mot) apparaît-il dans le texte, en mot entier ?
 function nomCiteDans(nom, texte) {
     const t = sansAccentPNJ(texte);
@@ -941,6 +974,11 @@ Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste 
     // (v330) Déjà connu ailleurs dans la partie ou le monde : pas de double.
     const retrouves = await Promise.all(nouveauxNomsDetectes.map(n => pnjExistant(n).catch(() => null)));
     retrouves.forEach((f, i) => { if (f) console.log(`[MIA_PNJ] « ${nouveauxNomsDetectes[i]} » est ${f.Nom_PNJ}, déjà connu : pas de nouvelle fiche ni de nouveau portrait.`); });
+    // (v462) …et sa fiche rejoint la scène (le Narrateur l'aura parmi les présents au prochain passage).
+    if (retrouves.some(Boolean)) {
+        const ici = await Promise.resolve(lieu).catch(() => null);
+        for (const f of retrouves) if (f) await ramenerDansLaScene(f, ici);
+    }
     nouveauxNomsDetectes = nouveauxNomsDetectes.filter((n, i) => !retrouves[i]);
     signaler(suivi.surNoms, nouveauxNomsDetectes.slice());
 
@@ -1119,6 +1157,16 @@ Utilise l'outil 'deplacerPNJ' pour lister les noms exacts de ceux qui partagent 
             for (const nom of pnjPresents) {
                 if (nomsHeros.includes(nom)) continue; // Sécurité anti-héros
 
+                // (v462) Le PNJ par son nom, avec la tolérance des noms (« Mael » est « Maël », « Thalia » est
+                // « Thalia la Tisseuse ») ; sinon, comme avant, le nom exact.
+                const connu = await pnjExistant(nom).catch(() => null);
+                if (connu && connu.__id) {
+                    if (!estDeLaPartiePNJ(connu) || (connu.ID_Lieu === idLieuCible && (connu.ID_Batiment || "") === idBatimentCible)) continue;
+                    console.log(`[MIA_DEPLACEMENT] 🚶 Le PNJ ${connu.Nom_PNJ} suit les joueurs -> Lieu: ${idLieuCible}, Bat: ${idBatimentCible}`);
+                    await updateDoc(doc(db, "Monde_PNJ", connu.__id), { ID_Lieu: idLieuCible, ID_Batiment: idBatimentCible });
+                    Object.assign(connu, { ID_Lieu: idLieuCible, ID_Batiment: idBatimentCible });
+                    continue;
+                }
                 // Chercher le PNJ par son nom dans la BDD
                 const qPnj = query(collection(db, "Monde_PNJ"), where("Nom_PNJ", "==", nom));
                 const snapPnj = await getDocs(qPnj);
@@ -2664,6 +2712,7 @@ window.declencherTourIA = async function(options) {
                     const connu = await pnjExistant(f.nom).catch(() => null);
                     if (connu) {
                         console.log(`[MIA_CASTING] ${f.nom} est ${connu.Nom_PNJ}, déjà connu : son portrait, pas de double.`);
+                        await ramenerDansLaScene(connu, await lieuDuRecit);   // (v462)
                         const cree = { Nom_PNJ: connu.Nom_PNJ, URL_Cloudinary: connu.URL_Cloudinary || "" };
                         pnjAffiches[cle] = cree; await ecrireMessage(null, {});
                         return cree;

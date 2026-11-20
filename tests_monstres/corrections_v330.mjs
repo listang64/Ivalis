@@ -257,6 +257,33 @@ await section(async () => {
 });
 
 // =========================================================================
+titre("3 bis. (v462) MAËL ET THALIA, NÉS PENDANT LA MISSION : RETROUVÉS APRÈS (PAS DE DOUBLE), ET RAMENÉS DANS LA SCÈNE");
+// =========================================================================
+// Nico : « j'ai fini une mission avec les PNJ Maël et Thalia, leurs avatars créés ; le récit continue avec eux, et l'IA
+// me crée deux nouveaux PNJ avec les mêmes noms. Il n'est pas censé lire dans la BDD si leurs noms existent ? »
+await section(async () => {
+  const r = await p.evaluate(async () => {
+    // La liste des PNJ de la partie, lue une fois sur ce poste (au début de la partie)…
+    await window.pnjExistantIvalis("Quelqu'un d'autre");
+    // …puis Maël et Thalia naissent ailleurs (un autre poste, l'illustrateur), au lieu de la mission.
+    window.__docs["Monde_PNJ/PNJ_0101_Mael"] = { Nom_PNJ: "Maël", URL_Cloudinary: "https://x/PNJ/mael.png", ID_Partie: "P_V330", ID_Lieu: "L_MISSION", ID_Batiment: "", Statut: "Vivant" };
+    window.__docs["Monde_PNJ/PNJ_0102_Thalia"] = { Nom_PNJ: "Thalia la Tisseuse", URL_Cloudinary: "https://x/PNJ/thalia.png", ID_Partie: "P_V330", ID_Lieu: "L_MISSION", ID_Batiment: "", Statut: "Vivant" };
+    await new Promise(f => setTimeout(f, 5200));
+    const mael = await window.pnjExistantIvalis("Mael"), thalia = await window.pnjExistantIvalis("Thalia");
+    // Le récit les fait revenir près des héros, ailleurs : leurs fiches suivent.
+    const bouge = await window.ramenerPnjDansLaSceneIvalis(mael, "L_PORT");
+    const encore = await window.ramenerPnjDansLaSceneIvalis(mael, "L_PORT");
+    return { mael: mael && mael.Nom_PNJ, thalia: thalia && thalia.Nom_PNJ, bouge, encore, lieu: window.__docs["Monde_PNJ/PNJ_0101_Mael"].ID_Lieu };
+  });
+  verifier("(v462) nés après la première lecture : « Mael » retrouve « Maël » (accent), « Thalia » retrouve « Thalia la Tisseuse »", r.mael === "Maël" && r.thalia === "Thalia la Tisseuse", JSON.stringify(r));
+  verifier("(v462) un PNJ connu qui revient dans le récit rejoint la scène des héros (sa fiche suit le groupe), une fois", r.bouge === true && r.encore === false && r.lieu === "L_PORT", JSON.stringify(r));
+  const ia = lire("ia_master.js"), il = lire("illustrations_recit.js");
+  verifier("(v462) MIA_PNJ et MIA_CASTING : un nom retrouvé ramène sa fiche dans la scène ; MIA_DEPLACEMENT cherche avec la même tolérance",
+           /for \(const f of retrouves\) if \(f\) await ramenerDansLaScene\(f, ici\)/.test(ia) && /await ramenerDansLaScene\(connu, await lieuDuRecit\)/.test(ia) && /const connu = await pnjExistant\(nom\)\.catch/.test(ia));
+  verifier("(v462) l'illustrateur : la fiche qu'il crée est posée dans le lieu du groupe et aussitôt connue", /window\.retenirPnjDeLaPartieIvalis\(\{ \.\.\.fichePnj, __id: id \}\)/.test(il) && /ID_Lieu: \(place && place\.ID_Lieu\) \|\| ""/.test(il));
+});
+
+// =========================================================================
 titre("4. LES AUTRES AGENTS : LES MÊMES RÈGLES");
 // =========================================================================
 await section(async () => {
