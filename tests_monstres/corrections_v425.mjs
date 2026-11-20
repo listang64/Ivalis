@@ -324,6 +324,38 @@ await section(async () => {
   verifier("« Ce qu'on ressent pour lui » : la réglette règle le lien de Thorin envers Doros", await attendreQue(() => G(() => (window.__docs["Systeme_Parties/P1/Liens/H1~PNJ_DOROS"] || {}).axes && window.__docs["Systeme_Parties/P1/Liens/H1~PNJ_DOROS"].axes.attachement === -15), 4000));
   await G(() => localStorage.setItem("ivalis_DEV_MODE", "off"));
 });
+// =========================================================================
+titre("4. (v464) EN MODE DEV : SUPPRIMER UN PNJ TOTALEMENT (SES IMAGES, SA FICHE, SON ÂME, SES LIENS, SES SOUVENIRS)");
+// =========================================================================
+// Nico : « dans la page des fils invisibles d'un PNJ, la possibilité de le supprimer totalement : ses images, et son
+// existence de la base de données ».
+await section(async () => {
+  await G(() => { localStorage.setItem("ivalis_DEV_MODE", "off"); window.__docs["Systeme_Parties/P1"] = window.__docs["Systeme_Parties/P1"] || {}; window.__docs["Systeme_Parties/P1"].Suiveurs = [{ id: "PNJ_DOROS", nom: "Doros", etat: "avec" }, { id: "PNJ_KORE", nom: "Dame Koré", etat: "avec" }];
+    window.__docs["Monde_PNJ/PNJ_DOROS"].URL_Token = "https://res.cloudinary.com/x/image/upload/v1/Tokens/doros_pion.png"; });
+  await G(() => window.GRIMOIRE_LIENS.ouvrir({ id: "PNJ_DOROS" })); await attendreQue(surLaDoublePage, 8000); await p.waitForTimeout(600);
+  verifier("(v464) hors mode DEV : pas de bouton pour supprimer", await G(() => !document.querySelector("#grimoire-liens-g .supprimer-pnj-liens")));
+  await G(() => { localStorage.setItem("ivalis_DEV_MODE", "on"); return window.GRIMOIRE_LIENS.ouvrir({ id: "H1" }); }); await p.waitForTimeout(600);
+  verifier("(v464) un héros : jamais de bouton pour le supprimer", await G(() => !document.querySelector("#grimoire-liens-g .supprimer-pnj-liens")));
+  await G(() => window.GRIMOIRE_LIENS.ouvrir({ id: "PNJ_DOROS" })); await p.waitForTimeout(600);
+  verifier("(v464) en mode DEV, sur la fiche de Doros : « Supprimer ce PNJ »", await G(() => /Supprimer ce PNJ/.test((document.querySelector("#grimoire-liens-g .supprimer-pnj-liens") || {}).textContent || "")));
+  await cap("v464-supprimer");
+  await G(() => { window.__effacees = []; window.supprimerImageCloudinary = async (u) => { window.__effacees.push(u); }; window.__confirme = ""; window.confirm = (t) => { window.__confirme = t; return true; }; });
+  await toucher("#grimoire-liens-g .supprimer-pnj-liens");
+  await attendreQue(() => G(() => !window.__docs["Monde_PNJ/PNJ_DOROS"]), 5000); await p.waitForTimeout(400);
+  const r = await G(() => { const d = window.__docs, k = Object.keys(d);
+    return { confirme: window.__confirme, fiche: !!d["Monde_PNJ/PNJ_DOROS"], ame: !!d["Systeme_Parties/P1/Ames/PNJ_DOROS"],
+             liens: k.filter(x => x.startsWith("Systeme_Parties/P1/Liens/") && x.includes("PNJ_DOROS")).length,
+             souvenirs: k.filter(x => x.startsWith("Systeme_Parties/P1/Souvenirs/") && d[x].ame === "PNJ_DOROS").length,
+             suiveurs: (d["Systeme_Parties/P1"].Suiveurs || []).map(x => x.id), images: (window.__effacees || []).slice().sort(),
+             kore: !!d["Monde_PNJ/PNJ_KORE"] && !!d["Systeme_Parties/P1/Ames/PNJ_KORE"],
+             page: [...document.querySelectorAll("#grimoire-liens-d select.index-liens option")].map(o => o.value) }; });
+  verifier("(v464) on confirme d'abord (c'est sans retour)", /Supprimer Doros de la partie, totalement/.test(r.confirme) && /sans retour/.test(r.confirme), r.confirme);
+  verifier("(v464) sa fiche, son âme, ses liens (dans les deux sens), ses souvenirs : effacés", !r.fiche && !r.ame && r.liens === 0 && r.souvenirs === 0, JSON.stringify(r));
+  verifier("(v464) …ses images aussi (son portrait, son pion)", JSON.stringify(r.images) === JSON.stringify(["https://res.cloudinary.com/x/image/upload/v1/PNJ/doros.png", "https://res.cloudinary.com/x/image/upload/v1/Tokens/doros_pion.png"]), JSON.stringify(r.images));
+  verifier("(v464) …il ne suit plus la compagnie ; les autres restent (Dame Koré)", JSON.stringify(r.suiveurs) === '["PNJ_KORE"]' && r.kore, JSON.stringify(r.suiveurs));
+  verifier("(v464) la page se redessine sans lui", r.page.length > 0 && !r.page.includes("PNJ_DOROS"), JSON.stringify(r.page.slice(0, 5)));
+  await G(() => localStorage.setItem("ivalis_DEV_MODE", "off"));
+});
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
 console.log(echecs === 0 ? "\nTOUT EST BON" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 await b.close(); serveur.close();

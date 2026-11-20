@@ -12481,3 +12481,16 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   - les fils invisibles après le paragraphe qu'ils ont fait bouger (« [🧠 Fils invisibles : Varos → Kaya : confiance −7] ») ;
   - le sceau d'une quête accomplie.
 - corrections_v428.mjs le vérifie (ses contrôles « v463 »).
+
+## v464 — Supprimer un PNJ totalement (fils invisibles, mode DEV)
+
+- Nico : « dans la page des fils invisibles d'un PNJ, la possibilité de le supprimer totalement : ses images, et son existence de la base de données ».
+- En mode DEV, au bas de la fiche d'un PNJ (jamais d'un héros), un bouton « Supprimer ce PNJ ». Après confirmation, c'est sans retour (grimoire_liens.js ; social.js, supprimerPnj).
+- Ce qui est effacé :
+  - sa fiche (Monde_PNJ) ;
+  - son âme, ses liens dans les deux sens, ses souvenirs ;
+  - sa place dans la compagnie (Suiveurs) ;
+  - toutes ses images sur Cloudinary (son portrait, son pion…).
+- Il sort aussi de la liste des PNJ que garde le Narrateur, et la page se redessine sans lui.
+- Un PNJ d'une autre partie n'est jamais touché.
+- corrections_v425.mjs le vérifie (ses contrôles « v464 »).

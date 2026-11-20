@@ -692,6 +692,8 @@ async function pnjExistant(nom) {
 const retenirPnjDeLaPartie = (fiche) => { if (pnjDeLaPartie && fiche && fiche.Nom_PNJ) pnjDeLaPartie.push(fiche); };
 window.pnjExistantIvalis = pnjExistant;
 window.retenirPnjDeLaPartieIvalis = retenirPnjDeLaPartie;
+// (v464) Un PNJ supprimé (les fils invisibles, mode DEV) sort aussi de la liste gardée ici.
+window.oublierPnjDeLaPartieIvalis = (id) => { if (pnjDeLaPartie) pnjDeLaPartie = pnjDeLaPartie.filter(x => x && x.__id !== id); };
 // (v462) La place d'une fiche de PNJ dans le lieu du groupe : { ID_Lieu, ID_Batiment } (un bâtiment : son lieu parent).
 async function placeDuLieuPNJ(idLieuActuel) {
     const id = String(idLieuActuel || "");

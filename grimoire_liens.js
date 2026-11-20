@@ -186,6 +186,7 @@ function htmlGauche() {
         ${a.memoire ? `<div class="sous-titre-liens">Sa mémoire à long terme</div><p class="memoire-liens">${echapper(a.memoire)}</p>` : ""}
         <div class="sous-titre-liens">Ses souvenirs</div>
         ${souvenirs ? `<ul class="souvenirs-liens">${souvenirs}</ul>` : `<p class="fiche-attente">Pas encore de souvenir.</p>`}
+        ${a.type === "pnj" && modeDev() ? `<button type="button" class="supprimer-pnj-liens" data-action="liens" data-cb="supprimer-pnj" data-id="${echapper(id)}" title="Supprimer ce PNJ de la partie (DEV)">Supprimer ce PNJ</button>` : ""}
       </div>${(window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.FLECHE_DEFILE) || ""}`;
 }
 
@@ -338,6 +339,16 @@ async function agir(cible) {
     if (cb === "parametres") { son(); vue.retourParametres = false; if (window.GRIMOIRE_PARAMETRES) window.GRIMOIRE_PARAMETRES.revenirDesLiens(); return; }
     if (cb === "groupe") { son(); vue.retourGroupe = false; if (window.GRIMOIRE_GROUPE) window.GRIMOIRE_GROUPE.ouvrir(); return; }
     const lien = () => { const de = vue.regard === "in" ? vue.selection : vue.centre, vers = vue.regard === "in" ? vue.centre : vue.selection; return { de, vers }; };
+    // (v464) Supprimer un PNJ totalement (mode DEV) : ses images, sa fiche, son âme, ses liens, ses souvenirs.
+    if (cb === "supprimer-pnj") {
+        const id = cible.dataset.id, a = ames()[id];
+        if (!modeDev() || !a || a.type !== "pnj" || !P || typeof P.supprimerPnj !== "function") return;
+        if (!confirm(`Supprimer ${a.nom} de la partie, totalement ? Ses images, sa fiche, son âme, ses liens et ses souvenirs disparaissent de la base. C'est sans retour.`)) return;
+        son();
+        try { await P.supprimerPnj(p, id); } catch (e) { alert("Le PNJ n'a pas pu être supprimé : " + (e.message || e)); return; }
+        vue.centre = ""; vue.selection = "";
+        await charger(); return;
+    }
     if (cb === "annuler") {
         const n = Number(cible.dataset.n);
         if (!confirm(`Annuler ce changement (n° ${n}) ? Ses écarts sont retirés des liens.`)) return;

@@ -99,3 +99,8 @@
 .ecarts-liens { color: #6b4a2b; font-size: 0.92em; }
 .annuler-liens { font-size: 0.9em !important; color: #9d4542 !important; text-decoration: underline; }
 .boutons-encart-liens { display: flex; gap: calc(var(--u) * 3); margin-top: calc(var(--u) * 1.4); }
+/* (v464) Supprimer un PNJ totalement (mode DEV), au bas de sa fiche. */
+.supprimer-pnj-liens { display: block; margin: calc(var(--u) * 4) auto calc(var(--u) * 2); padding: calc(var(--u) * 1) calc(var(--u) * 3) !important; cursor: pointer;
+  background: rgba(179, 38, 30, 0.06) !important; border: 1.5px solid #b3261e !important; border-radius: 999px; color: #b3261e !important;
+  font-family: 'Cinzel', serif; font-size: calc(var(--u) * 2.8); letter-spacing: 0.05em; }
+.supprimer-pnj-liens:hover { background: rgba(179, 38, 30, 0.14) !important; }

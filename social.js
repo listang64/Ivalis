@@ -24,7 +24,7 @@
 //  première impression (la réputation du lieu, sa personnalité).
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
-import { collection, query, where, getDocs, doc, getDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { collection, query, where, getDocs, doc, getDoc, setDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 import * as P from "./social_pur.js?v=5";
 
 const PARTIES = "Systeme_Parties";
@@ -257,6 +257,33 @@ export async function oublierAme(p, id) {
     }
     (await getDocs(query(collection(db, PARTIES, p, "Souvenirs"), where("ame", "==", id)))).forEach(d => lot.delete(d.ref || doc(db, PARTIES, p, "Souvenirs", d.id)));
     await lot.commit();
+}
+
+// (v464) Nico : « dans la page des fils invisibles d'un PNJ, la possibilité de le supprimer totalement : ses
+// images, et son existence de la base de données ». Sa fiche (Monde_PNJ), son âme, ses liens dans les deux sens,
+// ses souvenirs, sa place dans la compagnie, et ses images sur Cloudinary (son portrait, son pion…).
+// Rend { images: [urls effacées] } ; null si rien n'a pu être fait.
+export async function supprimerPnj(p, id) {
+    if (!p || !id) return null;
+    let fiche = null;
+    try { const f = await getDoc(doc(db, "Monde_PNJ", id)); fiche = f.exists() ? (f.data() || {}) : null; } catch (e) {}
+    // (le PNJ d'une autre partie n'est pas à elle)
+    if (fiche && fiche.ID_Partie && fiche.ID_Partie !== p) return null;
+    const images = fiche ? [...new Set(Object.values(fiche).filter(v => typeof v === "string" && /^https:\/\/res\.cloudinary\.com\//.test(v)))] : [];
+    await oublierAme(p, id);
+    if (fiche) await deleteDoc(doc(db, "Monde_PNJ", id));
+    if (typeof window.oublierPnjDeLaPartieIvalis === "function") window.oublierPnjDeLaPartieIvalis(id);
+    // Il ne suit plus la compagnie.
+    try {
+        const sp = await getDoc(doc(db, PARTIES, p)), suiveurs = sp.exists() ? (sp.data() || {}).Suiveurs : null;
+        if (Array.isArray(suiveurs) && suiveurs.some(x => x && x.id === id)) await setDoc(doc(db, PARTIES, p), { Suiveurs: suiveurs.filter(x => !x || x.id !== id) }, { merge: true });
+    } catch (e) { console.warn("[Fils invisibles] La compagnie :", e); }
+    const effacees = [];
+    if (typeof window.supprimerImageCloudinary === "function") {
+        for (const url of images) { try { await window.supprimerImageCloudinary(url); effacees.push(url); } catch (e) { console.warn("[Fils invisibles] Une image du PNJ :", e); } }
+    }
+    journal(`${(fiche && fiche.Nom_PNJ) || id} est supprimé de la partie (fiche, âme, liens, souvenirs, ${effacees.length} image(s)).`);
+    return { images: effacees };
 }
 
 // -------------------------------------------------------------------------
@@ -702,5 +729,5 @@ export async function apresLeTour(o) {
     catch (e) { console.error("[Fils invisibles] Le tour social :", e); return null; }
 }
 
-window.SOCIAL = { ...P, elaguerSouvenirs, MAX_SOUVENIRS, consoliderMemoire, consoliderSiBesoin, noterSouvenir, promptMemoire, SEUIL_MEMOIRE, LOT_MEMOIRE, contexteDuMJ, caractere, lireReseau, lireSouvenirsDe, annulerEvenement, ajusterLien, estAdminSocial, lireAmes, lireLiens, lireLiensVers, naissancePnj, assurerAmes, marquerMort, oublierAme, apresLeTour, tourSocial, paragrapheDe, lignesDeMarge,
+window.SOCIAL = { ...P, elaguerSouvenirs, MAX_SOUVENIRS, consoliderMemoire, consoliderSiBesoin, noterSouvenir, promptMemoire, SEUIL_MEMOIRE, LOT_MEMOIRE, contexteDuMJ, caractere, lireReseau, lireSouvenirsDe, annulerEvenement, ajusterLien, estAdminSocial, lireAmes, lireLiens, lireLiensVers, naissancePnj, assurerAmes, marquerMort, oublierAme, supprimerPnj, apresLeTour, tourSocial, paragrapheDe, lignesDeMarge,
                   schemaPsyche, schemaLiens, consigneCreation, psycheDeLIA, LIENS_IA, schemaDisposition, schemaRaisonDisposition, dispositionDeNaissance };
