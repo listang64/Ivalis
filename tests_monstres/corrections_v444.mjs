@@ -535,6 +535,19 @@ await section(async () => {
   await cap("v457-accomplie");
   await G(() => window.GRIMOIRE_FICHES.ouvrir("H1")); await attendreQue(() => G(() => window.GRIMOIRE_FICHES.herosAffiche() === "H1"), 6000); await p.waitForTimeout(500);
   verifier("la double page quittée, le parchemin s'en va", await G(() => { const el = document.querySelector(".parchemin-recompenses"); return !el || !el.classList.contains("pose"); }));
+  // (v458) Nico : « quand une mission vient d'être accomplie, dis au Narrateur en off de ne pas enchaîner de suite sur un truc
+  // intéressant, un combat ou une action nouvelle : laisser les joueurs respirer ».
+  const ctx = () => G(() => window.contexteMissionMJ(JSON.parse(JSON.stringify(window.__docs["Systeme_Parties/P1"])), ""));
+  const c0 = await ctx();
+  verifier("(v458) juste après la réussite : le Narrateur reçoit, en off, la consigne de laisser respirer (ni combat, ni action nouvelle)",
+           /VIENT D'ÊTRE ACCOMPLIE/.test(c0) && /n'enchaîne pas de suite/.test(c0) && /combat/.test(c0) && c0.includes(acc.Titre) && /Encore 3 passages/.test(c0), c0.slice(0, 200));
+  const repits = [];
+  for (let k = 1; k <= 3; k++) { await G((k) => window.MISSIONS_GUILDE.suivreApresMJ("Le calme revient.", "m_repit_" + k), k);
+    repits.push(((await partieDoc()).Mission_Accomplie || {}).Repit); }
+  const c3 = await ctx();
+  verifier("(v458) …pendant 3 passages du Narrateur (comptés sur la mission accomplie), puis plus rien", repits.join(",") === "1,2,3" && c3 === "", JSON.stringify(repits) + " " + c3.slice(0, 80));
+  const sceauToujours = await G(() => !!window.MISSIONS_GUILDE.missionAccomplie());
+  verifier("(v458) …le sceau et la page en lecture restent (jusqu'à la mission suivante)", sceauToujours);
 });
 
 titre("8. (v448) EN MODE DEV : FORCER LE VOTE DE LA MISSION, SUR SA FEUILLE");

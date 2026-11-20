@@ -12408,3 +12408,13 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   - finie (le joueur quitte, le PNJ part, ou les autres après trois minutes de silence), elle est rangée et lue par MIA_SOCIAL (devant témoins), et la marche reprend d'où elle s'était arrêtée ;
   - une halte restée sans discussion fait reprendre la route au bout d'une minute.
 - corrections_v457.mjs (nouveau) le vérifie, avec corrections_v444 et v314 (leurs contrôles « v457 ») et v443 (le suivi reçoit la narration).
+
+## v458 — Après une mission accomplie, le Narrateur laisse respirer
+
+- Nico : « quand une mission vient d'être accomplie, dis au Narrateur en off de ne pas enchaîner de suite sur un truc intéressant, un combat ou une action nouvelle : laisser les joueurs respirer un peu ».
+- Les trois passages du Narrateur qui suivent la réussite reçoivent une consigne en off (missions_guilde.js, contexteRepit, lu par contexteMissionMJ) :
+  - pas de nouvel événement marquant, de combat, de menace, de révélation ni d'action nouvelle ;
+  - raconter le calme qui suit (fatigue, soulagement, remerciements, blessures pansées) ;
+  - un nouvel enjeu seulement si les joueurs le provoquent.
+- Le compte se garde sur la mission accomplie (Mission_Accomplie.Repit) : suivreApresMJ l'avance à chaque passage, sauf celui qui a dit la réussite.
+- corrections_v444.mjs le vérifie (ses contrôles « v458 »).

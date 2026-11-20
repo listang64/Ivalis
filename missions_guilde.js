@@ -720,9 +720,23 @@ export function marqueMission() {
 export const TOURS_MIN_ETAPE = { normale: 3, difficile: 4 };
 const toursMin = (m) => TOURS_MIN_ETAPE[difficulteDe(m)] || 3;
 const liste = (l, f) => (Array.isArray(l) ? l : []).map(f).filter(Boolean).join("\n");
+// (v458) Nico : « quand une mission vient d'être accomplie, dis au Narrateur en off de ne pas enchaîner
+// de suite sur un truc intéressant, un combat ou une action nouvelle : laisser les joueurs respirer ».
+// Les REPIT_APRES_MISSION passages qui suivent la réussite (Mission_Accomplie.Repit, compté par suivreApresMJ).
+export const REPIT_APRES_MISSION = 3;
+function contexteRepit(dataPartie) {
+    const p = dataPartie || partie, a = p && p.Mission_Accomplie;
+    if (!a || !a.Id || (p.Mission_En_Cours && p.Mission_En_Cours.Id)) return "";
+    const fait = Number(a.Repit) || 0;
+    if (fait >= REPIT_APRES_MISSION) return "";
+    return ["--- LA MISSION VIENT D'ÊTRE ACCOMPLIE (CONSIGNE EN OFF, POUR TOI SEUL) ---",
+        `Les héros viennent d'accomplir la mission « ${a.Titre || "?"} ». Laisse-les respirer : n'enchaîne pas de suite sur un nouvel événement marquant, un combat, une menace, une révélation ou une action nouvelle.`,
+        "Raconte le calme qui suit : la fatigue, le soulagement, les remerciements, les blessures qu'on panse, la route ou le lieu qui s'apaise. Laisse les joueurs mener la suite à leur rythme ; n'introduis un nouvel enjeu que s'ils le provoquent eux-mêmes.",
+        `(Encore ${REPIT_APRES_MISSION - fait} passage${REPIT_APRES_MISSION - fait > 1 ? "s" : ""} de répit.)`].join("\n");
+}
 export function contexteMissionMJ(dataPartie, lieuActuel) {
     const d = missionEnCours;
-    if (!d || d.Statut !== "en_cours" || !d.Mission) return "";
+    if (!d || d.Statut !== "en_cours" || !d.Mission) return contexteRepit(dataPartie);
     const m = d.Mission, plan = d.Plan || {}, av = d.Avancement || {}, faites = av.Etapes || {};
     const etapes = Array.isArray(plan.etapes) ? plan.etapes : [];
     const courante = etapes.find(e => !faites[String(e.numero)]);
@@ -766,6 +780,14 @@ window.contexteMissionMJ = contexteMissionMJ;
 // la mission réussie ou échouée quand le récit le dit (v452 : plus d'indices relevés).
 export async function suivreApresMJ(texteMJ, idMessage) {
     const d = missionEnCours, id = idPartie();
+    // (v458) Le répit après une mission accomplie : un passage du Narrateur de plus (pas celui qui l'a dite).
+    const a = partie.Mission_Accomplie;
+    if (!d && id && a && a.Id && !(partie.Mission_En_Cours && partie.Mission_En_Cours.Id) && (!idMessage || idMessage !== a.Message) && (Number(a.Repit) || 0) < REPIT_APRES_MISSION) {
+        const repit = (Number(a.Repit) || 0) + 1;
+        partie = { ...partie, Mission_Accomplie: { ...a, Repit: repit } };
+        try { await setDoc(refPartie(id), { Mission_Accomplie: { Repit: repit } }, { merge: true }); } catch (e) { console.warn("Missions : le répit", e); }
+        return null;
+    }
     if (!d || d.Statut !== "en_cours" || !d.Mission || !texteMJ || !window.cleGemini || !window.cleGemini("missions")) return null;
     const m = d.Mission, etapes = Array.isArray((d.Plan || {}).etapes) ? d.Plan.etapes : [];
     const faites = (d.Avancement && d.Avancement.Etapes) || {};
@@ -907,4 +929,4 @@ window.MISSIONS_GUILDE = { DIFFICULTES, DECALAGES, MAX_DIFFICILES, IMAGE_SCEAU_D
                           lireTableau, relireTableau, surChangement, htmlEncart, missionDe, ouvrirFeuille, fermerFeuille,
                           voterMission, refuserMission, lireMission, relireLaMission, surMission, preparerMission, promptPlan, marqueMission, decalageNiveauMission,
                           contexteMissionMJ, suivreApresMJ, terminerMission, partie: () => partie,
-                          ecrireNotes, voterAbandon, missionsReussies, relireTerminees, missionAccomplie, sceauCire, idJoueur, ajusterEncarts, oublierAjustements };
+                          ecrireNotes, voterAbandon, missionsReussies, relireTerminees, missionAccomplie, sceauCire, REPIT_APRES_MISSION, idJoueur, ajusterEncarts, oublierAjustements };
