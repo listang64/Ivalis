@@ -722,13 +722,18 @@ const toursMin = (m) => TOURS_MIN_ETAPE[difficulteDe(m)] || 3;
 const liste = (l, f) => (Array.isArray(l) ? l : []).map(f).filter(Boolean).join("\n");
 // (v458) Nico : « quand une mission vient d'être accomplie, dis au Narrateur en off de ne pas enchaîner
 // de suite sur un truc intéressant, un combat ou une action nouvelle : laisser les joueurs respirer ».
-// Les REPIT_APRES_MISSION passages qui suivent la réussite (Mission_Accomplie.Repit, compté par suivreApresMJ).
+// Les REPIT_APRES_MISSION passages qui suivent la réussite (Mission_Accomplie.Repit, compté par suivreApresMJ),
+// (v459) ou jusqu'à ce que le groupe se mette en route.
 export const REPIT_APRES_MISSION = 3;
 function contexteRepit(dataPartie) {
     const p = dataPartie || partie, a = p && p.Mission_Accomplie;
     if (!a || !a.Id || (p.Mission_En_Cours && p.Mission_En_Cours.Id)) return "";
     const fait = Number(a.Repit) || 0;
     if (fait >= REPIT_APRES_MISSION) return "";
+    // (v459) « …ou quand le groupe se déplace » : le répit s'achève dès que le groupe se met en route.
+    const v = p.Voyage_Groupe, fin = p.Voyage_Termine;
+    if (v && v.Id && v.Etat && v.Etat !== "vote") return "";
+    if (fin && fin.Id && !fin.Annule && Number(fin.Le) > Number(a.Le)) return "";
     return ["--- LA MISSION VIENT D'ÊTRE ACCOMPLIE (CONSIGNE EN OFF, POUR TOI SEUL) ---",
         `Les héros viennent d'accomplir la mission « ${a.Titre || "?"} ». Laisse-les respirer : n'enchaîne pas de suite sur un nouvel événement marquant, un combat, une menace, une révélation ou une action nouvelle.`,
         "Raconte le calme qui suit : la fatigue, le soulagement, les remerciements, les blessures qu'on panse, la route ou le lieu qui s'apaise. Laisse les joueurs mener la suite à leur rythme ; n'introduis un nouvel enjeu que s'ils le provoquent eux-mêmes.",

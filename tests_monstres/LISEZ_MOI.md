@@ -12418,3 +12418,12 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   - un nouvel enjeu seulement si les joueurs le provoquent.
 - Le compte se garde sur la mission accomplie (Mission_Accomplie.Repit) : suivreApresMJ l'avance à chaque passage, sauf celui qui a dit la réussite.
 - corrections_v444.mjs le vérifie (ses contrôles « v458 »).
+
+## v459 — Le répit s'achève aussi en route ; les ennemis ne nomment plus les héros
+
+- **Le répit après une mission** (Nico : « trois passages de Narrateur c'est bien, ou quand le groupe se déplace ») : la consigne en off s'arrête dès que le groupe se met en route (un voyage en marche, ou un voyage fini depuis la réussite). Un simple vote de voyage ne compte pas (missions_guilde.js, contexteRepit).
+- **Les répliques de combat** (« quand un ennemi lance une phrase quand un joueur est tombé KO, ne lui fais pas dire son nom : ce n'est pas dit que le personnage connaisse le nom du héros ») :
+  - les répliques « héros à terre » ne le nomment plus ;
+  - plus généralement, l'IA n'emploie jamais le nom d'un héros dans les répliques : elle les interpelle autrement (« toi », « le nain »…) (combat_rp.js, PROMPT_REPLIQUES) ;
+  - une réplique écrite avant, avec la marque {heros}, la perd.
+- corrections_v457 et v444 le vérifient (leurs contrôles « v459 »).

@@ -1668,9 +1668,10 @@ const PROMPT_REPLIQUES = `Tu écris les répliques de combat de PNJ nommés, dan
 Pour chaque PNJ, des phrases courtes (une ou deux phrases, 25 mots au plus) qu'il lance à voix haute pendant le combat contre les héros,
 fidèles à son caractère, à sa façon de parler et à ce qui a déclenché le combat. Pas de description, seulement ce qu'il dit ;
 un geste bref peut s'écrire entre astérisques (*il crache par terre*). En français, tutoiement ou vouvoiement selon le personnage.
+JAMAIS LE NOM D'UN HÉROS : le PNJ ne le connaît pas forcément. Il les interpelle autrement (« toi », « le nain », « la sorcière », « vermine »…).
 Réponds en JSON : { "pnj": [ { "nom": "son nom exact", "debut": [3 phrases quand son tour commence et qu'il est en forme],
 "blesse": [2 phrases quand il est grièvement blessé], "seul": [2 phrases quand il est le dernier de son camp debout],
-"ko": [3 phrases quand un héros tombe à terre, où {heros} sera remplacé par le nom du héros] } ] }`;
+"ko": [3 phrases quand un des héros tombe à terre, sans le nommer] } ] }`;
 async function ecrireLesRepliques() {
     const c = etat();
     const tirage = (c && c.Ennemis && c.Ennemis.Tirage) || {};
@@ -1737,8 +1738,10 @@ function repliqueDuMoment(etape, etatAvant) {
         if (!pnjs.length) return null;
         const cle = `${c.Id}|ko|${etape.cible}|${etatAvant.manche || 0}`;
         const p = pnjs[Math.floor(tirageCommun(cle + "|qui") * pnjs.length) % pnjs.length];
-        const nomHeros = String(fh.prenom || fh.nom || "").trim() || "l'aventurier";
-        const texte = choisir(p.r.Ko, cle + "|phrase").replace(/\{heros\}/gi, nomHeros);
+        // (v459) Nico : « ne lui fais pas dire son nom : ce n'est pas dit que le personnage connaisse le nom du héros ».
+        // (Une réplique écrite avant, avec la marque {heros}, la perd.)
+        const brut = choisir(p.r.Ko, cle + "|phrase").replace(/\s*,?\s*\{heros\}\s*,?\s*/gi, " ").replace(/\s+([.,])/g, "$1").trim();
+        const texte = brut.charAt(0).toUpperCase() + brut.slice(1);
         return texte ? { nom: p.f.pnjNomme, image: p.f.urlCloudinary || "", texte } : null;
     }
     return null;

@@ -150,7 +150,7 @@ await p.route('**generativelanguage.googleapis.com/**', async r => {
       : JSON.stringify({ replique: reglagesFaux.partir ? "*hausse les épaules* Bon. Je retourne à l'arrière." : "Ha ! Menteur. Toute la compagnie t'entend.", partir: !!reglagesFaux.partir });
   } else if (/répliques de combat/.test(systeme)) texte = JSON.stringify({ pnj: [{ nom: "Dame Koré", debut: ["Vous n'auriez jamais dû venir ici.", "*Elle lève son sceptre* À genoux !", "Encore debout ?"],
       blesse: ["Je saigne… mais vous paierez.", "Ce n'est qu'une égratignure."], seul: ["Lâches ! Vous m'abandonnez ?", "Seule, je suffirai."],
-      ko: ["{heros}, reste à terre.", "Un de moins, {heros} !", "Dors, {heros}."] }] });
+      ko: ["Reste à terre, toi.", "Un de moins !", "*rit* Le nain ne se relèvera pas."] }] });
   else if (image) texte = JSON.stringify({ terrain: "lisière d'une forêt de pins", sous_le_groupe: "Un tapis d'aiguilles grises.", alentours: { nord: "la forêt", est: "une rivière", sud: "une plaine", ouest: "des collines" },
       elements_notables: ["une rivière"], resume_mj: "La lisière d'une pinède grise." });
   else if (/Continue l'histoire/.test(systeme)) texte = "Des volutes de fumée montent entre les pins ; une voix vous hèle.";
@@ -276,7 +276,7 @@ const poserCombat = (repliques) => p.evaluate(([repliques, KORE]) => {
   window.PARTIE_DATA.Combat_RP = { Id: "C_457", Etat: "en_cours", Raison: "Dame Koré veut le collier.", ...(repliques ? { Repliques: repliques } : {}) };
   if (typeof window.appliquerCombatRPDeLaPartie === "function") { try { window.appliquerCombatRPDeLaPartie(window.PARTIE_DATA); } catch (e) {} }
 }, [repliques, KORE]);
-const REPLIQUES = [{ Nom: "Dame Koré", Debut: ["D1", "D2", "D3"], Blesse: ["B1", "B2"], Seul: ["S1", "S2"], Ko: ["{heros}, reste à terre.", "Un de moins, {heros} !"] }];
+const REPLIQUES = [{ Nom: "Dame Koré", Debut: ["D1", "D2", "D3"], Blesse: ["B1", "B2"], Seul: ["S1", "S2"], Ko: ["Reste à terre, vermine.", "Un de moins !"] }];
 const etatCombat = (o) => ({ manche: 1, combattants: { H1: { id: "H1", pv: 30, pvMax: 40 }, H2: { id: "H2", pv: 30, pvMax: 40 },
   M1: { id: "M1", estMonstre: true, pv: 80, pvMax: 100 }, M2: { id: "M2", estMonstre: true, pv: 20, pvMax: 20 }, ...(o || {}) } });
 
@@ -318,8 +318,14 @@ await section(async () => {
     return { thorin: ko("H1"), lyra: ko("H2"), molosse: ko("M2"),
              koreATerre: ko("H1", { ...etat, combattants: { ...etat.combattants, M1: { id: "M1", estMonstre: true, aTerre: true } } }) };
   }, [etatCombat()]);
-  verifier("Thorin tombe : Dame Koré le nargue, son nom dans la phrase", r.thorin && r.thorin.nom === "Dame Koré" && /Thorin/.test(r.thorin.texte) && !/\{heros\}/.test(r.thorin.texte), JSON.stringify(r.thorin));
-  verifier("…Lyra aussi (toujours une phrase à la chute d'un héros)", r.lyra && /Lyra/.test(r.lyra.texte), JSON.stringify(r.lyra));
+  verifier("Thorin tombe : Dame Koré le nargue", r.thorin && r.thorin.nom === "Dame Koré" && /^(Reste à terre, vermine\.|Un de moins !)$/.test(r.thorin.texte), JSON.stringify(r.thorin));
+  // (v459) Nico : « ne lui fais pas dire son nom : ce n'est pas dit que le personnage connaisse le nom du héros ».
+  verifier("(v459) …sans dire son nom (elle ne le connaît pas forcément)", r.thorin && !/Thorin/.test(r.thorin.texte), JSON.stringify(r.thorin));
+  verifier("…Lyra aussi (toujours une phrase à la chute d'un héros), sans son nom", r.lyra && !!r.lyra.texte && !/Lyra/.test(r.lyra.texte), JSON.stringify(r.lyra));
+  // Une réplique écrite avant la v459, avec la marque {heros} : elle la perd.
+  await poserCombat([{ Nom: "Dame Koré", Debut: ["D1"], Blesse: [], Seul: [], Ko: ["Un de moins, {heros} !"] }]);
+  const vieille = await p.evaluate(([etat]) => window.repliqueDuMomentCombatRP({ type: "chute", cible: "H1", acteur: "M2" }, etat), [etatCombat()]);
+  verifier("(v459) une réplique d'avant, avec la marque du nom : la marque s'efface", vieille && vieille.texte === "Un de moins !", JSON.stringify(vieille));
   verifier("une créature qui tombe : rien", r.molosse === null);
   verifier("Dame Koré déjà à terre : personne pour parler", r.koreATerre === null);
 });
@@ -328,7 +334,7 @@ await section(async () => {
 titre("4. LA FENÊTRE : LE NOIR DU DIALOGUE PRIVÉ, L'AVATAR, LA PHRASE ; UN CLIC N'IMPORTE OÙ LA FERME");
 // =========================================================================
 await section(async () => {
-  await poserCombat([{ Nom: "Dame Koré", Debut: ["*Elle lève son sceptre* À genoux, chiens d'Eraldur !"], Blesse: [], Seul: [], Ko: ["{heros}, reste à terre."] }]);
+  await poserCombat([{ Nom: "Dame Koré", Debut: ["*Elle lève son sceptre* À genoux, chiens d'Eraldur !"], Blesse: [], Seul: [], Ko: ["Reste à terre, toi."] }]);
   await p.evaluate(([etat]) => { window.__repliqueFinie = null;
     window.repliqueCombatRP({ type: "chute", cible: "H1", acteur: "M1" }, etat).then(v => { window.__repliqueFinie = v; }); }, [etatCombat()]);
   await p.waitForTimeout(400);
@@ -337,7 +343,7 @@ await section(async () => {
     return { fond: cs.backgroundColor, plein: r.width >= innerWidth - 1 && r.height >= innerHeight - 1, img: (el.querySelector("img.avatar-dp.pnj") || {}).src || "",
              nom: (el.querySelector(".nom-dp") || {}).textContent, texte: (el.querySelector(".texte-dp") || {}).textContent, enCours: window.__repliqueFinie === null }; });
   verifier("l'écran noir (comme le dialogue privé), en plein écran", f && /rgba\(0, 0, 0, 0\.8/.test(f.fond) && f.plein, JSON.stringify(f));
-  verifier("…l'avatar de Dame Koré, son nom, sa phrase", f && f.img === KORE && f.nom === "Dame Koré" && /Thorin, reste à terre/.test(f.texte), JSON.stringify(f));
+  verifier("…l'avatar de Dame Koré, son nom, sa phrase", f && f.img === KORE && f.nom === "Dame Koré" && /Reste à terre, toi/.test(f.texte), JSON.stringify(f));
   verifier("…le combat attend (l'animation n'est pas finie)", f && f.enCours);
   await cap("v457_replique");
   await p.mouse.click(40, 60); await p.waitForTimeout(200);
@@ -365,7 +371,8 @@ await section(async () => {
   const req = requetes.slice(avant).find(x => /répliques de combat/.test(x.systeme));
   const rep = await p.evaluate(() => (window.__docs["Systeme_Parties/P1"].Combat_RP || {}).Repliques);
   verifier("l'IA reçoit les PNJ nommés affrontés (pas le molosse) et ce qui a déclenché le combat", !!req && /Dame Koré/.test(req.texte) && !/Molosse/.test(req.texte) && /veut le collier/.test(req.texte), req ? req.texte.slice(0, 200) : "aucune");
-  verifier("…selon leur caractère et la situation (début, blessé, seul, héros à terre)", !!req && /caractère/.test(req.systeme) && /\{heros\}/.test(req.systeme), "");
+  verifier("…selon leur caractère et la situation (début, blessé, seul, héros à terre)", !!req && /caractère/.test(req.systeme) && /quand un des héros tombe à terre/.test(req.systeme), "");
+  verifier("(v459) …jamais le nom d'un héros (le PNJ ne le connaît pas forcément)", !!req && /JAMAIS LE NOM D'UN HÉROS/.test(req.systeme) && !/\{heros\}/.test(req.systeme), "");
   verifier("rangées sur le combat (Combat_RP.Repliques)", Array.isArray(rep) && rep.length === 1 && rep[0].Nom === "Dame Koré" && rep[0].Debut.length === 3 && rep[0].Ko.length === 3, JSON.stringify(rep));
   const src = fs.readFileSync(path.join(RACINE, "combat_rp.js"), "utf-8");
   verifier("…en fond pendant la préparation (le combat ne les attend pas)", /!c\.Repliques && !fait\("repliques"\)\) lancer\("repliques", ecrireLesRepliques\);/.test(src));

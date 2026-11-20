@@ -541,6 +541,12 @@ await section(async () => {
   const c0 = await ctx();
   verifier("(v458) juste après la réussite : le Narrateur reçoit, en off, la consigne de laisser respirer (ni combat, ni action nouvelle)",
            /VIENT D'ÊTRE ACCOMPLIE/.test(c0) && /n'enchaîne pas de suite/.test(c0) && /combat/.test(c0) && c0.includes(acc.Titre) && /Encore 3 passages/.test(c0), c0.slice(0, 200));
+  // (v459) « …ou quand le groupe se déplace » : le groupe en route, plus de consigne ; un voyage fini depuis la réussite non plus.
+  const enRoute = await G(() => { const d = JSON.parse(JSON.stringify(window.__docs["Systeme_Parties/P1"]));
+    const vote = window.contexteMissionMJ({ ...d, Voyage_Groupe: { Id: "V1", Etat: "vote" } }, ""), marche = window.contexteMissionMJ({ ...d, Voyage_Groupe: { Id: "V1", Etat: "marche" } }, "");
+    const fini = window.contexteMissionMJ({ ...d, Voyage_Termine: { Id: "V1", Le: d.Mission_Accomplie.Le + 1000 } }, ""), avant = window.contexteMissionMJ({ ...d, Voyage_Termine: { Id: "V0", Le: d.Mission_Accomplie.Le - 1000 } }, "");
+    return { vote: !!vote, marche: !!marche, fini: !!fini, avant: !!avant }; });
+  verifier("(v459) le groupe se met en route : le répit s'achève (un vote seul ne compte pas, un voyage d'avant non plus)", enRoute.vote && !enRoute.marche && !enRoute.fini && enRoute.avant, JSON.stringify(enRoute));
   const repits = [];
   for (let k = 1; k <= 3; k++) { await G((k) => window.MISSIONS_GUILDE.suivreApresMJ("Le calme revient.", "m_repit_" + k), k);
     repits.push(((await partieDoc()).Mission_Accomplie || {}).Repit); }
