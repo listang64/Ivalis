@@ -12346,3 +12346,10 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   - L'existant : un panneau aux rangs d'avant se refait tout seul (aRenouveler). Une mission d'avant (en cours ou terminée) se lit ainsi : C normale, B et A difficiles, avec un décalage tiré de son identifiant (decalageDe), toujours le même.
 - **Les indices** (« vire les indices et leurs créations dans la page de mission en cours ») : plus de liste sur la page, et MIA_SUIVI_MISSION ne les relève plus. Le Narrateur garde ceux de son plan, pour lui seul.
 - corrections_v442, v443 et v444 le vérifient (leurs contrôles « v452 »).
+
+## v453 — La mise à terre d'un ennemi se joue même quand sa chute vient tard
+
+- **La chute KO** (Nico : « l'animation à terre KO ne s'est pas faite sur un token ennemi ; le texte « À terre ! », lui, est apparu ») : le pion abattu n'était gardé que 6 s après le coup qui l'abat. Si sa chute venait plus tard (une longue attaque, d'autres effets entre les deux), il était déjà effacé : la mise à terre, sans pion, laissait la place au seul mot.
+  - Le pion est maintenant gardé jusqu'à sa chute, 20 s au plus (DUREE_PION_RETENU).
+  - Déjà effacé, il revient le temps de tomber (animations_jeu.js, animerReactionCombat).
+- animations_en_jeu_4.mjs le vérifie (ses contrôles « v453 »).

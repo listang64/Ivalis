@@ -356,7 +356,12 @@
     // La mise à terre (ou l'illusion brisée) le rend ; un filet le rend de toute
     // façon au bout de quelques secondes.
     window.PIONS_RETENUS = window.PIONS_RETENUS || {};
-    window.pionRetenu = (id) => !!window.PIONS_RETENUS[id] && Date.now() - window.PIONS_RETENUS[id] < 6000;
+    // (v453) Nico : « l'animation à terre KO ne s'est pas faite sur un token ennemi (le texte « À terre ! », lui,
+    // est apparu) ». Le pion n'était gardé que 6 s après le coup qui l'abat : une longue attaque, d'autres effets
+    // entre le coup et la chute, et il était déjà effacé quand venait sa mise à terre — qui, sans pion, laissait
+    // la place au seul mot. Il est gardé jusqu'à sa chute (20 s au plus, si elle ne venait jamais).
+    window.DUREE_PION_RETENU = 20000;
+    window.pionRetenu = (id) => !!window.PIONS_RETENUS[id] && Date.now() - window.PIONS_RETENUS[id] < window.DUREE_PION_RETENU;
     const rendrePion = (id) => {
         delete window.PIONS_RETENUS[id];
         // Tombé : il ne se relève pas, jusqu'au redessin qui le retire.
@@ -372,6 +377,13 @@
         // juste après (l'état le redessine) — c'est là qu'il se relève.
         if (d && d.sorte === "releve-zombie") return window.annoncerZombieCombat(d);
         const geste = d && GESTE_DE_REACTION[d.sorte];
+        // (v453) La mise à terre d'un pion déjà effacé du plateau (le coup qui l'abat est loin) : il revient le
+        // temps de tomber — son entrée est toujours dans les pions, à sa case.
+        if (geste && d && (d.sorte === "ko" || d.sorte === "illusion-brisee" || d.sorte === "sursis-fin") && d.pion && !pionDe(d.pion)
+            && (window.TOKENS_VTT_DATA || {})[d.pion] && typeof window.appliquerTokensVTT === "function") {
+            window.PIONS_RETENUS[d.pion] = Date.now();
+            try { window.appliquerTokensVTT(window.TOKENS_VTT_DATA); } catch (e) {}
+        }
         if (!geste || typeof window.jouerAnimationJeu !== "function" || !pionDe(d.pion)) return false;
         // Le coup reçu d'un geste d'attaque du Studio est déjà montré : fait.
         if (/^coup-/.test(d.sorte) && dejaFrappe(d.pion)) return true;

@@ -335,6 +335,22 @@ console.log("\n4. LES RÉACTIONS SUR LE VRAI PLATEAU");
     out.ko.cache = getComputedStyle(document.getElementById("token-M2")).opacity === "0";
     out.illusion = await reagir({ sorte: "illusion-brisee", pion: "M3", depuis: "H1" });
     out.illusion.cache = getComputedStyle(document.getElementById("token-M3")).opacity === "0";
+    // (v453) « L'animation à terre KO ne s'est pas faite sur un token ennemi (le texte « À terre ! », lui, oui). »
+    // M1 tombe à 0 PV ; le coup qui l'abat est loin (8 s) : il est encore gardé. Puis effacé : sa mise à terre
+    // le fait revenir le temps de tomber.
+    const pion = () => document.getElementById("token-M1");
+    Object.assign(window.PERSOS_PARTIE.find(x => x.idPersonnage === "M1"), { PV_Actuels: 0, statut: "Mort" });
+    const vraieMort = window.estCombattantMort; window.estCombattantMort = (id) => id === "M1";   // (le banc la tient fausse)
+    window.PIONS_RETENUS.M1 = Date.now() - 8000; window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    const garde8s = !!pion();
+    delete window.PIONS_RETENUS.M1; window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    const efface = !pion();
+    out.koLoin = await reagir({ sorte: "ko", pion: "M1", depuis: "H1" });
+    Object.assign(out.koLoin, { garde8s, efface });
+    out.koLoin.cache = !!pion() && getComputedStyle(pion()).opacity === "0";
+    window.appliquerTokensVTT(window.TOKENS_VTT_DATA);
+    out.koLoin.retire = !pion();
+    window.estCombattantMort = vraieMort;
     return out;
   });
   const chiffres = (x) => x.textes.filter(t => /^-\d/.test(t) && !/⚡/.test(t));
@@ -365,6 +381,8 @@ console.log("\n4. LES RÉACTIONS SUR LE VRAI PLATEAU");
   verifier("après un coup d'épée du Studio, l'étape des dégâts ne rejoue pas le coup reçu", r.apresAttaque.fait && r.apresAttaque.sons.length === 0 && r.apresAttaque.sang === 0,
            JSON.stringify(r.apresAttaque));
   verifier("la mise à terre : « À terre ! », et il ne se relève pas", r.ko.textes.includes("À terre !") && r.ko.sons.includes("chute") && r.ko.cache, JSON.stringify(r.ko));
+  verifier("(v453) le coup qui abat est loin (8 s) : le pion est encore gardé pour sa chute", r.koLoin.garde8s && r.koLoin.efface, JSON.stringify(r.koLoin));
+  verifier("(v453) déjà effacé du plateau : sa mise à terre le fait revenir, tomber, puis il s'en va", r.koLoin.fait === true && r.koLoin.sons.includes("chute") && r.koLoin.textes.includes("À terre !") && r.koLoin.cache && r.koLoin.retire, JSON.stringify(r.koLoin));
   verifier("l'illusion brisée : les éclats, le leurre disparaît", r.illusion.textes.includes("Illusion brisée") && r.illusion.sons.includes("bris-verre") && r.illusion.cache);
   verifier("aucune réaction n'écrit de chiffre de dégâts (l'étape le dit)", !Object.values(r).some(x => chiffres(x).length),
            JSON.stringify(Object.values(r).map(chiffres)));
