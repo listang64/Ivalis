@@ -303,6 +303,34 @@ await section(async () => {
 });
 
 // =========================================================================
+titre("2 bis. (v461) UN PNJ NOMMÉ N'EST QU'UNE CRÉATURE ; PAS DE RACE D'UN AUTRE UNIVERS DANS LES PIONS");
+// Nico : « j'ai un PNJ nommé, qui a un avatar, qui s'est fait copier l'image de son token pour un ennemi random ; et un
+// autre token qui a l'image d'un orc alors que cette race n'existe pas dans mon JdR ».
+await section(async () => {
+  const r = await p.evaluate(() => {
+    const vrais = window.peuplesDuMonde;
+    window.peuplesDuMonde = () => [{ nom: "Humain", physique: "un humain" }, { nom: "Vargen", physique: "un homme-loup" }, { nom: "Elfe", physique: "oreilles pointues" }];
+    const m = (archetype) => ({ archetype, palier: "Normal" });
+    const tous = [{ m: { ...m("TANK CAC"), leader: true }, moment: "départ" }, { m: m("DPS CAC"), moment: "départ" }, { m: m("DPS DISTANCE"), moment: "départ" }, { m: m("SOUTIEN"), moment: "renfort" }];
+    const doros = [{ Nom_PNJ: "Doros", Race: "Humain", Description_Physique: "Un docker massif au crâne rasé.", URL_Cloudinary: "https://res.cloudinary.com/x/doros.png" }];
+    // L'IA rattache aussi le garde à Doros (même pnj, même visuel) ; le troisième est « un orque », le soutien une « elfe ».
+    const habits = { creatures: [{ numero: 1, nom: "Doros", visuel: "doros", pnj: "Doros" }, { numero: 2, nom: "Garde de Doros", visuel: "doros", pnj: "Doros" },
+                                 { numero: 3, nom: "Brute des quais", visuel: "brute", pnj: "" }, { numero: 4, nom: "Guérisseuse", visuel: "soin", pnj: "" }],
+                     visuels: [{ cle: "doros", peuple: "Humain", description_physique: "Doros, docker massif." }, { cle: "brute", peuple: "", description_physique: "Un orque massif à la peau verte, défenses jaunies, cuirasse de bronze." },
+                               { cle: "soin", peuple: "Elfe", description_physique: "Une elfe aux mains tachées d'herbes." }] };
+    const res = window.habillerEnnemisCombatRP(tous, habits, { ennemis: [], renforts: [] }, doros);
+    window.peuplesDuMonde = vrais;
+    return { creatures: res.creatures.map(c => ({ nom: c.nom, visuel: c.visuel, pnj: c.pnj || "", portrait: c.portrait || "" })), visuels: res.visuels };
+  });
+  const [d, g, o, e] = r.creatures;
+  verifier("(v461) Doros est le PNJ nommé, avec son portrait ; le garde, une autre créature (ni son nom de PNJ, ni son portrait)", d.pnj === "Doros" && !!d.portrait && g.pnj === "" && g.portrait === "", JSON.stringify(r.creatures));
+  verifier("(v461) …le garde n'a pas le pion de Doros (et pas sa description)", g.visuel !== d.visuel && !/Doros, docker/.test((r.visuels[g.visuel] || {}).Description || ""), JSON.stringify(r.visuels));
+  const vo = r.visuels[o.visuel] || {}, ve = r.visuels[e.visuel] || {};
+  verifier("(v461) « un orque » (absent du Grimoire des Races) : plus d'orque, un peuple du monde à la place", !/orque|orc/i.test(vo.Description) && vo.Peuple === "Humain" && /humain massif/i.test(vo.Description), JSON.stringify(vo));
+  verifier("(v461) …ni ses traits (peau verte, défenses) ; sa cuirasse reste", !/peau|défense/i.test(vo.Description) && /cuirasse de bronze/.test(vo.Description), JSON.stringify(vo));
+  verifier("(v461) …une race du monde (l'Elfe, au Grimoire) garde son nom", /elfe/i.test(ve.Description) && ve.Peuple === "Elfe", JSON.stringify(ve));
+});
+
 titre("3. MIA_BESTIAIRE (LES RENFORTS EN COMBAT) : LA MÊME RÈGLE");
 // =========================================================================
 await section(async () => {

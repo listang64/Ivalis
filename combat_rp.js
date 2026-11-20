@@ -677,8 +677,8 @@ RÈGLES :
 - Tous les noms sont différents : 1 à 4 mots, en français, sans chiffre.
 - Chaque description physique commence par le peuple ou l'espèce, et décrit une tenue et des armes antiques.
 - L'APPARENCE D'UN PEUPLE (v309) : quand un peuple a une APPARENCE dans la liste (le Grimoire des Races), la description physique la suit fidèlement (peau, traits, taille, signes du peuple), puis y ajoute ce qui est propre à cet individu.
-- "visuel" : une clé courte, commune aux créatures qui se RESSEMBLENT (trois loups gris identiques partagent la même clé) ; au plus 5 visuels différents. Un PNJ nommé a son propre visuel, que personne d'autre ne partage, et aucune autre créature ne lui ressemble. Chaque visuel a une description physique précise de la tête et du haut du corps (elle servira à sculpter un médaillon).
-- (v367) "peuple" : pour CHAQUE visuel, renforts compris, le nom EXACT d'un des peuples d'Elyria de la liste (« Vargen », « Ankylar »…), ou "bete" pour un animal de la faune, ou "mythe" pour une créature de la mythologie antique. Jamais un peuple inventé. Un membre d'un peuple a l'APPARENCE de ce peuple (la liste), pas celle d'un humain avec des cornes ou d'une race d'un autre univers.
+- "visuel" : une clé courte, commune aux créatures qui se RESSEMBLENT (trois loups gris identiques partagent la même clé) ; au plus 5 visuels différents. Un PNJ nommé a son propre visuel, que personne d'autre ne partage, et aucune autre créature ne lui ressemble. (v461) Un PNJ nommé n'est qu'UNE créature : ses gardes, ses hommes, ses bêtes ont "pnj" vide et un autre visuel. Chaque visuel a une description physique précise de la tête et du haut du corps (elle servira à sculpter un médaillon).
+- (v367) "peuple" : pour CHAQUE visuel, renforts compris, le nom EXACT d'un des peuples d'Elyria de la liste (« Vargen », « Ankylar »…), ou "bete" pour un animal de la faune, ou "mythe" pour une créature de la mythologie antique. Jamais un peuple inventé. Un membre d'un peuple a l'APPARENCE de ce peuple (la liste), pas celle d'un humain avec des cornes ou d'une race d'un autre univers. (v461) Toute race absente de la liste (orques, gobelins, trolls, ogres, kobolds, gnomes, halfelins…) N'EXISTE PAS dans ce monde : jamais ces mots, ni leurs traits (peau verte, défenses…).
 
 Réponds UNIQUEMENT en JSON : {"creatures": [{"numero": 1, "nom": "...", "visuel": "loup", "pnj": "", "lien": ""}], "visuels": [{"cle": "loup", "peuple": "bete", "description_physique": "..."}]}`;
 
@@ -752,16 +752,32 @@ function habiller(tous, habits, analyse, pnjs) {
     // des ennemis, nommés d'après le récit), dans l'ordre — plus de « Soigneur 7 ».
     const idees = ((analyse && analyse.renforts) || []).filter(x => x && x.nom);
     let rangRenfort = 0;
-    const creatures = tous.map((x, i) => {
+    // (v461) Nico : « un PNJ nommé, qui a un avatar, s'est fait copier l'image de son token pour un ennemi random ».
+    // L'IA rattachait parfois une seconde créature au même PNJ (« Garde de Doros », pnj : « Doros ») : elle prenait
+    // son visuel, et passait pour lui. Un PNJ nommé n'est qu'UNE créature (la première qui le nomme) ; et la clé de
+    // visuel que l'IA lui avait donnée ne sert à personne d'autre (sa description est la sienne).
+    const choix = tous.map((x, i) => {
         const h = parNumero.get(i + 1) || {};
         const r = x.moment === "départ" ? (recit[i] || {}) : (!h.nom && idees.length ? idees[rangRenfort++ % idees.length] : {});
         let nom = String(h.nom || r.nom || "").trim() || `${(ROLES[x.m.archetype] || "Créature").split(" ")[0].replace(/^./, l => l.toUpperCase())} ${i + 1}`;
         while (pris.has(normaliser(nom))) nom += " le Second";
         pris.add(normaliser(nom));
-        const pnj = pnjParNom.get(normaliser(h.pnj || r.pnj || "")) || (x.moment === "départ" ? pnjParNom.get(normaliser(nom)) : null) || null;
+        return { h, r, nom };
+    });
+    const pnjsPris = new Set();
+    choix.forEach((c, i) => {
+        const x = tous[i];
+        const pnj = pnjParNom.get(normaliser(c.h.pnj || c.r.pnj || "")) || (x.moment === "départ" ? pnjParNom.get(normaliser(c.nom)) : null) || null;
+        c.pnj = pnj && !pnjsPris.has(pnj.Nom_PNJ) ? pnj : null;
+        if (c.pnj) pnjsPris.add(c.pnj.Nom_PNJ);
+    });
+    const clesDesPnj = new Set(choix.filter(c => c.pnj && c.h.visuel).map(c => String(c.h.visuel).trim()));
+    const creatures = tous.map((x, i) => {
+        const { h, r, nom, pnj } = choix[i];
+        const visuelIA = pnj || !clesDesPnj.has(String(h.visuel || "").trim()) ? String(h.visuel || "").trim() : "";
         // LE VISUEL : le PNJ nommé a le sien (son portrait) ; les autres
         // partagent celui que l'IA leur donne, dans la limite des cinq.
-        let brute = pnj ? "pnj:" + pnj.Nom_PNJ : String(h.visuel || "").trim() || (r.nom ? "recit:" + r.nom : x.m.archetype + ":" + x.m.palier);
+        let brute = pnj ? "pnj:" + pnj.Nom_PNJ : visuelIA || (r.nom ? "recit:" + r.nom : x.m.archetype + ":" + x.m.palier);
         if (!cles.has(brute)) {
             // (v327) Plus de place pour un visuel : celui d'une créature du même rôle
             // (un soutien ne prend pas le dessin d'un molosse), sinon le premier.
@@ -775,8 +791,13 @@ function habiller(tous, habits, analyse, pnjs) {
             else {
                 const cle = "v" + (cles.size + 1);
                 cles.set(brute, cle);
-                const description = pnj ? (pnj.Description_Physique || descriptions.get(h.visuel) || "") : (descriptions.get(String(h.visuel || "").trim()) || r.description_physique || `${ROLES[x.m.archetype] || "créature"}, stature ${x.m.palier}`);
-                const peuple = peupleDuVisuel(peuples.get(String(h.visuel || "").trim()) || (pnj && pnj.Race) || "", description);
+                const brut = pnj ? (pnj.Description_Physique || descriptions.get(h.visuel) || "") : ((visuelIA && descriptions.get(visuelIA)) || r.description_physique || `${ROLES[x.m.archetype] || "créature"}, stature ${x.m.palier}`);
+                let peuple = peupleDuVisuel((visuelIA && peuples.get(visuelIA)) || (pnj && pnj.Race) || "", brut);
+                // (v461) « Un token a l'image d'un orc alors que cette race n'existe pas dans mon JdR » : une race d'un
+                // autre univers nommée dans la description s'efface ; sans peuple, celui du monde le plus courant.
+                const nettoye = sansRacesEtrangeres(brut, peuple);
+                if (!peuple && nettoye.trouvees.length) peuple = peupleParDefaut();
+                const description = nettoye.texte;
                 visuels[cle] = {
                     Description: description,
                     ...(peuple ? { Peuple: peuple } : {}),
@@ -792,6 +813,42 @@ function habiller(tous, habits, analyse, pnjs) {
     return { creatures, visuels };
 }
 window.habillerEnnemisCombatRP = habiller;
+// (v461) LES RACES D'AUTRES UNIVERS (orques, gobelins, trolls…) : jamais dans les pions, sauf si le Grimoire
+// des Races les a (une race du monde garde son nom). Rend { texte, trouvees }.
+const RACES_ETRANGERES = ["demi-orques", "demi-orque", "demi-orcs", "demi-orc", "orques", "orque", "orcs", "orc", "orks", "ork", "hobgobelins", "hobgobelin",
+    "gobelins", "gobelin", "goblins", "goblin", "trolls", "troll", "ogres", "ogre", "kobolds", "kobold", "halfelins", "halfelin", "hobbits", "hobbit",
+    "gnomes", "gnome", "drows", "drow", "elfes noirs", "elfe noir", "elfes", "elfe", "elves", "elf", "nains", "naine", "nain", "dwarves", "dwarf"];
+function sansRacesEtrangeres(description, peuple) {
+    const sansAcc = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const monde = (typeof window.peuplesDuMonde === "function" ? window.peuplesDuMonde() : []).map(r => sansAcc(r.nom));
+    const duMonde = (mot) => monde.some(m => m && (m === sansAcc(mot) || sansAcc(mot).startsWith(m) || m.startsWith(sansAcc(mot).replace(/s$/, ""))));
+    const remplacant = peuple && peuple !== "bete" && peuple !== "mythe" ? peuple : (peupleParDefaut() || "humain");
+    let texte = String(description || "");
+    const trouvees = [];
+    RACES_ETRANGERES.forEach(mot => {
+        if (duMonde(mot)) return;
+        const re = new RegExp(`(^|[^\\p{L}])${mot.replace(/[-]/g, "[- ]")}(?=$|[^\\p{L}])`, "giu");
+        if (re.test(texte)) { trouvees.push(mot); texte = texte.replace(re, (_, avant) => `${avant}${remplacant}`); }
+    });
+    // …et leurs traits (la peau verte, les défenses de l'orque ; les oreilles pointues de l'elfe) : sans eux.
+    if (trouvees.length) {
+        TRAITS_ETRANGERS.forEach(re => { texte = texte.replace(re, ""); });
+        texte = texte.replace(/\s*,\s*(,\s*)+/g, ", ").replace(/\s+([,.;])/g, "$1").replace(/,\s*\./g, ".").replace(/^\s*,\s*|\s*,\s*$/g, "").replace(/\s{2,}/g, " ").trim();
+    }
+    return { texte, trouvees };
+}
+const TRAITS_ETRANGERS = [
+    /,?\s*(à la|a la|avec une|avec la|d'une|à|a)?\s*peau (verte|verdâtre|verdatre|vert[- ]de[- ]gris|olivâtre|gris-vert|grisâtre)/giu,
+    /,?\s*(aux|avec des|des|de)?\s*(longues |grosses |petites )?(défenses|defenses|crocs) [^,.;]*/giu,
+    /,?\s*(aux|avec des|des)?\s*oreilles (longues et )?pointues/giu,
+    /,?\s*(tusks?|green skin|pointed ears)[^,.;]*/giu];
+// Le peuple le plus courant du monde (Humain s'il existe, sinon le premier du Grimoire).
+function peupleParDefaut() {
+    const liste = typeof window.peuplesDuMonde === "function" ? window.peuplesDuMonde() : [];
+    const h = liste.find(r => /^humain/i.test(String(r.nom || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")));
+    return (h || liste[0] || {}).nom || "";
+}
+window.sansRacesEtrangeresCombatRP = sansRacesEtrangeres;
 
 // --- 4.5 LES PIONS --------------------------------------------------------
 async function dessinerLesPions() {

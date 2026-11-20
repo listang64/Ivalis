@@ -12444,3 +12444,16 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   4. **Son empathie compte aussi** : ±5 de confiance, ±2,5 d'attachement.
 - Les PNJ nés avant gardent une disposition neutre.
 - social_pur.mjs et corrections_v457.mjs le vérifient (leurs contrôles « v460 »). corrections_v415 compte la rancune depuis la première impression, qui n'est plus forcément nulle.
+
+## v461 — Les pions ennemis : un PNJ nommé n'est qu'une créature ; pas de race d'un autre univers
+
+- **Le pion copié** (Nico : « un PNJ nommé, qui a un avatar, s'est fait copier l'image de son token pour un ennemi random ») :
+  - La cause : l'IA d'habillage rattachait parfois une seconde créature au même PNJ (« Garde de Doros », pnj : « Doros »). Elle prenait sa clé de visuel, donc son pion, et passait même pour lui. La v456 empêchait seulement le prêt du visuel d'un PNJ quand la place manquait.
+  - Maintenant, un PNJ nommé n'est qu'UNE créature : la première qui le nomme. La clé de visuel que l'IA lui avait donnée, et sa description, ne servent à personne d'autre (combat_rp.js, habiller).
+  - La consigne de l'IA le dit aussi : ses gardes et ses bêtes ont « pnj » vide et un autre visuel.
+- **L'orc** (« un token a l'image d'un orc alors que cette race n'existe pas dans mon JdR ») :
+  - La cause : une description qui nommait « un orque » gardait ce mot jusqu'au dessinateur, le peuple restant vide ; l'interdiction en anglais ne suffisait pas.
+  - Maintenant, toute race d'un autre univers absente du Grimoire des Races (orque, gobelin, troll, ogre, kobold, gnome, halfelin, drow, elfe, nain…) est remplacée par le peuple du visuel, ou à défaut l'Humain du monde. Ses traits typiques (peau verte, défenses, crocs, oreilles pointues) s'effacent (sansRacesEtrangeres).
+  - Une race qui est au Grimoire garde son nom.
+  - La consigne de l'IA le dit aussi.
+- corrections_v327.mjs le vérifie (ses contrôles « v461 »).
