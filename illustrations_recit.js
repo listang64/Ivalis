@@ -436,18 +436,24 @@ async function fichesPnj(noms, connus) {
 // fond magenta détouré, 1024 × 1792) ; le livre le pose en pleine page de droite.
 async function portraitDuPnj(p, fiche) {
     const description = (fiche && fiche.Description_Physique) || p.description_physique || "";
-    const race = (fiche && fiche.Race) || p.race || "Humain";
-    const url = typeof window.portraitPnjFaconAvatar === "function" ? await window.portraitPnjFaconAvatar(description, race) : "";
+    // (v455) Nico : « pour la création des PNJ, s'assurer qu'il gère bien les races » et « le même algo pour le
+    // skin des fringues que les personnages » : la race, celle du Grimoire (son nom exact) ; la tenue, celle de
+    // sa fiche, sinon une tirée dans les listes des héros (variations_tenues.js).
+    let race = (fiche && fiche.Race) || p.race || "Humain";
+    if (typeof window.raceDuGrimoirePNJ === "function") race = await window.raceDuGrimoirePNJ(race).catch(() => race);
+    const tenue = (fiche && fiche.Tenue) || (typeof window.choisirTenuePNJ === "function" && typeof window.tenuesProposeesPNJ === "function"
+        ? window.choisirTenuePNJ("", window.tenuesProposeesPNJ(2)) : null);
+    const url = typeof window.portraitPnjFaconAvatar === "function" ? await window.portraitPnjFaconAvatar(description, race, tenue) : "";
     // (Un dépôt manqué rend l'image brute, en data: : elle ne va pas dans la fiche.)
     if (!url || String(url).startsWith("data:")) throw new Error("MIA_ILLUSTRATEUR : pas de portrait");
     const img = { url, ratio: ratioDe("1024x1792") };
     let id = fiche && fiche.__id;
     try {
-        if (id) await updateDoc(doc(db, "Monde_PNJ", id), { URL_Cloudinary: img.url });
+        if (id) await updateDoc(doc(db, "Monde_PNJ", id), { URL_Cloudinary: img.url, ...(tenue && !(fiche && fiche.Tenue) ? { Tenue: tenue } : {}) });
         else {
             id = `PNJ_${Math.floor(Math.random() * 10000).toString().padStart(4, "0")}_${p.nom.replace(/[^a-zA-Z0-9]/g, "_")}`;
             await setDoc(doc(db, "Monde_PNJ", id), {
-                Nom_PNJ: p.nom, Race: race, Description_Physique: description, URL_Cloudinary: img.url,
+                Nom_PNJ: p.nom, Race: race, Description_Physique: description, URL_Cloudinary: img.url, ...(tenue ? { Tenue: tenue } : {}),
                 Statut: "Vivant", Occupation: "", Secret_Mental: "", Style_De_Parole: "", ID_Lieu: "", ID_Batiment: "",
                 Origine: "MIA_ILLUSTRATEUR", ID_Partie: window.ID_PARTIE_COURANTE || "", Cree_Le: Date.now(),
                 Version_Creation: Number(window.VERSION_IVALIS) || 0   // (v409) né avec la refonte des PNJ

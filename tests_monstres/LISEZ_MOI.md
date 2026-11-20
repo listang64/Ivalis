@@ -12361,3 +12361,15 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   - Le Narrateur la relit, avec une consigne de continuité, tant que le nouveau récit a moins de 4 passages (contexteRecitPrecedent).
   - Les jours de marche sans un mot des joueurs ne l'effacent pas : seul un vrai archivage la remplace.
 - corrections_v276.mjs le vérifie (ses contrôles « v454 »).
+
+## v455 — La création des PNJ : leur race bien dessinée, leur tenue tirée comme celles des héros
+
+- **Les races** (Nico : « pour la création des PNJ, s'assurer qu'il gère bien les races dans le design envoyé à l'IA ») :
+  - L'IA qui crée un PNJ (MIA_CASTING, MIA_PNJ) lit les races du Grimoire avec leur allure (Descriptif_Physique), pour que le physique qu'elle écrit la respecte.
+  - Le dessinateur reçoit toujours l'espèce, Humain compris, et son anatomie.
+  - La race se retrouve sans accents ni casse, au singulier comme au pluriel (raceDuGrimoire ; avant, un nom « contenu » dans un autre suffisait). Celle d'un PNJ peint par l'illustrateur du récit est ramenée à celle du Grimoire.
+- **Les tenues** (« le même algo pour le skin des fringues que les personnages, pour la variété : que l'IA choisisse dans la liste des choses faisables ») : variations_tenues.js (tenuesProposeesPNJ, choisirTenuePNJ).
+  - L'IA reçoit six tenues tirées dans les listes des héros (deux par type d'armure, pas les plus récentes) et recopie celle qui va au métier du PNJ.
+  - La palette se tire comme pour les héros. La tenue se garde sur la fiche (Tenue) et part au dessinateur, imposée.
+  - Sans choix de l'IA (l'illustrateur du récit), une des tenues proposées est tirée au hasard.
+- corrections_v408.mjs le vérifie (ses contrôles « v455 »).

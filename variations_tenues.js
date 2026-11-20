@@ -318,3 +318,50 @@ window.texteVariationTenue = function(v) {
     if (!v) return "";
     return `${v.titre} — ${v.description}` + (v.palette ? ` Couleurs dominantes : ${v.palette}.` : "");
 };
+
+// =========================================================================
+//  (v455) LES TENUES DES PNJ : LE MÊME TIRAGE QUE POUR LES HÉROS
+// =========================================================================
+//  Nico : « pour la création des PNJ, utiliser le même algo pour le skin des fringues que les personnages,
+//  pour la variété : que l'IA choisisse dans la liste des choses faisables ». L'IA qui crée le PNJ reçoit
+//  quelques tenues tirées dans les mêmes listes (deux par type d'armure, pas les plus récentes) et choisit
+//  celle qui va à son métier ; la palette se tire comme pour les héros. La tenue part au dessinateur.
+const CLE_RECENTES_PNJ = "ivalis_tenues_pnj_recentes";
+const lireRecentesPnj = () => { try { return JSON.parse(localStorage.getItem(CLE_RECENTES_PNJ) || "[]") || []; } catch (e) { return []; } };
+const ecrireRecentesPnj = (r) => { try { localStorage.setItem(CLE_RECENTES_PNJ, JSON.stringify(r)); } catch (e) { /* stockage indisponible */ } };
+const sansAccentTenue = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+// Les tenues proposées : `parType` par type d'armure (légère, intermédiaire, lourde), jamais deux fois la même,
+// les plus récentes (sur cet appareil) passent leur tour tant qu'il en reste d'autres.
+window.tenuesProposeesPNJ = function(parType, hasard) {
+    const tirer = typeof hasard === "function" ? hasard : Math.random;
+    const n = Number(parType) > 0 ? Number(parType) : 2;
+    const recentes = new Set(lireRecentesPnj());
+    const proposees = [];
+    Object.keys(window.VARIATIONS_TENUES).forEach(type => {
+        const liste = window.VARIATIONS_TENUES[type];
+        let pool = liste.filter(v => !recentes.has(v.titre));
+        if (pool.length < n) pool = liste.slice();
+        for (let k = 0; k < n && pool.length; k++) {
+            const v = pool.splice(Math.min(pool.length - 1, Math.floor(tirer() * pool.length)), 1)[0];
+            proposees.push({ titre: v.titre, description: v.description, type });
+        }
+    });
+    return proposees;
+};
+// La liste telle que l'IA la lit.
+window.texteTenuesProposeesPNJ = function(proposees) {
+    return (proposees || []).map(v => `- « ${v.titre} » (${String(v.type).replace("Armure ", "armure ")}) : ${v.description}`).join("\n");
+};
+// La tenue choisie (le titre que l'IA a recopié), avec sa palette ; un titre inconnu : une des proposées, au hasard.
+window.choisirTenuePNJ = function(titre, proposees, hasard) {
+    const tirer = typeof hasard === "function" ? hasard : Math.random;
+    const t = sansAccentTenue(titre);
+    const toutes = Object.keys(window.VARIATIONS_TENUES).flatMap(type => window.VARIATIONS_TENUES[type].map(v => ({ ...v, type })));
+    const pareil = (v) => t && sansAccentTenue(v.titre) === t;
+    let v = (proposees || []).find(pareil) || (t ? toutes.find(pareil) : null);
+    if (!v) { const pool = (proposees && proposees.length) ? proposees : toutes; v = pool[Math.min(pool.length - 1, Math.floor(tirer() * pool.length))]; }
+    const palettes = window.PALETTES_TENUES;
+    const palette = palettes[Math.min(palettes.length - 1, Math.floor(tirer() * palettes.length))];
+    ecrireRecentesPnj([...lireRecentesPnj().filter(x => x !== v.titre), v.titre].slice(-window.MEMOIRE_VARIATIONS_TENUES));
+    return { titre: v.titre, description: v.description, type: v.type || "", palette };
+};

@@ -456,8 +456,8 @@ window.PORTRAITS_PNJ_EN_PAUSE = false;
 // (v346) Nico : « pour les nouveaux PNJ, utilise le même procédé que pour créer l'avatar
 // des personnages joueurs, et affiche-les en pleine page de droite ». MIA_ILLUSTRATEUR
 // (illustrations_recit.js) passe outre la pause pour les PNJ présents dans la scène.
-window.portraitPnjFaconAvatar = (description, race) => genererEtStockerImagePNJ(description, race, true);
-async function genererEtStockerImagePNJ(descriptionPhysique, racePNJ = "Humain", malgreLaPause = false) {
+window.portraitPnjFaconAvatar = (description, race, tenue) => genererEtStockerImagePNJ(description, race, true, tenue);
+async function genererEtStockerImagePNJ(descriptionPhysique, racePNJ = "Humain", malgreLaPause = false, tenue = null) {
     if (!malgreLaPause && window.PORTRAITS_PNJ_EN_PAUSE !== false) return "";
     const cles = {
         openai: localStorage.getItem("ivalis_OPENAI_API_KEY")?.trim(),
@@ -474,25 +474,14 @@ async function genererEtStockerImagePNJ(descriptionPhysique, racePNJ = "Humain",
     // =====================================================================
     // 1. Récupération du descriptif physique de la race depuis le Grimoire
     // =====================================================================
+    // (v455) La race du Grimoire, retrouvée sans accents ni casse (un pluriel, un singulier) — avant, un nom
+    // « contenu » dans un autre suffisait, et le dernier trouvé gagnait ; son allure part toujours, Humain compris.
     let loreRace = "";
-    if (racePNJ && racePNJ.toLowerCase() !== "humain") {
-        try {
-            const qRace = query(collection(db, "Monde_Races"));
-            const snapRace = await getDocs(qRace);
-            
-            // On ignore la casse et les accents pour la comparaison
-            const normaliser = (str) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            const nomCherche = normaliser(racePNJ);
-
-            snapRace.forEach(docSnap => {
-                const dataRace = docSnap.data();
-                if (dataRace.Nom && normaliser(dataRace.Nom).includes(nomCherche)) {
-                    loreRace = dataRace.Descriptif_Physique || "";
-                }
-            });
-        } catch (e) {
-            console.error("[MIA_PNJ] Erreur récupération du lore de la race :", e);
-        }
+    try {
+        const r = raceDuGrimoire(racePNJ || "Humain", await lireRacesDuGrimoire());
+        if (r) { racePNJ = r.Nom; loreRace = r.Descriptif_Physique || ""; }
+    } catch (e) {
+        console.error("[MIA_PNJ] Erreur récupération du lore de la race :", e);
     }
 
     // =====================================================================
@@ -500,9 +489,14 @@ async function genererEtStockerImagePNJ(descriptionPhysique, racePNJ = "Humain",
     // =====================================================================
     let promptOpenAI = "Contexte de l'univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).\n\n";
 
-    if (loreRace !== "") {
-        promptOpenAI += `--- ANATOMIE DE BASE DE L'ESPÈCE (${racePNJ}) ---\n` +
-                        loreRace + "\n\n";
+    promptOpenAI += `--- ANATOMIE DE BASE DE L'ESPÈCE (${racePNJ || "Humain"}) ---\n` +
+                    `Le personnage est un(e) ${racePNJ || "Humain"} : son corps, sa peau et son visage sont ceux de cette espèce.\n` +
+                    (loreRace ? loreRace + "\n" : "") + "\n";
+    // (v455) LA TENUE, tirée comme celles des héros (variations_tenues.js) : elle passe devant celle que la
+    // description pourrait évoquer, et s'ajuste à l'anatomie de l'espèce.
+    const texteTenue = tenue && typeof window.texteVariationTenue === "function" ? window.texteVariationTenue(tenue) : "";
+    if (texteTenue) {
+        promptOpenAI += "--- LA TENUE DU PERSONNAGE (IMPOSÉE, ajustée à l'anatomie de son espèce) ---\n" + texteTenue + "\n\n";
     }
 
     promptOpenAI += "--- SPÉCIFICITÉS UNIQUES DU PERSONNAGE (TRÈS IMPORTANT, PRIORITAIRE SUR L'ANATOMIE DE BASE) ---\n" +
@@ -699,22 +693,43 @@ function nomCiteDans(nom, texte) {
 }
 
 // Les races du Grimoire (Monde_Races), Humain en premier.
-async function lireRacesConnues() {
-    const racesConnues = ["Humain"];
+// (v455) Nico : « pour la création des PNJ, s'assurer qu'il gère bien les races dans le design envoyé à
+// l'IA ». Avec leur allure (Descriptif_Physique) : la fiche que l'IA écrit doit la respecter, et le
+// dessinateur la reçoit.
+async function lireRacesDuGrimoire() {
+    const races = [{ Nom: "Humain", Descriptif_Physique: "" }];
     try {
         const snapRaces = await getDocs(query(collection(db, "Monde_Races")));
-        snapRaces.forEach(docSnap => { if (docSnap.data().Nom) racesConnues.push(docSnap.data().Nom); });
+        snapRaces.forEach(docSnap => { const d = docSnap.data() || {}; if (d.Nom && sansAccentPNJ(d.Nom) !== "humain") races.push({ Nom: d.Nom, Descriptif_Physique: d.Descriptif_Physique || "" });
+            else if (d.Nom) races[0].Descriptif_Physique = d.Descriptif_Physique || ""; });
     } catch (e) {
         console.warn("[MIA_PNJ] Impossible de lire le Grimoire des Races :", e);
     }
-    return racesConnues;
+    return races;
 }
+async function lireRacesConnues() {
+    return (await lireRacesDuGrimoire()).map(r => r.Nom);
+}
+// Les races, telles que l'IA qui crée un PNJ les lit : le nom exact et l'allure (courte).
+function texteRacesAvecAllure(races) {
+    return (races || []).map(r => {
+        const allure = String(r.Descriptif_Physique || "").replace(/\s+/g, " ").trim();
+        return `- ${r.Nom}${allure ? ` : ${allure.length > 220 ? allure.slice(0, 220) + "…" : allure}` : ""}`;
+    }).join("\n");
+}
+// La race du Grimoire qui correspond à un nom (sans accents ni casse ; un pluriel, un singulier) ; rien sinon.
+function raceDuGrimoire(nom, races) {
+    const n = sansAccentPNJ(nom).replace(/s$/, "");
+    if (!n) return null;
+    return (races || []).find(r => sansAccentPNJ(r.Nom).replace(/s$/, "") === n) || null;
+}
+window.raceDuGrimoirePNJ = async (nom) => { const r = raceDuGrimoire(nom, await lireRacesDuGrimoire()); return r ? r.Nom : "Humain"; };
 
 // 🛡️ SÉCURITÉ ANTI-HALLUCINATION (Le Videur) : la race choisie par l'IA doit
 // exister VRAIMENT, avec l'orthographe exacte du Grimoire ; sinon Humain.
 function validerRacePNJ(race, racesConnues) {
     if (!race) return "Humain";
-    const trouvee = racesConnues.find(r => sansAccentPNJ(r) === sansAccentPNJ(race));
+    const trouvee = racesConnues.find(r => sansAccentPNJ(r) === sansAccentPNJ(race)) || racesConnues.find(r => sansAccentPNJ(r).replace(/s$/, "") === sansAccentPNJ(race).replace(/s$/, ""));
     if (!trouvee) console.warn(`[MIA_PNJ] L'IA a tenté d'inventer la race '${race}'. Remplacement forcé par 'Humain'.`);
     return trouvee || "Humain";
 }
@@ -736,6 +751,7 @@ async function enregistrerFichePNJ(pnj, idLieuActuel) {
         Description_Physique: pnj.physique || "", ID_Batiment: idBatimentGlobal, ID_Lieu: idLieuGlobal,
         Nom_PNJ: pnj.nom, Occupation: pnj.occupation || "", Race: pnj.race || "Humain", Secret_Mental: pnj.secret || "",
         Statut: "Vivant", Style_De_Parole: pnj.style_parole || "", URL_Cloudinary: "",
+        ...(pnj.tenue && typeof pnj.tenue === "object" ? { Tenue: pnj.tenue } : {}),   // (v455) sa tenue, tirée comme celles des héros
         ID_Partie: window.ID_PARTIE_COURANTE || "",    // (v330 : pour le retrouver, où qu'il aille)
         Version_Creation: Number(window.VERSION_IVALIS) || 0   // (v409) sa marque de naissance (la version du jeu)
     });
@@ -757,10 +773,18 @@ async function enregistrerFichePNJ(pnj, idLieuActuel) {
 // un personnage NOMMÉ que les joueurs vont aborder. Rien n'est rangé ni peint
 // ici : la fiche part au MJ, et elle ne devient un vrai PNJ (fiche en base,
 // portrait) que si le MJ cite son nom.
+// (v455) Les races (avec leur allure) et les tenues possibles, telles que l'IA qui crée un PNJ les lit.
+function consigneRacesEtTenues(races, tenues) {
+    let t = `RACES OBLIGATOIRES (chaque personnage en a une, écrite EXACTEMENT ; son physique respecte l'allure de sa race — une peau, des cornes, des écailles, une taille… ne se contredisent pas) :\n${texteRacesAvecAllure(races)}`;
+    if (tenues && tenues.length && typeof window.texteTenuesProposeesPNJ === "function")
+        t += `\nTENUES POSSIBLES (choisis pour chacun, dans cette liste, celle qui va le mieux à son métier et à son rang, et recopie son titre EXACT dans "tenue" ; ne décris pas d'autre tenue dans le physique) :\n${window.texteTenuesProposeesPNJ(tenues)}`;
+    return t;
+}
 async function preparerNouveauxPNJ(contexteScene, historique4, nomsPnjExistants, nomsHeros) {
     const cleGemini = localStorage.getItem("ivalis_GEMINI_API_KEY");
     if (!cleGemini) return [];
-    const racesConnues = await lireRacesConnues();
+    const racesGrimoire = await lireRacesDuGrimoire(), racesConnues = racesGrimoire.map(r => r.Nom);
+    const tenues = typeof window.tenuesProposeesPNJ === "function" ? window.tenuesProposeesPNJ(2) : [];
     const lieux = await nomsDeLieux();
     const promptSysteme = `Tu es MIA_CASTING, la directrice de casting d'Ivalis (Antiquité magique, mythologie).
 Le Maître du Jeu va répondre aux dernières actions des joueurs. Avant qu'il écrive, décide si la scène a besoin d'un NOUVEAU personnage NOMMÉ.
@@ -770,7 +794,7 @@ JAMAIS de figurants anonymes, de foules, de passants, de groupes. JAMAIS un pers
 UN BLUFF N'EST PAS UN FAIT (v312) : un nom qu'un héros invente pour mentir ou bluffer (« je suis envoyé par le seigneur Untel ») n'existe pas : PAS de fiche pour lui.
 IMPORTANCE (v312) : seulement un personnage qui a un minimum d'importance — un rôle à jouer avec les héros (une information, une demande, un marché, un conflit), qu'on reverra sans doute. Un simple paysan, un passant, un serviteur, quelqu'un qu'on croise sans enjeu : PAS de fiche, même s'ils échangent deux mots.
 Chaque personnage a un VRAI nom propre, court, antique (un prénom, éventuellement un surnom).
-RACES OBLIGATOIRES : ${racesConnues.join(", ")}.
+${consigneRacesEtTenues(racesGrimoire, tenues)}
 
 Personnages DÉJÀ connus : ${JSON.stringify(nomsPnjExistants)}.
 Héros : ${JSON.stringify(nomsHeros)}.
@@ -790,9 +814,10 @@ ${contexteScene}`;
                             type: "OBJECT",
                             properties: {
                                 nom: { type: "STRING" },
-                                physique: { type: "STRING", description: "Haut du corps : sexe, âge, visage, coiffure, expression, tenue (textures, couleurs), objets portés." },
+                                physique: { type: "STRING", description: "Haut du corps, fidèle à l'allure de sa race : sexe, âge, visage, coiffure, expression, signes distinctifs, objets portés (sa tenue vient de la liste des tenues)." },
                                 occupation: { type: "STRING" },
-                                race: { type: "STRING" },
+                                race: { type: "STRING", description: "Le nom EXACT d'une race de la liste." },
+                                ...(tenues.length ? { tenue: { type: "STRING", description: "Le titre EXACT d'une tenue de la liste, celle qui va le mieux à son métier et à son rang." } } : {}),
                                 secret: { type: "STRING" },
                                 style_parole: { type: "STRING" },
                                 raison: { type: "STRING", description: "Pourquoi les joueurs vont l'aborder maintenant." },
@@ -822,7 +847,7 @@ ${contexteScene}`;
             if (!nom || nomsHeros.some(h => memeNomPNJ(h, nom)) || nomsPnjExistants.some(n => memeNomPNJ(n, nom))) return;
             if (estNomDeLieu(nom, lieux)) { console.warn(`[MIA_CASTING] « ${nom} » est un lieu, pas un personnage : écarté.`); return; }
             if (fiches.some(x => memeNomPNJ(x.nom, nom)) || fiches.length >= MAX_PNJ_PREPARES) return;
-            fiches.push({ ...f, nom, race: validerRacePNJ(f.race, racesConnues) });
+            fiches.push({ ...f, nom, race: validerRacePNJ(f.race, racesConnues), ...(tenues.length && typeof window.choisirTenuePNJ === "function" ? { tenue: window.choisirTenuePNJ(f.tenue, tenues) } : {}) });
         });
         if (fiches.length) console.log(`[MIA_CASTING] 🎭 ${fiches.map(f => f.nom).join(", ")} prêt(s) à entrer en scène (sans portrait tant que le MJ ne les cite pas).`);
         return fiches;
@@ -927,7 +952,8 @@ Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste 
     const idLieuActuel = await Promise.resolve(lieu).catch(() => null);
     if (!idLieuActuel) return listePNJCrees;
 
-    const racesConnues = await lireRacesConnues();
+    const racesGrimoire = await lireRacesDuGrimoire(), racesConnues = racesGrimoire.map(r => r.Nom);
+    const tenues = typeof window.tenuesProposeesPNJ === "function" ? window.tenuesProposeesPNJ(2) : [];
 
     // =========================================================
     // ÉTAPE 2 : LE CRÉATEUR (Chaud, Aléatoire et Créatif)
@@ -937,7 +963,7 @@ Si oui, utilise l'outil 'signalerNoms' pour lister leurs prénoms. Sinon, liste 
 
     const promptCreation = `Tu es MIA_PNJ, le forgeron d'âmes.
 Tu dois inventer les fiches détaillées de ces nouveaux personnages : ${JSON.stringify(nouveauxNomsDetectes)}.
-RACES OBLIGATOIRES À UTILISER DANS CET UNIVERS : ${racesConnues.join(", ")}. Tu dois choisir l'une de ces races pour chaque personnage.
+${consigneRacesEtTenues(racesGrimoire, tenues)}
 Assure-toi que tous les éléments de la fiche sont cohérents entre eux et adaptés à l'univers Antique Fantastique (Antiquité magique, mythologie).
 ÉQUIPEMENT DE L'ANTIQUITÉ SEULEMENT (v312) : lances, glaives, épées courtes, haches, arcs, frondes, javelots, boucliers, cuirasses de bronze ou de lin, tuniques, capes. JAMAIS d'arbalète, d'arme à feu, d'armure de plaques, de heaume médiéval.${window.SOCIAL ? window.SOCIAL.consigneCreation(nomsPnjExistants) : ""}
 Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
@@ -957,10 +983,11 @@ Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
                                 nom: { type: "STRING" },
                                 physique: { 
                                     type: "STRING", 
-                                    description: "Description focalisée sur le haut du corps : Sexe, Âge, Visage détaillé, Coiffure, Expression, Haut de la tenue (textures et couleurs), Armes ou objets portés à la ceinture ou dans le dos. Expression, Vêtements (préciser les matières comme le cuir ou l'acier et les couleurs dominantes), Accessoires, Signes distinctifs (cicatrices, tatouages, bijoux, accessoires)." 
+                                    description: "Description focalisée sur le haut du corps, fidèle à l'allure de sa race : Sexe, Âge, Visage détaillé, Coiffure, Expression, Armes ou objets portés à la ceinture ou dans le dos, Accessoires, Signes distinctifs (cicatrices, tatouages, bijoux). Sa tenue vient de la liste des tenues : ne la décris pas ici." 
                                 },
                                 occupation: { type: "STRING" },
-                                race: { type: "STRING" },
+                                race: { type: "STRING", description: "Le nom EXACT d'une race de la liste." },
+                                ...(tenues.length ? { tenue: { type: "STRING", description: "Le titre EXACT d'une tenue de la liste, celle qui va le mieux à son métier et à son rang." } } : {}),
                                 secret: { type: "STRING" },
                                 style_parole: { type: "STRING" },
                                 ...(window.SOCIAL ? { psyche: window.SOCIAL.schemaPsyche(), liens: window.SOCIAL.schemaLiens() } : {})
@@ -999,10 +1026,11 @@ Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
                 if (!pnj || !pnj.nom || nomsHeros.includes(pnj.nom)) return; 
 
                 pnj.race = validerRacePNJ(pnj.race, racesConnues);
+                if (tenues.length && typeof window.choisirTenuePNJ === "function") pnj.tenue = window.choisirTenuePNJ(pnj.tenue, tenues);
                 const docId = await enregistrerFichePNJ(pnj, idLieuActuel);
 
-                // On transmet la race (maintenant 100% sécurisée) au générateur d'image !
-                const urlImage = await genererEtStockerImagePNJ(pnj.physique, pnj.race);
+                // On transmet la race (maintenant 100% sécurisée) et (v455) la tenue au générateur d'image !
+                const urlImage = await genererEtStockerImagePNJ(pnj.physique, pnj.race, false, pnj.tenue);
                 if (urlImage) await updateDoc(doc(db, "Monde_PNJ", docId), { URL_Cloudinary: urlImage });
 
                 const cree = { Nom_PNJ: pnj.nom, URL_Cloudinary: urlImage || "" };
@@ -2632,7 +2660,7 @@ window.declencherTourIA = async function(options) {
                         pnjAffiches[cle] = cree; await ecrireMessage(null, {});
                         return cree;
                     }
-                    const promesseUrl = genererEtStockerImagePNJ(f.physique, f.race).catch(e => { console.error("[MIA_CASTING] Portrait :", e); return ""; });
+                    const promesseUrl = genererEtStockerImagePNJ(f.physique, f.race, false, f.tenue).catch(e => { console.error("[MIA_CASTING] Portrait :", e); return ""; });
                     const lieu = await lieuDuRecit;
                     const docId = lieu ? await enregistrerFichePNJ(f, lieu) : null;
                     const url = await promesseUrl;

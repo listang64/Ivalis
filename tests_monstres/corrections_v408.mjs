@@ -121,7 +121,7 @@ const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwA
 
 // LES FICHES QUE PRÉPARE MIA_CASTING : Myrto (que le MJ fera entrer) et Damon
 // (qu'il ne citera pas).
-const MYRTO = { nom: "Myrto", physique: "Jeune femme aux tresses brunes, tablier de lin taché de vin", occupation: "Tavernière", race: "Humain", secret: "Elle cache un fugitif à la cave", style_parole: "Gouailleuse" };
+const MYRTO = { nom: "Myrto", physique: "Jeune femme aux tresses brunes, tablier de lin taché de vin", occupation: "Tavernière", race: "Humain", secret: "Elle cache un fugitif à la cave", style_parole: "Gouailleuse", tenue: "Vestale" };   // (v455) la tenue choisie dans la liste
 const DAMON = { nom: "Damon", physique: "Colosse à la barbe rousse et au crâne rasé", occupation: "Videur", race: "Humain", secret: "Il doit de l'argent", style_parole: "Bourru" };
 const faux = { casting: [MYRTO, DAMON], castingEnPanne: false, batiment: { action: "nouveau", nouveau_nom: "La Taverne de la Chouette", nouvelle_description: "Une salle enfumée.", nouveaux_stigmates: "Odeur de vin", prompt_image: "tavern" },
                detection: ["Phaedra", "Iris", "Nikias", "Kleon"], narration: null, delaiPortraitMs: 1500 };
@@ -157,7 +157,8 @@ await p.route('**generativelanguage.googleapis.com/**', async r => {
   if (qui === "DETECTION") { json(appel("signalerNoms", { noms: faux.detection })); return; }
   if (qui === "FORGE") {
     const noms = faux.detection;
-    json(appel("creerNouveauxPNJ", { pnjs: noms.concat(["Bonus"]).map(n => ({ nom: n, physique: "Joueur d'osselets nommé " + n, occupation: "Joueur", race: "Humain", secret: "Triche", style_parole: "Rieur" })) })); return;
+    // (v455) Iris : une race écrite au pluriel, en minuscules (« satyres ») — le Grimoire la retrouve.
+    json(appel("creerNouveauxPNJ", { pnjs: noms.concat(["Bonus"]).map(n => ({ nom: n, physique: "Joueur d'osselets nommé " + n, occupation: "Joueur", race: n === "Iris" ? "satyres" : "Humain", secret: "Triche", style_parole: "Rieur" })) })); return;
   }
   if (qui === "BATIMENT") { json(appel("gererDecor", faux.batiment)); return; }
   if (qui === "MIA_COMBAT") { json(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ combat: false, raison: "Un accueil." }) }] } }] })); return; }
@@ -203,7 +204,7 @@ const preparerTable = () => p.evaluate((URL_PORTRAIT_KORE) => {
   window.__docs["Monde_Lieux/L_1"] = { Nom_Du_Lieu: "Le port de Mégara", Description_Global: "Un port de pêche, ses tavernes et ses entrepôts." };
   window.__docs["Monde_PNJ/PNJ_KORE"] = { Nom_PNJ: "Dame Koré", ID_Lieu: "L_1", Race: "Humain", Occupation: "Grande prêtresse", Statut: "Vivant",
     Description_Physique: "Une prêtresse au visage sévère.", URL_Cloudinary: URL_PORTRAIT_KORE };
-  window.__docs["Monde_Races/R1"] = { Nom: "Satyre" };
+  window.__docs["Monde_Races/R1"] = { Nom: "Satyre", Descriptif_Physique: "Cornes de bouc enroulées, jambes velues aux sabots fendus, oreilles pointues." };
   window.__docs["Cerveau_IA/INST_10895"] = { Titre_Menu: "MJ", Contenu_Direct: "Tu es le Maître du Jeu de test." };
   window.DATE_EN_JEU_ACTUELLE = { jour: "12", annee: "3" };
   window.PERSOS_PARTIE = [{ idPersonnage: "H1", prenom: "Thorin" }, { idPersonnage: "H2", prenom: "Lyra" }];
@@ -256,6 +257,24 @@ await section(async () => {
   verifier("Damon, jamais cité : ni fiche ni portrait (v292, inchangé)", imgDamon.length === 0 && !base.some(x => x.Nom_PNJ === "Damon"));
   const peints = ["Myrto", "Phaedra", "Iris", "Nikias"].filter(n => { const f = base.find(x => x.Nom_PNJ === n); return f && /^https:\/\/res\.cloudinary\.com\//.test(f.URL_Cloudinary || ""); });
   verifier("chaque fiche garde l'URL de son portrait", peints.length === 4, peints.join(", "));
+  // (v455) Nico : « pour la création des PNJ, s'assurer qu'il gère bien les races dans le design envoyé à l'IA, et le même
+  // algo pour le skin des fringues que les personnages, pour la variété : que l'IA choisisse dans la liste des choses faisables ».
+  const cast = t1.reqs.find(x => x.qui === "MIA_CASTING"), forge = t1.reqs.find(x => x.qui === "FORGE");
+  const tenuesListees = (s) => (s.split("TENUES POSSIBLES")[1] || "").split("\n").filter(l => /^- « /.test(l)).length;
+  verifier("(v455) l'IA qui crée un PNJ lit les races avec leur allure (Satyre : ses cornes de bouc) et quelques tenues possibles, deux par type d'armure",
+           [cast, forge].every(q => q && /RACES OBLIGATOIRES \(chaque personnage/.test(q.systeme) && /- Satyre : Cornes de bouc enroulées/.test(q.systeme) && tenuesListees(q.systeme) === 6),
+           JSON.stringify([cast && tenuesListees(cast.systeme), forge && tenuesListees(forge.systeme)]));
+  const myrto = base.find(x => x.Nom_PNJ === "Myrto"), iris = base.find(x => x.Nom_PNJ === "Iris"), nikias = base.find(x => x.Nom_PNJ === "Nikias");
+  const listes = await p.evaluate(() => Object.values(window.VARIATIONS_TENUES).flat().map(v => v.titre));
+  const palettes = await p.evaluate(() => window.PALETTES_TENUES);
+  verifier("(v455) la tenue choisie par l'IA (Myrto : « Vestale ») est gardée sur sa fiche, avec une palette des héros",
+           myrto && myrto.Tenue && myrto.Tenue.titre === "Vestale" && /Stola blanche/.test(myrto.Tenue.description) && palettes.includes(myrto.Tenue.palette), JSON.stringify(myrto && myrto.Tenue));
+  verifier("(v455) …sans tenue choisie (Nikias), une des tenues proposées, tirée au hasard", nikias && nikias.Tenue && listes.includes(nikias.Tenue.titre), JSON.stringify(nikias && nikias.Tenue));
+  const promptMyrto = (imgMyrto[0] || {}).prompt || "", promptIris = (t1.imgs.find(x => /nommé Iris/.test(x.prompt)) || {}).prompt || "";
+  verifier("(v455) le dessinateur reçoit la tenue imposée (titre, description, couleurs) et l'espèce", /LA TENUE DU PERSONNAGE \(IMPOSÉE/.test(promptMyrto) && /Vestale — Stola blanche/.test(promptMyrto)
+           && /Couleurs dominantes/.test(promptMyrto) && /ANATOMIE DE BASE DE L'ESPÈCE \(Humain\)/.test(promptMyrto), promptMyrto.slice(0, 200));
+  verifier("(v455) une race écrite « satyres » : le Satyre du Grimoire, sur la fiche et dans le dessin (ses cornes de bouc)", iris && iris.Race === "Satyre"
+           && /ANATOMIE DE BASE DE L'ESPÈCE \(Satyre\)/.test(promptIris) && /Cornes de bouc enroulées/.test(promptIris), JSON.stringify([iris && iris.Race, promptIris.slice(0, 160)]));
   const dernier = (t1.versions[t1.versions.length - 1] || {}).Texte || "";
   verifier("dans le texte du MJ, Myrto porte son portrait", /pnj-chat-hover"><strong>Myrto<\/strong><img src="https:\/\/res\.cloudinary\.com/.test(dernier));
 });
