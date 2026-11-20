@@ -2764,7 +2764,7 @@ window.declencherTourIA = async function(options) {
                     } else if (nomsPnjPresents.length) await analyserMortsPNJ(nomsPnjPresents, reponseTexte);   // (v418) les suiveurs, en pleine nature
                     // (v443) La mission de guilde : ses étapes, sa réussite ou son échec (MIA_SUIVI_MISSION).
                     if (window.MISSIONS_GUILDE && typeof window.MISSIONS_GUILDE.suivreApresMJ === "function") {
-                        try { await window.MISSIONS_GUILDE.suivreApresMJ(reponseTexte); } catch (e) { console.error("[Mission de guilde] Le suivi :", e); }
+                        try { await window.MISSIONS_GUILDE.suivreApresMJ(reponseTexte, idMessage); } catch (e) { console.error("[Mission de guilde] Le suivi :", e); }
                     }
                     {
                         // (v411) LES FILS INVISIBLES : les âmes de la scène (ceux qui y étaient au

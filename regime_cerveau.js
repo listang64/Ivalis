@@ -995,6 +995,8 @@ function contexteDuJeu() {
             bond: (d) => window.jouerAnimationBond
                 ? window.jouerAnimationBond(versAnimationDeSaut(d)) : null,
             ruee: (d) => window.jouerRueeCarte ? window.jouerRueeCarte(d) : null,
+            // (v457) La phrase d'un PNJ ennemi (combat_rp.js) : début de tour, chute d'un héros.
+            replique: (etape, etat) => window.repliqueCombatRP ? window.repliqueCombatRP(etape, etat) : null,
             // Le tir : la flèche, la boule bleue, la boule verte. Ce que la
             // carte envoie a été décidé par le noyau (projectileDe) et voyage
             // sur l'étape — ici on ne fait que le dessiner.

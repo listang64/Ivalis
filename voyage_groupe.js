@@ -356,11 +356,19 @@ function placePoiValable(n, x, y) {
         && Math.hypot((v.x - x) * asp, v.y - y) < (t + cote(v)) / 2 + t);
 }
 window.placePoiValable = placePoiValable;
+// (v457) Nico : « lors des déplacements sur la carte, 30 % de chance qu'au lieu de faire apparaître un POI,
+// un des PNJ qui nous suivent ouvre pour tous les joueurs la fenêtre de dialogue, visible par tous, et
+// commence à parler à l'un des joueurs ». Avec au moins un suiveur, un POI sur trois ou presque devient
+// une halte sur la route (Poi_Prevu.Dialogue) : la discussion de la route (discussion_privee.js).
+const CHANCE_DIALOGUE = 0.3;
+const aDesSuiveurs = () => (Array.isArray(partie.Suiveurs) ? partie.Suiveurs : []).some(x => x && x.id && (x.etat || "avec") === "avec");
 function planifierPoi(v, k) {
     if (!v || v.Type !== "region") return null;
     const chance = Number.isFinite(reglages.chancePoi) ? reglages.chancePoi : CHANCE_POI_DEFAUT;
     if (!(hasard() < chance)) return null;
     const n = Number(v.Arrivee.Region), asp = Number(v.Aspect) || aspectRegion(n), j = journee(v, k);
+    if (aDesSuiveurs() && hasard() < CHANCE_DIALOGUE)
+        return { Id: "D" + Date.now().toString(36) + Math.floor(hasard() * 1e5).toString(36), f: arrondi(j.de + (j.a - j.de) * (0.2 + 0.65 * hasard())), Dialogue: true };
     for (let essai = 0; essai < 60; essai++) {
         const f = j.de + (j.a - j.de) * (0.2 + 0.65 * hasard());
         const P = pointDuVoyage(v, f);
@@ -664,6 +672,13 @@ async function terminerEtape(id, cle) {
         }
         // Un tronçon de marche s'achève sur le POI prévu : il apparaît.
         const t = troncon(v);
+        // (v457) …ou, à sa place, un suiveur prend la parole : la marche s'arrête le temps de la discussion.
+        if (v.Poi_Prevu && v.Poi_Prevu.Dialogue && Math.abs(t.a - v.Poi_Prevu.f) < 1e-9) {
+            const ici = pointDuVoyage(v, v.Poi_Prevu.f);
+            return { maj: { ...champsVoyage({ Etat: "dialogue", Poi_Prevu: null, Segment: null, Dialogue: { Id: v.Poi_Prevu.Id, f: v.Poi_Prevu.f, Le: Date.now() } }),
+                            Position_Groupe: { Region: n, x: arrondi(ici.x), y: arrondi(ici.y) } },
+                     resultat: { dialogue: true, idDialogue: v.Poi_Prevu.Id } };
+        }
         if (v.Poi_Prevu && Math.abs(t.a - v.Poi_Prevu.f) < 1e-9) {
             const ici = pointDuVoyage(v, v.Poi_Prevu.f);
             return { maj: { ...champsVoyage({ Etat: "poi", Poi_Prevu: null, Segment: null,
@@ -684,6 +699,11 @@ async function terminerEtape(id, cle) {
                  resultat: { arrivee: true, region: n, lieu: v.Arrivee.Lieu || "" } };
     });
     if (r && r.nuit) posterMessageCampement();
+    // (v457) La halte de la discussion : ce poste la lance (s'il n'y a plus personne pour parler, la route reprend).
+    if (r && r.dialogue) {
+        Promise.resolve(window.DISCUSSION && window.DISCUSSION.ouvrirSurLaRoute ? window.DISCUSSION.ouvrirSurLaRoute({ voyage: id, id: r.idDialogue }) : false)
+            .then(ok => { if (!ok) reprendreApresDialogue(id); }).catch(e => { console.error("Voyage du groupe : la discussion de la route", e); reprendreApresDialogue(id); });
+    }
     const terrain = (r && (r.nuit || r.arrivee)) ? analyserLeTerrain() : null;
     // (v417) Arrivés à destination : le poste qui a clos le voyage annonce
     // l'arrivée et réveille le Narrateur (chacun passe sur la page du récit).
@@ -691,6 +711,23 @@ async function terminerEtape(id, cle) {
     return r;
 }
 window.terminerEtapeVoyageGroupe = terminerEtape;
+// (v457) La discussion de la route finie : la marche reprend là où elle s'était arrêtée, jusqu'au bout de la journée.
+async function reprendreApresDialogue(id) {
+    return transaction((data) => {
+        const v = data.Voyage_Groupe;
+        if (!v || v.Etat !== "dialogue" || !v.Dialogue || (id && v.Id !== id)) return null;
+        const k = Number(v.Jour) || 1, f = Number(v.Dialogue.f), fin = journee(v, k).a;
+        const vv = { ...v, Segment: { de: f, a: fin }, Poi_Prevu: null };
+        const { delai, duree } = dureeMarche(vv, f, fin, 300);
+        return { maj: champsVoyage({ Etat: "marche", Dialogue: null, Segment: { de: f, a: fin }, Debut_Marche: Date.now(), Duree_Marche_Ms: duree, Delai_Depart_Ms: delai }),
+                 resultat: { reprise: true } };
+    });
+}
+window.reprendreApresDialogueVoyage = reprendreApresDialogue;
+setInterval(() => {
+    if (document.hidden || !voyage || voyage.Etat !== "dialogue" || partie.Discussion_Route) return;
+    if (Date.now() - (Number(voyage.Dialogue && voyage.Dialogue.Le) || 0) > 60000) reprendreApresDialogue(voyage.Id);
+}, 5000);
 
 // L'ARRIVÉE À DESTINATION (v417). Nico : « quand le groupe se déplace quelque
 // part et qu'il arrive à destination, mets tous les joueurs sur la page du RP et
@@ -1116,6 +1153,7 @@ function placeEnVoyage(v) {
         case "vote": return pointDuVoyage(v, 0);
         case "marche": return pointDuVoyage(v, animee !== null ? animee : troncon(v).de);
         case "poi": return pointDuVoyage(v, v.Poi ? v.Poi.f : troncon(v).de);
+        case "dialogue": return pointDuVoyage(v, v.Dialogue ? v.Dialogue.f : troncon(v).de);
         case "detour": return v.Poi && v.Poi.Detour ? pointA(v.Poi.Detour, asp, animee !== null ? animee : 0) : null;
         case "retour": return v.Poi && v.Poi.Detour ? pointA(v.Poi.Detour, asp, animee !== null ? animee : arretDetour(v)) : null;
         case "halte": return v.Poi && v.Poi.Detour ? pointA(v.Poi.Detour, asp, arretDetour(v)) : (v.Poi ? { x: v.Poi.x, y: v.Poi.y } : null);
@@ -2084,6 +2122,10 @@ window.appliquerVoyageDeLaPartie = function(data) {
     if (fin && fin.Id && !fin.Annule && Date.now() - (Number(fin.Le) || 0) < 120000) allerAuRecitALArrivee(fin);
     // Un combat qui commence ferme le mode voyage de ce poste.
     if (combatEnCours() && choix && choix.type === "voyage") quitterChoix();
+    // (v457) La discussion de la route : visible par tous. Une halte restée sans discussion (son poste fermé
+    // trop tôt) : au bout d'une minute, n'importe quel poste fait reprendre la route.
+    if (window.DISCUSSION && typeof window.DISCUSSION.appliquerRoute === "function") window.DISCUSSION.appliquerRoute(partie.Discussion_Route || null);
+    if (v && v.Etat === "dialogue" && !partie.Discussion_Route && Date.now() - (Number(v.Dialogue && v.Dialogue.Le) || 0) > 60000) reprendreApresDialogue(v.Id);
     const cle = JSON.stringify([partie.Position_Groupe || null, partie.Lieu_Actuel || "", v, partie.Voyage_Annule || null, combatEnCours()]);
     if (cle === derniereCle) return;
     derniereCle = cle;

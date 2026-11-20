@@ -17,7 +17,7 @@
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
   <link rel="stylesheet" href="grimoire.css?v=29">
-  <link rel="stylesheet" href="grimoire_recit.css?v=29">
+  <link rel="stylesheet" href="grimoire_recit.css?v=30">
   <link rel="stylesheet" href="grimoire_carte.css?v=2">
   <link rel="stylesheet" href="grimoire_regions.css?v=9">
   <link rel="stylesheet" href="loupe_cartes.css?v=5">
@@ -29,9 +29,9 @@
   <link rel="stylesheet" href="grimoire_guilde.css?v=8">
 <link rel="stylesheet" href="grimoire_clans.css?v=2">
 <link rel="stylesheet" href="missions_guilde.css?v=7">
-<link rel="stylesheet" href="grimoire_mission.css?v=4">
+<link rel="stylesheet" href="grimoire_mission.css?v=5">
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Dancing+Script:wght@400;700&family=Homemade+Apple&family=Indie+Flower&family=Kalam:wght@400;700&family=Satisfy&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="discussion_privee.css?v=3">
+  <link rel="stylesheet" href="discussion_privee.css?v=4">
   <link rel="stylesheet" href="grimoire_parametres.css?v=3">
   <link rel="stylesheet" href="vocal.css?v=2">
 
@@ -2230,7 +2230,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=346"></script>
+<script src="trace_combat.js?v=347"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2263,7 +2263,7 @@
     "./cerveau_combat.js": "./cerveau_combat.js?v=82",
     "./spectateur_combat.js": "./spectateur_combat.js?v=9",
     "./depot_firestore.js": "./depot_firestore.js?v=11",
-    "./pont_combat.js": "./pont_combat.js?v=61",
+    "./pont_combat.js": "./pont_combat.js?v=62",
     "./totems_pur.js": "./totems_pur.js?v=1",
     "./playlist.js": "./playlist.js?v=1"
 } }
@@ -2293,22 +2293,22 @@
 <script type="module" src="depot_firestore.js?v=11"></script>
 <!-- LE PONT : de l'étape à ce qu'on voit. Il traduit un résultat déjà calculé
      vers les animations existantes — il ne recalcule jamais rien. -->
-<script type="module" src="pont_combat.js?v=61"></script>
+<script type="module" src="pont_combat.js?v=62"></script>
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
-<script type="module" src="regime_cerveau.js?v=57"></script>
+<script type="module" src="regime_cerveau.js?v=58"></script>
 <!-- LES FILS INVISIBLES (v411) : les âmes des PNJ et des héros, leurs liens (social_pur.js calcule). -->
 <script type="module" src="social.js?v=13"></script>
 <!-- LA COMPAGNIE (v418) : les PNJ qui suivent le groupe (groupe_pur.js calcule). -->
 <script type="module" src="groupe.js?v=5"></script>
 <!-- LES RENCONTRES RÉCENTES (v421) : les types de rencontre des derniers chapitres, pour que le Narrateur varie. -->
 <script type="module" src="rencontres_recit.js?v=1"></script>
-<script type="module" src="ia_master.js?v=44"></script>
+<script type="module" src="ia_master.js?v=45"></script>
 <script type="module" src="illustrations_recit.js?v=18"></script>
 <script type="module" src="app.js?v=184"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=6"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
-<script type="module" src="grimoire_recit.js?v=36"></script>
+<script type="module" src="grimoire_recit.js?v=37"></script>
 <!-- v396 : le chat vocal de la table (WebRTC, signalé par Firestore). -->
 <script type="module" src="vocal.js?v=3"></script>
 <!-- LA CARTE DU MONDE DANS LE GRIMOIRE (v302) : sa double page, ses zones (DEV). -->
@@ -2324,12 +2324,12 @@
 <!-- LE GROUPE (v418) : la double page de la compagnie ; les Aventuriers en sont les sous-pages. -->
 <script type="module" src="grimoire_groupe.js?v=10"></script>
 <!-- LE HALL DE GUILDE (v433) : le bâtiment du village, sa double page, le Livre des clans. -->
-<script type="module" src="missions_guilde.js?v=7"></script>
+<script type="module" src="missions_guilde.js?v=8"></script>
 <script type="module" src="grimoire_guilde.js?v=8"></script>
-<script type="module" src="grimoire_mission.js?v=3"></script>
+<script type="module" src="grimoire_mission.js?v=4"></script>
 <script type="module" src="grimoire_clans.js?v=3"></script>
 <!-- LA DISCUSSION PRIVÉE (v422) : parler en tête-à-tête avec un suiveur, depuis la page du Groupe. -->
-<script type="module" src="discussion_privee.js?v=3"></script>
+<script type="module" src="discussion_privee.js?v=4"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=4"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région et son titre (plus de nuages dessus, v286). -->
@@ -2344,7 +2344,7 @@
 <!-- Le déplacement des PJ (v275) : les terrains praticables des cartes régionales,
      puis le groupe, son bouton voyage, les tracés, les votes, la marche et les nuits. -->
 <script type="module" src="terrains_regionaux.js?v=3"></script>
-<script type="module" src="voyage_groupe.js?v=24"></script>
+<script type="module" src="voyage_groupe.js?v=25"></script>
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
 <script type="module" src="environnement_mj.js?v=5"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->
@@ -2401,7 +2401,7 @@
 <script type="module" src="objets_ia.js?v=18"></script>
 <script type="module" src="loot.js?v=37"></script>
 <!-- LES COMBATS DU RÉCIT (v278) : la détection, la préparation, le retour au récit. -->
-<script type="module" src="combat_rp.js?v=23"></script>
+<script type="module" src="combat_rp.js?v=24"></script>
 
 <!-- ============================================================= -->
 <!--  GÉNÉRATION D'UNE RENCONTRE (bouton 💀 des options de combat)  -->

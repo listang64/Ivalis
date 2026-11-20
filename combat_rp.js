@@ -483,6 +483,8 @@ function poursuivre() {
         if (c.Carte && !fait("grille")) lancer("grille", () => window.validerGrilleCombatRP(Number(c.Taille_Depart) || 60, { auto: true }));
         return;
     }
+    // (v457) Les répliques des PNJ nommés qu'on affronte : écrites en fond, le combat ne les attend pas.
+    if (c.Ennemis && c.Ennemis_Valides && !c.Repliques && !fait("repliques")) lancer("repliques", ecrireLesRepliques);
     if (!c.Peint && !fait("peinture")) return lancer("peinture", peindreLeTerrain);
     if (c.Ennemis && c.Ennemis_Valides && pionsPrets(c) && c.Peint && !c.Deploye) lancer("deploiement", deployer);
 }
@@ -1650,3 +1652,120 @@ window.appliquerCombatRPDeLaPartie = function(p) {
 
 // Le texte du bandeau d'attente change de temps en temps.
 setInterval(() => { if (window.combatRPEnPreparation()) actualiserFenetreCombat(); }, 6000);
+
+// =========================================================================
+//  6. (v457) LES RÉPLIQUES DES PNJ ENNEMIS
+// =========================================================================
+//  Nico : « en combat RP, que les PNJ ennemis parlent de temps en temps en balançant une phrase
+//  rôle play : au début de leur tour, une chance sur quatre, selon leur caractère et la situation.
+//  L'écran devient noir comme le dialogue privé, on voit l'avatar ennemi et sa phrase ; un clic
+//  n'importe où ferme la fenêtre et le combat se poursuit. Pareil quand un joueur tombe KO : une
+//  phrase d'un des PNJ nommés encore présents. »
+//    · écrites une fois, pendant la préparation (Combat_RP.Repliques : [{ Nom, Debut, Blesse, Seul, Ko }]) ;
+//    · rejouées par le pont du combat (pont_combat.js, `replique`) : le même tirage sur chaque poste
+//      (le combat, la manche, le combattant), la fenêtre attend le clic.
+const PROMPT_REPLIQUES = `Tu écris les répliques de combat de PNJ nommés, dans un jeu de rôle d'heroic fantasy antique (Ivalis).
+Pour chaque PNJ, des phrases courtes (une ou deux phrases, 25 mots au plus) qu'il lance à voix haute pendant le combat contre les héros,
+fidèles à son caractère, à sa façon de parler et à ce qui a déclenché le combat. Pas de description, seulement ce qu'il dit ;
+un geste bref peut s'écrire entre astérisques (*il crache par terre*). En français, tutoiement ou vouvoiement selon le personnage.
+Réponds en JSON : { "pnj": [ { "nom": "son nom exact", "debut": [3 phrases quand son tour commence et qu'il est en forme],
+"blesse": [2 phrases quand il est grièvement blessé], "seul": [2 phrases quand il est le dernier de son camp debout],
+"ko": [3 phrases quand un héros tombe à terre, où {heros} sera remplacé par le nom du héros] } ] }`;
+async function ecrireLesRepliques() {
+    const c = etat();
+    const tirage = (c && c.Ennemis && c.Ennemis.Tirage) || {};
+    const noms = [...new Set([...(tirage.depart || []), ...(tirage.renforts || [])].filter(x => x && x.pnj).map(x => x.pnj))];
+    if (!noms.length) { await maj({ "Combat_RP.Repliques": [] }); return; }
+    const partie = await lirePartie();
+    const [messages, lieu] = await Promise.all([lireMessages(R.messagesLieu), contexteDuLieu(partie)]);
+    let fiches = Object.values((lieu.env && lieu.env.pnjsPresents) || {}).filter(f => f && noms.some(n => normaliser(n) === normaliser(f.Nom_PNJ)));
+    const ids = fiches.map(f => f.idDoc).filter(Boolean);
+    if (ids.length && window.SOCIAL && typeof window.SOCIAL.lireAmes === "function") {
+        const ames = await window.SOCIAL.lireAmes(window.ID_PARTIE_COURANTE, ids).catch(() => ({}));
+        fiches = fiches.map(f => { const a = (ames || {})[f.idDoc]; return a && a.psyche ? { ...f, __caractere: window.SOCIAL.caractere(a.psyche), __humeur: a.humeur && a.humeur.emotion ? a.humeur.emotion : "" } : f; });
+    }
+    const decrire = (nom) => { const f = fiches.find(x => normaliser(x.Nom_PNJ) === normaliser(nom)) || {};
+        return `- ${nom} (${[f.Race, f.Occupation].filter(Boolean).join(", ") || "?"})` + (f.__caractere ? ` — caractère : ${f.__caractere}` : "")
+            + (f.__humeur ? ` — humeur : ${f.__humeur}` : "") + (f.Style_De_Parole ? ` — façon de parler : ${f.Style_De_Parole}` : "")
+            + (f.Description_Physique ? ` — allure : ${String(f.Description_Physique).slice(0, 200)}` : ""); };
+    const r = await demanderJSON({ systeme: PROMPT_REPLIQUES, temperature: 0.9,
+        texte: `--- CE QUI A DÉCLENCHÉ LE COMBAT ---\n${c.Raison || ""}\n\n--- LES PNJ NOMMÉS QU'AFFRONTENT LES HÉROS ---\n${noms.map(decrire).join("\n")}\n\n--- LES ${R.messagesLieu} DERNIERS MESSAGES ---\n${messages}` });
+    const phrases = (l, n) => (Array.isArray(l) ? l : []).map(x => String(x || "").trim().slice(0, 240)).filter(Boolean).slice(0, n);
+    const repliques = noms.map(nom => {
+        const x = ((r && r.pnj) || []).find(y => y && normaliser(y.nom) === normaliser(nom)) || {};
+        return { Nom: nom, Debut: phrases(x.debut, 4), Blesse: phrases(x.blesse, 3), Seul: phrases(x.seul, 3), Ko: phrases(x.ko, 4) };
+    }).filter(x => x.Debut.length || x.Ko.length);
+    await maj({ "Combat_RP.Repliques": repliques });
+    console.log(`💬 [Combat du récit] Les répliques de ${repliques.map(x => x.Nom).join(", ") || "personne"}.`);
+}
+window.ecrireLesRepliquesCombatRP = ecrireLesRepliques;
+
+const CHANCE_REPLIQUE = 4;             // une chance sur quatre, au début du tour d'un PNJ nommé
+const DUREE_MAX_REPLIQUE = 25000;      // sans clic, la fenêtre se ferme d'elle-même
+// Un tirage que chaque poste refait à l'identique (FNV-1a) : 0 ≤ x < 1.
+function tirageCommun(cle) {
+    let h = 2166136261;
+    for (let i = 0; i < cle.length; i++) { h ^= cle.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return ((h >>> 0) % 100000) / 100000;
+}
+const ficheDe = (id) => (window.PERSOS_PARTIE || []).find(f => f && f.idPersonnage === id) || null;
+const repliquesDe = (nom) => ((etat() || {}).Repliques || []).find(x => x && normaliser(x.Nom) === normaliser(nom)) || null;
+const choisir = (liste, cle) => (liste && liste.length ? liste[Math.floor(tirageCommun(cle) * liste.length) % liste.length] : "");
+// Ce que le PNJ dit, ou rien : `etape` du journal du combat, `etatAvant` l'état d'avant elle.
+function repliqueDuMoment(etape, etatAvant) {
+    const c = etat();
+    if (!c || c.Etat !== "en_cours" || !Array.isArray(c.Repliques) || !c.Repliques.length || !etape) return null;
+    const combattants = (etatAvant && etatAvant.combattants) || {};
+    const pnjDe = (id) => { const f = ficheDe(id), x = combattants[id]; return f && f.pnjNomme && x && x.estMonstre !== false && !x.aTerre ? { id, f, x, r: repliquesDe(f.pnjNomme) } : null; };
+    if (etape.type === "tour") {
+        if (etape.phase && etape.phase !== "Resolution") return null;
+        const tete = (etape.file || [])[0], id = tete && (tete.id || tete.idPersonnage);
+        const p = id ? pnjDe(id) : null;
+        if (!p || !p.r) return null;
+        const cle = `${c.Id}|${etape.manche}|${id}|${(etape.ontJoue || []).length}`;
+        if (tirageCommun(cle + "|parle") >= 1 / CHANCE_REPLIQUE) return null;
+        const pv = Number(p.x.pv), pvMax = Number(p.x.pvMax);
+        const allies = Object.values(combattants).filter(x => x && x.id !== id && x.estMonstre && !x.aTerre && !x.estIllusion && !x.totem);
+        const liste = !allies.length && p.r.Seul.length ? p.r.Seul : pvMax > 0 && pv / pvMax <= 0.35 && p.r.Blesse.length ? p.r.Blesse : p.r.Debut;
+        const texte = choisir(liste, cle + "|phrase");
+        return texte ? { nom: p.f.pnjNomme, image: p.f.urlCloudinary || "", texte } : null;
+    }
+    if (etape.type === "chute") {
+        const heros = combattants[etape.cible], fh = ficheDe(etape.cible);
+        if (!heros || heros.estMonstre || heros.estIllusion || !fh || fh.estMonstre) return null;
+        const pnjs = Object.keys(combattants).map(pnjDe).filter(p => p && p.r && p.r.Ko.length).sort((a, b) => (a.id < b.id ? -1 : 1));
+        if (!pnjs.length) return null;
+        const cle = `${c.Id}|ko|${etape.cible}|${etatAvant.manche || 0}`;
+        const p = pnjs[Math.floor(tirageCommun(cle + "|qui") * pnjs.length) % pnjs.length];
+        const nomHeros = String(fh.prenom || fh.nom || "").trim() || "l'aventurier";
+        const texte = choisir(p.r.Ko, cle + "|phrase").replace(/\{heros\}/gi, nomHeros);
+        return texte ? { nom: p.f.pnjNomme, image: p.f.urlCloudinary || "", texte } : null;
+    }
+    return null;
+}
+window.repliqueDuMomentCombatRP = repliqueDuMoment;
+// LA FENÊTRE : le fond noir et l'avatar du dialogue privé (discussion_privee.css) ; un clic la ferme.
+const htmlPhrase = (t) => echapper(t).replace(/\*([^*]+)\*/g, '<span class="geste-dp">$1</span>');
+function montrerReplique(r) {
+    return new Promise((fini) => {
+        const f = document.createElement("div");
+        f.className = "discussion-privee replique-combat";
+        f.dataset.tour = "pnj";
+        f.innerHTML = (r.image ? `<img class="avatar-dp pnj" src="${echapper(r.image)}" alt="" draggable="false">`
+                               : `<div class="avatar-dp pnj sans-image"><span>${echapper(String(r.nom).charAt(0))}</span></div>`)
+            + `<div class="encart-dp pnj"><div class="nom-dp">${echapper(r.nom)}</div><div class="texte-dp">${htmlPhrase(r.texte)}</div>`
+            + `<div class="suite-dp">Toucher pour continuer</div></div>`;
+        let ferme = false;
+        const fermer = () => { if (ferme) return; ferme = true; clearTimeout(minuteur); f.remove(); fini(true); };
+        const minuteur = setTimeout(fermer, DUREE_MAX_REPLIQUE);
+        f.addEventListener("pointerup", fermer);
+        f.addEventListener("click", fermer);
+        document.body.appendChild(f);
+    });
+}
+window.repliqueCombatRP = async function (etape, etatAvant) {
+    const r = repliqueDuMoment(etape, etatAvant);
+    if (!r) return false;
+    console.log(`💬 [Combat du récit] ${r.nom} : « ${r.texte} »`);
+    return montrerReplique(r);
+};

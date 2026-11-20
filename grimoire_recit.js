@@ -284,6 +284,12 @@ function construireEntrees(messages) {
     const liste = (messages || []).slice().sort((a, b) => (a.Timestamp || 0) - (b.Timestamp || 0));
     const idsHeros = new Set(herosDeLaPartie().map(h => h.idPersonnage));
     const entrees = [];
+    // (v457) Le sceau « Quête accomplie » : après la narration qui a dit la mission réussie (à défaut,
+    // la dernière narration), tant qu'aucune autre mission n'est choisie.
+    const quete = etat.queteAccomplie;
+    const narrations = liste.filter(m => m.Est_Narration_IA);
+    const idQuete = !quete ? null : (quete.Message && narrations.some(m => idDe(m) === quete.Message) ? quete.Message
+        : (!quete.Message && narrations.length ? idDe(narrations[narrations.length - 1]) : null));
     for (const m of liste) {
         const id = idDe(m);
         if (m.Auteur_ID === "ARBITRE_DES") continue;
@@ -299,6 +305,7 @@ function construireEntrees(messages) {
             // (v412) Les fils invisibles : les liens que ce paragraphe a fait bouger (social.js).
             if (textes.length) entrees.push({ id, type: "narration", auteurId: "MJ", textes, jets: [], enCours: m.Recit_En_Cours === true,
                                               cerveaux: Array.isArray(m.Social) ? m.Social : [] });
+            if (id === idQuete) entrees.push({ id: id + "-quete", type: "quete", image: { Format: "quete", Id: quete.Id }, textes: [], jets: [] });
             // (v314) Le croquis de MIA_ILLUSTRATEUR, après les paragraphes ; les PNJ nouveaux, en pleine page.
             const ill = m.Illustration;
             if (ill && ill.Url) entrees.push({ id: id + "-croquis", type: "illustration", image: ill, textes: [], jets: [] });
@@ -455,6 +462,14 @@ function paragraphesDuChapitre(entrees) {
     }
     return paras;
 }
+// (v457) LE SCEAU « QUÊTE ACCOMPLIE » : un cachet de cire rouge à la suite du texte ; touché, il
+// ouvre la page de la mission (en lecture, avec ses récompenses : grimoire_mission.js).
+function htmlSceauQuete(para) {
+    const M = window.MISSIONS_GUILDE;
+    const dessin = M && typeof M.sceauCire === "function" ? M.sceauCire("QUÊTE", "ACCOMPLIE", "quete-recit") : "";
+    return `<figure class="sceau-quete-recit" data-e="${echapper(para.e)}" role="button" tabindex="0" title="La mission accomplie" aria-label="Quête accomplie : voir la mission">`
+        + `${dessin}<figcaption class="texte-cache">Quête accomplie</figcaption></figure>`;
+}
 // LES CROQUIS (v314, illustrations_recit.js) : une taille tirée par l'IA, centrés
 // sur la page (v318), le tout stable d'un affichage à l'autre.
 // Un croquis déjà vu ne se redessine pas.
@@ -574,7 +589,7 @@ function paginer(entrees) {
             }
             if (para.image.Format === "double-page") { placer({ gauche: htmlFondRecit(para, "gauche"), droite: htmlFondRecit(para, "droite") }); continue; }
             const tmp = document.createElement("div");
-            tmp.innerHTML = htmlCroquis(para);
+            tmp.innerHTML = para.image.Format === "quete" ? htmlSceauQuete(para) : htmlCroquis(para);
             const fig = tmp.firstElementChild;
             boite.appendChild(fig);
             if (deborde()) {
@@ -903,6 +918,8 @@ function creerElements() {
         if (!etat.actif) return false;
         const nom = cible.closest(".nom-livre");
         if (nom) { montrerPortrait(nom.dataset.nom); return true; }
+        // (v457) le sceau « Quête accomplie » : la page de la mission, en lecture
+        if (cible.closest(".sceau-quete-recit")) { son("page-prise", 0.4); if (window.GRIMOIRE_MISSION) window.GRIMOIRE_MISSION.ouvrir(); return true; }
         const cerveau = cible.closest(".cerveau-marge");
         if (cerveau) { montrerSocial(cerveau); return true; }
         // (v428) le mode DEV du sommaire : la roue, puis les « − » d'un chapitre
@@ -1786,6 +1803,9 @@ window.livreRecitPartie = function (data) {
     // (v456) Les appels au Narrateur : tous là, c'est le poste du dernier qui l'a appelé qui l'envoie.
     const appels = (data && data.Appel_Narrateur) || {};
     const appelsChange = JSON.stringify(appels) !== JSON.stringify(etat.appelsNarrateur || {});
+    // (v457) La mission accomplie (son sceau dans le récit), jusqu'à la suivante.
+    const quete = (data && data.Mission_Accomplie && data.Mission_Accomplie.Id) ? data.Mission_Accomplie : null;
+    if (JSON.stringify(quete) !== JSON.stringify(etat.queteAccomplie || null)) { etat.queteAccomplie = quete; if (etat.actif) rendre(); }
     if (appelsChange) {
         etat.appelsNarrateur = { ...appels };
         const a = appelsNarrateur();

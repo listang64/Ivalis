@@ -56,3 +56,25 @@
 .missions-reussies-fiche ul { list-style: none; margin: 0.15em 0 0; padding: 0; }
 .missions-reussies-fiche li::before { content: "– "; }
 .aucune-mission-reussie { margin: 0.1em 0 0; font-style: italic; color: #4a3018; }
+/* (v457) LA MISSION ACCOMPLIE : à la place du vote d'abandon, son sceau de cire « Quête accomplie » ;
+   les notes se relisent sans s'écrire. */
+.page-mission-infos { position: relative; }
+.sceau-quete-page { position: absolute; top: calc(var(--u) * 1.5); right: calc(var(--u) * 1.5); width: calc(var(--u) * 17); height: calc(var(--u) * 17); transform: rotate(12deg); pointer-events: none; }
+.sceau-quete-page .dessin-sceau { width: 100%; height: 100%; }
+.notes-mission[readonly] { cursor: default; }
+/* LE PARCHEMIN DES RÉCOMPENSES : un morceau de parchemin posé en travers du livre, sur les deux pages
+   (posé sur la scène, à la place du livre : grimoire_mission.js, majParchemin). */
+.parchemin-recompenses { position: absolute; z-index: 40; pointer-events: none; display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.35s ease; filter: drop-shadow(0 calc(10px * var(--s, 1)) calc(14px * var(--s, 1)) rgba(30, 14, 4, 0.5)); }
+.parchemin-recompenses.pose { opacity: 1; }
+.papier-recompenses { width: 58%; min-height: 34%; box-sizing: border-box; padding: calc(28px * var(--s, 1)) calc(56px * var(--s, 1)) calc(36px * var(--s, 1));
+  display: flex; flex-direction: column; align-items: center; color: #24150a;
+  background: url('images/grimoire/page.webp?v=1') 40% 50% / 260% auto, #e6d3a6;
+  clip-path: polygon(1% 6%, 9% 2%, 18% 5%, 31% 1%, 44% 4%, 58% 0.5%, 71% 4%, 84% 1.5%, 96% 5%, 99.5% 18%, 98% 37%, 100% 58%, 98.5% 79%, 99% 95%, 88% 98%, 74% 95.5%, 61% 99%, 47% 96%, 33% 99.5%, 19% 96.5%, 6% 99%, 0.5% 86%, 2% 64%, 0% 42%, 1.5% 22%);
+  transform: translateY(calc(-20px * var(--s, 1))) rotate(-7deg) scale(1.08);
+  transition: transform 0.45s cubic-bezier(0.25, 1.2, 0.45, 1); }
+.parchemin-recompenses.pose .papier-recompenses { transform: rotate(-7deg) scale(1); }
+.titre-recompenses { font-size: calc(58px * var(--s, 1) * var(--echelle-titres, 1)); line-height: 1.1;
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important; }
+.papier-recompenses .fleuron-mission { width: 40%; }
+.liste-recompenses { flex: 1; min-height: calc(80px * var(--s, 1)); }

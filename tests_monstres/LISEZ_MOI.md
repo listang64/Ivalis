@@ -12387,3 +12387,24 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - **Les croquis** (« un nouveau PNJ avec son image : pas d'image de scène ») : un portrait posé ou peint à ce tour empêche le croquis, même forcé (illustrations_recit.js).
 - **Les dés** (« quand c'est facile je fais de gros scores, quand c'est difficile de faibles ») : vérifié, sans changement. Le d20 est tiré au hasard (Math.random) avant tout et sans connaître la difficulté, que seul le Narrateur compare au total.
 - corrections_v276, v300, v307, v314, v327, v346 et v387 le vérifient (leurs contrôles « v456 »).
+
+## v457 — Du RP partout : la quête accomplie scellée, les ennemis qui parlent, les suiveurs qui interpellent
+
+- **La quête accomplie** (Nico : « quand une mission est validée, dessine à la suite du texte un sceau rouge marqué Quête accomplie ; si les joueurs cliquent dessus, ça ouvre la page mission avec la mission et les notes, sans pouvoir écrire ; dessus, en travers, un parchemin par-dessus le livre sur les deux pages avec les récompenses (pour l'instant vide) ; tout disparaît quand ils choisissent une autre mission ») :
+  - réussie, la partie garde Mission_Accomplie { Id, Titre, Le, Message } (missions_guilde.js, terminerMission ; la narration qui l'a dite vient de ia_master.js) ;
+  - le récit pose un cachet de cire rouge « QUÊTE · ACCOMPLIE » juste après cette narration (grimoire_recit.js, htmlSceauQuete ; le dessin du sceau d'acceptation, sceauCire) ;
+  - un toucher ouvre la double page de la mission en lecture : son sceau en haut à droite, plus de vote d'abandon, les notes en lecture seule (grimoire_mission.js) ;
+  - le parchemin « Récompenses » se pose en travers du livre tant que cette double page est ouverte ;
+  - une nouvelle mission acceptée efface Mission_Accomplie : le sceau et la page en lecture s'en vont.
+- **Les ennemis qui parlent** (« en combat RP, que les PNJ ennemis lancent de temps en temps une phrase : au début de leur tour, une chance sur quatre, selon leur caractère et la situation ; l'écran noir comme le dialogue privé, l'avatar et la phrase ; un clic n'importe où ferme et le combat continue ; pareil quand un joueur tombe KO ») :
+  - pendant la préparation, une IA écrit les répliques de chaque PNJ nommé affronté, selon son caractère, son humeur et sa façon de parler : début de tour, blessé, dernier debout, héros à terre (combat_rp.js, Combat_RP.Repliques) ;
+  - le pont du combat les joue après le début d'un tour et après une chute (pont_combat.js, `replique` ; regime_cerveau.js) ;
+  - le tirage est le même sur chaque poste (le combat, la manche, le combattant) : une fois sur quatre au tour d'un PNJ nommé, toujours à la chute d'un héros (un PNJ nommé encore debout, son nom dans la phrase) ;
+  - la fenêtre reprend le noir et l'encart du dialogue privé ; le combat attend le clic (25 s au plus).
+- **Les suiveurs qui interpellent** (« en voyage, 30 % de chance qu'au lieu d'un POI, un des PNJ qui nous suivent ouvre pour tous la fenêtre de dialogue et parle à l'un des joueurs : NOM DU HÉROS, … ; ce joueur répond, les autres lisent ; au tour du PNJ, le RP du joueur est placé en bas ») :
+  - avec au moins un suiveur, 30 % des POI deviennent une halte sur la route (voyage_groupe.js, Poi_Prevu.Dialogue, Etat « dialogue ») ;
+  - un suiveur tiré au hasard engage la conversation avec un héros d'un joueur présent, par son prénom (discussion_privee.js, ouvrirSurLaRoute ; MIA_PAROLE sait qu'il parle devant la compagnie) ;
+  - la discussion vit sur la partie (Discussion_Route) : tout le monde voit la fenêtre ; seul ce joueur a l'encart pour écrire ; au tour du PNJ, la phrase du héros est en bas, chez tous ;
+  - finie (le joueur quitte, le PNJ part, ou les autres après trois minutes de silence), elle est rangée et lue par MIA_SOCIAL (devant témoins), et la marche reprend d'où elle s'était arrêtée ;
+  - une halte restée sans discussion fait reprendre la route au bout d'une minute.
+- corrections_v457.mjs (nouveau) le vérifie, avec corrections_v444 et v314 (leurs contrôles « v457 ») et v443 (le suivi reçoit la narration).

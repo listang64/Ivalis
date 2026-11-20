@@ -75,3 +75,8 @@
   .encart-dp.pj { left: 3vw; right: 14vw; }
   .rappel-dp { width: 92vw; bottom: 1.5vh; }
 }
+
+/* (v457) LA DISCUSSION DE LA ROUTE (discussion_privee.js, ouvrirSurLaRoute) : la même fenêtre, vue par tous ;
+   chez ceux qui lisent, pas d'encart pour écrire, et pas de main sur l'écran tant que le PNJ n'est pas parti. */
+.discussion-route[data-tour="attente"], .discussion-route[data-tour="pnj"]:not(:has(.encart-dp.pj)) { cursor: default; }
+.quitter-dp[hidden] { display: none; }

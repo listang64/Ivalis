@@ -722,6 +722,7 @@ export function creerPont(effets) {
         surSoi = null,                     // la Confusion retourne la carte contre son lanceur
         attaque = null,                    // le geste du Studio d'une attaque (épée, légère, lourde, tir, feu)
         reaction = null,                   // le geste du Studio d'une réaction (coup reçu, esquive, soin, énergie…)
+        replique = null,                   // (v457) la phrase d'un PNJ ennemi (combat_rp.js), au début d'un tour, à la chute d'un héros
         pause = (ms) => new Promise(r => setTimeout(r, ms)),
         tracer = () => {}
     } = effets || {};
@@ -729,7 +730,7 @@ export function creerPont(effets) {
     async function animer(etape, etat) {
         const scene = misEnScene(etape, etat);
         if (scene.inconnu) tracer("❓", `étape sans mise en scène : ${scene.inconnu}`, "");
-        if (scene.geste === "rien") return scene;
+        if (scene.geste === "rien") { await direLaReplique(etape, etat); return scene; }
 
         // UNE ANIMATION QUI CASSE NE DOIT PAS ARRÊTER LA PARTIE. Sans ce
         // filet, une exception au milieu d'un geste (l'écran d'un joueur en
@@ -747,7 +748,16 @@ export function creerPont(effets) {
         } catch (e) {
             tracer("❌", `animation « ${scene.geste} » en échec`, String(e && e.message));
         }
+        await direLaReplique(etape, etat);
         return scene;
+    }
+
+    // (v457) LA PHRASE D'UN PNJ ENNEMI : après le geste, le jeu décide (combat_rp.js) s'il parle ;
+    // on attend que la fenêtre se ferme. Elle ne peut pas arrêter la partie non plus.
+    async function direLaReplique(etape, etat) {
+        if (!replique || !etape || (etape.type !== "tour" && etape.type !== "chute")) return;
+        try { await replique(etape, etat); }
+        catch (e) { tracer("❌", "réplique en échec", String(e && e.message)); }
     }
 
     async function jouerLeGeste(scene) {

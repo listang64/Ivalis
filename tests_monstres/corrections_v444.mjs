@@ -507,6 +507,36 @@ await section(async () => {
   await cap("v444-fiche");
 });
 
+titre("7 bis. (v457) LA MISSION ACCOMPLIE : SA PAGE EN LECTURE, LE SCEAU « QUÊTE ACCOMPLIE », LE PARCHEMIN DES RÉCOMPENSES");
+await section(async () => {
+  // Nico : « si les joueurs cliquent sur le sceau, ça ouvre la page mission où l'on voit la mission et les notes, mais on ne
+  // peut plus écrire ; dessus, posé en travers, un morceau de parchemin par-dessus le livre sur les deux pages, marqué les
+  // récompenses (pour l'instant : Récompenses, vide). Tout disparaîtra quand les joueurs choisiront une autre mission. »
+  const pd = await partieDoc(), acc = pd.Mission_Accomplie || {};
+  const fin = await G((id) => window.__docs["Systeme_Parties/P1/Missions_Terminees/" + id] || null, acc.Id);
+  verifier("réussie : la partie garde la mission accomplie (Mission_Accomplie : son Id, son titre)", !!acc.Id && fin && fin.Statut === "reussie" && acc.Titre === fin.Mission.Titre && !pd.Mission_En_Cours, JSON.stringify(acc));
+  await G((id) => { window.__docs["Systeme_Parties/P1/Missions_Terminees/" + id].Notes = "Le puits était un leurre."; return window.MISSIONS_GUILDE.relireTerminees(); }, acc.Id);
+  await G(() => window.GRIMOIRE_MISSION.ouvrir()); await attendreQue(surMission, 8000); await pose();
+  await attendreQue(async () => (await gauche()).includes(acc.Titre), 4000);
+  const g = await gauche(), d = await G(() => { const t = document.querySelector("#grimoire-mission-d .notes-mission"); return t && { valeur: t.value, lecture: t.readOnly, eteint: t.disabled }; });
+  const sc = await G(() => { const s = document.querySelector("#grimoire-mission-g .sceau-quete-page"); return s && { mots: [...s.querySelectorAll("textPath")].map(x => x.textContent), ids: [...s.querySelectorAll("[id]")].every(x => /^quete-page-/.test(x.id)) }; });
+  verifier("la page de la mission, en lecture : son titre, ce qui s'est passé ; plus de vote d'abandon", g.includes(acc.Titre) && /Objectif/.test(g) && !/Voter pour abandonner/.test(g) && !(await G(() => !!document.querySelector("#grimoire-mission-g [data-mi]"))), g.slice(0, 200));
+  verifier("…à la place, le sceau de cire « QUÊTE · ACCOMPLIE » (ses identifiants à lui)", sc && sc.mots.join(" ") === "QUÊTE ACCOMPLIE" && sc.ids, JSON.stringify(sc));
+  verifier("les notes se relisent, sans s'écrire", d && d.valeur === "Le puits était un leurre." && d.lecture && !d.eteint, JSON.stringify(d));
+  await p.waitForTimeout(700);
+  const pa = await G(() => { const el = document.querySelector(".parchemin-recompenses"), l = document.getElementById("grimoire-livre"); if (!el) return null;
+    const a = el.querySelector(".papier-recompenses").getBoundingClientRect(), b = l.getBoundingClientRect(), pg = document.getElementById("grimoire-mission-g").getBoundingClientRect(), pd = document.getElementById("grimoire-mission-d").getBoundingClientRect();
+    const cx = a.left + a.width / 2, cy = a.top + a.height / 2, m = /matrix\(([-\d.e]+), ([-\d.e]+)/.exec(getComputedStyle(el.querySelector(".papier-recompenses")).transform || "");
+    return { pose: el.classList.contains("pose"), opacite: getComputedStyle(el).opacity, titre: el.querySelector(".titre-recompenses").textContent, vide: el.querySelector(".liste-recompenses").textContent.trim() === "",
+             surLesDeux: a.left < pg.right - 40 && a.right > pd.left + 40, centre: Math.abs(cx - (b.left + b.width / 2)) < b.width * 0.08 && Math.abs(cy - (b.top + b.height / 2)) < b.height * 0.15,
+             penche: m ? +(Math.atan2(Number(m[2]), Number(m[1])) * 180 / Math.PI).toFixed(1) : 0, doigt: getComputedStyle(el).pointerEvents,
+             dessus: (() => { const e = document.elementFromPoint(cx, cy); return !!(e && e.closest(".parchemin-recompenses")) || getComputedStyle(el).pointerEvents === "none"; })() }; });
+  verifier("le parchemin « Récompenses » (vide pour l'instant), posé en travers par-dessus le livre, sur les deux pages", pa && pa.pose && pa.titre === "Récompenses" && pa.vide && pa.surLesDeux && pa.centre && pa.penche < -3 && pa.penche > -12, JSON.stringify(pa));
+  await cap("v457-accomplie");
+  await G(() => window.GRIMOIRE_FICHES.ouvrir("H1")); await attendreQue(() => G(() => window.GRIMOIRE_FICHES.herosAffiche() === "H1"), 6000); await p.waitForTimeout(500);
+  verifier("la double page quittée, le parchemin s'en va", await G(() => { const el = document.querySelector(".parchemin-recompenses"); return !el || !el.classList.contains("pose"); }));
+});
+
 titre("8. (v448) EN MODE DEV : FORCER LE VOTE DE LA MISSION, SUR SA FEUILLE");
 await section(async () => {
   await G(() => { localStorage.setItem("ivalis_DEV_MODE", "off"); window.MISSIONS_GUILDE.ouvrirFeuille(2); }); await p.waitForTimeout(600);
@@ -518,6 +548,7 @@ await section(async () => {
   await G(() => window.__surPartie(window.__docs["Systeme_Parties/P1"]));
   const pd = await partieDoc();
   verifier("un toucher : tous les votants d'accord, la mission acceptée, la feuille fermée", pd.Mission_En_Cours && pd.Mission_En_Cours.Id === m2.Id && !pd.Vote_Mission && !(await G(() => document.getElementById("feuille-mission").classList.contains("ouverte"))), JSON.stringify(pd.Mission_En_Cours));
+  verifier("(v457) une autre mission choisie : la mission accomplie s'efface (son sceau, sa page en lecture)", !pd.Mission_Accomplie && !(await G(() => window.MISSIONS_GUILDE.missionAccomplie())), JSON.stringify(pd.Mission_Accomplie));
   await G(() => localStorage.setItem("ivalis_DEV_MODE", "off"));
 });
 

@@ -380,6 +380,12 @@ const SCEAU_CIRE = `<svg class="dessin-sceau" viewBox="0 0 200 200" aria-hidden=
   <use href="#sceau-motif" transform="translate(-0.8 -0.9)" style="color:#f6a89b" fill="#f6a89b" opacity="0.75"/>
   <use href="#sceau-motif" style="color:#a51d14" fill="#a51d14"/>
 </svg>`;
+// (v457) Le même cachet de cire, à d'autres mots (« QUÊTE · ACCOMPLIE », le récit et la page de la
+// mission) : ses identifiants SVG préfixés, pour ne pas se mêler à ceux d'un autre sceau affiché.
+export function sceauCire(haut, bas, prefixe) {
+    return SCEAU_CIRE.replace(/sceau-(cire|creux|biseau|relief|arc-haut|arc-bas|motif)/g, `${prefixe}-$1`)
+        .replace(">ACCEPTER<", `>${echapper(haut)}<`).replace(">LA MISSION<", `>${echapper(bas)}<`);
+}
 // (v443) Le sceau selon l'état du groupe : accepter (ou voter oui), en attente des autres,
 // une mission déjà en cours, un autre vote ; « Refuser » quand un vote porte sur elle.
 function htmlSceau(m) {
@@ -461,6 +467,10 @@ window.appliquerMissionDeLaPartie = function(data) {
     rafraichirFeuille();
     ecouterMission(idPartie(), !!(partie.Mission_En_Cours && partie.Mission_En_Cours.Id));
     majDecalage();
+    // (v457) Une mission accomplie sur un autre poste : sa fiche rangée, relue ici.
+    const a = partie.Mission_Accomplie;
+    if (a && a.Id && termineesDe === idPartie() && !terminees.some(t => t && t.Mission && t.Mission.Id === a.Id)) lireTerminees(true);
+    else if (a && a.Id && termineesDe !== idPartie()) lireTerminees();
 };
 
 // LE VOTE : « oui » (le premier propose), « non » (le vote disparaît). Tous oui : acceptée.
@@ -483,7 +493,8 @@ export async function voterMission(slot, m, reponse, options) {
             if (forcer) (v.Votants || []).forEach(x => { votes[x.id] = "oui"; });
             if (!(v.Votants || []).every(x => votes[x.id] === "oui")) { tx.set(refPartie(id), { Vote_Mission: { ...v, Votes: votes } }, { merge: true }); return { vote: true }; }
             const enCours = { Id: m.Id, Titre: m.Titre, Difficulte: difficulteDe(m), Decalage: decalageDe(m), Lieu_Id: (m.Lieu && m.Lieu.Id) || null, Region: m.Region, Le: Date.now() };
-            tx.update(refPartie(id), { Vote_Mission: deleteField(), Mission_En_Cours: enCours });
+            // (v457) Une autre mission choisie : le sceau « Quête accomplie » de la précédente s'efface.
+            tx.update(refPartie(id), { Vote_Mission: deleteField(), Mission_En_Cours: enCours, Mission_Accomplie: deleteField() });
             return { acceptee: true, enCours, votants: v.Votants || votants, slot: Number(v.Slot) };
         });
     } catch (e) { console.error("Missions : le vote", e); return null; }
@@ -753,7 +764,7 @@ window.contexteMissionMJ = contexteMissionMJ;
 
 // LE SUIVI (MIA_SUIVI_MISSION) : après chaque tour du Narrateur, les étapes accomplies ;
 // la mission réussie ou échouée quand le récit le dit (v452 : plus d'indices relevés).
-export async function suivreApresMJ(texteMJ) {
+export async function suivreApresMJ(texteMJ, idMessage) {
     const d = missionEnCours, id = idPartie();
     if (!d || d.Statut !== "en_cours" || !d.Mission || !texteMJ || !window.cleGemini || !window.cleGemini("missions")) return null;
     const m = d.Mission, etapes = Array.isArray((d.Plan || {}).etapes) ? d.Plan.etapes : [];
@@ -782,17 +793,22 @@ Réponds en JSON : { "etapes_accomplies": [numéros], "statut": "en_cours" | "re
     if (r.resume) maj.Avancement.Journal = [...maj.Avancement.Journal, { Le: Date.now(), Jour: jourAbsolu(), Texte: String(r.resume).slice(0, 300) }].slice(-60);
     try { await setDoc(refMission(id), maj, { merge: true }); } catch (e) { console.warn("Missions : l'avancement", e); }
     await relireMission(id);
-    if (r.statut === "reussie" || r.statut === "echouee") await terminerMission(r.statut === "reussie" ? "reussie" : "echouee", r.resume || "");
+    if (r.statut === "reussie" || r.statut === "echouee") await terminerMission(r.statut === "reussie" ? "reussie" : "echouee", r.resume || "", idMessage);
     return r;
 }
 // La fin d'une mission : rangée avec les missions terminées (ses héros) ; plus de mission en cours.
-export async function terminerMission(statut, resume) {
+// (v457) Nico : « quand une mission est validée, dessine à la suite du texte un sceau rouge "Quête
+// accomplie" » : réussie, la partie garde Mission_Accomplie { Id, Titre, Le, Message } (la narration
+// qui l'a dite), jusqu'à la mission suivante.
+export async function terminerMission(statut, resume, idMessage) {
     const id = idPartie(), d = missionEnCours;
     if (!id || !d || !d.Mission) return false;
     try {
         await setDoc(doc(db, "Systeme_Parties", id, "Missions_Terminees", d.Mission.Id), { ...d, Statut: statut, Fin_Le: Date.now(), Jour_Fin: jourAbsolu(), Resume_Fin: resume || "" });
         await deleteDoc(refMission(id));
-        await setDoc(refPartie(id), { Mission_En_Cours: deleteField() }, { merge: true });
+        const accomplie = statut === "reussie" ? { Id: d.Mission.Id, Titre: d.Mission.Titre || "", Le: Date.now(), Message: idMessage || null } : null;
+        await setDoc(refPartie(id), { Mission_En_Cours: deleteField(), Mission_Accomplie: accomplie || deleteField() }, { merge: true });
+        partie = { ...partie, Mission_Accomplie: accomplie };
     } catch (e) { console.error("Missions : la fin de la mission", e); return false; }
     missionEnCours = null; missionLue = "";
     partie = { ...partie, Mission_En_Cours: null };
@@ -856,6 +872,12 @@ async function lireTerminees(forcer) {
     return terminees;
 }
 export const relireTerminees = () => lireTerminees(true);
+// (v457) La mission accomplie (tant qu'aucune autre n'est choisie) : sa fiche rangée, notes comprises.
+export function missionAccomplie() {
+    const a = partie.Mission_Accomplie;
+    if (!a || !a.Id || (partie.Mission_En_Cours && partie.Mission_En_Cours.Id)) return null;
+    return terminees.find(t => t && t.Mission && t.Mission.Id === a.Id && t.Statut === "reussie") || null;
+}
 // Les missions réussies d'un héros : (v452) { normale, difficile } (lues une fois par partie ; celles
 // d'avant, à rang : C normale, B et A difficiles).
 export function missionsReussies(idHeros) {
@@ -885,4 +907,4 @@ window.MISSIONS_GUILDE = { DIFFICULTES, DECALAGES, MAX_DIFFICILES, IMAGE_SCEAU_D
                           lireTableau, relireTableau, surChangement, htmlEncart, missionDe, ouvrirFeuille, fermerFeuille,
                           voterMission, refuserMission, lireMission, relireLaMission, surMission, preparerMission, promptPlan, marqueMission, decalageNiveauMission,
                           contexteMissionMJ, suivreApresMJ, terminerMission, partie: () => partie,
-                          ecrireNotes, voterAbandon, missionsReussies, relireTerminees, idJoueur, ajusterEncarts, oublierAjustements };
+                          ecrireNotes, voterAbandon, missionsReussies, relireTerminees, missionAccomplie, sceauCire, idJoueur, ajusterEncarts, oublierAjustements };

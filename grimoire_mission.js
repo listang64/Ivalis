@@ -58,6 +58,8 @@ function poser() {
 //  LES PAGES
 // ---------------------------------------------------------------------
 const liste = (l) => (Array.isArray(l) ? l : []).filter(Boolean);
+// (v457) La mission accomplie (son sceau touché dans le récit) : la même double page, en lecture.
+const estAccomplie = (d) => !!(d && d.Mission && d.Statut === "reussie");
 function htmlGauche(d) {
     if (!d || !d.Mission) return `<div class="contenu-page page-mission-vide"><div class="titre-mission-en-cours">Mission en cours</div>${FLEURON}
         <p class="aucune-mission">Aucune mission en cours.</p>
@@ -67,13 +69,15 @@ function htmlGauche(d) {
     const m = d.Mission, av = d.Avancement || {}, journal = liste(av.Journal);
     const v = d.Vote_Abandon, moi = M() ? M().idJoueur() : "";
     const oui = v ? liste(v.Votants).filter(x => (v.Votes || {})[x.id] === "oui").length : 0;
-    const abandon = !v
+    const abandon = estAccomplie(d) ? ""
+        : !v
         ? boutonLivre("abandon-oui", "Voter pour abandonner la mission", TEINTE_ABANDON, "abandon-" + m.Id)
         : `<div class="vote-abandon"><p><b>${echapper((v.Initiateur || {}).nom || "Un joueur")}</b> propose d'abandonner la mission (${oui}/${liste(v.Votants).length}).</p>
             <div class="boutons-abandon">${(v.Votes || {})[moi] === "oui" ? `<p class="discret">En attente des autres joueurs.</p>` : boutonLivre("abandon-oui", "J'accepte", TEINTE_ABANDON, "abandon-accepte-" + m.Id)}
             ${boutonLivre("abandon-non", "Non, on continue", TEINTE_CONTINUER, "abandon-continue-" + m.Id)}</div></div>`;
     return `<div class="contenu-page page-mission-infos defile-fiche">
         <div class="titre-mission-en-cours">${echapper(m.Titre)}</div>
+        ${estAccomplie(d) && M() && M().sceauCire ? `<div class="sceau-quete-page" title="Quête accomplie">${M().sceauCire("QUÊTE", "ACCOMPLIE", "quete-page")}</div>` : ""}
         ${M() && M().difficulteDe(m) === "difficile" ? M().htmlSceauDifficile("sceau-difficile-page") : ""}
         ${FLEURON}
         <dl class="faits-mission-en-cours">
@@ -87,25 +91,51 @@ function htmlGauche(d) {
         <div class="abandon-mission">${abandon}</div>
       </div>`;
 }
+const modeNotes = (d) => (estAccomplie(d) ? "lu" : d && d.Mission ? "ecrit" : "vide");
 function htmlDroite(d) {
-    const avec = !!(d && d.Mission);
+    const mode = modeNotes(d);
+    const attributs = mode === "ecrit" ? "" : mode === "lu" ? "readonly" : "disabled";
+    const aide = mode === "ecrit" ? "Écrivez ici ce que vous voulez retenir de la mission…" : mode === "lu" ? "Aucune note pour cette mission." : "Les notes s'ouvriront avec une mission.";
     return `<div class="contenu-page page-mission-notes">
         <div class="titre-notes-mission">Nos notes</div>
-        <textarea class="notes-mission" spellcheck="false" ${avec ? "" : "disabled"}
-          placeholder="${avec ? "Écrivez ici ce que vous voulez retenir de la mission…" : "Les notes s'ouvriront avec une mission."}">${echapper(avec ? (d.Notes || "") : "")}</textarea>
+        <textarea class="notes-mission" data-mode="${mode}" spellcheck="false" ${attributs}
+          placeholder="${aide}">${echapper(mode !== "vide" ? (d.Notes || "") : "")}</textarea>
       </div>`;
 }
 let rendu = "";
 export function rendre() {
     if (!pages) return;
-    const d = M() ? M().lireMission() : null;
+    const enCours = M() ? M().lireMission() : null;
+    const d = enCours && enCours.Mission ? enCours : (M() && M().missionAccomplie ? M().missionAccomplie() : null);
     const ta = pages.d.querySelector(".notes-mission");
     const enEcriture = ta && document.activeElement === ta;
-    const sigG = JSON.stringify([d && d.Mission && d.Mission.Id, d && d.Avancement, d && d.Vote_Abandon, M() && M().idJoueur()]);
+    const sigG = JSON.stringify([d && d.Mission && d.Mission.Id, d && d.Statut, d && d.Avancement, d && d.Vote_Abandon, M() && M().idJoueur()]);
     if (sigG !== rendu) { pages.g.innerHTML = htmlGauche(d); rendu = sigG; }
     // Les notes des autres arrivent ; celles qu'on est en train d'écrire ne sont pas écrasées.
-    if (!ta || !!(d && d.Mission) !== !ta.disabled) pages.d.innerHTML = htmlDroite(d);
+    if (!ta || ta.dataset.mode !== modeNotes(d)) pages.d.innerHTML = htmlDroite(d);
     else if (!enEcriture && d && d.Mission && ta.value !== (d.Notes || "")) ta.value = d.Notes || "";
+    majParchemin(d);
+}
+// (v457) LE PARCHEMIN DES RÉCOMPENSES : Nico, « posé en travers un morceau de parchemin par-dessus le
+// livre, sur les deux pages, marqué dessus les récompenses de la mission (pour l'instant : Récompenses,
+// et laisse vide) ». Posé sur la scène, à la place du livre, tant que la double page d'une mission
+// accomplie est ouverte.
+let parchemin = null, accomplieAffichee = null;
+function majParchemin(d) {
+    if (d !== undefined) accomplieAffichee = estAccomplie(d) ? d : null;
+    const g = G(), scene = g && g.scene && g.scene(), livre = g && g.livre && g.livre();
+    const voulu = !!(accomplieAffichee && scene && livre && ouverte());
+    if (!voulu) { if (parchemin) parchemin.classList.remove("pose"); return; }
+    if (!parchemin || parchemin.parentNode !== scene) {
+        parchemin = parchemin || document.createElement("div");
+        parchemin.className = "parchemin-recompenses";
+        parchemin.setAttribute("aria-hidden", "true");
+        scene.appendChild(parchemin);
+    }
+    const html = `<div class="papier-recompenses"><div class="titre-recompenses">Récompenses</div>${FLEURON}<div class="liste-recompenses"></div></div>`;
+    if (parchemin.__html !== html) { parchemin.innerHTML = html; parchemin.__html = html; }
+    Object.assign(parchemin.style, { left: livre.offsetLeft + "px", top: livre.offsetTop + "px", width: livre.offsetWidth + "px", height: livre.offsetHeight + "px" });
+    requestAnimationFrame(() => parchemin && parchemin.classList.add("pose"));
 }
 let minuteurNotes = null;
 function programmerNotes(texte) { clearTimeout(minuteurNotes); minuteurNotes = setTimeout(() => enregistrerNotes(texte), 900); }
@@ -153,10 +183,14 @@ setInterval(() => {
         if (ouverte()) enRoute = Date.now();
         else if (g.pagesMission().length && Date.now() - enRoute > 8000) {
             const ta = pages && pages.d.querySelector(".notes-mission");
-            if (ta && !ta.disabled) enregistrerNotes(ta.value);
+            if (ta && ta.dataset.mode === "ecrit") enregistrerNotes(ta.value);
             g.definirMission([]);
         }
     } catch (e) { console.warn("Le livre : la mission en cours", e); }
 }, 1000);
+// (v457) Le parchemin suit la double page (posé dès qu'on y arrive, retiré dès qu'on la quitte) ;
+// la fiche d'une mission accomplie sur un autre poste arrive après coup.
+setInterval(() => { if (!document.hidden && pages) { try { majParchemin(); } catch (e) {} } }, 250);
+window.addEventListener("missions-terminees", () => { if (pages) rendre(); });
 
-window.GRIMOIRE_MISSION = { ouvrir, ouverte, rendre, pages: () => (pages ? [pages.g, pages.d] : []) };
+window.GRIMOIRE_MISSION = { ouvrir, ouverte, rendre, htmlGauche, htmlDroite, pages: () => (pages ? [pages.g, pages.d] : []) };

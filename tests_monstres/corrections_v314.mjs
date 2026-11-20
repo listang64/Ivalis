@@ -278,6 +278,38 @@ await section(async () => {
 });
 
 // =========================================================================
+titre("2 bis. (v457) LA MISSION ACCOMPLIE : UN SCEAU ROUGE « QUÊTE ACCOMPLIE » À LA SUITE DU TEXTE");
+// =========================================================================
+await section(async () => {
+  // Nico : « quand une mission est validée, dessine-le sur la page RP, à la suite du texte : un sceau rouge marqué
+  // Quête accomplie. Si les joueurs cliquent dessus, ça ouvre la page mission. Tout disparaîtra quand ils choisiront une autre mission. »
+  const msgs = [{ idDoc: "q1", ID_Partie: "P1", Auteur_ID: "MJ", Auteur_Nom: "MJ", Est_Narration_IA: true, Texte: "Le marchand compte les pièces.", Timestamp: 5000 },
+                { idDoc: "q2", ID_Partie: "P1", Auteur_ID: "MJ", Auteur_Nom: "MJ", Est_Narration_IA: true, Texte: "Le collier retrouvé, le vieux Hamar pleure de joie. La mission est accomplie.", Timestamp: 6000 },
+                { idDoc: "q3", ID_Partie: "P1", Auteur_ID: "H1", Auteur_Nom: "Kaya", Texte: "Kaya sourit.", Texte_Livre: "Kaya sourit au vieil homme.", Timestamp: 7000 }];
+  await p.evaluate(() => { window.__missionOuverte = 0; window.GRIMOIRE_MISSION = { ...(window.GRIMOIRE_MISSION || {}), ouvrir: () => { window.__missionOuverte++; return true; } }; });
+  await p.evaluate(() => window.livreRecitPartie({ Mission_Accomplie: { Id: "MQ1", Titre: "Le collier d'Hamar", Le: 6500, Message: "q2" } }));
+  await relayer(msgs, true); await p.waitForTimeout(900);
+  const r = await p.evaluate(() => { const s = document.querySelectorAll(".page-recit .sceau-quete-recit"); if (s.length !== 1) return { n: s.length };
+    const el = s[0], page = el.closest(".page-recit"), paras = [...page.querySelectorAll(".para-recit")];
+    const avant = paras.filter(x => x.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING).map(x => x.textContent).join(" ");
+    const apres = paras.filter(x => x.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING).map(x => x.textContent).join(" ");
+    const cire = getComputedStyle(el.querySelector(".cire-sceau")).fill || el.querySelector(".cire-sceau").getAttribute("fill");
+    return { n: 1, mots: [...el.querySelectorAll("textPath")].map(x => x.textContent).join(" "), avant, apres, cire, w: el.getBoundingClientRect().width }; });
+  verifier("un seul sceau, après la narration qui a dit la mission accomplie (avant le texte qui suit)", r.n === 1 && /pleure de joie/.test(r.avant) && /sourit au vieil homme/.test(r.apres), JSON.stringify(r));
+  verifier("…un cachet de cire rouge marqué « QUÊTE · ACCOMPLIE »", r.mots === "QUÊTE ACCOMPLIE" && /quete-recit-cire/.test(r.cire), JSON.stringify(r));
+  await p.evaluate(() => { const pg = document.querySelector(".sceau-quete-recit").closest(".page-grimoire"); window.GRIMOIRE.allerALaPage(window.GRIMOIRE.indexDe(pg)); });
+  await p.waitForTimeout(2600); await pose(); await p.waitForTimeout(1200);
+  const t = await p.evaluate(() => { const el = document.querySelector(".sceau-quete-recit"), a = el.getBoundingClientRect(), pg = el.closest(".page-recit").getBoundingClientRect();
+    return { w: Math.round(a.width), part: +(a.width / pg.width).toFixed(2), dansLaPage: a.top >= pg.top && a.bottom <= pg.bottom + 1 }; });
+  verifier("…à sa taille sur la page (un quart de sa largeur environ), entier", t.part > 0.18 && t.part < 0.4 && t.dansLaPage, JSON.stringify(t));
+  await cap("v457_sceau_recit");
+  const c = await centre(".sceau-quete-recit");
+  await p.mouse.click(c.x, c.y); await p.waitForTimeout(400);
+  verifier("un toucher sur le sceau ouvre la page de la mission", await p.evaluate(() => window.__missionOuverte === 1), String(await p.evaluate(() => window.__missionOuverte)));
+  await p.evaluate(() => window.livreRecitPartie({})); await p.waitForTimeout(300);
+  verifier("une autre mission choisie (plus de mission accomplie) : le sceau s'efface", await p.evaluate(() => !document.querySelector(".sceau-quete-recit")));
+});
+
 titre("3. LE COMBAT : LES ENNEMIS EN LISTE À DÉCOCHER ; SES IMAGES EFFACÉES À LA FIN");
 // =========================================================================
 await section(async () => {

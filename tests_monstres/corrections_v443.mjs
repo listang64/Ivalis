@@ -468,7 +468,7 @@ await section(async () => {
            && !/Le commanditaire ment/.test(ici) && !/elle aime le voleur/.test(ici) && /ne désigne aucun coupable, aucun traître/.test(ici), ici.slice(0, 400));
   verifier(`(v451) …le rythme : au moins ${min} passages par étape (selon la difficulté), un indice au plus par passage, une révélation à la fois`, new RegExp(`au moins ${min} de tes passages \\(celle-ci en est à 0\\)`).test(ici) && /un au plus par passage/.test(ici) && /Une révélation à la fois/.test(ici), ici.split("LE RYTHME")[1]);
   const ia = lire("ia_master.js");
-  verifier("le Narrateur le lit avant chaque tour, et MIA_SUIVI_MISSION suit après", /window\.contexteMissionMJ\(dataPartieMJ, lieuActuel\)/.test(ia) && /window\.MISSIONS_GUILDE\.suivreApresMJ\(reponseTexte\)/.test(ia));
+  verifier("le Narrateur le lit avant chaque tour, et MIA_SUIVI_MISSION suit après", /window\.contexteMissionMJ\(dataPartieMJ, lieuActuel\)/.test(ia) && /window\.MISSIONS_GUILDE\.suivreApresMJ\(reponseTexte, idMessage\)/.test(ia));
 });
 
 titre("6. LES CRÉATURES AU LIEU DE LA MISSION : (v452) LE DÉCALAGE CACHÉ DE LA MISSION (AILLEURS, LE NIVEAU DU GROUPE)");
