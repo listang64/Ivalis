@@ -655,11 +655,15 @@ function paginer(entrees) {
 // supprime le chapitre du livre et de la base, avec les images qui sont dedans (sauf les
 // PNJ) ». Les chapitres finis seulement (le chapitre en cours vit dans le chat).
 const ROUE_SOMMAIRE = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 2h3.4l.5 2.6c.7.2 1.3.5 1.9.9l2.3-1.3 2.4 2.4-1.3 2.3c.4.6.7 1.2.9 1.9l2.6.5v3.4l-2.6.5c-.2.7-.5 1.3-.9 1.9l1.3 2.3-2.4 2.4-2.3-1.3c-.6.4-1.2.7-1.9.9l-.5 2.6h-3.4l-.5-2.6c-.7-.2-1.3-.5-1.9-.9l-2.3 1.3-2.4-2.4 1.3-2.3c-.4-.6-.7-1.2-.9-1.9L2 13.7v-3.4l2.6-.5c.2-.7.5-1.3.9-1.9L4.2 5.6l2.4-2.4 2.3 1.3c.6-.4 1.2-.7 1.9-.9zM12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z"/></svg>`;
+const SVG_COPIE = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M5 16V5a2 2 0 0 1 2-2h9"/></svg>`;
 function sommaireHtml() {
     const dev = modeDevRecit();
     if (!dev) etat.suppression = false;
+    // (v463) Nico : « quand on appuie sur la roue crantée rouge, fais aussi apparaître un petit bouton pour copier dans
+    // le presse-papier tout le texte du chapitre, lancers de dés et fils invisibles compris, au bon endroit ».
+    const copier = (id, numero) => dev && etat.suppression ? `<button type="button" class="copie-sommaire" data-copier="${echapper(id)}" title="Copier le texte du chapitre (DEV)" aria-label="Copier le texte du chapitre ${echapper(romain(numero))}">${SVG_COPIE}</button>` : "";
     const ligne = (id, numero, titre, classe, idChap) =>
-        `<div class="ligne-sommaire-dev">${dev && etat.suppression && idChap ? `<button type="button" class="moins-sommaire" data-supprimer="${echapper(idChap)}" title="Supprimer ce chapitre (DEV)" aria-label="Supprimer le chapitre ${echapper(romain(numero))}">−</button>` : ""}<a class="ligne-sommaire${classe ? " " + classe : ""}" data-recit="${echapper(id)}"><span class="num">${romain(numero)}</span><span class="tit">${echapper(titre)}</span></a></div>`;
+        `<div class="ligne-sommaire-dev">${dev && etat.suppression && idChap ? `<button type="button" class="moins-sommaire" data-supprimer="${echapper(idChap)}" title="Supprimer ce chapitre (DEV)" aria-label="Supprimer le chapitre ${echapper(romain(numero))}">−</button>` : ""}${copier(id, numero)}<a class="ligne-sommaire${classe ? " " + classe : ""}" data-recit="${echapper(id)}"><span class="num">${romain(numero)}</span><span class="tit">${echapper(titre)}</span></a></div>`;
     const finis = etat.chapitres.map(c => ligne("chap:" + c.id, c.Numero, c.Titre || "Sans titre", "", c.id));
     const courant = ligne("courant", etat.chapitres.length + 1, "Le chapitre en cours", "courant");
     const toutes = [...finis, courant];
@@ -924,6 +928,8 @@ function creerElements() {
         if (cerveau) { montrerSocial(cerveau); return true; }
         // (v428) le mode DEV du sommaire : la roue, puis les « − » d'un chapitre
         if (cible.closest(".roue-sommaire")) { if (modeDevRecit()) { etat.suppression = !etat.suppression; son("page-prise", 0.4); rendre(); } return true; }
+        const copie = cible.closest("[data-copier]");
+        if (copie) { copierLeChapitre(copie.dataset.copier, copie); return true; }
         const moins = cible.closest("[data-supprimer]");
         if (moins) { supprimerChapitre(moins.dataset.supprimer); return true; }
         const r = cible.closest("[data-recit]");
@@ -1107,6 +1113,51 @@ async function choisirDansLeSommaire(cle) {
         rendre();
         G().allerALaPage(premiereRecit());
     } catch (e) { console.error("Le livre : chapitre", e); }
+}
+// (v463) LE TEXTE D'UN CHAPITRE, À COPIER (mode DEV) : ses paragraphes dans l'ordre du livre ; les jets de dés là où
+// la marge les pose (au début de l'action du joueur), les fils invisibles après le paragraphe qu'ils ont fait bouger.
+function texteDuChapitre(entrees, titre) {
+    const blocs = titre ? [titre] : [];
+    for (const e of entrees || []) {
+        if (e.image) { if (e.type === "quete") blocs.push("[Sceau : Quête accomplie]"); continue; }
+        (e.textes || []).forEach((t, k) => {
+            let p = sansBalises(t);
+            if (!p) return;
+            if (k === 0 && (e.jets || []).length)
+                p = e.jets.map(j => `[🎲 Jet de ${nomCaracJoli(j.carac) || "dé"} : ${j.de}${j.mod ? " " + j.mod : ""} = ${j.total}${j.de === 20 ? ", réussite critique" : j.de === 1 ? ", échec critique" : ""}]`).join(" ") + " " + p;
+            blocs.push(p);
+            (e.cerveaux || []).filter(c => c && Number(c.para) === k).forEach(c => (c.lignes || []).forEach(l => blocs.push(`[🧠 Fils invisibles : ${l}]`)));
+        });
+    }
+    return blocs.join("\n\n");
+}
+window.texteDuChapitreRecit = texteDuChapitre;
+async function copierLeChapitre(cle, bouton) {
+    if (!modeDevRecit()) return false;
+    let texte = "";
+    try {
+        if (cle === "courant") texte = texteDuChapitre(construireEntrees(etat.messages), `Chapitre ${romain(etat.chapitres.length + 1)} — Le chapitre en cours`);
+        else if (cle.startsWith("chap:")) {
+            const id = cle.slice(5), fiche = etat.chapitres.find(c => c.id === id) || {};
+            const snap = await getDoc(doc(db, "Recits_Textes", id));
+            texte = texteDuChapitre((snap.exists() && snap.data().Entrees) || [], `Chapitre ${romain(fiche.Numero || 0)} — ${fiche.Titre || "Sans titre"}`);
+        }
+    } catch (e) { console.error("Le livre : copier le chapitre", e); }
+    if (!texte) return false;
+    let ok = false;
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(texte); ok = true; } } catch (e) {}
+    if (!ok) {
+        const zone = document.createElement("textarea");
+        zone.value = texte; zone.setAttribute("readonly", ""); zone.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0";
+        document.body.appendChild(zone); zone.select();
+        try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+        zone.remove();
+    }
+    etat.dernierTexteCopie = texte;
+    son("page-prise", 0.4);
+    if (bouton) { bouton.classList.add(ok ? "copie-ok" : "copie-ratee"); setTimeout(() => bouton.classList.remove("copie-ok", "copie-ratee"), 1600); }
+    console.log(`📋 [Le livre] Chapitre copié (${texte.length} caractères)${ok ? "" : " — le presse-papier a refusé"}.`);
+    return ok;
 }
 // (v428) SUPPRIMER UN CHAPITRE FINI (mode DEV) : sa fiche, ses pages, ses croquis (les
 // portraits des PNJ restent : ce sont les leurs) ; les chapitres suivants reprennent les numéros.

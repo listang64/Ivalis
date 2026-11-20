@@ -518,8 +518,24 @@ await section(async () => {
   verifier("…le chapitre III devient le II (le prochain sera bien le III)", await G((id) => window.__docs["Recits_Chapitres/" + id].Numero === 2, ids[2]));
   const lignes = await G(() => [...document.querySelectorAll(".ligne-sommaire")].map(l => l.querySelector(".num").textContent + ":" + l.dataset.recit.slice(0, 5)));
   verifier("…et le sommaire n'a plus que deux chapitres finis", JSON.stringify(lignes) === '["I:chap:","II:chap:","III:coura"]', JSON.stringify(lignes));
+  // (v463) Nico : « quand on appuie sur la roue crantée rouge, fais aussi apparaître un petit bouton pour copier dans le
+  // presse-papier tout le texte du chapitre, lancers de dés et fils invisibles compris, au bon endroit dans le récit ».
+  const copies = await G(() => [...document.querySelectorAll(".copie-sommaire")].map(b => b.dataset.copier));
+  verifier("(v463) la roue ouverte : un petit bouton « copier » à côté de chaque chapitre, celui en cours compris", copies.length === 3 && copies.filter(x => x.startsWith("chap:")).length === 2 && copies.includes("courant"), JSON.stringify(copies));
+  await G(() => { window.__copie = null; Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (t) => { window.__copie = t; } } }); });
+  await cliquer(`.copie-sommaire[data-copier="chap:${ids[0]}"]`);
+  await attendreQue(() => G(() => !!window.__copie), 3000);
+  const copie = await G(() => window.__copie || "");
+  verifier("(v463) un toucher : le texte du chapitre I part dans le presse-papier (son titre, ses paragraphes, sans balises)", /^Chapitre I — /.test(copie) && /Le chapitre 1 commence sur les quais\./.test(copie) && /Nous arrivons au port\./.test(copie) && !/<p>/.test(copie), copie.slice(0, 200));
+  verifier("(v463) …le bouton le dit (vert un instant)", await G(() => !!document.querySelector(".copie-sommaire.copie-ok")));
+  const t = await G(() => window.texteDuChapitreRecit([
+    { type: "narration", textes: ["Varos vous toise.", "Il crache par terre."], jets: [], cerveaux: [{ para: 1, lignes: ["Varos → Kaya : confiance −7"] }] },
+    { type: "joueur", textes: ["Kaya tente de l'apaiser.", "Elle sourit."], jets: [{ de: 17, mod: "+2", total: 19, carac: "CHARISME" }] },
+    { type: "illustration", image: { Url: "x" }, textes: [], jets: [] }], "Chapitre IV — Le port"));
+  const attendu = "Chapitre IV — Le port\n\nVaros vous toise.\n\nIl crache par terre.\n\n[🧠 Fils invisibles : Varos → Kaya : confiance −7]\n\n[🎲 Jet de Charisme : 17 +2 = 19] Kaya tente de l'apaiser.\n\nElle sourit.";
+  verifier("(v463) les jets de dés au début de l'action du joueur, les fils invisibles après le paragraphe qu'ils ont fait bouger", t === attendu, JSON.stringify(t));
   await G(() => { localStorage.setItem("ivalis_DEV_MODE", "off"); window.GRIMOIRE_RECIT.rendre(); }); await p.waitForTimeout(300);
-  verifier("le mode DEV éteint : plus de roue, plus de « − »", !(await G(() => document.querySelector(".roue-sommaire, .moins-sommaire"))));
+  verifier("le mode DEV éteint : plus de roue, plus de « − »", !(await G(() => document.querySelector(".roue-sommaire, .moins-sommaire, .copie-sommaire"))));
 });
 
 // =========================================================================

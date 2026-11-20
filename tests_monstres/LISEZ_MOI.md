@@ -12470,3 +12470,14 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   - Un PNJ connu que le récit fait revenir rejoint la scène : sa fiche prend le lieu du groupe (ramenerDansLaScene, pour MIA_PNJ et MIA_CASTING). MIA_DEPLACEMENT le cherche avec la même tolérance.
   - L'illustrateur pose la fiche qu'il crée dans le lieu du groupe, et elle est aussitôt connue (illustrations_recit.js).
 - corrections_v330.mjs le vérifie (ses contrôles « v462 »).
+
+## v463 — Copier le texte d'un chapitre (sommaire, mode DEV)
+
+- Nico : « dans le sommaire des chapitres, quand on appuie sur la roue crantée rouge, fais aussi apparaître un petit bouton pour copier dans le presse-papier tout le texte du chapitre, lancers de dés et fils invisibles compris, au bon endroit dans le récit ».
+- La roue ouverte, chaque chapitre a son petit bouton « copier », le chapitre en cours compris (grimoire_recit.js, copierLeChapitre, texteDuChapitre). Le bouton devient vert un instant.
+- Ce qui est copié :
+  - le titre, puis les paragraphes dans l'ordre du livre, sans balises ;
+  - les jets de dés au début de l'action du joueur (« [🎲 Jet de Charisme : 17 +2 = 19] … ») ;
+  - les fils invisibles après le paragraphe qu'ils ont fait bouger (« [🧠 Fils invisibles : Varos → Kaya : confiance −7] ») ;
+  - le sceau d'une quête accomplie.
+- corrections_v428.mjs le vérifie (ses contrôles « v463 »).
