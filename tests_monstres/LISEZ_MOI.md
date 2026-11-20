@@ -12427,3 +12427,20 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   - plus généralement, l'IA n'emploie jamais le nom d'un héros dans les répliques : elle les interpelle autrement (« toi », « le nain »…) (combat_rp.js, PROMPT_REPLIQUES) ;
   - une réplique écrite avant, avec la marque {heros}, la perd.
 - corrections_v457 et v444 le vérifient (leurs contrôles « v459 »).
+
+## v460 — L'a priori des PNJ envers les héros
+
+- Nico : « à la création des PNJ, selon leur background, la situation ou au hasard, certains ont plus d'affinité pour les héros de base ; d'autres sont juste sympathiques ». Les quatre points proposés, validés :
+  1. **L'IA donne l'a priori** : MIA_CASTING et MIA_PNJ (ia_master.js), et MIA_AME pour un PNJ né sans âme (social.js), donnent sa disposition envers les héros (mefiant, reserve, neutre, bienveillant, chaleureux) d'après son background, son métier et la scène, avec sa raison en une phrase.
+  2. **Une part de hasard** à la naissance (social_pur.js, tirerDisposition) :
+     - 18 % sympathiques de nature : au moins bienveillants, un cran de plus s'ils l'étaient déjà ;
+     - 7 % avec un mauvais a priori sans raison : un cran de moins.
+     - Gardé sur son âme : disposition { niveau, base, nature, raison }.
+  3. **De vrais points de départ** dans sa première impression (premiereImpression, BONUS_DISPOSITION), en plus de la réputation et de la sociabilité :
+     - chaleureux : +25 confiance, +20 attachement, +10 respect ;
+     - bienveillant : +12 / +8 / +5 ;
+     - réservé : −10 confiance, −5 attachement ;
+     - méfiant : −25 confiance, −10 attachement, −5 respect, +5 crainte.
+  4. **Son empathie compte aussi** : ±5 de confiance, ±2,5 d'attachement.
+- Les PNJ nés avant gardent une disposition neutre.
+- social_pur.mjs et corrections_v457.mjs le vérifient (leurs contrôles « v460 »). corrections_v415 compte la rancune depuis la première impression, qui n'est plus forcément nulle.

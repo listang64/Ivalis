@@ -493,6 +493,41 @@ await section(async () => {
   await p.evaluate(() => { if (window.__vraisVotants) window.votantsVoyageGroupe = window.__vraisVotants; });
 });
 
+// =========================================================================
+titre("10. (v460) UN PNJ QUI NAÎT : SON A PRIORI ENVERS LES HÉROS (BACKGROUND, SCÈNE, HASARD) DANS SA PREMIÈRE IMPRESSION");
+// =========================================================================
+await section(async () => {
+  const r = await p.evaluate(async () => {
+    const S = window.SOCIAL, vrai = Math.random;
+    const psyche = { prudence: 50, impulsivite: 50, loyaute: 50, empathie: 50, orgueil: 50, sociabilite: 50, valeurs: ["famille"], objectifs: ["tenir l'auberge"], faille: "naïve", masque: "souriante" };
+    Math.random = () => 0.9;   // pas de hasard : l'a priori de l'IA
+    await S.naissancePnj("P1", "PNJ_hela", { nom: "Héla", psyche, disposition_heros: "chaleureux", disposition_raison: "Elle accueille tous les voyageurs comme ses enfants." }, {});
+    Math.random = () => 0.05;  // sympathique de nature, malgré un garde méfiant
+    await S.naissancePnj("P1", "PNJ_brann", { nom: "Brann", psyche, disposition_heros: "mefiant", disposition_raison: "Une alerte aux portes." }, {});
+    Math.random = () => 0.9;
+    await S.naissancePnj("P1", "PNJ_ozan", { nom: "Ozan", psyche }, {});
+    Math.random = vrai;
+    const ames = { hela: window.__docs["Systeme_Parties/P1/Social_Ames/PNJ_hela"] || null };
+    const cleAme = Object.keys(window.__docs).find(k => /PNJ_hela$/.test(k) && !/Monde_PNJ/.test(k));
+    const chemin = cleAme ? cleAme.replace(/PNJ_hela$/, "") : "";
+    const ame = (id) => window.__docs[chemin + id] || null;
+    const heros = [{ idPersonnage: "H1", prenom: "Thorin" }];
+    await S.assurerAmes({ idPartie: "P1", pnjs: ["PNJ_hela", "PNJ_brann", "PNJ_ozan"].map(id => ({ id, fiche: { Nom_PNJ: id } })), heros, reputation: 0 });
+    const liens = await S.lireLiens("P1", ["PNJ_hela", "PNJ_brann", "PNJ_ozan"]);
+    const vers = (id) => (liens[S.cleLien(id, "H1")] || {}).axes || null;
+    return { chemin, hela: ame("PNJ_hela") && ame("PNJ_hela").disposition, brann: ame("PNJ_brann") && ame("PNJ_brann").disposition, ozan: ame("PNJ_ozan") && ame("PNJ_ozan").disposition,
+             lHela: vers("PNJ_hela"), lBrann: vers("PNJ_brann"), lOzan: vers("PNJ_ozan") };
+  });
+  verifier("Héla, aubergiste chaleureuse (l'IA) : son a priori gardé sur son âme, avec sa raison", r.hela && r.hela.niveau === 2 && r.hela.nature === "" && /voyageurs/.test(r.hela.raison), JSON.stringify(r.hela));
+  verifier("Brann, garde méfiant… mais sympathique de nature (le hasard)", r.brann && r.brann.base === -2 && r.brann.niveau === 1 && r.brann.nature === "sympathique", JSON.stringify(r.brann));
+  verifier("Ozan, sans a priori donné : neutre", r.ozan && r.ozan.niveau === 0, JSON.stringify(r.ozan));
+  verifier("à la première rencontre : Héla fait d'emblée confiance à Thorin (+25) et s'y attache (+20)", r.lHela && r.lHela.confiance === 25 && r.lHela.attachement === 20, JSON.stringify(r.lHela));
+  verifier("…Brann le sympathique, un peu (+12) ; Ozan, rien", r.lBrann && r.lBrann.confiance === 12 && r.lOzan && r.lOzan.confiance === 0, JSON.stringify([r.lBrann, r.lOzan]));
+  const ia = fs.readFileSync(path.join(RACINE, "ia_master.js"), "utf-8"), so = fs.readFileSync(path.join(RACINE, "social.js"), "utf-8");
+  verifier("MIA_CASTING et MIA_PNJ demandent l'a priori (d'après le background et la scène)", (ia.match(/disposition_heros: window\.SOCIAL\.schemaDisposition\(\)/g) || []).length === 2 && /A PRIORI ENVERS LES HÉROS/.test(so));
+  verifier("…MIA_AME aussi, pour un PNJ né sans âme", /disposition_heros: schemaDisposition\(\), disposition_raison: schemaRaisonDisposition\(\)/.test(so) && /Pour un PNJ, ajoute aussi son a priori/.test(so));
+});
+
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
 console.log(`\n${echecs ? echecs + " ÉCHEC(S)" : "TOUT EST BON"}`);
 await b.close(); serveur.close();

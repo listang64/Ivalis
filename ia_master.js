@@ -821,7 +821,8 @@ ${contexteScene}`;
                                 secret: { type: "STRING" },
                                 style_parole: { type: "STRING" },
                                 raison: { type: "STRING", description: "Pourquoi les joueurs vont l'aborder maintenant." },
-                                ...(window.SOCIAL ? { psyche: window.SOCIAL.schemaPsyche(), liens: window.SOCIAL.schemaLiens() } : {})
+                                ...(window.SOCIAL ? { psyche: window.SOCIAL.schemaPsyche(), liens: window.SOCIAL.schemaLiens(),
+                                    disposition_heros: window.SOCIAL.schemaDisposition(), disposition_raison: window.SOCIAL.schemaRaisonDisposition() } : {})
                             }, required: ["nom", "physique", "occupation", "race", "secret", "style_parole"]
                         }
                     }
@@ -990,7 +991,8 @@ Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
                                 ...(tenues.length ? { tenue: { type: "STRING", description: "Le titre EXACT d'une tenue de la liste, celle qui va le mieux à son métier et à son rang." } } : {}),
                                 secret: { type: "STRING" },
                                 style_parole: { type: "STRING" },
-                                ...(window.SOCIAL ? { psyche: window.SOCIAL.schemaPsyche(), liens: window.SOCIAL.schemaLiens() } : {})
+                                ...(window.SOCIAL ? { psyche: window.SOCIAL.schemaPsyche(), liens: window.SOCIAL.schemaLiens(),
+                                    disposition_heros: window.SOCIAL.schemaDisposition(), disposition_raison: window.SOCIAL.schemaRaisonDisposition() } : {})
                             }, required: ["nom", "physique", "occupation", "race", "secret", "style_parole"]
                         }
                     }

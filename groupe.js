@@ -22,7 +22,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as GP from "./groupe_pur.js?v=2";
+import * as GP from "./groupe_pur.js?v=3";
 
 const PARTIES = "Systeme_Parties";
 const sansAccent = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();

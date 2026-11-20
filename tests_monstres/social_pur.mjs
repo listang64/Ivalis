@@ -191,5 +191,32 @@ section(() => {
     verifier("version ≥ 410", v >= 410, String(v));
 });
 
+titre("(v460) L'A PRIORI ENVERS LES HÉROS : SELON LE BACKGROUND, LA SCÈNE, ET UN PEU DE HASARD");
+// Nico : « à la création des PNJ, selon leur background, la situation ou au hasard, certains ont plus d'affinité pour
+// les héros de base ; d'autres sont juste sympathiques ». Ok pour : la disposition donnée par l'IA, une part de hasard,
+// des points de départ réels, l'empathie dans la première impression.
+section(() => {
+    const { tirerDisposition, DISPOSITIONS, CHANCE_SYMPATHIQUE, CHANCE_A_PRIORI } = S;
+    verifier("cinq a priori : méfiant, réservé, neutre, bienveillant, chaleureux", JSON.stringify(DISPOSITIONS) === JSON.stringify({ mefiant: -2, reserve: -1, neutre: 0, bienveillant: 1, chaleureux: 2 }));
+    verifier("sans hasard, celui que l'IA donne (un mot inconnu : neutre)", tirerDisposition("chaleureux", 0.9).niveau === 2 && tirerDisposition("mefiant", 0.9).niveau === -2 && tirerDisposition("n'importe", 0.9).niveau === 0 && tirerDisposition(undefined, 0.9).nature === "");
+    const sym = tirerDisposition("mefiant", 0.05), sym2 = tirerDisposition("neutre", 0.05), sym3 = tirerDisposition("bienveillant", 0.05), sym4 = tirerDisposition("chaleureux", 0.05);
+    verifier("sympathique de nature (hasard) : au moins bienveillant, un cran de plus s'il l'était déjà", sym.nature === "sympathique" && sym.niveau === 1 && sym2.niveau === 1 && sym3.niveau === 2 && sym4.niveau === 2, JSON.stringify([sym, sym2, sym3, sym4]));
+    const mal = tirerDisposition("neutre", CHANCE_SYMPATHIQUE + 0.01), mal2 = tirerDisposition("mefiant", CHANCE_SYMPATHIQUE + 0.01);
+    verifier("un mauvais a priori sans raison (hasard) : un cran de moins", mal.nature === "a_priori" && mal.niveau === -1 && mal2.niveau === -2, JSON.stringify([mal, mal2]));
+    let n = { sympathique: 0, a_priori: 0, "": 0 };
+    for (let i = 0; i < 10000; i++) n[tirerDisposition("neutre", i / 10000).nature]++;
+    verifier(`sur 10 000 PNJ : ${Math.round(CHANCE_SYMPATHIQUE * 100)} % sympathiques de nature, ${Math.round(CHANCE_A_PRIORI * 100)} % avec un mauvais a priori`, n.sympathique === 1800 && n.a_priori === 700, JSON.stringify(n));
+    const base = premiereImpression(psy({ ...MOYEN }), 0), chaud = premiereImpression(psy({ ...MOYEN }), 0, { niveau: 2 }), bien = premiereImpression(psy({ ...MOYEN }), 0, 1),
+          reserve = premiereImpression(psy({ ...MOYEN }), 0, -1), mefiant = premiereImpression(psy({ ...MOYEN }), 0, { niveau: -2 });
+    verifier("sans a priori (et un caractère moyen) : neutre, comme avant", base.confiance === 0 && base.attachement === 0 && base.respect === 0 && base.crainte === 0, JSON.stringify(base));
+    verifier("chaleureux : de vrais points de départ (+25 confiance, +20 attachement, +10 respect)", chaud.confiance === 25 && chaud.attachement === 20 && chaud.respect === 10, JSON.stringify(chaud));
+    verifier("bienveillant : la moitié environ", bien.confiance === 12 && bien.attachement === 8 && bien.respect === 5, JSON.stringify(bien));
+    verifier("réservé, méfiant : moins de confiance ; le méfiant craint un peu", reserve.confiance === -10 && mefiant.confiance === -25 && mefiant.attachement === -10 && mefiant.crainte === 5, JSON.stringify([reserve, mefiant]));
+    const adule = premiereImpression(psy({ ...MOYEN }), 10, 2);
+    verifier("…l'a priori s'ajoute à la réputation du groupe", adule.confiance > chaud.confiance && adule.attachement > chaud.attachement, JSON.stringify(adule));
+    const empathique = premiereImpression(psy({ ...MOYEN, empathie: 100 }), 0), froid = premiereImpression(psy({ ...MOYEN, empathie: 0 }), 0);
+    verifier("son empathie compte aussi (±5 de confiance, ±2,5 d'attachement)", empathique.confiance === 5 && empathique.attachement === 2.5 && froid.confiance === -5 && froid.attachement === -2.5, JSON.stringify([empathique, froid]));
+});
+
 console.log(echecs === 0 ? "\nTOUT EST BON" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs ? 1 : 0);

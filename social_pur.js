@@ -338,13 +338,41 @@ export const DERIVE_TRAITS = {
 // -------------------------------------------------------------------------
 // Ce qu'un PNJ pense d'un héros qu'il découvre : la réputation du groupe dans le
 // lieu (−10 à +10) et sa personnalité. Familiarité 5.
-export function premiereImpression(psyche, reputation) {
+// (v460) Nico : « à la création des PNJ, selon leur background, la situation ou au hasard, certains ont plus
+// d'affinité pour les héros de base, d'autres sont juste sympathiques ». Sa DISPOSITION envers les héros
+// (l'IA la donne d'après son background et la scène, puis le hasard s'en mêle : tirerDisposition) s'ajoute
+// à la réputation et à la sociabilité ; son empathie compte aussi.
+export const DISPOSITIONS = { mefiant: -2, reserve: -1, neutre: 0, bienveillant: 1, chaleureux: 2 };
+export const NOMS_DISPOSITIONS = { "-2": "méfiant", "-1": "réservé", "0": "neutre", "1": "bienveillant", "2": "chaleureux" };
+export const BONUS_DISPOSITION = {
+    "2": { confiance: 25, attachement: 20, respect: 10 },
+    "1": { confiance: 12, attachement: 8, respect: 5 },
+    "0": {},
+    "-1": { confiance: -10, attachement: -5 },
+    "-2": { confiance: -25, attachement: -10, respect: -5, crainte: 5 }
+};
+export const CHANCE_SYMPATHIQUE = 0.18;   // sympathique de nature, quoi qu'en dise son histoire
+export const CHANCE_A_PRIORI = 0.07;      // un mauvais a priori, sans raison
+// La disposition tirée à la naissance : celle de l'IA (un mot de DISPOSITIONS), puis `alea` (0 ≤ x < 1) :
+// sous CHANCE_SYMPATHIQUE, au moins « bienveillant » (un cran de plus s'il l'était déjà) ; juste au-dessus,
+// un cran de moins. Rend { niveau, base, nature : "sympathique" | "a_priori" | "" }.
+export function tirerDisposition(motIA, alea) {
+    const base = Object.prototype.hasOwnProperty.call(DISPOSITIONS, String(motIA || "")) ? DISPOSITIONS[motIA] : 0;
+    const x = nombre(alea, 1);
+    let niveau = base, nature = "";
+    if (x < CHANCE_SYMPATHIQUE) { niveau = Math.min(2, Math.max(1, base + 1)); nature = "sympathique"; }
+    else if (x < CHANCE_SYMPATHIQUE + CHANCE_A_PRIORI) { niveau = Math.max(-2, base - 1); nature = "a_priori"; }
+    return { niveau, base, nature };
+}
+export function premiereImpression(psyche, reputation, disposition) {
     const t = psycheValide(psyche).traits, r = Math.max(-10, Math.min(10, nombre(reputation)));
+    const n = Math.max(-2, Math.min(2, Math.round(nombre(disposition && typeof disposition === "object" ? disposition.niveau : disposition))));
+    const b = BONUS_DISPOSITION[String(n)] || {};
     const axes = axesVides();
-    axes.confiance = borner("confiance", r * (1 - 0.5 * t.prudence / 100) + (t.sociabilite - 50) / 10);
-    axes.respect = borner("respect", r * 0.8);
-    axes.attachement = borner("attachement", r * 0.5 * (0.5 + t.sociabilite / 100));
-    axes.crainte = borner("crainte", r < 0 ? -r * (0.5 + t.prudence / 100) : 0);
+    axes.confiance = borner("confiance", r * (1 - 0.5 * t.prudence / 100) + (t.sociabilite - 50) / 10 + (t.empathie - 50) / 10 + (b.confiance || 0));
+    axes.respect = borner("respect", r * 0.8 + (b.respect || 0));
+    axes.attachement = borner("attachement", r * 0.5 * (0.5 + t.sociabilite / 100) + (t.empathie - 50) / 20 + (b.attachement || 0));
+    axes.crainte = borner("crainte", (r < 0 ? -r * (0.5 + t.prudence / 100) : 0) + (b.crainte || 0));
     axes.familiarite = 5;
     return axes;
 }

@@ -249,7 +249,9 @@ await section(async () => {
   await tourComplet();
   await attendreQue(async () => !!(await lien("PNJ_DOROS", "H1")) && ((await lien("PNJ_DOROS", "H1")).derniers || []).length > 0, 12000);
   const l = await lien("PNJ_DOROS", "H1");
-  verifier("Doros → Thorin garde sa rancune (la confiance perdue ×1,5)", !!l && l.rancune > 0 && Math.abs(l.rancune - (-l.axes.confiance) * 1.5) < 2, JSON.stringify(l && { rancune: l.rancune, confiance: l.axes.confiance }));
+  // (v460) La première impression n'est plus forcément nulle (son empathie, son a priori tiré à la naissance) : la perte se compte depuis elle.
+  const c0 = await p.evaluate(async () => { const a = (await window.SOCIAL.lireAmes("P1", ["PNJ_DOROS"]))["PNJ_DOROS"]; return a ? window.SOCIAL.premiereImpression(a.psyche, 0, a.disposition).confiance : 0; });
+  verifier("Doros → Thorin garde sa rancune (la confiance perdue ×1,5)", !!l && l.rancune > 0 && Math.abs(l.rancune - (c0 - l.axes.confiance) * 1.5) < 2, JSON.stringify(l && { rancune: l.rancune, confiance: l.axes.confiance, depart: c0 }));
 });
 
 // =========================================================================
@@ -274,7 +276,7 @@ await section(async () => {
 
 await section(async () => {
   const index = lire("index.html");
-  verifier("version 415", Number((lire("version.json").match(/"version": (\d+)/) || [])[1]) >= 415 && /social_pur\.js\?v=4/.test(lire("social.js")));
+  verifier("version 415", Number((lire("version.json").match(/"version": (\d+)/) || [])[1]) >= 415 && /social_pur\.js\?v=\d+/.test(lire("social.js")));
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

@@ -25,7 +25,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { collection, query, where, getDocs, doc, getDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as P from "./social_pur.js?v=4";
+import * as P from "./social_pur.js?v=5";
 
 const PARTIES = "Systeme_Parties";
 const refAme = (p, id) => doc(db, PARTIES, p, "Ames", id);
@@ -86,6 +86,15 @@ const PROPRIETES_PSYCHE = {
     masque: { type: "STRING", description: "Comment il se montre en public, s'il cache ce qu'il ressent." }
 };
 export const schemaPsyche = () => ({ type: "OBJECT", description: "Sa personnalité (stable).", properties: PROPRIETES_PSYCHE });
+// (v460) Sa disposition de départ envers les héros (social_pur.js, DISPOSITIONS ; le hasard s'en mêle à sa naissance).
+const DESCRIPTION_DISPOSITION = "Son a priori envers les héros à leur première rencontre, d'après son background, son métier et la scène où il apparaît : mefiant, reserve, neutre, bienveillant ou chaleureux.";
+export const schemaDisposition = () => ({ type: "STRING", enum: Object.keys(P.DISPOSITIONS), description: DESCRIPTION_DISPOSITION });
+export const schemaRaisonDisposition = () => ({ type: "STRING", description: "Une courte phrase : pourquoi cet a priori." });
+// La disposition d'une âme qui naît : celle de l'IA, puis le tirage (sympathique de nature, mauvais a priori).
+export function dispositionDeNaissance(motIA, raison) {
+    const d = P.tirerDisposition(motIA, Math.random());
+    return { ...d, raison: String(raison || "").slice(0, 200) };
+}
 export const schemaLiens = () => ({
     type: "ARRAY", description: "0 à 3 liens qu'il a DÉJÀ avec des personnages de la liste des PNJ du lieu (jamais avec un héros, jamais un nom hors de la liste).",
     items: { type: "OBJECT", properties: { nom: { type: "STRING" }, type: { type: "STRING", enum: Object.keys(LIENS_IA) }, histoire: { type: "STRING", description: "Une phrase : ce qui les lie." } }, required: ["nom", "type"] }
@@ -93,6 +102,7 @@ export const schemaLiens = () => ({
 export function consigneCreation(nomsDuLieu) {
     const noms = (nomsDuLieu || []).filter(Boolean);
     return `\nÂME (v411) : donne à chacun une personnalité (psyche) : six traits de 0 à 100 (varie-les franchement, pas 50 partout), 1 à 3 valeurs parmi ${P.VALEURS.join(", ")}, 1 à 3 objectifs concrets, une faille, un masque public.`
+        + `\nA PRIORI ENVERS LES HÉROS (v460) : « disposition_heros » (mefiant, reserve, neutre, bienveillant, chaleureux), d'après son background, son métier et la scène où il apparaît (une aubergiste qui accueille des voyageurs : bienveillante ; un garde en pleine alerte : méfiant ; un marchand : neutre ou bienveillant…), avec « disposition_raison » en une phrase. Varie : pas neutre partout.`
         + (noms.length ? `\nLIENS D'AVANT (v411) : s'il le faut, 0 à 3 liens existants avec des PNJ DÉJÀ PRÉSENTS dans ce lieu, et seulement eux : ${JSON.stringify(noms)} (famille, ami, amour, voisin, rival, ennemi, patron_de, employe_de, mentor_de, eleve_de, creancier_de, debiteur_de). Le plus souvent, aucun ou un seul.`
                        : `\nLIENS D'AVANT : aucun PNJ n'est encore créé dans ce lieu ; laisse « liens » vide.`);
 }
@@ -120,7 +130,8 @@ export async function naissancePnj(p, idPnj, fiche, options) {
     const psyche = psycheDeLIA(fiche.psyche);
     if (!psyche) return null;   // sans personnalité : MIA_AME la donnera à sa première scène
     psyche.style = String(fiche.style_parole || psyche.style || "").slice(0, 200);
-    const ame = { id: idPnj, type: "pnj", nom: fiche.nom || "", ref: idPnj, psyche, humeur: null, statut: "vivant", Version: P.VERSION_SOCIAL, Cree_Le: Date.now() };
+    const disposition = dispositionDeNaissance(fiche.disposition_heros, fiche.disposition_raison);
+    const ame = { id: idPnj, type: "pnj", nom: fiche.nom || "", ref: idPnj, psyche, disposition, humeur: null, statut: "vivant", Version: P.VERSION_SOCIAL, Cree_Le: Date.now() };
     const lot = writeBatch(db);
     lot.set(refAme(p, idPnj), ame);
     const crees = [];
@@ -137,21 +148,24 @@ export async function naissancePnj(p, idPnj, fiche, options) {
         crees.push({ autre: autre.id, nom: autre.Nom_PNJ, type: sens[0] });
     });
     await lot.commit();
-    journal(`${fiche.nom} reçoit son âme${crees.length ? ` et ${crees.length} lien(s) d'avant : ${crees.map(c => `${c.nom} (${c.type})`).join(", ")}` : ""}.`);
+    journal(`${fiche.nom} reçoit son âme (a priori : ${P.NOMS_DISPOSITIONS[String(disposition.niveau)]}${disposition.nature ? `, ${disposition.nature === "sympathique" ? "sympathique de nature" : "mauvais a priori"}` : ""})${crees.length ? ` et ${crees.length} lien(s) d'avant : ${crees.map(c => `${c.nom} (${c.type})`).join(", ")}` : ""}.`);
     return { ame, liens: crees };
 }
 
 // -------------------------------------------------------------------------
 //  MIA_AME : la personnalité de ceux qui n'en ont pas encore
 // -------------------------------------------------------------------------
-async function demanderAmes(personnages) {
+// (v460) `dispositions` : rempli avec l'a priori des PNJ envers les héros ({ id: { mot, raison } }).
+async function demanderAmes(personnages, dispositions = {}) {
     if (!personnages.length || typeof window.fetchGemini !== "function") return {};
     const systeme = `Tu es MIA_AME : tu donnes une âme aux personnages d'Ivalis (Antiquité magique, mythologie).
 Pour chacun, d'après sa fiche, une personnalité stable : six traits de 0 à 100 (prudence, impulsivite, loyaute, empathie, orgueil, sociabilite — varie-les franchement, pas 50 partout), 1 à 3 valeurs parmi ${P.VALEURS.join(", ")} (la plus importante d'abord), 1 à 3 objectifs concrets, une faille, un masque public.
 Pour un héros (joué par un joueur), reste prudent : une estimation d'après sa fiche, qui se précisera avec ses actes.
+Pour un PNJ, ajoute aussi son a priori envers les héros (disposition_heros : mefiant, reserve, neutre, bienveillant, chaleureux) d'après son background et son métier, et disposition_raison en une phrase. Varie : pas neutre partout.
 Utilise l'outil 'donnerAmes', une entrée par personnage, avec son nom exact.`;
     const outils = [{ functionDeclarations: [{ name: "donnerAmes", description: "La personnalité de chaque personnage.",
-        parameters: { type: "OBJECT", properties: { ames: { type: "ARRAY", items: { type: "OBJECT", properties: { nom: { type: "STRING" }, ...PROPRIETES_PSYCHE }, required: ["nom"] } } }, required: ["ames"] } }] }];
+        parameters: { type: "OBJECT", properties: { ames: { type: "ARRAY", items: { type: "OBJECT", properties: { nom: { type: "STRING" }, ...PROPRIETES_PSYCHE,
+            disposition_heros: schemaDisposition(), disposition_raison: schemaRaisonDisposition() }, required: ["nom"] } } }, required: ["ames"] } }] }];
     const corps = JSON.stringify({ systemInstruction: { parts: [{ text: systeme }] },
         contents: [{ role: "user", parts: [{ text: JSON.stringify(personnages) }] }],
         tools: outils, toolConfig: { functionCallingConfig: { mode: "ANY" } }, generationConfig: { temperature: 0.9 } });
@@ -164,6 +178,7 @@ Utilise l'outil 'donnerAmes', une entrée par personnage, avec son nom exact.`;
             const qui = personnages.find(x => memeNom(x.nom, a && a.nom));
             const psyche = psycheDeLIA(a);
             if (qui && psyche) rendu[qui.id] = psyche;
+            if (qui && a.disposition_heros) dispositions[qui.id] = { mot: a.disposition_heros, raison: a.disposition_raison || "" };
         });
         return rendu;
     } catch (e) { console.warn("[MIA_AME] Personnalités impossibles (valeurs moyennes) :", e); return {}; }
@@ -188,11 +203,13 @@ export async function assurerAmes(o) {
     const lot = writeBatch(db);
     let ecrits = 0;
     if (manquants.length) {
-        const psyches = await demanderAmes(manquants.map(m => ({ id: m.id, nom: m.nom, type: m.type === "heros" ? "héros" : "PNJ", fiche: m.fiche })));
+        const dispositions = {};
+        const psyches = await demanderAmes(manquants.map(m => ({ id: m.id, nom: m.nom, type: m.type === "heros" ? "héros" : "PNJ", fiche: m.fiche })), dispositions);
         manquants.forEach(m => {
             const psyche = psyches[m.id] || P.psycheValide({});
             if (m.type === "pnj") psyche.style = String(m.fiche.parole || "").slice(0, 200);
-            const ame = { id: m.id, type: m.type, nom: m.nom, ref: m.id, psyche, humeur: null, statut: "vivant", Version: P.VERSION_SOCIAL, Cree_Le: Date.now(), ...(psyches[m.id] ? {} : { Psyche_Par_Defaut: true }) };
+            const ame = { id: m.id, type: m.type, nom: m.nom, ref: m.id, psyche, humeur: null, statut: "vivant", Version: P.VERSION_SOCIAL, Cree_Le: Date.now(), ...(psyches[m.id] ? {} : { Psyche_Par_Defaut: true }),
+                          ...(m.type === "pnj" ? { disposition: dispositionDeNaissance((dispositions[m.id] || {}).mot, (dispositions[m.id] || {}).raison) } : {}) };
             ames[m.id] = ame; lot.set(refAme(p, m.id), ame); ecrits++;
         });
         journal(`MIA_AME : ${manquants.map(m => m.nom).join(", ")} reçoi${manquants.length > 1 ? "vent" : "t"} une âme.`);
@@ -215,7 +232,7 @@ export async function assurerAmes(o) {
         const a = ames[x.id];
         if (!a || a.statut === "mort") return;
         const kp = P.cleLien(x.id, h.idPersonnage), kh = P.cleLien(h.idPersonnage, x.id);
-        if (!liens[kp]) { liens[kp] = { de: x.id, vers: h.idPersonnage, axes: P.premiereImpression(a.psyche, o.reputation), origine: "rencontre", etiquette: "", histoire: "", majLe: Date.now(), derniers: [] }; lot.set(refLien(p, x.id, h.idPersonnage), liens[kp]); ecrits++; }
+        if (!liens[kp]) { liens[kp] = { de: x.id, vers: h.idPersonnage, axes: P.premiereImpression(a.psyche, o.reputation, a.disposition), origine: "rencontre", etiquette: "", histoire: "", majLe: Date.now(), derniers: [] }; lot.set(refLien(p, x.id, h.idPersonnage), liens[kp]); ecrits++; }
         if (!liens[kh]) { liens[kh] = { de: h.idPersonnage, vers: x.id, axes: P.impressionHeros(), origine: "rencontre", etiquette: "", histoire: "", majLe: Date.now(), derniers: [] }; lot.set(refLien(p, h.idPersonnage, x.id), liens[kh]); ecrits++; }
     }));
     if (ecrits) await lot.commit();
@@ -686,4 +703,4 @@ export async function apresLeTour(o) {
 }
 
 window.SOCIAL = { ...P, elaguerSouvenirs, MAX_SOUVENIRS, consoliderMemoire, consoliderSiBesoin, noterSouvenir, promptMemoire, SEUIL_MEMOIRE, LOT_MEMOIRE, contexteDuMJ, caractere, lireReseau, lireSouvenirsDe, annulerEvenement, ajusterLien, estAdminSocial, lireAmes, lireLiens, lireLiensVers, naissancePnj, assurerAmes, marquerMort, oublierAme, apresLeTour, tourSocial, paragrapheDe, lignesDeMarge,
-                  schemaPsyche, schemaLiens, consigneCreation, psycheDeLIA, LIENS_IA };
+                  schemaPsyche, schemaLiens, consigneCreation, psycheDeLIA, LIENS_IA, schemaDisposition, schemaRaisonDisposition, dispositionDeNaissance };
