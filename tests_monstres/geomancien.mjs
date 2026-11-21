@@ -95,6 +95,20 @@ console.log("\n1. LES PALIERS");
     verifier("un nouveau combat : ni mur ni gravats", JSON.stringify(e.murs) === "{}" && JSON.stringify(e.gravats) === "{}");
 }
 
+console.log("\n1 ter. (v470) NIVEAU 1 : +5 DE FATIGUE MAXIMUM, EN PLUS DE SES AUTRES EFFETS");
+{
+    // Nico : « pour le Géomancien, rajoute au niveau 1 : +5 de fatigue en plus des autres effets de classe ».
+    const a1 = w.atoutRace(geomancien(1)), a9 = w.atoutRace(geomancien(9));
+    verifier("niveau 1 : +5 de fatigue max, avec la 5e case offerte et +10 d'initiative", a1.fatigueMax === 5 && a1.zoneGratuite === true && a1.initiativeZone === 10, JSON.stringify(a1));
+    verifier("…gardé aux niveaux suivants (une fois, pas cumulé par palier)", a9.fatigueMax === 5, JSON.stringify(a9.fatigueMax));
+    const humain = w.atoutRace(geomancien(1, { Race: "Humain", race: "Humain" }));
+    verifier("…additionné à celui de la race (un Humain : +10 +5 = +15)", humain.fatigueMax === 15, String(humain.fatigueMax));
+    verifier("…sur sa jauge (100 → 105)", w.fatigueMaxCombattant(geomancien(1, { Fatigue_Max: 100 })) === 105, String(w.fatigueMaxCombattant(geomancien(1, { Fatigue_Max: 100 }))));
+    const e = monde(1);
+    verifier("…et en combat (la jauge du cerveau)", e.combattants.G.fatigueMax === e.combattants.H.fatigueMax + 5, `${e.combattants.G.fatigueMax} / ${e.combattants.H.fatigueMax}`);
+    verifier("écrit sur sa fiche de classe et dans ses atouts", /\+5 de fatigue maximum/.test(fs.readFileSync(path.join("/home/user/Ivalis", "classes.js"), "utf-8")) && /\+5 de fatigue maximum/.test(w.texteAtout("fatigueMax", 5)));
+}
+
 console.log("\n1 bis. NIVEAU 9 (v350) : SES ZONES PERSISTANTES DURENT UN TOUR DE PLUS");
 {
     // Nico : « Géomancien, lvl 10 : les zones persistantes durent un tour de plus. »

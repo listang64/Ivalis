@@ -12545,3 +12545,11 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   - puis « 43 au lancement · 65 dans la zone », dans les deux couleurs.
 - Plus de « (32 au lancement) (48 dans la zone) », ni de « → 108 de dégâts avec la surpuissance » sur une carte à persistance. Sans persistance, ou sans surpuissance, rien ne change.
 - corrections_v427_persistance.mjs le vérifie (ses contrôles « v469 »).
+
+## v470 — Le Géomancien : +5 de fatigue maximum au niveau 1
+
+- Nico : « pour le Géomancien, rajoute au niveau 1 : +5 de fatigue, en plus des autres effets de classe ».
+- Son palier du niveau 1 porte fatigueMax: 5 (app.js, ATOUTS_CLASSES), à côté de la 5e case de zone offerte et des +10 d'initiative sur ses zones.
+- Le bonus s'additionne à celui de la race (un Humain Géomancien : +15). Il est lu par fatigueMaxCombattant : la jauge, le cap de la Forge et le combat (105 au lieu de 100).
+- Sa fiche de classe le dit (classes.js : « +5 de fatigue maximum »).
+- geomancien.mjs le vérifie (son « 1 ter »).

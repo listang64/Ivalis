@@ -1121,7 +1121,9 @@ window.ATOUTS_CLASSES = {
     // passifs de zone au niveau 5 ; au niveau 9, la Coulée de lave et ses zones
     // persistantes qui durent un tour de plus (4 au lieu de 3).
     "Géomancien": [
-        { niveau: 1,  zoneGratuite: true, initiativeZone: 10 },
+        // (v470) Nico : « pour le Géomancien, rajoute au niveau 1 : +5 de fatigue, en plus des autres effets de classe »
+        // (fatigueMax : additionné à celui de la race, lu par fatigueMaxCombattant et le cap de la Forge).
+        { niveau: 1,  zoneGratuite: true, initiativeZone: 10, fatigueMax: 5 },
         { niveau: 3,  techniques: ["CLASSE_MUR_DE_TERRE"] },
         { niveau: 5,  zonesInoffensives: true, terrainFacile: true, traverseSesMurs: true },
         { niveau: 9,  techniques: ["CLASSE_COULEE_LAVE"], zonesProlongees: 1 }

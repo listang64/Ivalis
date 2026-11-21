@@ -151,7 +151,8 @@ window.DESCRIPTIFS_CLASSES = {
         paliers: [
             { niveau: 1, titre: "Maître des étendues",
               points: ["Dans la Forge, la 5e case de zone payante d'une compétence ne coûte rien",
-                       "+10 d'initiative sur ses compétences à zone"] },
+                       "+10 d'initiative sur ses compétences à zone",
+                       "+5 de fatigue maximum"] },
             { niveau: 3, titre: "Technique : Mur de terre",
               points: ["Initiative 80 · 20 de fatigue par mur · autant de murs que sa fatigue le permet",
                        "Sur les cases choisies, à 5 cases et en vue : un pilier de roche de 10 PV, "
