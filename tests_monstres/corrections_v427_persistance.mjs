@@ -332,9 +332,13 @@ await section(async () => {
              parentheses: [...desc.querySelectorAll(":scope > .forge-persistance-lancement, :scope > .forge-persistance-zone")].map(x => x.innerText) };
   }, REGLEE);
   verifier("(v466) 95 de fatigue (16 + 3 PC) : la 2e surpuissance, ×1,35 (100 avant)", s.fatigue === "95" && /×1,35/.test(s.bandeau), JSON.stringify([s.fatigue, s.bandeau]));
-  verifier("(v466) les dégâts de la persistance, sans surpuissance, à côté de l'attaque (80 × 40 % = 32 ; × 60 % = 48)", JSON.stringify(s.parentheses) === '["(32 au lancement)","(48 dans la zone)"]', JSON.stringify(s.parentheses));
-  verifier("(v466) en dessous de la surpuissance (→ 108), ses deux dégâts surpuissants : 43 au lancement · 65 dans la zone (arrondis)",
-           /→ 108 de dégâts avec la surpuissance/.test(s.valeur) && /43 au lancement/.test(s.sous) && /65 dans la zone/.test(s.sous) && s.apres, JSON.stringify([s.valeur, s.sous]));
+  // (v469) Nico : « s'il y a une surpuissance avec persistance, n'affiche pas les valeurs avant surpuissance de lancement
+  // et de zone, ni le total de dégâts autre que persistance : une ligne avec les dégâts de création de la technique et la
+  // surpuissance avec le multiplicateur, puis sur une même ligne les dégâts au lancement et dans la zone (avec surpuissance) ».
+  verifier("(v469) plus les valeurs d'avant la surpuissance (pas de « (32 au lancement) (48 dans la zone) »)", s.parentheses.length === 0, JSON.stringify(s.parentheses));
+  verifier("(v469) une ligne : les dégâts de création et la surpuissance (« 80 de dégâts à la création · surpuissance ×1,35 »), plus le total « → 108 »",
+           s.valeur === "80 de dégâts à la création · surpuissance ×1,35" && !/108/.test(s.valeur), JSON.stringify(s.valeur));
+  verifier("(v469) puis, sur une même ligne, ses deux dégâts surpuissants : « 43 au lancement · 65 dans la zone » (arrondis)", s.sous === "43 au lancement · 65 dans la zone" && s.apres, JSON.stringify(s.sous));
   verifier("(v466) …dans les deux couleurs de la persistance", s.couleurs.length === 2 && s.couleurs[0] !== s.couleurs[1], JSON.stringify(s.couleurs));
 });
 

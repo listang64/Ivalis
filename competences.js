@@ -1483,9 +1483,16 @@ function texteValeurSurpuissante(act, fatigue) {
     // affiche-les en dessous de la surpuissance » : la valeur surpuissante (arrondie, comme au combat), puis ses parts.
     const surpuissante = Math.round(valeur * m);
     const parts = soigne ? null : partsPersistance(act, surpuissante);
-    return `<span class="forge-valeur-surpuissante">→ ${surpuissante} ${soigne ? "de soin" : "de dégâts"} avec la surpuissance</span>`
-        + (parts ? `<span class="forge-persistance-surpuissante">→ avec la surpuissance : <span class="forge-persistance-lancement">${parts.lancement} au lancement</span>`
-            + (parts.zone !== null ? ` · <span class="forge-persistance-zone">${parts.zone} dans la zone</span>` : "") + `</span>` : "");
+    // (v469) Nico : « s'il y a une surpuissance avec persistance, n'affiche pas les valeurs avant surpuissance de
+    // lancement et de zone, ni le total de dégâts autre que la persistance : une ligne avec les dégâts de création
+    // de la technique et la surpuissance avec son multiplicateur, puis sur une même ligne les dégâts au lancement et
+    // dans la zone (calculés avec la surpuissance) ». Les parenthèses d'avant se taisent (texteDegatsPersistance).
+    if (parts) {
+        return `<span class="forge-valeur-surpuissante">${String(Math.round(valeur * 10) / 10).replace(".", ",")} de dégâts à la création · surpuissance ×${String(m).replace(".", ",")}</span>`
+            + `<span class="forge-persistance-surpuissante"><span class="forge-persistance-lancement">${parts.lancement} au lancement</span>`
+            + (parts.zone !== null ? ` · <span class="forge-persistance-zone">${parts.zone} dans la zone</span>` : "") + `</span>`;
+    }
+    return `<span class="forge-valeur-surpuissante">→ ${surpuissante} ${soigne ? "de soin" : "de dégâts"} avec la surpuissance</span>`;
 }
 
 // (v427) Nico : « Affiche ces différents dégâts lors de la création du sort (la
@@ -1516,9 +1523,11 @@ function partsPersistance(act, valeur) {
     return { lancement: Math.round(v * r.lancement / 100), zone: premiere === act ? Math.round(v * r.zone / 100) : null };
 }
 window.partsPersistanceForge = partsPersistance;
-function texteDegatsPersistance(act) {
+function texteDegatsPersistance(act, fatigue) {
     const parts = partsPersistance(act);
     if (!parts) return "";
+    // (v469) Avec une surpuissance, seules ses valeurs s'affichent (texteValeurSurpuissante).
+    if (fatigue !== undefined && typeof window.multiplicateurSurpuissance === "function" && window.multiplicateurSurpuissance(fatigue) > 1) return "";
     return ` <span class="forge-persistance-lancement">(${parts.lancement} au lancement)</span>`
         + (parts.zone !== null ? ` <span class="forge-persistance-zone">(${parts.zone} dans la zone)</span>` : "");
 }
@@ -3123,7 +3132,7 @@ window.rafraichirForge = function() {
                     <div class="forge-ligne">
                         <div class="forge-ligne-texte">
                             <span class="forge-nom-effet" data-bulle-effet="${act.baseEffet.id}" data-action="${act.idInst}">${nettoyerNomEffet(act.baseEffet.Nom)}</span>${act.baseEffet.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${act.baseEffet.Modificateur}</span>` : ""}${genreDuLien(act) ? `<button type="button" class="forge-element-pastille${elementAct ? "" : " manquant"}" data-genre="${genreDuLien(act)}" title="Changer d'élément" ${elementAct ? `style="--el-couleur: ${elementAct.couleur}; --el-fond: ${elementAct.fond};"` : ""} onclick="window.changerElementForge('${act.idInst}')">${elementAct ? `${elementAct.dessin ? `<span class="forge-pastille-dessin">${iconeDuLien(elementAct)}</span>` : elementAct.icone} ${elementAct.nom}` : "Choisir un élément"}</button>` : ""}
-                            <div class="forge-desc">${formatterTexteEffet(act.baseEffet, act.count, act)}${texteDegatsPersistance(act)}${texteValeurSurpuissante(act, fatigueSurpuissance)}${currentBaseDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentBaseDuree} tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
+                            <div class="forge-desc">${formatterTexteEffet(act.baseEffet, act.count, act)}${texteDegatsPersistance(act, fatigueSurpuissance)}${texteValeurSurpuissante(act, fatigueSurpuissance)}${currentBaseDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentBaseDuree} tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
                         </div>
                         <div class="forge-controles">
                             ${baseHasDuree ? `

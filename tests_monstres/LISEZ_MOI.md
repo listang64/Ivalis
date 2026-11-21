@@ -12536,3 +12536,12 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - Le reste ne change pas : un soin en Zone, un soin avec Absorption.
 - LIA (lia_forge.js) passe par la même règle, et sa consigne le dit. La forge des ennemis aussi (monstres_competences.js, effetAutorise).
 - corrections_v431.mjs le vérifie (son « 3 bis »).
+
+## v469 — Forge : surpuissance et persistance, un affichage plus court
+
+- Nico : « s'il y a une surpuissance avec persistance, n'affiche pas les valeurs avant surpuissance de lancement et de zone, ni le total de dégâts autre que persistance. Mets juste une ligne avec les dégâts de création de la technique et la surpuissance avec le multiplicateur, puis sur une même ligne les dégâts au lancement et dans la zone (calculés avec la surpuissance). »
+- Sous l'attaque (competences.js, texteValeurSurpuissante, texteDegatsPersistance) :
+  - « 80 de dégâts à la création · surpuissance ×1,35 » ;
+  - puis « 43 au lancement · 65 dans la zone », dans les deux couleurs.
+- Plus de « (32 au lancement) (48 dans la zone) », ni de « → 108 de dégâts avec la surpuissance » sur une carte à persistance. Sans persistance, ou sans surpuissance, rien ne change.
+- corrections_v427_persistance.mjs le vérifie (ses contrôles « v469 »).
