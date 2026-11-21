@@ -12506,3 +12506,15 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   - sans zone possible, elle s'en va (pas de terrain sans emprise).
 - **Elle est jouée** (monstres_ia.js, choisirCarteMonstre) : une carte de terrain gagne un coup de pouce (+9, +4 si au moins deux héros sont à deux cases l'un de l'autre), tant que la créature n'a pas déjà son terrain au sol.
 - corrections_v457.mjs le vérifie (ses contrôles « v465 »).
+
+## v466 — Forge : 2e surpuissance à 95, zone sans % sur la persistance, dégâts de la persistance arrondis et surpuissants
+
+- **La 2e surpuissance dès 95 de fatigue** (Nico : « mets le cap à 95 à la place de 100 pour avoir le bonus ×1,35 ») :
+  - un seul palier change (app.js, PALIERS_SURPUISSANCE) : ×1,35 et +8 aux effets dès 95 ;
+  - la Forge, la carte et le combat le lisent tous.
+- **La 2e case de zone** (« le pourcentage qui s'applique au coût du sort : ne l'applique pas sur la persistance ») : le % se compte sur le reste de l'action, sans le coût de la Persistance terrain. C'est le cas dans la Forge des héros (competences.js, coutDUneAction) comme dans celle des ennemis (monstres_competences.js).
+- **Les dégâts de la persistance** :
+  - « afficher les dégâts réels arrondis à l'entier le plus proche » : (7 au lancement), plus 6,6 ;
+  - « avec une surpuissance, l'appliquer aux 2 valeurs et l'afficher en dessous de la surpuissance » : sous « → 108 de dégâts avec la surpuissance », la ligne « → avec la surpuissance : 43 au lancement · 65 dans la zone », dans les deux couleurs (partsPersistance).
+  - Le calcul suit le combat : la valeur surpuissante arrondie, puis les parts.
+- corrections_v427_persistance (son « 4 bis ») et v427_surpuissance le vérifient.

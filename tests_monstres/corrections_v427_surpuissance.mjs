@@ -103,17 +103,18 @@ console.log("\n1. LA RÈGLE (app.js)");
 // =========================================================================
 await section(async () => {
   const r = await p.evaluate(() => ({
-    paliers: [0, 69, 70, 99, 100, 140].map(f => window.surpuissanceDesEffets(f)),
-    mult: [69, 70, 100].map(f => window.multiplicateurSurpuissance(f)),
-    textes: [69, 70, 100].map(f => window.texteSurpuissanceEffets(f)),
+    // (v466) Nico : « la 2e surpuissance à partir de 100 de fatigue : mets le cap à 95 à la place ».
+    paliers: [0, 69, 70, 94, 95, 140].map(f => window.surpuissanceDesEffets(f)),
+    mult: [69, 70, 95].map(f => window.multiplicateurSurpuissance(f)),
+    textes: [69, 70, 95].map(f => window.texteSurpuissanceEffets(f)),
     monstre: window.surpuissanceDesEffets(100, { estMonstre: true }),
     maudit: window.surpuissanceDesEffets(100, { Race: "Humain", Classe: "Maudit", Niveau: 3, niveau: 3 }),
     atoutMaudit: !!(window.atoutRace({ Race: "Humain", Classe: "Maudit", Niveau: 3, niveau: 3 }) || {}).sansSurpuissanceOffensive
   }));
   const eq = (o, bo) => o.bonus === bo;
   verifier("sans surpuissance (0, 69) : rien", eq(r.paliers[0], 0) && eq(r.paliers[1], 0), JSON.stringify(r.paliers.slice(0, 2)));
-  verifier("1re surpuissance (70 à 99) : +5 par-dessus le max", eq(r.paliers[2], 5) && eq(r.paliers[3], 5), JSON.stringify(r.paliers.slice(2, 4)));
-  verifier("2e surpuissance (100+) : +8 par-dessus le max", eq(r.paliers[4], 8) && eq(r.paliers[5], 8), JSON.stringify(r.paliers.slice(4)));
+  verifier("1re surpuissance (70 à 94, v466) : +5 par-dessus le max", eq(r.paliers[2], 5) && eq(r.paliers[3], 5), JSON.stringify(r.paliers.slice(2, 4)));
+  verifier("(v466) 2e surpuissance dès 95 (100 avant) : +8 par-dessus le max", eq(r.paliers[4], 8) && eq(r.paliers[5], 8), JSON.stringify(r.paliers.slice(4)));
   verifier("le multiplicateur des dégâts ne bouge pas (×1 / ×1,25 / ×1,35)", r.mult.join() === "1,1.25,1.35", r.mult.join());
   verifier("les textes : « » / « effets +5 % (max +5 %) » / « effets +8 % (max +8 %) »",
     r.textes[0] === "" && r.textes[1] === "effets +5 % (max +5 %)" && r.textes[2] === "effets +8 % (max +8 %)", JSON.stringify(r.textes));

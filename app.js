@@ -2008,7 +2008,8 @@ window.multiplicateurSoinsRecus = function(perso) {
 //  Règle de Nico, à la création de compétence : selon la fatigue que coûte la
 //  carte, ses dégâts et ses soins sont multipliés.
 //      70 de fatigue et plus  → ×1,25
-//      100 de fatigue et plus → ×1,35 (à la place, pas en plus)
+//      95 de fatigue et plus  → ×1,35 (à la place, pas en plus) — (v466) Nico : « la 2e surpuissance à partir
+//                                de 100 de fatigue : mets le cap à 95 à la place » (100 avant)
 //  Ni les boucliers ni les purifications : ce ne sont ni des dégâts ni des
 //  soins. Le montant multiplié est arrondi au plus proche. Les techniques des
 //  héros seulement : celles des créatures ne sont pas forgées.
@@ -2021,13 +2022,13 @@ window.multiplicateurSoinsRecus = function(perso) {
 //  « Pourcentage max » au grimoire : Brûlé, Peur, Poussée, Lumière…) en profitent :
 //      1re surpuissance (70+)  → +5 points d'office, et le max monte d'autant
 //                                 (60 % → 65 %, 30 % → 35 %) ;
-//      2e surpuissance (100+)  → +8 points d'office, le max monte de 8
+//      2e surpuissance (95+, v466 ; 100+ avant) → +8 points d'office, le max monte de 8
 //                                 (60 % → 68 %, 30 % → 38 %), 100 au plus.
 //  Les crans achetés à la Forge restent bornés au max du grimoire : le bonus
 //  s'ajoute par-dessus, une fois la chance plafonnée. En points de pourcentage,
 //  pas en ×1,05. Ni le Maudit (pas de surpuissance classique) ni les créatures.
 window.PALIERS_SURPUISSANCE = [
-    { fatigue: 100, multiplicateur: 1.35, bonusEffets: 8 },
+    { fatigue: 95,  multiplicateur: 1.35, bonusEffets: 8 },
     { fatigue: 70,  multiplicateur: 1.25, bonusEffets: 5 }
 ];
 // (v427) Ce que la surpuissance donne aux effets à chance d'une carte de

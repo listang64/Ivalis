@@ -1479,7 +1479,13 @@ function texteValeurSurpuissante(act, fatigue) {
     if (m <= 1 || !(estUneAttaqueDeBase(nom) || soigne) || nom.includes("bouclier") || nom.includes("purification")) return "";
     const valeur = (parseFrenchFloat(act.baseEffet.Valeur) || 0) * (act.count || 1);
     if (valeur <= 0) return "";
-    return `<span class="forge-valeur-surpuissante">→ ${Math.round(valeur * m)} ${soigne ? "de soin" : "de dégâts"} avec la surpuissance</span>`;
+    // (v466) Nico : « avec une persistance et une surpuissance, applique la surpuissance aux 2 valeurs de dégâts et
+    // affiche-les en dessous de la surpuissance » : la valeur surpuissante (arrondie, comme au combat), puis ses parts.
+    const surpuissante = Math.round(valeur * m);
+    const parts = soigne ? null : partsPersistance(act, surpuissante);
+    return `<span class="forge-valeur-surpuissante">→ ${surpuissante} ${soigne ? "de soin" : "de dégâts"} avec la surpuissance</span>`
+        + (parts ? `<span class="forge-persistance-surpuissante">→ avec la surpuissance : <span class="forge-persistance-lancement">${parts.lancement} au lancement</span>`
+            + (parts.zone !== null ? ` · <span class="forge-persistance-zone">${parts.zone} dans la zone</span>` : "") + `</span>` : "");
 }
 
 // (v427) Nico : « Affiche ces différents dégâts lors de la création du sort (la
@@ -1488,7 +1494,10 @@ function texteValeurSurpuissante(act, fatigue) {
 // fait au lancement, et ce que fait la zone (case franchie ou fin de tour dessus).
 // La zone ne reprend que la PREMIÈRE attaque de la carte (creerZonePure) : sa
 // part ne s'affiche que là. Calculé sur les dégâts posés dans la Forge.
-function texteDegatsPersistance(act) {
+// Les deux parts d'une persistance sur la carte en construction, calculées sur `valeur` (les dégâts de l'action, ou
+// leur valeur surpuissante) : { lancement, zone (null hors de la 1re attaque) }, ARRONDIES À L'ENTIER (v466 : Nico,
+// « afficher les dégâts réels arrondis à l'entier le plus proche ») ; null sans persistance ou hors d'une attaque.
+function partsPersistance(act, valeur) {
     const actions = (window.forgeState && window.forgeState.actions) || [];
     const bdd = (window.forgeState && window.forgeState.effetsBDD) || [];
     let effetPersistance = null;
@@ -1497,15 +1506,21 @@ function texteDegatsPersistance(act) {
             if (!effetPersistance && e && (e.Nom || "").toLowerCase().includes("persistance")) effetPersistance = e;
         });
     });
-    if (!effetPersistance || typeof window.reglagesPersistance !== "function") return "";
+    if (!effetPersistance || typeof window.reglagesPersistance !== "function") return null;
     const nom = ((act && act.baseEffet && act.baseEffet.Nom) || "").toLowerCase();
     const valeurDe = (a) => (parseFrenchFloat(a.baseEffet.Valeur) || 0) * (a.count || 1);
-    if (!estUneAttaqueDeBase(nom) || valeurDe(act) <= 0) return "";
+    if (!estUneAttaqueDeBase(nom) || valeurDe(act) <= 0) return null;
     const r = window.reglagesPersistance(effetPersistance);
-    const ecrire = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
+    const v = valeur === undefined ? valeurDe(act) : Number(valeur) || 0;
     const premiere = actions.find(a => a.baseEffet && estUneAttaqueDeBase(a.baseEffet.Nom) && valeurDe(a) > 0);
-    return ` <span class="forge-persistance-lancement">(${ecrire(valeurDe(act) * r.lancement / 100)} au lancement)</span>`
-        + (premiere === act ? ` <span class="forge-persistance-zone">(${ecrire(valeurDe(act) * r.zone / 100)} dans la zone)</span>` : "");
+    return { lancement: Math.round(v * r.lancement / 100), zone: premiere === act ? Math.round(v * r.zone / 100) : null };
+}
+window.partsPersistanceForge = partsPersistance;
+function texteDegatsPersistance(act) {
+    const parts = partsPersistance(act);
+    if (!parts) return "";
+    return ` <span class="forge-persistance-lancement">(${parts.lancement} au lancement)</span>`
+        + (parts.zone !== null ? ` <span class="forge-persistance-zone">(${parts.zone} dans la zone)</span>` : "");
 }
 
 // (v431) LES AUGMENTATIONS MAX d'un effet sur la carte en construction (app.js,
@@ -2708,7 +2723,7 @@ function coutDUneAction(act, bdd, statsPerso, coutDureePlus) {
     
     let coutMods = 0;
     // (v427) Les cases de zone (leur coût) et le % de la 1re case payante.
-    let coutZone = 0, pctZone = 0;
+    let coutZone = 0, pctZone = 0, coutPersistanceAction = 0;
     let aDOT = false;
     let diviseurDOT = DIVISEUR_ETALEMENT;
     // LA RISTOURNE DE L'ÉTALEMENT NE VAUT QUE POUR LES DÉGÂTS ET LES SOINS
@@ -2776,6 +2791,8 @@ function coutDUneAction(act, bdd, statsPerso, coutDureePlus) {
             // Surcoût lié au bouton ⏳ de CE sous-effet
             let currentModDuree = (act.modsDuree && act.modsDuree[modId]) || 0;
             coutCeMod += currentModDuree * coutDureePlus;
+            // (v466) Nico : « pour la 2e case de la zone, le % de coût du sort ne s'applique pas à la Persistance ».
+            if ((modEff.Nom || "").toLowerCase().includes("persistance")) coutPersistanceAction += coutCeMod;
             coutMods += coutCeMod;
             if (estPartEtalable(modEff.Nom)) coutEtalable += coutCeMod;
         }
@@ -2786,7 +2803,7 @@ function coutDUneAction(act, bdd, statsPerso, coutDureePlus) {
     // reste de l'action (socle, durées, autres sous-effets), avant la ristourne
     // de l'étalement. Comme le reste de la Zone, elle ne s'étale pas.
     if (pctZone > 0) {
-        const coutPremiere = (baseActionCost + coutDureeBase + coutMods - coutZone) * pctZone / 100;
+        const coutPremiere = (baseActionCost + coutDureeBase + coutMods - coutZone - coutPersistanceAction) * pctZone / 100;
         coutMods += coutPremiere;
         coutZone += coutPremiere;
     }

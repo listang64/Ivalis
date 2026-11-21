@@ -831,7 +831,7 @@ function coutPCChantier(chantier, palette) {
         let coutDuree = (act.baseDuree || 0) * coutDureePlus;
         let coutMods = 0;
         // (v427) Les cases de zone (leur coût) et le % de la 1re case payante.
-        let coutZone = 0, pctZone = 0;
+        let coutZone = 0, pctZone = 0, coutPersistance = 0;
         let aEtalement = false;
         let diviseur = 1.3;
         // ⚖️ règle Forge : la ristourne de l'Étalement ne vaut que pour les
@@ -869,6 +869,8 @@ function coutPCChantier(chantier, palette) {
                 coutCeMod = coutPC(m.effet) * m.count;
             }
             coutCeMod += (m.duree || 0) * coutDureePlus;
+            // (v466) ⚖️ règle Forge : le % de la 2e case de zone ne s'applique pas à la Persistance.
+            if (contient(nom, MOTS_CLES.persistance)) coutPersistance += coutCeMod;
             coutMods += coutCeMod;
             if (etalable(nom)) coutEtalable += coutCeMod;
         });
@@ -876,7 +878,7 @@ function coutPCChantier(chantier, palette) {
         // (v427) ⚖️ règle Forge : la 1re case payante en % — ce % du reste de
         // l'action, avant la ristourne de l'étalement ; elle ne s'étale pas.
         if (pctZone > 0) {
-            const coutPremiere = (coutBase + coutDuree + coutMods - coutZone) * pctZone / 100;
+            const coutPremiere = (coutBase + coutDuree + coutMods - coutZone - coutPersistance) * pctZone / 100;
             coutMods += coutPremiere;
             coutZone += coutPremiere;
         }

@@ -296,8 +296,46 @@ await section(async () => {
   verifier("deux couleurs différentes", !!pourcent.couleurLancement && !!pourcent.couleurZone && pourcent.couleurLancement !== pourcent.couleurZone
            && pourcent.couleurLancement !== "rgb(0, 0, 0)" && pourcent.couleurZone !== "rgb(0, 0, 0)", `${pourcent.couleurLancement} / ${pourcent.couleurZone}`);
   const decimal = await forger({ ...REGLEE, Persistance_Degats_Lancement: 33, Persistance_Degats_Zone: 12.5 });
-  verifier("une part décimale s'écrit à la française (20 × 33 % = 6,6 ; 12,5 % = 2,5)",
-           decimal.lancement === "(6,6 au lancement)" && decimal.zone === "(2,5 dans la zone)", JSON.stringify([decimal.lancement, decimal.zone]));
+  // (v466) Nico : « lorsqu'on met une persistance, afficher les dégâts réels arrondis à l'entier le plus proche ».
+  verifier("(v466) les dégâts réels, arrondis à l'entier le plus proche (20 × 33 % = 6,6 → 7 ; 12,5 % = 2,5 → 3)",
+           decimal.lancement === "(7 au lancement)" && decimal.zone === "(3 dans la zone)", JSON.stringify([decimal.lancement, decimal.zone]));
+});
+
+// =========================================================================
+console.log("\n4 bis. (v466) LA 2E CASE DE ZONE NE COMPTE PAS LA PERSISTANCE ; LA SURPUISSANCE SUR SES DEUX DÉGÂTS");
+// =========================================================================
+// Nico : « pour la création de la 2e zone, nous avons un pourcentage qui s'applique au coût du sort : n'applique pas ce
+// pourcentage de coût supplémentaire sur l'effet persistance » ; « avec une persistance et une surpuissance, applique la
+// surpuissance aux 2 valeurs de dégâts et affiche-les en dessous de la surpuissance ».
+await section(async () => {
+  const c = await p.evaluate(() => {
+    const att = { id: "EFF_ATT", Nom: "Attaque Magique", Cout_PT: "2", Valeur: 10 };
+    const zone = { id: "EFF_ZONE2", Nom: "Zone", Cout_PT: "1", Zone_Pct_2: "50" };
+    const pers = { id: "EFF_PERS", Nom: "Persistance terrain", Cout_PT: "3" };
+    const act = (mods) => ({ idInst: "A9", baseEffet: att, count: 5, mods, zoneHexes: [{ q: 0, r: 0 }, { q: 1, r: 0 }], baseDuree: 0, modsDuree: {} });
+    const bdd = [att, zone, pers];
+    return { zone: window.coutDUneActionForge(act({ EFF_ZONE2: 2 }), bdd, {}, 5).cout, zonePers: window.coutDUneActionForge(act({ EFF_ZONE2: 2, EFF_PERS: 1 }), bdd, {}, 5).cout };
+  });
+  verifier("(v466) la 2e case de zone (50 % du sort) : sur l'attaque seulement, pas sur la persistance (10 + 5 + 3 = 18, plus 19,5)", c.zone === 15 && c.zonePers === 18, JSON.stringify(c));
+  const s = await p.evaluate((REGLEE) => {
+    const bdd = Object.entries({ ...window.EFFETS_BDD_CACHE, EFF_PERS: REGLEE }).map(([id, e]) => ({ id, ...e, Type_Mecanique_2: e.Type_Mecanique_2 || "Aucun" }));
+    window.EFFETS_BDD_CACHE.EFF_PERS = REGLEE;
+    Object.assign(window.forgeState, { statsPerso: {}, caracs: { int: 16 }, effetsBDD: bdd, armePrincipale: "Magie",
+      actions: [{ idInst: "A1", baseEffet: bdd.find(e => e.id === "EFF_ATT"), count: 8, mods: { EFF_PERS: 1 }, zoneHexes: [], baseDuree: 0, modsDuree: {} }] });
+    window.rafraichirForge();
+    const carte = document.getElementById("forge-contenu-carte"), sous = carte.querySelector(".forge-persistance-surpuissante");
+    const desc = carte.querySelector(".forge-desc");
+    return { fatigue: document.getElementById("forge-fatigue-val").innerText, bandeau: document.getElementById("forge-surpuissance").textContent,
+             valeur: (carte.querySelector(".forge-valeur-surpuissante") || {}).innerText || "", sous: sous ? sous.innerText : "",
+             apres: !!sous && !!(carte.querySelector(".forge-valeur-surpuissante").compareDocumentPosition(sous) & Node.DOCUMENT_POSITION_FOLLOWING),
+             couleurs: sous ? [...sous.querySelectorAll(".forge-persistance-lancement, .forge-persistance-zone")].map(x => getComputedStyle(x).color) : [],
+             parentheses: [...desc.querySelectorAll(":scope > .forge-persistance-lancement, :scope > .forge-persistance-zone")].map(x => x.innerText) };
+  }, REGLEE);
+  verifier("(v466) 95 de fatigue (16 + 3 PC) : la 2e surpuissance, ×1,35 (100 avant)", s.fatigue === "95" && /×1,35/.test(s.bandeau), JSON.stringify([s.fatigue, s.bandeau]));
+  verifier("(v466) les dégâts de la persistance, sans surpuissance, à côté de l'attaque (80 × 40 % = 32 ; × 60 % = 48)", JSON.stringify(s.parentheses) === '["(32 au lancement)","(48 dans la zone)"]', JSON.stringify(s.parentheses));
+  verifier("(v466) en dessous de la surpuissance (→ 108), ses deux dégâts surpuissants : 43 au lancement · 65 dans la zone (arrondis)",
+           /→ 108 de dégâts avec la surpuissance/.test(s.valeur) && /43 au lancement/.test(s.sous) && /65 dans la zone/.test(s.sous) && s.apres, JSON.stringify([s.valeur, s.sous]));
+  verifier("(v466) …dans les deux couleurs de la persistance", s.couleurs.length === 2 && s.couleurs[0] !== s.couleurs[1], JSON.stringify(s.couleurs));
 });
 
 // =========================================================================

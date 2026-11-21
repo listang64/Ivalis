@@ -5394,3 +5394,5 @@ textarea.input-texte-parchemin {
 #pilote-fleches .fleche-pilote:hover { background: rgba(90, 60, 20, 0.9); }
 #pilote-fleches .rang-pilote { position: absolute; transform: translateX(-50%); white-space: nowrap; padding: 2px 10px; border-radius: 999px;
   background: rgba(20, 12, 4, 0.82); border: 1px solid #d9b25a; color: #f3dfa8; font: 600 12px/1.4 'Cinzel', serif; letter-spacing: 0.06em; }
+/* (v466) Sous la surpuissance : les deux dégâts de la persistance, surpuissance comprise. */
+.forge-persistance-surpuissante { display: block; margin-top: 2px; font-style: normal; color: #7c2d12; }
