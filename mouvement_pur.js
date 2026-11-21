@@ -716,6 +716,7 @@ export function resoudrePeur(etat, idLanceur, idCible, des, plateau, options) {
     // principe qu'un déplacement volontaire), sauf de la part du lanceur.
     let contactAvant = new Set(ennemisAuContact(etat, idCible, depart).filter(id => id !== exempte));
     const defenseursTentes = new Set();
+    const zonesSubiesEnFuyant = new Set();   // (v473) une zone, une fois par fuite
     for (const pas of chemin) {
         const de = { q: cible.q, r: cible.r };
         cible.q = pas.q;
@@ -746,8 +747,11 @@ export function resoudrePeur(etat, idLanceur, idCible, des, plateau, options) {
         if (cible.aTerre) break;  // Tombée en chemin : la fuite s'arrête là.
 
         // Une fuite paniquée traverse une nappe au sol comme n'importe quel
-        // déplacement.
-        etapes.push(...traverserZones(etat, idCible, pas, des));
+        // déplacement. (v473) Nico : « une exception lorsqu'un ennemi a peur et traverse une zone persistante : il ne
+        // prend les dégâts de la zone qu'une seule fois » — sa fuite (jusqu'à 4 pas) la subissait à chaque case.
+        const touchees = zonesSubiesEnFuyant;
+        etapes.push(...traverserZones(etat, idCible, pas, des, { seulement: z => !touchees.has(z.id) }));
+        Object.values((etat && etat.zones) || {}).forEach(z => { if (z && (z.hexes || []).some(h => h && h.q === pas.q && h.r === pas.r)) touchees.add(z.id); });
         if (cible.aTerre) break;  // Tombée dans le feu : pareil.
     }
 

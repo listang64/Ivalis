@@ -12567,3 +12567,12 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - La zone ne reprend que la première attaque de la carte, comme au combat.
 - Sans persistance, rien ne change.
 - corrections_v427_persistance.mjs le vérifie (son « 4 ter »).
+
+## v473 — Sous la Peur, une zone persistante ne frappe qu'une fois
+
+- Nico : « fais une exception lorsqu'un ennemi a peur et traverse une zone persistante : il ne prend les dégâts de la zone qu'une seule fois ». (Et : « laisse la surpuissance à ×1,35 » : inchangée.)
+- Avant, la fuite (jusqu'à 4 pas) subissait la même nappe à chaque case franchie.
+- Maintenant, pendant une fuite (mouvement_pur.js, resoudrePeur), une zone déjà subie ne refrappe plus. Deux nappes différentes comptent chacune une fois.
+- La même fuite sert à la Confusion : elle suit la même règle.
+- Une marche ordinaire, elle, subit toujours la zone à chaque case (« s'il continue, ça continue »).
+- zones_cerveau.mjs le vérifie (son contrôle « v473 »).

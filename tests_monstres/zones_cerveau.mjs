@@ -368,5 +368,31 @@ console.log("\n12. MÊME GRAINE, MÊME BRÛLURE — SUR TROIS POSTES");
              resultats[0] === resultats[1] && resultats[1] === resultats[2], resultats[0]);
 }
 
+// =========================================================================
+console.log("\n(v473) SOUS LA PEUR : UNE NAPPE TRAVERSÉE EN FUYANT NE BRÛLE QU'UNE FOIS");
+// =========================================================================
+// Nico : « fais une exception lorsqu'un ennemi a peur et traverse une zone persistante : il ne prend les dégâts de la
+// zone qu'une seule fois ». Une marche ordinaire, elle, la subit toujours à chaque case (section 2).
+{
+    const { resoudrePeur } = await import('../mouvement_pur.js');
+    const disque = [];
+    for (let q = -5; q <= 5; q++) for (let r = Math.max(-5, -q - 5); r <= Math.min(5, -q + 5); r++) disque.push({ q, r });
+    const GRAND = { ...FEU, id: "zp_grand", hexes: disque, etat: null };
+    const AUTRE = { ...FEU, id: "zp_autre", hexes: disque.filter(h => h.q >= 2), etat: null };
+    const fuites = [];
+    for (const graine of [3, 7, 11, 19, 23]) {
+        const etat = monde({ zp_grand: { ...GRAND }, zp_autre: { ...AUTRE } });
+        etat.combattants.LANCEUR.q = -1; etat.combattants.LANCEUR.r = 0;
+        const etapes = resoudrePeur(etat, "LANCEUR", "MARCHEUR", creerDes(graine), null);
+        const pas = etapes.filter(e => e.type === "pas").length;
+        const parZone = (id) => etapes.filter(e => e.type === "degats" && e.zone === id).length;
+        const sur = (id) => etapes.filter(e => e.type === "pas" && (id === "zp_grand" ? disque : AUTRE.hexes).some(h => h.q === e.vers.q && h.r === e.vers.r)).length;
+        fuites.push({ pas, grand: parZone("zp_grand"), casesGrand: sur("zp_grand"), autre: parZone("zp_autre"), casesAutre: sur("zp_autre") });
+    }
+    verifier("(v473) la fuite fait plusieurs pas dans la même nappe…", fuites.every(f => f.pas >= 2 && f.casesGrand >= 2), JSON.stringify(fuites));
+    verifier("(v473) …mais ne la subit qu'une fois (une étape de dégâts au plus par zone)", fuites.every(f => f.grand <= 1 && f.autre <= 1), JSON.stringify(fuites));
+    verifier("(v473) …chaque nappe différente compte une fois (deux nappes traversées : deux fois)", fuites.filter(f => f.casesAutre > 0).every(f => f.autre <= 1) && fuites.some(f => f.grand === 1), JSON.stringify(fuites));
+}
+
 console.log(echecs === 0 ? "\nTOUS LES CONTRÔLES PASSENT" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);
 process.exit(echecs === 0 ? 0 : 1);
