@@ -12494,3 +12494,15 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - Il sort aussi de la liste des PNJ que garde le Narrateur, et la page se redessine sans lui.
 - Un PNJ d'une autre partie n'est jamais touché.
 - corrections_v425.mjs le vérifie (ses contrôles « v464 »).
+
+## v465 — Les ennemis posent plus souvent leur persistance de terrain
+
+- Nico : « fais en sorte que les ennemis utilisent un peu plus les persistances de terrain : je n'ai pas vu une seule fois un ennemi l'utiliser. J'ai changé l'équilibrage dans Effets de combat, base-toi dessus. »
+- **Son prix, celui des Effets de combat** : la forge des ennemis ne comptait que le coût fixe de la Persistance terrain (Cout_PT). Désormais, comme la Forge des héros, un coût réglé « en % » s'applique à toute la carte (monstres_competences.js, coutPCChantier, pourcentPersistance).
+- **Plus de créatures en ont une** : le combattant (DPS CAC) et le tireur (DPS DISTANCE) ont une carte de terrain à la place de leur seconde frappe ; avant, seuls les mages en avaient.
+- **Elle tient dans sa carte** :
+  - elle va dans une des trois tranches les plus chères (50 % de la fatigue et plus) ;
+  - elle est posée avant la zone, qui se taille dans ce qui reste ; avant, la zone prenait toute la place et la persistance sautait ;
+  - sans zone possible, elle s'en va (pas de terrain sans emprise).
+- **Elle est jouée** (monstres_ia.js, choisirCarteMonstre) : une carte de terrain gagne un coup de pouce (+9, +4 si au moins deux héros sont à deux cases l'un de l'autre), tant que la créature n'a pas déjà son terrain au sol.
+- corrections_v457.mjs le vérifie (ses contrôles « v465 »).

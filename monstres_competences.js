@@ -75,11 +75,14 @@ const ARME_PAR_ARCHETYPE = {
 //   soutienZone — un soin de zone ;
 //   etat        — une attaque qui pose un état.
 const PATRONS_PAR_ARCHETYPE = {
-    "DPS CAC":           ["brute", "frappe", "etat", "frappe", "zone", "controle"],
+    // (v465) Nico : « que les ennemis utilisent un peu plus les persistances de terrain » : le combattant et le
+    // tireur en ont une aussi (des chausse-trapes, de l'huile, une volée de flèches enflammées…), à la place
+    // de leur seconde frappe.
+    "DPS CAC":           ["brute", "frappe", "etat", "persistance", "zone", "controle"],
     "TANK CAC":          ["brute", "frappe", "controle", "soutien", "etat", "zone"],
     "SOUTIEN":           ["defense", "faible", "soutien", "soutienZone", "soutien", "etat"],
     "DPS MAGE CAC":      ["brute", "frappe", "etat", "zone", "persistance", "etat"],
-    "DPS DISTANCE":      ["brute", "frappe", "etat", "zone", "frappe", "controle"],
+    "DPS DISTANCE":      ["brute", "frappe", "etat", "zone", "persistance", "controle"],
     "DPS MAGE DISTANCE": ["brute", "frappe", "zone", "persistance", "etat", "frappe"]
 };
 // Les patrons qui soignent ou protègent (sans attaque comme socle).
@@ -808,13 +811,23 @@ function diviseurEtalementMonstre(effet) {
     return Math.max(1.3, d > 1 ? d : 0);
 }
 
+// (v465) ⚖️ règle Forge (v427) : la Persistance terrain coûte une valeur fixe (son Cout_PT) ou un % de tout le
+// reste de la carte (Persistance_Cout_Mode « pourcent », Effets de combat). En %, elle ne coûte rien sur son action ;
+// sa part s'ajoute à la fin, sur la carte entière — comme dans la Forge des héros (competences.js, rafraichirForge).
+function pourcentPersistance(effet) {
+    if (!effet || !contient(effet.Nom || "", MOTS_CLES.persistance) || typeof window.reglagesPersistance !== "function") return 0;
+    const r = window.reglagesPersistance(effet);
+    return r.coutEnPourcent ? Math.max(0, Number(r.coutPourcent) || 0) : 0;
+}
 function coutPCChantier(chantier, palette) {
     const effetDureePlus = palette.find(e => e.Nom === "Durée +");
     const coutDureePlus = effetDureePlus ? coutPC(effetDureePlus) : 5;
 
-    let totalPC = 0;
+    let totalPC = 0, pctPersistance = 0;
     chantier.actions.forEach(act => {
-        let coutBase = coutPC(act.baseEffet) * act.count;
+        const pctBase = pourcentPersistance(act.baseEffet);
+        pctPersistance = Math.max(pctPersistance, pctBase);
+        let coutBase = pctBase ? 0 : coutPC(act.baseEffet) * act.count;
         let coutDuree = (act.baseDuree || 0) * coutDureePlus;
         let coutMods = 0;
         // (v427) Les cases de zone (leur coût) et le % de la 1re case payante.
@@ -850,6 +863,8 @@ function coutPCChantier(chantier, palette) {
                 // ⚖️ règle Forge : 1,3, ou plus si le grimoire le dit
                 // (« Cout / 1.x »), comme dans la Forge (diviseurEtalement).
                 diviseur = diviseurEtalementMonstre(m.effet);
+            } else if (pourcentPersistance(m.effet)) {
+                pctPersistance = Math.max(pctPersistance, pourcentPersistance(m.effet));
             } else {
                 coutCeMod = coutPC(m.effet) * m.count;
             }
@@ -870,8 +885,10 @@ function coutPCChantier(chantier, palette) {
         if (aEtalement) coutAction = (coutAction - coutEtalable) + coutEtalable / diviseur;
         totalPC += coutAction;
     });
+    if (pctPersistance > 0) totalPC += totalPC * pctPersistance / 100;
     return totalPC;
 }
+window.coutPCChantierMonstre = (chantier, palette) => coutPCChantier(chantier, palette || window.paletteEffetsMonstres());
 
 // ⚖️ règle Forge : initiative = ce qui reste de 100 après la fatigue, plus les
 // bonus d'Initiative + et le remboursement des effets hors initiative — la
@@ -1027,6 +1044,10 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang, pref
         return true;
     };
 
+    // (v465) La persistance d'abord : la zone se taille ensuite dans ce qui reste de la tranche (avant, la zone
+    // prenait toute la place et la persistance, posée après, sautait presque toujours).
+    const modPersistance = patron === "persistance" ? trouverMod(MOTS_CLES.persistance) : null;
+    if (modPersistance) poserMod(chantier, action, modPersistance, 1);
     if (patron === "zone" || patron === "persistance" || patron === "soutienZone") {
         const modZone = trouverMod(MOTS_CLES.zone);
         if (modZone) {
@@ -1050,7 +1071,9 @@ function fabriquerCarte(monstre, affinites, patron, tranche, palette, rang, pref
             }
         }
     }
-    if (patron === "persistance") poserSiTientDansLaTranche(trouverMod(MOTS_CLES.persistance), 1);
+    // (v465) Sans zone, pas de terrain : la persistance s'en va ; trop chère même avec la plus petite zone, aussi.
+    if (modPersistance && (!(action.zoneHexes && action.zoneHexes.length) || fatigueDe(chantier, palette) > fatiguePlafond))
+        action.modsEffets = action.modsEffets.filter(x => x.effet.id !== modPersistance.id);
     if (patron === "etalement")   poserSiTientDansLaTranche(trouverMod(MOTS_CLES.etalement), 1);
     if (patron === "etat")        poserSiTientDansLaTranche(trouverMod(MOTS_CLES.etat), 1);
     if (patron === "controle")    poserSiTientDansLaTranche(trouverMod(MOTS_CLES.controle), 1);
@@ -1560,6 +1583,14 @@ window.genererCompetencesMonstre = async function(monstreBrut) {
                 patrons[cible] = "brute";
             }
         }
+    }
+    // (v465) La persistance va dans une des trois tranches les plus chères (50 % de la fatigue et plus), après le coup brut : une
+    // zone ET un terrain n'entrent pas dans une petite carte.
+    const iPers = patrons.indexOf("persistance");
+    if (iPers >= 0 && iPers < 3) {
+        const hautes = [3, 4, 5].filter(k => patrons[k] !== "brute");
+        const k = hautes[Math.floor(Math.random() * hautes.length)];
+        [patrons[iPers], patrons[k]] = [patrons[k], patrons[iPers]];
     }
 
     // Signature d'une carte : la liste de ses effets. Deux cartes de même

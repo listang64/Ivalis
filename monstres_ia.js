@@ -284,6 +284,7 @@ const DELAI_FORGE_MS = 30000;
 const DELAI_ATTENTE_JOUEURS_MS = 180000;
 window.ATTENTE_TECHNIQUES_MONSTRES = window.ATTENTE_TECHNIQUES_MONSTRES || {};
 
+const BONUS_TERRAIN = 9;   // (v465) le coup de pouce d'une carte de terrain (voir choisirCarteMonstre)
 window.choisirCarteMonstre = function(monstre, exclure) {
     // `exclure` : l'identifiant d'une carte déjà retenue ce tour-ci (la
     // première compétence d'un boss), qu'on ne choisit pas une seconde fois.
@@ -360,6 +361,10 @@ window.choisirCarteMonstre = function(monstre, exclure) {
     // stature du monstre, et les cartes à effets restent dans la course.
     const analyses = new Map();
     abordables.forEach(c => analyses.set(c.id, window.analyserCarteMonstre(c.data)));
+    // (v465) Les héros groupés : combien en a-t-il un autre à deux cases ou moins (un terrain les prendrait ensemble).
+    const adversaires = (window.PERSOS_PARTIE || []).filter(p => p.camp !== monstre.camp && tokens[p.idPersonnage]
+        && !(typeof window.estCombattantMort === "function" && window.estCombattantMort(p.idPersonnage)));
+    const herosGroupes = adversaires.filter(a => adversaires.some(b => b !== a && distanceHex(tokens[a.idPersonnage], tokens[b.idPersonnage]) <= 2)).length;
     const degatsMax = Math.max(1, ...abordables.map(c => analyses.get(c.id).degats));
 
     let meilleure = null, meilleurScore = -Infinity;
@@ -384,6 +389,16 @@ window.choisirCarteMonstre = function(monstre, exclure) {
             // Un caractère sanguinaire cogne fort, un prudent préfère la portée.
             score += t.cibleFaible * forceRelative * 8;
             score += t.tientDistance * (infos.portee - 1) * 3;
+        }
+
+        // (v465) Nico : « que les ennemis utilisent un peu plus les persistances de terrain ; je n'en ai pas vu une
+        // seule fois ». Une carte de terrain frappe moins fort (sa zone et son terrain coûtent) : sans ce coup de
+        // pouce, la plus grosse frappe la battait toujours. Tant que la créature n'a pas déjà son terrain au sol
+        // (une zone à son nom, zp_…_<son id>), poser le sien vaut le détour ; plus encore si les héros sont groupés.
+        if (infos.persistanceTerrain && !infos.estSoin && portable) {
+            const id = monstre.idPersonnage;
+            const dejaAuSol = Object.keys(window.ZONES_PERSISTANTES || {}).some(k => k.endsWith("_" + id));
+            if (!dejaAuSol) score += BONUS_TERRAIN + (herosGroupes >= 2 ? 4 : 0);
         }
 
         // Garder un peu de réserve : une carte qui vide la fatigue empêche de bouger.

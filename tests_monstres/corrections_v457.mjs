@@ -528,6 +528,56 @@ await section(async () => {
   verifier("…MIA_AME aussi, pour un PNJ né sans âme", /disposition_heros: schemaDisposition\(\), disposition_raison: schemaRaisonDisposition\(\)/.test(so) && /Pour un PNJ, ajoute aussi son a priori/.test(so));
 });
 
+// =========================================================================
+titre("11. (v465) LES ENNEMIS ET LA PERSISTANCE DE TERRAIN : FORGÉE PLUS SOUVENT, AU BON PRIX, ET JOUÉE");
+// =========================================================================
+// Nico : « fais en sorte que les ennemis utilisent un peu plus les persistances de terrain : je n'ai pas vu une seule fois
+// un ennemi l'utiliser. J'ai changé l'équilibrage dans Effets de combat, base-toi dessus. »
+await section(async () => {
+  // 1. Son prix, celui des Effets de combat : fixe (Cout_PT), ou en % de toute la carte (v427).
+  const c = await p.evaluate(() => {
+    const att = { Nom: "Attaque physique", Cout_PT: "2" };
+    const chantier = (pers) => ({ actions: [{ baseEffet: att, count: 5, baseDuree: 0, zoneHexes: [], modsEffets: [{ effet: pers, count: 1 }] }] });
+    const fixe = { Nom: "Persistance terrain", Cout_PT: "3" };
+    const pct = { Nom: "Persistance terrain", Cout_PT: "3", Persistance_Cout_Mode: "pourcent", Persistance_Cout_Pourcent: 50 };
+    return { sans: window.coutPCChantierMonstre({ actions: [{ baseEffet: att, count: 5, baseDuree: 0, zoneHexes: [], modsEffets: [] }] }, []),
+             fixe: window.coutPCChantierMonstre(chantier(fixe), []), pct: window.coutPCChantierMonstre(chantier(pct), []) };
+  });
+  verifier("(v465) la forge des ennemis compte la persistance comme les Effets de combat : fixe (10 + 3), ou en % de la carte (10 + 50 %)", c.sans === 10 && c.fixe === 13 && c.pct === 15, JSON.stringify(c));
+  const mc = fs.readFileSync(path.join(RACINE, "monstres_competences.js"), "utf-8");
+  const plans = (arch) => (new RegExp(`"${arch}":\\s+\\[([^\\]]+)\\]`).exec(mc) || [, ""])[1];
+  verifier("(v465) une persistance aussi dans le jeu du combattant et du tireur (plus seulement les mages)", ["DPS CAC", "DPS DISTANCE", "DPS MAGE CAC", "DPS MAGE DISTANCE"].every(a => /"persistance"/.test(plans(a))), ["DPS CAC", "DPS DISTANCE"].map(plans).join(" / "));
+  verifier("(v465) …dans une des trois tranches les plus chères, la persistance posée avant la zone (la zone se taille autour)",
+           /const hautes = \[3, 4, 5\]\.filter/.test(mc) && mc.indexOf("if (modPersistance) poserMod(chantier, action, modPersistance, 1);") < mc.indexOf("const modZone = trouverMod(MOTS_CLES.zone);"));
+  // 2. Le choix de la carte en combat : la carte de terrain sort quand la créature n'a pas encore le sien au sol.
+  const r = await p.evaluate(() => {
+    window.EFFETS_BDD_CACHE = { ...(window.EFFETS_BDD_CACHE || {}), E_ATT_V465: { Nom: "Attaque physique", Valeur: "5", Cout_PT: "2" }, E_ZONE_V465: { Nom: "Zone", Valeur: "1", Cout_PT: "1" },
+                                E_PERS_V465: { Nom: "Persistance terrain", Valeur: "1", Cout_PT: "3" } };
+    const zone = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 0, r: 1 }, { q: -1, r: 1 }];
+    window.CACHE_COMPETENCES_GLOBAL = { ...(window.CACHE_COMPETENCES_GLOBAL || {}), M_V465: {
+      C_COUP: { Nom: "Coup de massue", Fatigue: 30, Composants: { actions: [{ baseEffetId: "E_ATT_V465", count: 6, mods: {}, zoneHexes: [] }] } },
+      C_TERRAIN: { Nom: "Huile enflammée", Fatigue: 30, Composants: { actions: [{ baseEffetId: "E_ATT_V465", count: 3, mods: { E_ZONE_V465: 4, E_PERS_V465: 1 }, zoneHexes: zone }] } } } };
+    const avant = { persos: window.PERSOS_PARTIE, tokens: window.TOKENS_VTT_DATA, zones: window.ZONES_PERSISTANTES };
+    window.PERSOS_PARTIE = [{ idPersonnage: "H1", camp: "Allié", PV_Max: 40, PV_Actuels: 40 }, { idPersonnage: "H2", camp: "Allié", PV_Max: 40, PV_Actuels: 40 },
+      { idPersonnage: "M_V465", camp: "Ennemi", estMonstre: true, PV_Max: 50, PV_Actuels: 50 }];
+    window.TOKENS_VTT_DATA = { H1: { q: 0, r: 0 }, H2: { q: 1, r: 0 }, M_V465: { q: 3, r: 0 } };
+    const monstre = { idPersonnage: "M_V465", camp: "Ennemi", estMonstre: true, deckEquipe: ["C_COUP", "C_TERRAIN"], fatigueActuelle: 100, Fatigue_Max: 100, fatigueMax: 100, Palier: "Normal", archetype: "DPS CAC" };
+    const tirer = (n) => { let t = 0; for (let i = 0; i < n; i++) { window.DERNIERES_CARTES_MONSTRES = {}; const c = window.choisirCarteMonstre(monstre); if (c && c.id === "C_TERRAIN") t++; } return t; };
+    window.ZONES_PERSISTANTES = {};
+    const libre = tirer(400);
+    window.ZONES_PERSISTANTES = { "zp_12_M_V465": { hexes: [] } };
+    const auSol = tirer(400);
+    window.ZONES_PERSISTANTES = {};
+    window.TOKENS_VTT_DATA = { H1: { q: 0, r: 0 }, H2: { q: 6, r: -3 }, M_V465: { q: 3, r: 0 } };
+    const disperses = tirer(400);
+    window.PERSOS_PARTIE = avant.persos; window.TOKENS_VTT_DATA = avant.tokens; window.ZONES_PERSISTANTES = avant.zones;
+    return { libre, auSol, disperses };
+  });
+  verifier("(v465) en combat : pas encore de terrain au sol, les héros groupés : la créature pose le sien la plupart du temps", r.libre > 220, `${r.libre}/400`);
+  verifier("(v465) …les héros dispersés : un peu moins", r.disperses > 140 && r.disperses < r.libre, `${r.disperses}/400`);
+  verifier("(v465) …son terrain déjà au sol : elle frappe plutôt (pas deux flaques de suite)", r.auSol < 120, `${r.auSol}/400`);
+});
+
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
 console.log(`\n${echecs ? echecs + " ÉCHEC(S)" : "TOUT EST BON"}`);
 await b.close(); serveur.close();
