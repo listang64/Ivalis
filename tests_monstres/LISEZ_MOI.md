@@ -12559,3 +12559,11 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - Nico : « retire la ligne "tant de dégâts à la création" quand il y a surpuissance et persistance ».
 - Sous l'attaque, il ne reste que « 43 au lancement · 65 dans la zone » (competences.js, texteValeurSurpuissante). La surpuissance de la carte se lit toujours dans son bandeau (« 💥 Surpuissance ×1,35 … »).
 - corrections_v427_persistance.mjs le vérifie (ses contrôles « v471 »).
+
+## v472 — L'encart de la carte : les dégâts au lancement et dans la zone
+
+- Nico : « dans l'encart, l'affichage : mets les dégâts au lancement et dans la zone, pas la surpuissance classique ».
+- Sur une carte à Persistance terrain, l'attaque de l'encart (combat.js, ligneEffetsCarte : combat, carte du livre, aperçus) n'affiche plus « 108 Surpuissance ». Elle dit « 43 au lancement · 65 dans la zone » : surpuissance (ou triche des créatures) déjà comptée, arrondi, en deux couleurs.
+- La zone ne reprend que la première attaque de la carte, comme au combat.
+- Sans persistance, rien ne change.
+- corrections_v427_persistance.mjs le vérifie (son « 4 ter »).

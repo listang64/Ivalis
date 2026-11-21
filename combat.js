@@ -6423,6 +6423,35 @@ window.ligneEffetsCarte = function(dataCarte, lanceur, options) {
             + `</div>`;
     };
 
+    // (v472) Nico : « dans l'encart, mets les dégâts au lancement et dans la zone, pas la surpuissance classique » :
+    // sur une carte à Persistance terrain, une attaque dit ses deux dégâts (surpuissance et triche déjà comptées),
+    // arrondis ; la zone ne reprend que la PREMIÈRE attaque de la carte (creerZonePure), comme dans la Forge.
+    const effetPersistance = (() => {
+        const cache = window.EFFETS_BDD_CACHE || {};
+        let e = null;
+        (((dataCarte && dataCarte.Composants) || {}).actions || []).forEach(a => [a.baseEffetId, ...Object.keys(a.mods || {})].forEach(id => {
+            const x = cache[id]; if (!e && x && /persistance/i.test(x.Nom || "")) e = x;
+        }));
+        if (!e && effets.some(f => f && typeof f === "object" && /persistance/i.test(f.nom || "")))
+            e = Object.values(cache).find(x => x && /persistance/i.test(x.Nom || "")) || {};
+        return e;
+    })();
+    const partsPersistance = effetPersistance && typeof window.reglagesPersistance === "function" ? window.reglagesPersistance(effetPersistance) : null;
+    let attaqueZoneVue = false;
+    const ligneMontantPersistance = (nature, nom, montant, estMod) => {
+        const couleur = couleurs[nature] || couleurs.physique;
+        const v = parseFloat(String(montant).replace(",", ".")) || 0;
+        const lancement = Math.round(v * partsPersistance.lancement / 100);
+        const zone = attaqueZoneVue ? null : Math.round(v * partsPersistance.zone / 100);
+        attaqueZoneVue = true;
+        const retrait = estMod ? "margin-left: 18px; margin-top: 4px;" : "margin-top: 8px;";
+        return `<div class="encart-montant encart-montant-persistance" data-nature="${nature}" title="${echapperAttr(nom)}" style="${retrait} color: ${couleur};">`
+            + SYMBOLES_ENCART[nature === "brut" ? "physique" : nature]
+            + `<span class="encart-chiffre">${lancement}</span><span class="encart-persistance-lancement" style="color: #f0a35e; font-size: 0.8em; margin-left: 4px;">au lancement</span>`
+            + (zone !== null ? `<span style="color: #cfc6b6; margin: 0 6px;">·</span><span class="encart-chiffre">${zone}</span><span class="encart-persistance-zone" style="color: #5fd0bd; font-size: 0.8em; margin-left: 4px;">dans la zone</span>` : "")
+            + `</div>`;
+    };
+
     effets.forEach((eff, i) => {
         // Les vieilles cartes gardent des effets en simple texte : on les
         // affiche tels quels, sans description.
@@ -6443,7 +6472,8 @@ window.ligneEffetsCarte = function(dataCarte, lanceur, options) {
         const nature = window.natureEffetEncart(eff.nom, sansBalises(eff.desc));
         const chiffre = nature ? sansBalises(eff.desc).match(/(\d+(?:[.,]\d+)?)/) : null;
         if (nature && chiffre) {
-            lignes.push(ligneMontant(nature, nom, montantReel(chiffre[1], nature).replace(".", ","), toursPour(i), !!eff.isMod));
+            if (partsPersistance && nature !== "soin") lignes.push(ligneMontantPersistance(nature, nom, montantReel(chiffre[1], nature), !!eff.isMod));
+            else lignes.push(ligneMontant(nature, nom, montantReel(chiffre[1], nature).replace(".", ","), toursPour(i), !!eff.isMod));
             // (v316) Ce que le montant porte en % (une chance, une part), écrit dessous.
             if (avecPourcentages) {
                 const pc = sansBalises(eff.desc).split(/(?<=[.;])\s+/).filter(x => /%/.test(x)).join(" ");

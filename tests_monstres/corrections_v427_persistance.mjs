@@ -344,6 +344,26 @@ await section(async () => {
 });
 
 // =========================================================================
+console.log("\n4 ter. (v472) L'ENCART DE LA CARTE : LES DÉGÂTS AU LANCEMENT ET DANS LA ZONE, PAS LA SURPUISSANCE CLASSIQUE");
+// =========================================================================
+// Nico : « dans l'encart, l'affichage : mets les dégâts au lancement et dans la zone, pas la surpuissance classique ».
+await section(async () => {
+  const r = await p.evaluate((REGLEE) => {
+    window.EFFETS_BDD_CACHE.EFF_PERS = REGLEE;
+    const carte = (avecPers) => ({ Nom: "Brasier", Fatigue: 95, Arme: "Magie",
+      Composants: { actions: [{ baseEffetId: "EFF_ATT", count: 8, mods: avecPers ? { EFF_PERS: 1 } : {}, zoneHexes: [] }] },
+      Effets_Compiles: [{ nom: "Attaque Magique", desc: "Inflige 80 dégâts magiques." }, ...(avecPers ? [{ nom: "Persistance terrain", desc: "Laisse une zone dangereuse.", isMod: true }] : [])] });
+    const lire = (html) => { const d = document.createElement("div"); d.innerHTML = html; const m = d.querySelector(".encart-montant");
+      return { texte: m ? m.textContent.replace(/\s+/g, " ").trim() : "", persistance: !!d.querySelector(".encart-montant-persistance"), surpuissance: !!d.querySelector(".encart-surpuissance") }; };
+    const heros = { idPersonnage: "H_ENCART", prenom: "Lyra", Fatigue_Max: 100 };
+    return { avec: lire(window.ligneEffetsCarte(carte(true), heros)), sans: lire(window.ligneEffetsCarte(carte(false), heros)) };
+  }, REGLEE);
+  verifier("(v472) une carte à persistance (surpuissance ×1,35) : « 43 au lancement · 65 dans la zone », pas « 108 Surpuissance »",
+           r.avec.persistance && /43\s*au lancement/.test(r.avec.texte) && /65\s*dans la zone/.test(r.avec.texte) && !/108/.test(r.avec.texte) && !r.avec.surpuissance, JSON.stringify(r.avec));
+  verifier("(v472) …sans persistance, rien ne change (« 108 Surpuissance »)", !r.sans.persistance && /108/.test(r.sans.texte) && r.sans.surpuissance, JSON.stringify(r.sans));
+});
+
+// =========================================================================
 console.log("\n5. L'ÉDITEUR DES EFFETS : LES RÉGLAGES S'ÉCRIVENT DANS Combat_Effets");
 // =========================================================================
 await section(async () => {
