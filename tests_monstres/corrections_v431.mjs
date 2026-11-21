@@ -201,6 +201,36 @@ await section(async () => {
 });
 
 // =========================================================================
+console.log("\n3 bis. (v468) CONTRE ET ABSORPTION NE SE METTENT PLUS EN ZONE");
+// Nico : « sur Contre et Absorption, retirer le fait de pouvoir les mettre sur une zone ».
+{
+  const r = await p.evaluate(async () => {
+    window.EFFETS_BDD_CACHE.EFF_ZONE = { Nom: "Zone", Cout_PT: 1, Modificateur: "AUCUN", Type_Mecanique: "Spatial", Type_Mecanique_2: "Aucun", Valeur: 0, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0 };
+    window.EFFETS_BDD_CACHE.EFF_SOIN = { Nom: "Soin", Cout_PT: 1, Modificateur: "SAGESSE", Type_Mecanique: "Action/Global", Type_Mecanique_2: "Aucun", Valeur: 5, Pourcent_Base: 0, Pourcent_Max: 0, Tours: 0 };
+    window.OUVERTURE_FORGE_EN_COURS = false;
+    await window.ouvrirCreationCompetence();
+    window.forgeState.armePrincipale = "Magie";
+    const eff = (id) => window.forgeState.effetsBDD.find(e => e.id === id);
+    const etat = (mod, act) => window.etatSousEffetForge(mod, act);
+    const action = (base, mods) => ({ idInst: "A1", baseEffet: eff(base), count: 1, mods: mods || {}, zoneHexes: [], baseDuree: 0, modsDuree: {} });
+    const res = {
+      zoneSurContre: etat(eff("EFF_ZONE"), action("EFF_CONTRE")), zoneSurAbsorption: etat(eff("EFF_ZONE"), action("EFF_ABSORPTION")),
+      zoneSurSoinAbsorbant: etat(eff("EFF_ZONE"), action("EFF_SOIN", { EFF_ABSORPTION: 1 })),
+      absorptionSurSoinEnZone: etat(eff("EFF_ABSORPTION"), action("EFF_SOIN", { EFF_ZONE: 3 })), contreSurSoinEnZone: etat(eff("EFF_CONTRE"), action("EFF_SOIN", { EFF_ZONE: 3 })),
+      zoneSurSoin: etat(eff("EFF_ZONE"), action("EFF_SOIN")), absorptionSurSoin: etat(eff("EFF_ABSORPTION"), action("EFF_SOIN"))
+    };
+    window.fermerForgeCompetence();
+    delete window.EFFETS_BDD_CACHE.EFF_ZONE; delete window.EFFETS_BDD_CACHE.EFF_SOIN;
+    return res;
+  });
+  verifier("(v468) une action Contre ou Absorption : la Zone est grisée (incompatible)", r.zoneSurContre === "incompatible" && r.zoneSurAbsorption === "incompatible" && r.zoneSurSoinAbsorbant === "incompatible", JSON.stringify(r));
+  verifier("(v468) …et une action déjà en Zone ne prend ni Contre ni Absorption", r.absorptionSurSoinEnZone === "incompatible" && r.contreSurSoinEnZone === "incompatible", JSON.stringify(r));
+  verifier("(v468) …le reste ne change pas (un soin en Zone, un soin avec Absorption)", r.zoneSurSoin === "ok" && r.absorptionSurSoin === "ok", JSON.stringify(r));
+  const lia = fs.readFileSync(path.join(RACINE, "lia_forge.js"), "utf-8"), mc = fs.readFileSync(path.join(RACINE, "monstres_competences.js"), "utf-8");
+  verifier("(v468) LIA le sait (sa consigne, et elle passe par la même règle) ; la forge des ennemis aussi",
+           /Sur une action qui porte Contre ou Absorption : pas de Zone/.test(lia) && /O\.etatSousEffet\(mod, act/.test(lia) && /nom\.trim\(\) === "zone" && \(estCA/.test(mc));
+}
+
 console.log("\n4. LA PORTÉE D'UNE ARME NE SERT QUE LES CARTES DE SON TYPE (objets.js)");
 // =========================================================================
 await section(async () => {

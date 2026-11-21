@@ -12526,3 +12526,13 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - Ils sont maintenant posés pour 2 manches (moteur_effets.js, DUREE_CONTRE_ABSORPTION ; réglage dans app.js). Ils restent après la 1re fin de manche, jouent encore pendant la 2e (le Contre renvoie sa part), et tombent à la fin de la 2e.
 - **Le descriptif** finit par « Dure 2 tours. » dans la Forge (competences.js, formatterTexteEffet) et sur l'état posé en combat.
 - bouclier_absorption_contre.mjs le vérifie (son « 5 bis »), avec le vrai décompte des états du cerveau (vieillirLesEtats).
+
+## v468 — Contre et Absorption ne se mettent plus en zone
+
+- Nico : « sur Contre et Absorption, retirer le fait de pouvoir les mettre sur une zone ».
+- Dans la Forge (competences.js, etatSousEffet), dans les deux sens :
+  - une action qui porte Contre ou Absorption (socle ou sous-effet) a la Zone grisée ;
+  - une action déjà en Zone n'accepte ni l'un ni l'autre.
+- Le reste ne change pas : un soin en Zone, un soin avec Absorption.
+- LIA (lia_forge.js) passe par la même règle, et sa consigne le dit. La forge des ennemis aussi (monstres_competences.js, effetAutorise).
+- corrections_v431.mjs le vérifie (son « 3 bis »).

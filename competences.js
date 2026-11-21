@@ -2679,6 +2679,14 @@ function etatSousEffet(mod, actionCourante, activeTags) {
     // réciproquement, où qu'ils soient posés sur la carte.
     const estIncompatiblePersistanceDot = (nomModLower.includes("persistance") && carteADejaUnEtalement)
         || (estUnModEtalement(nomModLower) && carteADejaUnePersistance);
+    // (v468) Nico : « sur Contre et Absorption, retirer le fait de pouvoir les mettre sur une zone » : une action
+    // qui porte l'un des deux (socle ou sous-effet) n'a pas de Zone, et une action en Zone ne prend ni l'un ni l'autre.
+    const estContreOuAbsorption = (n) => { const x = String(n || "").toLowerCase().trim(); return x === "contre" || x.includes("absorption"); };
+    const nomDuMod = (id) => ((window.forgeState.effetsBDD.find(e => e.id === id) || {}).Nom || "");
+    const actionPorteCA = !!actionCourante && (estContreOuAbsorption(actionCourante.baseEffet && actionCourante.baseEffet.Nom)
+        || Object.keys(actionCourante.mods || {}).some(id => estContreOuAbsorption(nomDuMod(id))));
+    const actionPorteZone = !!actionCourante && Object.keys(actionCourante.mods || {}).some(id => nomDuMod(id) === "Zone");
+    const estIncompatibleZoneCA = (mod.Nom === "Zone" && actionPorteCA) || (estContreOuAbsorption(mod.Nom) && actionPorteZone);
     // LUMIÈRE (Chasseur de mages) : elle fait passer un sort outre la
     // défense magique — il lui faut donc une action à dégâts magiques.
     const estIncompatibleLumiere = (nomModLower.startsWith("lumi") || nomModLower === "magie du sang")
@@ -2689,7 +2697,7 @@ function etatSousEffet(mod, actionCourante, activeTags) {
         && !window.distancePermiseSurAction(actionCourante, window.forgeState.armePrincipale);
     return (estIncompatiblePoussee || estIncompatibleIllusion || estIncompatiblePoison || estIncompatibleEtalement
             || estIncompatiblePersistanceSoin || estIncompatiblePersistanceDot || estIncompatibleDistance
-            || estIncompatibleLumiere) ? "incompatible" : "ok";
+            || estIncompatibleLumiere || estIncompatibleZoneCA) ? "incompatible" : "ok";
 }
 window.etatSousEffetForge = etatSousEffet;
 

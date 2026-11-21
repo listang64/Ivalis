@@ -652,6 +652,15 @@ function effetAutorise(chantier, effet, commeMod) {
             incompatiblesPoussee.includes((m.effet.Nom || "").toLowerCase().trim())))) return false;
     }
 
+    // (v468) ⚖️ règle Forge : pas de Zone sur une action qui porte Contre ou Absorption, ni l'un ni l'autre sur une
+    // action en Zone (l'action en cours : la dernière du chantier).
+    if (commeMod) {
+        const act = chantier.actions[chantier.actions.length - 1];
+        const estCA = (n) => { const x = String(n || "").toLowerCase().trim(); return x === "contre" || x.includes("absorption"); };
+        if (act && nom.trim() === "zone" && (estCA(act.baseEffet && act.baseEffet.Nom) || act.modsEffets.some(m => estCA(m.effet.Nom)))) return false;
+        if (act && estCA(nom) && act.modsEffets.some(m => (m.effet.Nom || "") === "Zone")) return false;
+    }
+
     // ⚖️ règle Forge : pas de Persistance terrain sur un soin (la Zone, oui).
     if (commeMod && nom.includes("persistance")) {
         const act = chantier.actions[chantier.actions.length - 1];
