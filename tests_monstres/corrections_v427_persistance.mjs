@@ -327,7 +327,7 @@ await section(async () => {
     const desc = carte.querySelector(".forge-desc");
     return { fatigue: document.getElementById("forge-fatigue-val").innerText, bandeau: document.getElementById("forge-surpuissance").textContent,
              valeur: (carte.querySelector(".forge-valeur-surpuissante") || {}).innerText || "", sous: sous ? sous.innerText : "",
-             apres: !!sous && !!(carte.querySelector(".forge-valeur-surpuissante").compareDocumentPosition(sous) & Node.DOCUMENT_POSITION_FOLLOWING),
+             apres: !!sous,
              couleurs: sous ? [...sous.querySelectorAll(".forge-persistance-lancement, .forge-persistance-zone")].map(x => getComputedStyle(x).color) : [],
              parentheses: [...desc.querySelectorAll(":scope > .forge-persistance-lancement, :scope > .forge-persistance-zone")].map(x => x.innerText) };
   }, REGLEE);
@@ -336,9 +336,10 @@ await section(async () => {
   // et de zone, ni le total de dégâts autre que persistance : une ligne avec les dégâts de création de la technique et la
   // surpuissance avec le multiplicateur, puis sur une même ligne les dégâts au lancement et dans la zone (avec surpuissance) ».
   verifier("(v469) plus les valeurs d'avant la surpuissance (pas de « (32 au lancement) (48 dans la zone) »)", s.parentheses.length === 0, JSON.stringify(s.parentheses));
-  verifier("(v469) une ligne : les dégâts de création et la surpuissance (« 80 de dégâts à la création · surpuissance ×1,35 »), plus le total « → 108 »",
-           s.valeur === "80 de dégâts à la création · surpuissance ×1,35" && !/108/.test(s.valeur), JSON.stringify(s.valeur));
-  verifier("(v469) puis, sur une même ligne, ses deux dégâts surpuissants : « 43 au lancement · 65 dans la zone » (arrondis)", s.sous === "43 au lancement · 65 dans la zone" && s.apres, JSON.stringify(s.sous));
+  // (v471) Nico : « retire la ligne "tant de dégâts à la création" quand il a surpuissance et persistance ».
+  verifier("(v471) plus de ligne « dégâts à la création », ni de total « → 108 »", s.valeur === "", JSON.stringify(s.valeur));
+  verifier("(v469) sur une même ligne, ses deux dégâts surpuissants : « 43 au lancement · 65 dans la zone » (arrondis)", s.sous === "43 au lancement · 65 dans la zone", JSON.stringify(s.sous));
+  verifier("(v471) …la surpuissance de la carte reste dans son bandeau (×1,35)", /×1,35/.test(s.bandeau), s.bandeau);
   verifier("(v466) …dans les deux couleurs de la persistance", s.couleurs.length === 2 && s.couleurs[0] !== s.couleurs[1], JSON.stringify(s.couleurs));
 });
 

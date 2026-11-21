@@ -1487,9 +1487,10 @@ function texteValeurSurpuissante(act, fatigue) {
     // lancement et de zone, ni le total de dégâts autre que la persistance : une ligne avec les dégâts de création
     // de la technique et la surpuissance avec son multiplicateur, puis sur une même ligne les dégâts au lancement et
     // dans la zone (calculés avec la surpuissance) ». Les parenthèses d'avant se taisent (texteDegatsPersistance).
+    // (v471) Nico : « retire la ligne "tant de dégâts à la création" quand il a surpuissance et persistance » : seuls
+    // restent ses deux dégâts surpuissants (la surpuissance de la carte se lit dans son bandeau).
     if (parts) {
-        return `<span class="forge-valeur-surpuissante">${String(Math.round(valeur * 10) / 10).replace(".", ",")} de dégâts à la création · surpuissance ×${String(m).replace(".", ",")}</span>`
-            + `<span class="forge-persistance-surpuissante"><span class="forge-persistance-lancement">${parts.lancement} au lancement</span>`
+        return `<span class="forge-persistance-surpuissante"><span class="forge-persistance-lancement">${parts.lancement} au lancement</span>`
             + (parts.zone !== null ? ` · <span class="forge-persistance-zone">${parts.zone} dans la zone</span>` : "") + `</span>`;
     }
     return `<span class="forge-valeur-surpuissante">→ ${surpuissante} ${soigne ? "de soin" : "de dégâts"} avec la surpuissance</span>`;

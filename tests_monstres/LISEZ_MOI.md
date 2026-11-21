@@ -12553,3 +12553,9 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - Le bonus s'additionne à celui de la race (un Humain Géomancien : +15). Il est lu par fatigueMaxCombattant : la jauge, le cap de la Forge et le combat (105 au lieu de 100).
 - Sa fiche de classe le dit (classes.js : « +5 de fatigue maximum »).
 - geomancien.mjs le vérifie (son « 1 ter »).
+
+## v471 — Forge : plus de ligne « dégâts à la création » avec surpuissance et persistance
+
+- Nico : « retire la ligne "tant de dégâts à la création" quand il y a surpuissance et persistance ».
+- Sous l'attaque, il ne reste que « 43 au lancement · 65 dans la zone » (competences.js, texteValeurSurpuissante). La surpuissance de la carte se lit toujours dans son bandeau (« 💥 Surpuissance ×1,35 … »).
+- corrections_v427_persistance.mjs le vérifie (ses contrôles « v471 »).
