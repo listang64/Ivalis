@@ -1866,12 +1866,13 @@ window.demarrerCiblage = async function(idCarte, options) {
 
             if (chanceOfferte("Brûlé") > 0) {
                 isBrule = true;
-                bruleChance += chanceOfferte("Brûlé");
+                // (v474) Nico : « les 5 % d'effet d'un élément, quand on sélectionne un élément avec une attaque magique, c'est une
+                // augmentation max » : ils s'ajoutent APRÈS le plafond du grimoire (le max monte d'autant), plus dedans.
                 bruleDuree = Math.max(bruleDuree, dureeOfferte());
             }
 
             if (isBrule) {
-                bruleChance = Math.min(bruleChance, plafondDuGrimoire("brûl", 60)); // plafond du grimoire
+                bruleChance = Math.min(100, Math.min(bruleChance, plafondDuGrimoire("brûl", 60)) + chanceOfferte("Brûlé")); // plafond du grimoire, puis l'élément (v474)
                 if (bruleDuree <= 0) bruleDuree = 2; // Sécurité si la BDD n'a pas de durée
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
@@ -1919,12 +1920,12 @@ window.demarrerCiblage = async function(idCarte, options) {
 
             if (chanceOfferte("Glacé") > 0) {
                 isGlace = true;
-                glaceChance += chanceOfferte("Glacé");
+                // (v474) l'élément : une augmentation max (après le plafond)
                 glaceDuree = Math.max(glaceDuree, dureeOfferte());
             }
 
             if (isGlace) {
-                glaceChance = Math.min(glaceChance, plafondDuGrimoire("glac", 60)); // plafond du grimoire
+                glaceChance = Math.min(100, Math.min(glaceChance, plafondDuGrimoire("glac", 60)) + chanceOfferte("Glacé")); // plafond du grimoire, puis l'élément (v474)
                 if (glaceDuree <= 0) glaceDuree = 2; // Sécurité si la BDD n'a pas de durée
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;
@@ -2006,12 +2007,12 @@ window.demarrerCiblage = async function(idCarte, options) {
 
             if (chanceOfferte("Électrifié") > 0) {
                 isElectrifie = true;
-                electrifieChance += chanceOfferte("Électrifié");
+                // (v474) l'élément : une augmentation max (après le plafond)
                 electrifieDuree = Math.max(electrifieDuree, dureeOfferte());
             }
 
             if (isElectrifie) {
-                electrifieChance = Math.min(electrifieChance, plafondDuGrimoire("électri", 75)); // plafond du grimoire (75 %, v267)
+                electrifieChance = Math.min(100, Math.min(electrifieChance, plafondDuGrimoire("électri", 75)) + chanceOfferte("Électrifié")); // plafond du grimoire (75 %, v267), puis l'élément (v474)
                 if (electrifieDuree <= 0) electrifieDuree = 2; // Sécurité si la BDD n'a pas de durée
 
                 if (indexPremierAutreEffet === -1) indexPremierAutreEffet = idxAction;

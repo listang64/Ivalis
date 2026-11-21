@@ -806,7 +806,8 @@ function corpsDeCarte(data, h, graine) {
     const corps = effets !== null
         ? `<div class="carte-effets carte-effets-encart">${effets}</div>`
         : `<ul class="carte-effets">${lignesEffets(data, h)}</ul>`;
-    const noteSurpuissance = surpuissance && !(effets && effets.includes("encart-surpuissance"));
+    // (v474) Une technique à persistance : ses dégâts finaux (au lancement, dans la zone) disent tout, pas de note.
+    const noteSurpuissance = surpuissance && !(effets && (effets.includes("encart-surpuissance") || effets.includes("encart-montant-persistance")));
     return `${lavis("gris", graine, { deborde: true })}
         ${cadre(graine, 1.2)}${cadre(graine + "-2", 2.2)}
         <div class="carte-entete">

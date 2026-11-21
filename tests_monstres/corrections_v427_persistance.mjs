@@ -356,8 +356,15 @@ await section(async () => {
     const lire = (html) => { const d = document.createElement("div"); d.innerHTML = html; const m = d.querySelector(".encart-montant");
       return { texte: m ? m.textContent.replace(/\s+/g, " ").trim() : "", persistance: !!d.querySelector(".encart-montant-persistance"), surpuissance: !!d.querySelector(".encart-surpuissance") }; };
     const heros = { idPersonnage: "H_ENCART", prenom: "Lyra", Fatigue_Max: 100 };
-    return { avec: lire(window.ligneEffetsCarte(carte(true), heros)), sans: lire(window.ligneEffetsCarte(carte(false), heros)) };
+    const livre = (() => { const d = document.createElement("div"); d.innerHTML = window.ligneEffetsCarte(carte(true), heros, { pourcentages: true });
+      return { lignes: [...d.children].map(x => x.textContent.replace(/\s+/g, " ").trim()), detailPourcent: !!d.querySelector(".encart-detail-pourcent") }; })();
+    return { avec: lire(window.ligneEffetsCarte(carte(true), heros)), sans: lire(window.ligneEffetsCarte(carte(false), heros)), livre };
   }, REGLEE);
+  // (v474) Nico : « dans l'encart avec le résumé de la technique, pour une technique avec persistance, affiche juste les
+  // dégâts finaux au lancement et dans la zone ».
+  verifier("(v474) l'encart du livre (avec les %) : seulement « 43 au lancement · 65 dans la zone » (ni la ligne Persistance, ni de %)",
+           r.livre.lignes.length === 1 && /43\s*au lancement/.test(r.livre.lignes[0]) && /65\s*dans la zone/.test(r.livre.lignes[0]) && !r.livre.detailPourcent, JSON.stringify(r.livre));
+  verifier("(v474) …et pas de note « Surpuissance » sous la carte", /effets\.includes\("encart-montant-persistance"\)/.test(fs.readFileSync(path.join(RACINE, "grimoire_fiches.js"), "utf-8")));
   verifier("(v472) une carte à persistance (surpuissance ×1,35) : « 43 au lancement · 65 dans la zone », pas « 108 Surpuissance »",
            r.avec.persistance && /43\s*au lancement/.test(r.avec.texte) && /65\s*dans la zone/.test(r.avec.texte) && !/108/.test(r.avec.texte) && !r.avec.surpuissance, JSON.stringify(r.avec));
   verifier("(v472) …sans persistance, rien ne change (« 108 Surpuissance »)", !r.sans.persistance && /108/.test(r.sans.texte) && r.sans.surpuissance, JSON.stringify(r.sans));

@@ -231,6 +231,29 @@ console.log("\n3 bis. (v468) CONTRE ET ABSORPTION NE SE METTENT PLUS EN ZONE");
            /Sur une action qui porte Contre ou Absorption : pas de Zone/.test(lia) && /O\.etatSousEffet\(mod, act/.test(lia) && /nom\.trim\(\) === "zone" && \(estCA/.test(mc));
 }
 
+console.log("\n3 ter. (v474) LES 5 % DE L'ÉLÉMENT D'UNE ATTAQUE MAGIQUE : UNE AUGMENTATION MAX");
+// Nico : « les 5 % d'effet d'un élément, quand on sélectionne un élément avec une attaque magique, c'est une augmentation max ».
+{
+  const r = await p.evaluate(async () => {
+    window.__docs = { "Personnages/H1": { Race: "Humain" }, "Caracteristiques/H1": { force: 20, dex: 20, con: 20, int: 20, sag: 20, cha: 20 } };
+    document.getElementById("champ-id-personnage").value = "H1";
+    window.OUVERTURE_FORGE_EN_COURS = false;
+    await window.ouvrirCreationCompetence();
+    window.forgeState.armePrincipale = "Magie";
+    const eff = (id) => window.forgeState.effetsBDD.find(e => e.id === id);
+    const lire = (crans) => {
+      window.forgeState.actions = [{ idInst: "A1", baseEffet: eff("EFF_ATTAQUE_MAGIQUE"), count: 1, element: "Feu", mods: crans ? { EFF_BRULE: crans } : {}, zoneHexes: [], baseDuree: 0, modsDuree: {} }];
+      window.rafraichirForge();
+      return [...document.querySelectorAll("#forge-contenu-carte .forge-desc")].map(x => x.textContent).find(t => /brûl/i.test(t)) || "";
+    };
+    const res = { six: lire(6), trois: lire(3), zero: lire(0) };
+    window.fermerForgeCompetence();
+    return res;
+  });
+  verifier("(v474) Brûlé au max (6 crans, 60 %) sur une Attaque de Feu : 65 %, et le max monte à 65 %", /\b65\s*%/.test(r.six) && /max\s*65/i.test(r.six) && !/\b60\s*%/.test(r.six), r.six);
+  verifier("(v474) …3 crans : 30 + 5 = 35 % (max 65 %)", /\b35\s*%/.test(r.trois) && /max\s*65/i.test(r.trois), r.trois);
+}
+
 console.log("\n4. LA PORTÉE D'UNE ARME NE SERT QUE LES CARTES DE SON TYPE (objets.js)");
 // =========================================================================
 await section(async () => {

@@ -6471,8 +6471,12 @@ window.ligneEffetsCarte = function(dataCarte, lanceur, options) {
         const nom = nomActuel(eff.nom);
         const nature = window.natureEffetEncart(eff.nom, sansBalises(eff.desc));
         const chiffre = nature ? sansBalises(eff.desc).match(/(\d+(?:[.,]\d+)?)/) : null;
+        // (v474) Nico : « dans l'encart avec le résumé de la technique, pour une technique avec persistance, affiche
+        // juste les dégâts finaux au lancement et dans la zone » : la ligne de la Persistance elle-même s'efface (ses
+        // deux dégâts la disent), et sous l'attaque, pas de détail en %.
+        if (partsPersistance && /persistance/i.test(eff.nom)) return;
         if (nature && chiffre) {
-            if (partsPersistance && nature !== "soin") lignes.push(ligneMontantPersistance(nature, nom, montantReel(chiffre[1], nature), !!eff.isMod));
+            if (partsPersistance && nature !== "soin") { lignes.push(ligneMontantPersistance(nature, nom, montantReel(chiffre[1], nature), !!eff.isMod)); return; }
             else lignes.push(ligneMontant(nature, nom, montantReel(chiffre[1], nature).replace(".", ","), toursPour(i), !!eff.isMod));
             // (v316) Ce que le montant porte en % (une chance, une part), écrit dessous.
             if (avecPourcentages) {

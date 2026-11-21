@@ -396,7 +396,8 @@ titre("6. LES EFFETS : ÉLECTRIFIÉ 15 % (MAX 75), PURIFICATION 35 ET 2 ÉTATS, 
   });
   verifier("le grimoire de la base (10 % / 60 %, -35 initiative) cède aux règles du jeu : 15 % / 75 %",
            r.cache.elec[0] === 15 && r.cache.elec[1] === 75 && !/Initiative/i.test(r.cache.texteElec || ""), JSON.stringify(r.cache));
-  verifier("ÉLECTRIFIÉ : deux crans = 30 % (+5 offerts par la Foudre) ; six crans plafonnent à 75 %", r.elec.deux === 35 && r.elec.six === 75, JSON.stringify(r.elec));
+  // (v474) Les 5 % de la Foudre sont une augmentation max : par-dessus le plafond (75 → 80).
+  verifier("ÉLECTRIFIÉ : deux crans = 30 % (+5 offerts par la Foudre) ; six crans au plafond (75) + 5 de l'élément = 80 % (v474)", r.elec.deux === 35 && r.elec.six === 80, JSON.stringify(r.elec));
   verifier("…et l'état ne parle plus d'initiative", !!r.elec.desc && !/initiative/i.test(r.elec.desc), r.elec.desc);
   verifier("PURIFICATION : 35 de fatigue (7 pts) et deux états retirés", r.cache.purif[0] === "7" && r.cache.purif[1] === 2 && r.purif === 2, `${JSON.stringify(r.cache.purif)} → ${r.purif}`);
   verifier("L'ARCANE se choisit comme un élément", r.arcane.dansLaListe && r.arcane.element === "Arcane", JSON.stringify(r.arcane));

@@ -181,8 +181,12 @@ await section(async () => {
   verifier("1re surpuissance : un cran de trop reste plafonné au max, puis +5 (7 crans → 65)", p7.chances["Brûlé"] === 65, JSON.stringify(p7.chances));
   const feu40 = await extraire(40, 4, { EFF_BRULE: 6 }, { element: "Feu" });
   const feu75 = await extraire(75, 4, { EFF_BRULE: 6 }, { element: "Feu" });
-  verifier("Attaque de Feu, 60 % + 5 % offerts : 60 sans, 65 à la 1re surpuissance", feu40.chances["Brûlé"] === 60 && feu75.chances["Brûlé"] === 65,
+  // (v474) Nico : « les 5 % d'un élément, quand on sélectionne un élément avec une attaque magique, c'est une augmentation
+  // max » : ils passent par-dessus le max du grimoire (60 → 65), comme la surpuissance (65 → 70).
+  const feu3 = await extraire(40, 4, { EFF_BRULE: 3 }, { element: "Feu" }), feu0 = await extraire(40, 4, {}, { element: "Feu" });
+  verifier("(v474) Attaque de Feu, Brûlé au max (60) + 5 % de l'élément par-dessus : 65 ; 70 à la 1re surpuissance", feu40.chances["Brûlé"] === 65 && feu75.chances["Brûlé"] === 70,
            `${feu40.chances["Brûlé"]} / ${feu75.chances["Brûlé"]}`);
+  verifier("(v474) …sous le max, 30 + 5 = 35 ; sans cran, les 5 % seuls", feu3.chances["Brûlé"] === 35 && feu0.chances["Brûlé"] === 5, `${feu3.chances["Brûlé"]} / ${feu0.chances["Brûlé"]}`);
   const et = await extraire(75, 4, { EFF_ETOURDI: 4 });
   const po = await extraire(75, 4, { EFF_POUSSEE: 5 });
   const lu = await extraire(75, 4, { EFF_LUMIERE: 5 });

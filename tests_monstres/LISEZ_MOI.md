@@ -12576,3 +12576,15 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
 - La même fuite sert à la Confusion : elle suit la même règle.
 - Une marche ordinaire, elle, subit toujours la zone à chaque case (« s'il continue, ça continue »).
 - zones_cerveau.mjs le vérifie (son contrôle « v473 »).
+
+## v474 — L'encart d'une technique à persistance ; les 5 % de l'élément, une augmentation max
+
+- **L'encart avec le résumé de la technique** (Nico : « pour une technique avec persistance, affiche juste les dégâts finaux au lancement et dans la zone ») : sur une carte à persistance, l'encart (combat.js, ligneEffetsCarte ; la carte du livre, grimoire_fiches.js) n'écrit que « 43 au lancement · 65 dans la zone ». Disparaissent :
+  - la ligne de l'effet Persistance ;
+  - le détail en % sous l'attaque ;
+  - la note « Surpuissance » sous la carte.
+- **Les 5 % de l'élément** (« les 5 % d'effet d'un élément, quand on sélectionne un élément avec une attaque magique, c'est une augmentation max ») :
+  - ils s'ajoutent après le plafond du grimoire, et le max monte d'autant ;
+  - exemples : Brûlé au max (60 %) sur une Attaque de Feu → 65 % (70 % à la 1re surpuissance) ; Électrifié au plafond (75 %) avec la Foudre → 80 % ;
+  - en combat (moteur_effets.js : Brûlé, Glacé, Électrifié) comme dans la Forge (competences.js : « 65 % … (max 65 %) »).
+- corrections_v427_persistance, v427_surpuissance, v431 et v267 le vérifient.

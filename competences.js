@@ -1387,13 +1387,15 @@ function formatterTexteEffet(effet, stacks, action) {
         // (une fonction du même fichier, lue par window : les bancs qui
         // n'extraient que formatterTexteEffet s'en passent.)
         const offert = typeof window.chanceOfferteForge === "function" ? window.chanceOfferteForge(effet, action) : 0;
-        let calcP = offert > 0 && pMax > 0 ? Math.min(pMax, pBase * stacks + offert) : pBase * stacks + offert;
+        // (v474) Nico : « les 5 % d'un élément, avec une attaque magique, c'est une augmentation max » : les crans
+        // restent bornés au max du grimoire, l'élément s'ajoute par-dessus (et le max monte d'autant).
+        let calcP = pMax > 0 ? Math.min(pMax, pBase * stacks) : pBase * stacks + offert;
         // (v431) LES AUGMENTATIONS MAX du personnage (pas celles des armes) : Nico, « tu ajoutes
         // chaque max à la limite et tu mets sur l'effet l'augmentation : Peur avec 5 % d'augmentation
         // max, au premier niveau 15 % (10 + 5), avec à côté (max 65 %) ». Sur un sort en
         // construction seulement (`action`), et sur un effet qu'il porte.
-        const augMax = action && pMax > 0 && (stacks > 0 || offert > 0) && typeof window.augmentationsMaxForge === "function"
-            ? window.augmentationsMaxForge(effet, action) : 0;
+        const augMax = (action && pMax > 0 && (stacks > 0 || offert > 0) && typeof window.augmentationsMaxForge === "function"
+            ? window.augmentationsMaxForge(effet, action) : 0) + (pMax > 0 ? offert : 0);
         const maxAffiche = pMax > 0 ? Math.min(100, pMax + augMax) : pMax;
         if (augMax > 0) calcP = Math.min(100, Math.min(pMax, calcP) + augMax);
         const ecrireP = (v) => String(Math.round(v * 100) / 100).replace(".", ",");
