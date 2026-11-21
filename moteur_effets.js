@@ -2216,6 +2216,7 @@ window.demarrerCiblage = async function(idCarte, options) {
             }
 
             // 🔻 NOUVEAU : DÉTECTION ABSORPTION 🔻
+            const DUREE_CONTRE_ABSORPTION = Number(window.DUREE_CONTRE_ABSORPTION) || 2;
             // (v431) Nico : « se guérit de 25 %, puis de 40 % au 2e cumul, des dégâts magiques
             // subis après réduction de la résistance magique ; 2 cumuls max ». Les crans
             // (effet de base et modificateurs) donnent la part : 1 → 25 %, 2 et plus → 40 %.
@@ -2244,9 +2245,11 @@ window.demarrerCiblage = async function(idCarte, options) {
                 alterationsExtraites.push({
                     nom: "Absorption",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", // NOTE: Remplace par le lien d'une belle icône Cloudinary !
-                    desc: `Soigne de ${absorptionValeur}% des dégâts magiques subis (après la résistance magique).`,
+                    desc: `Soigne de ${absorptionValeur}% des dégâts magiques subis (après la résistance magique). Dure 2 tours.`,
                     chance: 100, // Toujours 100% d'application pour un buff
-                    duree: 1, // Dure uniquement le tour en cours !
+                    // (v467) Nico : « Absorption et Contre : préciser qu'ils durent 2 tours ; vérifie que ce soit bien le cas
+                    // en vrai ». Ils ne duraient qu'une manche (celle où on les pose) : deux maintenant (DUREE_CONTRE_ABSORPTION).
+                    duree: DUREE_CONTRE_ABSORPTION,
                     valeurAbs: absorptionValeur,
                     isRanged: isRanged,
                     rangeMax: rangeMax,
@@ -2281,9 +2284,9 @@ window.demarrerCiblage = async function(idCarte, options) {
                 alterationsExtraites.push({
                     nom: "Contre",
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png",
-                    desc: `Renvoie ${contreValeur}% des dégâts physiques subis (après l'armure) à l'attaquant.`,
+                    desc: `Renvoie ${contreValeur}% des dégâts physiques subis (après l'armure) à l'attaquant. Dure 2 tours.`,
                     chance: 100,
-                    duree: 1,
+                    duree: DUREE_CONTRE_ABSORPTION,   // (v467) 2 manches
                     valeurContre: contreValeur,
                     isRanged: isRanged,
                     rangeMax: rangeMax,

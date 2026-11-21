@@ -1684,6 +1684,8 @@ window.EFFETS_RENOMMES = { EFF_MOTS_DE_POUVOIRS: "Distorsion mentale" };
 //    magiques subis en plus.
 //  · Purification : « on passe à 35 de fatigue, et ça enlève 2 états »
 //    (Cout_PT ×5 = la fatigue ; Valeur = le nombre d'états retirés).
+// (v467) Contre et Absorption durent 2 manches (moteur_effets.js, leur extraction ; la Forge le dit).
+window.DUREE_CONTRE_ABSORPTION = 2;
 window.REGLES_EFFETS_IMPOSEES = {
     EFF_ELECTRIFIE: { Valeur: 0, Pourcent_Base: 15, Pourcent_Max: 75,
                       Effet_Base: "15% chance d'électrifier la cible (Max 75%)",

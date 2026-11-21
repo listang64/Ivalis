@@ -1373,8 +1373,8 @@ function formatterTexteEffet(effet, stacks, action) {
     if (nomCA === "contre" || nomCA === "absorption") {
         const part = [25, 40][Math.min(2, Math.max(1, Math.round(stacks) || 1)) - 1];
         return nomCA === "contre"
-            ? `Renvoie ${part}% des dégâts physiques subis (après l'armure) à l'attaquant.`
-            : `Soigne de ${part}% des dégâts magiques subis (après la résistance magique).`;
+            ? `Renvoie ${part}% des dégâts physiques subis (après l'armure) à l'attaquant. Dure 2 tours.`
+            : `Soigne de ${part}% des dégâts magiques subis (après la résistance magique). Dure 2 tours.`;
     }
     let texte = effet.Effet_Base || "";
     const val = parseFrenchFloat(effet.Valeur);

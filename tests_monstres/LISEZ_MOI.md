@@ -12518,3 +12518,11 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   - « avec une surpuissance, l'appliquer aux 2 valeurs et l'afficher en dessous de la surpuissance » : sous « → 108 de dégâts avec la surpuissance », la ligne « → avec la surpuissance : 43 au lancement · 65 dans la zone », dans les deux couleurs (partsPersistance).
   - Le calcul suit le combat : la valeur surpuissante arrondie, puis les parts.
 - corrections_v427_persistance (son « 4 bis ») et v427_surpuissance le vérifient.
+
+## v467 — Contre et Absorption durent 2 tours
+
+- Nico : « pour Absorption et Contre, modifier le descriptif de l'effet et préciser qu'il dure 2 tours. Vérifie également que ce soit bien le cas en vrai. »
+- **En vrai, ce n'était pas le cas** : posés avec une durée de 1, ils tombaient à la fin de la manche où on les lançait.
+- Ils sont maintenant posés pour 2 manches (moteur_effets.js, DUREE_CONTRE_ABSORPTION ; réglage dans app.js). Ils restent après la 1re fin de manche, jouent encore pendant la 2e (le Contre renvoie sa part), et tombent à la fin de la 2e.
+- **Le descriptif** finit par « Dure 2 tours. » dans la Forge (competences.js, formatterTexteEffet) et sur l'état posé en combat.
+- bouclier_absorption_contre.mjs le vérifie (son « 5 bis »), avec le vrai décompte des états du cerveau (vieillirLesEtats).

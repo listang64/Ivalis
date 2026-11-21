@@ -185,6 +185,34 @@ console.log("\n5. CE QUE LA CARTE EXTRAIT (vrai moteur_effets.js)");
   verifier("(v431) Absorption : 25 % puis 40 %, jamais plus", r.a1 === 25 && r.a2 === 40 && r.a4 === 40, `(${r.a1}, ${r.a2}, ${r.a4})`);
 }
 
+console.log("\n5 bis. (v467) CONTRE ET ABSORPTION DURENT 2 TOURS (LE DESCRIPTIF ET LE VRAI COMBAT)");
+// Nico : « pour Absorption et Contre, modifier le descriptif de l'effet et préciser qu'il dure 2 tours ; vérifie
+// également que ce soit bien le cas en vrai ». Ils ne duraient qu'une manche : celle où on les posait.
+{
+  const r = await p.evaluate(async () => {
+    const c = (await window.__extraire([{ baseEffetId: "EFF_CONTRE", count: 1, mods: {} }])).alterations[0] || {};
+    const a = (await window.__extraire([{ baseEffetId: "EFF_ABSORPTION", count: 2, mods: {} }])).alterations[0] || {};
+    return { c: { duree: c.duree, desc: c.desc, valeurContre: c.valeurContre }, a: { duree: a.duree, desc: a.desc, valeurAbs: a.valeurAbs } };
+  });
+  verifier("(v467) l'état posé : 2 tours, et son descriptif le dit", r.c.duree === 2 && r.a.duree === 2 && / Dure 2 tours\.$/.test(r.c.desc) && / Dure 2 tours\.$/.test(r.a.desc), JSON.stringify(r));
+  const { vieillirLesEtats } = await import('../cerveau_combat.js');
+  const e = monde();
+  const h1 = e.combattants.H1;
+  h1.etats = [{ nom: "Contre", duree: r.c.duree, valeurContre: r.c.valeurContre }, { nom: "Absorption", duree: r.a.duree, valeurAbs: r.a.valeurAbs }];
+  vieillirLesEtats(e);
+  const apres1 = h1.etats.map(x => x.nom + ":" + x.duree).join(",");
+  // Un coup physique pendant la 2e manche : le Contre renvoie encore sa part.
+  const m = jouer(e, { type: "carte", idLanceur: "M1", idCarte: "C1", attaques: [{ nom: "Coup", valeurBrute: 20, typeRes: "Physique", cibles: ["H1"] }], alterations: [] });
+  const renvoi = m.etat.combattants.M1.pv < 60;
+  vieillirLesEtats(m.etat);
+  const apres2 = (m.etat.combattants.H1.etats || []).filter(x => x.nom === "Contre" || x.nom === "Absorption").length;
+  verifier("(v467) en vrai : après la 1re fin de manche ils sont encore là (1 tour restant)…", apres1 === "Contre:1,Absorption:1", apres1);
+  verifier("(v467) …ils jouent encore pendant la 2e manche (le Contre renvoie sa part)…", renvoi, String(m.etat.combattants.M1.pv));
+  verifier("(v467) …et tombent à la fin de la 2e manche", apres2 === 0, String(apres2));
+  const forge = fs.readFileSync('/home/user/Ivalis/competences.js', 'utf-8');
+  verifier("(v467) la Forge le dit aussi (« … Dure 2 tours. »)", /à l'attaquant\. Dure 2 tours\.`/.test(forge) && /résistance magique\)\. Dure 2 tours\.`/.test(forge));
+}
+
 console.log("\n6. UNE ZONE DE SOIN À DISTANCE, MÊME ENNEMI AU CONTACT");
 {
   const r = await p.evaluate(async () => {
