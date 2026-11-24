@@ -1197,6 +1197,8 @@ function placerPions() {
         placerCroix("monde", ici, reglages.tailleMonde);
         pm.classList.toggle("en-marche", !!(voyage && voyage.Type === "monde" && voyage.Etat === "marche"));
     }
+    // (v478) Le logo du camp du clan nomade, au centre de la boîte de sa région (camp.js).
+    if (typeof window.placerCampMonde === "function") { try { window.placerCampMonde(centreMonde, reglages.tailleMonde); } catch (e) {} }
     // La carte régionale ouverte : le marqueur, s'il est dans cette région.
     const { pion, nuit } = calquesRegion();
     const c = cadrageRegion();
@@ -2217,6 +2219,7 @@ window.appliquerVoyageDeLaPartie = function(data) {
     dessinerTout();
 };
 window.IMAGE_GROUPE_MONDE = IMAGE_GROUPE_MONDE;      // (v312) le pion du groupe, aussi sur la carte du monde du livre
+window.placerPionsVoyage = () => placerPions();       // (v478) le camp a bougé (camp.js)
 window.etatVoyageGroupe = () => ({
     position: positionEffective(), voyage: voyage ? JSON.parse(JSON.stringify(voyage)) : null,
     choix: window.choixVoyageGroupe(), anim: anim ? { cle: anim.cle, f: anim.f, de: anim.de, a: anim.a, duree: anim.duree, delai: anim.delai } : null,

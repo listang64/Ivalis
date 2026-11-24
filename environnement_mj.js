@@ -215,6 +215,47 @@ window.lireTerrainA = async function(pos) {
     return demanderTerrain(decoupe, p, lieuxProches(p));
 };
 
+// (v478) LES RESSOURCES NATURELLES AUTOUR DU CAMP (MIA_RESSOURCES) — le clan nomade
+// (CLAN_NOMADE.md, étape 2) : « on envoie à une IA une capture de la carte autour du
+// camp, et elle estime la quantité de ressources », de 0 à 100 selon le terrain.
+// Rend { terrain, valeur } tels que l'IA les dit : camp.js les relit avec le barème
+// (camp_pur.js, jaugeDuTerrain).
+function promptRessources(pos) {
+    const nom = (carte(pos.Region) || {}).nom || `Région ${pos.Region}`;
+    return `Tu es MIA_RESSOURCES, l'intendante d'un clan nomade d'Ivalis (un monde d'Antique Fantastique).
+Voici un extrait de la carte dessinée de la région « ${nom} ». Le POINT ROUGE cerclé de blanc marque l'endroit EXACT où le clan a posé son camp.
+
+Ta mission : estime les ressources naturelles autour du camp (gibier, cueillette, eau, bois), d'après le terrain que tu VOIS sur l'image, sans rien inventer.
+Le barème (une valeur de 0 à 100) :
+- Forêt ou rivière : 80 à 100
+- Plaine : 60 à 80
+- Colline ou montagne : 40 à 60
+- Marais : 30 à 50
+- Désert ou neige : 10 à 30
+
+Réponds OBLIGATOIREMENT avec un JSON valide, exactement de cette forme :
+{ "terrain": "Forêt ou rivière | Plaine | Colline ou montagne | Marais | Désert ou neige", "valeur": un nombre entier de 0 à 100 }`;
+}
+window.estimerRessourcesA = async function(pos) {
+    const p = { Region: Number(pos.Region), x: Number(pos.x), y: Number(pos.y) };
+    const cle = localStorage.getItem("ivalis_GEMINI_API_KEY");
+    if (!cle) return null;
+    const decoupe = await decouper(p);
+    if (!decoupe) return null;
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${cle}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: promptRessources(p) }, { inline_data: { mime_type: "image/jpeg", data: decoupe.base64 } }] }],
+            generationConfig: { temperature: 0.2, responseMimeType: "application/json" }
+        })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error((data.error && data.error.message) || `Gemini ${res.status}`);
+    if (typeof window.ajouterTokens === "function" && data.usageMetadata) window.ajouterTokens(data.usageMetadata.totalTokenCount || 0);
+    const r = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
+    return { terrain: String(r.terrain || ""), valeur: Number(r.valeur) };
+};
+
 // L'ANALYSE, UNE FOIS PAR POSITION : refaite seulement si le groupe a bougé
 // (ou `forcer`). Rend la fiche gardée dans la partie.
 window.analyserTerrainGroupe = async function(options) {

@@ -53,6 +53,7 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
 |---|---|---|
 | 0 — Inventaire | v477 | fait |
 | 1 — Nettoyage de l'ancien système | v477 | fait |
+| 2 — Le camp, Thémès et les données | v478 | fait |
 
 ## Points ambigus
 
@@ -62,3 +63,17 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
   clique sur « Créer ». Choix fait : l'identité de clan disparaît (fanion, nom de clan, fondation,
   réinitialisation, bouton « Les clans »), la page de gauche reste comme **liste des personnages** du
   joueur (case du héros actif, fiche, « + Un nouvel aventurier ») jusqu'à l'étape 6.
+- **Étape 2, « le logo du camp sur la carte globale ».** Le document dit aussi que le camp est « représenté
+  par le logo qu'on utilise sur la carte globale ». Choix fait : ce logo (celui du pion du groupe sur la
+  carte du monde) représente le camp sur la carte régionale, à sa place, et sur la carte du monde, au centre
+  de sa région.
+- **Étape 2, la tâche en cours.** Le document la range parmi les données du camp ; elle reste le champ
+  `Mission_En_Cours` de la partie (celui des missions), pour ne pas tenir deux fois la même chose.
+- **Étape 2, la bourse des joueurs.** Rangée sur la partie (`Bourses_Joueurs`, un montant par joueur), vide
+  pour l'instant.
+- **Étape 2, les membres du clan.** Le bouton DEV y met Thémès et les héros vivants des joueurs (moral 60,
+  sans tâche) : « tout personnage de joueur qui n'est pas utilisé en expédition est traité comme un PNJ ».
+- **Étape 2, l'affection de Thémès.** « Au maximum » : confiance, respect et attachement à 100 dans ses fils
+  invisibles (l'affinité vaut alors 100), et la familiarité aussi à 100.
+- **Étape 2, sans « Forêt des Murmures ».** La région se cherche par son nom ; si la partie n'en a pas, le
+  bouton DEV ne crée rien et le dit.

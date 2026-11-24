@@ -171,6 +171,9 @@ function dessiner() {
     // (v443) Le lieu de la mission de guilde en cours : un point d'interrogation doré.
     const mq = marqueDeMission(numero);
     if (mq) couche.appendChild(elementMarqueMission(mq, boite(mq, c)));
+    // (v478) Le camp du clan nomade, sous le logo de la carte du monde (camp.js).
+    const campIci = typeof window.elementCampCarte === "function" ? window.elementCampCarte(numero, c) : null;
+    if (campIci) couche.appendChild(campIci);
     if (dev) {
         pastilles.forEach(p => {
             const b = boite(p, c);

@@ -4127,6 +4127,11 @@ function ecouterPersonnagesDeLaPartie(idPartie) {
              try { window.appliquerVoyageDeLaPartie(dataPartie); }
              catch (e) { console.error("Voyage du groupe (le jeu continue) :", e); }
          }
+         // (v478) LE CAMP DU CLAN NOMADE (camp.js) : sa place sur les cartes.
+         if (typeof window.appliquerCampDeLaPartie === "function") {
+             try { window.appliquerCampDeLaPartie(dataPartie); }
+             catch (e) { console.error("Le camp (le jeu continue) :", e); }
+         }
          // (v443) LES MISSIONS DE GUILDE (missions_guilde.js) : le vote, la mission en cours.
          if (typeof window.appliquerMissionDeLaPartie === "function") {
              try { window.appliquerMissionDeLaPartie(dataPartie); }

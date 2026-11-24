@@ -5415,3 +5415,12 @@ textarea.input-texte-parchemin {
 .date-voyage.roule .chiffre-date.roule .ancien { transform: translateY(-100%); opacity: 0; }
 .date-voyage.roule .chiffre-date.roule .nouveau { transform: translateY(0); opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .date-voyage, .date-voyage .chiffre-date.roule .ancien, .date-voyage .chiffre-date.roule .nouveau { transition: none; } }
+
+/* (v478) LE CAMP DU CLAN NOMADE (camp.js) : le logo de la carte du monde, sur la carte
+   régionale (à sa place) et sur la carte du monde (au centre de sa région, sous le pion
+   du groupe) ; et le bouton DEV qui crée Thémès et le camp, à côté de celui des régions. */
+.camp-carte { position: absolute; pointer-events: none; z-index: 2; }
+.camp-carte img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.55)); }
+.camp-monde { position: absolute; display: none; height: auto; transform: translate(-50%, -50%); pointer-events: none; z-index: 6;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.55)); }
+.btn-camp-dev { margin-left: 8px; }
