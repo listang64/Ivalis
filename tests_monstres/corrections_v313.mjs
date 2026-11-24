@@ -115,7 +115,7 @@ await p.evaluate(() => {
                    xp: 1060, PV_Max: 62, Fatigue_Max: 100, fatigueMax: 100, Regeneration: 35, Esquive: 15, Parade: 0, Critique: 10, Def_Physique: 5, Def_Magique: 0,
                    talents: { TAL_PREPARER: 1 }, talentsChoix: {}, blessures: [{ uid: "b1", id: "BLE_LEVRE_FENDUE", jours: 2 }], deckEquipe: ["C1", "C3"], creeLe: 2000,
                    equipArmure: { nom: "Cuirasse de lin lamellé", rarete: "Rare", type: "Armure légère", emplacement: "armure", effetTexte: "+6 % de défense physique", image: "" },
-                   equipMainDroite: arme("Glaive de bronze"), equipMainGauche: null, equipStock: arme("Fronde de berger", { type: "Arme légère Distance" }), piecesLaiton: 12, piecesBronze: 17 },
+                   equipMainDroite: arme("Glaive de bronze"), equipMainGauche: null, equipStock: arme("Fronde de berger", { type: "Arme légère Distance" }), drachmes: 12 },
                  { idPersonnage: "H3", idJoueur: "J1", prenom: "Thorin", nom: "Ironfoot", race: "Nain", classe: "Protecteur", actif: true, urlCloudinary: "", creeLe: 1000 },
                  { idPersonnage: "H2", idJoueur: "J2", prenom: "Lyra", nom: "Sombreval", genre: "Femme", race: "Elfe", classe: "Oracle", actif: true, urlCloudinary: "", creeLe: 1500 }];
   window.CARACS_PARTIE = { H1: { force: 10, dex: 15, con: 12, int: 13, sag: 10, cha: 8 } };
@@ -294,21 +294,22 @@ titre("6. L'INVENTAIRE : LA RICHESSE (LAITON, BRONZE), L'ÉQUIPEMENT, LE STOCKAG
 // =========================================================================
 await section(async () => {
   await allerA("inv-g"); await p.waitForTimeout(2200); await pose();
-  const r = await p.evaluate(() => ({ pieces: [...document.querySelectorAll("#grimoire-fiches-inv-g .saisie-pieces")].map(i => i.dataset.metal + ":" + i.value),
+  const r = await p.evaluate(() => ({ pieces: [...document.querySelectorAll("#grimoire-fiches-inv-g .saisie-pieces")].map(i => i.value),
     svg: document.querySelectorAll("#grimoire-fiches-inv-g svg.piece").length,
     encarts: [...document.querySelectorAll("#grimoire-fiches-inv-g .encart-objet .titre-encart, #grimoire-fiches-inv-d .encart-objet .titre-encart")].map(t => t.textContent),
     stock: document.querySelector("#grimoire-fiches-inv-d .objet-stock .objet-nom").textContent, dev: !!document.querySelector("#grimoire-fiches-inv-d .lien-dev") }));
-  verifier("la richesse : pièces de laiton et de bronze, dessinées en pièces antiques", JSON.stringify(r.pieces) === '["laiton:12","bronze:17"]' && r.svg === 2, JSON.stringify(r.pieces));
+  // (v475) Nico : « une seule monnaie : les drachmes ».
+  verifier("(v475) la richesse : les drachmes, une seule pièce antique", JSON.stringify(r.pieces) === '["12"]' && r.svg === 1, JSON.stringify(r.pieces));
   const aide = await appuiLong("#grimoire-fiches-inv-g .encart-richesse .titre-encart");
-  verifier("un appui long sur « Richesse » : 30 pièces de bronze = 1 pièce de laiton", /30 pièces de bronze valent 1 pièce de laiton/.test(aide.texte), aide.texte);
+  verifier("(v475) un appui long sur « Richesse » : la drachme, seule monnaie", /La drachme est la seule monnaie d'Ivalis/.test(aide.texte), aide.texte);
   verifier("l'armure, la main droite, la main gauche, et un emplacement de stockage", JSON.stringify(r.encarts) === '["Armure","Main droite","Main gauche","Stockage"]' && r.stock === "Fronde de berger", JSON.stringify(r.encarts));
   verifier("hors mode DEV, pas de lien « Dev »", !r.dev);
   await cap("v313_inventaire");
-  // 40 bronzes : 1 laiton de plus, 10 bronzes.
-  await p.evaluate(() => { const i = document.querySelector('#grimoire-fiches-inv-g .saisie-pieces[data-metal="bronze"]'); i.value = "40"; i.dispatchEvent(new Event("change", { bubbles: true })); });
+  // (v475) 40 drachmes.
+  await p.evaluate(() => { const i = document.querySelector('#grimoire-fiches-inv-g .saisie-pieces'); i.value = "40"; i.dispatchEvent(new Event("change", { bubbles: true })); });
   await p.waitForTimeout(500);
   const m = await p.evaluate(() => (window.__majs || []).filter(x => x.chemin === "Personnages/H1").pop());
-  verifier("les pièces s'écrivent ; 30 bronzes font un laiton", !!m && m.data.Pieces_Laiton === 13 && m.data.Pieces_Bronze === 10, JSON.stringify(m && m.data));
+  verifier("(v475) les drachmes s'écrivent", !!m && m.data.Drachmes === 40 && m.data.Pieces_Laiton === undefined, JSON.stringify(m && m.data));
   // Ranger le glaive ? Le stockage est plein : on prend d'abord la fronde en main gauche.
   await cliquer('#grimoire-fiches-inv-d .objet-stock [data-fa="prendre"]'); await p.waitForTimeout(600);
   const pris = await p.evaluate(() => (window.__majs || []).filter(x => x.chemin === "Personnages/H1").pop().data);
