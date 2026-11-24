@@ -7,8 +7,8 @@
    "carac": "DEXTÉRITÉ",
    "Commun": "+3% chance de critique",
    "Rare": "+6% chance de critique",
-   "Très rare": "+10% chance de critique + 1 Effet A",
-   "Épique": "+10% chance de critique + 2XEffet A",
+   "Très rare": "+9% chance de critique",
+   "Épique": "+9% chance de critique + 1 Effet A",
    "noms": "Sica, panazonium"
   },
   {
@@ -18,8 +18,8 @@
    "carac": "DEXTÉRITÉ",
    "Commun": "-1 au coût du déplacement",
    "Rare": "+3% chance de critique - 1 au coût du déplacement",
-   "Très rare": "+5% chance de critique -1 au coût du déplacement + 1 Effet A",
-   "Épique": "+5% chance de critique -1 au coût du déplacement + 2XEffet A",
+   "Très rare": "+5% chance de critique -1 au coût du déplacement + 3 d’initiative",
+   "Épique": "+5% chance de critique -1 au coût du déplacement + 3 d’initiative + 1 Effet A",
    "noms": "Couteaux"
   },
   {
@@ -29,8 +29,8 @@
    "carac": "FORCE",
    "Commun": "+5 d’initiative",
    "Rare": "+1 dégâts physique +5 d’initiative",
-   "Très rare": "+2 dégâts physique + 8 d’initiative + 1 Effet A",
-   "Épique": "+2 dégâts physique + 8 d’initiative + 2XEffet A",
+   "Très rare": "+2 dégâts physique + 5 d’initiative",
+   "Épique": "+2 dégâts physique + 5 d’initiative + 1 Effet A",
    "noms": "Glaive, xiphos"
   },
   {
@@ -40,8 +40,8 @@
    "carac": "DEXTÉRITÉ",
    "Commun": "+ 1 dégâts physique",
    "Rare": "+1 dégâts physique + 3% chance de critique",
-   "Très rare": "+2 dégâts physique + 5% chance de critique + 1 Effet A",
-   "Épique": "+2 dégâts physique + 5% chance de critique + 2XEffet A",
+   "Très rare": "+2 dégâts physique + 3% chance de critique",
+   "Épique": "+2 dégâts physique + 3% chance de critique + 1 Effet A",
    "noms": "Harpé, machaira, falcata"
   },
   {
@@ -49,10 +49,10 @@
    "type": "Arme lourde CAC",
    "modele": "Hache",
    "carac": "FORCE",
-   "Commun": "+1 dégâts physique",
-   "Rare": "+2 dégâts physique",
-   "Très rare": "+3 dégâts physique +1 Effet A",
-   "Épique": "+3 dégâts physique +2XEffet A",
+   "Commun": "+5% de chance de saignement max",
+   "Rare": "+1 dégâts physique + 5% de chance de saignement max",
+   "Très rare": "+2 dégâts physiques + 5% de chance de saignement max",
+   "Épique": "+2 dégâts physiques + 5% de chance de saignement max +1 Effet A",
    "noms": "Sagaris, Labrys"
   },
   {
@@ -60,10 +60,10 @@
    "type": "Arme lourde CAC",
    "modele": "Gourdin",
    "carac": "FORCE",
-   "Commun": "10% de chance d’étourdissement",
-   "Rare": "15% de chance d’étourdissement",
-   "Très rare": "20% de chance d’étourdissement + 1 dégât + 1 Effet A",
-   "Épique": "20% de chance d’étourdissement + 1 dégât + 2XEffet A",
+   "Commun": "+5% de chance de d’étourdissement max",
+   "Rare": "+10% de chance de d’étourdissement max",
+   "Très rare": "+10% de chance d’étourdissement max + 1 dégât physique",
+   "Épique": "+10% de chance d’étourdissement max+ 1 dégât + 1 Effet A",
    "noms": "Gourdin"
   },
   {
@@ -71,32 +71,32 @@
    "type": "Arme lourde CAC",
    "modele": "Masse",
    "carac": "FORCE",
-   "Commun": "15% de chance d’ignorer l’armure",
+   "Commun": "10% de chance d’ignorer l’armure",
    "Rare": "20% de chance d’ignorer l’armure",
-   "Très rare": "25% de chance d’ignorer l’armure + 1 Effet A",
-   "Épique": "25% de chance d’ignorer l’armure + 2XEffet A",
+   "Très rare": "30% de chance d’ignorer l’armure",
+   "Épique": "35% de chance d’ignorer l’armure + 1 Effet A",
    "noms": "Gada"
   },
   {
    "ligne": 11,
    "type": "Arme lourde CAC",
-   "modele": "Lance courte",
+   "modele": "Lance courte ou gladius",
    "carac": "FORCE",
-   "Commun": "+5% de parade",
-   "Rare": "+1dégâts physique + 5% de chance de parade",
-   "Très rare": "+2 dégâts physique + 5% de chance de parade + 1 Effet A",
-   "Épique": "+2 dégâts physique + 5% de chance de parade+ 2XEffet A",
-   "noms": "Doratium"
+   "Commun": "+3% de parade ou esquive",
+   "Rare": "+6% de chance de parade ou esquive",
+   "Très rare": "+1 dégâts physique + 6% de chance de parade ou esquive",
+   "Épique": "+1 dégâts physique + 6% de chance de parade ou esquive + 1 Effet A",
+   "noms": "Doratium, gladius"
   },
   {
    "ligne": 12,
    "type": "Arme polyvalente",
    "modele": "Javelots",
    "carac": "FORCE",
-   "Commun": "+1 Dégâts physique",
-   "Rare": "+1dégâts physique + 10% de chance d’ignorer l’armure",
-   "Très rare": "+1 dégâts physique + 15% de chance d’ignorer l’armure + 1 Effet A",
-   "Épique": "+1 dégâts physique + 15% de chance d’ignorer l’armure + 2XEffet A",
+   "Commun": "+1 dégât physique",
+   "Rare": "+2 dégâts physique",
+   "Très rare": "+3 dégâts physique",
+   "Épique": "+3 dégâts physique  +1XEffet B",
    "noms": "Hasta, pilum"
   },
   {
@@ -104,10 +104,10 @@
    "type": "Arme légère Distance",
    "modele": "Fronde",
    "carac": "DEXTÉRITÉ",
-   "Commun": "10% de chance d’immobilisation +1 Portée",
-   "Rare": "15% de chance d’immobilisation +1 Portée",
-   "Très rare": "20% de chance d’immobilisation + 1 Effet A +1 Portée",
-   "Épique": "20% de chance d’immobilisation + 1 portée + 2XEffet A",
+   "Commun": "+5% de chance d’immobilisation max +1 Portée",
+   "Rare": "+10% de chance d’immobilisation max +1 Portée +1 dégât",
+   "Très rare": "+15% de chance d’immobilisation max + 1 dégât physique + 2 portée",
+   "Épique": "+15% de chance d’immobilisation max +1 dégât physique + 2 portée + 2XEffet B",
    "noms": "Fronde"
   },
   {
@@ -115,10 +115,10 @@
    "type": "Bouclier",
    "modele": "Bouclier léger",
    "carac": "DEXTÉRITÉ",
-   "Commun": "20 Parade",
-   "Rare": "25 Parade",
-   "Très rare": "25 Parade + 1 Effet A",
-   "Épique": "25 Parade + 2X Effet A",
+   "Commun": "+3 à 5 % d’esquive (aléatoire)",
+   "Rare": "+6 à 8 % d’esquive (aléatoire)",
+   "Très rare": "+6 à 8% d’esquive (aléatoire) + 5 d’initiative",
+   "Épique": "+8% d’esquive + 5 d’initiative + 1X Effet A",
    "noms": "Pelta, caetra"
   },
   {
@@ -127,9 +127,9 @@
    "modele": "Bouclier intermédiaire",
    "carac": "FORCE",
    "Commun": "20 Parade",
-   "Rare": "25 Parade",
-   "Très rare": "25 Parade + 1 Effet A",
-   "Épique": "25 Parade + 2X Effet A",
+   "Rare": "21 à 23 Parade (aléatoire)",
+   "Très rare": "24 à 26 Parade  (aléatoire)",
+   "Épique": "26 Parade + 1X Effet A",
    "noms": "Aspi, clipeus"
   },
   {
@@ -137,54 +137,54 @@
    "type": "Bouclier",
    "modele": "Bouclier lourd",
    "carac": "FORCE",
-   "Commun": "28 Parade - +1 au coût de déplacement",
-   "Rare": "32 Parade +1 au coût de déplacement",
-   "Très rare": "32 Parade +1 au coût de déplacement + 1 Effet A",
-   "Épique": "32 Parade +1 au coût de déplacement + 2X Effet A",
+   "Commun": "23 à 25 Parade  (aléatoire) +1 au coût de déplacement",
+   "Rare": "26 à 28 Parade   (aléatoire)+1 au coût de déplacement",
+   "Très rare": "29 à 31 (aléatoire) Parade +1 au coût de déplacement",
+   "Épique": "31 (aléatoire) de Parade +1 au coût de déplacement +1 Effet A",
    "noms": "Scutum"
   },
   {
    "ligne": 18,
    "type": "Arme lourde CAC",
-   "modele": "Hache a deux mains",
+   "modele": "Hache à deux mains",
    "carac": "FORCE",
-   "Commun": "+2 dégâts physique",
-   "Rare": "+4 dégâts physique",
-   "Très rare": "+5 dégâts physique + 2 Effet A",
-   "Épique": "+6 dégâts physique +2X (2 Effet A)",
+   "Commun": "+10% de chance saignement max",
+   "Rare": "+2 dégâts physique +10% de chance saignement max",
+   "Très rare": "+3 dégâts physique +10% de chance saignement max + 1 Effet A",
+   "Épique": "+4 dégâts physique +10% de chance saignement max +2XEffet A",
    "noms": "Hache a deux mains"
   },
   {
    "ligne": 19,
    "type": "Arme lourde CAC",
-   "modele": "Masse a deux mains",
+   "modele": "Masse à deux mains",
    "carac": "FORCE",
-   "Commun": "30% de chance d’ignorer l’armure",
+   "Commun": "20% de chance d’ignorer l’armure",
    "Rare": "40% de chance d’ignorer l’armure",
-   "Très rare": "50% de chance d’ignorer l’armure + 2 Effet A",
-   "Épique": "50% de chance d’ignorer l’armure + 2X ( 2 Effet A)",
+   "Très rare": "60% de chance d’ignorer l’armure",
+   "Épique": "70% de chance d’ignorer l’armure + 2XEffet A",
    "noms": "Gada a deux mains"
   },
   {
    "ligne": 20,
    "type": "Arme lourde CAC",
-   "modele": "Lance a deux mains",
+   "modele": "Lance à deux mains",
    "carac": "FORCE",
-   "Commun": "+1 allonge",
-   "Rare": "+1 allonge + 2 dégâts",
-   "Très rare": "+1 allonge + 4 dégâts + 2 Effet A",
-   "Épique": "+1 allonge + 4 Dégâts + 2X (2 Effet A)",
+   "Commun": "+1 allonge +1 dégât physique",
+   "Rare": "+1 allonge + 2 dégâts physique + 5% de chance de poussée max",
+   "Très rare": "+1 allonge + 3 dégâts + 5% de chance de poussée max + 1 Effet A",
+   "Épique": "+1 allonge + 3 Dégâts + 10% de chance de poussée max + 2X Effet A",
    "noms": "Lance lourde"
   },
   {
    "ligne": 21,
    "type": "Arme légère CAC",
-   "modele": "Épée a deux mains",
+   "modele": "Épée à deux mains",
    "carac": "DEXTÉRITÉ",
    "Commun": "+1 dégâts physique +5 d’initiative",
    "Rare": "+2 dégâts physique + 10 d’initiative",
-   "Très rare": "+ 4 dégâts physique + 10 d’initiative + 2 Effet A",
-   "Épique": "+ 4 dégâts physique + 10 d’initiative +2X ( 2 Effet A)",
+   "Très rare": "+ 3 dégâts physique + 10 d’initiative + 1 Effet A",
+   "Épique": "+ 4 dégâts physique + 10 d’initiative +2XEffet A",
    "noms": "Falx"
   },
   {
@@ -192,32 +192,54 @@
    "type": "Arme légère Distance",
    "modele": "Arc court",
    "carac": "DEXTÉRITÉ",
-   "Commun": "+1 portée",
-   "Rare": "+1 Portée + 2 dégâts",
-   "Très rare": "+1 portée +4 dégâts + 2 Effet B",
-   "Épique": "+1 portée + 4 dégâts + 2X (2 Effet B)",
+   "Commun": "+1 portée +1dégât physique",
+   "Rare": "+1 Portée + 2 dégâts physique +1 Effet B",
+   "Très rare": "+1 portée +3 dégâts physique + 2 Effet B",
+   "Épique": "+1 portée + 4 dégâts + 3XEffet B",
    "noms": "Arc court"
   },
   {
+   "ligne": 23,
+   "type": "Arme légère Distance",
+   "modele": "Gantelet lance-fléchette",
+   "carac": "DEXTÉRITÉ",
+   "Commun": "+1 portée + 3% de chance de critiques",
+   "Rare": "+1 portée +9% de critique",
+   "Très rare": "+1 portée +12% de critique + 1 Effet B",
+   "Épique": "+1 portée +15% de critique + 2X (2 Effet B)",
+   "noms": ""
+  },
+  {
    "ligne": 24,
+   "type": "Arme légère Distance",
+   "modele": "Sarbacane",
+   "carac": "DEXTÉRITÉ",
+   "Commun": "+1 portée + 5% d’empoisonnement max",
+   "Rare": "+2 portée 10%de chance d’empoisonnement max",
+   "Très rare": "+2 portée +15%de chance d’empoisonnement max + 1 Effet B",
+   "Épique": "+2 portée +20%de chance d’empoisonnement max + 2X (2 Effet B)",
+   "noms": ""
+  },
+  {
+   "ligne": 26,
    "type": "Magie",
    "modele": "Bagues DPS",
    "carac": "INTELLIGENCE",
-   "Commun": "+1 dégâts magique",
-   "Rare": "+2 dégâts magiques",
-   "Très rare": "+3 dégâts magiques +1 Effet B",
-   "Épique": "+3 dégâts magiques +2X Effet B",
+   "Commun": "+1 dégâts",
+   "Rare": "+1 dégât + 1 Effet B",
+   "Très rare": "+2 dégâts +1 Effet B",
+   "Épique": "+2 dégâts  +2X Effet B",
    "noms": "Bagues"
   },
   {
-   "ligne": 25,
+   "ligne": 27,
    "type": "Magie",
    "modele": "Bagues Soins",
    "carac": "SAGESSE",
    "Commun": "+1 soin",
-   "Rare": "+2 soins",
-   "Très rare": "+3 soins + Effet C",
-   "Épique": "+3 soins + 2X Effet C",
+   "Rare": "+1 soin + 1XEffet C",
+   "Très rare": "+1 soin +2XEffet C",
+   "Épique": "+1 soin + 3XEffet C",
    "noms": "Bagues"
   },
   {
@@ -261,31 +283,35 @@
   },
   {
    "ligne": 4,
-   "texte": "10% chance d’empoisonnement"
+   "texte": "+5% chance d’empoisonnement max"
   },
   {
    "ligne": 5,
-   "texte": "10% chance d’étourdissement"
+   "texte": "+5% chance d’étourdissement max"
   },
   {
    "ligne": 6,
-   "texte": "10% chance de gelée"
+   "texte": "+5% chance de gelée max"
   },
   {
    "ligne": 7,
-   "texte": "10% de chance de bruler"
+   "texte": "+5% de chance de bruler max"
   },
   {
    "ligne": 8,
-   "texte": "10% chance d’immobiliser"
+   "texte": "+5% chance d’immobiliser max"
   },
   {
    "ligne": 9,
-   "texte": "10% chance de peur"
+   "texte": "+5% chance de peur max"
   },
   {
    "ligne": 10,
-   "texte": "15% chance de repousser"
+   "texte": "+5% chance de repousser max"
+  },
+  {
+   "ligne": 11,
+   "texte": "+5% chance de saignement max"
   },
   {
    "ligne": 12,
@@ -297,7 +323,7 @@
   },
   {
    "ligne": 14,
-   "texte": "15% chance de provoquer"
+   "texte": "+8% chance de provoquer max"
   },
   {
    "ligne": 15,
@@ -310,6 +336,10 @@
   {
    "ligne": 18,
    "texte": "+10% de chance d’ignorer les résistances"
+  },
+  {
+   "ligne": 19,
+   "texte": "+5% chance d’électrifier max"
   }
  ],
  "effetsB": [
@@ -319,35 +349,35 @@
   },
   {
    "ligne": 5,
-   "texte": "10% chance d’empoisonnement"
+   "texte": "+5% chance d’empoisonnement max"
   },
   {
    "ligne": 6,
-   "texte": "10% chance d’étourdissement"
+   "texte": "+5% chance d’étourdissement max"
   },
   {
    "ligne": 7,
-   "texte": "10% chance de gelée"
+   "texte": "+5% chance de gelée max"
   },
   {
    "ligne": 8,
-   "texte": "10% de chance de bruler"
+   "texte": "+5% de chance de bruler max"
   },
   {
    "ligne": 9,
-   "texte": "10% chance d’immobiliser"
+   "texte": "+5% chance d’immobiliser max"
   },
   {
    "ligne": 10,
-   "texte": "10% chance de peur"
+   "texte": "+3% chance de peur max"
   },
   {
    "ligne": 11,
-   "texte": "15% chance de repousser"
+   "texte": "+5% chance de repousser max"
   },
   {
    "ligne": 12,
-   "texte": "15% chance de tracter"
+   "texte": "+5% chance de tracter max"
   },
   {
    "ligne": 13,
@@ -359,7 +389,7 @@
   },
   {
    "ligne": 15,
-   "texte": "15% chance de provoquer"
+   "texte": "+8% chance de provoquer max"
   },
   {
    "ligne": 16,
@@ -372,6 +402,18 @@
   {
    "ligne": 19,
    "texte": "+10% de chance d’ignorer les résistances"
+  },
+  {
+   "ligne": 20,
+   "texte": "+3% de chance de confusion max"
+  },
+  {
+   "ligne": 21,
+   "texte": "+5% chance de saignement max"
+  },
+  {
+   "ligne": 22,
+   "texte": "+5% chance d’électrifier max"
   }
  ],
  "effetsC": [
@@ -424,6 +466,7 @@
  },
  "_corrections": {
   "Javelots / Épique": "Le classeur d'origine portait 12% d'ignore-armure, sous les 15% du palier Très rare. Coquille confirmée par Nico le 03/09 : l'épique garde 15%. Seule retouche apportée à la transcription du classeur.",
-  "Tableau de Nico (octobre)": "Cellules en rouge du nouveau classeur : Lance courte commune +5 parade ; Hache à deux mains très rare +5 dégâts ; effets A/B : repousser, tracter, provoquer à 15 %, initiative +5 ; effet C « +10 % d'ignorer les résistances » supprimé."
+  "Tableau de Nico (octobre)": "Cellules en rouge du nouveau classeur : Lance courte commune +5 parade ; Hache à deux mains très rare +5 dégâts ; effets A/B : repousser, tracter, provoquer à 15 %, initiative +5 ; effet C « +10 % d'ignorer les résistances » supprimé.",
+  "Tableau de Nico (v476)": "Nouveau classeur des armes (armures inchangées, reprises de l'ancien). « Lance courte ou gladius » : carac écrite « FORCE (Parade) ou DEXTÉRITÉ (esquive) » — le catalogue garde FORCE comme carac principale, accepte aussi la DEXTÉRITÉ (CARACS_MODELE) et donne parade ou esquive selon la meilleure des deux. « Bagues DPS » : « INTELLIGENCE / CHARISME » — carac principale INTELLIGENCE, le CHARISME accepté aussi (CARACS_MODELE)."
  }
 }

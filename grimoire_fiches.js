@@ -1245,8 +1245,20 @@ async function prendreArme() {
     // (v475) Jamais deux boucliers, deux lances ni deux frondes en main.
     const doublon = typeof window.memeFamilleUnique === "function" ? [d, g].find(o => window.memeFamilleUnique(objet, o)) : null;
     if (doublon) { noter(pagesFiche["inv-d"], `${window.libelleFamilleUnique(window.familleUniqueEnMain(objet))} en main : range ou lâche d'abord ${doublon.nom}.`); return; }
+    // (v476) La lance et les javelots : main droite seulement, et à côté d'eux
+    // rien d'autre qu'un bouclier ou une bague (loot.js).
+    const lance = typeof window.armeMainDroiteSeule === "function" ? window.armeMainDroiteSeule : () => false;
+    const avecLance = typeof window.vaAvecUneLance === "function" ? window.vaAvecUneLance : () => true;
+    if (lance(objet)) {
+        if (d) { noter(pagesFiche["inv-d"], `${objet.nom} se tient en main droite : range ou lâche d'abord ${d.nom}.`); return; }
+        if (g && !avecLance(g)) { noter(pagesFiche["inv-d"], `À côté de ${objet.nom}, la main gauche ne tient qu'un bouclier ou une bague : range ou lâche d'abord ${g.nom}.`); return; }
+        maj = { Equip_Main_Droite: objet };
+    } else if (!objet.deuxMains && lance(d) && !avecLance(objet)) {
+        noter(pagesFiche["inv-d"], `À côté de ${d.nom}, la main gauche ne tient qu'un bouclier ou une bague.`); return;
+    }
     const berserker = typeof window.atoutRace === "function" && !!(window.atoutRace(h) || {}).deuxArmesDeuxMains;
-    if (objet.deuxMains && berserker && d && d.deuxMains && (d === g || (d.uid && g && d.uid === g.uid))) {
+    if (maj) { /* la lance, déjà placée */ }
+    else if (objet.deuxMains && berserker && d && d.deuxMains && (d === g || (d.uid && g && d.uid === g.uid))) {
         maj = { Equip_Main_Droite: d, Equip_Main_Gauche: objet };
     } else if (objet.deuxMains) {
         if (h.equipMainDroite || h.equipMainGauche) { noter(pagesFiche["inv-d"], "Il faut les deux mains libres pour cette arme."); return; }

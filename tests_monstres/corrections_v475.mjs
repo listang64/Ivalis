@@ -358,7 +358,8 @@ await section(async () => {
       memeUid: window.memeFamilleUnique(arme("Lance courte", "a"), arme("Lance courte", "a")) };
   });
   verifier("une lance en main droite : une seconde lance ne peut que la remplacer (main droite)", JSON.stringify(r.lance) === '["Droite"]', JSON.stringify(r.lance));
-  verifier("…une dague, elle, va dans l'une ou l'autre main", JSON.stringify(r.lanceDague) === '["Droite","Gauche"]');
+  // (v476) À côté d'une lance, la main gauche ne prend plus qu'un bouclier ou une bague.
+  verifier("…une dague, elle, ne peut que la remplacer (v476)", JSON.stringify(r.lanceDague) === '["Droite"]');
   verifier("une fronde en main gauche : une seconde fronde ne peut que la remplacer", JSON.stringify(r.fronde) === '["Gauche"]', JSON.stringify(r.fronde));
   verifier("deux boucliers : toujours interdit", JSON.stringify(r.bouclier) === '["Droite"]');
   verifier("une lance à deux mains est aussi une lance (le Berserker n'en tient pas deux)", r.deuxMains === "lance");

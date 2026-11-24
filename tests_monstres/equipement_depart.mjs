@@ -59,25 +59,21 @@ console.log("1. LE FORMULAIRE PROPOSE LES BONNES FAMILLES");
     // pas de vraies familles du catalogue (voir objets.js, equipementDeDepart).
     const w = {};
     new Function('window', SRC_OBJETS)(w);
-    const typesReels = new Set((w.MODELES_OBJETS || []).map(m => m.type));
-    // (v391) « Magie Soins » et « Magie DPS » : la bague de soin ou de dégâts, de la famille Magie.
-    const inconnus = valeurs.filter(v => !/\+ Bouclier$/.test(v) && !/^Magie (Soins|DPS)$/.test(v) && !typesReels.has(v));
-    verifier("chaque famille proposée existe dans le catalogue",
+    // (v476) Nico : « choisir une arme parmi toutes les armes grises, autres que
+    // les armes corps à corps à deux mains et les boucliers » — arme par arme.
+    const attendues = (w.armesDeDepartAuChoix ? w.armesDeDepartAuChoix() : []).map(m => m.modele);
+    const armes = valeurs.filter(v => !/^Armure/.test(v));   // le même bloc porte les tenues
+    const inconnus = armes.filter(v => !attendues.includes(v));
+    const manquantes = attendues.filter(v => !armes.includes(v));
+    verifier("chaque arme proposée existe dans le catalogue",
              inconnus.length === 0, `(${inconnus.join(", ") || "aucune inconnue"})`);
-    verifier("le bouclier n'est pas proposé seul : ce n'est pas une arme",
-             !valeurs.includes("Bouclier"));
-    // Nico : « pour l'arme et bouclier, faire le choix entre arme légère et
-    // bouclier ou arme lourde et bouclier ».
-    verifier("« Arme légère + Bouclier » et « Arme lourde + Bouclier » sont proposés",
-             valeurs.includes("Arme légère + Bouclier") && valeurs.includes("Arme lourde + Bouclier"));
-    verifier("l'ancien « Arme + Bouclier » sans famille n'est plus proposé",
-             !valeurs.includes("Arme + Bouclier"));
-
-    // Et inversement : aucune famille d'arme du jeu ne doit manquer.
-    const armesDuJeu = w.TYPES_ARMES_FORGE;
-    const manquantes = armesDuJeu.filter(t => !valeurs.includes(t) && !(t === "Magie" && valeurs.includes("Magie Soins") && valeurs.includes("Magie DPS")));
-    verifier("aucun type d'arme de la Forge ne manque à l'appel",
-             manquantes.length === 0, `(${manquantes.join(", ") || "aucun"})`);
+    verifier("toutes les armes grises permises sont proposées",
+             manquantes.length === 0 && attendues.length === 15, `(${manquantes.join(", ") || attendues.length + " armes"})`);
+    const parModele = Object.fromEntries((w.MODELES_OBJETS || []).map(m => [m.modele, m]));
+    verifier("ni bouclier, ni arme de corps à corps à deux mains",
+             armes.every(v => parModele[v] && parModele[v].type !== "Bouclier" && !(parModele[v].deuxMains && /CAC/.test(parModele[v].type))));
+    verifier("les armes à distance (deux mains) et les deux bagues y sont",
+             ["Fronde", "Arc court", "Gantelet lance-fléchette", "Sarbacane", "Bagues DPS", "Bagues Soins"].every(v => armes.includes(v)));
 
     // La bascule par race ne doit plus toucher à ces deux encarts.
     verifier("l'équipement de départ n'est masqué pour aucune race",

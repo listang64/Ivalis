@@ -1422,7 +1422,9 @@ function formatterTexteEffet(effet, stacks, action) {
         let calcV = val * stacks;
         
         // 🔻 NOUVEAU : Si c'est l'effet Distance, on affiche +1 case (car 1 = CAC)
-        if (effet.Nom === "Distance") {
+        // — sauf sur une arme à distance (v476) : « Portée de l'arme + N ».
+        const porteeDeLArme = effet.Nom === "Distance" && forgeArmeADistance();
+        if (effet.Nom === "Distance" && !porteeDeLArme) {
             calcV += 1;
             calcV += bonusPorteeDeRace(action);
         }
@@ -1437,6 +1439,7 @@ function formatterTexteEffet(effet, stacks, action) {
             // S'il y a un %, on remplace le 1er chiffre qui n'est PAS collé à un %
             texte = texte.replace(/\b\d+(?:[.,]\d+)?\b(?!\s*%)/, calcTexte);
         }
+        if (porteeDeLArme) texte = "Portée de l'arme + " + texte;
     }
 
     // 3. Fallback générique
@@ -1577,8 +1580,23 @@ function augmentationsMaxForge(effet, act) {
 }
 window.augmentationsMaxForge = augmentationsMaxForge;
 
+// (v476) UNE TECHNIQUE D'ARME À DISTANCE porte toujours la portée de l'arme
+// (au moins 1, moteur_effets.js porteeAvecArme) : la Forge l'écrit « Portée de
+// l'arme + N », N étant la Distance posée ici — le nombre exact se calcule en
+// combat, avec l'arme tenue. Ses zones se posent donc à distance, jamais
+// collées au lanceur.
+function forgeArmeADistance() {
+    return String((window.forgeState || {}).armePrincipale || "").includes("Distance");
+}
+function texteSansDistanceArme(act) {
+    if (!forgeArmeADistance() || !act || !act.baseEffet || actionHasDistance(act, true)) return "";
+    return ` <span class="forge-portee-arme">🏹 Portée de l'arme</span>`;
+}
+
 // === OUTILS POUR LA ZONE ===
-function actionHasDistance(act) {
+// `seulementLaForge` : la Distance posée sur l'action, sans celle de l'arme.
+function actionHasDistance(act, seulementLaForge) {
+    if (!seulementLaForge && forgeArmeADistance()) return true;
     if (act.baseEffet.Nom === "Distance") return true;
     let hasDist = false;
     Object.keys(act.mods).forEach(modId => {
@@ -3177,7 +3195,7 @@ window.rafraichirForge = function() {
                     <div class="forge-ligne">
                         <div class="forge-ligne-texte">
                             <span class="forge-nom-effet" data-bulle-effet="${act.baseEffet.id}" data-action="${act.idInst}">${nettoyerNomEffet(act.baseEffet.Nom)}</span>${act.baseEffet.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${act.baseEffet.Modificateur}</span>` : ""}${genreDuLien(act) ? `<button type="button" class="forge-element-pastille${elementAct ? "" : " manquant"}" data-genre="${genreDuLien(act)}" title="Changer d'élément" ${elementAct ? `style="--el-couleur: ${elementAct.couleur}; --el-fond: ${elementAct.fond};"` : ""} onclick="window.changerElementForge('${act.idInst}')">${elementAct ? `${elementAct.dessin ? `<span class="forge-pastille-dessin">${iconeDuLien(elementAct)}</span>` : elementAct.icone} ${elementAct.nom}` : "Choisir un élément"}</button>` : ""}
-                            <div class="forge-desc">${formatterTexteEffet(act.baseEffet, act.count, act)}${texteChancePersistance(act.baseEffet, act.count, act)}${texteDegatsPersistance(act, fatigueSurpuissance)}${texteValeurSurpuissante(act, fatigueSurpuissance)}${currentBaseDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentBaseDuree} tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
+                            <div class="forge-desc">${formatterTexteEffet(act.baseEffet, act.count, act)}${texteSansDistanceArme(act)}${texteChancePersistance(act.baseEffet, act.count, act)}${texteDegatsPersistance(act, fatigueSurpuissance)}${texteValeurSurpuissante(act, fatigueSurpuissance)}${currentBaseDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentBaseDuree} tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
                         </div>
                         <div class="forge-controles">
                             ${window.forgeState.actions.length > 1 ? `

@@ -3692,12 +3692,21 @@ window.porteeReelleCarte = function(dataCarte, lanceur) {
 // compris celle qui décrit un coup de coude — et elle encaissait au passage le
 // malus de tir à bout portant, ce qui est exactement l'inverse de ce qu'une
 // technique de corps-à-corps doit faire.
+//
+// (v476) Nico : « on ne peut pas faire d'attaque sans portée avec une arme à
+// distance » : une technique forgée pour une arme à distance part toujours avec
+// au moins 1 de portée d'arme — la portée de l'arme tenue, ou 1 sans elle — en
+// plus de la Distance posée à la Forge. Elle tire donc toujours de loin, ses
+// zones comprises (jamais au corps à corps).
 window.porteeAvecArme = function(lanceur, isRanged, rangeMax, armeDeLaCarte) {
-    if (!lanceur || typeof window.bonusEquip !== "function") return { isRanged, rangeMax };
+    const carteADistance = String(armeDeLaCarte || "").includes("Distance");
+    if (!lanceur || typeof window.bonusEquip !== "function") {
+        return carteADistance ? { isRanged: true, rangeMax: rangeMax + 1 } : { isRanged, rangeMax };
+    }
     const bonus = (cle) => (typeof window.bonusEquipPourCarte === "function")
         ? window.bonusEquipPourCarte(lanceur, cle, armeDeLaCarte)
         : window.bonusEquip(lanceur, cle);
-    const portee = bonus("portee");
+    const portee = carteADistance ? Math.max(1, bonus("portee")) : bonus("portee");
     const allonge = bonus("allonge");
     const r = portee > 0 ? { isRanged: true, rangeMax: rangeMax + portee + allonge }
                          : { isRanged, rangeMax: rangeMax + allonge };
@@ -3901,43 +3910,22 @@ window.appliquerEquipementALaCarte = function(state, lanceur, armeDeLaCarte) {
         if (saignement) saignement.chance = Number(saignement.chance) + saignementTalent;
     }
 
-    // Les états de l'arme visent exactement ce que la carte a frappé — et seule
-    // une carte qui se sert de l'arme y a droit.
+    // (v476) LES ÉTATS DE L'ÉQUIPEMENT SONT DES AUGMENTATIONS MAX (tableau de
+    // Nico : « +5 % de chance de saignement max »). Comme celle du Protecteur ou
+    // du Pugiliste, une augmentation max ne sert QUE l'état du même nom que la
+    // carte porte déjà : elle s'ajoute à sa chance, par-dessus le plafond du
+    // grimoire (le jet ne tire jamais au-delà de 100, chanceFaceA). Une carte
+    // sans cet état ne le gagne pas. Seule une carte qui se sert de l'arme y a
+    // droit (etatsEquipementPourCarte) ; plusieurs sources s'additionnent.
     const etatsArme = typeof window.etatsEquipementPourCarte === "function"
         ? window.etatsEquipementPourCarte(lanceur, armeDeLaCarte)
         : (typeof window.etatsEquipement === "function" ? window.etatsEquipement(lanceur) : []);
-    if (etatsArme.length === 0) return;
-
-    const frappees = attaquesFrappantes(state);
-    if (frappees.length === 0) return;
-    const cibles = [...new Set(frappees.flatMap(a => a.cibles || []))];
-    if (cibles.length === 0) return;
-
-    state.alterations = state.alterations || [];
     etatsArme.forEach(e => {
-        const gabarit = GABARITS_ETATS_EQUIPEMENT[e.etat];
-        if (!gabarit) return;
-        // Si la carte (ou un autre objet) inflige DÉJÀ cet état, l'arme ne le
-        // double pas : elle AJOUTE sa chance à la sienne (v429, Nico : « en cas
-        // de bonus d'état multiples > somme, et c'est valable pour tout sur ce
-        // jeu »). Le jet ne tire jamais au-delà de 100 (chanceFaceA).
-        const dejaLa = state.alterations.find(a => a.nom === e.etat);
-        if (dejaLa) {
-            dejaLa.chance = (Number(dejaLa.chance) || 0) + (Number(e.chance) || 0);
-            return;
-        }
-        const alteration = {
-            nom: e.etat, ...gabarit, chance: e.chance || 0,
-            venuDeLEquipement: true, isRanged: false, rangeMax: 1,
-            cibles: [...cibles]
-        };
-        // La provocation retient QUI a provoqué : c'est ce que l'IA lit pour
-        // n'avoir plus d'yeux que pour lui (monstres_ia.js). Pour tout autre
-        // état, le champ n'existe PAS — surtout pas « undefined » : Firestore
-        // refuse toute valeur undefined, et l'intention de la carte partait
-        // en erreur. Une arme qui brûle ou qui gèle empêchait de jouer.
-        if (e.etat === "Provocation") alteration.idProvocateur = lanceur.idPersonnage;
-        state.alterations.push(alteration);
+        const plus = Number(e.chance) || 0;
+        if (plus <= 0) return;
+        (state.alterations || []).forEach(a => {
+            if (a.nom === e.etat && (Number(a.chance) || 0) > 0) a.chance = Number(a.chance) + plus;
+        });
     });
 };
 

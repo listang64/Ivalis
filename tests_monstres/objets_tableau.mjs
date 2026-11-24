@@ -57,6 +57,7 @@ function nombresDuCatalogue(palier) {
     const sortie = [];
     Object.keys(palier || {}).forEach(cle => {
         const v = palier[cle];
+        if (cle === "effets") return;   // (v476) [nombre, fois] : la clause « Effet », lue à part
         if (cle === "etatsPropres") (v || []).forEach(e => sortie.push(e.chance));
         else if (cle === "aRepartir") sortie.push(v);
         else if (Array.isArray(v)) sortie.push(v[0], v[1]);
@@ -68,7 +69,7 @@ function nombresDuCatalogue(palier) {
 const memeListe = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 
 // =========================================================================
-console.log("1. LES 23 LIGNES DU TABLEAU, DANS LE MÊME ORDRE");
+console.log("1. LES LIGNES DU TABLEAU, DANS LE MÊME ORDRE");
 verifier("le catalogue compte autant de modèles que le tableau",
          w.MODELES_OBJETS.length === REF.modeles.length,
          `(${w.MODELES_OBJETS.length} contre ${REF.modeles.length})`);
@@ -111,53 +112,49 @@ const ecartsEffets = [];
 REF.modeles.forEach((ref, i) => {
     const cat = w.MODELES_OBJETS[i];
     if (!cat) return;
-    ["Très rare", "Épique"].forEach(rarete => {
-        const attendu = clauseEffet(ref[rarete] || "");
+    // (v476) Chaque palier écrit ses effets : « + 1 Effet A » = [1, 1],
+    // « +2XEffet A » = [1, 2], « + 2 Effet B » = [2, 1], « + 2X (2 Effet B) » = [2, 2].
+    ["Commun", "Rare", "Très rare", "Épique"].forEach(rarete => {
+        const texte = ref[rarete] || "";
+        const attendu = clauseEffet(texte);
+        const ecrit = (cat.paliers[rarete] || {}).effets;
         const tires = w.tirerEffetsObjet(cat, rarete);
         if (!attendu) {
-            if (tires.length > 0) ecartsEffets.push(`ligne ${ref.ligne} ${rarete} : le tableau n'annonce aucun effet, le catalogue en tire ${tires.length}`);
+            if (tires.length > 0 || ecrit) ecartsEffets.push(`ligne ${ref.ligne} ${rarete} : le tableau n'annonce aucun effet, le catalogue en tire ${tires.length}`);
             return;
         }
-        if (tires.length !== attendu.nombre) {
-            ecartsEffets.push(`ligne ${ref.ligne} ${rarete} : ${attendu.nombre} effet(s) annoncé(s), ${tires.length} tiré(s)`);
+        const fois = parseInt((texte.match(/(\d+)\s*X/i) || [])[1]) || 1;
+        if (!ecrit || ecrit[0] !== attendu.nombre || ecrit[1] !== fois || tires.length !== attendu.nombre) {
+            ecartsEffets.push(`ligne ${ref.ligne} ${rarete} : [${attendu.nombre}, ${fois}] annoncé, [${ecrit}] écrit, ${tires.length} tiré(s)`);
         }
-        // Réservoir : une lettre précise, ou "au choix parmi A, B ou C".
         const reservoirCat = cat.effets.reservoir;
         if (attendu.multi) {
             if (reservoirCat !== "ABC") ecartsEffets.push(`ligne ${ref.ligne} ${rarete} : réservoir A/B/C attendu, "${reservoirCat}" trouvé`);
         } else if (reservoirCat !== attendu.lettre) {
             ecartsEffets.push(`ligne ${ref.ligne} ${rarete} : réservoir ${attendu.lettre} attendu, "${reservoirCat}" trouvé`);
         }
-        // Doublement : "2X" dans la cellule <=> l'objet épique double ses effets.
-        if (rarete === "Épique") {
-            const doubleCat = !cat.effets.sansDoublement;
-            if (attendu.double !== doubleCat) {
-                ecartsEffets.push(`ligne ${ref.ligne} : doublement 2X ${attendu.double ? "attendu" : "non prévu"} par le tableau, catalogue ${doubleCat ? "double" : "ne double pas"}`);
-            }
-        }
     });
 });
 ecartsEffets.forEach(e => console.log("     ÉCART : " + e));
-verifier("nombre d'effets, réservoir et doublement conformes au tableau", ecartsEffets.length === 0);
+verifier("nombre d'effets, réservoir et « 2X » conformes au tableau, palier par palier", ecartsEffets.length === 0);
 
-// Un très rare ne tire jamais d'effet doublé, un épique toujours (sauf armures).
+// « 2X Effet » : le même effet compté deux fois (Nico : « 2 fois +5 % saignement
+// max fera +10 % »). La hache à deux mains très rare a « + 1 Effet A », l'épique
+// « +2XEffet A ».
 {
-    const dague = w.MODELES_OBJETS.find(m => m.modele === "Dague");
-    const chances = [];
+    const hache = w.MODELES_OBJETS.find(m => m.modele === "Hache à deux mains");
+    const chances = new Set(), simples = new Set(), valeurs = new Set();
     for (let i = 0; i < 400; i++) {
-        w.tirerEffetsObjet(dague, "Épique").forEach(e => { if (e.chance) chances.push(e.chance); });
+        w.tirerEffetsObjet(hache, "Épique").forEach(e => { if (e.chance) chances.add(e.chance); if (e.bonus && e.bonus.initiative) valeurs.add(e.bonus.initiative); });
+        w.tirerEffetsObjet(hache, "Très rare").forEach(e => { if (e.chance) simples.add(e.chance); });
     }
-    // Les effets à 10 % passent à 20, ceux à 15 % (repousser, provoquer) à 30.
-    verifier("les effets à chance d'un épique valent bien le double (20 ou 30 %)",
-             chances.length > 0 && chances.every(c => c === 20 || c === 30) && chances.includes(30),
-             `(${[...new Set(chances)].join(",")})`);
-
-    const simples = [];
-    for (let i = 0; i < 400; i++) {
-        w.tirerEffetsObjet(dague, "Très rare").forEach(e => { if (e.chance) simples.push(e.chance); });
-    }
-    verifier("et ceux d'un très rare restent à leur valeur de base (10 ou 15 %)",
-             simples.length > 0 && simples.every(c => c === 10 || c === 15), `(${[...new Set(simples)].join(",")})`);
+    verifier("un épique « 2X » : 5 → 10 %, 8 → 16 %, l'élan 10 → 20 %", [...chances].sort((a, b) => a - b).join() === "10,16,20", `(${[...chances]})`);
+    verifier("…et +5 d'initiative → +10", [...valeurs].join() === "10", `(${[...valeurs]})`);
+    verifier("un très rare « 1 Effet » garde ses valeurs (5, 8, 10 %)", [...simples].sort((a, b) => a - b).join() === "5,8,10", `(${[...simples]})`);
+    const beni = w.multiplierEffetObjet({ beniSoin: { resMag: 8, tours: 1 } }, 2);
+    verifier("une bénédiction « 2X » : +16 % pendant 1 tour (la durée ne double pas)", beni.beniSoin.resMag === 16 && beni.beniSoin.tours === 1);
+    const ganteletEpique = w.tirerEffetsObjet(w.MODELES_OBJETS.find(m => m.modele === "Gantelet lance-fléchette"), "Épique");
+    verifier("« 2X (2 Effet B) » : deux effets différents", ganteletEpique.length === 2 && ganteletEpique[0].cle !== ganteletEpique[1].cle);
 }
 
 // =========================================================================

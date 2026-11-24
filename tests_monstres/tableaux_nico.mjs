@@ -138,29 +138,30 @@ console.log("\n4. LES ARMES ET LEURS EFFETS BONUS");
 // =========================================================================
 {
     const modele = (nom) => w.MODELES_OBJETS.find(m => m.modele === nom);
+    // (v476) Le tableau d'octobre est remplacé par celui de la v476 (objets_tableau.mjs
+    // le relit cellule par cellule) : ce sont SES chiffres qui font foi ici.
     const lance = modele("Lance courte").paliers;
-    verifier("Lance courte commune : +5 parade, plus de dégât", JSON.stringify(lance["Commun"]) === '{"parade":5}',
+    verifier("(v476) Lance courte commune : +3 % de parade ou d'esquive", JSON.stringify(lance["Commun"]) === '{"paradeOuEsquive":3}',
              JSON.stringify(lance["Commun"]));
-    verifier("… les paliers suivants inchangés (rare : +1 dégât, +5 parade)",
-             JSON.stringify(lance["Rare"]) === '{"degatsPhys":1,"parade":5}');
+    verifier("(v476) … très rare : +1 dégât, +6 % de parade ou d'esquive",
+             lance["Très rare"].degatsPhys === 1 && lance["Très rare"].paradeOuEsquive === 6);
     const hache = modele("Hache à deux mains").paliers;
-    verifier("Hache à deux mains : très rare +5, épique +6",
-             hache["Très rare"].degatsPhys === 5 && hache["Épique"].degatsPhys === 6,
+    verifier("(v476) Hache à deux mains : très rare +3, épique +4",
+             hache["Très rare"].degatsPhys === 3 && hache["Épique"].degatsPhys === 4,
              `${hache["Très rare"].degatsPhys} / ${hache["Épique"].degatsPhys}`);
     const gourdin = modele("Gourdin").paliers;
-    verifier("Gourdin : 10 / 15 / 20 / 20 % d'étourdissement (déjà juste)",
-             ["Commun", "Rare", "Très rare", "Épique"].map(p => gourdin[p].etatsPropres[0].chance).join() === "10,15,20,20");
-    verifier("Javelots épique : 15 % d'ignorer l'armure (déjà juste)", modele("Javelots").paliers["Épique"].ignoreArmure === 15);
-
+    verifier("(v476) Gourdin : 5 / 10 / 10 / 10 % d'étourdissement max",
+             ["Commun", "Rare", "Très rare", "Épique"].map(p => gourdin[p].etatsPropres[0].chance).join() === "5,10,10,10");
+    verifier("(v476) Javelots épique : +3 dégâts physiques", modele("Javelots").paliers["Épique"].degatsPhys === 3);
     const chance = (res, etat) => (w[res].find(e => e.etat === etat) || {}).chance;
     const init = (res) => ((w[res].find(e => e.cle === "initiative") || {}).bonus || {}).initiative;
-    verifier("A : Poussée 15 %, Provocation 15 %, initiative +5",
-             chance("EFFETS_A", "Poussée") === 15 && chance("EFFETS_A", "Provocation") === 15 && init("EFFETS_A") === 5);
-    verifier("B : Poussée, Traction, Provocation 15 %, initiative +5",
-             chance("EFFETS_B", "Poussée") === 15 && chance("EFFETS_B", "Traction") === 15
-             && chance("EFFETS_B", "Provocation") === 15 && init("EFFETS_B") === 5);
-    verifier("les autres états restent à 10 % (empoisonnement, gelée…)",
-             chance("EFFETS_A", "Empoisonnement") === 10 && chance("EFFETS_B", "Glacé") === 10);
+    verifier("(v476) A : Poussée 5 %, Provocation 8 %, initiative +5",
+             chance("EFFETS_A", "Poussée") === 5 && chance("EFFETS_A", "Provocation") === 8 && init("EFFETS_A") === 5);
+    verifier("(v476) B : Poussée et Traction 5 %, Peur 3 %, Provocation 8 %, initiative +5",
+             chance("EFFETS_B", "Poussée") === 5 && chance("EFFETS_B", "Traction") === 5 && chance("EFFETS_B", "Peur") === 3
+             && chance("EFFETS_B", "Provocation") === 8 && init("EFFETS_B") === 5);
+    verifier("(v476) les autres états à 5 % (empoisonnement, gelée…)",
+             chance("EFFETS_A", "Empoisonnement") === 5 && chance("EFFETS_B", "Glacé") === 5);
     verifier("C : « ignorer les résistances » supprimé, les cinq autres restent",
              !w.EFFETS_C.some(e => e.cle === "ignoreResistances") && w.EFFETS_C.length === 5,
              w.EFFETS_C.map(e => e.cle).join(", "));

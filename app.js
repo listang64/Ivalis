@@ -205,11 +205,13 @@ function persoDocVersFront(id, d) {
     // (ou l'ancien « Or »), plus ses bronzes changés à 30 pour 1.
     drachmes: drachmesDeLaFiche(d),
     // v313 : l'emplacement de stockage (une arme qu'on ne tient pas), et la date de création du héros.
-    equipStock: d.Equip_Stock || null,
+    // (v476) objetAuxReglesDuJour (objets.js) : une arme à distance trouvée
+    // avant la v476 (une fronde à une main) se lit à deux mains.
+    equipStock: objetAuxRegles(d.Equip_Stock),
     creeLe: Number(d.Cree_Le) || 0,
     equipArmure: d.Equip_Armure || null,
-    equipMainDroite: d.Equip_Main_Droite || null,
-    equipMainGauche: d.Equip_Main_Gauche || null,
+    equipMainDroite: objetAuxRegles(d.Equip_Main_Droite),
+    equipMainGauche: objetAuxRegles(d.Equip_Main_Gauche),
     estIllusion: d.Est_Illusion === true,
     // (v368) Un totem du Chaman (sans tour comme un leurre, mais bien réel) et son effet.
     estTotem: d.Est_Totem === true,
@@ -338,6 +340,9 @@ window.afficherEmplacementEquipement = function(suffixe, objet) {
 
     if (lacher) lacher.style.display = rempli ? "inline-block" : "none";
 };
+
+// (v476) Un objet tenu, lu avec les règles d'aujourd'hui (objets.js).
+const objetAuxRegles = (o) => (typeof window.objetAuxReglesDuJour === "function" ? window.objetAuxReglesDuJour(o) : o) || null;
 
 // v475 : la seule monnaie du jeu, la drachme. L'ancienne richesse (laiton,
 // bronze, or) ne sert plus qu'à remplir une fiche qui n'a pas encore ses drachmes.
@@ -1956,7 +1961,8 @@ window.bonusEquip = function(perso, cle) {
 window.esquiveCombattant = function(perso) {
     if (!perso) return 0;
     return (parseInt(perso.Esquive) || 0) + (parseInt(perso.Dev_Mod_Esquive) || 0)
-         + (window.atoutRace(perso).esquive || 0);
+         + (window.atoutRace(perso).esquive || 0)
+         + window.bonusEquip(perso, "esquive");   // (v476) le bouclier léger, la lance courte
 };
 
 window.paradeCombattant = function(perso) {

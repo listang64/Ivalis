@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=156">
+  <link rel="stylesheet" href="style.css?v=157">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
   <link rel="stylesheet" href="grimoire.css?v=29">
@@ -2230,7 +2230,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=365"></script>
+<script src="trace_combat.js?v=366"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2304,7 +2304,7 @@
 <script type="module" src="rencontres_recit.js?v=1"></script>
 <script type="module" src="ia_master.js?v=49"></script>
 <script type="module" src="illustrations_recit.js?v=19"></script>
-<script type="module" src="app.js?v=188"></script>
+<script type="module" src="app.js?v=189"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
 <script type="module" src="comptes.js?v=6"></script>
 <!-- LE RÉCIT DANS LE GRIMOIRE (v300) : après app.js et les comptes. -->
@@ -2315,7 +2315,7 @@
 <script type="module" src="grimoire_carte.js?v=6"></script>
 <script src="grimoire_regions.js?v=16"></script>
 <script src="loupe_cartes.js?v=7"></script>
-<script type="module" src="grimoire_fiches.js?v=23"></script>
+<script type="module" src="grimoire_fiches.js?v=24"></script>
 <script type="module" src="grimoire_creation.js?v=13"></script>
 <!-- Les combats dans le livre (v388) : la double page du menu Combat. -->
 <script type="module" src="grimoire_combats.js?v=1"></script>
@@ -2366,7 +2366,7 @@
 <script src="blessures.js?v=3"></script>
 <script type="module" src="creation_personnage.js?v=29"></script>
 <script type="module" src="classes.js?v=51"></script>
-<script type="module" src="competences.js?v=87"></script>
+<script type="module" src="competences.js?v=88"></script>
 <script type="module" src="talents_ui.js?v=2"></script>
 <script type="module" src="blessures_ui.js?v=8"></script>
 <!-- Les zones procédurales : le givre (v243), le brasier (v244), le poison et la foudre (v245), au Studio puis en jeu (v246) ; les gravats (v247) et les chausse-trappes (v248), au Studio puis en jeu (v249) ; la lumière du soin (v250), au Studio. -->
@@ -2388,7 +2388,7 @@
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=41"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->
-<script type="module" src="moteur_effets.js?v=119"></script>
+<script type="module" src="moteur_effets.js?v=120"></script>
 <!-- LES APPARITIONS (v268) : le tableau de Nico, son tirage, sa fenêtre de
      réglage. Avant monstres.js, qui le lit dès son chargement. -->
 <script src="apparitions.js?v=4"></script>
@@ -2396,10 +2396,10 @@
 <script type="module" src="monstres_competences.js?v=36"></script>
 <script type="module" src="monstres_ia.js?v=45"></script>
 <!-- 🔻 NOUVEAU : Inventaire, équipement et butin de fin de combat 🔻 -->
-<script type="module" src="objets.js?v=25"></script>
+<script type="module" src="objets.js?v=26"></script>
 <script src="variations_tenues.js?v=3"></script>
 <script type="module" src="objets_ia.js?v=18"></script>
-<script type="module" src="loot.js?v=38"></script>
+<script type="module" src="loot.js?v=39"></script>
 <!-- LES COMBATS DU RÉCIT (v278) : la détection, la préparation, le retour au récit. -->
 <script type="module" src="combat_rp.js?v=27"></script>
 
@@ -2726,16 +2726,35 @@
         <div class="bloc-formulaire">
           <h4>Équipement de départ</h4>
           <div class="champ-formulaire" id="groupe-type-arme">
-            <label>Type d'arme</label>
+            <label>Arme</label>
+            <!-- (v476) Toutes les armes grises, sauf les armes de corps à corps
+                 à deux mains et les boucliers (objets.js, armesDeDepartAuChoix). -->
             <select class="input-perso" id="champ-type-arme">
-              <option value="Arme légère CAC">Arme légère (corps à corps)</option>
-              <option value="Arme lourde CAC">Arme lourde (corps à corps)</option>
-              <option value="Arme polyvalente">Arme polyvalente</option>
-              <option value="Arme légère Distance">Arme à distance</option>
-              <option value="Arme légère + Bouclier">Arme légère + Bouclier</option>
-              <option value="Arme lourde + Bouclier">Arme lourde + Bouclier</option>
-              <option value="Magie Soins">Magie : bague de soin</option>
-              <option value="Magie DPS">Magie : bague de dégâts</option>
+              <optgroup label="Arme légère (corps à corps)">
+                <option value="Dague">Dague</option>
+                <option value="Couteau">Couteau</option>
+                <option value="Épée courbée">Épée courbée</option>
+              </optgroup>
+              <optgroup label="Arme lourde (corps à corps)">
+                <option value="Épée courte">Épée courte</option>
+                <option value="Hache">Hache</option>
+                <option value="Gourdin">Gourdin</option>
+                <option value="Masse">Masse</option>
+                <option value="Lance courte">Lance courte</option>
+              </optgroup>
+              <optgroup label="Arme polyvalente">
+                <option value="Javelots">Javelots</option>
+              </optgroup>
+              <optgroup label="Arme à distance (deux mains)">
+                <option value="Fronde">Fronde</option>
+                <option value="Arc court">Arc court</option>
+                <option value="Gantelet lance-fléchette">Gantelet lance-fléchette</option>
+                <option value="Sarbacane">Sarbacane</option>
+              </optgroup>
+              <optgroup label="Magie">
+                <option value="Bagues DPS">Bague de dégâts</option>
+                <option value="Bagues Soins">Bague de soin</option>
+              </optgroup>
             </select>
           </div>
           <div class="champ-formulaire" id="groupe-tenue">
@@ -2907,7 +2926,7 @@
           <button id="btn-arme-legere-cac" class="btn-parametres" style="width: 100%; font-size: 18px;" onclick="jouerSonClic(); window.selectionnerArme('Arme légère CAC')">🗡️ Arme légère CAC</button>
           <button id="btn-arme-lourde-cac" class="btn-parametres" style="width: 100%; font-size: 18px;" onclick="jouerSonClic(); window.selectionnerArme('Arme lourde CAC')">🪓 Arme lourde CAC</button>
           <button id="btn-arme-polyvalente" class="btn-parametres" style="width: 100%; font-size: 18px;" onclick="jouerSonClic(); window.selectionnerArme('Arme polyvalente')">⚔️ Arme polyvalente</button>
-          <button id="btn-arme-legere-distance" class="btn-parametres" style="width: 100%; font-size: 18px;" onclick="jouerSonClic(); window.selectionnerArme('Arme légère Distance')">🏹 Arme légère Distance</button>
+          <button id="btn-arme-legere-distance" class="btn-parametres" style="width: 100%; font-size: 18px;" onclick="jouerSonClic(); window.selectionnerArme('Arme légère Distance')">🏹 Arme à distance</button>
           <button class="btn-parametres" style="width: 100%; font-size: 18px; background-color: #5c1e16; color: white;" onclick="jouerSonClic(); window.selectionnerArme('Magie')">✨ Magie</button>
           <button class="btn-parametres" style="width: 100%; font-size: 18px; background-color: #4a5568; color: white;" onclick="jouerSonClic(); window.selectionnerArme('Sans arme / Arme rp')">✊ Sans arme / Arme rp</button>
       </div>

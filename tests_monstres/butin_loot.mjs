@@ -455,7 +455,8 @@ console.log("\n8. ÉQUIPER ET LÂCHER : LES MAINS, ET CE QU'ON DÉTRUIT");
   const modele = (nom) => w.MODELES_OBJETS.find(m => m.modele === nom);
   const dague = w.fabriquerObjet(modele("Dague"), "Commun");
   const bouclier = w.fabriquerObjet(modele("Bouclier léger"), "Commun");
-  const hacheDeuxMains = w.fabriquerObjet(modele("Hache à deux mains"), "Commun");
+  // (v476) La hache à deux mains commune ne donne plus de dégâts plats : la rare (+2).
+  const hacheDeuxMains = w.fabriquerObjet(modele("Hache à deux mains"), "Rare");
   const armure = w.fabriquerObjet(modele("Armure lourde"), "Commun");
 
   await w.equiperObjet("J1", dague, "Droite");

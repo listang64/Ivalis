@@ -325,7 +325,8 @@ console.log("\n7. LES CARTES ET L'ÉQUIPEMENT");
     };
   });
   verifier("Main endolorie : +5 de fatigue sur un sort (20 → 25), rien au corps à corps", r.coutMagie === 25 && r.coutCac === 20 && r.coutSain === 20);
-  verifier("Amputation de doigts : −1 de portée à distance (6 → 5), jamais sous 2", r.portee === 5 && r.porteeCourte === 2);
+  // (v476) Une technique d'arme à distance a toujours au moins 1 de portée d'arme : 6 + 1 − 1.
+  verifier("Amputation de doigts : −1 de portée à distance (6 + 1 → 6), jamais sous 2", r.portee === 6 && r.porteeCourte === 2);
   verifier("Bras fracturé : −2 au corps à corps (10 → 8), rien à distance, jamais sous 0", JSON.stringify(r.degats) === "[8,10,0]", JSON.stringify(r.degats));
   verifier("Épaule démise : la hache à deux mains ne sert plus, et l'inventaire dit pourquoi", r.hache === 0 && /Épaule démise : pas d'arme à deux mains/.test(r.hacheRaison || ""));
   verifier("…ni la seconde main pendant le combat qui suit (seule la dague de droite)", r.dagues === "D1", r.dagues);

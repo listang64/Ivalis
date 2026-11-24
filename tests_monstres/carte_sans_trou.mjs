@@ -53,29 +53,34 @@ etats.forEach(nomEtat => {
     window.bonusEquip = () => 0;
     window.bonusEquipPourCarte = () => 0;
     window.etatsEquipementPourCarte = () => [{ etat: nomEtat, chance: 20 }];
+    // (v476) Les états d'arme sont des augmentations max : ils s'ajoutent à
+    // l'état que la carte porte déjà (10 % + 20 % = 30 %), et n'en créent aucun.
     const state = {
         isZone: true, zoneHexesFinaux: [{ q: 1, r: 0 }, { q: 2, r: 0 }],
         attaques: [{ nom: "Attaque légère", valeurBrute: 6, typeRes: "Physique", cibles: ["M1", "M2"] }],
-        alterations: []
+        alterations: [{ nom: nomEtat, chance: 10, duree: 2, cibles: ["M1", "M2"] }]
     };
     window.appliquerEquipementALaCarte(state, { idPersonnage: "BRAKAR" }, "Arme légère CAC");
     const ajoute = state.alterations.find(a => a.nom === nomEtat);
     const trou = premierIndefini(state, "");
-    if (!ajoute || trou !== null) trous.push(`${nomEtat} → ${ajoute ? trou : "état absent"}`);
+    if (!ajoute || ajoute.chance !== 30 || state.alterations.length !== 1 || trou !== null) trous.push(`${nomEtat} → ${ajoute ? (trou || ajoute.chance) : "état absent"}`);
+    const sans = { attaques: [{ valeurBrute: 6, cibles: ["M1"] }], alterations: [] };
+    window.appliquerEquipementALaCarte(sans, { idPersonnage: "BRAKAR" }, "Arme légère CAC");
+    if (sans.alterations.length !== 0) trous.push(`${nomEtat} → ajouté à une carte qui ne le porte pas`);
 });
-verifier(`les ${etats.length} états d'arme s'ajoutent sans aucun champ undefined`, trous.length === 0,
+verifier(`les ${etats.length} états d'arme montent la chance de la carte (augmentation max), sans undefined ni état créé`, trous.length === 0,
          trous.join(" | "));
 
 console.log("\n2. LA PROVOCATION GARDE SON PROVOCATEUR");
 {
     window.etatsEquipementPourCarte = () => [{ etat: "Provocation", chance: 30 }];
-    const state = { attaques: [{ valeurBrute: 5, cibles: ["M1"] }], alterations: [] };
+    const state = { attaques: [{ valeurBrute: 5, cibles: ["M1"] }], alterations: [{ nom: "Provocation", chance: 10, idProvocateur: "BRAKAR", cibles: ["M1"] }] };
     window.appliquerEquipementALaCarte(state, { idPersonnage: "BRAKAR" }, "Arme légère CAC");
     const provo = state.alterations.find(a => a.nom === "Provocation") || {};
-    verifier("idProvocateur désigne le porteur de l'arme", provo.idProvocateur === "BRAKAR",
-             String(provo.idProvocateur));
+    verifier("idProvocateur désigne toujours le lanceur (40 %)", provo.idProvocateur === "BRAKAR" && provo.chance === 40,
+             String(provo.idProvocateur) + " " + provo.chance);
     window.etatsEquipementPourCarte = () => [{ etat: "Brûlé", chance: 30 }];
-    const autre = { attaques: [{ valeurBrute: 5, cibles: ["M1"] }], alterations: [] };
+    const autre = { attaques: [{ valeurBrute: 5, cibles: ["M1"] }], alterations: [{ nom: "Brûlé", chance: 10, cibles: ["M1"] }] };
     window.appliquerEquipementALaCarte(autre, { idPersonnage: "BRAKAR" }, "Arme légère CAC");
     verifier("une brûlure, elle, n'a même pas le champ",
              !("idProvocateur" in (autre.alterations[0] || {})), JSON.stringify(autre.alterations[0]));

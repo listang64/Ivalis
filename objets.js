@@ -185,7 +185,9 @@ window.CARACS_ARMURE = {
 // mage et le maître de la Distorsion mentale y ont droit tous les deux. Lue par
 // MODÈLE, pour que les bagues déjà trouvées suivent la règle.
 window.CARACS_MODELE = {
-    "Bagues DPS": ["INTELLIGENCE", "CHARISME"]
+    "Bagues DPS": ["INTELLIGENCE", "CHARISME"],
+    // (v476) « FORCE (parade) ou DEXTÉRITÉ (esquive) ».
+    "Lance courte": ["FORCE", "DEXTÉRITÉ"]
 };
 window.caracsRequisesObjet = function(objet) {
     if (!objet) return [];
@@ -210,6 +212,8 @@ window.CLES_BONUS = [
     "soin",              // points de soin en plus
     "initiative",        // initiative des cartes lancées
     "parade",            // points de parade
+    "esquive",           // (v476) points d'esquive (le bouclier léger)
+    "paradeOuEsquive",   // (v476) la lance courte : parade (FORCE) ou esquive (DEXTÉRITÉ), voir bonusEquipement
     "resPhys",           // points de % de résistance physique
     "resMag",            // points de % de résistance magique
     "portee",            // cases de portée en plus (attaques à distance)
@@ -228,50 +232,58 @@ window.CLES_BONUS = [
 //  affiché est reconstruit ensuite. "chance" est un pourcentage ; un effet qui
 //  n'en a pas s'applique toujours.
 //
-//  Doubler un effet (objet épique) double sa chance quand il en a une, sinon
-//  sa valeur — c'est la lecture retenue avec Nico : « 10% de chance
-//  d'empoisonnement devient 20%, +1 dégât devient +2 ».
+//  « 2X Effet » : le MÊME effet compté deux fois — sa chance quand il en a une,
+//  sinon sa valeur ; une durée ne double pas (Nico : « 2 fois +5 % saignement
+//  max fera +10 % » ; « +8 % de résistance magique pendant 2 tours donne +16 %
+//  pendant 2 tours »).
 
 const ETAT_EFFET = (nom, chance, libelle) => ({ cle: "etat_" + nom, etat: nom, chance, libelle });
 
-// Colonne J — EFFET A (arme de contact). Tableau de Nico (octobre) : Poussée,
-// Provocation (et Traction en B) à 15 %, initiative +5.
-
+// Colonne J — EFFET A (arme de contact). (v476) Tableau de Nico mis à jour :
+// les états deviennent des AUGMENTATIONS MAX (« +5 % de chance de saignement
+// max ») — ils ne s'ajoutent qu'à une carte qui porte déjà cet état, par-dessus
+// son plafond (appliquerEquipementALaCarte, moteur_effets.js). Saignement et
+// Électrifié rejoignent le réservoir, la Provocation passe à 8 %.
 window.EFFETS_A = [
     { cle: "degats",            bonus: { degats: 1 },            libelle: "dégât" },
-    ETAT_EFFET("Empoisonnement", 10, "empoisonnement"),
-    ETAT_EFFET("Étourdi",        10, "étourdissement"),
-    ETAT_EFFET("Glacé",          10, "gelée"),
-    ETAT_EFFET("Brûlé",          10, "brûlure"),
-    ETAT_EFFET("Immobilisation", 10, "immobilisation"),
-    ETAT_EFFET("Peur",           10, "peur"),
-    ETAT_EFFET("Poussée",        15, "poussée"),
+    ETAT_EFFET("Empoisonnement", 5, "empoisonnement"),
+    ETAT_EFFET("Étourdi",        5, "étourdissement"),
+    ETAT_EFFET("Glacé",          5, "gelée"),
+    ETAT_EFFET("Brûlé",          5, "brûlure"),
+    ETAT_EFFET("Immobilisation", 5, "immobilisation"),
+    ETAT_EFFET("Peur",           5, "peur"),
+    ETAT_EFFET("Poussée",        5, "poussée"),
+    ETAT_EFFET("Saignement",     5, "saignement"),
     { cle: "initTemporaire",    chance: 10, buff: { initiative: 15, tours: 2 }, libelle: "élan" },
     { cle: "hexApresAttaque",   bonus: { hexApresAttaque: 1 },   libelle: "repli" },
-    ETAT_EFFET("Provocation",    15, "provocation"),
+    ETAT_EFFET("Provocation",    8, "provocation"),
     { cle: "initiative",        bonus: { initiative: 5 },        libelle: "initiative" },
     { cle: "critique",          bonus: { critique: 3 },          libelle: "critique" },
-    { cle: "ignoreResistances", bonus: { ignoreResistances: 10 }, libelle: "perce-résistances" }
+    { cle: "ignoreResistances", bonus: { ignoreResistances: 10 }, libelle: "perce-résistances" },
+    ETAT_EFFET("Électrifié",     5, "électrification")
 ];
 
-// Colonne K — EFFET B (arme à distance). Même palette, plus la Traction, et
-// sans le "+1 dégât" placé une ligne plus haut dans le tableau.
+// Colonne K — EFFET B (arme à distance). (v476) Peur à 3 %, Traction à 5 %,
+// plus la Confusion (3 %), le Saignement et l'Électrifié.
 window.EFFETS_B = [
     { cle: "degats",            bonus: { degats: 1 },            libelle: "dégât" },
-    ETAT_EFFET("Empoisonnement", 10, "empoisonnement"),
-    ETAT_EFFET("Étourdi",        10, "étourdissement"),
-    ETAT_EFFET("Glacé",          10, "gelée"),
-    ETAT_EFFET("Brûlé",          10, "brûlure"),
-    ETAT_EFFET("Immobilisation", 10, "immobilisation"),
-    ETAT_EFFET("Peur",           10, "peur"),
-    ETAT_EFFET("Poussée",        15, "poussée"),
-    ETAT_EFFET("Traction",       15, "traction"),
+    ETAT_EFFET("Empoisonnement", 5, "empoisonnement"),
+    ETAT_EFFET("Étourdi",        5, "étourdissement"),
+    ETAT_EFFET("Glacé",          5, "gelée"),
+    ETAT_EFFET("Brûlé",          5, "brûlure"),
+    ETAT_EFFET("Immobilisation", 5, "immobilisation"),
+    ETAT_EFFET("Peur",           3, "peur"),
+    ETAT_EFFET("Poussée",        5, "poussée"),
+    ETAT_EFFET("Traction",       5, "traction"),
     { cle: "initTemporaire",    chance: 10, buff: { initiative: 15, tours: 2 }, libelle: "élan" },
     { cle: "hexApresAttaque",   bonus: { hexApresAttaque: 1 },   libelle: "repli" },
-    ETAT_EFFET("Provocation",    15, "provocation"),
+    ETAT_EFFET("Provocation",    8, "provocation"),
     { cle: "critique",          bonus: { critique: 3 },          libelle: "critique" },
     { cle: "initiative",        bonus: { initiative: 5 },        libelle: "initiative" },
-    { cle: "ignoreResistances", bonus: { ignoreResistances: 10 }, libelle: "perce-résistances" }
+    { cle: "ignoreResistances", bonus: { ignoreResistances: 10 }, libelle: "perce-résistances" },
+    ETAT_EFFET("Confusion",      3, "confusion"),
+    ETAT_EFFET("Saignement",     5, "saignement"),
+    ETAT_EFFET("Électrifié",     5, "électrification")
 ];
 
 // Colonne L — EFFET C (soins). Les trois "sur un sort de soin pendant 1 tour"
@@ -288,269 +300,301 @@ window.EFFETS_C = [
 window.RESERVOIRS_EFFETS = { A: window.EFFETS_A, B: window.EFFETS_B, C: window.EFFETS_C };
 
 // =========================================================================
-//  LES 23 MODÈLES (colonnes A à H du tableau)
+//  LES MODÈLES (colonnes A à H du tableau)
 // =========================================================================
 //  "paliers" donne les bonus chiffrés de chaque rareté. Une valeur écrite
-//  [min, max] est tirée au sort dans cette fourchette (les armures).
-//  "effets" dit combien d'effets s'ajoutent à partir de Très rare, et dans
-//  quel réservoir les prendre. Un objet épique tire le MÊME nombre d'effets
-//  qu'un très rare, mais chacun compte double.
+//  [min, max] est tirée au sort dans cette fourchette (armures, boucliers).
+//  "etatsPropres" : les « +X % de chance de … max » de l'arme elle-même, des
+//  augmentations max (voir EFFETS_A).
+//
+//  (v476) LES EFFETS DE RARETÉ SONT ÉCRITS PALIER PAR PALIER, comme dans le
+//  tableau : `effets: [nombre, fois]` — « + 1 Effet A » = [1, 1] ; « + 2X Effet
+//  A » = [1, 2] (UN effet, compté deux fois : « +5 % saignement max » devient
+//  +10 %, « +8 % de résistance magique pendant 1 tour » devient +16 % pendant
+//  1 tour — la durée ne double pas) ; « + 2 Effet B » = [2, 1] (deux effets
+//  différents) ; « + 2X (2 Effet B) » = [2, 2]. Le réservoir (A, B ou C) est
+//  celui du modèle.
 // -------------------------------------------------------------------------
 
 window.MODELES_OBJETS = [
-    // --- Armes et boucliers à une main (lignes 3 à 16) --------------------
+    // --- Armes et boucliers à une main ------------------------------------
     {
         modele: "Dague", type: "Arme légère CAC", emplacement: "Main", deuxMains: false,
-        carac: "DEXTÉRITÉ", noms: ["Sica", "Panazonium"], effets: { reservoir: "A", nombre: 1 },
+        carac: "DEXTÉRITÉ", noms: ["Sica", "Panazonium"], effets: { reservoir: "A" },
         paliers: {
             "Commun":    { critique: 3 },
             "Rare":      { critique: 6 },
-            "Très rare": { critique: 10 },
-            "Épique":    { critique: 10 }
+            "Très rare": { critique: 9 },
+            "Épique":    { critique: 9, effets: [1, 1] }
         }
     },
     {
         modele: "Couteau", type: "Arme légère CAC", emplacement: "Main", deuxMains: false,
-        carac: "DEXTÉRITÉ", noms: ["Couteau"], effets: { reservoir: "A", nombre: 1 },
+        carac: "DEXTÉRITÉ", noms: ["Couteau"], effets: { reservoir: "A" },
         paliers: {
             "Commun":    { coutDeplacement: -1 },
             "Rare":      { critique: 3, coutDeplacement: -1 },
-            "Très rare": { critique: 5, coutDeplacement: -1 },
-            "Épique":    { critique: 5, coutDeplacement: -1 }
+            "Très rare": { critique: 5, coutDeplacement: -1, initiative: 3 },
+            "Épique":    { critique: 5, coutDeplacement: -1, initiative: 3, effets: [1, 1] }
         }
     },
     {
         modele: "Épée courte", type: "Arme lourde CAC", emplacement: "Main", deuxMains: false,
-        carac: "FORCE", noms: ["Glaive", "Xiphos"], effets: { reservoir: "A", nombre: 1 },
+        carac: "FORCE", noms: ["Glaive", "Xiphos"], effets: { reservoir: "A" },
         paliers: {
             "Commun":    { initiative: 5 },
             "Rare":      { degatsPhys: 1, initiative: 5 },
-            "Très rare": { degatsPhys: 2, initiative: 8 },
-            "Épique":    { degatsPhys: 2, initiative: 8 }
+            "Très rare": { degatsPhys: 2, initiative: 5 },
+            "Épique":    { degatsPhys: 2, initiative: 5, effets: [1, 1] }
         }
     },
     {
         modele: "Épée courbée", type: "Arme légère CAC", emplacement: "Main", deuxMains: false,
-        carac: "DEXTÉRITÉ", noms: ["Harpé", "Machaira", "Falcata"], effets: { reservoir: "A", nombre: 1 },
+        carac: "DEXTÉRITÉ", noms: ["Harpé", "Machaira", "Falcata"], effets: { reservoir: "A" },
         paliers: {
             "Commun":    { degatsPhys: 1 },
             "Rare":      { degatsPhys: 1, critique: 3 },
-            "Très rare": { degatsPhys: 2, critique: 5 },
-            "Épique":    { degatsPhys: 2, critique: 5 }
+            "Très rare": { degatsPhys: 2, critique: 3 },
+            "Épique":    { degatsPhys: 2, critique: 3, effets: [1, 1] }
         }
     },
     {
         modele: "Hache", type: "Arme lourde CAC", emplacement: "Main", deuxMains: false,
-        carac: "FORCE", noms: ["Sagaris", "Labrys"], effets: { reservoir: "A", nombre: 1 },
+        carac: "FORCE", noms: ["Sagaris", "Labrys"], effets: { reservoir: "A" },
         paliers: {
-            "Commun":    { degatsPhys: 1 },
-            "Rare":      { degatsPhys: 2 },
-            "Très rare": { degatsPhys: 3 },
-            "Épique":    { degatsPhys: 3 }
+            "Commun":    { etatsPropres: [{ etat: "Saignement", chance: 5 }] },
+            "Rare":      { etatsPropres: [{ etat: "Saignement", chance: 5 }], degatsPhys: 1 },
+            "Très rare": { etatsPropres: [{ etat: "Saignement", chance: 5 }], degatsPhys: 2 },
+            "Épique":    { etatsPropres: [{ etat: "Saignement", chance: 5 }], degatsPhys: 2, effets: [1, 1] }
         }
     },
     {
         modele: "Gourdin", type: "Arme lourde CAC", emplacement: "Main", deuxMains: false,
-        carac: "FORCE", noms: ["Gourdin"], effets: { reservoir: "A", nombre: 1 },
+        carac: "FORCE", noms: ["Gourdin"], effets: { reservoir: "A" },
         paliers: {
-            "Commun":    { etatsPropres: [{ etat: "Étourdi", chance: 10 }] },
-            "Rare":      { etatsPropres: [{ etat: "Étourdi", chance: 15 }] },
-            "Très rare": { etatsPropres: [{ etat: "Étourdi", chance: 20 }], degats: 1 },
-            "Épique":    { etatsPropres: [{ etat: "Étourdi", chance: 20 }], degats: 1 }
+            "Commun":    { etatsPropres: [{ etat: "Étourdi", chance: 5 }] },
+            "Rare":      { etatsPropres: [{ etat: "Étourdi", chance: 10 }] },
+            "Très rare": { etatsPropres: [{ etat: "Étourdi", chance: 10 }], degatsPhys: 1 },
+            "Épique":    { etatsPropres: [{ etat: "Étourdi", chance: 10 }], degatsPhys: 1, effets: [1, 1] }
         }
     },
     {
         modele: "Masse", type: "Arme lourde CAC", emplacement: "Main", deuxMains: false,
-        carac: "FORCE", noms: ["Gada"], effets: { reservoir: "A", nombre: 1 },
+        carac: "FORCE", noms: ["Gada"], effets: { reservoir: "A" },
         paliers: {
-            "Commun":    { ignoreArmure: 15 },
+            "Commun":    { ignoreArmure: 10 },
             "Rare":      { ignoreArmure: 20 },
-            "Très rare": { ignoreArmure: 25 },
-            "Épique":    { ignoreArmure: 25 }
+            "Très rare": { ignoreArmure: 30 },
+            "Épique":    { ignoreArmure: 35, effets: [1, 1] }
         }
     },
     {
+        // (v476) « FORCE (parade) ou DEXTÉRITÉ (esquive) » : l'une ou l'autre
+        // suffit pour la porter (CARACS_MODELE), et le bonus va à la parade ou à
+        // l'esquive selon la meilleure des deux chez celui qui la tient
+        // (bonusEquipement). Une main seulement, la droite (loot.js).
         modele: "Lance courte", type: "Arme lourde CAC", emplacement: "Main", deuxMains: false,
-        carac: "FORCE", noms: ["Doratium"], effets: { reservoir: "A", nombre: 1 },
+        carac: "FORCE", noms: ["Doratium", "Gladius"], effets: { reservoir: "A" },
         paliers: {
-            // Tableau de Nico : la lance commune donne la parade, pas le dégât.
-            "Commun":    { parade: 5 },
-            "Rare":      { degatsPhys: 1, parade: 5 },
-            "Très rare": { degatsPhys: 2, parade: 5 },
-            "Épique":    { degatsPhys: 2, parade: 5 }
+            "Commun":    { paradeOuEsquive: 3 },
+            "Rare":      { paradeOuEsquive: 6 },
+            "Très rare": { paradeOuEsquive: 6, degatsPhys: 1 },
+            "Épique":    { paradeOuEsquive: 6, degatsPhys: 1, effets: [1, 1] }
         }
     },
     {
-        // Le classeur portait 12% en Épique, sous les 15% du Très rare :
-        // coquille confirmée par Nico, l'épique tient ses 15%.
+        // Une main, la droite (loot.js), comme la lance courte.
         modele: "Javelots", type: "Arme polyvalente", emplacement: "Main", deuxMains: false,
-        carac: "FORCE", noms: ["Hasta", "Pilum"], effets: { reservoir: "A", nombre: 1 },
+        carac: "FORCE", noms: ["Hasta", "Pilum"], effets: { reservoir: "B" },
         paliers: {
             "Commun":    { degatsPhys: 1 },
-            "Rare":      { degatsPhys: 1, ignoreArmure: 10 },
-            "Très rare": { degatsPhys: 1, ignoreArmure: 15 },
-            "Épique":    { degatsPhys: 1, ignoreArmure: 15 }
+            "Rare":      { degatsPhys: 2 },
+            "Très rare": { degatsPhys: 3 },
+            "Épique":    { degatsPhys: 3, effets: [1, 1] }
         }
     },
     {
-        modele: "Fronde", type: "Arme légère Distance", emplacement: "Main", deuxMains: false,
-        carac: "DEXTÉRITÉ", noms: ["Fronde"], effets: { reservoir: "A", nombre: 1 },
+        // Une arme à distance : à deux mains, comme toutes (v476, Nico).
+        modele: "Fronde", type: "Arme légère Distance", emplacement: "Main", deuxMains: true,
+        carac: "DEXTÉRITÉ", noms: ["Fronde"], effets: { reservoir: "B" },
         paliers: {
-            "Commun":    { etatsPropres: [{ etat: "Immobilisation", chance: 10 }], portee: 1 },
-            "Rare":      { etatsPropres: [{ etat: "Immobilisation", chance: 15 }], portee: 1 },
-            "Très rare": { etatsPropres: [{ etat: "Immobilisation", chance: 20 }], portee: 1 },
-            "Épique":    { etatsPropres: [{ etat: "Immobilisation", chance: 20 }], portee: 1 }
+            "Commun":    { etatsPropres: [{ etat: "Immobilisation", chance: 5 }],  portee: 1 },
+            "Rare":      { etatsPropres: [{ etat: "Immobilisation", chance: 10 }], portee: 1, degatsPhys: 1 },
+            "Très rare": { etatsPropres: [{ etat: "Immobilisation", chance: 15 }], portee: 2, degatsPhys: 1 },
+            "Épique":    { etatsPropres: [{ etat: "Immobilisation", chance: 15 }], portee: 2, degatsPhys: 1, effets: [1, 2] }
         }
     },
     {
         modele: "Bouclier léger", type: "Bouclier", emplacement: "Main", deuxMains: false,
-        carac: "DEXTÉRITÉ", noms: ["Pelta", "Caetra"], effets: { reservoir: "A", nombre: 1 },
+        carac: "DEXTÉRITÉ", noms: ["Pelta", "Caetra"], effets: { reservoir: "A" },
         paliers: {
-            "Commun":    { parade: 20 },
-            "Rare":      { parade: 25 },
-            "Très rare": { parade: 25 },
-            "Épique":    { parade: 25 }
+            "Commun":    { esquive: [3, 5] },
+            "Rare":      { esquive: [6, 8] },
+            "Très rare": { esquive: [6, 8], initiative: 5 },
+            "Épique":    { esquive: 8, initiative: 5, effets: [1, 1] }
         }
     },
     {
         modele: "Bouclier intermédiaire", type: "Bouclier", emplacement: "Main", deuxMains: false,
-        carac: "FORCE", noms: ["Aspis", "Clipeus"], effets: { reservoir: "A", nombre: 1 },
+        carac: "FORCE", noms: ["Aspis", "Clipeus"], effets: { reservoir: "A" },
         paliers: {
             "Commun":    { parade: 20 },
-            "Rare":      { parade: 25 },
-            "Très rare": { parade: 25 },
-            "Épique":    { parade: 25 }
+            "Rare":      { parade: [21, 23] },
+            "Très rare": { parade: [24, 26] },
+            "Épique":    { parade: 26, effets: [1, 1] }
         }
     },
     {
         modele: "Bouclier lourd", type: "Bouclier", emplacement: "Main", deuxMains: false,
-        carac: "FORCE", noms: ["Scutum"], effets: { reservoir: "A", nombre: 1 },
+        carac: "FORCE", noms: ["Scutum"], effets: { reservoir: "A" },
         paliers: {
-            "Commun":    { parade: 28, coutDeplacement: 1 },
-            "Rare":      { parade: 32, coutDeplacement: 1 },
-            "Très rare": { parade: 32, coutDeplacement: 1 },
-            "Épique":    { parade: 32, coutDeplacement: 1 }
+            "Commun":    { parade: [23, 25], coutDeplacement: 1 },
+            "Rare":      { parade: [26, 28], coutDeplacement: 1 },
+            "Très rare": { parade: [29, 31], coutDeplacement: 1 },
+            "Épique":    { parade: 31, coutDeplacement: 1, effets: [1, 1] }
         }
     },
 
-    // --- Armes à deux mains (lignes 18 à 22) ------------------------------
+    // --- Armes à deux mains -----------------------------------------------
     {
         modele: "Hache à deux mains", type: "Arme lourde CAC", emplacement: "Main", deuxMains: true,
-        carac: "FORCE", noms: ["Hache à deux mains"], effets: { reservoir: "A", nombre: 2 },
+        carac: "FORCE", noms: ["Hache à deux mains"], effets: { reservoir: "A" },
         paliers: {
-            "Commun":    { degatsPhys: 2 },
-            "Rare":      { degatsPhys: 4 },
-            "Très rare": { degatsPhys: 5 },      // tableau de Nico : +5 (l'Épique garde +6)
-            "Épique":    { degatsPhys: 6 }
+            "Commun":    { etatsPropres: [{ etat: "Saignement", chance: 10 }] },
+            "Rare":      { etatsPropres: [{ etat: "Saignement", chance: 10 }], degatsPhys: 2 },
+            "Très rare": { etatsPropres: [{ etat: "Saignement", chance: 10 }], degatsPhys: 3, effets: [1, 1] },
+            "Épique":    { etatsPropres: [{ etat: "Saignement", chance: 10 }], degatsPhys: 4, effets: [1, 2] }
         }
     },
     {
         modele: "Masse à deux mains", type: "Arme lourde CAC", emplacement: "Main", deuxMains: true,
-        carac: "FORCE", noms: ["Gada à deux mains"], effets: { reservoir: "A", nombre: 2 },
+        carac: "FORCE", noms: ["Gada à deux mains"], effets: { reservoir: "A" },
         paliers: {
-            "Commun":    { ignoreArmure: 30 },
+            "Commun":    { ignoreArmure: 20 },
             "Rare":      { ignoreArmure: 40 },
-            "Très rare": { ignoreArmure: 50 },
-            "Épique":    { ignoreArmure: 50 }
+            "Très rare": { ignoreArmure: 60 },
+            "Épique":    { ignoreArmure: 70, effets: [1, 2] }
         }
     },
     {
         modele: "Lance à deux mains", type: "Arme lourde CAC", emplacement: "Main", deuxMains: true,
-        carac: "FORCE", noms: ["Lance lourde"], effets: { reservoir: "A", nombre: 2 },
+        carac: "FORCE", noms: ["Lance lourde"], effets: { reservoir: "A" },
         paliers: {
-            "Commun":    { allonge: 1 },
-            "Rare":      { allonge: 1, degats: 2 },
-            "Très rare": { allonge: 1, degats: 4 },
-            "Épique":    { allonge: 1, degats: 4 }
+            "Commun":    { allonge: 1, degatsPhys: 1 },
+            "Rare":      { allonge: 1, degatsPhys: 2, etatsPropres: [{ etat: "Poussée", chance: 5 }] },
+            "Très rare": { allonge: 1, degatsPhys: 3, etatsPropres: [{ etat: "Poussée", chance: 5 }], effets: [1, 1] },
+            "Épique":    { allonge: 1, degatsPhys: 3, etatsPropres: [{ etat: "Poussée", chance: 10 }], effets: [1, 2] }
         }
     },
     {
         // Typée "Arme légère CAC" dans le tableau malgré ses deux mains :
         // transcrit tel quel, c'est la Falx.
         modele: "Épée à deux mains", type: "Arme légère CAC", emplacement: "Main", deuxMains: true,
-        carac: "DEXTÉRITÉ", noms: ["Falx"], effets: { reservoir: "A", nombre: 2 },
+        carac: "DEXTÉRITÉ", noms: ["Falx"], effets: { reservoir: "A" },
         paliers: {
             "Commun":    { degatsPhys: 1, initiative: 5 },
             "Rare":      { degatsPhys: 2, initiative: 10 },
-            "Très rare": { degatsPhys: 4, initiative: 10 },
-            "Épique":    { degatsPhys: 4, initiative: 10 }
-        }
-    },
-    {
-        modele: "Arc court", type: "Arme légère Distance", emplacement: "Main", deuxMains: true,
-        carac: "DEXTÉRITÉ", noms: ["Arc court"], effets: { reservoir: "B", nombre: 2 },
-        paliers: {
-            "Commun":    { portee: 1 },
-            "Rare":      { portee: 1, degats: 2 },
-            "Très rare": { portee: 1, degats: 4 },
-            "Épique":    { portee: 1, degats: 4 }
+            "Très rare": { degatsPhys: 3, initiative: 10, effets: [1, 1] },
+            "Épique":    { degatsPhys: 4, initiative: 10, effets: [1, 2] }
         }
     },
 
-    // --- Magie (lignes 24 et 25) ------------------------------------------
+    // --- Armes à distance : TOUTES à deux mains (v476, Nico) ---------------
+    {
+        modele: "Arc court", type: "Arme légère Distance", emplacement: "Main", deuxMains: true,
+        carac: "DEXTÉRITÉ", noms: ["Arc court"], effets: { reservoir: "B" },
+        paliers: {
+            "Commun":    { portee: 1, degatsPhys: 1 },
+            "Rare":      { portee: 1, degatsPhys: 2, effets: [1, 1] },
+            "Très rare": { portee: 1, degatsPhys: 3, effets: [2, 1] },
+            "Épique":    { portee: 1, degatsPhys: 4, effets: [1, 3] }
+        }
+    },
+    {
+        modele: "Gantelet lance-fléchette", type: "Arme légère Distance", emplacement: "Main", deuxMains: true,
+        carac: "DEXTÉRITÉ", noms: ["Gantelet lance-fléchette"], effets: { reservoir: "B" },
+        paliers: {
+            "Commun":    { portee: 1, critique: 3 },
+            "Rare":      { portee: 1, critique: 9 },
+            "Très rare": { portee: 1, critique: 12, effets: [1, 1] },
+            "Épique":    { portee: 1, critique: 15, effets: [2, 2] }
+        }
+    },
+    {
+        modele: "Sarbacane", type: "Arme légère Distance", emplacement: "Main", deuxMains: true,
+        carac: "DEXTÉRITÉ", noms: ["Sarbacane"], effets: { reservoir: "B" },
+        paliers: {
+            "Commun":    { portee: 1, etatsPropres: [{ etat: "Empoisonnement", chance: 5 }] },
+            "Rare":      { portee: 2, etatsPropres: [{ etat: "Empoisonnement", chance: 10 }] },
+            "Très rare": { portee: 2, etatsPropres: [{ etat: "Empoisonnement", chance: 15 }], effets: [1, 1] },
+            "Épique":    { portee: 2, etatsPropres: [{ etat: "Empoisonnement", chance: 20 }], effets: [2, 2] }
+        }
+    },
+
+    // --- Magie ------------------------------------------------------------
     //  Une bague occupe une main, mais ne la ferme pas : elle ne compte pas
     //  comme main occupée pour la règle "lancer un sort demande une main libre".
     {
         modele: "Bagues DPS", type: "Magie", emplacement: "Main", deuxMains: false, bague: true,
-        carac: "INTELLIGENCE", noms: ["Bague"], effets: { reservoir: "B", nombre: 1 },
+        carac: "INTELLIGENCE", noms: ["Bague"], effets: { reservoir: "B" },
         paliers: {
             "Commun":    { degatsMag: 1 },
-            "Rare":      { degatsMag: 2 },
-            "Très rare": { degatsMag: 3 },
-            "Épique":    { degatsMag: 3 }
+            "Rare":      { degatsMag: 1, effets: [1, 1] },
+            "Très rare": { degatsMag: 2, effets: [1, 1] },
+            "Épique":    { degatsMag: 2, effets: [1, 2] }
         }
     },
     {
         modele: "Bagues Soins", type: "Magie", emplacement: "Main", deuxMains: false, bague: true,
-        carac: "SAGESSE", noms: ["Bague"], effets: { reservoir: "C", nombre: 1 },
+        carac: "SAGESSE", noms: ["Bague"], effets: { reservoir: "C" },
         paliers: {
             "Commun":    { soin: 1 },
-            "Rare":      { soin: 2 },
-            "Très rare": { soin: 3 },
-            "Épique":    { soin: 3 }
+            "Rare":      { soin: 1, effets: [1, 1] },
+            "Très rare": { soin: 1, effets: [1, 2] },
+            "Épique":    { soin: 1, effets: [1, 3] }
         }
     },
 
     // --- Armures (lignes 27 à 29) -----------------------------------------
     //  Les fourchettes [min, max] sont tirées au sort à la création de l'objet.
-    //  Un épique tire son effet dans A, B ou C (au hasard), et sans doublement :
+    //  Un épique tire son effet dans A, B ou C (au hasard), une seule fois :
     //  le tableau dit "+ 1 Effet A, B, ou C", pas "2X".
     {
         modele: "Armure légère", type: "Armure légère", emplacement: "Armure", deuxMains: false,
         carac: "INTELLIGENCE",
         noms: ["Tunique de lin", "Exômide", "Chiton de laine", "Robe de bure", "Cape de voyage"],
-        effets: { reservoir: "ABC", nombre: 1, seulementEpique: true, sansDoublement: true },
+        effets: { reservoir: "ABC" },
         paliers: {
             "Commun":    { resMag: [15, 25], resPhys: 5 },
             "Rare":      { resMag: [20, 30], resPhys: [5, 10] },
             "Très rare": { resMag: [25, 40], resPhys: [10, 15] },
-            "Épique":    { resMag: 40, resPhys: 15 }
+            "Épique":    { resMag: 40, resPhys: 15, effets: [1, 1] }
         }
     },
     {
         modele: "Armure intermédiaire", type: "Armure intermédiaire", emplacement: "Armure", deuxMains: false,
         carac: "DEXTÉRITÉ",
         noms: ["Spolas", "Linothorax", "Brigandine", "Jaque de cuir", "Cuirasse de cuir"],
-        effets: { reservoir: "ABC", nombre: 1, seulementEpique: true, sansDoublement: true },
+        effets: { reservoir: "ABC" },
         paliers: {
             "Commun":    { resPhys: [10, 15], resMag: [10, 15] },
             "Rare":      { resPhys: [13, 20], resMag: [13, 20] },
             // Le seul palier avec une réserve à répartir : 10 points de plus,
             // distribués au hasard entre les deux résistances.
             "Très rare": { resPhys: [18, 26], resMag: [18, 26], aRepartir: 10 },
-            "Épique":    { resPhys: 26, resMag: 26 }
+            "Épique":    { resPhys: 26, resMag: 26, effets: [1, 1] }
         }
     },
     {
         modele: "Armure lourde", type: "Armure lourde", emplacement: "Armure", deuxMains: false,
         carac: "FORCE",
         noms: ["Lorica", "Cuirasse de bronze", "Thorax hoplitique", "Cotte d'écailles", "Lorica segmentata"],
-        effets: { reservoir: "ABC", nombre: 1, seulementEpique: true, sansDoublement: true },
+        effets: { reservoir: "ABC" },
         paliers: {
             "Commun":    { resPhys: [15, 25], resMag: 5 },
             "Rare":      { resPhys: [20, 30], resMag: [5, 10] },
             "Très rare": { resPhys: [25, 40], resMag: [10, 15] },
-            "Épique":    { resPhys: 40, resMag: 15 }
+            "Épique":    { resPhys: 40, resMag: 15, effets: [1, 1] }
         }
     }
 ];
@@ -582,39 +626,43 @@ window.tirerRarete = function(difficulte) {
     return "Commun";
 };
 
-// Double un effet : sa chance si elle existe, sinon sa valeur. Un effet doublé
-// reste un effet unique — c'est la lecture retenue avec Nico pour "2X Effet A".
-function doublerEffet(effet) {
+// « 2X », « 3X » : le même effet compté `fois` fois — sa chance s'il en a une,
+// sinon sa valeur, jamais sa durée. Il reste UN effet.
+function multiplierEffet(effet, fois) {
     const copie = JSON.parse(JSON.stringify(effet));
+    const n = Math.max(1, Number(fois) || 1);
+    if (n === 1) return copie;
     if (copie.chance !== undefined) {
-        copie.chance = Math.min(100, copie.chance * 2);
+        copie.chance = Math.min(100, copie.chance * n);
         return copie;
     }
     ["bonus", "buff", "buffSoi", "beniSoin"].forEach(cle => {
         if (!copie[cle]) return;
         Object.keys(copie[cle]).forEach(k => {
-            if (k !== "tours" && typeof copie[cle][k] === "number") copie[cle][k] *= 2;
+            if (k !== "tours" && typeof copie[cle][k] === "number") copie[cle][k] *= n;
         });
     });
     return copie;
 }
+window.multiplierEffetObjet = multiplierEffet;
 
-// Les effets ajoutés par la rareté : rien avant Très rare, puis "nombre"
-// effets distincts, doublés si l'objet est épique.
+// Les effets de rareté d'un palier (v476) : `effets: [nombre, fois]` — "nombre"
+// effets distincts du réservoir du modèle, chacun compté "fois" fois.
 window.tirerEffetsObjet = function(modele, rarete) {
-    const regle = modele.effets || {};
-    if (rarete !== "Très rare" && rarete !== "Épique") return [];
-    if (regle.seulementEpique && rarete !== "Épique") return [];
+    const palier = (modele.paliers || {})[rarete] || {};
+    const [nombre, fois] = Array.isArray(palier.effets) ? palier.effets : [0, 1];
+    if (!(nombre > 0)) return [];
 
     // "ABC" (les armures épiques) : le réservoir lui-même est tiré au sort.
+    const regle = modele.effets || {};
     const nomReservoir = regle.reservoir === "ABC" ? auHasard(["A", "B", "C"]) : regle.reservoir;
     const reservoir = window.RESERVOIRS_EFFETS[nomReservoir] || window.EFFETS_A;
 
     const disponibles = [...reservoir];
     const tires = [];
-    for (let i = 0; i < (regle.nombre || 1) && disponibles.length > 0; i++) {
+    for (let i = 0; i < nombre && disponibles.length > 0; i++) {
         const effet = disponibles.splice(Math.floor(Math.random() * disponibles.length), 1)[0];
-        tires.push(rarete === "Épique" && !regle.sansDoublement ? doublerEffet(effet) : effet);
+        tires.push(multiplierEffet(effet, fois));
     }
     return tires;
 };
@@ -631,7 +679,7 @@ window.fabriquerObjet = function(modele, rarete, options) {
     Object.keys(palier).forEach(cle => {
         if (cle === "etatsPropres") {
             (palier[cle] || []).forEach(e => etats.push({ etat: e.etat, chance: e.chance }));
-        } else if (cle !== "aRepartir") {
+        } else if (cle !== "aRepartir" && cle !== "effets") {
             bonus[cle] = valeurPalier(palier[cle], !!opts.auPlusBas);
         }
     });
@@ -651,7 +699,13 @@ window.fabriquerObjet = function(modele, rarete, options) {
         if (effet.bonus) {
             Object.keys(effet.bonus).forEach(k => { bonus[k] = (bonus[k] || 0) + effet.bonus[k]; });
         }
-        if (effet.etat) etats.push({ etat: effet.etat, chance: effet.chance });
+        if (effet.etat) {
+            // Le même état que celui de l'arme (la hache qui fait déjà saigner) :
+            // les deux s'additionnent sur une seule ligne.
+            const deja = etats.find(e => e.etat === effet.etat);
+            if (deja) deja.chance += effet.chance;
+            else etats.push({ etat: effet.etat, chance: effet.chance });
+        }
     });
 
     const objet = {
@@ -732,15 +786,27 @@ function bagueDeDepart(modele) {
     return m ? window.fabriquerObjet(m, "Commun", { depart: true }) : window.objetDeDepart("Magie");
 }
 
+// (v476) Nico : « à la création du personnage, laisse au joueur la possibilité
+// de choisir une arme parmi toutes les armes grises, autres que les armes corps
+// à corps à deux mains et les boucliers ». Le formulaire (index.html) propose
+// ces modèles un par un ; le joueur reçoit le sien en qualité commune.
+window.armesDeDepartAuChoix = function() {
+    return (window.MODELES_OBJETS || []).filter(m => m.emplacement === "Main" && m.type !== "Bouclier"
+        && !(m.deuxMains && /CAC/.test(m.type)));
+};
+
 // Les deux (ou trois, avec le bouclier) objets qu'un héros porte à sa création.
 // Renvoie toujours un objet, même partiel : un type inconnu ne doit pas
-// empêcher la création du personnage.
+// empêcher la création du personnage. Les anciens choix par famille
+// (« Arme lourde CAC », « Arme légère + Bouclier »…) restent compris.
 window.equipementDeDepart = function(typeArme, typeArmure) {
     const famillesAvecBouclier = Object.prototype.hasOwnProperty.call(CHOIX_ARME_BOUCLIER, typeArme)
         ? CHOIX_ARME_BOUCLIER[typeArme] : null;
     const estArmeBouclier = !!famillesAvecBouclier;
+    const modeleChoisi = window.armesDeDepartAuChoix().find(m => m.modele === typeArme);
     return {
-        arme: estArmeBouclier ? window.objetDeDepartUneMain(famillesAvecBouclier)
+        arme: modeleChoisi ? window.fabriquerObjet(modeleChoisi, "Commun", { depart: true })
+              : estArmeBouclier ? window.objetDeDepartUneMain(famillesAvecBouclier)
               : CHOIX_BAGUE[typeArme] ? bagueDeDepart(CHOIX_BAGUE[typeArme])
               : typeArme ? window.objetDeDepart(typeArme) : null,
         bouclier: estArmeBouclier ? window.objetDeDepart("Bouclier") : null,
@@ -806,6 +872,8 @@ const LIBELLES_BONUS = {
     soin:              v => `+${v} soin${v > 1 ? "s" : ""}`,
     initiative:        v => `+${v} d'initiative`,
     parade:            v => `+${v} de parade`,
+    esquive:           v => `+${v}% d'esquive`,
+    paradeOuEsquive:   v => `+${v}% de parade ou d'esquive (selon la Force ou la Dextérité)`,
     resPhys:           v => `+${v}% de résistance physique`,
     resMag:            v => `+${v}% de résistance magique`,
     portee:            v => `+${v} de portée`,
@@ -820,7 +888,8 @@ const LIBELLES_BONUS = {
 const LIBELLES_ETATS = {
     "Empoisonnement": "d'empoisonnement", "Étourdi": "d'étourdissement", "Glacé": "de gelée",
     "Brûlé": "de brûlure", "Immobilisation": "d'immobilisation", "Peur": "de peur",
-    "Poussée": "de repousser", "Traction": "de tracter", "Provocation": "de provoquer"
+    "Poussée": "de repousser", "Traction": "de tracter", "Provocation": "de provoquer",
+    "Saignement": "de saignement", "Électrifié": "d'électrifier", "Confusion": "de confusion"
 };
 
 window.decrireObjet = function(objet) {
@@ -832,7 +901,9 @@ window.decrireObjet = function(objet) {
     });
 
     (objet.etats || []).forEach(e => {
-        morceaux.push(`${e.chance}% de chance ${LIBELLES_ETATS[e.etat] || e.etat.toLowerCase()}`);
+        // (v476) Une augmentation max : elle ne sert qu'une technique qui porte
+        // déjà cet état, par-dessus son plafond.
+        morceaux.push(`+${e.chance}% de chance ${LIBELLES_ETATS[e.etat] || e.etat.toLowerCase()} max`);
     });
 
     (objet.effets || []).forEach(e => {
@@ -893,6 +964,13 @@ window.raisonObjetInterditParBlessure = function(perso, objet, emplacement) {
     return null;
 };
 
+// (v476) « Toutes les armes à distance sont considérées comme à 2 mains » —
+// celles trouvées avant aussi (une fronde d'avant n'avait qu'une main).
+window.objetAuxReglesDuJour = function(objet) {
+    if (objet && objet.type === "Arme légère Distance" && objet.deuxMains !== true) return { ...objet, deuxMains: true };
+    return objet;
+};
+
 // (v360) LE BERSERKER de niveau 9 tient-il DEUX armes à deux mains (une par main) ?
 window.deuxArmesDeuxMains = function(perso) {
     const d = perso && perso.equipMainDroite, g = perso && perso.equipMainGauche;
@@ -923,6 +1001,16 @@ window.bonusEquipement = function(perso) {
             total[cle] += v;
         });
     });
+    // (v476) LA LANCE COURTE : « FORCE (parade) ou DEXTÉRITÉ (esquive) ». Le
+    // bonus va à la parade si la Force du porteur vaut au moins sa Dextérité,
+    // sinon à l'esquive (une carac inconnue compte pour rien : la parade).
+    if (total.paradeOuEsquive) {
+        const id = perso && perso.idPersonnage;
+        const force = Number(id ? window.caracDuPersonnage(id, "FORCE") : null) || 0;
+        const dex = Number(id ? window.caracDuPersonnage(id, "DEXTÉRITÉ") : null) || 0;
+        total[dex > force ? "esquive" : "parade"] += total.paradeOuEsquive;
+        total.paradeOuEsquive = 0;
+    }
     return total;
 };
 

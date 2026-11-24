@@ -5403,6 +5403,8 @@ textarea.input-texte-parchemin {
 .forge-persistance-surpuissante { display: block; margin-top: 2px; font-style: normal; color: #7c2d12; }
 /* (v475) « avec la surpuissance », sous les dégâts au lancement et dans la zone. */
 .forge-persistance-mention { display: block; font-style: italic; font-size: 0.9em; color: #92400e; }
+/* (v476) La portée d'une technique d'arme à distance (competences.js, texteSansDistanceArme). */
+.forge-portee-arme { display: block; font-style: italic; font-size: 0.9em; color: #1e3a8a; }
 
 /* (v475) LA DATE DU VOYAGE, en haut du livre (voyage_groupe.js, afficherDateVoyage) :
    elle arrive en fondu, ses chiffres qui changent montent et laissent la place aux

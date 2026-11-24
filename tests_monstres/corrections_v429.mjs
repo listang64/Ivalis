@@ -81,7 +81,7 @@ await section(async () => {
     const coup = () => [{ nom: "Coup", typeRes: "Physique", valeurBrute: 10, cibles: ["M"] }];
     return {
       carteEtArme: avec([{ etat: "Saignement", chance: 20 }], () => window.__carte(humain, coup(), [{ nom: "Saignement", chance: 30, duree: 2, cibles: ["M"] }], "Arme légère")),
-      deuxObjets: avec([{ etat: "Brûlé", chance: 10 }, { etat: "Brûlé", chance: 15 }], () => window.__carte(humain, coup(), [], "Arme légère")),
+      deuxObjets: avec([{ etat: "Brûlé", chance: 10 }, { etat: "Brûlé", chance: 15 }], () => window.__carte(humain, coup(), [{ nom: "Brûlé", chance: 5, duree: 2, cibles: ["M"] }], "Arme légère")),
       armeSeule: avec([{ etat: "Étourdi", chance: 12 }], () => window.__carte(humain, coup(), [], "Arme légère")),
       talentEtBague: avec([{ etat: "Saignement", chance: 20 }], () => window.__carte(window.__heros({ equipMainDroite: window.__bague }), window.__sort(), [])),
       talentBagueCarte: avec([{ etat: "Saignement", chance: 20 }], () => window.__carte(window.__heros({ equipMainDroite: window.__bague }), window.__sort(), [{ nom: "Saignement", chance: 40, duree: 2, cibles: ["M"] }]))
@@ -89,10 +89,11 @@ await section(async () => {
   });
   const ch = (l, nom) => (l.find(a => a.nom === nom) || {}).chance;
   verifier("une carte à 30 % de Saignement + une arme à 20 % : 50 % (et plus le meilleur des deux)", ch(r.carteEtArme, "Saignement") === 50 && r.carteEtArme.length === 1, JSON.stringify(r.carteEtArme));
-  verifier("deux objets qui brûlent (10 et 15) : 25 %, un seul Brûlé", ch(r.deuxObjets, "Brûlé") === 25 && r.deuxObjets.length === 1, JSON.stringify(r.deuxObjets));
-  verifier("une arme seule : sa chance telle quelle (12 %)", ch(r.armeSeule, "Étourdi") === 12, JSON.stringify(r.armeSeule));
-  // (v431) Le Pugiliste est une augmentation max (+10) : seulement sur le Saignement du sort ; l'arme, elle, s'ajoute partout.
-  verifier("(v431) un sort sans Saignement : le Pugiliste ne donne rien, la bague ajoute le sien (20 %)", ch(r.talentEtBague, "Saignement") === 20, JSON.stringify(r.talentEtBague));
+  // (v476) Les états d'équipement sont des augmentations max : ils s'additionnent
+  // sur l'état que la carte porte, et n'en créent aucun.
+  verifier("deux objets qui brûlent (10 et 15) sur une carte à 5 % : 30 %, un seul Brûlé", ch(r.deuxObjets, "Brûlé") === 30 && r.deuxObjets.length === 1, JSON.stringify(r.deuxObjets));
+  verifier("(v476) une arme seule sur une carte sans Étourdi : rien", r.armeSeule.length === 0, JSON.stringify(r.armeSeule));
+  verifier("(v476) un sort sans Saignement : ni le Pugiliste ni la bague ne le créent", r.talentEtBague.length === 0, JSON.stringify(r.talentEtBague));
   verifier("(v431) …et avec une carte qui fait déjà saigner à 40 : 40 + 10 (Pugiliste) + 20 (bague) = 70", ch(r.talentBagueCarte, "Saignement") === 70, JSON.stringify(r.talentBagueCarte));
 });
 

@@ -175,7 +175,8 @@ titre("2. L'ARME DE DÉPART : UNE BAGUE DE SOIN OU UNE BAGUE DE DÉGÂTS");
 // =========================================================================
 await section(async () => {
   const o = await p.evaluate(() => [...document.querySelectorAll("#champ-type-arme option")].map(x => [x.value, x.textContent.trim()]));
-  verifier("le choix propose la bague de soin et la bague de dégâts (plus « Magie (bague) »)", JSON.stringify(o.filter(x => /Magie/.test(x[0]))) === '[["Magie Soins","Magie : bague de soin"],["Magie DPS","Magie : bague de dégâts"]]', JSON.stringify(o));
+  // (v476) Le choix se fait désormais arme par arme : les deux bagues y sont.
+  verifier("le choix propose la bague de soin et la bague de dégâts (plus « Magie (bague) »)", JSON.stringify(o.filter(x => /Bague/.test(x[0]))) === '[["Bagues DPS","Bague de dégâts"],["Bagues Soins","Bague de soin"]]', JSON.stringify(o));
   const t = await p.evaluate(() => {
     const tire = (choix) => Array.from({ length: 12 }, () => { const a = window.equipementDeDepart(choix, "Armure légère").arme; return a ? [a.type, !!a.bague, a.carac] : null; });
     return { soin: tire("Magie Soins"), degats: tire("Magie DPS"), ancien: tire("Magie") };

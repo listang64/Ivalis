@@ -184,8 +184,10 @@ window.champsPourObjet = function(objet, main) {
 // Ivalis, l'écrasement est définitif : le joueur doit le voir avant de valider.
 window.objetsEcrasesPar = function(perso, objet, main) {
     if (!perso) return [];
+    const gauche = window.mainGaucheIncompatible(perso, objet, main);   // (v476) la lance chasse la dague
     return window.champsPourObjet(objet, main)
         .map(champ => perso[window.champDocVersFront[champ]])
+        .concat(gauche ? [gauche] : [])
         .filter(o => o && o.nom);
 };
 
@@ -225,14 +227,37 @@ window.memeFamilleUnique = function(a, b) {
     return !!f && f === window.familleUniqueEnMain(b) && !(a.uid && b && a.uid === b.uid) && a !== b;
 };
 
+// (v476) Nico : « les lances et javelots, qui s'utilisent à une main, ne
+// peuvent pas être placés en main gauche, et ne permettent en main secondaire
+// qu'un bouclier ou une bague ». La lance à deux mains n'est pas concernée.
+window.armeMainDroiteSeule = function(objet) {
+    if (!objet || !objet.nom || objet.deuxMains) return false;
+    return /^(lance|javelot)/i.test(String(objet.modele || ""));
+};
+// Ce qui peut tenir la main gauche à côté d'une lance ou de javelots.
+window.vaAvecUneLance = (objet) => !!objet && (window.estBouclier(objet) || !!objet.bague);
+// L'objet qu'il faudrait ôter de la main gauche pour mettre cet objet en main
+// droite (une dague à côté d'une lance qui arrive), ou null.
+window.mainGaucheIncompatible = function(perso, objet, main) {
+    if (!perso || !window.armeMainDroiteSeule(objet) || main === "Gauche") return null;
+    const g = perso.equipMainGauche, d = perso.equipMainDroite;
+    if (!g || !g.nom || window.vaAvecUneLance(g)) return null;
+    if (g.uid && d && g.uid === d.uid) return null;   // une arme à deux mains : déjà remplacée
+    return g;
+};
+
 // Les mains où cet objet peut aller, pour ce héros-là : ["Droite", "Gauche"],
-// une seule des deux (le bouclier), ou [null] quand la question ne se pose pas
-// (une armure, une arme à deux mains, un vieil objet à main imposée).
+// une seule des deux (le bouclier, la lance), ou [null] quand la question ne
+// se pose pas (une armure, une arme à deux mains, un vieil objet à main imposée).
 window.mainsPossibles = function(perso, objet) {
     if (!objet) return [null];
     if (objet.emplacement === "Armure" || objet.deuxMains
         || objet.emplacement === "Main_Gauche" || objet.emplacement === "Main_Droite") return [null];
-    const mains = ["Droite", "Gauche"];
+    if (window.armeMainDroiteSeule(objet)) return ["Droite"];
+    // À côté d'une lance en main droite, la gauche ne prend qu'un bouclier ou
+    // une bague : tout le reste ne peut que remplacer la lance.
+    const droite = perso && perso.equipMainDroite;
+    const mains = window.armeMainDroiteSeule(droite) && !window.vaAvecUneLance(objet) ? ["Droite"] : ["Droite", "Gauche"];
     if (!window.familleUniqueEnMain(objet)) return mains;
     const voisine = { Droite: perso && perso.equipMainGauche, Gauche: perso && perso.equipMainDroite };
     const permises = mains.filter(m => !window.memeFamilleUnique(objet, voisine[m]));
@@ -307,7 +332,9 @@ window.equiperObjet = async function(idPersonnage, objet, main, options) {
     // Le garde-fou du bouclier : une main interdite (l'autre tient déjà un
     // bouclier) est redressée vers la seule permise — le nouveau bouclier
     // remplace l'ancien au lieu de s'installer à côté.
-    if (window.familleUniqueEnMain(objet)) {
+    // (v476) Même garde-fou pour la lance et les javelots : la main droite
+    // seulement, et rien d'autre qu'un bouclier ou une bague à côté d'eux.
+    {
         const permises = window.mainsPossibles(perso, objet);
         const demandee = main === "Gauche" ? "Gauche" : "Droite";
         if (permises[0] !== null && !permises.includes(demandee)) main = permises[0];
@@ -321,6 +348,12 @@ window.equiperObjet = async function(idPersonnage, objet, main, options) {
     // Une arme à deux mains chasse aussi ce qui occupait l'autre main : les
     // deux champs sont réécrits, donc rien ne peut survivre à côté d'elle.
     champs.forEach(champ => maj[champ] = valeur);
+    // La lance qui arrive en main droite chasse l'arme de la main gauche
+    // (annoncée au joueur par objetsEcrasesPar).
+    if (window.mainGaucheIncompatible(perso, objet, main)) {
+        maj.Equip_Main_Gauche = null;
+        champs.push("Equip_Main_Gauche");
+    }
 
     // L'INVERSE EST TOUT AUSSI VRAI, et il manquait. Une arme à deux mains est
     // écrite DANS LES DEUX MAINS avec le même identifiant. La remplacer par une
@@ -1991,8 +2024,12 @@ window.ouvrirConfirmationEquip = function(idPersonnage, item, uid, mode) {
     const lignes = [];
     if (!test.possible) {
         lignes.push(`Il te faut ${item.prerequis} en ${window.texteCaracsObjet(item)} pour porter cet objet (tu as ${test.valeur}).`);
+    } else if (window.armeMainDroiteSeule(item)) {
+        lignes.push("Une lance ou des javelots se tiennent en main droite ; la main gauche ne garde qu'un bouclier ou une bague.");
     } else if (bouclierPorte && bouclierPorte.nom) {
         lignes.push(`${window.libelleFamilleUnique(famille)} à la fois : ${famille === "bouclier" ? "celui-ci" : "celle-ci"} ne peut que remplacer ${bouclierPorte.nom}.`);
+    } else if (mains[0] !== null && mains.length === 1 && perso && window.armeMainDroiteSeule(perso.equipMainDroite)) {
+        lignes.push(`À côté de ${perso.equipMainDroite.nom}, la main gauche ne prend qu'un bouclier ou une bague : cet objet ne peut que la remplacer.`);
     }
     const message = document.getElementById("message-confirmation-equip");
     if (message) {

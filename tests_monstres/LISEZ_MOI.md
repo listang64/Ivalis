@@ -12610,3 +12610,20 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   - plus de « attachement −0 ».
 - **Le multiplicateur de persistance des états** : dans l'éditeur des effets, sous un effet à chance, × au lancement et × dans la zone ; en combat, la part du grimoire est multipliée, puis l'élément, la surpuissance, la classe et les talents s'ajoutent (moteur_effets.js, moteur_pur.js) ; dans la Forge, en gras à la fin de l'effet : « 80 % avec persistance au lancement » · « 40 % dans la zone ».
 - corrections_v475 le vérifie ; corrections_v313 (la richesse en drachmes), social_pur (24 actions), corrections_v277 (plus de nuit ; la maquette ne relaie plus un sous-document comme la partie) et corrections_v427_persistance (la mention) suivent.
+
+## v476 — Les armes du nouveau tableau, les armes à distance, la lance en main droite, l'arme de départ au choix
+
+- **Le catalogue** (objets.js) suit le nouveau tableau cellule par cellule (tableau_objets.json régénéré ; armures inchangées) :
+  - deux nouvelles armes à distance, le **Gantelet lance-fléchette** (+1 portée, 3 / 9 / 12 / 15 % de critique) et la **Sarbacane** (portée 1 à 2, empoisonnement max 5 à 20 %) ;
+  - le **Bouclier léger** donne de l'**esquive** (3 à 5 %, 6 à 8 %, 8 %), nouvelle clé `esquive` lue par esquiveCombattant (app.js) ; les boucliers intermédiaire et lourd ont des fourchettes de parade ;
+  - la **Lance courte** (Doratium, Gladius) : +3 / +6 % de parade **ou** d'esquive — à la parade si la Force du porteur vaut au moins sa Dextérité, sinon à l'esquive ; elle se porte avec l'une ou l'autre ;
+  - les chiffres revus : dague 9 %, couteau +3 d'initiative, masses 10 à 35 % / 20 à 70 %, javelots +1 à +3 dégâts, hache et gourdin à saignement / étourdissement « max », lance lourde poussée max, etc.
+- **Les états d'arme sont des augmentations max** (« +5 % de chance de saignement max ») : ils montent la chance de l'état que la technique porte déjà, par-dessus son plafond, et n'en créent plus aucun (moteur_effets.js, appliquerEquipementALaCarte). Les objets l'écrivent : « +10% de chance d'étourdissement max ».
+- **Les effets de rareté, palier par palier** (`effets: [nombre, fois]`) : « 1 Effet » = [1, 1], « 2X Effet » = [1, 2], « 2 Effet B » = [2, 1], « 2X (2 Effet B) » = [2, 2], « 3X Effet C » = [1, 3]. **2X = le même effet deux fois** : sa chance ou sa valeur double, jamais sa durée (+5 % saignement max → +10 % ; +8 % de résistance magique pendant 1 tour → +16 % pendant 1 tour). Réservoirs : A à 16 effets (Saignement et Électrifié en plus, états à 5 %, provocation 8 %), B à 18 (Confusion 3 %, Peur 3 %, Traction 5 %, Saignement, Électrifié). Un état tiré qui est déjà celui de l'arme s'additionne sur une seule ligne.
+- **Les armes à distance** :
+  - toutes à deux mains, même une fronde trouvée avant (objetAuxReglesDuJour, à la lecture de la fiche) ;
+  - une technique d'arme à distance a toujours au moins 1 de portée d'arme — celle de l'arme tenue, ou 1 sans elle — en plus de la Distance de la Forge : elle tire toujours de loin, et ses zones se posent à distance (moteur_effets.js, porteeAvecArme) ;
+  - la Forge écrit « Portée de l'arme + N » sur la Distance, « 🏹 Portée de l'arme » sous une action sans Distance ; ses zones ne sont plus collées au lanceur ; le menu dit « 🏹 Arme à distance ».
+- **Lances et javelots** (loot.js, grimoire_fiches.js) : main droite seulement ; à côté d'eux, la main gauche ne prend qu'un bouclier ou une bague. Une dague ne peut que remplacer la lance ; une lance qui arrive chasse l'arme de la main gauche (annoncée avant de valider).
+- **La création** : le joueur choisit son arme parmi les 15 armes grises permises (pas de bouclier, pas d'arme de corps à corps à deux mains) ; les anciens choix par famille restent compris (objets.js, armesDeDepartAuChoix, equipementDeDepart).
+- corrections_v476 le vérifie ; objets_tableau, tableaux_nico, equipement_depart, carte_sans_trou, corrections_v391, v429, v475, blessures et butin_loot suivent les nouvelles règles ; menage_images retrouve les règles de main dont il a besoin.

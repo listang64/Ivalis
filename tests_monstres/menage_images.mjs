@@ -33,6 +33,12 @@ const SRC = [
   extraire('loot.js', 'window.champsPourObjet = function(objet, main) {'),
   // equiperObjet refuse un second bouclier : il s'appuie sur ces deux-là.
   extraire('loot.js', 'window.estBouclier = function(objet) {'),
+  // (v475-v476) Les règles de main que mainsPossibles et equiperObjet lisent.
+  extraire('loot.js', 'window.familleUniqueEnMain = function(objet) {'),
+  extraire('loot.js', 'window.memeFamilleUnique = function(a, b) {'),
+  extraire('loot.js', 'window.armeMainDroiteSeule = function(objet) {'),
+  extraire('loot.js', 'window.mainGaucheIncompatible = function(perso, objet, main) {'),
+  "window.vaAvecUneLance = (objet) => !!objet && (window.estBouclier(objet) || !!objet.bague);",
   extraire('loot.js', 'window.mainsPossibles = function(perso, objet) {'),
   extraire('loot.js', 'window.equiperObjet = async function(idPersonnage, objet, main, options) {'),
   extraire('loot.js', 'window.lacherObjet = async function(idPersonnage, champ) {'),
