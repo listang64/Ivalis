@@ -1493,7 +1493,9 @@ function texteValeurSurpuissante(act, fatigue) {
     // restent ses deux dégâts surpuissants (la surpuissance de la carte se lit dans son bandeau).
     if (parts) {
         return `<span class="forge-persistance-surpuissante"><span class="forge-persistance-lancement">${parts.lancement} au lancement</span>`
-            + (parts.zone !== null ? ` · <span class="forge-persistance-zone">${parts.zone} dans la zone</span>` : "") + `</span>`;
+            + (parts.zone !== null ? ` · <span class="forge-persistance-zone">${parts.zone} dans la zone</span>` : "")
+            // (v475) Nico : « précise en dessous des dégâts : "avec la surpuissance" ».
+            + `<span class="forge-persistance-mention">avec la surpuissance</span></span>`;
     }
     return `<span class="forge-valeur-surpuissante">→ ${surpuissante} ${soigne ? "de soin" : "de dégâts"} avec la surpuissance</span>`;
 }
@@ -1526,6 +1528,32 @@ function partsPersistance(act, valeur) {
     return { lancement: Math.round(v * r.lancement / 100), zone: premiere === act ? Math.round(v * r.zone / 100) : null };
 }
 window.partsPersistanceForge = partsPersistance;
+
+// (v475) Nico : « affiche ces nouvelles valeurs en gras à la fin de l'effet : "80 % avec persistance
+// au lancement" et "X % dans la zone" ». Sur une carte à persistance, pour un effet d'état dont le
+// grimoire porte un multiplicateur : la part du grimoire (crans plafonnés au max) multipliée, puis ce
+// qui s'y ajoute (élément offert, surpuissance, classe, talents) — comme au combat
+// (chancesEtatAvecPersistance, moteur_effets.js). La zone ne se dit que pour un état qui y reste.
+function texteChancePersistance(effet, stacks, action) {
+    if (!effet || !action || typeof window.multiplicateursPersistanceEtat !== "function" || typeof window.chancesEtatAvecPersistance !== "function") return "";
+    const pBase = parseFrenchFloat(effet.Pourcent_Base), pMax = parseFrenchFloat(effet.Pourcent_Max);
+    if (!(pBase > 0) || (effet.Nom || "").toLowerCase().includes("persistance")) return "";
+    const actions = (window.forgeState && window.forgeState.actions) || [];
+    const bdd = (window.forgeState && window.forgeState.effetsBDD) || [];
+    const aPersistance = actions.some(a => [a.baseEffet, ...Object.keys(a.mods || {}).map(id => bdd.find(e => e.id === id))]
+        .some(e => e && (e.Nom || "").toLowerCase().includes("persistance")));
+    if (!aPersistance) return "";
+    const mult = window.multiplicateursPersistanceEtat(effet);
+    if (mult.lancement === 1 && mult.zone === 1) return "";
+    const offert = typeof window.chanceOfferteForge === "function" ? window.chanceOfferteForge(effet, action) : 0;
+    const grimoire = pMax > 0 ? Math.min(pMax, pBase * stacks) : pBase * stacks;
+    const augMax = pMax > 0 && (stacks > 0 || offert > 0) && typeof window.augmentationsMaxForge === "function" ? window.augmentationsMaxForge(effet, action) : 0;
+    const c = window.chancesEtatAvecPersistance(grimoire, augMax + offert, mult);
+    const resteEnZone = Object.keys(window.TYPES_ZONES_PERSISTANTES || {}).includes(effet.Nom);
+    return ` <b class="forge-chance-persistance">${c.lancement} % avec persistance au lancement</b>`
+        + (resteEnZone ? ` · <b class="forge-chance-persistance">${c.zone} % dans la zone</b>` : "");
+}
+window.texteChancePersistanceForge = texteChancePersistance;
 function texteDegatsPersistance(act, fatigue) {
     const parts = partsPersistance(act);
     if (!parts) return "";
@@ -2063,6 +2091,20 @@ function chanceOfferteSur(effet, action) {
         ? window.chanceElementOfferte(window.forgeState && window.forgeState.statsPerso, el.etat) : (window.CHANCE_ELEMENT_OFFERTE || 5);
 }
 window.chanceOfferteForge = chanceOfferteSur;
+
+// (v475) Nico : « dans la forge, à côté des effets mis sur la compétence, une
+// flèche haut et bas pour monter ou baisser l'effet dans l'ordre où les effets
+// se font ». La carte s'enregistre dans l'ordre de la liste (actions), et le
+// combat la joue dans cet ordre : déplacer un effet, c'est changer quand il se fait.
+window.deplacerActionForge = function(idInst, delta) {
+    const actions = window.forgeState.actions;
+    const i = actions.findIndex(a => a.idInst === idInst);
+    const j = i + delta;
+    if (i < 0 || j < 0 || j >= actions.length) return;
+    [actions[i], actions[j]] = [actions[j], actions[i]];
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    window.rafraichirForge();
+};
 
 window.modifierActionCount = function(idInst, delta) {
     const act = window.forgeState.actions.find(a => a.idInst === idInst);
@@ -3043,7 +3085,7 @@ window.rafraichirForge = function() {
     };
 
     if (window.forgeState.actions.length > 0) {
-        window.forgeState.actions.forEach(act => {
+        window.forgeState.actions.forEach((act, rangAction) => {
 
             const isActMaxed = act.count >= getMaxStacks(act.baseEffet);
             const btnPlusActDisabled = (isActMaxed || capDepasse) ? `class="forge-btn-plus" disabled` : `class="forge-btn-plus"`;
@@ -3068,7 +3110,7 @@ window.rafraichirForge = function() {
                     <div class="forge-ligne forge-sous-effet forge-sous-effet-offert" style="--el-couleur: ${elementAct.couleur};">
                         <div class="forge-ligne-texte">
                             <span class="forge-nom-effet" data-bulle-effet="${effElement.id}" data-action="${act.idInst}">${elementAct.icone} ${nettoyerNomEffet(effElement.Nom)}</span><span class="forge-tag-offert">OFFERT</span>
-                            <div class="forge-desc">${formatterTexteEffet(effElement, 0, act)}</div>
+                            <div class="forge-desc">${formatterTexteEffet(effElement, 0, act)}${texteChancePersistance(effElement, 0, act)}</div>
                         </div>
                         <div class="forge-controles">
                             <div class="forge-compteur">
@@ -3109,7 +3151,7 @@ window.rafraichirForge = function() {
                     <div class="forge-ligne forge-sous-effet">
                         <div class="forge-ligne-texte">
                             <span class="forge-nom-effet" data-bulle-effet="${modEff.id}" data-action="${act.idInst}">${offertIci > 0 ? elementAct.icone + " " : ""}${nettoyerNomEffet(modEff.Nom)}</span>${modEff.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${modEff.Modificateur}</span>` : ""}${offertIci > 0 ? `<span class="forge-tag-offert">+${offertIci} % OFFERTS</span>` : ""}
-                            <div class="forge-desc">${formatterTexteEffet(modEff, modCount, act)}${currentModDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentModDuree} tour(s) (+${(currentModDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
+                            <div class="forge-desc">${formatterTexteEffet(modEff, modCount, act)}${texteChancePersistance(modEff, modCount, act)}${currentModDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentModDuree} tour(s) (+${(currentModDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
                         </div>
                         <div class="forge-controles">
                             ${modHasDuree ? `
@@ -3135,9 +3177,15 @@ window.rafraichirForge = function() {
                     <div class="forge-ligne">
                         <div class="forge-ligne-texte">
                             <span class="forge-nom-effet" data-bulle-effet="${act.baseEffet.id}" data-action="${act.idInst}">${nettoyerNomEffet(act.baseEffet.Nom)}</span>${act.baseEffet.Modificateur !== "AUCUN" ? `<span class="forge-tag-mini">${act.baseEffet.Modificateur}</span>` : ""}${genreDuLien(act) ? `<button type="button" class="forge-element-pastille${elementAct ? "" : " manquant"}" data-genre="${genreDuLien(act)}" title="Changer d'élément" ${elementAct ? `style="--el-couleur: ${elementAct.couleur}; --el-fond: ${elementAct.fond};"` : ""} onclick="window.changerElementForge('${act.idInst}')">${elementAct ? `${elementAct.dessin ? `<span class="forge-pastille-dessin">${iconeDuLien(elementAct)}</span>` : elementAct.icone} ${elementAct.nom}` : "Choisir un élément"}</button>` : ""}
-                            <div class="forge-desc">${formatterTexteEffet(act.baseEffet, act.count, act)}${texteDegatsPersistance(act, fatigueSurpuissance)}${texteValeurSurpuissante(act, fatigueSurpuissance)}${currentBaseDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentBaseDuree} tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
+                            <div class="forge-desc">${formatterTexteEffet(act.baseEffet, act.count, act)}${texteChancePersistance(act.baseEffet, act.count, act)}${texteDegatsPersistance(act, fatigueSurpuissance)}${texteValeurSurpuissante(act, fatigueSurpuissance)}${currentBaseDuree > 0 ? `<span class="forge-duree-ajoutee">⏳ +${currentBaseDuree} tour(s) (+${(currentBaseDuree * coutDureePlus).toFixed(1).replace(/\.0$/, '')} PC)</span>` : ""}</div>
                         </div>
                         <div class="forge-controles">
+                            ${window.forgeState.actions.length > 1 ? `
+                                <div class="forge-ordre" title="Ordre dans lequel les effets se font">
+                                    <button type="button" class="forge-btn-ordre" aria-label="Monter l'effet" onclick="window.deplacerActionForge('${act.idInst}', -1)" ${rangAction === 0 ? "disabled" : ""}>▲</button>
+                                    <button type="button" class="forge-btn-ordre" aria-label="Descendre l'effet" onclick="window.deplacerActionForge('${act.idInst}', 1)" ${rangAction === window.forgeState.actions.length - 1 ? "disabled" : ""}>▼</button>
+                                </div>
+                            ` : ""}
                             ${baseHasDuree ? `
                                 <div class="forge-compteur-duree" title="Augmenter la durée">
                                     <button class="forge-btn-moins" onclick="window.modifierDuree('${act.idInst}', null, -1)">-</button>

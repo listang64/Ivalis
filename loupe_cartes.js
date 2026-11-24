@@ -38,7 +38,7 @@
 //  Script simple (pas un module), chargé après grimoire_regions.js.
 // =========================================================================
 (function () {
-    const IMAGE_LOUPE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794006881/IMG_2235_e1zblf.png";
+    const IMAGE_LOUPE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794006881/IMG_2235_e1zblf.png";
     // L'image (2416 × 1135) : le verre, centré en (567,8 ; 563,5), de rayon 433 (mesuré).
     const LOUPE = { l: 2416, h: 1135, cx: 567.8 / 2416, cy: 563.5 / 1135, r: 433 / 2416 };
     const LARGEUR_IMAGE = 600;                            // la taille de l'image à l'échelle 1

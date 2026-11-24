@@ -200,11 +200,10 @@ function persoDocVersFront(id, d) {
     Bouclier_Actuel: d.Bouclier_Actuel || 0,
     // Or et équipement : propres à chaque personnage, jamais aux monstres (qui
     // n'utilisent pas ce chemin de conversion pour ces champs-là).
-    or: parseInt(d.Or) || 0,
-    // v313 : la richesse en pièces de laiton et de bronze (30 bronzes = 1 laiton) ;
-    // l'ancien « Or » vaut des laitons tant que la fiche n'a pas ses pièces.
-    piecesLaiton: d.Pieces_Laiton !== undefined ? (parseInt(d.Pieces_Laiton) || 0) : (parseInt(d.Or) || 0),
-    piecesBronze: parseInt(d.Pieces_Bronze) || 0,
+    // v475 (Nico : « une seule monnaie : les drachmes »). Une fiche qui n'a
+    // pas encore ses drachmes les reprend de l'ancienne richesse : ses laitons
+    // (ou l'ancien « Or »), plus ses bronzes changés à 30 pour 1.
+    drachmes: drachmesDeLaFiche(d),
     // v313 : l'emplacement de stockage (une arme qu'on ne tient pas), et la date de création du héros.
     equipStock: d.Equip_Stock || null,
     creeLe: Number(d.Cree_Le) || 0,
@@ -340,20 +339,30 @@ window.afficherEmplacementEquipement = function(suffixe, objet) {
     if (lacher) lacher.style.display = rempli ? "inline-block" : "none";
 };
 
+// v475 : la seule monnaie du jeu, la drachme. L'ancienne richesse (laiton,
+// bronze, or) ne sert plus qu'à remplir une fiche qui n'a pas encore ses drachmes.
+function drachmesDeLaFiche(d) {
+    if (d && d.Drachmes !== undefined && d.Drachmes !== null) return Math.max(0, parseInt(d.Drachmes) || 0);
+    const laiton = d && d.Pieces_Laiton !== undefined ? (parseInt(d.Pieces_Laiton) || 0) : (parseInt(d && d.Or) || 0);
+    const bronze = parseInt(d && d.Pieces_Bronze) || 0;
+    return Math.max(0, laiton + Math.floor(bronze / 30));
+}
+window.drachmesDeLaFiche = drachmesDeLaFiche;
+
 // Appelée à l'ouverture de la fiche, comme chargerOngletCompetences : "donnees"
 // est déjà au format front-end (persoDocVersFront), quelle que soit sa source
 // (cache RAM ou lecture réseau de secours).
 window.chargerOngletInventaire = function(idPersonnage, donnees) {
     window.ID_PERSONNAGE_INVENTAIRE = idPersonnage;
     const champOr = document.getElementById("champ-or-perso");
-    if (champOr) champOr.value = donnees ? (parseInt(donnees.or) || 0) : 0;
+    if (champOr) champOr.value = donnees ? (parseInt(donnees.drachmes) || 0) : 0;
 
     window.afficherEmplacementEquipement("armure", donnees ? donnees.equipArmure : null);
     window.afficherEmplacementEquipement("main-droite", donnees ? donnees.equipMainDroite : null);
     window.afficherEmplacementEquipement("main-gauche", donnees ? donnees.equipMainGauche : null);
 };
 
-// L'or est modifié à la main par le joueur (case du bandeau) : jamais de
+// Les drachmes sont modifiées à la main par le joueur (case du bandeau) : jamais de
 // négatif, et on sécurise une valeur non numérique en la ramenant à 0.
 window.mettreAJourOr = async function(valeurBrute) {
     const idPersonnage = window.ID_PERSONNAGE_INVENTAIRE || document.getElementById("champ-id-personnage").value;
@@ -365,12 +374,12 @@ window.mettreAJourOr = async function(valeurBrute) {
     if (champ) champ.value = valeur;
 
     const enRam = (window.PERSOS_PARTIE || []).find(p => p.idPersonnage === idPersonnage);
-    if (enRam) enRam.or = valeur;
+    if (enRam) enRam.drachmes = valeur;
 
     try {
-        await updateDoc(doc(db, COL.PERSONNAGES, idPersonnage), { Or: valeur });
+        await updateDoc(doc(db, COL.PERSONNAGES, idPersonnage), { Drachmes: valeur });
     } catch (e) {
-        console.error("Mise à jour de l'or :", e);
+        console.error("Mise à jour des drachmes :", e);
     }
 };
 
@@ -2187,10 +2196,9 @@ function frontVersPersoDoc(donnees, idPersonnage) {
     // L'équipement de départ, tiré à la création. Sur une fiche déjà en jeu ces
     // trois champs valent ce qu'ils valaient : ils ne sont posés qu'une fois.
     Equip_Armure: donnees.equipArmure || null,
-    // v313 (grimoire_fiches.js) : le stockage, les pièces et la date de création suivent la fiche.
+    // v313 (grimoire_fiches.js) : le stockage, les drachmes (v475) et la date de création suivent la fiche.
     Equip_Stock: donnees.equipStock || null,
-    Pieces_Laiton: donnees.piecesLaiton !== undefined ? (parseInt(donnees.piecesLaiton) || 0) : (parseInt(donnees.or) || 0),
-    Pieces_Bronze: parseInt(donnees.piecesBronze) || 0,
+    Drachmes: donnees.drachmes !== undefined ? (parseInt(donnees.drachmes) || 0) : 0,
     Cree_Le: Number(donnees.creeLe) || Date.now(),
     Equip_Main_Droite: donnees.equipMainDroite || null,
     Equip_Main_Gauche: donnees.equipMainGauche || null,
@@ -3506,7 +3514,7 @@ async function televerserImageDetouree(imageSource, dossier, cles, options) {
         const json2 = await (await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/upload`, { method: "POST", body: form2 })).json();
         if (json2.secure_url) return json2.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
     } catch (e) { console.error("Compagnon : dépôt final impossible :", e); }
-    return urlSecurisee && !String(urlSecurisee).startsWith("data:") ? urlSecurisee : "";
+    return urlSecurisee && !String(urlSecurisee).startsWith("data:") ? urlSecurisee.replace("/upload/", "/upload/q_auto,f_auto/") : "";
 }
 
 async function genererCompagnonEnArrierePlan(donnees, idPersonnage) {
@@ -3916,7 +3924,7 @@ async function genererEtStockerPortrait(donnees) {
       console.error("ERREUR RESEAU CLOUDINARY FINAL :", e);
   }
 
-  return urlSecurisee || "";
+  return urlSecurisee ? urlSecurisee.replace("/upload/", "/upload/q_auto,f_auto/") : "";
 }
 
 // =========================================================================
@@ -5096,6 +5104,26 @@ window.ajouterLigneEffetHTML = function(id, data = {}) {
         </td>`;
         tbody.appendChild(sousLigne);
     }
+
+    // (v475) Nico : « dans les effets d'état, la possibilité d'appliquer un
+    // multiplicateur pour l'effet persistance, qui change le pourcentage de
+    // chance d'appliquer l'état » : au lancement, et dans la zone. Sous chaque
+    // effet à chance (un % de base ou un max), hors la Persistance elle-même.
+    // Vides, 1 (rien ne change). Lus par multiplicateursPersistanceEtat (moteur_effets.js).
+    const aUneChance = (parseFloat(d.Pourcent_Base) || 0) > 0 || (parseFloat(d.Pourcent_Max) || 0) > 0;
+    if (aUneChance && !d.Nom.toLowerCase().includes("persistance")) {
+        const vide = (v) => (v === undefined || v === null) ? "" : v;
+        const sousLigne = document.createElement("tr");
+        sousLigne.id = `ligne-mult-persistance-${id}`;
+        sousLigne.innerHTML = `
+        <td colspan="13" style="font-size: 13px; background: rgba(0,0,0,0.03);">
+            Avec une <b>Persistance</b> sur la carte, chance de l'état × 
+            <input type="text" id="mult-pers-lancement-${id}" value="${vide(data.Persistance_Mult_Lancement)}" placeholder="1" style="width: 50px; text-align: center;"> au lancement
+            &nbsp;·&nbsp; × <input type="text" id="mult-pers-zone-${id}" value="${vide(data.Persistance_Mult_Zone)}" placeholder="1" style="width: 50px; text-align: center;"> dans la zone
+            <span style="opacity: 0.7;">(avant la surpuissance, la classe et les talents)</span>
+        </td>`;
+        tbody.appendChild(sousLigne);
+    }
 };
 
 window.sauvegarderEffetLigne = async function(id) {
@@ -5138,6 +5166,15 @@ window.sauvegarderEffetLigne = async function(id) {
         newData.Persistance_Degats_Lancement = pourcent(`pers-lancement-${id}`, 100);
         newData.Persistance_Degats_Zone = pourcent(`pers-zone-${id}`, 100);
     }
+    // (v475) Les multiplicateurs de persistance d'un effet d'état (vide = 1).
+    if (document.getElementById(`mult-pers-lancement-${id}`)) {
+        const mult = (champ) => {
+            const v = parseFloat(String(document.getElementById(champ).value).replace(",", "."));
+            return Number.isFinite(v) ? Math.max(0, v) : 1;
+        };
+        newData.Persistance_Mult_Lancement = mult(`mult-pers-lancement-${id}`);
+        newData.Persistance_Mult_Zone = mult(`mult-pers-zone-${id}`);
+    }
 
     try {
         await setDoc(doc(db, "Combat_Effets", id), newData, { merge: true });
@@ -5157,7 +5194,7 @@ window.supprimerEffetLigne = async function(id) {
         await deleteDoc(doc(db, "Combat_Effets", id));
         document.getElementById(`ligne-effet-${id}`).remove();
         // (v427) Et ses sous-lignes : les paliers de la Zone, les réglages de la Persistance.
-        [`ligne-zone-${id}`, `ligne-persistance-${id}`].forEach(cle => { const sousLigne = document.getElementById(cle); if (sousLigne) sousLigne.remove(); });
+        [`ligne-zone-${id}`, `ligne-persistance-${id}`, `ligne-mult-persistance-${id}`].forEach(cle => { const sousLigne = document.getElementById(cle); if (sousLigne) sousLigne.remove(); });
     } catch(e) { alert("Échec de la suppression."); }
 };
 

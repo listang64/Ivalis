@@ -6000,7 +6000,7 @@ function contenuTuilePiste(entree, cestSonTour, choix, choixNeuf) {
         ? (pion ? pion.url : window.IMAGE_TOKEN_ENNEMI)
         : (((window.TOKENS_VTT_DATA || {})[perso.idPersonnage] || {}).url
            || perso.urlCloudinary
-           || "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png");
+           || "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786114507/Les_humains_h0ubwh.png");
     const filtrePion = pion && pion.provisoire ? ` filter: ${window.FILTRE_ZOMBIE_PROVISOIRE};` : "";
 
     const portrait = `<div style="position: absolute; top: ${Math.round((H - L) / 2)}px; left: 0; width: ${L}px; height: ${L}px;
@@ -6830,7 +6830,7 @@ window.rafraichirVoileTour = function(queueParam, phaseParam) {
         const url = (estCreature && !estCompagnon && !pnjEnPied
             ? (pionCreature ? pionCreature.url : window.IMAGE_TOKEN_ENNEMI)
             : perso.urlCloudinary)
-            || "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1786114507/Les_humains_h0ubwh.png";
+            || "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1786114507/Les_humains_h0ubwh.png";
         // Réécrire `src` à chaque battement relancerait le chargement de
         // l'image, et le pion clignoterait pendant tout le tour.
         if (elPion.dataset.url !== url) { elPion.dataset.url = url; elPion.src = url; }

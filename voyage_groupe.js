@@ -61,13 +61,17 @@ const TAILLE_REGION_DEFAUT = 0.07;     // part de la hauteur de la carte région
 const BORNES_MONDE = [40, 600], BORNES_REGION = [0.02, 0.25];
 // Une journée de marche : 20 % de la hauteur d'une carte régionale (Nico,
 // v276 : « de 45 % mets plutôt 30 % » ; v281 : « pour le temps de marche
-// avant la nuit, passe à 20 % »).
-const DISTANCE_JOUR = 0.20;
+// avant la nuit, passe à 20 % »). (v475) Nico : « on double le temps en jours de
+// marche » : 10 % par jour, deux fois plus de jours pour la même route.
+const DISTANCE_JOUR = 0.10;
 window.DISTANCE_JOUR_VOYAGE = DISTANCE_JOUR;
 const TOLERANCE_JOUR = 0.1;            // un trajet de 1,05 jour se fait en un jour
-const MARCHE_JOUR_MS = 5200;           // le temps d'écran d'une journée de marche
-const MARCHE_MIN_MS = 1600;
-const DELAI_JOUR_MS = 1900;            // « JOUR 2 » s'affiche, puis on part
+// (v475) Deux fois plus de jours pour la même route : une journée deux fois plus
+// courte à l'écran, et la marche file d'un jour à l'autre sans s'arrêter.
+const MARCHE_JOUR_MS = 2600;           // le temps d'écran d'une journée de marche
+const MARCHE_MIN_MS = 800;
+const DELAI_JOUR_MS = 1900;            // le départ : la date s'affiche, puis on part
+const DELAI_JOUR_SUIVANT_MS = 0;       // (v475) d'un jour au suivant : pas d'arrêt
 const DELAI_MONDE_MS = 500;
 const DESSIN_TRACE_MS = { monde: 1400, region: 1800 };
 const POINTS_CHEMIN = 72;
@@ -260,11 +264,11 @@ function dureeMarche(v, de, a, delai) {
 }
 // Le départ d'une journée k (le premier jour, ou après une nuit) : le POI de
 // la journée est tiré à ce moment (planifierPoi), et la marche s'arrêtera là.
-function lancerJournee(v, k) {
+function lancerJournee(v, k, delaiDepart) {
     const poi = v.Type === "region" ? planifierPoi(v, k) : null;
     const vv = { ...v, Jour: k, Segment: null, Poi_Prevu: poi };
     const t = troncon(vv);
-    const { delai, duree } = dureeMarche(vv, t.de, t.a, DELAI_JOUR_MS);
+    const { delai, duree } = dureeMarche(vv, t.de, t.a, delaiDepart === undefined ? DELAI_JOUR_MS : delaiDepart);
     return { Etat: "marche", Jour: k, Debut_Marche: Date.now(), Duree_Marche_Ms: duree, Delai_Depart_Ms: delai, Poi_Prevu: poi, Segment: null };
 }
 function dureeEtape(v, k) {
@@ -488,6 +492,13 @@ async function transactionUneFois(fn, options, peutReessayer) {
     }
 }
 window.transactionVoyageGroupe = transaction;
+// (v475) La date de la veille et celle du jour, gardées sur le voyage : chaque
+// poste fait rouler la date en haut du livre (afficherDateVoyage).
+function datesDuJour(date) {
+    const ici = window.DATE_EN_JEU_ACTUELLE || {};
+    const avant = { Jour: String(parseInt(date && date.Jour) || parseInt(ici.jour) || 1), Annee: String(parseInt(date && date.Annee) || parseInt(ici.annee) || 1) };
+    return { Date_Avant: avant, Date_Apres: lendemain(date) };
+}
 // Le lendemain de la date en jeu (Jour et Annee sont des textes en base).
 function lendemain(date) {
     const ici = window.DATE_EN_JEU_ACTUELLE || {};
@@ -631,7 +642,7 @@ window.cleAnimationVoyage = (v) => cleAnimation(v || voyage);
 // le voyage — le POI aperçu, le camp de la nuit, l'arrivée ; la halte au POI ;
 // la reprise de la route.
 async function terminerEtape(id, cle) {
-    const r = await transaction((data) => {
+    const r = await transaction((data, date) => {
         const v = data.Voyage_Groupe;
         if (!memeVoyage(v, id) || cleAnimation(v) !== cle) return null;
         const k = Number(v.Jour) || 1;
@@ -660,9 +671,12 @@ async function terminerEtape(id, cle) {
             const ici = pointDuVoyage(v, v.Poi.f);
             const base = { Poi: null, Choix_Halte: null, Etapes: plan.Etapes, Jours: plan.Jours, Segment: null, Poi_Prevu: null };
             if (plan.nuit) {
+                // (v475) Nico : « plus d'arrêt le soir » : la journée mangée, la marche
+                // repart aussitôt sur le jour suivant, et la date avance.
                 const c = { x: arrondi(ici.x), y: arrondi(ici.y) };
-                return { maj: { ...champsVoyage({ ...base, Etat: "nuit", Camp: c, Choix_Nuit: {} }), Position_Groupe: { Region: n, x: c.x, y: c.y } },
-                         resultat: { nuit: true, jour: k } };
+                const vv = { ...v, ...base, Poi: null };
+                return { maj: { ...champsVoyage({ ...base, ...lancerJournee(vv, k + 1, DELAI_JOUR_SUIVANT_MS), ...datesDuJour(date) }), Position_Groupe: { Region: n, x: c.x, y: c.y } },
+                         date: lendemain(date), resultat: { jourSuivant: true, jour: k + 1 } };
             }
             const vv = { ...v, Etapes: plan.Etapes, Jours: plan.Jours, Segment: { de: v.Poi.f, a: plan.fin }, Poi_Prevu: null };
             const { delai, duree } = dureeMarche(vv, v.Poi.f, plan.fin, 300);
@@ -686,18 +700,19 @@ async function terminerEtape(id, cle) {
                             Position_Groupe: { Region: n, x: arrondi(ici.x), y: arrondi(ici.y) } },
                      resultat: { poi: true } };
         }
-        // La journée s'achève : la nuit, ou l'arrivée.
+        // La journée s'achève : (v475) plus d'arrêt le soir — la marche file sur le
+        // jour suivant, la date avance ; ou c'est l'arrivée.
         if (k < (Number(v.Jours) || 1)) {
-            const camp = pointDuVoyage(v, v.Etapes[k - 1]);
-            const c = { x: arrondi(camp.x), y: arrondi(camp.y) };
-            return { maj: { ...champsVoyage({ Etat: "nuit", Camp: c, Choix_Nuit: {}, Segment: null, Poi_Prevu: null }),
+            const ici = pointDuVoyage(v, v.Etapes[k - 1]);
+            const c = { x: arrondi(ici.x), y: arrondi(ici.y) };
+            return { maj: { ...champsVoyage({ ...lancerJournee(v, k + 1, DELAI_JOUR_SUIVANT_MS), ...datesDuJour(date) }),
                             Position_Groupe: { Region: n, x: c.x, y: c.y } },
-                     resultat: { nuit: true, jour: k } };
+                     date: lendemain(date), resultat: { jourSuivant: true, jour: k + 1 } };
         }
         return { maj: { ...fini, Position_Groupe: { Region: n, x: arrondi(v.Arrivee.x), y: arrondi(v.Arrivee.y) }, Lieu_Actuel: v.Arrivee.Lieu || "",
                         Situation: situationDe(v.Arrivee.Lieu) },
                  resultat: { arrivee: true, region: n, lieu: v.Arrivee.Lieu || "" } };
-    });
+    }, { avecDate: true });
     if (r && r.nuit) posterMessageCampement();
     // (v457) La halte de la discussion : ce poste la lance (s'il n'y a plus personne pour parler, la route reprend).
     if (r && r.dialogue) {
@@ -1968,6 +1983,51 @@ function annoncerJour(k) {
 }
 window.annoncerJourVoyage = annoncerJour;
 
+// --- LA DATE QUI ROULE (v475) ------------------------------------------------
+// En haut du livre, centrée : « Jour 56 de l'an 3 » arrive en fondu ; les
+// chiffres qui changent montent et disparaissent, les nouveaux arrivent par le
+// bas ; puis la date repart en fondu. Sans `avant`, la date du jour, immobile.
+const texteDate = (d) => `Jour ${d.Jour} de l'an ${d.Annee}`;
+function htmlDateQuiRoule(avant, apres) {
+    const a = texteDate(avant), b = texteDate(apres);
+    // Aligner les deux textes chiffre à chiffre (un jour à deux chiffres qui passe à trois).
+    const morceaux = (t) => t.split(/(\d+)/);
+    const ma = morceaux(a), mb = morceaux(b);
+    if (ma.length !== mb.length) return echapper(b);
+    return mb.map((m, i) => {
+        if (!/^\d+$/.test(m)) return echapper(m);
+        const ancien = ma[i].padStart(m.length, " ");
+        return [...m].map((c, j) => ancien[j] === c ? `<span class="chiffre-date">${c}</span>`
+            : `<span class="chiffre-date roule"><span class="ancien">${ancien[j].trim() ? ancien[j] : "&nbsp;"}</span><span class="nouveau">${c}</span></span>`).join("");
+    }).join("");
+}
+function afficherDateVoyage(avant, apres) {
+    let el = $("date-voyage");
+    if (!el) {
+        el = document.createElement("div");
+        el.id = "date-voyage";
+        el.className = "date-voyage";
+        el.setAttribute("aria-live", "polite");
+        document.body.appendChild(el);
+    }
+    const ici = window.DATE_EN_JEU_ACTUELLE || {};
+    const maintenant = { Jour: String(ici.jour || "?"), Annee: String(ici.annee || "?") };
+    el.innerHTML = avant && apres ? htmlDateQuiRoule(avant, apres) : echapper(texteDate(maintenant));
+    // Centrée en haut du livre (ou de l'écran, sans livre).
+    const livre = $("grimoire-livre");
+    const r = livre && livre.getBoundingClientRect();
+    if (r && r.width > 0) { el.style.left = `${r.left + r.width / 2}px`; el.style.top = `${Math.max(8, r.top + 10)}px`; }
+    else { el.style.left = "50%"; el.style.top = "12px"; }
+    el.classList.remove("visible", "roule");
+    void el.offsetWidth;
+    el.classList.add("visible");
+    clearTimeout(afficherDateVoyage.roule); clearTimeout(afficherDateVoyage.fin);
+    if (avant && apres) afficherDateVoyage.roule = setTimeout(() => el.classList.add("roule"), 700);
+    afficherDateVoyage.fin = setTimeout(() => el.classList.remove("visible"), avant && apres ? 2900 : 2400);
+}
+window.afficherDateVoyage = afficherDateVoyage;
+window.htmlDateQuiRouleVoyage = htmlDateQuiRoule;
+
 // --- LES PETITS MESSAGES ---------------------------------------------------
 function annoncer(texte) {
     let el = $("annonce-voyage");
@@ -2071,8 +2131,15 @@ function synchroniserAnimation() {
     // chacun revient sur la carte du voyage.
     const debutDeJournee = voyage.Etat === "marche" && (voyage.Type !== "region" || Math.abs(de - journee(voyage, k).de) < 1e-9);
     const cleJour = `${voyage.Id}:${k}`;
-    if (!perime && debutDeJournee && voyage.Type === "region" && !etapesVues.has(cleJour)) { etapesVues.add(cleJour); annoncerJour(k); }
-    if (!perime && debutDeJournee && !vus.has("etape:" + cleJour)) {
+    // (v475) Nico : « plus d'apparition jour 1, 2… : la date en haut, centrée sur le livre, en fondu ; les chiffres
+    // qui changent partent vers le haut, les nouveaux arrivent par le bas, comme un tourniquet ».
+    if (!perime && debutDeJournee && voyage.Type === "region" && !etapesVues.has(cleJour)) {
+        etapesVues.add(cleJour);
+        if (k > 1 && voyage.Date_Avant && voyage.Date_Apres) afficherDateVoyage(voyage.Date_Avant, voyage.Date_Apres);
+        else afficherDateVoyage(null, null);
+    }
+    // (v475) La marche file d'un jour à l'autre : on n'amène sur la carte qu'au départ du voyage.
+    if (!perime && debutDeJournee && k === 1 && !vus.has("etape:" + cleJour)) {
         vus.add("etape:" + cleJour);
         amenerSurLaCarte(voyage);
     }

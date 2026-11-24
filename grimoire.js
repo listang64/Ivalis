@@ -28,7 +28,7 @@
 (function () {
     const IMAGES = {
         // v314 : la nouvelle couverture de Nico (l'ancienne : images/grimoire/couverture.webp).
-        couverture: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793823356/IMG_2214_etfv11.png",
+        couverture: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793823356/IMG_2214_etfv11.png",
         livre: "images/grimoire/livre_ouvert.webp?v=1",
         page: "images/grimoire/page.webp?v=1",
         // v305 : la table de bois, l'encrier et la plume (l'image de Nico).
@@ -155,8 +155,8 @@
     // elles doivent remplir tout l'espace si possible, et centrées ».
     const PAGE_CARTE = 5;
     const IMAGES_CARTE = {
-        gauche: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793744008/IMG_2203_gvfqfv.png",
-        droite: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793744008/IMG_2207_sz48ll.png"
+        gauche: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793744008/IMG_2203_gvfqfv.png",
+        droite: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793744008/IMG_2207_sz48ll.png"
     };
     // (v335) Sur les pages, une image légère (1600 de large) ; la loupe prend les originaux.
     const reduite = (url, l) => /\/upload\/[a-z]_/.test(url) ? url : url.replace("/upload/", `/upload/w_${l},c_limit,q_auto,f_auto/`);
@@ -168,7 +168,7 @@
     // la moitié gauche sur la page de gauche, l'autre sur celle de droite.
     // (v399) Nico : « change l'image du village par celle-là plutôt » (même taille, même fond transparent).
     // (v432) Nico : « remplace l'image du village par celle-ci ».
-    const IMAGE_VILLAGE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794984079/IMG_2275_ncxeo8.png";
+    const IMAGE_VILLAGE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794984079/IMG_2275_ncxeo8.png";
     const IMAGE_VILLAGE_PAGES = reduite(IMAGE_VILLAGE, 1600);
     const ASPECT_VILLAGE = 1672 / 941;
     const pages = {};

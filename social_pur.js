@@ -53,7 +53,7 @@ export const NOMS_EMOTIONS = { calme: "calme", joie: "joyeux", colere: "en colè
 export const MULT_GRAVITE = { 1: 1, 2: 2, 3: 4 };
 export const PLAFOND_GRAVITE = { 1: 6, 2: 12, 3: 30 };
 // Le rôle de celui dont le lien change : la cible de l'action, un témoin.
-export const ROLE = { cible: 1, temoin: 0.5 };
+export const ROLE = { cible: 1, temoin: 0.5, ouiDire: 0.3 };
 // Ce que l'acte révèle de l'acteur envers sa cible : entier pour un héros (ses
 // sentiments se déduisent de ses actes), réduit pour un PNJ (le MJ l'a déjà fait
 // agir selon ce qu'il ressent).
@@ -98,7 +98,13 @@ export const ACTIONS = {
     combattre_ensemble: { nom: "a combattu aux côtés de", cible: { respect: 4, attachement: 3, familiarite: 4, confiance: 2 }, acteur: { respect: 3, attachement: 2, familiarite: 4 }, gmax: 2 },
     excuser:            { nom: "s'est excusé auprès de",  cible: { confiance: 3, attachement: 2 },                    acteur: {}, gmax: 1, emotion: "calme" },
     servir:             { nom: "a loyalement servi",      cible: { respect: 3, confiance: 3 },                        acteur: { respect: 2 }, gmax: 2, valeur: "ordre" },
-    impressionner:      { nom: "a impressionné",          cible: { respect: 5, crainte: 2 },                          acteur: {}, gmax: 2, valeur: "pouvoir" }
+    impressionner:      { nom: "a impressionné",          cible: { respect: 5, crainte: 2 },                          acteur: {}, gmax: 2, valeur: "pouvoir" },
+    // (v475) Prendre parti contre quelqu'un, le contredire ouvertement : celui
+    // qu'on contredit le vit mal (Thalia qui défend les aventuriers contre Mael).
+    s_opposer:          { nom: "s'est opposé ouvertement à", cible: { confiance: -4, attachement: -2, crainte: 1 }, acteur: { attachement: -1 }, gmax: 2, hostile: true, emotion: "colere" },
+    // (v475) Raconter à quelqu'un ce qu'un autre a fait (`rapporte`) : celui qui
+    // écoute l'apprend, et son regard sur l'auteur change — moins fort qu'un témoin.
+    raconter:           { nom: "a raconté à",             cible: { familiarite: 1 },                                   acteur: { familiarite: 1 }, gmax: 3 }
 };
 export const TYPES_ACTIONS = Object.keys(ACTIONS);
 
@@ -226,7 +232,23 @@ export function validerEvenement(ev, presents, ames) {
     const ame = (ames || {})[e.acteur];
     if (ame && ame.statut === "mort") return { rejet: `un mort n'agit plus : ${e.acteur}` };
     const gravite = Math.max(1, Math.min(ACTIONS[type].gmax, Math.round(nombre(e.gravite, 1)) || 1));
-    return { type, acteur: e.acteur, cible: e.cible, gravite, discret: e.discret === true, resume: String(e.resume || "").slice(0, 240) };
+    const valide = { type, acteur: e.acteur, cible: e.cible, gravite, discret: e.discret === true, resume: String(e.resume || "").slice(0, 240) };
+    // (v475) LA CONNAISSANCE DE L'ÉVÉNEMENT : ceux qui l'ont vraiment vu ou
+    // entendu. Donnés, seuls eux réagissent (un PNJ resté au village ne sait rien
+    // de ce qui se passe en forêt) ; absents (une scène d'avant la v475), tous
+    // les présents en sont témoins, comme avant.
+    if (Array.isArray(e.temoins)) valide.temoins = [...new Set(e.temoins)].filter(id => ici.has(id) && id !== e.acteur && id !== e.cible);
+    // (v475) Ce qu'on raconte : l'acte d'un autre, connu de celui qui écoute
+    // par ouï-dire. Son auteur peut être loin ; il doit seulement exister.
+    if (type === "raconter") {
+        const r = e.rapporte || {};
+        const typeR = String(r.type || "").toLowerCase().trim();
+        if (!ACTIONS[typeR] || typeR === "raconter") return { rejet: `ce qui est raconté n'est pas un acte connu : ${r.type}` };
+        if (!r.acteur || !(ames || {})[r.acteur]) return { rejet: `l'auteur de l'acte raconté est inconnu : ${r.acteur}` };
+        if (r.acteur === e.cible) return { rejet: "on ne raconte pas à quelqu'un ce qu'il a fait lui-même" };
+        valide.rapporte = { type: typeR, acteur: r.acteur, cible: r.cible && (ames || {})[r.cible] ? r.cible : null };
+    }
+    return valide;
 }
 
 // -------------------------------------------------------------------------
@@ -245,6 +267,14 @@ export function appliquerEvenements(etatAvant, evenements, ctx) {
     const presents = (c.presents || []).filter(id => etat.ames[id]);
     const historique = (c.historique || []).slice();
     const valides = [], changements = [], humeurs = [], derives = [], rejets = [];
+    // (v475) Les adversaires d'une scène : celui contre qui un acteur agit avec
+    // hostilité (il s'oppose à lui, le menace…) n'approuve pas, en témoin, ce que
+    // ce même acteur fait de bien aux autres dans la même scène.
+    const adversaires = new Set();
+    (evenements || []).forEach(b => {
+        const t = String((b && b.type) || "").toLowerCase().trim();
+        if (ACTIONS[t] && ACTIONS[t].hostile && b.acteur && b.cible) adversaires.add(b.acteur + "~" + b.cible);
+    });
 
     const lien = (de, vers) => {
         const k = cleLien(de, vers);
@@ -289,15 +319,35 @@ export function appliquerEvenements(etatAvant, evenements, ctx) {
         // 3. Les témoins (pas pour un geste discret) : leur regard sur l'acteur, à
         //    moitié ; jamais de dette. Un témoin qui déteste la cible approuve
         //    plutôt une action hostile (un peu).
-        if (!ev.discret) presents.filter(id => id !== ev.acteur && id !== ev.cible).forEach(t => {
+        //    (v475) Seulement ceux qui l'ont vu (ev.temoins) ; un geste bienveillant
+        //    envers quelqu'un qu'on déteste est désapprouvé ; l'adversaire de
+        //    l'acteur dans cette scène ne lui sait pas gré de ses bontés.
+        const temoins = Array.isArray(ev.temoins) ? ev.temoins.filter(id => presents.includes(id)) : presents.filter(id => id !== ev.acteur && id !== ev.cible);
+        if (!ev.discret && ev.type !== "raconter") temoins.forEach(t => {
+            if (!act.hostile && adversaires.has(ev.acteur + "~" + t)) return;
             const versCible = etat.liens[cleLien(t, ev.cible)];
-            const approuve = act.hostile && versCible && affinite(versCible.axes) <= -40;
+            const deteste = versCible && affinite(versCible.axes) <= -40;
+            const approuve = act.hostile && deteste;
+            const desapprouve = !act.hostile && deteste;
             Object.entries(act.cible).forEach(([axe, v]) => {
                 if (axe === "dette") return;
-                const sens = approuve && axe !== "crainte" ? -0.6 : 1;
+                const sens = (approuve || desapprouve) && axe !== "crainte" ? -0.6 : 1;
                 changer(n, t, ev.acteur, axe, v * k * ROLE.temoin * sens, ev.gravite);
             });
         });
+        // 3 bis. (v475) Le ouï-dire : celui qui écoute apprend l'acte raconté, et
+        //    son regard sur son auteur change (×0,3, jamais de dette).
+        //    (Celui à qui l'acte a été fait le sait déjà : on ne le lui apprend pas.)
+        if (ev.type === "raconter" && ev.rapporte && ev.rapporte.acteur !== ev.cible && ev.rapporte.cible !== ev.cible) {
+            const r = ev.rapporte, actR = ACTIONS[r.type];
+            const versCibleR = r.cible ? etat.liens[cleLien(ev.cible, r.cible)] : null;
+            const detesteR = versCibleR && affinite(versCibleR.axes) <= -40;
+            const sensR = detesteR ? -0.6 : 1;
+            Object.entries(actR.cible).forEach(([axe, v]) => {
+                if (axe === "dette") return;
+                changer(n, ev.cible, r.acteur, axe, v * MULT_GRAVITE[ev.gravite] * ROLE.ouiDire * (axe === "crainte" ? 1 : sensR), ev.gravite);
+            });
+        }
         // 4. Se côtoyer : un peu de familiarité, des deux côtés (v415 : 2 par événement).
         changer(n, ev.cible, ev.acteur, "familiarite", 2, ev.gravite);
         changer(n, ev.acteur, ev.cible, "familiarite", 2, ev.gravite);

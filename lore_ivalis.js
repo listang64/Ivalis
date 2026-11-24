@@ -98,7 +98,7 @@
     };
     // L'ANTIQUITÉ, pour habiller qui que ce soit (v287, Nico : « que ça soit
     // bien dans un monde antique »).
-    const ANTIQUITE = "Le monde est ANTIQUE FANTASTIQUE (mythologie, Antiquité magique), pas médiéval : armes et tenues de l'Antiquité — lances, glaives, sabres courbes, haches de bronze, javelots, arcs, frondes, boucliers ronds ou de hoplite, casques à cimier ou à nasal, cuirasses de bronze ou de lin, tuniques, chitons, pagnes, capes, sandales, bijoux de bronze et d'or. Jamais de chevalier en armure de plaques, d'arbalète, d'arme à feu, de heaume médiéval ni de château. Les bêtes et les monstres viennent de la mythologie (chimères, harpies, serpents géants, bêtes des marais ou du désert…) ou de la faune de la région.";
+    const ANTIQUITE = "Le monde est ANTIQUE FANTASTIQUE (mythologie, Antiquité magique), pas médiéval : armes et tenues de l'Antiquité — lances, glaives, sabres courbes, haches de bronze, javelots, arcs, frondes, boucliers ronds ou de hoplite, casques à cimier ou à nasal, cuirasses de bronze ou de lin, tuniques, chitons, pagnes, capes, sandales, bijoux de bronze et d'or. Jamais de chevalier en armure de plaques, d'arbalète, d'arme à feu, de heaume médiéval ni de château. Les bêtes et les monstres viennent de la mythologie (chimères, harpies, serpents géants, bêtes des marais ou du désert…) ou de la faune de la région. La seule monnaie du monde est la DRACHME : on paie, on vend et on compte en drachmes (jamais en pièces d'or, d'argent, de laiton ou de bronze, ni en écus).";
 
     window.LORE_IVALIS = { ordre: ORDRE, regions: REGIONS, cites: CITES, peuples: PEUPLES, antiquite: ANTIQUITE,
         univers: "Antique Fantastique : mythologie, Antiquité magique." };

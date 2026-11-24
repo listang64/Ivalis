@@ -205,6 +205,26 @@ window.estBouclier = function(objet) {
     return !!(objet && objet.nom && objet.type === "Bouclier");
 };
 
+// v475 (Nico : « vérifie qu'on ne peut pas mettre 2 lances en main, et pas 2
+// frondes ») : la même règle que le bouclier, pour trois familles. Rend la
+// famille d'un objet qui ne se double pas (« bouclier », « lance », « fronde »),
+// ou null.
+window.familleUniqueEnMain = function(objet) {
+    if (!objet || !objet.nom) return null;
+    if (window.estBouclier(objet)) return "bouclier";
+    const modele = String(objet.modele || "");
+    if (/^lance\b/i.test(modele)) return "lance";
+    if (/^fronde\b/i.test(modele)) return "fronde";
+    return null;
+};
+const LIBELLE_FAMILLE_UNIQUE = { bouclier: "Un seul bouclier", lance: "Une seule lance", fronde: "Une seule fronde" };
+window.libelleFamilleUnique = (famille) => LIBELLE_FAMILLE_UNIQUE[famille] || "";
+// Deux objets de la même famille unique (deux identifiants différents) ?
+window.memeFamilleUnique = function(a, b) {
+    const f = window.familleUniqueEnMain(a);
+    return !!f && f === window.familleUniqueEnMain(b) && !(a.uid && b && a.uid === b.uid) && a !== b;
+};
+
 // Les mains où cet objet peut aller, pour ce héros-là : ["Droite", "Gauche"],
 // une seule des deux (le bouclier), ou [null] quand la question ne se pose pas
 // (une armure, une arme à deux mains, un vieil objet à main imposée).
@@ -213,9 +233,9 @@ window.mainsPossibles = function(perso, objet) {
     if (objet.emplacement === "Armure" || objet.deuxMains
         || objet.emplacement === "Main_Gauche" || objet.emplacement === "Main_Droite") return [null];
     const mains = ["Droite", "Gauche"];
-    if (!window.estBouclier(objet)) return mains;
+    if (!window.familleUniqueEnMain(objet)) return mains;
     const voisine = { Droite: perso && perso.equipMainGauche, Gauche: perso && perso.equipMainDroite };
-    const permises = mains.filter(m => !window.estBouclier(voisine[m]) || voisine[m].uid === objet.uid);
+    const permises = mains.filter(m => !window.memeFamilleUnique(objet, voisine[m]));
     // Une vieille fiche qui porterait déjà DEUX boucliers : aucune main n'est
     // « propre », remplacer l'un ou l'autre ne peut rien aggraver.
     return permises.length ? permises : mains;
@@ -287,7 +307,7 @@ window.equiperObjet = async function(idPersonnage, objet, main, options) {
     // Le garde-fou du bouclier : une main interdite (l'autre tient déjà un
     // bouclier) est redressée vers la seule permise — le nouveau bouclier
     // remplace l'ancien au lieu de s'installer à côté.
-    if (window.estBouclier(objet)) {
+    if (window.familleUniqueEnMain(objet)) {
         const permises = window.mainsPossibles(perso, objet);
         const demandee = main === "Gauche" ? "Gauche" : "Droite";
         if (permises[0] !== null && !permises.includes(demandee)) main = permises[0];
@@ -1965,13 +1985,14 @@ window.ouvrirConfirmationEquip = function(idPersonnage, item, uid, mode) {
     if (titre) titre.innerText = auPartage ? "Dans quelle main, si tu le remportes ?" : "Équiper cet objet ?";
 
     // Un seul bouclier : si une main a été retirée du choix, on dit pourquoi.
-    const bouclierPorte = window.estBouclier(item) && mains[0] !== null && mains.length === 1
+    const famille = window.familleUniqueEnMain(item);
+    const bouclierPorte = famille && mains[0] !== null && mains.length === 1
         ? perso && perso["equipMain" + mains[0]] : null;
     const lignes = [];
     if (!test.possible) {
         lignes.push(`Il te faut ${item.prerequis} en ${window.texteCaracsObjet(item)} pour porter cet objet (tu as ${test.valeur}).`);
     } else if (bouclierPorte && bouclierPorte.nom) {
-        lignes.push(`Un seul bouclier à la fois : celui-ci ne peut que remplacer ${bouclierPorte.nom}.`);
+        lignes.push(`${window.libelleFamilleUnique(famille)} à la fois : ${famille === "bouclier" ? "celui-ci" : "celle-ci"} ne peut que remplacer ${bouclierPorte.nom}.`);
     }
     const message = document.getElementById("message-confirmation-equip");
     if (message) {

@@ -25,7 +25,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { collection, query, where, getDocs, doc, getDoc, setDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as P from "./social_pur.js?v=5";
+import * as P from "./social_pur.js?v=6";
 
 const PARTIES = "Systeme_Parties";
 const refAme = (p, id) => doc(db, PARTIES, p, "Ames", id);
@@ -308,11 +308,14 @@ Les actions possibles (et seulement elles) :
 ${catalogue}
 
 RÈGLES :
-- Un événement = un personnage (acteur) fait une de ces actions à un autre (cible), tous deux présents. Jamais entre deux héros.
+- Un événement = un personnage (acteur) fait une de ces actions à un autre (cible), tous deux PHYSIQUEMENT là dans cette scène (pas seulement dans la liste des présents). Jamais entre deux héros. Un acte qui ne vise personne en particulier (éviter des pièges, trouver un chemin) n'est un événement envers personne : celui qui n'était pas là n'en sait rien.
 - Seulement ce qui s'est VRAIMENT passé dans ce texte (pas une intention, pas un souvenir, pas une menace imaginée, pas une action ratée qui n'a rien fait).
 - Dans le récit des joueurs, les paroles comptent (une promesse, un compliment, une insulte, un mensonge, une confidence) ; une action seulement TENTÉE (« Kaya tente de le plaquer au sol ») n'est pas encore un fait : c'est la réponse du Maître du Jeu qui dit si elle a réussi.
-- Gravité : 1 un petit geste, 2 un acte qui compte, 3 un événement fondateur (une vie sauvée, une trahison grave). Le plus souvent 1.
+- Gravité : 1 un petit geste, 2 un acte qui compte, 3 un événement fondateur (une vie sauvée, une trahison grave). Le plus souvent 1. Pour « raconter », la gravité de l'acte raconté.
 - « discret » : vrai si personne d'autre ne pouvait le voir ou l'entendre.
+- « temoins » : les noms exacts des AUTRES personnages qui ont VRAIMENT vu ou entendu l'action, parce qu'ils étaient physiquement là à ce moment. La liste des présents est ce que le jeu croit : un personnage resté ailleurs (au village, au camp, dans une autre pièce, parti en avant) n'est PAS témoin, même s'il figure dans la liste. Dans le doute, ne le mets pas. Personne d'autre ne l'a vu : une liste vide.
+- Ce qu'un personnage n'a ni vu ni appris ne change rien pour lui. S'il l'APPREND parce qu'on le lui raconte dans la scène (« Syrinx raconte à Thalia que Tartuf l'a sauvée »), c'est l'action « raconter » : acteur = celui qui raconte, cible = celui qui écoute, et « rapporte » = l'acte raconté (son auteur, son type, sa cible).
+- Quand un personnage prend parti contre un autre ou le contredit ouvertement (il défend les aventuriers contre Mael, il désavoue un ordre de Mael devant tous), ajoute « s_opposer » de lui envers celui qu'il contredit : c'est ce dernier qui le vit mal, jamais l'inverse. Vérifie toujours le sens : l'acteur est celui qui agit, la cible celui qui subit.
 - « extrait » : quatre à huit mots EXACTS du texte où cela se passe (celui du Maître du Jeu de préférence).
 - Six événements au plus ; s'il ne s'est rien passé entre eux, une liste vide.
 - Souvenirs : pour chaque PNJ marqué par la scène, UNE phrase à la première personne (ce qu'il en retiendra), et de qui elle parle.
@@ -324,7 +327,10 @@ const OUTIL_SOCIAL = [{ functionDeclarations: [{ name: "noterScene", description
         evenements: { type: "ARRAY", items: { type: "OBJECT", properties: {
             type: { type: "STRING", enum: P.TYPES_ACTIONS }, acteur: { type: "STRING" }, cible: { type: "STRING" },
             gravite: { type: "NUMBER" }, discret: { type: "BOOLEAN" }, resume: { type: "STRING", description: "Une phrase, au passé." },
-            extrait: { type: "STRING" } }, required: ["type", "acteur", "cible", "gravite", "resume"] } },
+            temoins: { type: "ARRAY", items: { type: "STRING" }, description: "Les autres personnages qui ont vraiment vu ou entendu l'action (noms exacts) ; vide si personne." },
+            rapporte: { type: "OBJECT", description: "Pour « raconter » seulement : l'acte raconté.", properties: {
+                acteur: { type: "STRING" }, type: { type: "STRING", enum: P.TYPES_ACTIONS.filter(t => t !== "raconter") }, cible: { type: "STRING" } } },
+            extrait: { type: "STRING" } }, required: ["type", "acteur", "cible", "gravite", "resume", "temoins"] } },
         souvenirs: { type: "ARRAY", items: { type: "OBJECT", properties: {
             nom: { type: "STRING" }, texte: { type: "STRING" }, a_propos_de: { type: "ARRAY", items: { type: "STRING" } }, importance: { type: "NUMBER" } }, required: ["nom", "texte"] } }
     }, required: ["evenements"] } }] }];
@@ -395,7 +401,12 @@ export async function tourSocial(o) {
     catch (e) { console.warn("[MIA_SOCIAL] Lecture de la scène impossible :", e); }
     const idDuNom = (n) => (presents.find(x => memeNom(x.nom, n)) || {}).id || "";
     const typeDe = (id) => (ames[id] || {}).type;
-    const proposes = ((rendu && rendu.evenements) || []).slice(0, MAX_EVENEMENTS).map(e => ({ ...e, acteur: idDuNom(e.acteur), cible: idDuNom(e.cible), acteurNom: e.acteur, cibleNom: e.cible }))
+    // (v475) Les témoins nommés par l'IA (jamais d'office tous les présents), et
+    // l'auteur d'un acte raconté, qu'on cherche parmi toutes les âmes connues.
+    const idDuNomTous = (n) => (Object.values(ames).find(a => a && memeNom(a.nom, n)) || {}).id || "";
+    const proposes = ((rendu && rendu.evenements) || []).slice(0, MAX_EVENEMENTS).map(e => ({ ...e, acteur: idDuNom(e.acteur), cible: idDuNom(e.cible), acteurNom: e.acteur, cibleNom: e.cible,
+            temoins: (Array.isArray(e.temoins) ? e.temoins : []).map(idDuNom).filter(Boolean),
+            rapporte: e.rapporte ? { type: e.rapporte.type, acteur: idDuNomTous(e.rapporte.acteur), cible: idDuNomTous(e.rapporte.cible) } : undefined }))
         .filter(e => !(typeDe(e.acteur) === "heros" && typeDe(e.cible) === "heros"));   // pas de relation chiffrée entre héros
     const calcul = P.appliquerEvenements({ ames, liens }, proposes, { presents: presents.map(x => x.id), tour, historique: fin.historique, sansLienEntreHeros: true });
     calcul.rejets.forEach(r => console.warn("[MIA_SOCIAL] Écarté :", r.raison, r.evenement && r.evenement.resume));
@@ -411,7 +422,8 @@ export async function tourSocial(o) {
         // (v417) qui a agi envers qui : l'encart ne montre que ce qui s'est passé entre les deux.
         const parEv = [...new Set(ici.map(c => c.evenement))].map(n => ({ n: numeros[n], tour, resume: calcul.evenements[n].resume,
             acteur: calcul.evenements[n].acteur, cible: calcul.evenements[n].cible,
-            ecarts: Object.fromEntries(ici.filter(c => c.evenement === n).map(c => [c.axe, Math.round((c.apres - c.avant) * 100) / 100])) }));
+            // (v475) Nico : « attachement −0 : à filtrer » — un écart qui s'arrondit à zéro ne s'écrit pas.
+            ecarts: Object.fromEntries(ici.filter(c => c.evenement === n && Math.abs(c.apres - c.avant) >= 0.5).map(c => [c.axe, Math.round((c.apres - c.avant) * 100) / 100])) }));
         lot.set(refLien(p, l.de, l.vers), { ...l, majLe: Date.now(), derniers: [...((liens[k] && liens[k].derniers) || []), ...parEv].slice(-5) });
     });
     // Les âmes : l'humeur de la cible, la personnalité d'un héros qui glisse.
@@ -423,7 +435,8 @@ export async function tourSocial(o) {
     const presentsIds = presents.map(x => x.id);
     calcul.evenements.forEach((e, i) => {
         const fiche = { numero: numeros[i], tour, message: o.idMessage || "", dateJeu: o.dateJeu || "", type: e.type, acteur: e.acteur, cible: e.cible, gravite: e.gravite,
-            discret: e.discret, resume: e.resume, temoins: e.discret ? [] : presentsIds.filter(x => x !== e.acteur && x !== e.cible),
+            discret: e.discret, resume: e.resume, temoins: e.discret ? [] : (Array.isArray(e.temoins) ? e.temoins : presentsIds.filter(x => x !== e.acteur && x !== e.cible)),
+            ...(e.rapporte ? { rapporte: e.rapporte } : {}),
             changements: calcul.changements.filter(c => c.evenement === i).map(c => ({ de: c.de, vers: c.vers, axe: c.axe, avant: c.avant, apres: c.apres })),
             annule: false, Le: Date.now() };
         lot.set(refEvenement(p, numeros[i]), fiche);

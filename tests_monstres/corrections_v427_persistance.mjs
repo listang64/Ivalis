@@ -338,7 +338,9 @@ await section(async () => {
   verifier("(v469) plus les valeurs d'avant la surpuissance (pas de « (32 au lancement) (48 dans la zone) »)", s.parentheses.length === 0, JSON.stringify(s.parentheses));
   // (v471) Nico : « retire la ligne "tant de dégâts à la création" quand il a surpuissance et persistance ».
   verifier("(v471) plus de ligne « dégâts à la création », ni de total « → 108 »", s.valeur === "", JSON.stringify(s.valeur));
-  verifier("(v469) sur une même ligne, ses deux dégâts surpuissants : « 43 au lancement · 65 dans la zone » (arrondis)", s.sous === "43 au lancement · 65 dans la zone", JSON.stringify(s.sous));
+  verifier("(v469) sur une même ligne, ses deux dégâts surpuissants : « 43 au lancement · 65 dans la zone » (arrondis)", s.sous.replace(/\s*avec la surpuissance$/, "") === "43 au lancement · 65 dans la zone", JSON.stringify(s.sous));
+  // (v475) Nico : « précise en dessous des dégâts : "avec la surpuissance" ».
+  verifier("(v475) …et en dessous, « avec la surpuissance »", /avec la surpuissance$/.test(s.sous), JSON.stringify(s.sous));
   verifier("(v471) …la surpuissance de la carte reste dans son bandeau (×1,35)", /×1,35/.test(s.bandeau), s.bandeau);
   verifier("(v466) …dans les deux couleurs de la persistance", s.couleurs.length === 2 && s.couleurs[0] !== s.couleurs[1], JSON.stringify(s.couleurs));
 });

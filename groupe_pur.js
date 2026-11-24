@@ -25,7 +25,7 @@
 //  s'oublie.
 // =========================================================================
 
-import { affinite, nombre } from "./social_pur.js?v=5";
+import { affinite, nombre } from "./social_pur.js?v=6";
 
 export const MAX_SUIVEURS = 3;
 export const SEUIL_ACCEPTE = 40, SEUIL_REFUSE = 10, SEUIL_VETO = -30;

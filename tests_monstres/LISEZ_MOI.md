@@ -12588,3 +12588,25 @@ Cinq chantiers menés en parallèle (chacun dans son worktree), puis fusionnés 
   - exemples : Brûlé au max (60 %) sur une Attaque de Feu → 65 % (70 % à la 1re surpuissance) ; Électrifié au plafond (75 %) avec la Foudre → 80 % ;
   - en combat (moteur_effets.js : Brûlé, Glacé, Électrifié) comme dans la Forge (competences.js : « 65 % … (max 65 %) »).
 - corrections_v427_persistance, v427_surpuissance, v431 et v267 le vérifient.
+
+## v475 — Images légères, Forge, drachmes, mains, voyage sans nuit, narrateur, fils invisibles, multiplicateur de persistance
+
+- **Les images** (« vérifie que chaque lien a bien /q_auto,f_auto/ ») : les 17 liens Cloudinary qui ne l'avaient pas l'ont (combat.js, grimoire.js, cartes_regionales.js, loupe_cartes.js), et les images hébergées en jeu repartent avec, même quand le détourage échoue (app.js, ia_master.js).
+- **La Forge** :
+  - à côté de chaque effet de la carte, ▲ et ▼ pour le monter ou le descendre (competences.js, deplacerActionForge) : la carte s'enregistre dans cet ordre, le combat la joue dans cet ordre ;
+  - une persistance surpuissante : « avec la surpuissance » en dessous de ses dégâts au lancement et dans la zone.
+- **Une seule monnaie, la drachme** : la fiche porte `Drachmes` (laiton, bronze et « Or » ne servent plus qu'à remplir une ancienne fiche : laitons + bronzes ÷ 30) ; l'inventaire du livre montre une seule pièce, le bandeau dit « Drachmes » ; les IA savent que la drachme est la seule monnaie (lore_ivalis.js).
+- **Les mains** : comme le bouclier, jamais deux lances ni deux frondes (loot.js, familleUniqueEnMain ; grimoire_fiches.js, prendre en main depuis le stockage) ; une lance à deux mains compte (le Berserker n'en tient pas deux).
+- **Le voyage** (voyage_groupe.js) :
+  - plus d'arrêt le soir : au bout d'une journée, la marche file sur la suivante et la date avance d'un jour ;
+  - deux fois plus de jours pour la même route (10 % de carte par jour), une journée deux fois plus courte à l'écran ;
+  - plus de « JOUR 2 » : la date (« Jour 100 de l'an 3 ») arrive en fondu en haut du livre, centrée ; ses chiffres qui changent montent, les nouveaux arrivent par le bas, puis elle repart en fondu ;
+  - les arrêts aux POI et aux discussions de la route restent ; on n'est ramené sur la carte qu'au départ.
+- **Le narrateur** (ia_master.js, combat_rp.js) : des règles qui partent toujours, même avec le cerveau de la base — ne pas répéter les mêmes réactions corporelles ; ne pas imaginer un combat vécu en jeu, juste une reprise à partir de son résultat réel ; relire les faits établis (lieu, présents, événements) avant d'écrire.
+- **Les fils invisibles** (social_pur.js, social.js, grimoire_liens.js) :
+  - seuls ceux qui ont vu ou entendu un événement (ses témoins, nommés par MIA_SOCIAL) en sont touchés ;
+  - « raconter » : celui qui écoute apprend l'acte d'un autre, et son regard sur son auteur change à ×0,3 (jamais de dette) ;
+  - « s_opposer » : celui qu'on contredit le vit mal (confiance et attachement en baisse, crainte, colère) ; l'adversaire d'un acteur n'approuve pas ses bontés dans la même scène ; un geste bienveillant envers quelqu'un qu'on déteste est désapprouvé ;
+  - plus de « attachement −0 ».
+- **Le multiplicateur de persistance des états** : dans l'éditeur des effets, sous un effet à chance, × au lancement et × dans la zone ; en combat, la part du grimoire est multipliée, puis l'élément, la surpuissance, la classe et les talents s'ajoutent (moteur_effets.js, moteur_pur.js) ; dans la Forge, en gras à la fin de l'effet : « 80 % avec persistance au lancement » · « 40 % dans la zone ».
+- corrections_v475 le vérifie ; social_pur (24 actions), corrections_v277 (plus de nuit ; la maquette ne relaie plus un sous-document comme la partie) et corrections_v427_persistance (la mention) suivent.

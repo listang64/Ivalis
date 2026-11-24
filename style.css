@@ -3696,6 +3696,11 @@ textarea.input-texte-parchemin {
 .forge-compteur-duree { background: rgba(91,47,134,0.1); border-color: rgba(91,47,134,0.5); }
 .forge-compteur b, .forge-compteur-duree span { min-width: 22px; text-align: center; font-size: 15px; font-weight: bold; color: #2c1e16; }
 .forge-compteur-duree span { color: #5b2f86; font-size: 13px; min-width: 34px; }
+/* (v475) Les flèches qui montent ou descendent un effet dans l'ordre de la carte. */
+.forge-ordre { display: inline-flex; flex-direction: column; gap: 2px; }
+.forge-btn-ordre { width: 22px; height: 16px; padding: 0; border: 1px solid #a8841f; border-radius: 4px; background: #f6ead0;
+  color: #5c3a21; font-size: 10px; line-height: 1; cursor: pointer; }
+.forge-btn-ordre:disabled { opacity: 0.3; cursor: default; }
 .forge-btn-moins, .forge-btn-plus {
   width: 24px; height: 24px; border-radius: 50%; border: none; cursor: pointer; padding: 0;
   font-size: 16px; font-weight: bold; line-height: 24px; text-align: center; background: transparent; transition: background 0.12s;
@@ -5396,3 +5401,20 @@ textarea.input-texte-parchemin {
   background: rgba(20, 12, 4, 0.82); border: 1px solid #d9b25a; color: #f3dfa8; font: 600 12px/1.4 'Cinzel', serif; letter-spacing: 0.06em; }
 /* (v466) Sous la surpuissance : les deux dégâts de la persistance, surpuissance comprise. */
 .forge-persistance-surpuissante { display: block; margin-top: 2px; font-style: normal; color: #7c2d12; }
+/* (v475) « avec la surpuissance », sous les dégâts au lancement et dans la zone. */
+.forge-persistance-mention { display: block; font-style: italic; font-size: 0.9em; color: #92400e; }
+
+/* (v475) LA DATE DU VOYAGE, en haut du livre (voyage_groupe.js, afficherDateVoyage) :
+   elle arrive en fondu, ses chiffres qui changent montent et laissent la place aux
+   nouveaux, venus d'en bas (un tourniquet), puis elle repart en fondu. */
+.date-voyage { position: fixed; transform: translateX(-50%); z-index: 9000; pointer-events: none; white-space: nowrap;
+  font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive; font-size: clamp(20px, 3.2vw, 38px); color: #1d1209;
+  text-shadow: 0 0 8px rgba(255, 244, 220, 0.9), 0 0 2px rgba(255, 244, 220, 1); opacity: 0; transition: opacity 0.6s ease; }
+.date-voyage.visible { opacity: 1; }
+.date-voyage .chiffre-date { display: inline-block; }
+.date-voyage .chiffre-date.roule { position: relative; overflow: hidden; vertical-align: bottom; height: 1.2em; line-height: 1.2em; }
+.date-voyage .chiffre-date.roule .ancien, .date-voyage .chiffre-date.roule .nouveau { display: block; transition: transform 0.55s ease, opacity 0.55s ease; }
+.date-voyage .chiffre-date.roule .nouveau { position: absolute; left: 0; top: 0; transform: translateY(100%); opacity: 0; }
+.date-voyage.roule .chiffre-date.roule .ancien { transform: translateY(-100%); opacity: 0; }
+.date-voyage.roule .chiffre-date.roule .nouveau { transform: translateY(0); opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .date-voyage, .date-voyage .chiffre-date.roule .ancien, .date-voyage .chiffre-date.roule .nouveau { transition: none; } }

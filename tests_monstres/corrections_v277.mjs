@@ -64,7 +64,7 @@ const FAUX_FIRESTORE = `
       });
     }
     (window.__journal = window.__journal || []).push({ chemin, mode, data: JSON.parse(JSON.stringify(data, (k, v) => v && v.__supprimer ? "<supprimé>" : v)) });
-    if (chemin.startsWith("Systeme_Parties/") && window.__relaisPartie && typeof window.appliquerVoyageDeLaPartie === "function") {
+    if (chemin.startsWith("Systeme_Parties/") && chemin.split("/").length === 2 && window.__relaisPartie && typeof window.appliquerVoyageDeLaPartie === "function") {
       const copie = cloner(d[chemin]);
       setTimeout(() => window.appliquerVoyageDeLaPartie(copie), 0);
     }
@@ -352,13 +352,14 @@ await section(async () => {
   await p.waitForTimeout(200);
   const w = await v();
   const r = await p.evaluate(() => ({ poi: getComputedStyle(document.getElementById("poi-voyage")).display, annonce: (document.getElementById("annonce-voyage") || {}).textContent,
-    jour: document.getElementById("annonce-jour-voyage").classList.contains("visible") }));
+    jour: !!(document.getElementById("annonce-jour-voyage") || { classList: { contains: () => false } }).classList.contains("visible") }));
   verifier("la marche reprend, du POI jusqu'à la fin de la journée", w.Etat === "marche" && !w.Poi && w.Segment && Math.abs(w.Segment.de - avant.Poi.f) < 1e-9
            && Math.abs(w.Segment.a - w.Etapes[0]) < 1e-9, JSON.stringify(w.Segment));
   verifier("le point d'exclamation disparaît ; chacun sait qui a passé son chemin", r.poi === "none" && /Lyra préfère passer son chemin/.test(r.annonce), r.annonce);
   verifier("(pas de nouveau « JOUR 1 » : c'est la même journée)", !r.jour || true);
   await finir();
-  verifier("la journée s'achève normalement (la nuit)", (await v()).Etat === "nuit");
+  // (v475) Nico : « plus d'arrêt le soir » : la marche file sur le jour suivant.
+  verifier("(v475) la journée s'achève normalement : la marche file sur le jour 2 (plus de nuit)", (await v()).Etat === "marche" && (await v()).Jour === 2);
 });
 
 // =========================================================================

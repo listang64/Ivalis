@@ -585,7 +585,7 @@ async function genererEtStockerImagePNJ(descriptionPhysique, racePNJ = "Humain",
             return jsonCloud.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
         }
     } catch (e) { }
-    return urlSecurisee || "";
+    return urlSecurisee ? urlSecurisee.replace("/upload/", "/upload/q_auto,f_auto/") : "";
 }
 
 // =========================================================================
@@ -1643,7 +1643,7 @@ async function genererEtStockerIconeCarte(nomLieu, descriptionLieu) {
     try {
         const resCloud = await fetch(`https://api.cloudinary.com/v1_1/${cles.cloudName}/image/upload`, { method: "POST", body: formCloudinary });
         const jsonCloud = await resCloud.json();
-        if (jsonCloud.secure_url) return jsonCloud.secure_url; 
+        if (jsonCloud.secure_url) return jsonCloud.secure_url.replace("/upload/", "/upload/q_auto,f_auto/"); 
     } catch (e) { return ""; }
     return "";
 }
@@ -1882,7 +1882,9 @@ async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTe
     const snapInst = await getDoc(doc(db, "Cerveau_IA", "INST_10895"));
     if (snapInst.exists() && snapInst.data().Contenu_Direct) instructionMJ = snapInst.data().Contenu_Direct;
 
-    const promptSysteme = instructionMJ + "\n\n" + contexteFormate + "\n\nContinue l'histoire en répondant à la dernière action.";
+    // (v475) Des règles qui valent quel que soit le cerveau (celui de la base remplace
+    // celui du livre en entier) : CONSIGNES_NARRATEUR_TOUJOURS.
+    const promptSysteme = instructionMJ + "\n\n" + CONSIGNES_NARRATEUR_TOUJOURS + "\n\n" + contexteFormate + "\n\nContinue l'histoire en répondant à la dernière action.";
     const bodyRequete = {
         systemInstruction: { parts: [{ text: promptSysteme }] },
         contents: [{ role: "user", parts: [{ text: historiqueComplet }] }],
@@ -2332,6 +2334,17 @@ function contexteRecitPrecedent(dataPartie, messages) {
 window.recitPrecedentDepuis = recitPrecedentDepuis;
 window.contexteRecitPrecedent = contexteRecitPrecedent;
 
+// (v475) LES RÈGLES DU NARRATEUR QUI VALENT TOUJOURS, à la suite de son cerveau
+// (celui de la base, INST_10895, ou celui du livre) : Nico, « évite de répéter les
+// mêmes réactions corporelles du narrateur » ; « il n'a pas besoin d'imaginer le
+// combat qui vient de se passer, les joueurs le vivent en gameplay : juste une
+// reprise narrative à partir du résultat réel du combat » ; et la continuité du
+// monde (Kalthos décrite cité de pierre, puis hameau de huttes deux lignes après).
+const CONSIGNES_NARRATEUR_TOUJOURS = `RÈGLES QUI PASSENT AVANT TOUT LE RESTE :
+- Évite de répéter les mêmes réactions corporelles du narrateur (cœur qui bat, souffle court, frisson, mains moites…). Une émotion déjà établie n'a pas besoin d'être redécrite à chaque échange.
+- Les combats se jouent en gameplay : n'imagine jamais un combat qui vient de se passer, ne le raconte pas coup par coup. Reprends le récit à partir de son résultat réel tel que le contexte te le donne (qui est debout, qui est tombé, les blessures), en une reprise narrative courte. Exemple : « Kréon gît dans la mousse, blessé mais vivant. »
+- CONTINUITÉ DU MONDE : avant d'écrire, relis les faits déjà établis sur le lieu (sa taille, son architecture, ce qu'on en a dit), sur les personnages présents (qui est là, qui est blessé, ce qu'ils portent et tiennent) et sur les événements précédents (l'heure du jour, ce qui vient d'arriver). Ne les contredis jamais : une cité reste une cité (pas un hameau), le jour ne redevient pas la nuit sans raison, un blessé reste blessé, une épée ne devient pas un arc, un PNJ présent ne disparaît pas sans sortir de scène.`;
+
 // LE CERVEAU DU NARRATEUR (v300), par défaut. Nico : « le MJ, que l'on va
 // nommer maintenant Narrateur, parlera comme si c'était un personnage du groupe
 // d'aventuriers qui suit les aventuriers dans leurs aventures. Il écrira à la
@@ -2383,7 +2396,7 @@ puis le joueur a lancé son dé :
 - Raconte ce qui arrive, comme tu l'as vécu à côté du héros (ton souffle retenu, ton soulagement), jamais les chiffres.
 
 6. LES COMBATS
-Le jeu a son propre combat tactique. Si les héros attaquent ou sont attaqués : ne résous pas le combat ; décris la tension, l'instant où les armes sortent, qui se dresse contre nous (combien, à quoi ils ressemblent), ce que tu ressens, puis arrête-toi. Après un combat, le contexte te donne son issue : raconte la suite en la respectant à la lettre. Ne gère jamais les points de vie, l'expérience, l'or ni le butin chiffré.
+Le jeu a son propre combat tactique. Si les héros attaquent ou sont attaqués : ne résous pas le combat ; décris la tension, l'instant où les armes sortent, qui se dresse contre nous (combien, à quoi ils ressemblent), ce que tu ressens, puis arrête-toi. Après un combat, le contexte te donne son issue : les joueurs l'ont vécu en jeu, ne l'imagine pas ; reprends simplement à partir de son résultat réel, en le respectant à la lettre. Ne gère jamais les points de vie, l'expérience, l'or ni le butin chiffré.
 
 7. LA FORME (essentiel : ta page s'écrit dans un livre)
 - De la prose, au présent, à la première personne (« je », « nous »), en français. Des paragraphes de 2 à 4 phrases, séparés par un retour à la ligne ; 3 à 6 paragraphes en tout, moins s'il se passe peu de chose.

@@ -1651,7 +1651,9 @@ export function creerZonePure(etat, action, hexes, idLanceur) {
     const etatDeZone = alt ? {
         nom: alt.nom, icone: alt.icone, desc: alt.desc || "",
         // La chance est figée au lancement, triche des créatures comprise.
-        chance: chanceEtatDe(combattant(etat, idLanceur), alt), duree: nombre(alt.duree),
+        // (v475) Le multiplicateur de persistance « dans la zone » : l'écart
+        // avec celui du lancement, retiré de la chance du lancement (bonus compris).
+        chance: Math.max(0, Math.min(100, chanceEtatDe(combattant(etat, idLanceur), alt) - nombre(alt.ecartZone))), duree: nombre(alt.duree),
         estPoison: !!alt.estPoison, tickFait: false
     } : null;
 

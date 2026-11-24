@@ -1264,7 +1264,9 @@ window.resumeCombatPourMJ = function(c, fin) {
         }
     }
     lignes.push("CONSIGNES ABSOLUES POUR TA RÉPONSE :");
-    lignes.push("- Ne rejoue pas le combat coup par coup : raconte la fin de l'affrontement et ce qui suit immédiatement.");
+    // (v475) Nico : « il n'a pas besoin d'imaginer le combat qui vient de se passer, les joueurs le vivent
+    // directement en gameplay : juste une reprise narrative à partir du résultat réel du combat ».
+    lignes.push("- N'imagine pas le combat : les joueurs viennent de le vivre en jeu. Ne raconte ni les coups, ni l'affrontement : fais une reprise narrative courte à partir de son résultat réel (qui est debout, qui est tombé, les blessures ci-dessus), puis ce qui suit immédiatement. Exemple : « Kréon gît dans la mousse, blessé mais vivant. »");
     if (ennemisBilan && ennemisBilan.length) {
         lignes.push("- Respecte EXACTEMENT ce bilan : aucun adversaire tué, blessé ou en fuite au-delà de ce qu'il dit. Ceux « encore debout » le sont toujours.");
         if (!ennemisBilan.some(x => x.tombe)) lignes.push("- Les héros n'ont abattu PERSONNE : ne raconte aucun ennemi tué ni mis à terre par eux.");

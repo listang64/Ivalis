@@ -61,19 +61,19 @@ const SEUIL_GLISSE = 5;
 
 // La liste de Nico : le numéro de la boîte cliquable, le nom, l'image.
 window.CARTES_REGIONALES_DEFAUT = {
-    1:  { nom: "La forêt des murmures",      image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793949573/IMG_2229_oi0hov.png" },
-    2:  { nom: "La vallée de souffre",       image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793949573/IMG_2230_p6phe7.png" },
-    3:  { nom: "Le mont Pletia",             image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057662/IMG_2239_mkf3uo.png" },
+    1:  { nom: "La forêt des murmures",      image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793949573/IMG_2229_oi0hov.png" },
+    2:  { nom: "La vallée de souffre",       image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793949573/IMG_2230_p6phe7.png" },
+    3:  { nom: "Le mont Pletia",             image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057662/IMG_2239_mkf3uo.png" },
     4:  { nom: "Volcanisse",                 image: null },
-    5:  { nom: "Le désert d'Etheria",        image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793949572/IMG_2231_qn6rj9.png" },
-    6:  { nom: "L'enclave d'argenté",        image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057661/IMG_2238_gj4sns.png" },
-    7:  { nom: "L'île aux marchés",          image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057662/IMG_2240_o0wrvi.png" },
-    8:  { nom: "Les doigts d'Atrium",        image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057662/IMG_2242_uyv7l8.png" },
+    5:  { nom: "Le désert d'Etheria",        image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793949572/IMG_2231_qn6rj9.png" },
+    6:  { nom: "L'enclave d'argenté",        image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057661/IMG_2238_gj4sns.png" },
+    7:  { nom: "L'île aux marchés",          image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057662/IMG_2240_o0wrvi.png" },
+    8:  { nom: "Les doigts d'Atrium",        image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057662/IMG_2242_uyv7l8.png" },
     9:  { nom: "Arcaï",                      image: null },
-    10: { nom: "La pointe des sentinelles",  image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057662/IMG_2248_s7zmzs.png" },
-    11: { nom: "La province d'Aurelya",      image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057661/IMG_2244_gntmbs.png" },
-    12: { nom: "La crique du Pendu",         image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057662/IMG_2241_jnjr6u.png" },
-    13: { nom: "Les îlots maudits",          image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057662/IMG_2243_oaglx4.png" }
+    10: { nom: "La pointe des sentinelles",  image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057662/IMG_2248_s7zmzs.png" },
+    11: { nom: "La province d'Aurelya",      image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057661/IMG_2244_gntmbs.png" },
+    12: { nom: "La crique du Pendu",         image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057662/IMG_2241_jnjr6u.png" },
+    13: { nom: "Les îlots maudits",          image: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057662/IMG_2243_oaglx4.png" }
 };
 
 // LES NOUVELLES CARTES (v331). Nico : « on va changer les maps régionales ; je te
@@ -84,18 +84,18 @@ window.CARTES_REGIONALES_DEFAUT = {
 // attendant, on n'en tient pas compte. Les villages et les lieux, Nico les
 // supprime en DEV (villages_regionaux.js), et refait les frontières.
 window.NOUVELLES_CARTES_REGIONALES = {
-    1: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793949573/IMG_2229_oi0hov.png",   // la forêt des murmures
-    2: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793949573/IMG_2230_p6phe7.png",   // la vallée de souffre
-    5: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1793949572/IMG_2231_qn6rj9.png",   // le désert d'Etheria
+    1: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793949573/IMG_2229_oi0hov.png",   // la forêt des murmures
+    2: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793949573/IMG_2230_p6phe7.png",   // la vallée de souffre
+    5: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793949572/IMG_2231_qn6rj9.png",   // le désert d'Etheria
     // (v338) Le reste des cartes, en pleine page de droite elles aussi.
-    3:  "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057662/IMG_2239_mkf3uo.png",   // le mont Pletia
-    6:  "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057661/IMG_2238_gj4sns.png",   // l'enclave d'argenté
-    7:  "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057662/IMG_2240_o0wrvi.png",   // l'île aux marchés
-    8:  "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057662/IMG_2242_uyv7l8.png",   // les doigts d'Atrium
-    10: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057662/IMG_2248_s7zmzs.png",   // la pointe des sentinelles
-    11: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057661/IMG_2244_gntmbs.png",   // la province d'Aurelya
-    12: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057662/IMG_2241_jnjr6u.png",   // la crique du Pendu
-    13: "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1794057662/IMG_2243_oaglx4.png"    // les îlots maudits
+    3:  "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057662/IMG_2239_mkf3uo.png",   // le mont Pletia
+    6:  "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057661/IMG_2238_gj4sns.png",   // l'enclave d'argenté
+    7:  "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057662/IMG_2240_o0wrvi.png",   // l'île aux marchés
+    8:  "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057662/IMG_2242_uyv7l8.png",   // les doigts d'Atrium
+    10: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057662/IMG_2248_s7zmzs.png",   // la pointe des sentinelles
+    11: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057661/IMG_2244_gntmbs.png",   // la province d'Aurelya
+    12: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057662/IMG_2241_jnjr6u.png",   // la crique du Pendu
+    13: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794057662/IMG_2243_oaglx4.png"    // les îlots maudits
 };
 // La fiche parle-t-elle encore de l'ancienne image ?
 // (Une fiche qui ne nomme aucune image n'a rien de l'ancienne à oublier.)

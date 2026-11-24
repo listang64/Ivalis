@@ -215,7 +215,7 @@ function htmlEncart(choix) {
     // ce que l'un a seulement vu l'autre faire à un tiers n'y figure pas. Un ajustement à la
     // main reste ; un changement d'avant la v417 (sans acteur noté) aussi.
     const entreEux = (d) => d.type === "ajustement" || !d.acteur || ((d.acteur === de && d.cible === vers) || (d.acteur === vers && d.cible === de));
-    const derniers = (l.derniers || []).filter(entreEux).slice().reverse().map(d => `<li class="${d.annule ? "annule" : ""}">${echapper(d.resume || "")} <span class="ecarts-liens">${Object.entries(d.ecarts || {}).map(([x, v]) => `${echapper(P.NOMS_AXES[x] || x).toLowerCase()} ${signe(v)}`).join(" · ")}</span>${d.annule ? " <i>(annulé)</i>" : admin ? ` <button type="button" class="annuler-liens" data-action="liens" data-cb="annuler" data-n="${d.n}">annuler</button>` : ""}</li>`).join("");
+    const derniers = (l.derniers || []).filter(entreEux).slice().reverse().map(d => `<li class="${d.annule ? "annule" : ""}">${echapper(d.resume || "")} <span class="ecarts-liens">${Object.entries(d.ecarts || {}).filter(([, v]) => Math.round(Math.abs(Number(v) || 0)) > 0).map(([x, v]) => `${echapper(P.NOMS_AXES[x] || x).toLowerCase()} ${signe(v)}`).join(" · ")}</span>${d.annule ? " <i>(annulé)</i>" : admin ? ` <button type="button" class="annuler-liens" data-action="liens" data-cb="annuler" data-n="${d.n}">annuler</button>` : ""}</li>`).join("");
     return `<div class="encart-liens">
         <button type="button" class="fermer-encart-liens" data-action="liens" data-cb="fermer" aria-label="Fermer">×</button>
         <div class="titre-encart-liens">${echapper(nomDe(de))} → ${echapper(nomDe(vers))}</div>

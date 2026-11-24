@@ -292,6 +292,39 @@ window.reglagesPersistance = function(effet) {
     };
 };
 
+// (v475) Nico : « dans les effets d'état, un multiplicateur pour l'effet
+// persistance, qui change la chance d'appliquer l'état. Exemple : 0,8 au
+// lancement et 0,4 dans la zone — de 100 % de base, la chance descend à 80 %
+// au lancement et 40 % dans la zone ; les bonus de surpuissance et de classe
+// ou de talent s'appliquent après ce multiplicateur ». Les deux réglages vivent
+// sur l'effet d'état du grimoire (éditeur des effets, app.js) ; absents, 1.
+window.multiplicateursPersistanceEtat = function(effet) {
+    const lire = (v) => {
+        if (v === undefined || v === null || v === "") return 1;
+        const n = parseFloat(String(v).replace(",", "."));
+        return Number.isFinite(n) ? Math.max(0, n) : 1;
+    };
+    const e = effet || {};
+    return { lancement: lire(e.Persistance_Mult_Lancement), zone: lire(e.Persistance_Mult_Zone) };
+};
+// L'effet du grimoire d'un état posé en combat (« Brûlé » → l'effet Brûlé).
+window.effetGrimoireDeLEtat = function(nomEtat) {
+    const net = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    const cible = net(nomEtat);
+    if (!cible) return null;
+    const effets = Object.values(window.EFFETS_BDD_CACHE || {}).filter(Boolean);
+    return effets.find(e => net(e.Nom) === cible) || effets.find(e => net(e.Cible_Etat) === cible)
+        || effets.find(e => net(e.Nom).startsWith(cible.slice(0, 5)) && !net(e.Nom).includes("persistance")) || null;
+};
+// Les deux chances d'un état sur une carte à persistance : `grimoire` est la
+// part du grimoire (crans plafonnés au max), `bonus` ce qui s'y ajoute ensuite
+// (élément offert, surpuissance, classe, talents). Arrondies à l'entier.
+window.chancesEtatAvecPersistance = function(grimoire, bonus, mult) {
+    const m = mult || { lancement: 1, zone: 1 };
+    const borne = (v) => Math.max(0, Math.min(100, v));
+    return { lancement: borne(Math.round(grimoire * m.lancement) + bonus), zone: borne(Math.round(grimoire * m.zone) + bonus) };
+};
+
 // Quel visuel pour quel état embarqué par le sort d'origine.
 window.TYPES_ZONES_PERSISTANTES = {
     "Brûlé": "feu",
@@ -1881,6 +1914,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181101/IMG_2087_q6chof.png",
                     desc: "-50% de soins reçus, et 8% des PV max en dégâts magiques à chaque fin de manche (défense magique appliquée).",
                     chance: bruleChance,
+                    bonusElement: chanceOfferte("Brûlé"),   // (v475) au-delà du grimoire : hors du multiplicateur de persistance
                     duree: bruleDuree,
                     isRanged: isRanged,
                     rangeMax: rangeMax,
@@ -1934,6 +1968,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788181888/IMG_2089_isgcrs.png",
                     desc: "Coût en fatigue du mouvement doublé, et 20% de dégâts physiques subis en plus.",
                     chance: glaceChance,
+                    bonusElement: chanceOfferte("Glacé"),   // (v475) au-delà du grimoire : hors du multiplicateur de persistance
                     duree: glaceDuree,
                     isRanged: isRanged,
                     rangeMax: rangeMax,
@@ -2021,6 +2056,7 @@ window.demarrerCiblage = async function(idCarte, options) {
                     icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1788088220/IMG_2081_p5xenm.png",
                     desc: "Subit 20% de dégâts magiques en plus tant qu'il dure.",
                     chance: electrifieChance,
+                    bonusElement: chanceOfferte("Électrifié"),   // (v475) au-delà du grimoire : hors du multiplicateur de persistance
                     duree: electrifieDuree,
                     isRanged: isRanged,
                     rangeMax: rangeMax,
@@ -2302,6 +2338,11 @@ window.demarrerCiblage = async function(idCarte, options) {
         dataCarte.Composants.actions.forEach((act, idxAction) => {
             const avantA = attaquesExtraites.length, avantAlt = alterationsExtraites.length;
             lireAction(act, idxAction);
+            // (v475) La part du grimoire de chaque état, avant ce qui s'y ajoute
+            // (élément, surpuissance…) : c'est elle que multiplie la persistance.
+            alterationsExtraites.slice(avantAlt).forEach(alt => {
+                if ((Number(alt.chance) || 0) > 0) alt.chanceGrimoire = Math.max(0, Number(alt.chance) - (Number(alt.bonusElement) || 0));
+            });
             // (v429) LA SURPUISSANCE DES EFFETS : +5 points (70+) ou +8 (100+) sur
             // les chances des effets de l'action, une fois plafonnées au max du
             // grimoire — le max monte d'autant (100 au plus) — états, Poussée,
@@ -2376,6 +2417,22 @@ window.demarrerCiblage = async function(idCarte, options) {
     // partLancement (chaineDeDegats) et partZone (creerZonePure), moteur_pur.js.
     // À 100 % (réglage absent), rien n'est posé : la carte reste celle d'avant.
     // Créatures comprises : elles passent par cette même extraction.
+    // (v475) LE MULTIPLICATEUR DE PERSISTANCE DES ÉTATS : la part du grimoire
+    // de chaque état est multipliée (au lancement, et dans la zone), puis ce qui
+    // s'y ajoutait revient par-dessus. La zone retient son écart avec le
+    // lancement (ecartZone) : les bonus de talent posés plus tard
+    // (enrichissement du lanceur) s'ajoutent aux deux (creerZonePure).
+    if (aPersistanceTerrain) {
+        alterationsExtraites.forEach(alt => {
+            if (alt.chanceGrimoire === undefined) return;
+            const mult = window.multiplicateursPersistanceEtat(window.effetGrimoireDeLEtat(alt.nom));
+            if (mult.lancement === 1 && mult.zone === 1) return;
+            const bonus = Math.max(0, (Number(alt.chance) || 0) - alt.chanceGrimoire);
+            const c = window.chancesEtatAvecPersistance(alt.chanceGrimoire, bonus, mult);
+            alt.chance = c.lancement;
+            alt.ecartZone = Math.round(alt.chanceGrimoire * mult.lancement) - Math.round(alt.chanceGrimoire * mult.zone);
+        });
+    }
     if (aPersistanceTerrain) {
         const parts = window.reglagesPersistance(effetPersistance);
         attaquesExtraites.forEach(a => {
@@ -2411,6 +2468,7 @@ window.demarrerCiblage = async function(idCarte, options) {
     if (tricheSorts !== 1) {
         alterationsExtraites.forEach(alt => {
             if ((Number(alt.chance) || 0) > 0) alt.chance = Math.min(100, Math.round(alt.chance * tricheSorts));
+            if (alt.ecartZone) alt.ecartZone = Math.round(alt.ecartZone * tricheSorts);   // (v475)
         });
     }
 

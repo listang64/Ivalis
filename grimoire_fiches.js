@@ -22,8 +22,8 @@
 //    · LA FORGE : sur sa double page, la technique à gauche et, à droite, le
 //      codex de tous les effets (la Forge de competences.js, rangée dans le
 //      livre) ;
-//    · L'INVENTAIRE : la richesse (pièces de laiton et de bronze ; un appui
-//      long : 30 bronzes = 1 laiton), l'armure, les deux mains et un
+//    · L'INVENTAIRE : la richesse (v475 : les drachmes, seule monnaie),
+//      l'armure, les deux mains et un
 //      emplacement de stockage (une arme qu'on ne tient pas) ; en bas, un petit
 //      « Dev » souligné, en mode développeur, mène aux pages du panneau DEV.
 //
@@ -48,10 +48,6 @@ function hasard(graine) {
     for (const c of String(graine)) s = (s * 31 + c.charCodeAt(0)) >>> 0;
     return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
 }
-
-// 30 pièces de bronze font une pièce de laiton (Nico).
-const BRONZES_PAR_LAITON = 30;
-window.BRONZES_PAR_LAITON = BRONZES_PAR_LAITON;
 
 // ---------------------------------------------------------------------
 //  LES DONNÉES
@@ -1136,9 +1132,9 @@ function brancherForge() {
 // ---------------------------------------------------------------------
 //  L'INVENTAIRE (double page 4)
 // ---------------------------------------------------------------------
+// v475 : une seule monnaie, la drachme.
 function richesse(h) {
-    const laiton = h.piecesLaiton !== undefined && h.piecesLaiton !== null ? h.piecesLaiton : (parseInt(h.or) || 0);
-    return { laiton: Math.max(0, parseInt(laiton) || 0), bronze: Math.max(0, parseInt(h.piecesBronze) || 0) };
+    return Math.max(0, parseInt(h.drachmes) || 0);
 }
 function htmlObjet(h, cle, titre, objet, actions) {
     const rempli = !!(objet && objet.nom);
@@ -1172,16 +1168,15 @@ const bouton = (fa, texte, extra) => `<button type="button" class="lien-fiche" d
 function htmlInventaireGauche(h) {
     const r = richesse(h);
     const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev();
-    const champ = (metal, v) => moi
-        ? `<input type="number" class="saisie-pieces" min="0" step="1" inputmode="numeric" value="${v}" data-metal="${metal}" aria-label="Pièces de ${metal}">`
+    const champ = v => moi
+        ? `<input type="number" class="saisie-pieces" min="0" step="1" inputmode="numeric" value="${v}" aria-label="Drachmes">`
         : `<b>${v}</b>`;
     return `<div class="contenu-page page-inventaire">
         <div class="entete-fiche"><span class="titre-page-fiche">Inventaire</span></div>
         <div class="encart-fiche encart-richesse">${cadre("richesse-" + h.idPersonnage)}
-          <div class="titre-encart" ${aide("Richesse", `${BRONZES_PAR_LAITON} pièces de bronze valent 1 pièce de laiton.`)}>Richesse</div>
+          <div class="titre-encart" ${aide("Richesse", "La drachme est la seule monnaie d'Ivalis.")}>Richesse</div>
           <div class="rangee-pieces">
-            <label class="tas-pieces">${piece("laiton")}${champ("laiton", r.laiton)}<span>laiton</span></label>
-            <label class="tas-pieces">${piece("bronze")}${champ("bronze", r.bronze)}<span>bronze</span></label>
+            <label class="tas-pieces">${piece("laiton")}${champ(r)}<span>drachmes</span></label>
           </div>
         </div>
         ${htmlObjet(h, "armure", "Armure", h.equipArmure, moi && h.equipArmure ? bouton("lacher", "Lâcher", ` data-champ="Equip_Armure"`) : "")}
@@ -1212,8 +1207,7 @@ async function ecrire(h, maj) {
     [enRam, enRam2].forEach(p => {
         if (!p) return;
         if ("Equip_Stock" in maj) p.equipStock = maj.Equip_Stock;
-        if ("Pieces_Laiton" in maj) p.piecesLaiton = maj.Pieces_Laiton;
-        if ("Pieces_Bronze" in maj) p.piecesBronze = maj.Pieces_Bronze;
+        if ("Drachmes" in maj) p.drachmes = maj.Drachmes;
     });
     if (typeof window.rafraichirCompetencesSiOuvertes === "function") window.rafraichirCompetencesSiOuvertes(h.idPersonnage);
     majPlus(true);
@@ -1248,6 +1242,9 @@ async function prendreArme() {
     // (v360) Le Berserker de niveau 9 : une seconde arme à deux mains, dans la
     // main gauche, quand il en tient déjà une (et rien d'autre).
     const d = h.equipMainDroite, g = h.equipMainGauche;
+    // (v475) Jamais deux boucliers, deux lances ni deux frondes en main.
+    const doublon = typeof window.memeFamilleUnique === "function" ? [d, g].find(o => window.memeFamilleUnique(objet, o)) : null;
+    if (doublon) { noter(pagesFiche["inv-d"], `${window.libelleFamilleUnique(window.familleUniqueEnMain(objet))} en main : range ou lâche d'abord ${doublon.nom}.`); return; }
     const berserker = typeof window.atoutRace === "function" && !!(window.atoutRace(h) || {}).deuxArmesDeuxMains;
     if (objet.deuxMains && berserker && d && d.deuxMains && (d === g || (d.uid && g && d.uid === g.uid))) {
         maj = { Equip_Main_Droite: d, Equip_Main_Gauche: objet };
@@ -1264,21 +1261,13 @@ async function prendreArme() {
     maj.Equip_Stock = null;
     await ecrire(h, maj);
 }
-async function changerPieces(metal, valeur) {
+async function changerPieces(valeur) {
     const h = herosParId(heros);
     if (!h) return;
     let v = parseInt(valeur);
     if (isNaN(v) || v < 0) v = 0;
-    const r = richesse(h);
-    const maj = { Pieces_Laiton: metal === "laiton" ? v : r.laiton, Pieces_Bronze: metal === "bronze" ? v : r.bronze };
-    // Les bronzes au-delà de 30 se changent en laiton.
-    if (maj.Pieces_Bronze >= BRONZES_PAR_LAITON) {
-        maj.Pieces_Laiton += Math.floor(maj.Pieces_Bronze / BRONZES_PAR_LAITON);
-        maj.Pieces_Bronze %= BRONZES_PAR_LAITON;
-    }
-    maj.Or = maj.Pieces_Laiton;            // l'ancien champ suit (l'ancienne fiche le lit)
     son();
-    await ecrire(h, maj);
+    await ecrire(h, { Drachmes: v });
 }
 
 // ---------------------------------------------------------------------
@@ -1411,7 +1400,7 @@ function majPlus(force) {
 function rendre(h) {
     // Ce qu'on était en train de saisir n'est pas effacé sous les doigts.
     const actif = document.activeElement;
-    const saisie = actif && actif.classList && actif.classList.contains("saisie-pieces") ? actif.dataset.metal : null;
+    const saisie = !!(actif && actif.classList && actif.classList.contains("saisie-pieces"));
     pagesFiche["fiche-g"].innerHTML = htmlAvatar(h);
     pagesFiche["fiche-d"].innerHTML = htmlFicheDroite(h);
     Object.keys(LIGNES_PAR_PAGE).forEach(c => { pagesFiche[c].innerHTML = htmlTalentsPage(h, c); });
@@ -1423,7 +1412,7 @@ function rendre(h) {
     pagesFiche["inv-g"].innerHTML = htmlInventaireGauche(h);
     pagesFiche["inv-d"].innerHTML = htmlInventaireDroite(h);
     preparerPagesForge();
-    if (saisie) { const el = pagesFiche["inv-g"].querySelector(`.saisie-pieces[data-metal="${saisie}"]`); if (el) el.focus(); }
+    if (saisie) { const el = pagesFiche["inv-g"].querySelector(".saisie-pieces"); if (el) el.focus(); }
     requestAnimationFrame(() => ajusterNom(document.getElementById("fiche-nom-heros")));
     const img = pagesFiche["fiche-g"].querySelector(".avatar-heros");
     if (img) img.addEventListener("error", () => img.classList.add("absente"), { once: true });
@@ -1597,7 +1586,7 @@ function brancherGestes() {
     ecran.addEventListener("contextmenu", (ev) => { if (ev.target && ev.target.closest && ev.target.closest(".page-fiches")) ev.preventDefault(); });
     ecran.addEventListener("change", (ev) => {
         const t = ev.target;
-        if (t && t.classList && t.classList.contains("saisie-pieces")) changerPieces(t.dataset.metal, t.value);
+        if (t && t.classList && t.classList.contains("saisie-pieces")) changerPieces(t.value);
     });
     ecran.addEventListener("keydown", (ev) => {
         const t = ev.target;
