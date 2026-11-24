@@ -59,9 +59,8 @@
         { id: "atelier", titre: "L'atelier", teinte: "beige", cote: "droite",
           texte: "Les outils de ceux qui construisent Ivalis.",
           entrees: [
-              ["studio", "Studio d'animation", () => window.ouvrirStudioAnimation && window.ouvrirStudioAnimation()],
-              // (v434) Nico : « un bouton dans les paramètres pour reboot l'image d'un clan » (grimoire_clans.js).
-              ["clans", "Les clans", () => ouvrirClans()]
+              // (v477) « Les clans » (la réinitialisation d'un clan) a disparu avec les clans (CLAN_NOMADE.md).
+              ["studio", "Studio d'animation", () => window.ouvrirStudioAnimation && window.ouvrirStudioAnimation()]
           ] }
     ];
     // LES PAGES DÉDIÉES : chaque fenêtre de sous-menu (index.html), son titre, sa
@@ -203,49 +202,10 @@
         try { rencontres = await window.RENCONTRES.lire(window.ID_PARTIE_COURANTE); } catch (e) { console.warn("Paramètres : les rencontres", e); rencontres = []; }
         if (vue === "rencontres" && actif()) montrer("rencontres");
     }
-    // (v434) LES CLANS : chacun peut être réinitialisé — son nom, la description de sa
-    // bannière et son fanion partent de la base et de Cloudinary ; à sa prochaine
-    // connexion, le joueur refonde son clan (grimoire_clans.js).
-    let clansListe = null, clanMessage = "";
-    function htmlClans() {
-        const lignes = clansListe === null ? `<p class="texte-parametres discret">Le livre cherche les clans…</p>`
-            : clansListe.length ? `<ul class="liste-clans-parametres">${clansListe.map(c => `<li class="clan-parametres" data-id="${echapper(c.id)}">
-                  ${c.URL_Banniere ? `<img class="fanion-parametres" src="${echapper(c.URL_Banniere)}" alt="" draggable="false">` : `<span class="fanion-parametres vide"></span>`}
-                  <span class="nom-clan-parametres"><b>Clan ${echapper(c.Nom_Clan)}</b><br><em>${echapper(c.ID_Joueur || c.id)}${c.URL_Banniere ? "" : " — fanion pas encore dessiné"}</em></span>
-                  <button type="button" class="lien-fiche reinitialiser-clan" data-action="param-clan-reset" data-id="${echapper(c.id)}">Réinitialiser</button></li>`).join("")}</ul>`
-            : `<p class="texte-parametres discret">Aucun clan n'a encore été fondé.</p>`;
-        return [
-            `<div class="contenu-page page-parametres-g">
-               <div class="sur-titre-parametres">L'atelier</div>
-               <div class="titre-page-fiche titre-parametres">Les clans</div>
-               ${FLEURON}
-               <p class="texte-parametres">Réinitialiser un clan efface son nom, la description de sa bannière et son fanion (de la base et de Cloudinary). À sa prochaine connexion, le joueur fondera son clan à nouveau.</p>
-               ${clanMessage ? `<p class="texte-parametres message-clans-parametres">${echapper(clanMessage)}</p>` : ""}
-               <button type="button" class="lien-fiche revenir-parametres" data-action="param-menu">← Retour aux paramètres</button>
-             </div>`,
-            `<div class="contenu-page page-parametres-d defile-fiche">${lignes}</div>`
-        ];
-    }
-    async function ouvrirClans() {
-        clansListe = null; clanMessage = "";
-        montrer("clans");
-        clansListe = window.CLANS_IVALIS ? await window.CLANS_IVALIS.listerClans() : [];
-        if (vue === "clans" && actif()) montrer("clans");
-    }
-    async function reinitialiserUnClan(id) {
-        const c = (clansListe || []).find(x => x.id === id);
-        if (!c || !window.CLANS_IVALIS) return;
-        if (!window.confirm(`Réinitialiser le clan « ${c.Nom_Clan} » ? Son nom, sa bannière et son fanion seront effacés.`)) return;
-        const ok = await window.CLANS_IVALIS.reinitialiserClan(id);
-        clanMessage = ok ? `Le clan « ${c.Nom_Clan} » est effacé : son joueur le refondera à sa prochaine connexion.` : "La réinitialisation n'a pas pu se faire.";
-        clansListe = await window.CLANS_IVALIS.listerClans();
-        if (vue === "clans" && actif()) montrer("clans");
-    }
     function html() {
         if (vue === "verrou") return htmlVerrou();
         if (vue === "menu") return htmlMenu();
         if (vue === "rencontres") return htmlRencontres();
-        if (vue === "clans") return htmlClans();
         return SOUS_PAGES[vue] ? htmlSousPage(vue) : htmlMenu();
     }
     // La double page vient d'être écrite (grimoire.js, remplirChapitre).
@@ -368,7 +328,6 @@
         if (vue === "verrou") return;                     // rien ne s'ouvre sans le mot de passe
         if (a === "param-menu") { son(); montrer("menu"); return; }
         if (a === "param-verrouiller") { son(); montrer("verrou"); return; }
-        if (a === "param-clan-reset") { son(); reinitialiserUnClan(cible.dataset.id); return; }
         if (a === "param-dev") {
             son();
             const oui = !modeDev();

@@ -13,7 +13,6 @@
 .fleuron-mission { align-self: center; width: 46%; height: auto; margin: calc(var(--u) * 1) 0 calc(var(--u) * 2.4); fill: none; stroke: #3a2210; stroke-width: 1.2; }
 .fleuron-mission circle { fill: #3a2210; }
 .aucune-mission { font-size: calc(var(--u) * 4.4); font-style: italic; color: #4a3018; margin: calc(var(--u) * 4) 0 calc(var(--u) * 1.5); }
-.aide-mission { font-size: calc(var(--u) * 3); color: #6b4a2b; }
 .page-mission-infos { font-size: calc(var(--u) * 3); line-height: 1.38; color: #2b1a0e; }
 .page-mission-infos p { margin: 0 0 calc(var(--u) * 1.2); text-align: justify; }
 .faits-mission-en-cours { margin: 0 0 calc(var(--u) * 1.4); display: grid; gap: calc(var(--u) * 0.5); }

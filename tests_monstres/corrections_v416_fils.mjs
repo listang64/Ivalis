@@ -274,7 +274,7 @@ await section(async () => {
   await G(() => window.grimoireAllerIndex());
   await pose();
   const e = await G(() => [...document.querySelectorAll(".entree-index")].map(x => x.textContent.replace(/\s+/g, " ").trim()));
-  verifier("(v418) I- Groupe … V- Le récit, et rien d'autre", e.join(" | ") === "I- Groupe | II- Carte du monde | III- Le village | IV- Les combats | V- Le récit", e.join(" | "));
+  verifier("(v418) I- Groupe … V- Le récit, et rien d'autre", e.join(" | ") === "I- Groupe | II- Carte du monde | III- Le camp | IV- Les combats | V- Le récit", e.join(" | "));
   verifier("pas d'entrée « Les fils invisibles »", !(await G(() => document.getElementById("grimoire-index-liens"))));
 });
 

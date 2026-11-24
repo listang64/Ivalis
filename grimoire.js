@@ -99,7 +99,8 @@
     // (v418) Nico : « à la place du bouton Aventuriers, un bouton Groupe » (grimoire_groupe.js) ;
     // les Aventuriers en deviennent les sous-pages.
     const ENTREES_INDEX = [
-        ["groupe", "Groupe"], ["carte", "Carte du monde"], ["village", "Le village"],
+        // (v477) Le clan nomade : « Le camp » remplace « Le village » (CLAN_NOMADE.md).
+        ["groupe", "Groupe"], ["carte", "Carte du monde"], ["camp", "Le camp"],
         ["combats", "Les combats"], ["recit", "Le récit"]
     ];
     const ROMAINS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
@@ -135,8 +136,6 @@
     let pagesFiches = [];
     // (v388) La double page des combats (grimoire_combats.js), après les Aventuriers.
     let pagesCombats = [];
-    // (v398) La double page du village, après les combats (juste avant le récit).
-    let pagesVillage = [];
     // (v414) La double page des fils invisibles (grimoire_liens.js), juste après les Aventuriers.
     // (v416) Nico : « vire les fils invisibles du sommaire et mets-les dans les paramètres » :
     // elle n'est dans le livre que le temps qu'on la lit (ouverte des Paramètres ou du
@@ -144,11 +143,8 @@
     let pagesLiens = [];
     // (v418) La double page du Groupe (grimoire_groupe.js), juste avant les Aventuriers (ses sous-pages).
     let pagesGroupe = [];
-    // (v433) La double page du Hall de guilde (grimoire_guilde.js), juste après le village :
-    // comme les fils invisibles, elle n'est dans le livre que le temps qu'on la lit.
-    let pagesGuilde = [];
     let pagesMission = [];      // (v444) la double page « Mission en cours » (grimoire_mission.js), le temps qu'on la lit
-    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesGroupe.length + pagesFiches.length + pagesLiens.length + pagesCombats.length + pagesVillage.length + pagesGuilde.length + pagesMission.length : 0);
+    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesGroupe.length + pagesFiches.length + pagesLiens.length + pagesCombats.length + pagesMission.length : 0);
     // LA CARTE DU MONDE (v302) : sa double page vient juste après l'index (5-6),
     // en partie seulement ; la suite (le récit) commence alors à la page 7.
     // Nico : « page de gauche cette partie de la map, page de droite celle-là ;
@@ -162,15 +158,6 @@
     const reduite = (url, l) => /\/upload\/[a-z]_/.test(url) ? url : url.replace("/upload/", `/upload/w_${l},c_limit,q_auto,f_auto/`);
     const IMAGES_CARTE_PAGES = { gauche: reduite(IMAGES_CARTE.gauche, 1600), droite: reduite(IMAGES_CARTE.droite, 1600) };
     let pagesCarte = [];
-    // LE VILLAGE (v398). Nico : « mets cette image sur une nouvelle double page, quand
-    // on clique sur le village du sommaire ; en gros, sur les deux pages ». Un dessin
-    // à fond transparent (1672 × 941) posé à même le papier, à cheval sur la reliure :
-    // la moitié gauche sur la page de gauche, l'autre sur celle de droite.
-    // (v399) Nico : « change l'image du village par celle-là plutôt » (même taille, même fond transparent).
-    // (v432) Nico : « remplace l'image du village par celle-ci ».
-    const IMAGE_VILLAGE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794984079/IMG_2275_ncxeo8.png";
-    const IMAGE_VILLAGE_PAGES = reduite(IMAGE_VILLAGE, 1600);
-    const ASPECT_VILLAGE = 1672 / 941;
     const pages = {};
 
     // ---------------------------------------------------------------------
@@ -290,7 +277,7 @@
         fiches: { couleurs: ["#b3261e", "#c8402f", "#8f1d15"], opacite: 0.3, nom: "index-fiches" },
         groupe: { couleurs: ["#b3261e", "#c8402f", "#8f1d15"], opacite: 0.3, nom: "index-groupe" },
         carte: { couleurs: ["#5f86b0", "#7fa2c4", "#4a6f98"], opacite: 0.3, nom: "index-carte" },
-        village: { couleurs: ["#6fa64f", "#8dbb6a", "#567f3c"], opacite: 0.3, nom: "index-village" },
+        camp: { couleurs: ["#6fa64f", "#8dbb6a", "#567f3c"], opacite: 0.3, nom: "index-camp" },
         combats: { couleurs: ["#9b2c22", "#7a1d14", "#c0503a"], opacite: 0.32, nom: "index-combats" },
         recit: { couleurs: ["#8a5fb0", "#a37cc4", "#6d4890"], opacite: 0.26, nom: "index-recit" },
         titre: { couleurs: ["#d9a93a", "#e8c25a", "#b8862a"], opacite: 0.46, nom: "index-titre" }
@@ -395,41 +382,6 @@
         el.className = `page-grimoire page-papier ${cote} page-carte`;
         el.id = "grimoire-carte-" + cote;
         el.innerHTML = `<div class="contenu-carte"><img class="image-carte" src="${IMAGES_CARTE_PAGES[cote]}" alt="La carte du monde" draggable="false"></div>`;
-        return el;
-    }
-
-    // Le village sur la double page, « contenu » dans la place des deux pages (en
-    // largeurs de page : une page fait 1 de large, 984/757 de haut), centré, une
-    // petite marge autour ; chaque page en montre sa moitié.
-    function boiteVillage(cote) {
-        const H = 984 / 757, mx = 0.05, my = 0.06;
-        const L = 2 - 2 * mx, P = H * (1 - 2 * my);
-        let w = L, h = L / ASPECT_VILLAGE;
-        if (h > P) { h = P; w = P * ASPECT_VILLAGE; }
-        const x0 = (2 - w) / 2, y0 = (H - h) / 2;
-        return `left:${((cote === "gauche" ? x0 : x0 - 1) * 100).toFixed(3)}%;top:${(y0 / H * 100).toFixed(3)}%;width:${(w * 100).toFixed(3)}%;height:${(h / H * 100).toFixed(3)}%`;
-    }
-    // (v433) LES LIEUX DU VILLAGE. Nico : « un bouton pour le Hall de guilde au centre de la
-    // map village : on garde la même image, une boîte cliquable sur le bâtiment, et en dessous
-    // son nom sur un petit parchemin déplié ; les nouveaux lieux du village garderont ce même
-    // type de nom sur parchemin ». En parts de l'image (x, y : le coin haut gauche de la boîte ;
-    // l, h : sa taille ; le parchemin centré sous elle). Le Hall est sur le pli : chaque page
-    // en porte sa moitié, comme l'image.
-    const LIEUX_VILLAGE = [
-        { id: "hall", nom: "Hall de guilde", x: 0.452, y: 0.385, l: 0.093, h: 0.135 }
-    ];
-    function lieuxDuVillage() {
-        const pct = (v) => (v * 100).toFixed(3) + "%";
-        return LIEUX_VILLAGE.map(o => `<button type="button" class="lieu-village" id="lieu-village-${o.id}" data-action="guilde" data-gu="${o.id}"
-                    style="left:${pct(o.x)};top:${pct(o.y)};width:${pct(o.l)};height:${pct(o.h)}" aria-label="${echapper(o.nom)}"></button>
-                  <span class="parchemin-lieu-village" style="left:${pct(o.x + o.l / 2)};top:${pct(o.y + o.h + 0.006)}" aria-hidden="true"><span>${echapper(o.nom)}</span></span>`).join("");
-    }
-    function pageVillage(cote) {
-        const el = document.createElement("div");
-        el.className = `page-grimoire page-papier ${cote} page-village`;
-        el.id = "grimoire-village-" + cote;
-        el.innerHTML = `<div class="contenu-village"><div class="calque-village" style="${boiteVillage(cote)}">`
-            + `<img class="image-village" src="${IMAGE_VILLAGE_PAGES}" alt="${cote === "gauche" ? "Le village" : ""}" draggable="false">${lieuxDuVillage()}</div></div>`;
         return el;
     }
 
@@ -655,7 +607,6 @@
         feuillets = Array.from({ length: NB_FEUILLETS }, (_, i) => pageManuscrite(i));
         listeActuelle = [pages[0], pages[1], pages[2], pages[3], pages[4], ...vierges, dos];
         pagesCarte = [pageCarte("gauche"), pageCarte("droite")];
-        pagesVillage = [pageVillage("gauche"), pageVillage("droite")];
         pages[1].innerHTML = pageTitre();
         // (v395) Nico : « les réglages du son, enlève-les des paramètres et mets-les en dessous
         // du titre de la première page » : les mêmes curseurs (index.html, app.js), déplacés.
@@ -1118,7 +1069,7 @@
     function definirSuite(elements) {
         suite = (elements || []).slice();
         if (!pageFlip) return;
-        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesGroupe, ...pagesFiches, ...pagesLiens, ...pagesCombats, ...pagesVillage, ...pagesGuilde, ...pagesMission] : []), ...suite, ...vierges, dos];
+        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesGroupe, ...pagesFiches, ...pagesLiens, ...pagesCombats, ...pagesMission] : []), ...suite, ...vierges, dos];
         const generation = ++definirSuite.generation;      // seule la dernière demande s'applique
         const appliquer = () => {
             if (generation !== definirSuite.generation) return;
@@ -1315,11 +1266,8 @@
     // autres ouvrent encore l'ancienne fenêtre, par-dessus le livre ; la
     // carte et le village viendront.
     function allerALaCarte() { if (enPartie) allerALaPage(PAGE_CARTE); }
-    // (v398) Le village : sa double page.
-    function allerAuVillage() { const i = listeActuelle.indexOf(pagesVillage[0]); if (enPartie && i > 0) allerALaPage(i); }
     const OUVRIR_INDEX = {
         carte: () => allerALaCarte(),
-        village: () => allerAuVillage(),
         // v313 : le sommaire des chapitres du récit (le marque-page plume, lui, mène à la page à lire).
         recit: () => window.GRIMOIRE_RECIT && (window.GRIMOIRE_RECIT.allerAuSommaireDuRecit || window.GRIMOIRE_RECIT.allerAuRecit)(),
         // v313 : les Aventuriers sont dans le livre (grimoire_fiches.js).
@@ -1330,7 +1278,8 @@
         combats: () => (window.GRIMOIRE_COMBATS && window.GRIMOIRE_COMBATS.ouvrir()) || (window.ouvrirPopupRencontre && window.ouvrirPopupRencontre()),
         parametres: () => window.ouvrirParametres && window.ouvrirParametres()
     };
-    const BIENTOT = {};                     // (v398 : le village a sa double page)
+    // (v477) Le camp arrive à l'étape 3 du clan nomade (CLAN_NOMADE.md).
+    const BIENTOT = { camp: "Le camp se prépare : il arrive bientôt." };
     function choisirIndex(id) {
         if (!enPartie) return;
         if (BIENTOT[id]) {
@@ -1378,8 +1327,6 @@
         if (action === "combats") { if (window.GRIMOIRE_COMBATS) window.GRIMOIRE_COMBATS.agir(cible); return; }
         if (action === "liens") { if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.agir(cible); return; }
         if (action === "groupe") { if (window.GRIMOIRE_GROUPE) window.GRIMOIRE_GROUPE.agir(cible); return; }
-        // (v433) Le Hall de guilde (le bâtiment du village, sa double page : grimoire_guilde.js).
-        if (action === "guilde") { if (window.GRIMOIRE_GUILDE) window.GRIMOIRE_GUILDE.agir(cible); return; }
         // (v444) Le marque-page de la mission : la double page « Mission en cours ».
         if (action === "marque-mission") { if (window.GRIMOIRE_MISSION) window.GRIMOIRE_MISSION.ouvrir(); return; }
         // (v312) Le marque-page du menu : la page principale (le journal), en partie ou non.
@@ -1513,13 +1460,8 @@
         // (v418) la double page du Groupe
         definirGroupe: (els) => { pagesGroupe = (els || []).slice(); if (enPartie) definirSuite(suite); },
         pagesGroupe: () => pagesGroupe.slice(),
-        // (v433) la double page du Hall de guilde
-        definirGuilde: (els) => { pagesGuilde = (els || []).slice(); if (enPartie) definirSuite(suite); },
-        pagesGuilde: () => pagesGuilde.slice(),
         definirMission: (els) => { pagesMission = (els || []).slice(); if (enPartie) definirSuite(suite); },
         pagesMission: () => pagesMission.slice(),
-        // (v398) la double page du village
-        pagesVillage: () => pagesVillage.slice(), allerAuVillage, IMAGE_VILLAGE,
         // (v395) les Paramètres du livre (grimoire_parametres.js) : le chapitre des pages 3-4
         chapitre: () => chapitre, remplirChapitre, pageChapitre: (i) => pages[i],
         ouvrirChapitre: (nom) => { remplirChapitre(nom); partieChoisie = null; if (pageFlip) allerALaPage(3); },

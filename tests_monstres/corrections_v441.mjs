@@ -289,9 +289,6 @@ const ici = () => G(() => window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex());
 
 
 
-const surVillage = () => G(() => { const [g] = window.GRIMOIRE.pagesVillage(); const i = window.GRIMOIRE.indexDe(g), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1); });
-const surHall = () => G(() => window.GRIMOIRE_GUILDE.vue() === "hall" && window.GRIMOIRE_GUILDE.ouverte());
-const surPiece = (id) => G((id) => { const [g] = window.GRIMOIRE_GUILDE.pagesPiece(); if (!g) return false; const i = window.GRIMOIRE.indexDe(g), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1) && window.GRIMOIRE_GUILDE.piece() === id; }, id);
 const surClan = (n) => G((n) => { const c = window.GRIMOIRE_FICHES.pages().clans; const i = window.GRIMOIRE.indexDe(c[2 * n]), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1); }, n);
 const tournerEnArriere = async () => { await G(() => window.GRIMOIRE_PAGEFLIP.flipPrev("top")); await p.waitForTimeout(200); await pose(); };
 
@@ -337,10 +334,11 @@ await G((e) => { window.__docs["Monde_Lieux/L_ERALDUR"] = e;
   window.__surPartie = (d) => { try { window.PARTIE_DATA = d; window.appliquerVoyageDeLaPartie(d); } catch (err) { console.log("surPartie", err.message); } };
   window.__surPartie(window.__docs["Systeme_Parties/P1"]);
   window.__tours = 0; window.declencherTourIA = async () => { window.__tours++; };
-  window.__village = 0; const vrai = window.GRIMOIRE.allerAuVillage; window.GRIMOIRE.allerAuVillage = () => { window.__village++; vrai(); };
+  // (v477) Plus de page du village (CLAN_NOMADE.md) : Eraldur n'est plus qu'un village comme les autres.
+  window.__village = 0;
 }, ERALDUR);
-const ou = () => G(() => { const g = window.GRIMOIRE, ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), P = window.__docs["Systeme_Parties/P1"], v = g.indexDe(g.pagesVillage()[0]);
-  return { ici, surVillage: ici === v || ici === v + 1, surRecit: ici >= g.premiereDeLaSuite(), tours: window.__tours, village: window.__village, voyage: (P.Voyage_Groupe || {}).Etat || null, lieu: P.Lieu_Actuel || "", fin: !!P.Voyage_Termine }; });
+const ou = () => G(() => { const g = window.GRIMOIRE, ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), P = window.__docs["Systeme_Parties/P1"];
+  return { ici, surVillage: typeof g.pagesVillage === "function", surRecit: ici >= g.premiereDeLaSuite(), tours: window.__tours, village: window.__village, voyage: (P.Voyage_Groupe || {}).Etat || null, lieu: P.Lieu_Actuel || "", fin: !!P.Voyage_Termine }; });
 const toucherEraldur = async () => { const c = await G(() => { const e = [...document.querySelectorAll('.village-region[data-id="L_ERALDUR"]')].find(x => x.getBoundingClientRect().width > 0); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
   if (!c) return false; await p.mouse.move(c.x, c.y); await p.mouse.down(); await p.mouse.up(); await p.waitForTimeout(400); return true; };
 const surLaRegion = async () => { await G(() => window.GRIMOIRE_REGIONS.ouvrir(5));
@@ -390,12 +388,12 @@ await section(async () => {
   verifier("…et le livre est sur le récit, pas sur la page du village", e.surRecit && !e.surVillage && e.village === 0, JSON.stringify(e));
 });
 
-titre("4. UNE FOIS À ERALDUR : SA CARTE MÈNE À « LE VILLAGE »");
+titre("4. (v477) UNE FOIS À ERALDUR : PLUS DE PAGE DU VILLAGE (LE CLAN NOMADE)");
 await section(async () => {
   await surLaRegion();
   await toucherEraldur(); await p.waitForTimeout(1500); await pose();
   const e = await ou();
-  verifier("le groupe y est, sans voyage : un toucher sur Eraldur ouvre la double page du village", e.village === 1 && e.surVillage, JSON.stringify(e));
+  verifier("le groupe y est : un toucher sur le village n'ouvre plus de page du village (elle n'existe plus)", e.village === 0 && !e.surVillage, JSON.stringify(e));
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

@@ -298,7 +298,7 @@ await section(async () => {
   await G(() => window.grimoireAllerIndex());
   await pose();
   const e = await G(() => [...document.querySelectorAll(".entree-index")].map(x => x.textContent.replace(/\s+/g, " ").trim()));
-  verifier("I- Groupe … V- Le récit", e.join(" | ") === "I- Groupe | II- Carte du monde | III- Le village | IV- Les combats | V- Le récit", e.join(" | "));
+  verifier("I- Groupe … V- Le récit", e.join(" | ") === "I- Groupe | II- Carte du monde | III- Le camp | IV- Les combats | V- Le récit", e.join(" | "));
   verifier("plus d'entrée « Aventuriers » au sommaire", !(await G(() => document.getElementById("grimoire-index-fiches"))));
   await cap("v418-sommaire");
 });

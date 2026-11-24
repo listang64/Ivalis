@@ -1739,7 +1739,7 @@ window.RESISTANCES_SELON_NIVEAU = [
 ];
 window.nbResistancesCreature = function(palier, options) {
     const o = options || {};
-    // (v443) au lieu d'une mission de guilde, le niveau des créatures (monstres.js : C −2, A +2)
+    // (v443) le niveau des créatures (monstres.js, niveauDesCreatures)
     const niveau = Math.max(1, Math.round(Number(o.niveau !== undefined ? o.niveau : (typeof window.niveauDesCreatures === "function" ? window.niveauDesCreatures() : window.NIVEAU_GROUPE)) || 1));
     const tranche = window.RESISTANCES_SELON_NIVEAU.find(t => niveau <= t.jusqua);
     const p = String(palier || "").trim();

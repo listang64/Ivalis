@@ -27,22 +27,9 @@
 .page-fiches .page-liste-clan { align-items: center; padding-top: calc(var(--u) * 11) !important; }
 .titre-clan { font-size: calc(var(--u) * 8.4 * var(--echelle-titres, 1)); color: #24150a; text-align: center; line-height: 1.1; }
 .fleuron-clan { width: 46%; height: auto; margin: calc(var(--u) * 1) 0 calc(var(--u) * 3); }
-/* (v433) LE LIVRE DES CLANS : à droite, la bannière du clan (vide en attendant l'IA) et,
-   dessous, son nom en gros titre. */
-/* (v434) Le fanion, en grand, collé en haut de la page ; le nom du clan dessous.
-   (v435) « Fais-la descendre encore un peu plus sur sa page » : environ 74 % de la page (67 % avant). */
-.page-fiches .page-banniere-du-clan { align-items: center; justify-content: flex-start; padding-top: 0 !important; padding-bottom: calc(var(--u) * 3) !important; }
-.cadre-banniere-clan { position: relative; width: 80%; height: 76%; flex: none; min-height: 0; display: flex; align-items: flex-start; justify-content: center; }
-/* (v449) « Sous l'image des bannières, un effet d'ombrage sympa » : le fanion décolle un peu de la page
-   (son ombre portée, plus large et douce, tombe en bas à droite) et, sous sa pointe, une flaque d'ombre
-   ovale. (v450) « Enlève le halo doré, garde juste l'ombre portée. » */
-.cadre-banniere-clan img { position: relative; z-index: 1; max-width: 100%; height: 100%; object-fit: contain; object-position: center top; -webkit-user-drag: none; user-select: none;
-  filter: drop-shadow(calc(var(--u) * 0.8) calc(var(--u) * 1.6) calc(var(--u) * 0.9) rgba(0, 0, 0, 0.8))
-          drop-shadow(calc(var(--u) * 2.2) calc(var(--u) * 4.5) calc(var(--u) * 3) rgba(0, 0, 0, 0.6)); }
-/* Sous sa pointe, la flaque d'ombre. */
-.cadre-banniere-clan:not(.vide)::after { content: ""; position: absolute; left: 6%; right: 6%; top: calc(100% - var(--u) * 2); height: calc(var(--u) * 7); pointer-events: none;
-  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.6) 35%, rgba(0, 0, 0, 0) 70%); filter: blur(calc(var(--u) * 0.6)); }
-.cadre-banniere-clan.vide { width: 56%; height: 68%; border: calc(var(--u) * 0.35) dashed rgba(58, 34, 16, 0.22); border-top: 0; border-radius: 0 0 calc(var(--u) * 2) calc(var(--u) * 2); }
+/* (v433) LE LIVRE DES CLANS — (v477) plus de fanion : la page de droite porte seulement le nom du
+   joueur, au milieu de la page (CLAN_NOMADE.md, étape 1). */
+.page-fiches .page-banniere-du-clan { align-items: center; justify-content: center; }
 .nom-clan { margin-top: calc(var(--u) * 3); font-size: calc(var(--u) * 10 * var(--echelle-titres, 1)); color: #24150a; text-align: center; line-height: 1.05; }
 .page-fiches .fleuron path { fill: none; stroke: #2b1a0e; stroke-width: 1.4; }
 .page-fiches .fleuron circle { fill: #2b1a0e; }
@@ -514,7 +501,6 @@
   background: linear-gradient(180deg, #fff3b8 0%, #f0cf63 38%, #c8952c 62%, #8a5d12 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
   filter: drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.15) rgba(0, 0, 0, 0.95)) drop-shadow(0 calc(var(--u) * 0.8) calc(var(--u) * 1.2) rgba(0, 0, 0, 0.7)); }
-/* Sur le fond sombre, le fleuron sous le nom et la place vide du fanion passent à l'or. */
+/* Sur le fond sombre, le fleuron sous le nom passe à l'or. */
 .page-banniere-du-clan .fleuron path { stroke: #d9b45a; }
 .page-banniere-du-clan .fleuron circle { fill: #d9b45a; }
-.page-banniere-du-clan .cadre-banniere-clan.vide { border-color: rgba(217, 180, 90, 0.45); }

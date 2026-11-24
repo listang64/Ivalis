@@ -293,9 +293,6 @@ const ici = () => G(() => window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex());
 
 
 
-const surVillage = () => G(() => { const [g] = window.GRIMOIRE.pagesVillage(); const i = window.GRIMOIRE.indexDe(g), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1); });
-const surHall = () => G(() => window.GRIMOIRE_GUILDE.vue() === "hall" && window.GRIMOIRE_GUILDE.ouverte());
-const surPiece = (id) => G((id) => { const [g] = window.GRIMOIRE_GUILDE.pagesPiece(); if (!g) return false; const i = window.GRIMOIRE.indexDe(g), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1) && window.GRIMOIRE_GUILDE.piece() === id; }, id);
 const surClan = (n) => G((n) => { const c = window.GRIMOIRE_FICHES.pages().clans; const i = window.GRIMOIRE.indexDe(c[2 * n]), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1); }, n);
 const tournerEnArriere = async () => { await G(() => window.GRIMOIRE_PAGEFLIP.flipPrev("top")); await p.waitForTimeout(200); await pose(); };
 
@@ -363,7 +360,6 @@ await G((E) => {
   window.DATE_EN_JEU_ACTUELLE = { jour: "12", annee: "3" };
   window.NIVEAU_GROUPE = 3;
 }, ENCARTS);
-const tableau = () => G(() => window.__docs["Systeme_Parties/P1/Guilde/Tableau"] || null);
 
 
 const MIS = (f, a) => G(f, a);
@@ -380,16 +376,16 @@ const postit = () => G(() => { const el = document.getElementById("postit-missio
 
 
 const surMission = () => G(() => window.GRIMOIRE_MISSION.ouverte());
-const accepter = async (slot) => { const m = (await tableau()).Missions[slot];
-  await enJoueur("J1"); await G(([s, m]) => window.MISSIONS_GUILDE.voterMission(s, m, "oui"), [slot, m]);
-  await enJoueur("J2"); await G(([s, m]) => window.MISSIONS_GUILDE.voterMission(s, m, "oui"), [slot, m]);
-  await enJoueur("J1"); await G(() => window.__surPartie(window.__docs["Systeme_Parties/P1"]));
+// (v477) Plus de tableau ni de vote (CLAN_NOMADE.md, étape 1) : le créateur d'une mission la donne,
+// lancerMission en fait la mission en cours.
+const accepter = async (slot) => { const m = (await G((n) => window.MISSIONS_GUILDE.genererMissions(Array(n).fill("normale")), slot + 1))[slot];
+  await enJoueur("J1"); await G((m) => window.MISSIONS_GUILDE.lancerMission(m), m);
+  await G(() => window.__surPartie(window.__docs["Systeme_Parties/P1"]));
   await attendreQue(async () => { const md = await missionDoc(); return md && md.Plan; }, 8000); return m; };
 const gauche = () => texte("#grimoire-mission-g"), droite = () => G(() => { const t = document.querySelector("#grimoire-mission-d .notes-mission"); return t ? { titre: document.querySelector("#grimoire-mission-d .titre-notes-mission").textContent, valeur: t.value, invite: t.placeholder, eteint: t.disabled } : null; });
 
 titre("1. LE MARQUE-PAGE DE LA MISSION : UN RUBAN DE TISSU, UN PARCHEMIN ROULÉ, À CÔTÉ DES AUTRES");
 await section(async () => {
-  verifier("le tableau se remplit", await attendreQue(async () => { const t = await tableau(); return t && Array.isArray(t.Missions) && t.Missions.length === 6; }, 12000));
   const r = await G(() => { const m = document.getElementById("grimoire-marque-mission"), p = document.getElementById("grimoire-marque-recit"); if (!m) return null;
     const a = m.getBoundingClientRect(), b = p.getBoundingClientRect(), cs = getComputedStyle(m);
     return { inactif: m.classList.contains("inactif"), tissu: cs.getPropertyValue("--tissu").trim(), rouleau: !!m.querySelector("svg.dessin-rouleau"), aDroite: a.left > b.right - 4 && a.left - b.right < 60, haut: Math.abs(a.top - b.top) < 40 }; });
@@ -556,19 +552,14 @@ await section(async () => {
   verifier("(v458) …le sceau et la page en lecture restent (jusqu'à la mission suivante)", sceauToujours);
 });
 
-titre("8. (v448) EN MODE DEV : FORCER LE VOTE DE LA MISSION, SUR SA FEUILLE");
+titre("8. (v477) UNE AUTRE MISSION LANCÉE : LA MISSION ACCOMPLIE S'EFFACE");
 await section(async () => {
-  await G(() => { localStorage.setItem("ivalis_DEV_MODE", "off"); window.MISSIONS_GUILDE.ouvrirFeuille(2); }); await p.waitForTimeout(600);
-  verifier("hors DEV : pas de bouton pour forcer", await G(() => !document.querySelector("#feuille-mission .forcer-mission")));
-  await G(() => { window.MISSIONS_GUILDE.fermerFeuille(); localStorage.setItem("ivalis_DEV_MODE", "on"); window.MISSIONS_GUILDE.ouvrirFeuille(2); }); await p.waitForTimeout(600);
-  verifier("en DEV : « Forcer le vote (DEV) » sur la feuille", await G(() => /Forcer le vote/.test((document.querySelector("#feuille-mission .forcer-mission") || {}).textContent || "")));
-  const m2 = (await tableau()).Missions[2];
-  await cliquer("#feuille-mission .forcer-mission"); await p.waitForTimeout(800);
+  const m2 = (await G(() => window.MISSIONS_GUILDE.genererMissions(["normale", "normale", "normale"])))[2];
+  await G((m) => window.MISSIONS_GUILDE.lancerMission(m), m2);
   await G(() => window.__surPartie(window.__docs["Systeme_Parties/P1"]));
   const pd = await partieDoc();
-  verifier("un toucher : tous les votants d'accord, la mission acceptée, la feuille fermée", pd.Mission_En_Cours && pd.Mission_En_Cours.Id === m2.Id && !pd.Vote_Mission && !(await G(() => document.getElementById("feuille-mission").classList.contains("ouverte"))), JSON.stringify(pd.Mission_En_Cours));
+  verifier("la nouvelle mission en cours", pd.Mission_En_Cours && pd.Mission_En_Cours.Id === m2.Id, JSON.stringify(pd.Mission_En_Cours));
   verifier("(v457) une autre mission choisie : la mission accomplie s'efface (son sceau, sa page en lecture)", !pd.Mission_Accomplie && !(await G(() => window.MISSIONS_GUILDE.missionAccomplie())), JSON.stringify(pd.Mission_Accomplie));
-  await G(() => localStorage.setItem("ivalis_DEV_MODE", "off"));
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

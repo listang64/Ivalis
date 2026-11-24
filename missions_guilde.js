@@ -1,6 +1,12 @@
 // =========================================================================
-//  IVALIS — LES MISSIONS DE GUILDE : LE TABLEAU (v442)
+//  IVALIS — LES MISSIONS (v442) — (v477) LE CRÉATEUR D'UNE MISSION ET LA MISSION EN COURS
 // =========================================================================
+//  (v477) LE CLAN NOMADE (CLAN_NOMADE.md, étape 1) : le Hall de guilde et son tableau des
+//  missions disparaissent — plus de six missions renouvelées tous les 30 jours, plus de feuilles,
+//  plus de vote d'acceptation, plus de décalage du niveau des créatures. Restent le créateur d'une
+//  mission (MIA_MISSIONS, genererMission), son lancement (lancerMission : son lieu, son plan caché,
+//  MIA_PLAN_MISSION), son suivi par le narrateur et sa fin : ils serviront aux tâches (étape 10).
+//  Ce qui suit est l'histoire du tableau, gardée pour comprendre les champs de la base.
 //  Nico : « nous allons pouvoir commencer la création de missions de guilde.
 //  (v452 : plus de rangs — des missions normales ou difficiles, voir DIFFICULTES.)
 //  Trois niveaux de difficulté : Rang C (le plus faible, des missions facilement
@@ -31,9 +37,6 @@ import { doc, getDoc, getDocs, collection, onSnapshot, runTransaction, setDoc, d
 
 const echapper = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const son = (id) => { try { if (typeof window.jouerSonEvenement === "function") window.jouerSonEvenement(id); } catch (e) {} };
-export const NB_MISSIONS = 6;
-export const DUREE_JOURS = 30;
-const VERROU_MS = 3 * 60 * 1000;
 // (v452) Nico : « pour le panneau des missions, on enlève les Rang A, B et C. Sur le panneau, des missions
 // normales ou difficiles (deux au plus). Les niveaux des monstres par rapport au niveau du groupe :
 // normale −1 / 0 / +1, difficile +2 / +3 / +4 — tirés au hasard pour chaque mission ; les joueurs ne
@@ -44,20 +47,10 @@ export const DIFFICULTES = {
     normale: { nom: "normale", consigne: "des missions à la portée du groupe (escorter et protéger un PNJ, enquêter sur une disparition, retrouver un objet, chasser des bêtes, porter un message dangereux, démêler une petite intrigue…). Des combats mesurés, des adversaires à sa taille." },
     difficile: { nom: "difficile", consigne: "des missions dures, tant par leurs tâches que par leurs adversaires (un monstre redoutable, une bande organisée, une conspiration puissante, une expédition au cœur d'un lieu maudit). Des combats très dangereux, des choix lourds." }
 };
-export const DECALAGES = { normale: [-1, 0, 1], difficile: [2, 3, 4] };
-export const MAX_DIFFICILES = 2;
 export const IMAGE_SCEAU_DIFFICILE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1795128379/IMG_2294_ghiayl.png";
 // La difficulté d'une mission ; une mission d'avant v452 (un rang) : C normale, B et A difficiles.
 export const difficulteDe = (m) => (m && (m.Difficulte === "difficile" || m.Difficulte === "normale") ? m.Difficulte : (m && m.Rang && m.Rang !== "C" ? "difficile" : "normale"));
-// Son décalage (caché) ; sans décalage écrit (une mission d'avant v452), un des trois de sa difficulté,
-// toujours le même pour elle (tiré de son identifiant).
-export function decalageDe(m) {
-    if (m && Number.isFinite(Number(m.Decalage)) && m.Decalage !== null && m.Decalage !== "") return Number(m.Decalage);
-    const choix = DECALAGES[difficulteDe(m)];
-    const h = String((m && m.Id) || "").split("").reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
-    return choix[h % choix.length];
-}
-// Six écritures à la main, une par encart (index.html : Google Fonts).
+// Les écritures à la main du mot du commanditaire (index.html : Google Fonts).
 export const ECRITURES = ["Caveat", "Dancing Script", "Kalam", "Homemade Apple", "Indie Flower", "Satisfy"];
 
 // ---------------------------------------------------------------------
@@ -69,16 +62,6 @@ export const jourAbsolu = (d) => {
     return (Number.isFinite(a) ? a : 0) * 365 + (Number.isFinite(j) ? j : 0);
 };
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
-const refTableau = (id) => doc(db, "Systeme_Parties", id, "Guilde", "Tableau");
-
-// (v452) Les difficultés des six encarts : de 0 à 2 difficiles (au hasard), les autres normales, mêlées.
-export function tirerDifficultes(alea = Math.random) {
-    const nbDifficiles = Math.min(MAX_DIFFICILES, Math.floor(alea() * (MAX_DIFFICILES + 1)));
-    const liste = [...Array(nbDifficiles).fill("difficile"), ...Array(NB_MISSIONS - nbDifficiles).fill("normale")];
-    for (let i = liste.length - 1; i > 0; i--) { const k = Math.floor(alea() * (i + 1)); [liste[i], liste[k]] = [liste[k], liste[i]]; }
-    return liste;
-}
-export const tirerDecalage = (difficulte, alea = Math.random) => { const c = DECALAGES[difficulte] || DECALAGES.normale; return c[Math.min(c.length - 1, Math.floor(alea() * c.length))]; };
 
 // ---------------------------------------------------------------------
 //  LE GÉNÉRATEUR (MIA_MISSIONS)
@@ -94,12 +77,12 @@ function regionsConnues() {
 }
 function lieuxConnus() {
     return Object.values(window.VILLAGES_REGIONAUX || {}).filter(v => v && v.id && v.nom)
-        .map(v => ({ id: v.id, nom: v.nom, type: v.type || "Lieu", region: v.numero, hub: !!v.hub })).slice(0, 80);
+        .map(v => ({ id: v.id, nom: v.nom, type: v.type || "Lieu", region: v.numero })).slice(0, 80);
 }
 export function promptMissions(difficultes, contexte) {
     const regions = contexte.regions.map(r => `- Région ${r.numero} « ${r.nom} » : ${r.texte || "(pas de description)"}`).join("\n");
-    const lieux = contexte.lieux.length ? contexte.lieux.map(l => `- ${l.id} : ${l.nom} (${l.type}, région ${l.region})${l.hub ? " — Eraldur, le village de la guilde : pas de mission dedans" : ""}`).join("\n") : "(aucun lieu connu pour l'instant)";
-    return `Tu es MIA_MISSIONS, le scribe de la guilde d'Ivalis : tu rédiges les missions affichées sur le panneau des missions du Hall de guilde d'Eraldur.
+    const lieux = contexte.lieux.length ? contexte.lieux.map(l => `- ${l.id} : ${l.nom} (${l.type}, région ${l.region})`).join("\n") : "(aucun lieu connu pour l'instant)";
+    return `Tu es MIA_MISSIONS, le scribe d'Ivalis : tu rédiges les missions qu'un clan nomade d'aventuriers peut entendre et accepter.
 Le monde : Ivalis, un monde antique fantastique (mythologie, Antiquité magique). Rien d'anachronique, rien de farfelu ; pas de technologie moderne.
 
 LA DIFFICULTÉ :
@@ -125,7 +108,7 @@ Réponds UNIQUEMENT par un tableau JSON de ${difficultes.length} objets, chacun 
   "commanditaire": "qui confie la mission (nom et qualité)",
   "details": "le détail de la mission, ce que l'on sait (3 à 5 phrases)",
   "objectif": "l'objectif de la mission, clair et vérifiable (1 phrase)",
-  "lettre": "le mot laissé par le commanditaire à la guilde, écrit à la première personne, avec sa voix (3 à 6 phrases)",
+  "lettre": "le mot laissé par le commanditaire aux aventuriers, écrit à la première personne, avec sa voix (3 à 6 phrases)",
   "lieu": { "id_existant": "l'identifiant d'un lieu de la liste, ou null", "nom": "le nom du lieu de la mission", "type": "son type (ruine, grotte, camp, village, sanctuaire…)", "description": "à quoi il ressemble (2 phrases)" }
 }`;
 }
@@ -136,11 +119,11 @@ function nettoyerMission(m, difficulte, i, contexte, ecriture) {
     let region = Number(m && m.region);
     if (!regions.has(region)) region = contexte.regions.length ? contexte.regions[i % contexte.regions.length].numero : 1;
     const l = (m && m.lieu) || {};
-    const existant = l.id_existant && lieux.get(String(l.id_existant)) && !lieux.get(String(l.id_existant)).hub ? lieux.get(String(l.id_existant)) : null;
+    const existant = l.id_existant && lieux.get(String(l.id_existant)) ? lieux.get(String(l.id_existant)) : null;
     if (existant) region = existant.region;
     return {
         Id: `M_${Date.now().toString(36)}_${i}_${Math.floor(Math.random() * 1e5).toString(36)}`,
-        Difficulte: difficulte, Decalage: tirerDecalage(difficulte), Titre: texte(m && m.titre, 80) || "Une mission", Resume: texte(m && m.resume, 200),
+        Difficulte: difficulte, Titre: texte(m && m.titre, 80) || "Une mission", Resume: texte(m && m.resume, 200),
         Region: region, Region_Nom: regions.get(region) || `Région ${region}`,
         Commanditaire: texte(m && m.commanditaire, 120), Details: texte(m && m.details, 1200), Objectif: texte(m && m.objectif, 300),
         Lettre: String((m && m.lettre) || "").trim().slice(0, 1500),
@@ -149,13 +132,13 @@ function nettoyerMission(m, difficulte, i, contexte, ecriture) {
         Ecriture: ecriture
     };
 }
-export async function genererMissions() {
+// (v477) `difficultes` : la difficulté de chaque mission voulue, dans l'ordre (« normale », « difficile »).
+export async function genererMissions(difficultes) {
     if (typeof window.fetchGemini !== "function" || !window.cleGemini || !window.cleGemini("missions")) throw new Error("Aucune clé Gemini");
-    const difficultes = tirerDifficultes();
     const contexte = { regions: regionsConnues(), lieux: lieuxConnus(), niveau: window.NIVEAU_GROUPE || 1, jour: jourAbsolu() };
     const corps = JSON.stringify({
         systemInstruction: { parts: [{ text: promptMissions(difficultes, contexte) }] },
-        contents: [{ role: "user", parts: [{ text: "Rédige les missions du panneau." }] }],
+        contents: [{ role: "user", parts: [{ text: "Rédige les missions." }] }],
         generationConfig: { temperature: 1.0, responseMimeType: "application/json" }
     });
     const rep = await window.fetchGemini("missions", corps);
@@ -163,180 +146,16 @@ export async function genererMissions() {
     if (!rep.ok || json.error) throw new Error((json.error && json.error.message) || `Gemini ${rep.status}`);
     let liste = JSON.parse(json.candidates[0].content.parts[0].text);
     if (!Array.isArray(liste)) liste = Array.isArray(liste && liste.missions) ? liste.missions : [];
-    if (liste.length < NB_MISSIONS) throw new Error(`MIA_MISSIONS n'a rendu que ${liste.length} missions`);
+    if (liste.length < difficultes.length) throw new Error(`MIA_MISSIONS n'a rendu que ${liste.length} missions`);
     const ecritures = ECRITURES.slice().sort(() => Math.random() - 0.5);
     return difficultes.map((r, i) => nettoyerMission(liste[i], r, i, contexte, ecritures[i % ecritures.length]));
 }
+// Une seule mission, de cette difficulté.
+export const genererMission = async (difficulte) => (await genererMissions([difficulte === "difficile" ? "difficile" : "normale"]))[0];
 
-// ---------------------------------------------------------------------
-//  LE TABLEAU DE LA PARTIE : écouté ; écrit (ou renouvelé) par un seul poste
-// ---------------------------------------------------------------------
-let tableau = null, partieEcoutee = "", arretEcoute = null, enGeneration = false;
-const abonnes = new Set();
-const prevenir = () => abonnes.forEach(f => { try { f(tableau); } catch (e) { console.warn("Missions : un abonné", e); } });
-export const surChangement = (f) => { abonnes.add(f); return () => abonnes.delete(f); };
-export const lireTableau = () => tableau;
-function ecouter(id) {
-    if (partieEcoutee === id) return;
-    if (arretEcoute) { try { arretEcoute(); } catch (e) {} arretEcoute = null; }
-    partieEcoutee = id; tableau = null; prevenir();
-    if (!id) return;
-    relire(id);
-    try {
-        arretEcoute = onSnapshot(refTableau(id), (s) => { if (partieEcoutee !== id) return; tableau = s.exists() ? s.data() : { Missions: [] }; prevenir(); },
-                                 (e) => console.warn("Missions : l'écoute du tableau", e));
-    } catch (e) { console.warn("Missions : l'écoute du tableau", e); }
-}
-// Une lecture directe (au départ, après une écriture de ce poste) : l'écoute suit ensuite.
-async function relire(id) {
-    try { const s = await getDoc(refTableau(id)); if (partieEcoutee === id) { tableau = s.exists() ? s.data() : { Missions: [] }; prevenir(); } }
-    catch (e) { console.warn("Missions : la lecture du tableau", e); }
-}
-export const relireTableau = () => relire(idPartie());
-// À renouveler ? Vide, jamais écrit, ou plus vieux que 30 jours en jeu ; (v452) ou encore aux rangs
-// d'avant (Nico : « refaire le panneau ») — une mission sans difficulté écrite.
-export function aRenouveler(t, jour = jourAbsolu()) {
-    if (!t) return false;                                             // pas encore lu
-    const missions = Array.isArray(t.Missions) ? t.Missions : [];
-    if (!missions.length || t.Jour_Absolu == null) return true;
-    if (missions.some(m => m && !m.Difficulte)) return true;
-    return jour - Number(t.Jour_Absolu) >= DUREE_JOURS;
-}
-export async function renouveler(options) {
-    const id = idPartie();
-    if (!id || enGeneration) return false;
-    const forcer = !!(options && options.forcer);
-    enGeneration = true;
-    try {
-        // Le verrou : un seul poste écrit les missions.
-        const pris = await runTransaction(db, async (tx) => {
-            const s = await tx.get(refTableau(id)), d = s.exists() ? s.data() : {};
-            if (!forcer && !aRenouveler({ Missions: [], ...d })) return false;
-            if (d.Generation_En_Cours && Date.now() - Number(d.Generation_En_Cours) < VERROU_MS) return false;
-            tx.set(refTableau(id), { Generation_En_Cours: Date.now() }, { merge: true });
-            return true;
-        });
-        if (!pris) return false;
-        let missions;
-        try { missions = await genererMissions(); }
-        catch (e) { console.error("MIA_MISSIONS :", e); await setDoc(refTableau(id), { Generation_En_Cours: deleteField() }, { merge: true }); return false; }
-        await setDoc(refTableau(id), { Missions: missions, Jour_Absolu: jourAbsolu(), Genere_Le: Date.now(), Generation_En_Cours: deleteField() }, { merge: true });
-        await relire(id);
-        return true;
-    } catch (e) { console.error("Missions : le renouvellement", e); return false; }
-    finally { enGeneration = false; }
-}
-// La veille : la partie chargée, son tableau écouté ; vide ou trop vieux, il se (re)fait.
-let derniereTentative = 0;
-setInterval(() => {
-    if (document.hidden) return;
-    const id = idPartie();
-    ecouter(id);
-    if (!id || !tableau || enGeneration || !window.cleGemini || !window.cleGemini("missions")) return;
-    if (!aRenouveler(tableau)) return;
-    if (Date.now() - derniereTentative < 60000) return;               // un échec : on réessaie dans une minute
-    derniereTentative = Date.now();
-    renouveler();
-}, 2000);
-
-// ---------------------------------------------------------------------
-//  L'ENCART (grimoire_guilde.js le pose dans chaque encart du tableau)
-// ---------------------------------------------------------------------
-const SEPARATEUR = `<svg class="separateur-mission" viewBox="0 0 120 10" preserveAspectRatio="none" aria-hidden="true"><path d="M4 5 C 30 3.2, 48 6.4, 56 5 M64 5 C 72 3.6, 92 6.6, 116 5"/><path d="M60 2.2 L 62.6 5 L 60 7.8 L 57.4 5 Z"/></svg>`;
-export function htmlEncart(m, slot) {
-    if (!m) return "";
-    // (l'écriture passe par une variable : style.css impose Almendra à tout, en !important)
-    // (v445) `--ajuste` : l'échelle du texte, mesurée pour qu'il tienne dans l'encart (ajusterEncarts).
-    const a = ajustements.get(m.Id);
-    return `<div class="mission-encart" data-mission="${echapper(m.Id)}" style="--ecriture:'${echapper(m.Ecriture || ECRITURES[slot % ECRITURES.length])}'${a ? `; --ajuste:${a}` : ""}">
-        <div class="texte-mission-encart">
-        <div class="titre-mission">${echapper(m.Titre)}</div>
-        ${SEPARATEUR}
-        <div class="resume-mission">${echapper(m.Resume)}</div>
-        ${difficulteDe(m) === "difficile" ? htmlSceauDifficile("sceau-difficile-encart") : ""}</div></div>`;
-}
-// (v452) Le sceau des missions difficiles, en petit sous le texte (l'encart, la feuille, la page).
+// (v452) Le sceau des missions difficiles, en petit sous le texte (la page de la mission).
 export function htmlSceauDifficile(classe) {
     return `<img class="sceau-difficile ${classe || ""}" src="${IMAGE_SCEAU_DIFFICILE}" alt="Mission difficile" title="Mission difficile" draggable="false">`;
-}
-// (v445) Nico : « l'encart en bas à droite, le texte est tronqué un peu ». Les écritures n'ont pas
-// toutes la même largeur (Homemade Apple, Satisfy… bien plus larges que Caveat) : chaque encart
-// rapetisse son texte, pas à pas, jusqu'à ce qu'il y tienne en entier (le titre, tout le
-// résumé), en hauteur comme en largeur. L'échelle est mesurée sur l'encart visible (les deux pages
-// en portent chacune une copie) ; elle ne dépend que des proportions (les tailles suivent l'encart).
-const ajustements = new Map();          // Id de la mission → l'échelle de son texte
-export function ajusterEncarts(pages) {
-    const parMission = new Map();
-    (pages || []).forEach(pg => pg && pg.querySelectorAll(".mission-encart").forEach(el => {
-        const id = el.dataset.mission;
-        if (!parMission.has(id)) parMission.set(id, []);
-        parMission.get(id).push(el);
-    }));
-    let tout = true;
-    parMission.forEach((els, id) => {
-        const el = els.find(e => e.clientHeight > 0 && e.clientWidth > 0);
-        const texte = el && el.querySelector(".texte-mission-encart");
-        if (!texte) { tout = false; return; }
-        const deborde = () => texte.offsetHeight > el.clientHeight + 0.5 || texte.scrollWidth > texte.clientWidth + 0.5;
-        let a = 1;
-        el.style.setProperty("--ajuste", "1");
-        while (deborde() && a > 0.3) { a = Math.round((a - 0.03) * 100) / 100; el.style.setProperty("--ajuste", String(a)); }
-        ajustements.set(id, a);
-        els.forEach(e => e.style.setProperty("--ajuste", String(a)));
-    });
-    return tout;
-}
-export const oublierAjustements = () => ajustements.clear();
-export const missionDe = (slot) => { const l = tableau && Array.isArray(tableau.Missions) ? tableau.Missions : []; return l[slot] || null; };
-
-// ---------------------------------------------------------------------
-//  LA FEUILLE QUI GLISSE DU BAS DE L'ÉCRAN
-// ---------------------------------------------------------------------
-const paragraphes = (t) => String(t || "").split(/\n+/).map(x => x.trim()).filter(Boolean).map(x => `<p>${echapper(x)}</p>`).join("");
-export function ouvrirFeuille(slot) {
-    // (v443) La mission d'un vote en cours peut avoir quitté le tableau (renouvelé) : le vote la garde.
-    const v = partie.Vote_Mission;
-    const m = missionDe(slot) || (v && v.Mission && Number(v.Slot) === Number(slot) ? v.Mission : null);
-    if (!m) return false;
-    let voile = document.getElementById("feuille-mission");
-    if (!voile) {
-        voile = document.createElement("div");
-        voile.id = "feuille-mission";
-        voile.className = "voile-feuille-mission";
-        voile.addEventListener("click", (e) => {
-            if (e.target.closest(".sceau-mission")) { e.stopPropagation(); if (!e.target.closest(".sceau-mission").disabled) accepter(Number(voile.dataset.slot)); return; }
-            if (e.target.closest(".refuser-mission")) { e.stopPropagation(); refuserMission(); fermerFeuille(); return; }
-            if (e.target.closest(".forcer-mission")) { e.stopPropagation(); forcerMission(Number(voile.dataset.slot)); return; }
-            if (!e.target.closest(".feuille-mission")) fermerFeuille();
-        });
-        document.body.appendChild(voile);
-    }
-    voile.dataset.slot = String(slot);
-    voile.innerHTML = `<div class="feuille-mission" role="dialog" aria-label="${echapper(m.Titre)}">
-        <div class="contenu-feuille-mission">
-          <h2 class="titre-feuille">${echapper(m.Titre)}</h2>
-          ${SEPARATEUR}
-          <dl class="faits-mission">
-            <div><dt>Région</dt><dd>${echapper(m.Region_Nom)}</dd></div>
-            <div><dt>Lieu</dt><dd>${echapper(m.Lieu && m.Lieu.Nom)}${m.Lieu && m.Lieu.Type ? ` <em>(${echapper(m.Lieu.Type)})</em>` : ""}</dd></div>
-            <div><dt>Commanditaire</dt><dd>${echapper(m.Commanditaire)}</dd></div>
-          </dl>
-          <h3>La mission</h3>${paragraphes(m.Details)}
-          <h3>L'objectif</h3><p class="objectif-mission">${echapper(m.Objectif)}</p>
-          <h3>Le mot du commanditaire</h3><div class="lettre-mission" style="--ecriture:'${echapper(m.Ecriture || "Caveat")}'">${paragraphes(m.Lettre)}</div>
-          ${difficulteDe(m) === "difficile" ? htmlSceauDifficile("sceau-difficile-feuille") : ""}
-          ${htmlSceau(m)}
-        </div></div>`;
-    son("page-prise");
-    requestAnimationFrame(() => requestAnimationFrame(() => voile.classList.add("ouverte")));
-    return true;
-}
-export function fermerFeuille() {
-    const voile = document.getElementById("feuille-mission");
-    if (!voile || !voile.classList.contains("ouverte")) return false;
-    voile.classList.remove("ouverte");
-    son("page-prise");
-    return true;
 }
 // (v445) Nico : « refais le dessin du sceau en bas de page : un sceau de cire réaliste ». La cire
 // coulée, au bord irrégulier (deux petites coulures), bombée par la lumière (un éclairage spéculaire
@@ -386,49 +205,8 @@ export function sceauCire(haut, bas, prefixe) {
     return SCEAU_CIRE.replace(/sceau-(cire|creux|biseau|relief|arc-haut|arc-bas|motif)/g, `${prefixe}-$1`)
         .replace(">ACCEPTER<", `>${echapper(haut)}<`).replace(">LA MISSION<", `>${echapper(bas)}<`);
 }
-// (v443) Le sceau selon l'état du groupe : accepter (ou voter oui), en attente des autres,
-// une mission déjà en cours, un autre vote ; « Refuser » quand un vote porte sur elle.
-function htmlSceau(m) {
-    const v = partie.Vote_Mission, enCours = partie.Mission_En_Cours && partie.Mission_En_Cours.Id;
-    const surElle = v && v.Id === m.Id, j = idJoueur();
-    let etat = "", aide = "";
-    if (enCours) { etat = "eteint"; aide = "Une mission est déjà en cours."; }
-    else if (v && v.Id && !surElle) { etat = "eteint"; aide = `Un vote est en cours pour « ${v.Titre} ».`; }
-    else if (surElle && (v.Votes || {})[j] === "oui") { etat = "eteint"; aide = `En attente des autres joueurs (${compterOui(v)}/${(v.Votants || []).length}).`; }
-    else if (surElle) aide = `${(v.Initiateur || {}).nom || "Un joueur"} propose cette mission : tous doivent l'accepter.`;
-    return `<button type="button" class="sceau-mission${etat ? " " + etat : ""}" title="Accepter la mission" aria-label="Accepter la mission"${etat ? " disabled" : ""}>${SCEAU_CIRE}<span class="texte-cache">Accepter la mission</span></button>
-        ${aide ? `<p class="aide-sceau">${echapper(aide)}</p>` : ""}
-        ${surElle ? `<button type="button" class="refuser-mission">Refuser</button>` : ""}
-        ${estDevMission() && !enCours && !(v && v.Id && !surElle) ? `<button type="button" class="forcer-mission">Forcer le vote (DEV)</button>` : ""}`;
-}
-const compterOui = (v) => (v.Votants || []).filter(x => (v.Votes || {})[x.id] === "oui").length;
-async function forcerMission(slot) {
-    const v = partie.Vote_Mission;
-    const m = missionDe(slot) || (v && v.Mission && Number(v.Slot) === slot ? v.Mission : null);
-    if (!m) return;
-    const r = await voterMission(slot, m, "oui", { forcer: true });
-    if (r && r.acceptee) fermerFeuille(); else rafraichirFeuille();
-}
-async function accepter(slot) {
-    const v = partie.Vote_Mission;
-    const m = missionDe(slot) || (v && v.Mission && Number(v.Slot) === slot ? v.Mission : null);
-    if (!m) return;
-    const r = await voterMission(slot, m, "oui");
-    if (r && r.acceptee) fermerFeuille(); else rafraichirFeuille();
-}
-function rafraichirFeuille() {
-    const voile = document.getElementById("feuille-mission");
-    if (!voile || !voile.classList.contains("ouverte")) return;
-    const slot = Number(voile.dataset.slot), v = partie.Vote_Mission;
-    const m = missionDe(slot) || (v && v.Mission && Number(v.Slot) === slot ? v.Mission : null);
-    const zone = voile.querySelector(".contenu-feuille-mission");
-    if (!m || !zone) return;
-    zone.querySelectorAll(".sceau-mission, .aide-sceau, .refuser-mission, .forcer-mission").forEach(e => e.remove());
-    zone.insertAdjacentHTML("beforeend", htmlSceau(m));
-}
-
 // =========================================================================
-//  v443 — ACCEPTER UNE MISSION : LE VOTE, LE PLAN, LE LIEU, LE MJ
+//  v443 — UNE MISSION LANCÉE : LE PLAN, LE LIEU, LE MJ — (v477) sans vote ni tableau : lancerMission
 // =========================================================================
 //  Nico : « oui vote : quand un joueur valide le choix d'une mission, c'est en attente des
 //  autres, un post-it apparaît sur le livre des autres joueurs, avec le lien qui fait
@@ -441,8 +219,7 @@ function rafraichirFeuille() {
 //  de la mission. » « C'est le narrateur qui valide ou fait échouer la mission. »
 //
 //  LA BASE :
-//    · Systeme_Parties/{partie}.Vote_Mission — { Id, Slot, Titre, Difficulte, Mission, Initiateur,
-//      Votants, Votes, Le } ; Mission_En_Cours — { Id, Titre, Difficulte, Decalage, Lieu_Id, Region, Le } ;
+//    · Systeme_Parties/{partie}.Mission_En_Cours — { Id, Titre, Difficulte, Lieu_Id, Region, Le } ;
 //    · Systeme_Parties/{partie}/Guilde/Mission — { Mission, Statut, Accepte_Le, Jour_Accepte,
 //      Votants, Heros, Lieu_Id, Lieu_Position: { Region, x, y }, Plan, Avancement: { Etapes,
 //      Journal } } (les verrous Plan_En_Cours, Lieu_En_Creation : 5 minutes) ;
@@ -459,54 +236,40 @@ function votantsGroupe() {
 const herosDuGroupe = () => ((window.PERSOS_JOUEURS_PARTIE && window.PERSOS_JOUEURS_PARTIE.length ? window.PERSOS_JOUEURS_PARTIE : window.PERSOS_PARTIE) || [])
     .filter(h => h && h.idPersonnage && h.actif !== false && !h.estMonstre && !h.estIllusion).map(h => h.idPersonnage);
 
-let partie = {}, missionEnCours = null, missionLue = "", ficheAbsente = false;
+let partie = {}, missionEnCours = null, missionLue = "";
 // La partie, comme la base la relaie (app.js, l'écoute de la partie).
 window.appliquerMissionDeLaPartie = function(data) {
     partie = data || {};
-    majPostit();
-    rafraichirFeuille();
     ecouterMission(idPartie(), !!(partie.Mission_En_Cours && partie.Mission_En_Cours.Id));
-    majDecalage();
     // (v457) Une mission accomplie sur un autre poste : sa fiche rangée, relue ici.
     const a = partie.Mission_Accomplie;
     if (a && a.Id && termineesDe === idPartie() && !terminees.some(t => t && t.Mission && t.Mission.Id === a.Id)) lireTerminees(true);
     else if (a && a.Id && termineesDe !== idPartie()) lireTerminees();
 };
 
-// LE VOTE : « oui » (le premier propose), « non » (le vote disparaît). Tous oui : acceptée.
-export async function voterMission(slot, m, reponse, options) {
+// (v477) LANCER UNE MISSION (le créateur la donne, genererMission) : elle devient la mission en cours
+// de la partie (une seule à la fois), puis sa fiche s'installe. Plus de vote : c'est ce qui la
+// décide (le RP, le conseil — étapes 9 et 10) qui l'appelle. Rend vrai si elle a été lancée.
+export async function lancerMission(m) {
     const id = idPartie();
-    if (!id || !m) return null;
-    const moi = idJoueur(), votants = votantsGroupe();
-    // (v448) Nico : « en mode DEV, un bouton pour forcer le vote de mission » : tous les votants disent oui.
-    const forcer = !!(options && options.forcer) && estDevMission();
-    let r;
+    if (!id || !m || !m.Id) return false;
+    const enCours = { Id: m.Id, Titre: m.Titre, Difficulte: difficulteDe(m), Lieu_Id: (m.Lieu && m.Lieu.Id) || null, Region: m.Region, Le: Date.now() };
     try {
-        r = await runTransaction(db, async (tx) => {
+        const pris = await runTransaction(db, async (tx) => {
             const s = await tx.get(refPartie(id)), d = s.exists() ? s.data() : {};
-            if (d.Mission_En_Cours && d.Mission_En_Cours.Id) return { occupe: true };
-            let v = d.Vote_Mission;
-            if (v && v.Id && v.Id !== m.Id) return { autreVote: true };
-            if (reponse === "non") { if (v && v.Id === m.Id) tx.update(refPartie(id), { Vote_Mission: deleteField() }); return { refuse: true }; }
-            if (!v || !v.Id) v = { Id: m.Id, Slot: slot, Titre: m.Titre, Difficulte: difficulteDe(m), Mission: m, Initiateur: { id: moi, nom: (votants.find(x => x.id === moi) || {}).nom || "Un joueur" }, Votants: votants, Votes: {}, Le: Date.now() };
-            const votes = { ...(v.Votes || {}), [moi]: "oui" };
-            if (forcer) (v.Votants || []).forEach(x => { votes[x.id] = "oui"; });
-            if (!(v.Votants || []).every(x => votes[x.id] === "oui")) { tx.set(refPartie(id), { Vote_Mission: { ...v, Votes: votes } }, { merge: true }); return { vote: true }; }
-            const enCours = { Id: m.Id, Titre: m.Titre, Difficulte: difficulteDe(m), Decalage: decalageDe(m), Lieu_Id: (m.Lieu && m.Lieu.Id) || null, Region: m.Region, Le: Date.now() };
+            if (d.Mission_En_Cours && d.Mission_En_Cours.Id) return false;
             // (v457) Une autre mission choisie : le sceau « Quête accomplie » de la précédente s'efface.
-            tx.update(refPartie(id), { Vote_Mission: deleteField(), Mission_En_Cours: enCours, Mission_Accomplie: deleteField() });
-            return { acceptee: true, enCours, votants: v.Votants || votants, slot: Number(v.Slot) };
+            tx.set(refPartie(id), { Mission_En_Cours: enCours, Mission_Accomplie: deleteField() }, { merge: true });
+            return true;
         });
-    } catch (e) { console.error("Missions : le vote", e); return null; }
+        if (!pris) return false;
+    } catch (e) { console.error("Missions : le lancement", e); return false; }
     son("page-tourne");
-    if (r && r.acceptee) await installerMission(m, r);
-    return r;
+    await installerMission(m, { votants: votantsGroupe() });
+    return true;
 }
-const estDevMission = () => { try { return localStorage.getItem("ivalis_DEV_MODE") === "on"; } catch (e) { return false; } };
-export const refuserMission = () => { const v = partie.Vote_Mission; return v && v.Mission ? voterMission(Number(v.Slot), v.Mission, "non") : null; };
-
-// La mission acceptée : sa fiche du groupe, l'encart vidé, la place de son lieu ; puis, en
-// fond, son plan et son lieu (sur ce poste s'il a les clés, sinon sur un autre).
+// La mission lancée : sa fiche du groupe, la place de son lieu ; puis, en fond, son plan et son lieu
+// (sur ce poste s'il a les clés, sinon sur un autre).
 async function installerMission(m, r) {
     const id = idPartie();
     const existant = m.Lieu && m.Lieu.Id ? (window.VILLAGES_REGIONAUX || {})[m.Lieu.Id] : null;
@@ -515,21 +278,8 @@ async function installerMission(m, r) {
         await setDoc(refMission(id), { Mission: m, Statut: "en_cours", Accepte_Le: Date.now(), Jour_Accepte: jourAbsolu(), Votants: r.votants || [], Heros: herosDuGroupe(),
             Lieu_Id: (m.Lieu && m.Lieu.Id) || null, Lieu_Position: position, Plan: null, Avancement: { Etapes: {}, Journal: [] } });
     } catch (e) { console.error("Missions : la fiche de la mission", e); }
-    await retirerDuTableau(m.Id);
     await relireMission(id);
     preparerMission();
-}
-async function retirerDuTableau(idMission) {
-    const id = idPartie();
-    try {
-        await runTransaction(db, async (tx) => {
-            const s = await tx.get(refTableau(id)); if (!s.exists()) return;
-            const l = Array.isArray(s.data().Missions) ? s.data().Missions : [];
-            if (!l.some(x => x && x.Id === idMission)) return;
-            tx.set(refTableau(id), { Missions: l.map(x => (x && x.Id === idMission ? null : x)) }, { merge: true });
-        });
-    } catch (e) { console.warn("Missions : l'encart vidé", e); }
-    await relire(id);
 }
 // Une place pour un lieu nouveau, dans sa région : sur le terrain, loin des autres lieux.
 function placeDuLieu(region) {
@@ -557,13 +307,13 @@ function ecouterMission(id, active) {
     const cle = id && active ? id : "";
     if (missionLue === cle) return;
     if (arretMission) { try { arretMission(); } catch (e) {} arretMission = null; }
-    missionLue = cle; missionEnCours = null; ficheAbsente = false;
-    if (!cle) { prevenirMission(); majDecalage(); return; }
+    missionLue = cle; missionEnCours = null;
+    if (!cle) { prevenirMission(); return; }
     relireMission(id);
-    try { arretMission = onSnapshot(refMission(id), (s) => { if (missionLue !== id) return; missionEnCours = s.exists() ? s.data() : null; ficheAbsente = !s.exists(); prevenirMission(); majDecalage(); }, () => {}); } catch (e) {}
+    try { arretMission = onSnapshot(refMission(id), (s) => { if (missionLue !== id) return; missionEnCours = s.exists() ? s.data() : null; prevenirMission(); }, () => {}); } catch (e) {}
 }
 async function relireMission(id) {
-    try { const s = await getDoc(refMission(id)); if (missionLue === id) { missionEnCours = s.exists() ? s.data() : null; ficheAbsente = !s.exists(); prevenirMission(); majDecalage(); } }
+    try { const s = await getDoc(refMission(id)); if (missionLue === id) { missionEnCours = s.exists() ? s.data() : null; prevenirMission(); } }
     catch (e) { console.warn("Missions : la lecture de la mission", e); }
 }
 export const relireLaMission = () => relireMission(idPartie());
@@ -648,54 +398,6 @@ export async function preparerMission() {
         }
         await relireMission(id);
     } finally { preparation = false; }
-}
-
-// LE POST-IT : un vote en cours ; chez ceux qui n'ont pas encore dit oui, le lien vers la feuille.
-function majPostit() {
-    const v = partie.Vote_Mission, j = idJoueur();
-    const g = window.GRIMOIRE, scene = g && g.scene && g.scene(), livre = g && g.livre && g.livre();
-    let el = document.getElementById("postit-mission");
-    const votant = v && v.Id && (v.Votants || []).some(x => x.id === j);
-    if (!votant || !scene || !livre) { if (el) { el.__voulu = false; el.classList.remove("sortie"); } return; }
-    if (!el) {
-        el = document.createElement("div");
-        el.id = "postit-mission";
-        el.className = "recit-ecriture postit-mission";
-        el.innerHTML = `<div class="papier-ecriture papier-postit-mission"></div>`;
-        el.addEventListener("click", (e) => { const b = e.target.closest("[data-mission]"); if (!b) return;
-            if (b.dataset.mission === "voir") ouvrirFeuille(Number((partie.Vote_Mission || {}).Slot));
-            if (b.dataset.mission === "refuser") refuserMission(); });
-        scene.insertBefore(el, livre);
-    }
-    const aVote = (v.Votes || {})[j] === "oui";
-    el.querySelector(".papier-postit-mission").innerHTML = aVote
-        ? `<div class="titre-postit-mission">Mission proposée</div><p>« ${echapper(v.Titre)} »</p>
-           <p class="discret">En attente des autres joueurs (${compterOui(v)}/${(v.Votants || []).length}).</p>`
-        : `<div class="titre-postit-mission">${echapper((v.Initiateur || {}).nom || "Un joueur")} propose une mission</div><p>« ${echapper(v.Titre)} »</p>
-           <div class="boutons-postit-mission"><button type="button" class="lien-postit-mission" data-mission="voir">Voir la mission</button>
-           <button type="button" class="lien-postit-mission discret" data-mission="refuser">Refuser</button></div>`;
-    // (le post-it ne sort que s'il le faut encore à l'image suivante : un vote fini entre-temps le laisse rentré)
-    el.__voulu = true;
-    requestAnimationFrame(() => { if (el.__voulu) el.classList.add("sortie"); });
-}
-
-// LE NIVEAU DES CRÉATURES AU LIEU DE LA MISSION (monstres.js le lit) : (v452) le décalage caché de la
-// mission — normale −1/0/+1, difficile +2/+3/+4.
-export function decalageNiveauMission() {
-    const mc = partie.Mission_En_Cours;
-    const lieu = (missionEnCours && missionEnCours.Lieu_Id) || (mc && mc.Lieu_Id);
-    if (!mc || !mc.Id || !lieu || partie.Lieu_Actuel !== lieu) return 0;
-    const m = missionEnCours && missionEnCours.Mission && missionEnCours.Mission.Id === mc.Id ? missionEnCours.Mission : null;
-    return decalageDe(Number.isFinite(Number(mc.Decalage)) && mc.Decalage !== null && mc.Decalage !== undefined ? mc : (m || mc));
-}
-window.decalageNiveauMission = decalageNiveauMission;
-let decalageApplique = 0;
-function majDecalage() {
-    const d = decalageNiveauMission();
-    if (d === decalageApplique) return;
-    decalageApplique = d;
-    try { if (typeof window.appliquerReglagesMonstres === "function") window.appliquerReglagesMonstres(window.REGLAGES_MONSTRES_BRUTS); } catch (e) { console.warn("Missions : la triche des créatures", e); }
-    try { if (typeof window.afficherNiveauGroupe === "function") window.afficherNiveauGroupe(); } catch (e) {}
 }
 
 // LE « ? » DORÉ : la place du lieu de la mission (villages_regionaux.js le dessine).
@@ -839,7 +541,7 @@ export async function terminerMission(statut, resume, idMessage) {
     } catch (e) { console.error("Missions : la fin de la mission", e); return false; }
     missionEnCours = null; missionLue = "";
     partie = { ...partie, Mission_En_Cours: null };
-    prevenirMission(); majDecalage();
+    prevenirMission();
     lireTerminees(true);
     return true;
 }
@@ -914,24 +616,16 @@ export function missionsReussies(idHeros) {
     return n;
 }
 
-// LA VEILLE : la mission acceptée sur un poste sans clés se prépare sur un poste qui les a ;
-// une mission en cours sans fiche (son poste fermé trop tôt) retrouve la sienne.
+// LA VEILLE : la mission lancée sur un poste sans clés se prépare sur un poste qui les a.
 setInterval(async () => {
     if (document.hidden) return;
     const id = idPartie(), mc = partie.Mission_En_Cours;
-    if (!id || !mc || !mc.Id || missionLue !== id) return;
-    if (!missionEnCours) {
-        if (!ficheAbsente) return;                                     // pas encore lue
-        const m = (tableau && Array.isArray(tableau.Missions) ? tableau.Missions : []).find(x => x && x.Id === mc.Id);
-        if (m) await installerMission(m, { votants: votantsGroupe() });
-        return;
-    }
+    if (!id || !mc || !mc.Id || missionLue !== id || !missionEnCours) return;
     if (missionEnCours.Statut === "en_cours" && (!missionEnCours.Plan || !missionEnCours.Lieu_Id)) preparerMission();
 }, 5000);
 
-window.MISSIONS_GUILDE = { DIFFICULTES, DECALAGES, MAX_DIFFICILES, IMAGE_SCEAU_DIFFICILE, difficulteDe, decalageDe, tirerDifficultes, tirerDecalage, htmlSceauDifficile,
-                          ECRITURES, NB_MISSIONS, DUREE_JOURS, TOURS_MIN_ETAPE, jourAbsolu, promptMissions, genererMissions, renouveler, aRenouveler,
-                          lireTableau, relireTableau, surChangement, htmlEncart, missionDe, ouvrirFeuille, fermerFeuille,
-                          voterMission, refuserMission, lireMission, relireLaMission, surMission, preparerMission, promptPlan, marqueMission, decalageNiveauMission,
+window.MISSIONS_GUILDE = { DIFFICULTES, IMAGE_SCEAU_DIFFICILE, difficulteDe, htmlSceauDifficile, ECRITURES, TOURS_MIN_ETAPE, jourAbsolu,
+                          promptMissions, genererMissions, genererMission, lancerMission,
+                          lireMission, relireLaMission, surMission, preparerMission, promptPlan, marqueMission,
                           contexteMissionMJ, suivreApresMJ, terminerMission, partie: () => partie,
-                          ecrireNotes, voterAbandon, missionsReussies, relireTerminees, missionAccomplie, sceauCire, REPIT_APRES_MISSION, idJoueur, ajusterEncarts, oublierAjustements };
+                          ecrireNotes, voterAbandon, missionsReussies, relireTerminees, missionAccomplie, sceauCire, REPIT_APRES_MISSION, idJoueur };

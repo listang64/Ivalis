@@ -558,9 +558,9 @@ const tricheDesFormules = (f) => {
 };
 // La triche du moment, au niveau du groupe d'aujourd'hui : le % de DÉGÂTS
 // (v406 : plus les PV ni les soins — voir tricheActuelle).
-// (v443) LE NIVEAU DES CRÉATURES : celui du groupe ; au lieu d'une mission de guilde,
-// décalé selon son rang (missions_guilde.js : C −2, B +0, A +2), jamais sous 1.
-window.niveauDesCreatures = () => Math.max(1, (window.NIVEAU_GROUPE || 1) + (typeof window.decalageNiveauMission === "function" ? (Number(window.decalageNiveauMission()) || 0) : 0));
+// (v443) LE NIVEAU DES CRÉATURES : celui du groupe, jamais sous 1. (v477) Plus de décalage au lieu
+// d'une mission : le tableau des missions a disparu (CLAN_NOMADE.md, étape 1).
+window.niveauDesCreatures = () => Math.max(1, window.NIVEAU_GROUPE || 1);
 window.tricheMonstresActuelle = () => window.tricheDuNiveau(window.niveauDesCreatures());
 // (v406) Les trois, au niveau du groupe d'aujourd'hui : { degats, pv, soins }.
 window.tricheActuelle = () => window.tricheDeNiveau(window.niveauDesCreatures());

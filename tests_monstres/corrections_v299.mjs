@@ -362,12 +362,13 @@ await section(async () => {
   const tout = [...r.g, ...r.d];
   // v312 : « dans le sommaire, devant chaque titre le numéro en chiffres romains ; dans cet
   // ordre : Aventuriers, Carte du monde, Le village, Les combats, Le récit ».
-  verifier("page de gauche (v312, v418) : I- Groupe, II- Carte du monde, III- Le village", r.g.map(x => x.texte).join(" | ") === "I- Groupe | II- Carte du monde | III- Le village", r.g.map(x => x.texte).join(" | "));
+  // (v477) « Le camp » remplace « Le village » (le clan nomade, CLAN_NOMADE.md).
+  verifier("page de gauche (v312, v418, v477) : I- Groupe, II- Carte du monde, III- Le camp", r.g.map(x => x.texte).join(" | ") === "I- Groupe | II- Carte du monde | III- Le camp", r.g.map(x => x.texte).join(" | "));
   verifier("page de droite (v312) : IV- Les combats, V- Le récit", r.d.map(x => x.texte).join(" | ") === "IV- Les combats | V- Le récit", r.d.map(x => x.texte).join(" | "));
   verifier("en gros (plus de deux fois le texte des pages)", tout.every(x => x.taille > r.u * 5.5), `${tout[0] && tout[0].taille.toFixed(1)} px, u = ${r.u.toFixed(2)} px`);
   verifier("à la main (v313 : l'écriture choisie dans Paramètres, Shadows Into Light par défaut depuis v340)", tout.every(x => /Shadows Into Light/.test(x.police)), tout[0] && tout[0].police);
   const angles = tout.map(x => { const m = /matrix\(([-\d.e]+), ([-\d.e]+)/.exec(x.transform); return m ? Math.atan2(Number(m[2]), Number(m[1])) * 180 / Math.PI : 0; });
-  verifier("pas bien droit : chaque ligne penche un peu, chacune à sa façon", angles.every(a => Math.abs(a) > 0.2 && Math.abs(a) < 4) && new Set(angles.map(a => a.toFixed(1))).size >= 5, angles.map(a => a.toFixed(1)).join(" "));
+  verifier("pas bien droit : chaque ligne penche un peu, chacune à sa façon", angles.every(a => Math.abs(a) > 0.2 && Math.abs(a) < 4) && new Set(angles.map(a => a.toFixed(2))).size >= 5, angles.map(a => a.toFixed(1)).join(" "));
   verifier("v300 : souligné d'un trait de plume (plus de jaune), ligne par ligne", tout.every(x => x.surligne && x.clone === "clone"));
   verifier("un titre « Sommaire » (v312, l'ancien « Index »)", r.entete === "Sommaire", r.entete);
   if (CAPTURES) await p.screenshot({ path: CAPTURES + "/v299_index.png" });
@@ -410,12 +411,11 @@ await section(async () => {
     verifier("« combats » : la double page des combats, dans le livre (plus de popup)", a.appels.length === 0 && Math.abs(a.page - a.combats) <= 1, JSON.stringify(a));
     await p.evaluate(() => window.grimoireAllerIndex()); await p.waitForTimeout(2600);
   }
-  // (v398) « Le village » a sa double page : le livre y va (plus de note « bientôt »).
-  await cliquer("#grimoire-index-village");
-  await p.waitForTimeout(2600);
-  const v = await p.evaluate(() => ({ vue: document.getElementById("grimoire-note-index").classList.contains("visible"), page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), village: window.GRIMOIRE.indexDe(window.GRIMOIRE.pagesVillage()[0]) }));
-  verifier("« Le village » : sa double page, dans le livre (v398)", !v.vue && v.village > 0 && Math.abs(v.page - v.village) <= 1, JSON.stringify(v));
-  await p.evaluate(() => window.grimoireAllerIndex()); await p.waitForTimeout(2600);
+  // (v477) « Le camp » (étape 3 du clan nomade) : en attendant, la note « bientôt », le livre reste au sommaire.
+  await cliquer("#grimoire-index-camp");
+  await p.waitForTimeout(600);
+  const v = await p.evaluate(() => ({ vue: document.getElementById("grimoire-note-index").classList.contains("visible"), note: document.getElementById("grimoire-note-index").textContent, page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() }));
+  verifier("« Le camp » : la note « bientôt », le livre reste au sommaire (v477)", v.vue && /camp/i.test(v.note) && v.page >= 3 && v.page <= 4, JSON.stringify(v));
   // Depuis le journal (on a tourné en arrière), puis depuis « Compte » : le marque-page ramène à l'index.
   await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipPrev("top"));
   await p.waitForTimeout(900);

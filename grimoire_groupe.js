@@ -135,7 +135,7 @@ function htmlGauche() {
     const l = donnees.lieu || {};
     const lieu = l.nature ? "Dans la nature" : (l.nom || "");
     // (v433) Nico : « enlève le bouton pour changer le personnage sous l'avatar » (la double
-    // flèche de la v419) : on change de héros dans le Livre des clans.
+    // flèche de la v419) : on change de héros dans la liste des personnages.
     const ligneHeros = heros.map(h => {
         const url = h.urlCloudinary || h.urlAvatarEquipe || h.urlPortraitReference || "";
         const id = echapper(h.idPersonnage);
@@ -161,7 +161,7 @@ function htmlGauche() {
         ${!l.nature && l.reputation != null ? htmlReputation(l) : ""}
         ${/* (v447) Nico : « sur la page groupe, vire le titre La compagnie » */""}
         <div class="liste-heros-groupe" style="--n:${Math.max(1, heros.length)}">${ligneHeros || `<p class="fiche-attente">Aucun héros dans le groupe.</p>`}</div>
-        <button type="button" class="bouton-aventuriers-groupe" data-action="groupe" data-gp="aventuriers">${lavis(TEINTE_AVENTURIERS, "aventuriers-groupe")}${cadre("aventuriers-groupe", 1.3)}<span>Les clans ›</span></button>
+        <button type="button" class="bouton-aventuriers-groupe" data-action="groupe" data-gp="aventuriers">${lavis(TEINTE_AVENTURIERS, "aventuriers-groupe")}${cadre("aventuriers-groupe", 1.3)}<span>Les personnages ›</span></button>
       </div>`;
 }
 
@@ -238,7 +238,8 @@ async function agir(cible) {
     const gp = cible.dataset.gp;
     if (gp === "heros") { son(); if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.ouvrir(cible.dataset.id); return; }
     if (gp === "revenir") { son(); ouvrir(); return; }
-    // (v433) « Les clans › » : le Livre des clans, sur le sien.
+    // (v433) « Les clans › » — (v477) « Les personnages › » (le bouton « Les clans » n'est plus,
+    // CLAN_NOMADE.md) : la liste de ses personnages, jusqu'à la page Expédition (étape 6).
     if (gp === "aventuriers") { son(); if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.allerAuxAventuriers(); return; }
     if (gp === "ame") { son(); if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id: cible.dataset.id, nom: cible.dataset.nom, depuisGroupe: true }); return; }
     // (v422) Parler en privé avec un suiveur.

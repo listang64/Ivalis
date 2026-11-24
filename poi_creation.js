@@ -72,7 +72,7 @@ ${lore}
 LE TERRAIN à cet endroit (lu sur la carte) : ${t}.
 ${lieuxProches && lieuxProches.length ? `Lieux connus non loin : ${lieuxProches.join(" ; ")}.\n` : ""}Les lieux qui existent déjà sur cette carte : ${JSON.stringify(nomsExistants)}.
 
-${impose ? `CE LIEU EST CELUI D'UNE MISSION DE GUILDE (v443) — il existe pour elle :
+${impose ? `CE LIEU EST CELUI D'UNE MISSION (v443) — il existe pour elle :
 - Son nom, à garder exactement : « ${impose.nom} ». Son type : ${impose.type || "à ta guise"}.
 - Ce qu'on en sait : ${impose.description || "(rien de plus)"}
 - La mission : ${impose.mission || ""}

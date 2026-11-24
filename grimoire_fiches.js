@@ -66,23 +66,18 @@ const idJoueurCourant = () => { try { return localStorage.getItem("ID_JOUEUR_COU
 const GARDIENS_DES_CLANS = ["P_01", "P_02", "P_03"];
 const gardienDesClans = () => !!((window.COMPTE_JOUEUR && window.COMPTE_JOUEUR.admin) || GARDIENS_DES_CLANS.includes(idJoueurCourant()));
 
-// Les noms des joueurs (Joueurs), lus une fois ; (v434) et leurs clans (Clans,
-// grimoire_clans.js : le nom donné par le joueur, son fanion).
-let joueurs = null, joueursEnLecture = null, clansBase = {};
+// Les noms des joueurs (Joueurs), lus une fois. (v477) Plus de clans par joueur (leur nom, leur
+// fanion) : le clan, c'est désormais tout le monde (CLAN_NOMADE.md).
+let joueurs = null, joueursEnLecture = null;
 function chargerJoueurs() {
     if (joueurs || joueursEnLecture) return joueursEnLecture;
     joueursEnLecture = (async () => {
-        const liste = {}, cl = {};
+        const liste = {};
         try {
             const snap = await getDocs(collection(db, "Joueurs"));
             snap.forEach(d => { const x = d.data() || {}; if (x.Nom) liste[x.ID_Joueur || d.id] = x.Nom; });
         } catch (e) { console.warn("Le livre : les joueurs", e); }
-        try {
-            const snap = await getDocs(collection(db, "Clans"));
-            snap.forEach(d => { const x = d.data() || {}; cl[x.ID_Joueur || d.id] = { nom: String(x.Nom_Clan || "").trim(), banniere: x.URL_Banniere || "" }; });
-        } catch (e) { console.warn("Le livre : les clans", e); }
         joueurs = liste;
-        clansBase = cl;
         joueursEnLecture = null;
         majPlus(true);
     })();
@@ -111,15 +106,15 @@ function clans() {
         parJoueur.get(j).push({ h, i });
     });
     const liste = [...parJoueur.entries()].map(([id, hs]) => ({
-        id, nom: nomDuJoueur(id), nomClan: (clansBase[id] || {}).nom || "", banniere: (clansBase[id] || {}).banniere || "",
+        id, nom: nomDuJoueur(id),
         heros: hs.sort((a, b) => ((a.h.creeLe || Infinity) - (b.h.creeLe || Infinity)) || (a.i - b.i)).map(x => x.h)
     }));
     liste.sort((a, b) => (a.id === moi ? -1 : b.id === moi ? 1 : 0) || String(a.nom || "~").localeCompare(String(b.nom || "~"), "fr"));
-    if (!liste.some(c => c.id === moi) && moi) liste.unshift({ id: moi, nom: nomDuJoueur(moi), nomClan: (clansBase[moi] || {}).nom || "", banniere: (clansBase[moi] || {}).banniere || "", heros: [] });
+    if (!liste.some(c => c.id === moi) && moi) liste.unshift({ id: moi, nom: nomDuJoueur(moi), heros: [] });
     return liste;
 }
-// (v434) Nico : « on affiche Clan + le nom que le joueur a donné ; sans nom donné, le nom du joueur ».
-const titreClan = (c) => c.id === "MJ" ? "Les gens du Maître du jeu" : (c.nomClan || c.nom) ? `Clan ${c.nomClan || c.nom}` : "Clan sans nom";
+// (v477) La double page des personnages d'un joueur porte son nom (plus de nom de clan).
+const titreClan = (c) => c.id === "MJ" ? "Les gens du Maître du jeu" : c.nom ? `Les personnages de ${c.nom}` : "Les personnages";
 
 // Les caractéristiques d'un héros (sans bonus) : partagées par la partie,
 // sinon le cache de l'ancienne fiche.
@@ -208,7 +203,7 @@ function pageClan(c, cote, i) {
     // (v433) Le Livre des clans : à gauche, les aventuriers du clan (le nom du clan est
     // sur la page de droite, sous sa bannière). (v434) « Renomme le titre : Membres du clan ».
     el.innerHTML = `${fondClan("gauche")}<div class="contenu-page page-liste-clan">${retourGroupe}
-        <div class="titre-clan titre-aventuriers-clan">Membres du clan</div>
+        <div class="titre-clan titre-aventuriers-clan">Les personnages</div>
         <svg class="fleuron fleuron-clan" viewBox="0 0 200 24" aria-hidden="true">
           <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>
         ${lignes ? `<ol class="liste-aventuriers">${lignes}</ol>` : `<p class="clan-vide">Aucun aventurier pour l'instant.</p>`}
@@ -230,15 +225,12 @@ async function choisirHerosActif(id) {
     signatures.clans = "";
     majPlus(true);
 }
-// (v433) LE LIVRE DES CLANS. Nico : « sur la page clan, page de droite, l'image de la
-// bannière du clan, et en bas de celle-ci en gros titre le nom du clan ; page de gauche la
-// liste des aventuriers avec la case à cocher » ; « on peut changer de page pour voir les
-// autres clans ». Une double page par clan. (v434) Le fanion du clan (grimoire_clans.js),
-// en grand, collé en haut de la page ; sa place reste vide tant qu'il n'est pas dessiné.
+// (v433) Une double page par joueur : à gauche, ses personnages ; à droite, son nom. (v477) Le
+// Livre des clans n'est plus : ni fanion ni nom de clan (CLAN_NOMADE.md, étape 1) — la liste des
+// personnages reste, jusqu'à la page Expédition (étape 6).
 function pageBanniereClan(c, i) {
     const el = page("clan-banniere-" + i, "droite", "page-clan page-banniere-clan");
     el.innerHTML = `${fondClan("droite")}<div class="contenu-page page-banniere-du-clan">
-        <div class="cadre-banniere-clan${c.banniere ? "" : " vide"}">${c.banniere ? `<img src="${echapper(c.banniere)}" alt="" draggable="false">` : ""}</div>
         <div class="nom-clan">${echapper(titreClan(c))}</div>
         <svg class="fleuron fleuron-clan" viewBox="0 0 200 24" aria-hidden="true">
           <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>
@@ -247,7 +239,7 @@ function pageBanniereClan(c, i) {
 }
 function construireClans() {
     const cs = clans();
-    const sig = JSON.stringify([gardienDesClans(), cs.map(c => [c.id, c.nom, c.nomClan || "", c.banniere || "", c.heros.map(h => [h.idPersonnage, nomHeros(h), classeDe(h), h.actif !== false])])]);
+    const sig = JSON.stringify([gardienDesClans(), cs.map(c => [c.id, c.nom, c.heros.map(h => [h.idPersonnage, nomHeros(h), classeDe(h), h.actif !== false])])]);
     if (sig === signatures.clans && pagesClans.length) return false;
     signatures.clans = sig;
     const nouvelles = cs.flatMap((c, i) => [pageClan(c, "gauche", i), pageBanniereClan(c, i)]);
@@ -1651,7 +1643,6 @@ window.GRIMOIRE_FICHES = {
     herosAffiche: () => heros,
     pages: () => ({ clans: pagesClans.slice(), ...pagesFiche }),
     // (v434) Un clan fondé, un fanion dessiné, un clan réinitialisé : on relit la base.
-    rechargerClans: () => { joueurs = null; chargerJoueurs(); },
     majPlus: () => majPlus(true),
     // pour les bancs : les dessins ; (v319) pour la création : le lavis, le cadre, la pose des pages
     dessins: { jaugeCrayon, dessinBanniere, piece, lavis, cadre },

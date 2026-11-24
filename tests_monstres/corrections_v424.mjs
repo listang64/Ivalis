@@ -321,7 +321,8 @@ titre("2. AILLEURS DANS LE LIVRE, RIEN NE CHANGE");
 await section(async () => {
   await G(() => window.GRIMOIRE_GROUPE.ouvrir()); await attendreQue(surGroupe, 6000); await pose();
   verifier("la double page du Groupe garde son ombre", await G(() => window.GRIMOIRE.pagesGroupe().every(p => getComputedStyle(p, "::after").display !== "none")));
-  verifier("le village, lui, reste sans ombre (v400)", /\.page-village\.page-papier::after \{ display: none; \}/.test(lire("grimoire.css")));
+  // (v477) La page du village n'est plus (le clan nomade) : sa règle « sans ombre » est partie avec elle.
+  verifier("(v477) plus de règle pour la page du village (elle n'existe plus)", !/\.page-village/.test(lire("grimoire.css")));
 });
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));
 console.log(echecs === 0 ? "\nTOUT EST BON" : `\n${echecs} CONTRÔLE(S) EN ÉCHEC`);

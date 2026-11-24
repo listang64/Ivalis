@@ -99,7 +99,8 @@ for (const [t, attendu] of [
 verifier("l'Arbitre IA le sait aussi : « enfoncer une porte », pas « s'enfoncer dans la forêt »", /enfoncer une porte/.test(lire("ia_master.js")) && /pas « s'enfoncer dans la forêt » : c'est un déplacement/.test(lire("ia_master.js")));
 
 console.log("\n2. LE VILLAGE : LA NOUVELLE IMAGE");
-verifier("le livre demande IMG_2275 (1672 × 941, comme l'ancienne)", await p.evaluate(() => /v1794984079\/IMG_2275_ncxeo8\.png$/.test(window.GRIMOIRE && window.GRIMOIRE.IMAGE_VILLAGE)), await p.evaluate(() => window.GRIMOIRE && window.GRIMOIRE.IMAGE_VILLAGE));
+// (v477) Le clan nomade : la page du village n'est plus (CLAN_NOMADE.md, étape 1), ni son image.
+verifier("(v477) plus de page du village : le livre ne demande plus son image", await p.evaluate(() => !(window.GRIMOIRE && window.GRIMOIRE.IMAGE_VILLAGE)) && !/IMG_2275/.test(lire("grimoire.js")));
 verifier("plus aucune trace de l'ancienne (IMG_2272)", !/IMG_2272/.test(lire("grimoire.js")));
 
 console.log("\n3. LE GROUPE : L'AQUARELLE SOUS LES DEUX PETITS TITRES");

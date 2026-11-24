@@ -184,7 +184,8 @@ await section(async () => {
     titre: ((pg.nextElementSibling && pg.nextElementSibling.querySelector(".nom-clan")) || document.querySelector("#" + pg.id.replace("clan-", "clan-banniere-") + " .nom-clan") || {}).textContent,
     heros: [...pg.querySelectorAll(".ligne-aventurier")].map(b => b.textContent.replace(/\s+/g, " ").trim()) })));
   verifier("« Aventuriers » ouvre la page des clans", (await ici()) === "clans", await ici());
-  verifier("un clan par joueur, une double page chacun, le sien d'abord : « Clan Benjamin », « Clan Nico » (v434)", clans.length === 2 && clans[0].titre === "Clan Benjamin" && clans[1].titre === "Clan Nico", JSON.stringify(clans.map(c => c.titre)));
+  // (v477) Plus de clans par joueur : la double page de chacun porte « Les personnages de … » (CLAN_NOMADE.md).
+  verifier("une double page par joueur, la sienne d'abord : « Les personnages de Benjamin », « … de Nico » (v477)", clans.length === 2 && clans[0].titre === "Les personnages de Benjamin" && clans[1].titre === "Les personnages de Nico", JSON.stringify(clans.map(c => c.titre)));
   verifier("ses héros dans l'ordre de leur création, « Nom - Classe » (au masculin, v365)", JSON.stringify(clans[0].heros) === JSON.stringify(["Thorin Ironfoot - Protecteur", "Kaya - Pisteur"]), JSON.stringify(clans[0].heros));
   verifier("les autres clans avec leurs héros", JSON.stringify(clans[1].heros) === JSON.stringify(["Lyra Sombreval - Oracle"]), JSON.stringify(clans[1].heros));
   await cap("v313_clans");

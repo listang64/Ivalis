@@ -4913,11 +4913,6 @@ textarea.input-texte-parchemin {
 .pastille-village-poignee { position: absolute; top: calc(-7px / var(--zoom-region, 1)); right: calc(-7px / var(--zoom-region, 1));
   width: calc(14px / var(--zoom-region, 1)); height: calc(14px / var(--zoom-region, 1)); box-sizing: border-box; background: #fff;
   border: calc(2px / var(--zoom-region, 1)) solid #a01212; cursor: nesw-resize; }
-/* (v433) La pastille d'Eraldur : dorée, son nom écrit dessus. */
-.pastille-village.eraldur { background: rgba(214, 170, 40, 0.35); border-color: rgba(176, 128, 20, 0.95); }
-.pastille-eraldur-nom { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: calc(3px / var(--zoom-region, 1));
-  font-family: 'Cinzel', serif; font-weight: bold; font-size: calc(13px / var(--zoom-region, 1)); color: #6b4a08; white-space: nowrap; pointer-events: none;
-  text-shadow: 0 0 calc(3px / var(--zoom-region, 1)) #fff6d8; }
 /* La popup DEV : la partie des villages. */
 .popup-regions-villages { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(138, 106, 42, 0.5); }
 .popup-regions-sous-titre { font-family: 'Cinzel', serif; font-weight: bold; color: #7a0d0d; margin-bottom: 6px; }

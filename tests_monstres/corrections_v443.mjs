@@ -291,9 +291,6 @@ const ici = () => G(() => window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex());
 
 
 
-const surVillage = () => G(() => { const [g] = window.GRIMOIRE.pagesVillage(); const i = window.GRIMOIRE.indexDe(g), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1); });
-const surHall = () => G(() => window.GRIMOIRE_GUILDE.vue() === "hall" && window.GRIMOIRE_GUILDE.ouverte());
-const surPiece = (id) => G((id) => { const [g] = window.GRIMOIRE_GUILDE.pagesPiece(); if (!g) return false; const i = window.GRIMOIRE.indexDe(g), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1) && window.GRIMOIRE_GUILDE.piece() === id; }, id);
 const surClan = (n) => G((n) => { const c = window.GRIMOIRE_FICHES.pages().clans; const i = window.GRIMOIRE.indexDe(c[2 * n]), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1); }, n);
 const tournerEnArriere = async () => { await G(() => window.GRIMOIRE_PAGEFLIP.flipPrev("top")); await p.waitForTimeout(200); await pose(); };
 
@@ -372,69 +369,35 @@ await G(() => {
   window.__surPartie = (d) => { window.PARTIE_DATA = d; try { window.appliquerVoyageDeLaPartie(d); } catch (e) {} try { window.appliquerMissionDeLaPartie(d); } catch (e) { console.log("mission", e.message); } };
   window.__surPartie(window.__docs["Systeme_Parties/P1"]);
 });
-const feuille = () => G(() => { const v = document.getElementById("feuille-mission"); if (!v) return null; const s = v.querySelector(".sceau-mission");
-  return { ouverte: v.classList.contains("ouverte"), sceauEteint: !!(s && s.disabled), aide: (v.querySelector(".aide-sceau") || {}).textContent || "", refuser: !!v.querySelector(".refuser-mission"), slot: Number(v.dataset.slot) }; });
-const postit = () => G(() => { const el = document.getElementById("postit-mission"); return el ? { sorti: el.classList.contains("sortie"), texte: el.textContent.replace(/\s+/g, " ").trim(), voir: !!el.querySelector('[data-mission="voir"]') } : null; });
-
-titre("1. LE TABLEAU, PUIS BEN PROPOSE UNE MISSION : EN ATTENTE DES AUTRES");
+// (v477) LE CLAN NOMADE (CLAN_NOMADE.md, étape 1) : plus de tableau ni de vote. Le créateur d'une mission
+// (genererMission) la donne ; lancerMission en fait la mission en cours.
+titre("1. (v477) LE CRÉATEUR D'UNE MISSION : MIA_MISSIONS EN ÉCRIT UNE, SANS TABLEAU");
 let m0 = null;
 await section(async () => {
-  verifier("le tableau se remplit (six missions)", await attendreQue(async () => { const t = await tableau(); return t && Array.isArray(t.Missions) && t.Missions.length === 6; }, 12000));
-  m0 = (await tableau()).Missions[0];
-  await G(() => window.MISSIONS_GUILDE.ouvrirFeuille(0)); await p.waitForTimeout(700);
-  let f = await feuille();
-  verifier("la feuille : le sceau « Accepter la mission » allumé, pas de « Refuser » (pas de vote)", f.ouverte && !f.sceauEteint && !f.refuser, JSON.stringify(f));
-  await cliquer("#feuille-mission .sceau-mission"); await p.waitForTimeout(600);
-  const pd = await partieDoc();
-  verifier("le sceau : un vote (Systeme_Parties/P1.Vote_Mission) — Ben dit oui, les deux joueurs votent", pd.Vote_Mission && pd.Vote_Mission.Id === m0.Id && pd.Vote_Mission.Votes.J1 === "oui" && pd.Vote_Mission.Votants.map(x => x.id).sort().join() === "J1,J2" && !pd.Mission_En_Cours, JSON.stringify(pd.Vote_Mission || {}).slice(0, 200));
-  f = await feuille();
-  verifier("…la feuille : « En attente des autres joueurs (1/2) », le sceau éteint", f.sceauEteint && /En attente des autres joueurs \(1\/2\)/.test(f.aide), JSON.stringify(f));
-  const pi = await postit();
-  verifier("…le post-it de Ben : la mission proposée, en attente", pi && pi.sorti && /Mission proposée/.test(pi.texte) && /Mission 1/.test(pi.texte) && !pi.voir, JSON.stringify(pi));
-  await G(() => window.MISSIONS_GUILDE.fermerFeuille()); await p.waitForTimeout(500);
+  m0 = await G(() => window.MISSIONS_GUILDE.genererMission("normale"));
+  verifier("une mission : son titre, sa région, son lieu (Kesh), sa difficulté, plus de décalage caché",
+    m0 && /^Mission 1\b/.test(m0.Titre) && m0.Region === 5 && m0.Lieu && m0.Lieu.Id === "L_KESH" && m0.Difficulte === "normale" && !("Decalage" in m0), JSON.stringify(m0 || {}).slice(0, 200));
+  const tb = await tableau();
+  verifier("…et plus aucun tableau dans la base (Guilde/Tableau)", !tb, JSON.stringify(tb || null).slice(0, 80));
+  verifier("…ni vote, ni feuille, ni post-it (le Hall de guilde n'est plus)", await G(() => !window.MISSIONS_GUILDE.voterMission && !window.MISSIONS_GUILDE.ouvrirFeuille && !document.getElementById("postit-mission")));
 });
 
-titre("2. CHEZ L'AUTRE JOUEUR : LE POST-IT ET SON LIEN ; IL REFUSE, LE VOTE DISPARAÎT");
+titre("2. (v477) LA MISSION LANCÉE : ELLE EST EN COURS, SANS VOTE");
 await section(async () => {
-  await enJoueur("J2"); await p.waitForTimeout(300);
-  const pi = await postit();
-  verifier("le post-it : « Ben, Thorin… propose une mission », « Voir la mission »", pi && pi.sorti && /propose une mission/.test(pi.texte) && pi.voir, JSON.stringify(pi));
-  await cap("v443-postit");
-  // (v450) « Sur PC le post-it sort complètement du livre, hors écran en haut : l'écran PC est moins haut
-  // que celui d'un iPad — quitte à réduire un peu le livre. » En 1920 × 1080 (et 1366 × 768), il tient à l'écran.
-  for (const [w, h] of [[1920, 1080], [1366, 768]]) {
-    await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(900);
-    const pc = await G(() => { const r = document.querySelector("#postit-mission .papier-ecriture").getBoundingClientRect(); return { haut: Math.round(r.top), bas: Math.round(r.bottom), visible: document.getElementById("postit-mission").classList.contains("sortie") }; });
-    verifier(`(v450) en ${w} × ${h}, le post-it du vote tient à l'écran (son haut sous le bord)`, pc.visible && pc.haut >= 0 && pc.bas > pc.haut + 50, JSON.stringify(pc));
-  }
-  await p.setViewportSize({ width: 1194, height: 834 }); await p.waitForTimeout(900);
-  await cliquer('#postit-mission [data-mission="voir"]'); await p.waitForTimeout(800);
-  const f = await feuille();
-  verifier("le lien : la feuille de la mission glisse du bas, le sceau allumé, « Refuser » dessous", f.ouverte && f.slot === 0 && !f.sceauEteint && f.refuser, JSON.stringify(f));
-  await cap("v443-feuille-vote");
-  await cliquer("#feuille-mission .refuser-mission"); await p.waitForTimeout(600);
-  await G(() => window.__surPartie(window.__docs["Systeme_Parties/P1"])); await p.waitForTimeout(200);
-  const pd = await partieDoc(), pj = await postit();
-  verifier("« Refuser » : le vote disparaît, le post-it rentre, la feuille se ferme", !pd.Vote_Mission && !pd.Mission_En_Cours && (!pj || !pj.sorti) && !(await feuille()).ouverte, JSON.stringify([pd.Vote_Mission, pj]));
-});
-
-titre("3. BEN PROPOSE À NOUVEAU, L'AUTRE ACCEPTE : LA MISSION EST EN COURS");
-await section(async () => {
-  await enJoueur("J1");
-  await G((m) => window.MISSIONS_GUILDE.voterMission(0, m, "oui"), m0);
-  await enJoueur("J2");
-  const r = await G((m) => window.MISSIONS_GUILDE.voterMission(0, m, "oui"), m0);
+  const ok = await G((m) => window.MISSIONS_GUILDE.lancerMission(m), m0);
   await G(() => window.__surPartie(window.__docs["Systeme_Parties/P1"])); await p.waitForTimeout(500);
-  const pd = await partieDoc(), md = await missionDoc(), t = await tableau();
-  verifier("tous d'accord : acceptée (Mission_En_Cours), le vote effacé", r && r.acceptee && pd.Mission_En_Cours && pd.Mission_En_Cours.Id === m0.Id && pd.Mission_En_Cours.Lieu_Id === "L_KESH" && !pd.Vote_Mission, JSON.stringify(pd.Mission_En_Cours));
-  verifier("…sa fiche dans la base du groupe (Guilde/Mission) : la mission, en cours, ses votants, ses héros, la place de son lieu",
+  const pd = await partieDoc(), md = await missionDoc();
+  verifier("lancée : la mission en cours de la partie (Mission_En_Cours), son lieu", ok === true && pd.Mission_En_Cours && pd.Mission_En_Cours.Id === m0.Id && pd.Mission_En_Cours.Lieu_Id === "L_KESH" && !("Decalage" in pd.Mission_En_Cours), JSON.stringify(pd.Mission_En_Cours));
+  verifier("…sa fiche dans la base du groupe (Guilde/Mission) : la mission, en cours, ses joueurs, ses héros, la place de son lieu",
            md && md.Mission.Id === m0.Id && md.Statut === "en_cours" && md.Votants.length === 2 && md.Heros.includes("H1") && md.Lieu_Id === "L_KESH" && md.Lieu_Position.Region === 5 && md.Lieu_Position.x === 0.3, JSON.stringify(md && { ...md, Mission: undefined, Plan: !!md.Plan }).slice(0, 260));
-  verifier("…son encart vidé sur le tableau (les autres restent)", t.Missions[0] === null && t.Missions.slice(1).every(Boolean), JSON.stringify(t.Missions.map(x => x ? x.Rang : null)));
-  await enJoueur("J1");
-  await G(() => window.MISSIONS_GUILDE.ouvrirFeuille(1)); await p.waitForTimeout(600);
-  const f = await feuille();
-  verifier("une seule mission à la fois : sur une autre feuille, le sceau éteint (« Une mission est déjà en cours »)", f.sceauEteint && /déjà en cours/.test(f.aide), JSON.stringify(f));
-  await G(() => window.MISSIONS_GUILDE.fermerFeuille());
+});
+
+titre("3. (v477) UNE SEULE MISSION À LA FOIS");
+await section(async () => {
+  const autre = { ...m0, Id: "M_AUTRE", Titre: "Une autre" };
+  const ok = await G((m) => window.MISSIONS_GUILDE.lancerMission(m), autre);
+  const pd = await partieDoc();
+  verifier("une seconde mission ne se lance pas tant que la première est en cours", ok === false && pd.Mission_En_Cours.Id === m0.Id, JSON.stringify([ok, pd.Mission_En_Cours && pd.Mission_En_Cours.Id]));
 });
 
 titre("4. LE PLAN (MIA_PLAN_MISSION, LE MODÈLE DU NARRATEUR) ; LE « ? » DORÉ SUR LA CARTE");
@@ -471,22 +434,16 @@ await section(async () => {
   verifier("le Narrateur le lit avant chaque tour, et MIA_SUIVI_MISSION suit après", /window\.contexteMissionMJ\(dataPartieMJ, lieuActuel\)/.test(ia) && /window\.MISSIONS_GUILDE\.suivreApresMJ\(reponseTexte, idMessage\)/.test(ia));
 });
 
-titre("6. LES CRÉATURES AU LIEU DE LA MISSION : (v452) LE DÉCALAGE CACHÉ DE LA MISSION (AILLEURS, LE NIVEAU DU GROUPE)");
+titre("6. (v477) LES CRÉATURES : LE NIVEAU DU GROUPE, PARTOUT (PLUS DE DÉCALAGE AU LIEU DE LA MISSION)");
 await section(async () => {
-  const r = await G(async () => { const mc = window.__docs["Systeme_Parties/P1"].Mission_En_Cours, d = mc.Decalage;
+  const r = await G(async () => {
     window.NIVEAU_GROUPE = 5;
-    const ailleurs = { n: window.niveauDesCreatures(), t: window.tricheActuelle().pv, res: window.nbResistancesCreature("Normal") };
+    const ailleurs = window.niveauDesCreatures();
     window.__docs["Systeme_Parties/P1"].Lieu_Actuel = "L_KESH"; window.__surPartie(window.__docs["Systeme_Parties/P1"]);
-    const ici = { n: window.niveauDesCreatures(), t: window.tricheActuelle().pv, attendu: window.tricheDeNiveau(5 + d).pv };
+    const ici = { n: window.niveauDesCreatures(), t: window.tricheActuelle().pv, attendu: window.tricheDeNiveau(5).pv };
     window.__docs["Systeme_Parties/P1"].Lieu_Actuel = ""; window.__surPartie(window.__docs["Systeme_Parties/P1"]);
-    return { d, difficulte: mc.Difficulte, ailleurs, ici, apres: window.niveauDesCreatures() }; });
-  verifier(`ailleurs : le niveau du groupe (5)`, r.ailleurs.n === 5, JSON.stringify(r));
-  verifier(`au lieu de la mission (${r.difficulte}, décalage caché ${r.d}) : ${5 + r.d} — la triche des créatures suit`, ((r.difficulte === "normale" && [-1, 0, 1].includes(r.d)) || (r.difficulte === "difficile" && [2, 3, 4].includes(r.d))) && r.ici.n === 5 + r.d && r.ici.t === r.ici.attendu && r.apres === 5, JSON.stringify(r));
-  verifier("(v452) les décalages : normale −1 / 0 / +1, difficile +2 / +3 / +4", JSON.stringify(await G(() => window.MISSIONS_GUILDE.DECALAGES)) === '{"normale":[-1,0,1],"difficile":[2,3,4]}');
-  // Une mission d'avant v452 (à rang, sans décalage écrit) : le sien, tiré de son identifiant, dans sa difficulté.
-  const anc = await G(() => { const p = window.__docs["Systeme_Parties/P1"], avant = p.Mission_En_Cours; p.Mission_En_Cours = { Id: "M_ANCIENNE_V451", Titre: avant.Titre, Rang: "A", Lieu_Id: avant.Lieu_Id };
-    p.Lieu_Actuel = "L_KESH"; window.__surPartie(p); const n = window.niveauDesCreatures(); p.Mission_En_Cours = avant; p.Lieu_Actuel = ""; window.__surPartie(p); return n; });
-  verifier("(v452) une mission en cours d'avant (Rang A) : difficile, +2 à +4 au lieu de la mission", [7, 8, 9].includes(anc), String(anc));
+    return { ailleurs, ici, decalage: typeof window.decalageNiveauMission }; });
+  verifier("ailleurs comme au lieu de la mission : le niveau du groupe (5), la triche des créatures le suit", r.ailleurs === 5 && r.ici.n === 5 && r.ici.t === r.ici.attendu && r.decalage === "undefined", JSON.stringify(r));
 });
 
 titre("7. LE SUIVI : LES ÉTAPES, LES INDICES ; LE NARRATEUR DIT QUE C'EST RÉUSSI : LA MISSION S'ACHÈVE");
@@ -517,18 +474,17 @@ await section(async () => {
 
 titre("8. UNE MISSION DANS UN LIEU À CRÉER : LE LIEU NAÎT COMME UN POI, À SON NOM");
 await section(async () => {
-  const m1 = (await tableau()).Missions[1];
+  const m1 = (await G(() => window.MISSIONS_GUILDE.genererMissions(["normale", "normale"])))[1];
   await G(() => { window.__creations = []; window.peutCreerPoi = () => true;
     window.creerLieuPoi = async (o) => { window.__creations.push(o); return { id: "L_NEUF_GROTTE", nom: o.impose.nom }; }; });
-  await enJoueur("J1"); await G((m) => window.MISSIONS_GUILDE.voterMission(1, m, "oui"), m1);
-  await enJoueur("J2"); await G((m) => window.MISSIONS_GUILDE.voterMission(1, m, "oui"), m1);
+  await G((m) => window.MISSIONS_GUILDE.lancerMission(m), m1);
   await G(() => window.__surPartie(window.__docs["Systeme_Parties/P1"]));
   verifier("le lieu est créé (creerLieuPoi), à son nom, dans sa région, pour cette mission", await attendreQue(async () => { const md = await missionDoc(); return md && md.Lieu_Id === "L_NEUF_GROTTE"; }, 10000));
   const c = (await G(() => window.__creations))[0] || {}, md = await missionDoc(), pd = await partieDoc();
   verifier("…le nom et la description de la mission imposés, la place choisie dans la région", c.impose && c.impose.nom === "La grotte 2" && /humide/.test(c.impose.description) && c.region === 5 && c.x > 0 && c.x < 1 && c.impose.missionId === m1.Id, JSON.stringify(c).slice(0, 200));
   verifier("…la partie le sait (Mission_En_Cours.Lieu_Id)", pd.Mission_En_Cours && pd.Mission_En_Cours.Lieu_Id === "L_NEUF_GROTTE", JSON.stringify(pd.Mission_En_Cours));
   const poi = lire("poi_creation.js");
-  verifier("MIA_POI reçoit le lieu de la mission (son nom gardé tel quel)", /CE LIEU EST CELUI D'UNE MISSION DE GUILDE/.test(poi) && /if \(o\.impose && o\.impose\.nom\) lieu\.nom = String\(o\.impose\.nom\)\.trim\(\);/.test(poi));
+  verifier("MIA_POI reçoit le lieu de la mission (son nom gardé tel quel)", /CE LIEU EST CELUI D'UNE MISSION \(v443\)/.test(poi) && /if \(o\.impose && o\.impose\.nom\) lieu\.nom = String\(o\.impose\.nom\)\.trim\(\);/.test(poi));
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

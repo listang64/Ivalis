@@ -63,7 +63,7 @@ const estAccomplie = (d) => !!(d && d.Mission && d.Statut === "reussie");
 function htmlGauche(d) {
     if (!d || !d.Mission) return `<div class="contenu-page page-mission-vide"><div class="titre-mission-en-cours">Mission en cours</div>${FLEURON}
         <p class="aucune-mission">Aucune mission en cours.</p>
-        <p class="aide-mission">Le panneau des missions, au Hall de guilde d'Eraldur, en propose.</p></div>`;
+        </div>`;
     // (v452) Nico : « vire les indices et leurs créations dans la page de mission en cours » : plus de liste
     // d'indices (le Narrateur garde ceux de son plan, pour lui seul).
     const m = d.Mission, av = d.Avancement || {}, journal = liste(av.Journal);
