@@ -220,3 +220,132 @@ export function groupeAuCamp(camp, position, expedition, rayon = 0.06) {
     if (Number(position.Region) !== Number(camp.Position.Region)) return false;
     return Math.hypot(Number(position.x) - Number(camp.Position.x), Number(position.y) - Number(camp.Position.y)) <= rayon;
 }
+
+// =========================================================================
+//  (v481) LA GESTION DU CAMP (étape 4) : LES TÂCHES, LE BILAN, LE MORAL
+// =========================================================================
+// « m = modificateur de la caractéristique, calculé comme dans le jeu : (carac − 10) ÷ 2, arrondi vers
+// le bas. Pour une tâche à deux caracs, on prend la meilleure. » Les caracs : { force, dex, con, int, sag, cha }.
+export const modificateur = (v) => Math.floor(((Number.isFinite(Number(v)) && v !== null && v !== "" ? Number(v) : 10) - 10) / 2);
+export const TACHES = {
+    cuisiner: { nom: "Cuisiner", caracs: ["int"], max: 2, aide: "Chaque cuisinier fait manger le camp (1 + m) provisions de moins par jour (jamais moins de 1 en tout) ; repas : +2 de moral par jour à tous." },
+    chasser: { nom: "Chasser", caracs: ["dex"], max: null, aide: "+(3 + m) provisions par jour (1 au moins), selon la jauge ; parfois une peau (3 drachmes) ; un petit risque de blessure." },
+    cueillir: { nom: "Cueillir", caracs: ["int", "force"], max: null, aide: "+(2 + m) provisions par jour (1 au moins), selon la jauge ; sans risque." },
+    soigner: { nom: "Soigner", caracs: ["sag"], max: 1, aide: "Si m vaut 1 ou plus : m blessés guérissent deux fois plus vite." },
+    forger: { nom: "Forger, réparer", caracs: ["force"], max: 1, aide: "Le déplacement du camp coûte (10 % + 5 % × m) de moins (5 % au moins)." },
+    eclaireur: { nom: "Éclaireur", caracs: ["dex"], max: 1, aide: "Chaque jour, une chance (20 % à 40 %) de repérer un lieu intéressant près du camp, à raconter au conseil." },
+    commercer: { nom: "Commercer", caracs: ["cha"], max: null, aide: "Achète (3 drachmes) ou vend (1 drachme) des provisions au village le plus proche, ±10 % par point de m ; une fois, jusqu'au prochain conseil." },
+    entrainer: { nom: "Entraîner", caracs: ["cha", "sag"], max: 2, aide: "+(20 + 10 × m) XP par jour (10 au moins) à une recrue de niveau inférieur." }
+};
+export const PLURIEL_TACHES = { cuisiner: "cuisiniers", soigner: "soigneur", forger: "forgeron", eclaireur: "éclaireur", entrainer: "entraîneurs" };
+export const mDeTache = (tache, caracs) => {
+    const t = TACHES[tache];
+    if (!t) return 0;
+    return Math.max(...t.caracs.map(c => modificateur((caracs || {})[c])));
+};
+// Le moral : « 80 ou plus : +1 au m de sa tâche ; 10 à 29 : −1 ; moins de 10 : ne travaille plus » (null).
+export function mAvecMoral(m, moral) {
+    const v = Number.isFinite(Number(moral)) ? Number(moral) : 60;
+    if (v < 10) return null;
+    if (v < 30) return m - 1;
+    if (v >= 80) return m + 1;
+    return m;
+}
+// « Rendement de la chasse et de la cueillette » selon la jauge.
+export function rendementJauge(jauge) {
+    const j = Number(jauge) || 0;
+    return j >= 60 ? 1 : j >= 30 ? 0.5 : j >= 1 ? 0.25 : 0;
+}
+export const estThemes = (id, membre) => !!((membre && membre.Narrateur) || String(id || "").startsWith("PNJ_THEMES_"));
+// Les membres restés au camp (pas en expédition).
+export const presentsAuCampSeulement = (camp, partis) => Object.keys((camp && camp.Membres) || {}).filter(id => !(partis || []).includes(id));
+
+// LE BILAN DU JOUR : production − consommation, au camp (l'expédition mange sur ses propres provisions).
+// `infos` : { id: { caracs, indisponible: { chasser: true… } } }. « Rester au camp : 1 provision par membre et
+// par jour » ; les cuisiniers la font baisser, jamais sous 1. La production : (chasse + cueillette) × le
+// rendement de la jauge, arrondie vers le bas.
+export function bilanDuJour(camp, infos, partis) {
+    const ici = presentsAuCampSeulement(camp, partis);
+    const rendement = rendementJauge(((camp && camp.Ressources) || {}).Jauge);
+    let chasse = 0, cueillette = 0, cuisine = 0, ouvriers = 0;
+    ici.forEach(id => {
+        const mb = camp.Membres[id] || {}, t = mb.Tache, i = (infos || {})[id] || {};
+        if (!t || !TACHES[t] || (i.indisponible && i.indisponible[t])) return;
+        const m = mAvecMoral(mDeTache(t, i.caracs), mb.Moral);
+        if (m === null) return;
+        ouvriers++;
+        if (t === "chasser") chasse += Math.max(1, 3 + m);
+        if (t === "cueillir") cueillette += Math.max(1, 2 + m);
+        if (t === "cuisiner") cuisine += Math.max(0, 1 + m);
+    });
+    const production = Math.floor((chasse + cueillette) * rendement);
+    const consommation = ici.length ? Math.max(1, ici.length - cuisine) : 0;
+    return { presents: ici.length, ouvriers, rendement, chasse, cueillette, production, cuisine: ici.length ? ici.length - consommation : 0, consommation, net: production - consommation };
+}
+
+// LE COMMERCE : « achat d'1 provision : 3 drachmes, vente : 1 drachme ; ±10 % par point de m, appliqué au total
+// de la transaction puis arrondi à la drachme la plus proche ; jusqu'à (5 + 2 × m) provisions échangées (3 au moins). »
+export const maxCommerce = (m) => Math.max(3, 5 + 2 * m);
+export function prixCommerce(sens, quantite, m) {
+    const q = Math.max(0, Math.floor(Number(quantite) || 0));
+    return sens === "vente" ? Math.round(q * 1 * (1 + 0.1 * m)) : Math.round(q * 3 * (1 - 0.1 * m));
+}
+
+// PEUT-ON DONNER CETTE TÂCHE ? Rend "" ou la raison du refus. `o` : { bloque (une expédition est en cours hors du
+// camp), infos ({ id: { caracs, niveau } }), recrue, commerce: { sens, quantite } }.
+export function peutAssigner(camp, id, tache, o = {}) {
+    if (o.bloque) return "Une expédition est en cours : les postes du camp ne changent pas avant son retour.";
+    const membres = (camp && camp.Membres) || {};
+    if (!membres[id]) return "Ce personnage n'est pas au camp.";
+    if (!tache) return "";
+    if (!TACHES[tache]) return "Tâche inconnue.";
+    if (estThemes(id, membres[id])) return "Thémès ne prend pas de tâche : il part avec chaque expédition.";
+    const t = TACHES[tache];
+    if (t.max && Object.keys(membres).filter(x => x !== id && membres[x] && membres[x].Tache === tache).length >= t.max)
+        return `Pas plus de ${t.max === 1 ? "un" : t.max} ${PLURIEL_TACHES[tache] || t.nom.toLowerCase()} au camp.`;
+    const infos = o.infos || {};
+    if (tache === "entrainer") {
+        const r = o.recrue;
+        if (!r || !membres[r] || r === id) return "Choisis la recrue qu'il entraîne.";
+        if (estThemes(r, membres[r])) return "Thémès n'a pas besoin d'entraînement.";
+        const nE = Number((infos[id] || {}).niveau) || 1, nR = Number((infos[r] || {}).niveau) || 1;
+        if (nR >= nE) return "La recrue doit être d'un niveau inférieur à celui de l'entraîneur.";
+    }
+    if (tache === "commercer") {
+        const c = o.commerce || {}, q = Math.floor(Number(c.quantite) || 0), m = mDeTache("commercer", (infos[id] || {}).caracs);
+        if (!["achat", "vente"].includes(c.sens)) return "Achat ou vente ?";
+        if (q < 1) return "Combien de provisions ?";
+        if (q > maxCommerce(m)) return `Il ne peut pas échanger plus de ${maxCommerce(m)} provisions.`;
+        const prix = prixCommerce(c.sens, q, m);
+        if (c.sens === "achat" && prix > (Number(camp.Caisse) || 0)) return `Pas assez de drachmes dans la caisse (${prix} pour ${q} provisions).`;
+        if (c.sens === "vente" && q > (Number(camp.Provisions) || 0)) return "Le camp n'a pas autant de provisions à vendre.";
+    }
+    return "";
+}
+// L'INTENDANT : « en plus d'un autre rôle ; obligatoire dès qu'au moins un personnage reste au camp » ; jamais Thémès.
+export function peutEtreIntendant(camp, id, partis) {
+    const mb = ((camp && camp.Membres) || {})[id];
+    if (!mb) return "Ce personnage n'est pas au camp.";
+    if (estThemes(id, mb)) return "Thémès ne peut pas être intendant.";
+    if ((partis || []).includes(id)) return "Il est parti en expédition.";
+    return "";
+}
+export function intendantManquant(camp, partis) {
+    const restent = presentsAuCampSeulement(camp, partis).filter(id => !estThemes(id, camp.Membres[id]));
+    if (!restent.length) return false;
+    return !camp.Intendant || !restent.includes(camp.Intendant);
+}
+
+// LE MORAL : borné entre 0 et 100 ; « chaque variation est inscrite dans son fil invisible et pèse sur son
+// humeur » : une hausse le rend joyeux, une baisse triste (5 points au moins pour toucher l'humeur).
+export const MORAL_HISTORIQUE = 12;
+export const moralBorne = (v) => Math.max(0, Math.min(MORAL_MAX, Math.round(Number(v) || 0)));
+export function humeurDuMoral(delta) {
+    const d = Number(delta) || 0;
+    if (Math.abs(d) < 5) return null;
+    return { emotion: d > 0 ? "joie" : "tristesse", intensite: Math.abs(d) >= 15 ? 3 : Math.abs(d) >= 10 ? 2 : 1 };
+}
+export function effetDuMoral(moral) {
+    const v = Number(moral);
+    return v >= 80 ? "+1 au m de sa tâche" : v >= 30 ? "normal" : v >= 10 ? "−1 au m de sa tâche" : "ne travaille plus";
+}

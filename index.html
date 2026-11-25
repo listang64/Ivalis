@@ -27,6 +27,7 @@
   <link rel="stylesheet" href="grimoire_liens.css?v=7">
   <link rel="stylesheet" href="grimoire_groupe.css?v=10">
   <link rel="stylesheet" href="camp_scene.css?v=1">
+  <link rel="stylesheet" href="grimoire_gestion.css?v=1">
 <link rel="stylesheet" href="missions_guilde.css?v=8">
 <link rel="stylesheet" href="grimoire_mission.css?v=6">
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Dancing+Script:wght@400;700&family=Homemade+Apple&family=Indie+Flower&family=Kalam:wght@400;700&family=Satisfy&display=swap" rel="stylesheet">
@@ -2228,7 +2229,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=370"></script>
+<script src="trace_combat.js?v=371"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2238,7 +2239,7 @@
 <!-- LE GRIMOIRE (v297) : StPageFlip 2.0.7 (MIT, dans vendor/), puis le livre -->
 <script src="vendor/page-flip/page-flip.browser.js?v=2.0.7"></script>
 <script src="police_titres.js?v=2"></script>
-<script src="grimoire.js?v=45"></script>
+<script src="grimoire.js?v=46"></script>
 <script src="grimoire_parametres.js?v=8"></script>
 <!-- LES DÉPENSES DU MJ (v293) : tokens et coût en euros de chaque réponse -->
 <script src="depenses_ia.js?v=4"></script>
@@ -2318,7 +2319,7 @@
 <!-- Les combats dans le livre (v388) : la double page du menu Combat. -->
 <script type="module" src="grimoire_combats.js?v=1"></script>
 <!-- LES FILS INVISIBLES DANS LE LIVRE (v414) : la fiche et le radar des âmes de la partie. -->
-<script type="module" src="grimoire_liens.js?v=10"></script>
+<script type="module" src="grimoire_liens.js?v=11"></script>
 <!-- LE GROUPE (v418) : la double page de la compagnie ; les Aventuriers en sont les sous-pages. -->
 <script type="module" src="grimoire_groupe.js?v=12"></script>
 <!-- LES MISSIONS (v442) : (v477) le créateur d'une mission et la mission en cours ; sa double page. -->
@@ -2344,10 +2345,12 @@
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
 <script type="module" src="environnement_mj.js?v=6"></script>
 <!-- LE CAMP DU CLAN NOMADE (v478) : ses règles (camp_pur.js), sa place, Thémès, le bouton DEV. -->
-<script type="module" src="camp.js?v=3"></script>
+<script type="module" src="camp.js?v=4"></script>
 <!-- LA PAGE DU CAMP (v480) : les images en scène des membres (camp_avatars.js), l'image en 9 couches et ses encarts (camp_scene.js). -->
-<script type="module" src="camp_avatars.js?v=1"></script>
-<script type="module" src="camp_scene.js?v=1"></script>
+<script type="module" src="camp_avatars.js?v=2"></script>
+<script type="module" src="camp_scene.js?v=2"></script>
+<!-- LA GESTION DU CAMP (v481) : la double page du livre (la caisse, les provisions, le bilan, les tâches, l'intendant). -->
+<script type="module" src="grimoire_gestion.js?v=1"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->
 <script src="poi_catalogue.js?v=1"></script>
 <script type="module" src="poi_creation.js?v=6"></script>

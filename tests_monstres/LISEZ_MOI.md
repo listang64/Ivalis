@@ -12667,3 +12667,11 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Au camp, jamais de combat** (`groupeAuCamp`) : le pion sur l'icône du camp et pas d'expédition en cours ; la détection du combat ne s'annonce pas (`combat_rp.js`), le narrateur le sait (`ia_master.js`).
 - **Les deux images en scène** (`camp_avatars.js`) : le personnage en entier, des pieds à la tête, deux poses différentes tirées dans la liste, l'image actuelle et l'armure en référence, fond magenta puis détourage ; refaites (et les anciennes effacées) si l'armure change ; le gabarit du compagnon par MIA_GABARIT.
 - corrections_v480 le vérifie.
+
+## v481 — Le clan nomade, étape 4 : la gestion du camp
+
+- **Les règles des tâches** (`camp_pur.js`) : m = (carac − 10) ÷ 2 arrondi vers le bas, la meilleure de deux caracs ; le moral sur le m (80+ : +1, 10-29 : −1, sous 10 : ne travaille plus) ; le rendement de la jauge (60+ 100 %, 30-59 50 %, 1-29 25 %, 0 rien) ; le bilan du jour (l'exemple du document : +6 en forêt, +1 sous 60, déficit sous 30 ; la consommation jamais sous 1 ; l'expédition à part) ; les limites (2 cuisiniers, 1 soigneur, 1 forgeron, 1 éclaireur, 2 entraîneurs) ; la recrue de niveau inférieur ; le commerce (3 drachmes l'achat, 1 la vente, ±10 % par point de m sur le total, 5 + 2 × m au plus) ; l'intendant (jamais Thémès, obligatoire dès qu'un membre reste au camp) ; le moral borné et son humeur.
+- **La double page « Gestion du camp »** (`grimoire_gestion.js`, `grimoire_gestion.css`, depuis le bouton du camp) : à gauche la caisse, les provisions, la jauge et son rendement, le bilan du jour (et combien de jours tiendront les provisions), l'intendant ; à droite les membres (Thémès, les héros, les PNJ), leur moral, leur tâche (un menu ; « complet » quand la limite est atteinte ; la recrue pour entraîner ; acheter ou vendre et combien pour commercer). Tout est figé pendant une expédition hors du camp (et la base refuse).
+- **Le moral dans les fils invisibles** (`grimoire_liens.js`) : la jauge et les dernières variations ; une variation de 5 ou plus y laisse un souvenir et une humeur (`camp.js`, `changerMoral`). « ← Revenir à la gestion du camp ».
+- corrections_v481 le vérifie.
+

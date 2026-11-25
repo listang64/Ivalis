@@ -56,6 +56,7 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
 | 2 — Le camp, Thémès et les données | v478 | fait |
 | (Nico) Plus de clans : le menu « Mon héros principal » | v479 | fait |
 | 3 — La page du camp | v480 | fait |
+| 4 — Gestion du camp | v481 | fait |
 
 ## Points ambigus
 
@@ -103,3 +104,21 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
   Expédition à l'étape 6) ; « Déplacer le camp » est éteint tant que le conseil ne l'a pas voté (étape 11).
 - **Étape 3, le cadrage sur un téléphone en hauteur.** Le document dit « bord à bord » : sur un écran plus
   haut que l'image, le haut reste noir (l'image est collée en bas).
+- **Étape 4, les caractéristiques des PNJ.** Les héros ont les leurs (`Caracteristiques`). Les PNJ n'en ont pas
+  encore : un PNJ sans `Caracs` dans sa fiche compte 10 partout (m = 0) ; son niveau, `Niveau` (1 sinon). Le
+  recrutement (étape 12) pourra leur en donner.
+- **Étape 4, Thémès et les tâches.** Il ne prend pas de tâche (il part avec chaque expédition) et ne peut pas
+  être intendant ; il mange au camp quand il y est.
+- **Étape 4, le bilan du jour.** Production = (chasse + cueillette) × le rendement de la jauge, arrondie vers le
+  bas ; consommation = 1 par membre resté au camp, moins (1 + m) par cuisinier, jamais sous 1. C'est l'exemple
+  du document : +6 en forêt, +1 sous 60, déficit sous 30. Le moral joue sur le m (80 ou plus : +1 ; 10 à 29 :
+  −1 ; sous 10 : ne travaille plus).
+- **Étape 4, le commerce.** On choisit d'acheter ou de vendre (le tableau des tâches donne les deux prix), et
+  combien ; la caisse doit pouvoir payer un achat, le camp avoir les provisions d'une vente. Le prix est noté
+  avec la tâche (`Commerce`), payé au premier jour (étape 5), livré au retour de l'expédition (étape 8).
+- **Étape 4, « postes bloqués ».** Pendant une expédition hors du camp (le clan n'est pas « au camp », voir
+  l'étape 3), les menus sont figés et la base refuse aussi.
+- **Étape 4, le moral dans les fils invisibles.** La jauge et les dernières variations sont sur la page de gauche
+  des fils invisibles d'un membre. Chaque variation est gardée (les 12 dernières) ; une variation de 5 points ou
+  plus laisse aussi un souvenir (« Mon moral baisse (−10) : la faim ») et une humeur (joyeux ou triste), ce qui
+  pèse sur ses relations comme les autres humeurs.

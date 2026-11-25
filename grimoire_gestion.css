@@ -1,0 +1,68 @@
+/* =========================================================================
+   IVALIS — LA GESTION DU CAMP (v481, grimoire_gestion.js)
+   =========================================================================
+   Une double page du livre : à gauche la caisse, les provisions, la jauge,
+   le bilan du jour et l'intendant ; à droite les membres du camp, leur
+   moral et leur tâche. Les tailles suivent la page (--u).
+   ========================================================================= */
+.page-gestion .contenu-page { gap: calc(var(--u) * 1.4) !important; }
+.page-gestion-gauche > *, .page-gestion-droite > * { flex-shrink: 0; }
+.retour-gestion { align-self: flex-start; }
+.tresor-gestion { display: flex; gap: calc(var(--u) * 3); justify-content: center; }
+.case-gestion { display: flex; flex-direction: column; align-items: center; min-width: 40%; padding: calc(var(--u) * 1.2) calc(var(--u) * 2);
+  border: 1px solid rgba(90, 60, 30, 0.35); border-radius: calc(var(--u) * 1.2); background: rgba(255, 248, 230, 0.35); }
+.case-gestion b { font-family: 'Cinzel', serif; font-size: calc(var(--u) * 6); color: #3a2210; line-height: 1.1; }
+.case-gestion span { font-size: calc(var(--u) * 2.6); color: #5a3c22; text-align: center; }
+.jauge-gestion { display: flex; align-items: center; gap: calc(var(--u) * 1.5); font-size: calc(var(--u) * 3); }
+.barre-jauge-gestion { flex: 1; height: calc(var(--u) * 1.6); background: rgba(120, 90, 50, 0.2); border-radius: 9px; overflow: hidden; }
+.barre-jauge-gestion i { display: block; height: 100%; background: linear-gradient(90deg, #8a6a2a, #5e7f59); border-radius: 9px; }
+.ligne-gestion { margin: 0; font-size: calc(var(--u) * 2.8); color: #3a2a1a; }
+.ligne-gestion.petite { font-size: calc(var(--u) * 2.5); font-style: italic; color: #5a4632; }
+.bilan-gestion { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(var(--u) * 0.8); }
+.bilan-gestion li { display: grid; grid-template-columns: calc(var(--u) * 22) calc(var(--u) * 8) 1fr; align-items: baseline; gap: calc(var(--u) * 1.2); font-size: calc(var(--u) * 3); }
+.bilan-gestion b { font-family: 'Cinzel', serif; text-align: right; }
+.bilan-gestion small { font-size: calc(var(--u) * 2.4); color: #6b5440; }
+.bilan-gestion .net-gestion { border-top: 1px solid rgba(90, 60, 30, 0.35); padding-top: calc(var(--u) * 0.8); font-weight: 700; color: #2f5a2a; }
+.bilan-gestion .net-gestion.deficit { color: #8a1a10; }
+.avis-gestion { margin: 0; font-size: calc(var(--u) * 2.6); color: #8a1a10; font-style: italic; }
+.avis-gestion.petit { font-size: calc(var(--u) * 2.3); }
+.select-gestion { font: inherit; font-size: calc(var(--u) * 2.8); color: #24150a; padding: calc(var(--u) * 0.5) calc(var(--u) * 1);
+  background: rgba(255, 250, 238, 0.85); border: 1px solid rgba(90, 60, 30, 0.45); border-radius: calc(var(--u) * 0.8); max-width: 100%; }
+.select-gestion:disabled, .quantite-gestion:disabled { opacity: 0.6; }
+.select-intendant { align-self: flex-start; min-width: 60%; }
+.note-gestion { margin: 0; min-height: 1.2em; font-size: calc(var(--u) * 2.7); color: #2f4a6a; opacity: 0; transition: opacity 0.3s ease; }
+.note-gestion.visible { opacity: 1; }
+
+.liste-membres-gestion { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(var(--u) * 1.6); }
+.membre-gestion { display: flex; gap: calc(var(--u) * 1.8); align-items: flex-start; padding-bottom: calc(var(--u) * 1.4); border-bottom: 1px dashed rgba(90, 60, 30, 0.3); }
+.membre-gestion.parti { opacity: 0.65; }
+.portrait-gestion { flex: 0 0 auto; width: calc(var(--u) * 10); height: calc(var(--u) * 10); border-radius: 50%; overflow: hidden; padding: 0; cursor: pointer;
+  border: 2px solid rgba(140, 100, 40, 0.7) !important; background: #e8d8b8 !important; display: flex; align-items: center; justify-content: center; }
+.portrait-gestion img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 15%; }
+.portrait-gestion span { font-family: 'Cinzel', serif; font-size: calc(var(--u) * 4.5); color: #5a3c22; }
+.corps-membre-gestion { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: calc(var(--u) * 0.6); }
+.ligne-nom-gestion { display: flex; flex-wrap: wrap; align-items: baseline; gap: calc(var(--u) * 1.2); }
+.nom-gestion { background: none; border: 0; padding: 0; cursor: pointer; font-family: 'Cinzel', serif; font-size: calc(var(--u) * 3.4); color: #24150a; text-decoration: underline;
+  text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
+.qui-gestion { font-size: calc(var(--u) * 2.5); color: #6b5440; font-style: italic; }
+.badge-intendant { font-size: calc(var(--u) * 2.2); padding: 0 calc(var(--u) * 1); border-radius: 9px; background: rgba(94, 127, 89, 0.2); color: #2f5a2a; border: 1px solid rgba(47, 90, 42, 0.4); }
+.moral-gestion { display: grid; grid-template-columns: calc(var(--u) * 9) 1fr calc(var(--u) * 5); align-items: center; gap: calc(var(--u) * 1); font-size: calc(var(--u) * 2.5); }
+.moral-gestion b { text-align: right; }
+.barre-moral-gestion { height: calc(var(--u) * 1.1); background: rgba(120, 90, 50, 0.2); border-radius: 9px; overflow: hidden; }
+.barre-moral-gestion i { display: block; height: 100%; background: #b08a3a; border-radius: 9px; }
+.barre-moral-gestion.haut i { background: #5e7f59; }
+.barre-moral-gestion.bas i { background: #a3201a; }
+.tache-gestion { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 1); align-items: center; }
+.tache-fixe { font-size: calc(var(--u) * 2.6); font-style: italic; color: #5a4632; }
+.commerce-gestion { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 0.8); align-items: center; font-size: calc(var(--u) * 2.5); }
+.quantite-gestion { width: calc(var(--u) * 9); font: inherit; font-size: calc(var(--u) * 2.8); padding: calc(var(--u) * 0.4); border: 1px solid rgba(90, 60, 30, 0.45);
+  border-radius: calc(var(--u) * 0.8); background: rgba(255, 250, 238, 0.85); }
+.valider-commerce { align-self: center !important; }
+
+/* LE MORAL DANS LES FILS INVISIBLES (grimoire_liens.js). */
+.moral-liens { display: grid; grid-template-columns: calc(var(--u) * 9) 1fr calc(var(--u) * 5) auto; align-items: center; gap: calc(var(--u) * 1); font-size: calc(var(--u) * 2.8); }
+.moral-liens b { text-align: right; }
+.moral-liens small { font-size: calc(var(--u) * 2.3); color: #6b5440; font-style: italic; }
+.variations-moral-liens { list-style: none; margin: 0; padding: 0; font-size: calc(var(--u) * 2.5); color: #3a2a1a; }
+.variations-moral-liens .hausse { color: #2f5a2a; }
+.variations-moral-liens .baisse { color: #8a1a10; }

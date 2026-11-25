@@ -144,7 +144,8 @@
     // (v418) La double page du Groupe (grimoire_groupe.js), juste avant les Aventuriers (ses sous-pages).
     let pagesGroupe = [];
     let pagesMission = [];      // (v444) la double page « Mission en cours » (grimoire_mission.js), le temps qu'on la lit
-    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesGroupe.length + pagesFiches.length + pagesLiens.length + pagesCombats.length + pagesMission.length : 0);
+    let pagesGestion = [];      // (v481) la double page « Gestion du camp » (grimoire_gestion.js), quand le clan a un camp
+    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesGroupe.length + pagesGestion.length + pagesFiches.length + pagesLiens.length + pagesCombats.length + pagesMission.length : 0);
     // LA CARTE DU MONDE (v302) : sa double page vient juste après l'index (5-6),
     // en partie seulement ; la suite (le récit) commence alors à la page 7.
     // Nico : « page de gauche cette partie de la map, page de droite celle-là ;
@@ -1069,7 +1070,7 @@
     function definirSuite(elements) {
         suite = (elements || []).slice();
         if (!pageFlip) return;
-        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesGroupe, ...pagesFiches, ...pagesLiens, ...pagesCombats, ...pagesMission] : []), ...suite, ...vierges, dos];
+        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesGroupe, ...pagesGestion, ...pagesFiches, ...pagesLiens, ...pagesCombats, ...pagesMission] : []), ...suite, ...vierges, dos];
         const generation = ++definirSuite.generation;      // seule la dernière demande s'applique
         const appliquer = () => {
             if (generation !== definirSuite.generation) return;
@@ -1328,6 +1329,7 @@
         if (action === "combats") { if (window.GRIMOIRE_COMBATS) window.GRIMOIRE_COMBATS.agir(cible); return; }
         if (action === "liens") { if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.agir(cible); return; }
         if (action === "groupe") { if (window.GRIMOIRE_GROUPE) window.GRIMOIRE_GROUPE.agir(cible); return; }
+        if (action === "gestion") { if (window.GESTION_CAMP) window.GESTION_CAMP.agir(cible); return; }
         // (v444) Le marque-page de la mission : la double page « Mission en cours ».
         if (action === "marque-mission") { if (window.GRIMOIRE_MISSION) window.GRIMOIRE_MISSION.ouvrir(); return; }
         // (v312) Le marque-page du menu : la page principale (le journal), en partie ou non.
@@ -1463,6 +1465,9 @@
         pagesGroupe: () => pagesGroupe.slice(),
         definirMission: (els) => { pagesMission = (els || []).slice(); if (enPartie) definirSuite(suite); },
         pagesMission: () => pagesMission.slice(),
+        // (v481) la double page « Gestion du camp »
+        definirGestion: (els) => { pagesGestion = (els || []).slice(); if (enPartie) definirSuite(suite); },
+        pagesGestion: () => pagesGestion.slice(),
         // (v395) les Paramètres du livre (grimoire_parametres.js) : le chapitre des pages 3-4
         chapitre: () => chapitre, remplirChapitre, pageChapitre: (i) => pages[i],
         ouvrirChapitre: (nom) => { remplirChapitre(nom); partieChoisie = null; if (pageFlip) allerALaPage(3); },

@@ -14,8 +14,8 @@
 //      la carte globale » : ce logo, sur la carte régionale et sur la carte du monde.
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
-import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=3";
+import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import * as CP from "./camp_pur.js?v=4";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -199,4 +199,99 @@ export function contexteMJ() {
     return `--- LE CAMP DU CLAN ---\nLes héros sont au camp du clan nomade : des tentes, un feu, les membres du clan qui vaquent à leurs occupations. Ils flânent, parlent, s'occupent.\nRÈGLE ABSOLUE : un RP dans le camp ne déclenche JAMAIS de combat (aucun ennemi, aucune attaque, aucune embuscade, aucune bagarre qui tourne au combat).`;
 }
 
-window.CAMP = { lire: lireCamp, creerCampDev, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ };
+// ---------------------------------------------------------------------
+//  (v481) LA GESTION DU CAMP : les tâches, l'intendant, le moral
+// ---------------------------------------------------------------------
+// Ceux qui sont partis en expédition (étape 6) ; les autres restent au camp.
+export const partis = () => (((window.PARTIE_DATA || {}).Expedition || {}).Membres || []).slice();
+// « Pendant qu'une expédition est en cours, hors du camp, on ne peut ni lancer de conseil, ni changer les postes. »
+export const postesBloques = () => !!camp && !auCamp();
+// Ce qu'il faut savoir des membres pour leurs tâches : leurs caracs (les héros : Caracteristiques ; les PNJ :
+// leur fiche, Caracs, 10 partout sinon), leur niveau, leur nom, leur portrait.
+const cacheInfos = new Map();
+async function lireDoc(col, id) {
+    const c = cacheInfos.get(col + "/" + id);
+    if (c && Date.now() - c.le < 30000) return c.d;
+    let d = null;
+    try { const s = await getDoc(doc(db, col, id)); d = s.exists() ? s.data() : null; } catch (e) {}
+    cacheInfos.set(col + "/" + id, { d, le: Date.now() });
+    return d;
+}
+export async function infosMembres() {
+    if (!camp) return {};
+    const persos = window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || [];
+    const out = {};
+    await Promise.all(Object.keys(camp.Membres || {}).map(async (id) => {
+        const mb = camp.Membres[id] || {}, h = persos.find(x => x && x.idPersonnage === id);
+        if (h) {
+            const caracs = (window.CARACS_PARTIE || {})[id] || await lireDoc("Caracteristiques", id) || {};
+            out[id] = { id, heros: true, joueur: h.idJoueur || "", nom: [h.prenom, h.nom].filter(Boolean).join(" ").trim() || mb.Nom || "", caracs,
+                        niveau: Number(h.niveau) || 1, portrait: h.urlCloudinary || h.urlAvatarEquipe || h.urlPortraitReference || "" };
+            return;
+        }
+        const f = await lireDoc("Monde_PNJ", id) || {};
+        out[id] = { id, heros: false, nom: f.Nom_PNJ || mb.Nom || "", caracs: f.Caracs || {}, niveau: Number(f.Niveau) || 1, portrait: f.URL_Cloudinary || "",
+                    occupation: f.Occupation || "" };
+    }));
+    return out;
+}
+// Donner une tâche (null : le repos). Rend "" ou la raison du refus.
+export async function assignerTache(id, tache, o = {}) {
+    const p = idPartie();
+    if (!p || !camp) return "Pas de camp.";
+    const infos = await infosMembres();
+    const refus = CP.peutAssigner(camp, id, tache || null, { bloque: postesBloques(), infos, recrue: o.recrue, commerce: o.commerce });
+    if (refus) return refus;
+    const base = "Camp.Membres." + id + ".";
+    const maj = { [base + "Tache"]: tache || null, [base + "Recrue"]: tache === "entrainer" ? o.recrue : deleteField(), [base + "Commerce"]: deleteField() };
+    if (tache === "commercer") {
+        const m = CP.mDeTache("commercer", (infos[id] || {}).caracs), q = Math.floor(Number(o.commerce.quantite));
+        // « La transaction est payée immédiatement, au jour 1, et les provisions arrivent au camp au retour de l'expédition. »
+        maj[base + "Commerce"] = { Sens: o.commerce.sens, Quantite: q, Prix: CP.prixCommerce(o.commerce.sens, q, m), Paye: false, Le: Date.now() };
+    }
+    try { await updateDoc(refPartie(p), maj); } catch (e) { console.error("[Camp] La tâche :", e); return "La base n'a pas répondu."; }
+    return "";
+}
+export async function nommerIntendant(id) {
+    const p = idPartie();
+    if (!p || !camp) return "Pas de camp.";
+    if (postesBloques()) return CP.peutAssigner(camp, id, null, { bloque: true });
+    const refus = id ? CP.peutEtreIntendant(camp, id, partis()) : "";
+    if (refus) return refus;
+    try { await updateDoc(refPartie(p), { "Camp.Intendant": id || null }); } catch (e) { return "La base n'a pas répondu."; }
+    return "";
+}
+// LE MORAL qui change : [{ id, delta, raison, dateJeu }]. Inscrit dans le camp (Moral, Moral_Historique), et dans
+// les fils invisibles : un souvenir et une humeur (joyeux, triste) pour une variation de 5 points ou plus.
+export async function changerMoral(changes) {
+    const p = idPartie();
+    if (!p || !camp || !Array.isArray(changes) || !changes.length) return [];
+    const maj = {}, faits = [];
+    changes.forEach(c => {
+        const mb = (camp.Membres || {})[c.id];
+        const delta = Math.round(Number(c.delta) || 0);
+        if (!mb || !delta) return;
+        const avant = Number.isFinite(Number(mb.Moral)) ? Number(mb.Moral) : 60, apres = CP.moralBorne(avant + delta);
+        const histo = (Array.isArray(mb.Moral_Historique) ? mb.Moral_Historique : []).concat([{ Delta: apres - avant, Raison: String(c.raison || ""), Date_Jeu: c.dateJeu || "", Le: Date.now() }]).slice(-CP.MORAL_HISTORIQUE);
+        maj["Camp.Membres." + c.id + ".Moral"] = apres;
+        maj["Camp.Membres." + c.id + ".Moral_Historique"] = histo;
+        mb.Moral = apres; mb.Moral_Historique = histo;
+        faits.push({ id: c.id, avant, apres, delta: apres - avant, raison: c.raison || "", dateJeu: c.dateJeu || "" });
+    });
+    if (!faits.length) return [];
+    await updateDoc(refPartie(p), maj);
+    // Les fils invisibles.
+    let tour = 0;
+    try { const e = await getDoc(doc(db, PARTIES, p, "Social", "etat")); tour = Number(((e.exists() && e.data()) || {}).tour) || 0; } catch (e) {}
+    for (const f of faits) {
+        const h = CP.humeurDuMoral(f.delta);
+        if (!h) continue;
+        const texte = `${f.delta > 0 ? "Mon moral remonte" : "Mon moral baisse"} (${f.delta > 0 ? "+" : "−"}${Math.abs(f.delta)}) : ${f.raison || "la vie du camp"}.`;
+        try { if (window.SOCIAL && window.SOCIAL.noterSouvenir) await window.SOCIAL.noterSouvenir(p, f.id, texte, { cle: "moral", importance: h.intensite >= 2 ? 2 : 1, dateJeu: f.dateJeu }); } catch (e) {}
+        try { await setDoc(doc(db, PARTIES, p, "Ames", f.id), { humeur: { emotion: h.emotion, intensite: h.intensite, cause: f.raison || "le moral", jusquA: tour + 1 + 3 } }, { merge: true }); } catch (e) {}
+    }
+    return faits;
+}
+
+window.CAMP = { lire: lireCamp, creerCampDev, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
+                partis, postesBloques, infosMembres, assignerTache, nommerIntendant, changerMoral };

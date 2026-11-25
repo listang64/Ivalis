@@ -99,7 +99,7 @@ export function liensDuRegard(reseau, centre, regard, filtre, P) {
 //  L'ÉTAT DE LA DOUBLE PAGE
 // ---------------------------------------------------------------------
 let pages = null;
-const vue = { centre: "", regard: "out", filtre: "tous", selection: "", recherche: "", regle: "", reseau: null, souvenirs: [], charge: 0, retourRecit: false, retourParametres: false, retourGroupe: false, dernierToucher: null };
+const vue = { centre: "", regard: "out", filtre: "tous", selection: "", recherche: "", regle: "", reseau: null, souvenirs: [], charge: 0, retourRecit: false, retourParametres: false, retourGroupe: false, retourGestion: false, dernierToucher: null };
 
 function creer() {
     if (pages) return pages;
@@ -154,7 +154,8 @@ function htmlGauche() {
     const P = S(), id = vue.centre, a = ames()[id];
     const retour = vue.retourRecit ? `<button type="button" class="lien-fiche retour-liens" data-action="liens" data-cb="recit">← Revenir au récit</button>`
         : vue.retourParametres ? `<button type="button" class="lien-fiche retour-liens" data-action="liens" data-cb="parametres">← Revenir aux paramètres</button>`
-        : vue.retourGroupe ? `<button type="button" class="lien-fiche retour-liens" data-action="liens" data-cb="groupe">← Revenir au groupe</button>` : "";
+        : vue.retourGroupe ? `<button type="button" class="lien-fiche retour-liens" data-action="liens" data-cb="groupe">← Revenir au groupe</button>`
+        : vue.retourGestion ? `<button type="button" class="lien-fiche retour-liens" data-action="liens" data-cb="gestion">← Revenir à la gestion du camp</button>` : "";
     if (!P || !a) return `<div class="contenu-page page-liens-gauche">
         <div class="entete-liens">${lavis(TEINTE_LIENS, "liens-titre")}<span class="titre-page-fiche">Les fils invisibles</span></div>${FLEURON}
         <p class="fiche-attente">${vue.charge === 1 ? "Le livre cherche les âmes de la partie…" : "Aucune âme n'est encore connue dans cette partie : elles naissent avec les personnages nommés du récit."}</p>${retour}</div>`;
@@ -174,6 +175,7 @@ function htmlGauche() {
           <div class="qui-liens">${echapper(qui)}</div>
           ${hum ? `<div class="humeur-liens">Humeur : ${echapper(P.NOMS_EMOTIONS[hum.emotion] || hum.emotion)}${hum.cause ? ` — ${echapper(hum.cause)}` : ""}</div>` : ""}
         </div></div>
+        ${htmlMoral(id)}
         <div class="caractere-liens">${echapper(S().caractere ? S().caractere(ps) : "")}</div>
         <div class="traits-liens">${traits}</div>
         ${ps.valeurs.length ? `<p class="ligne-liens"><b>Valeurs :</b> ${ps.valeurs.map(v => echapper(P.NOMS_VALEURS[v])).join(", ")}</p>` : ""}
@@ -188,6 +190,20 @@ function htmlGauche() {
         ${souvenirs ? `<ul class="souvenirs-liens">${souvenirs}</ul>` : `<p class="fiche-attente">Pas encore de souvenir.</p>`}
         ${a.type === "pnj" && modeDev() ? `<button type="button" class="supprimer-pnj-liens" data-action="liens" data-cb="supprimer-pnj" data-id="${echapper(id)}" title="Supprimer ce PNJ de la partie (DEV)">Supprimer ce PNJ</button>` : ""}
       </div>${(window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.FLECHE_DEFILE) || ""}`;
+}
+
+// (v481) LE MORAL d'un membre du camp (le clan nomade, CLAN_NOMADE.md) : « chaque personnage du clan a une
+// jauge de moral, affichée dans son fil invisible, héros principaux compris » ; ses dernières variations.
+function htmlMoral(id) {
+    const camp = window.CAMP && window.CAMP.lire ? window.CAMP.lire() : null;
+    const mb = camp && (camp.Membres || {})[id];
+    if (!mb) return "";
+    const R = window.CAMP.regles || {};
+    const v = Number.isFinite(Number(mb.Moral)) ? Number(mb.Moral) : 60;
+    const histo = (Array.isArray(mb.Moral_Historique) ? mb.Moral_Historique : []).slice().reverse().slice(0, 6);
+    return `<div class="moral-liens"><span class="cle-moral-liens">Moral</span><span class="jauge-liens"><i style="width:${v}%"></i></span><b>${v}</b>
+        <small>${R.effetDuMoral ? echapper(R.effetDuMoral(v)) : ""}</small></div>
+      ${histo.length ? `<ul class="variations-moral-liens">${histo.map(x => `<li><b class="${x.Delta > 0 ? "hausse" : "baisse"}">${x.Delta > 0 ? "+" : "−"}${Math.abs(x.Delta)}</b> ${echapper(x.Raison || "")}${x.Date_Jeu ? ` <span class="date-liens">${echapper(x.Date_Jeu)}</span>` : ""}</li>`).join("")}</ul>` : ""}`;
 }
 
 // ---------------------------------------------------------------------
@@ -338,6 +354,7 @@ async function agir(cible) {
     if (cb === "recit") { son(); vue.retourRecit = false; if (window.GRIMOIRE_RECIT && window.GRIMOIRE_RECIT.allerAuRecit) window.GRIMOIRE_RECIT.allerAuRecit(); return; }
     if (cb === "parametres") { son(); vue.retourParametres = false; if (window.GRIMOIRE_PARAMETRES) window.GRIMOIRE_PARAMETRES.revenirDesLiens(); return; }
     if (cb === "groupe") { son(); vue.retourGroupe = false; if (window.GRIMOIRE_GROUPE) window.GRIMOIRE_GROUPE.ouvrir(); return; }
+    if (cb === "gestion") { son(); vue.retourGestion = false; if (window.GESTION_CAMP) window.GESTION_CAMP.ouvrir(); return; }
     const lien = () => { const de = vue.regard === "in" ? vue.selection : vue.centre, vers = vue.regard === "in" ? vue.centre : vue.selection; return { de, vers }; };
     // (v464) Supprimer un PNJ totalement (mode DEV) : ses images, sa fiche, son âme, ses liens, ses souvenirs.
     if (cb === "supprimer-pnj") {
@@ -374,6 +391,7 @@ async function ouvrir(options) {
     vue.retourRecit = !!o.depuisRecit;
     vue.retourParametres = !!o.depuisParametres;
     vue.retourGroupe = !!o.depuisGroupe;      // (v418) depuis la double page du Groupe
+    vue.retourGestion = !!o.depuisGestion;    // (v481) depuis la gestion du camp
     // (v428) Nico : « les fils invisibles dans paramètres, le bouton ne fonctionne pas ». Le
     // livre attendait d'avoir tout lu dans la base avant de tourner : rien ne bougeait sous
     // le doigt et, si la lecture passait 8 secondes, la double page ressortait du livre
