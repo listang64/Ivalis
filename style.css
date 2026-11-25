@@ -5423,3 +5423,13 @@ textarea.input-texte-parchemin {
 .camp-carte img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.55)); }
 .camp-monde { position: absolute; display: none; height: auto; transform: translate(-50%, -50%); pointer-events: none; z-index: 6;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.55)); }
+
+/* (v495) LA BANDE DU HAUT, SUR IPAD. iPadOS 26 floute le contenu sous la barre d'état, sauf s'il trouve tout en haut un
+   élément fixe d'au moins 90 % de la largeur et de plus de 10 px de haut : il remplit alors cette zone de sa couleur.
+   La bande ne dessine rien (background-clip: text, sans texte) et ne prend aucun clic. PC : absente. */
+.bande-haut-ipad { display: none; }
+@supports (-webkit-touch-callout: none) {
+  .bande-haut-ipad { display: block; position: fixed; inset: 0 0 auto; height: 12px; background-color: #000;
+    background-clip: text; -webkit-background-clip: text; pointer-events: none; z-index: 2147483647; }
+}
+

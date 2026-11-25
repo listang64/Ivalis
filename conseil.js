@@ -18,8 +18,8 @@
 //  Les règles : camp_pur.js. Les messages : Systeme_Parties/{p}/Conseil_Messages.
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
-import { doc, getDoc, getDocs, addDoc, collection, query, where, onSnapshot, runTransaction, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=15";
+import { doc, getDoc, getDocs, addDoc, collection, query, where, onSnapshot, runTransaction, deleteField, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import * as CP from "./camp_pur.js?v=16";
 
 const PARTIES = "Systeme_Parties";
 export const ATTENTE_IA_MS = 6000;
@@ -191,6 +191,29 @@ async function apresLeVote(c, resultat) {
     console.log(`🔥 [Conseil] Décidé : « ${s.Titre} ».`);
 }
 
+// (v495) METTRE FIN AU CONSEIL : son historique effacé (les messages de ce conseil), le conseil retiré de la partie ;
+// le prochain repart de zéro.
+export async function terminer() {
+    const c = conseil();
+    if (!idPartie() || !c) return "Aucun conseil n'est réuni.";
+    clearTimeout(minuteurIA);
+    try {
+        const snap = await getDocs(query(colMessages(), where("Conseil", "==", c.Id)));
+        const refs = []; snap.forEach(d => refs.push(d.ref));
+        for (let i = 0; i < refs.length; i += 400) { const lot = writeBatch(db); refs.slice(i, i + 400).forEach(r => lot.delete(r)); await lot.commit(); }
+        await runTransaction(db, async (tx) => {
+            const s = await tx.get(refPartie());
+            const d = s.exists() ? s.data() : {};
+            // (le conseil extraordinaire aussi : sinon il se rouvrirait aussitôt)
+            if (d.Conseil && d.Conseil.Id === c.Id) tx.update(refPartie(), { Conseil: deleteField(), ...(d.Camp && d.Camp.Conseil_Extraordinaire ? { "Camp.Conseil_Extraordinaire": deleteField() } : {}) });
+        });
+    } catch (e) { console.error("[Conseil] Mettre fin au conseil :", e); return "La base n'a pas répondu."; }
+    messages = [];
+    const d = { ...(window.PARTIE_DATA || {}) }; delete d.Conseil; window.PARTIE_DATA = d;
+    console.log(`🔥 [Conseil] Le conseil ${c.Id} est clos, son historique effacé.`);
+    return "";
+}
+
 // ---------------------------------------------------------------------
 //  L'IA : Thémès et les PNJ répondent
 // ---------------------------------------------------------------------
@@ -300,7 +323,8 @@ function construire() {
     e.innerHTML = `
       <div class="cadre-conseil">
         <div class="tete-conseil"><button type="button" class="retour-conseil" data-cs="quitter">‹ Le camp</button>
-          <h2 class="titre-conseil">Le conseil du clan</h2><span class="raison-conseil" id="raison-conseil"></span></div>
+          <h2 class="titre-conseil">Le conseil du clan</h2><span class="raison-conseil" id="raison-conseil"></span>
+          <button type="button" class="finir-conseil" data-cs="finir" title="Clore le conseil et effacer son historique">Mettre fin au conseil</button></div>
         <div class="corps-conseil">
           <div class="colonne-chat-conseil">
             <div class="chat-conseil" id="chat-conseil" aria-live="polite"></div>
@@ -400,6 +424,12 @@ async function surClic(ev) {
     const quoi = b.dataset.cs;
     son();
     if (quoi === "quitter") return fermerVue();
+    if (quoi === "finir") {
+        if (typeof window.confirm === "function" && !window.confirm("Mettre fin au conseil ? Son historique sera effacé.")) return;
+        const r = await terminer();
+        if (r) return noter(r);
+        return fermerVue();
+    }
     if (quoi === "voter") { const r = await voter(b.dataset.sujet); if (r) noter(r); return; }
     if (quoi === "proposer") { proposition = true; return rendre(); }
     if (quoi === "annuler") { proposition = false; return rendre(); }
@@ -425,5 +455,5 @@ export async function veiller() {
     if (cs && cs.Ouvert && Object.keys(cs.Votes || {}).length) verifierVote();
 }
 
-window.CONSEIL = { ouvrir, peutOuvrir, creerConseil, envoyer, proposer, voter, verifierVote, repondre, planifierIA, rafraichir, ouvrirVue, fermerVue, veiller, conseil,
+window.CONSEIL = { terminer, ouvrir, peutOuvrir, creerConseil, envoyer, proposer, voter, verifierVote, repondre, planifierIA, rafraichir, ouvrirVue, fermerVue, veiller, conseil,
                    ouverte: () => ouverte, messages: () => messages.slice() };

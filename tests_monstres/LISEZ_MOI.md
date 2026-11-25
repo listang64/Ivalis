@@ -12769,3 +12769,11 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Les images en scène** (`camp_pur.js`, `POSES_CAMP`) : plus de bûche fendue ni d'animal (la chèvre) ; deux poses neutres.
 - **L'apparition** (`placerAuCamp`, `CHANCE_APPARAITRE_CAMP`) : 50 % de chance, compagnons compris ; les encarts de Nico (14).
 - corrections_v494 le vérifie (dans une vraie partie : le livre dans l'écran de jeu) ; corrections_v478, v480, v491 adaptés.
+
+## v495 — Le conseil qu'on clôt, la bande du haut sur iPad, le retour à la gestion, Thémès jamais joué
+
+- **Mettre fin au conseil** (`conseil.js`, `terminer` ; `conseil.css`) : un bouton dans l'en-tête ; les messages du conseil effacés, le conseil (et le conseil extraordinaire) retiré de la partie ; le suivant repart de zéro.
+- **La bande du haut sur iPad** (`index.html`, `style.css`, `.bande-haut-ipad`) : iPadOS 26 floute le contenu sous la barre d'état, sauf s'il trouve tout en haut un élément fixe (90 % de la largeur au moins, plus de 10 px) dont il reprend la couleur ; une bande invisible de 12 px, sur les écrans tactiles WebKit (correctif vérifié sur iPad : coder/coder#31027).
+- **Le retour à la gestion** (`grimoire_gestion.js`, `marquerRetour`) : une fiche ou des fils invisibles ouverts depuis la gestion, la page tournée en arrière ramène à la gestion (les fils, rangés après les fiches, retombaient sur les fiches).
+- **Thémès jamais joué** (`camp_pur.js`, `estThemesPerso`) : ni sa fiche de PNJ, ni une fiche d'aventurier créée à son nom — hors des personnages jouables, des places de l'expédition et de l'arène.
+- corrections_v495 le vérifie.

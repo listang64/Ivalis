@@ -278,6 +278,7 @@ async function agir(cible) {
     }
     if (gc === "ame") {
         son();
+        marquerRetour("liens");
         if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id, nom: nomDe(id, C().lire()), depuisGestion: true, exact: true });
         return;
     }
@@ -286,7 +287,8 @@ async function agir(cible) {
     if (gc === "fiche") {
         son();
         const aSaFiche = (window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || []).some(h => h && h.idPersonnage === id);
-        if (aSaFiche && window.GRIMOIRE_FICHES) { window.GRIMOIRE_FICHES.ouvrir(id); return; }
+        if (aSaFiche && window.GRIMOIRE_FICHES) { marquerRetour("fiches"); window.GRIMOIRE_FICHES.ouvrir(id); return; }
+        marquerRetour("liens");
         if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id, nom: nomDe(id, C().lire()), depuisGestion: true, exact: true });
         return;
     }
@@ -393,6 +395,26 @@ function ouverte() {
     if (!pages || !pf || !g.ouvert || !g.ouvert() || !g.enPartie()) return false;
     const i = g.indexDe(pages.g), ici = pf.getCurrentPageIndex();
     return i >= 0 && (ici === i || ici === i + 1);
+}
+// (v495) LE RETOUR À LA GESTION : une fiche ou des fils invisibles ouverts depuis la gestion, tourner la page en arrière
+// (au-delà de leur première page) ramène à la gestion — les fils invisibles, rangés après les fiches, y tombaient sinon.
+let retour = null, ecouteRetour = false;
+function marquerRetour(quoi) {
+    retour = { quoi, le: Date.now() };
+    const g = G(), e = g && g.ecran && g.ecran();
+    if (ecouteRetour || !e) return;
+    ecouteRetour = true;
+    e.addEventListener("grimoire-page", (ev) => {
+        const gg = G();
+        if (!retour || !gg || !pages) return;
+        const premieres = retour.quoi === "liens" ? (gg.pagesLiens ? gg.pagesLiens() : []) : (gg.pagesFiches ? gg.pagesFiches() : []);
+        const i0 = premieres.length ? gg.indexDe(premieres[0]) : -1, ig = gg.indexDe(pages.g), i = Number(ev.detail && ev.detail.index);
+        if (i0 < 0 || ig < 0 || !Number.isFinite(i)) { retour = null; return; }
+        if (i >= i0) { retour.arrive = true; return; }   // arrivé sur la fiche (ou les fils), ou plus loin
+        if (!retour.arrive) return;                         // le livre tourne encore vers la page ouverte
+        retour = null;
+        if (i !== ig && i !== ig + 1) gg.allerALaPage(ig);
+    });
 }
 // La veille : en partie et avec un camp, la double page est dans le livre ; ouverte, elle suit la base.
 setInterval(() => {

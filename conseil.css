@@ -54,3 +54,8 @@
 @media (max-width: 760px) {
   .corps-conseil { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1.4fr) minmax(0, 1fr); }
 }
+/* (v495) Mettre fin au conseil : à droite de l'en-tête. */
+.finir-conseil { margin-left: auto; padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(240, 150, 120, 0.6); background: rgba(70, 14, 8, 0.6); color: #f6d0c0; cursor: pointer;
+  font-family: 'Cinzel', serif; font-size: 13px; }
+.finir-conseil:hover { background: rgba(110, 22, 12, 0.75); }
+

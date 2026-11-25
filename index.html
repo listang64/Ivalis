@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=160">
+  <link rel="stylesheet" href="style.css?v=161">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
   <link rel="stylesheet" href="grimoire.css?v=30">
@@ -28,7 +28,7 @@
   <link rel="stylesheet" href="grimoire_groupe.css?v=11">
   <link rel="stylesheet" href="camp_scene.css?v=3">
   <link rel="stylesheet" href="grimoire_gestion.css?v=3">
-  <link rel="stylesheet" href="conseil.css?v=1">
+  <link rel="stylesheet" href="conseil.css?v=2">
 <link rel="stylesheet" href="missions_guilde.css?v=8">
 <link rel="stylesheet" href="grimoire_mission.css?v=6">
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Dancing+Script:wght@400;700&family=Homemade+Apple&family=Indie+Flower&family=Kalam:wght@400;700&family=Satisfy&display=swap" rel="stylesheet">
@@ -376,6 +376,9 @@
   </script>
 </head>
 <body>
+  <!-- (v495) iPad : sans élément fixe en haut, iPadOS 26 floute le haut de la page sous la barre d'état. Cette bande
+       invisible (style.css, .bande-haut-ipad) lui donne une couleur unie à la place (correctif vérifié : coder/coder#31027). -->
+  <div class="bande-haut-ipad" aria-hidden="true"></div>
 
   <audio id="musique-ambiance"></audio>
   <!-- Le clic des boutons n'est plus un fichier : c'est la Goutte de la
@@ -2224,7 +2227,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=384"></script>
+<script src="trace_combat.js?v=385"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2340,24 +2343,24 @@
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
 <script type="module" src="environnement_mj.js?v=6"></script>
 <!-- LE CAMP DU CLAN NOMADE (v478) : ses règles (camp_pur.js), sa place, Thémès, le bouton DEV. -->
-<script type="module" src="camp.js?v=15"></script>
+<script type="module" src="camp.js?v=16"></script>
 <!-- LA PAGE DU CAMP (v480) : les images en scène des membres (camp_avatars.js), l'image en 9 couches et ses encarts (camp_scene.js). -->
-<script type="module" src="camp_avatars.js?v=13"></script>
-<script type="module" src="camp_scene.js?v=14"></script>
+<script type="module" src="camp_avatars.js?v=14"></script>
+<script type="module" src="camp_scene.js?v=15"></script>
 <!-- LA GESTION DU CAMP (v481) : la double page du livre (la caisse, les provisions, le bilan, les tâches, l'intendant). -->
-<script type="module" src="grimoire_gestion.js?v=9"></script>
+<script type="module" src="grimoire_gestion.js?v=10"></script>
 <!-- LES EXPÉDITIONS (v483) : monter l'expédition, ses places et ses suiveurs, son départ et son retour, le mode arène. -->
-<script type="module" src="expedition.js?v=10"></script>
+<script type="module" src="expedition.js?v=11"></script>
 <!-- LE RETOUR AU CAMP (v484) : les événements, les affinités, le rapport de l'intendant. -->
-<script type="module" src="retour_camp.js?v=9"></script>
+<script type="module" src="retour_camp.js?v=10"></script>
 <!-- LE CONSEIL AUTOUR DU FEU (v485) : son récit à part, ses post-its, ses votes, l'extraordinaire. -->
-<script type="module" src="conseil.js?v=8"></script>
+<script type="module" src="conseil.js?v=9"></script>
 <!-- LA TÂCHE EN COURS (v486) : la tâche acceptée dans le RP ou votée au conseil, ses récompenses pour la caisse du groupe. -->
-<script type="module" src="tache_en_cours.js?v=7"></script>
+<script type="module" src="tache_en_cours.js?v=8"></script>
 <!-- LE DÉPLACEMENT DU CAMP (v487) : le bouton après le vote, la route du clan, l'arrivée et la nouvelle jauge. -->
-<script type="module" src="deplacement_camp.js?v=6"></script>
+<script type="module" src="deplacement_camp.js?v=7"></script>
 <!-- LE RECRUTEMENT (v488) : les recrues vers le camp, les mercenaires, les personnages à 300 drachmes, le bouton DEV. -->
-<script type="module" src="recrutement.js?v=5"></script>
+<script type="module" src="recrutement.js?v=6"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->
 <script src="poi_catalogue.js?v=1"></script>
 <script type="module" src="poi_creation.js?v=6"></script>

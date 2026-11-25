@@ -117,7 +117,7 @@ export function regionNommee(cartes, nom) {
 // estIllusion }) ; `choix` : Heros_Principaux de la partie ({ idJoueur: idPersonnage }).
 export function personnagesDuJoueur(joueur, persos) {
     return (persos || []).map((h, i) => ({ h, i }))
-        .filter(({ h }) => h && h.idPersonnage && joueur && h.idJoueur === joueur && !h.estIllusion && !h.estMonstre && h.statut !== "Mort" && !h.librePourTous)
+        .filter(({ h }) => h && h.idPersonnage && joueur && h.idJoueur === joueur && !h.estIllusion && !h.estMonstre && h.statut !== "Mort" && !h.librePourTous && !estThemesPerso(h))
         .sort((a, b) => ((a.h.creeLe || Infinity) - (b.h.creeLe || Infinity)) || (a.i - b.i))
         .map(x => x.h);
 }
@@ -658,6 +658,7 @@ export function peutPrendrePlace(exp, i, perso, joueur, jouables) {
     if (pl.some((x, k) => k !== i && x && x.Joueur === joueur)) return "Tu as déjà une place dans l'expédition.";
     if (pl.some((x, k) => k !== i && x && x.Perso === perso)) return "Ce personnage part déjà.";
     if ((exp.Suiveurs || []).includes(perso)) return "Ce personnage part déjà comme suiveur.";
+    if (String(perso || "").startsWith("PNJ_THEMES_")) return "Thémès ne part jamais comme personnage joué : il accompagne l'expédition.";
     if (!(jouables || []).includes(perso)) return "Tu ne peux pas jouer ce personnage.";
     return "";
 }
@@ -1230,7 +1231,7 @@ export function pnjsDuConseil(camp, persos, choix, connectes, partis = []) {
 // combattre (il peut combattre seul en mode DEV) ». `persos` : les personnages de la partie ; rend les combattants choisis.
 export const MAX_COMBATTANTS_ARENE = 3;
 export function persosArene(persos) {
-    return (persos || []).filter(h => h && h.idPersonnage && !h.estIllusion && !h.estMonstre && !h.estTotem && h.statut !== "Mort");
+    return (persos || []).filter(h => h && h.idPersonnage && !h.estIllusion && !h.estMonstre && !h.estTotem && h.statut !== "Mort" && !estThemesPerso(h));
 }
 export function choisirCombattantArene(combattants, id, coche) {
     const l = (combattants || []).filter(Boolean).filter(x => x !== id);
@@ -1246,4 +1247,13 @@ export function combattantsArene(arene, persos) {
 // (v494) LA CARAC DÉTERMINANTE D'UNE TÂCHE (la Gestion du camp l'écrit à la place du modificateur).
 export const NOMS_CARACS_CAMP = { force: "Force", dex: "Dextérité", con: "Constitution", int: "Intelligence", sag: "Sagesse", cha: "Charisme" };
 export const caracsDeTache = (t) => ((TACHES[t] || {}).caracs || []).map(c => NOMS_CARACS_CAMP[c] || c).join(" ou ");
+
+// (v495) THÉMÈS N'EST JAMAIS UN PERSONNAGE JOUÉ (« il ne se bat jamais ; il part automatiquement en expédition ») : ni sa
+// fiche de PNJ, ni une fiche d'aventurier créée à son nom.
+export function estThemesPerso(h) {
+    if (!h) return false;
+    if (String(h.idPersonnage || h.id || "").startsWith("PNJ_THEMES_") || h.narrateur === true || h.Narrateur === true) return true;
+    const nom = String([h.prenom, h.nom].filter(Boolean).join(" ") || h.Prenom_Personnage || h.Nom_PNJ || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+    return nom === "themes";
+}
 
