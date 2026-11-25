@@ -349,3 +349,248 @@ export function effetDuMoral(moral) {
     const v = Number(moral);
     return v >= 80 ? "+1 au m de sa tâche" : v >= 30 ? "normal" : v >= 10 ? "−1 au m de sa tâche" : "ne travaille plus";
 }
+
+// =========================================================================
+//  (v482) LA JOURNÉE DU CAMP (étape 5) : à chaque jour de voyage, dans l'ordre du document
+// =========================================================================
+// « Table des blessures de chasse (d10, jamais de mort). »
+export const BLESSURES_CHASSE = [
+    { min: 1, max: 4, nom: "Égratignure de ronces", effet: "aucun effet", jours: 0 },
+    { min: 5, max: 6, nom: "Cheville foulée", effet: "ne peut plus chasser pendant 2 jours", jours: 2, interdit: "chasser" },
+    { min: 7, max: 7, nom: "Coup de corne", effet: "−2 aux jets de Dextérité pendant 3 jours", jours: 3, malus: { dex: -2 } },
+    { min: 8, max: 8, nom: "Morsure", effet: "ne peut plus chasser pendant 3 jours", jours: 3, interdit: "chasser" },
+    { min: 9, max: 9, nom: "Chute dans un ravin", effet: "repos forcé pendant 4 jours", jours: 4, interdit: "tout" },
+    { min: 10, max: 10, nom: "Griffure profonde d'une bête", effet: "−2 aux jets de Force et de Dextérité pendant 5 jours", jours: 5, malus: { force: -2, dex: -2 } }
+];
+export const blessureChasse = (d10) => BLESSURES_CHASSE.find(b => d10 >= b.min && d10 <= b.max) || BLESSURES_CHASSE[0];
+// L'éclaireur : 20 % (m −1), 25 % (m 0), 30 % (m +1), 35 % (m +2), 40 % (m +3).
+export const chanceEclaireur = (m) => [20, 25, 30, 35, 40][Math.max(-1, Math.min(3, Math.round(Number(m) || 0))) + 1] / 100;
+export const SOLDE_MERCENAIRE = 3, JOURS_SANS_SOLDE_MAX = 5, JOURS_MORAL_ZERO_MAX = 8, PRIX_PEAU = 3, CHANCE_PEAU = 0.25, JOURNAL_JOURS = 60;
+export const MORAL_JOUR = { repos: 3, repas: 2, repasMauvais: 1, faim: -10, sansSolde: -5 };
+
+// « Quand il n'y a pas assez de provisions pour tout le monde, on les distribue dans cet ordre de priorité (au
+// hasard à l'intérieur d'un même rang) : Thémès > PNJ > mercenaires > personnages achetés par les joueurs >
+// héros principaux des joueurs. » Un héros qui n'est le héros principal de personne est « traité comme un PNJ ».
+export function rangProvisions(id, mb, principaux) {
+    if (estThemes(id, mb)) return 0;
+    if ((principaux || []).includes(id)) return 4;
+    if (mb && mb.Type === "achete") return 3;
+    if (mb && mb.Type === "mercenaire") return 2;
+    return 1;
+}
+export function distribuer(ids, parts, rang, alea = Math.random) {
+    const groupes = {};
+    (ids || []).forEach(id => { const r = rang(id); (groupes[r] = groupes[r] || []).push(id); });
+    const ordre = Object.keys(groupes).map(Number).sort((a, b) => a - b).flatMap(r => melanger(groupes[r], alea));
+    const n = Math.max(0, Math.min(ordre.length, Math.floor(Number(parts) || 0)));
+    return { mangent: ordre.slice(0, n), affames: ordre.slice(n) };
+}
+
+// LA JOURNÉE. `e` : { camp, infos ({ id: { nom, caracs, niveau, heros, convalescence } }), partis (les membres de
+// l'expédition), expedition ({ Provisions, Economie_Provisions } ou null), principaux (les héros principaux),
+// jour, dateJeu }. Rend { camp, expedition, journal, moraux, xp, soinsHeros, departs, evenements } ; ne touche pas
+// à ses arguments.
+export function journeeDuCamp(e, alea = Math.random) {
+    const copie = (v) => (v === undefined || v === null ? v : JSON.parse(JSON.stringify(v)));
+    const camp = copie(e.camp) || {};
+    const membres = camp.Membres = camp.Membres || {};
+    const infos = e.infos || {}, principaux = e.principaux || [];
+    const partis = (e.partis || []).slice();
+    const exp = copie(e.expedition) || null;
+    const journal = [], deltas = {}, xp = [], soinsHeros = {}, departs = [];
+    const ev = { production: 0, peaux: 0, blessures: [], lieuRepere: false, conseilExtraordinaire: false, arret: false, expeditionAffamee: false, commerce: [], affames: [] };
+    const nom = (id) => (infos[id] && infos[id].nom) || (membres[id] && membres[id].Nom) || id;
+    const liste = (ids) => ids.map(nom).join(", ");
+    const de = (n) => 1 + Math.floor(alea() * n);
+    const bouger = (id, delta, raison) => { if (delta && membres[id]) (deltas[id] = deltas[id] || []).push({ delta, raison }); };
+    camp.Provisions = Math.max(0, Number(camp.Provisions) || 0);
+    camp.Caisse = Math.max(0, Number(camp.Caisse) || 0);
+    const provisionsAvant = camp.Provisions;
+    const ici = presentsAuCampSeulement(camp, partis);
+    const rendement = rendementJauge((camp.Ressources || {}).Jauge);
+
+    // Qui travaille aujourd'hui, et à quel m (le moral compris). Une blessure de chasse peut l'en empêcher.
+    const travail = {};
+    ici.forEach(id => {
+        const mb = membres[id], t = mb.Tache, b = mb.Blessure_Chasse;
+        if (!t || !TACHES[t] || estThemes(id, mb)) return;
+        if (b && b.Jours > 0 && (b.Interdit === "tout" || b.Interdit === t)) return;
+        const m = mAvecMoral(mDeTache(t, (infos[id] || {}).caracs), mb.Moral);
+        if (m === null) return;
+        travail[id] = { tache: t, m };
+    });
+    const qui = (t) => Object.keys(travail).filter(id => travail[id].tache === t);
+    const auRepos = (id) => { const mb = membres[id], b = mb.Blessure_Chasse; return !mb.Tache || !TACHES[mb.Tache] || !!(b && b.Jours > 0 && b.Interdit === "tout"); };
+
+    // 1. LA PRODUCTION DES TÂCHES.
+    let chasse = 0, cueillette = 0;
+    qui("chasser").forEach(id => { chasse += Math.max(1, 3 + travail[id].m); });
+    qui("cueillir").forEach(id => { cueillette += Math.max(1, 2 + travail[id].m); });
+    ev.production = Math.floor((chasse + cueillette) * rendement);
+    camp.Provisions += ev.production;
+    if (ev.production) journal.push(`La chasse et la cueillette rapportent ${ev.production} provision${ev.production > 1 ? "s" : ""}.`);
+    else if (chasse + cueillette) journal.push("Les alentours sont épuisés : la chasse et la cueillette ne rapportent plus rien.");
+    // Le commerce : une fois, payé au premier jour ; les achats arrivent au retour de l'expédition.
+    qui("commercer").forEach(id => {
+        const c = membres[id].Commerce;
+        if (!c || c.Paye) return;
+        const q = Math.max(0, Math.floor(Number(c.Quantite) || 0)), prix = Math.max(0, Math.round(Number(c.Prix) || 0));
+        c.Paye = true;
+        if (c.Sens === "vente") {
+            const vendu = Math.min(q, camp.Provisions), gain = q ? Math.round(prix * vendu / q) : 0;
+            camp.Provisions -= vendu; camp.Caisse += gain; c.Quantite = vendu; c.Prix = gain;
+            journal.push(`${nom(id)} vend ${vendu} provision${vendu > 1 ? "s" : ""} au village : +${gain} drachmes.`);
+        } else if (camp.Caisse >= prix) {
+            camp.Caisse -= prix; c.A_Livrer = q;
+            journal.push(`${nom(id)} achète ${q} provision${q > 1 ? "s" : ""} au village (−${prix} drachmes) : elles arriveront au camp au retour de l'expédition.`);
+        } else {
+            c.Echec = true;
+            journal.push(`${nom(id)} n'a pas pu payer ses achats au village : la caisse est vide.`);
+        }
+        ev.commerce.push(id);
+    });
+    const cuisiniers = qui("cuisiner");
+    const cuisine = cuisiniers.reduce((s, id) => s + Math.max(0, 1 + travail[id].m), 0);
+
+    // 2. LA CONSOMMATION : le camp, puis l'expédition sur ses propres provisions.
+    const affames = new Set();
+    if (ici.length) {
+        const besoin = Math.max(1, ici.length - cuisine);
+        if (camp.Provisions >= besoin) camp.Provisions -= besoin;
+        else {
+            const manque = besoin - camp.Provisions;
+            camp.Provisions = 0;
+            const r = distribuer(ici, ici.length - manque, (id) => rangProvisions(id, membres[id], principaux), alea);
+            r.affames.forEach(id => affames.add(id));
+            if (r.affames.length) journal.push(`Il n'y a pas assez à manger au camp : ${liste(r.affames)} ${r.affames.length > 1 ? "ont" : "a"} faim.`);
+        }
+    }
+    if (exp && partis.length) {
+        const besoin = Math.max(0, partis.length - Math.max(0, Number(exp.Economie_Provisions) || 0));
+        const avant = Math.max(0, Number(exp.Provisions) || 0);
+        if (avant >= besoin) exp.Provisions = avant - besoin;
+        else {
+            exp.Provisions = 0;
+            const r = distribuer(partis, partis.length - (besoin - avant), (id) => rangProvisions(id, membres[id], principaux), alea);
+            r.affames.forEach(id => affames.add(id));
+            ev.expeditionAffamee = true;
+            journal.push(`L'expédition n'a plus assez de vivres${r.affames.length ? ` : ${liste(r.affames)} ${r.affames.length > 1 ? "ont" : "a"} faim` : ""}.`);
+        }
+    }
+    ev.affames = [...affames];
+
+    // 3. L'USURE DE LA JAUGE : −1 pour le camp, −1 par chasseur ou cueilleur.
+    if (camp.Ressources) {
+        const usure = 1 + qui("chasser").length + qui("cueillir").length;
+        camp.Ressources.Jauge = Math.max(0, (Number(camp.Ressources.Jauge) || 0) - usure);
+    }
+
+    // 4. LA SOLDE DES MERCENAIRES : 3 drachmes par jour ; ils partent après 5 jours sans solde.
+    let solde = 0;
+    Object.keys(membres).filter(id => membres[id].Type === "mercenaire").forEach(id => {
+        const mb = membres[id];
+        if (camp.Caisse >= SOLDE_MERCENAIRE) { camp.Caisse -= SOLDE_MERCENAIRE; solde += SOLDE_MERCENAIRE; mb.Jours_Sans_Solde = 0; return; }
+        mb.Jours_Sans_Solde = (Number(mb.Jours_Sans_Solde) || 0) + 1;
+        bouger(id, MORAL_JOUR.sansSolde, "sa solde n'est pas payée");
+        if (mb.Jours_Sans_Solde >= JOURS_SANS_SOLDE_MAX) departs.push({ id, raison: `sans solde depuis ${JOURS_SANS_SOLDE_MAX} jours` });
+    });
+    if (solde) journal.push(`La solde des mercenaires : −${solde} drachmes.`);
+
+    // 5. LE MORAL : repos, repas cuisiné (pour ceux qui ont mangé), faim (« sans autre pénalité chiffrée que le moral »).
+    ici.forEach(id => { if (auRepos(id)) bouger(id, MORAL_JOUR.repos, "le repos"); });
+    if (cuisiniers.length) {
+        const gain = cuisiniers.length === 1 && travail[cuisiniers[0]].m === -1 ? MORAL_JOUR.repasMauvais : MORAL_JOUR.repas;
+        ici.forEach(id => { if (!affames.has(id)) bouger(id, gain, "un repas cuisiné"); });
+    }
+    affames.forEach(id => bouger(id, MORAL_JOUR.faim, "la faim"));
+    const moraux = [];
+    Object.keys(deltas).forEach(id => {
+        const mb = membres[id], avant = Number.isFinite(Number(mb.Moral)) ? Number(mb.Moral) : 60;
+        const total = deltas[id].reduce((s, d) => s + d.delta, 0), apres = moralBorne(avant + total);
+        const raison = deltas[id].map(d => d.raison).join(", ");
+        mb.Moral = apres;
+        if (apres !== avant) {
+            mb.Moral_Historique = (Array.isArray(mb.Moral_Historique) ? mb.Moral_Historique : []).concat([{ Delta: apres - avant, Raison: raison, Date_Jeu: e.dateJeu || "", Jour: e.jour || 0 }]).slice(-MORAL_HISTORIQUE);
+            moraux.push({ id, avant, apres, delta: apres - avant, raison });
+        }
+    });
+    Object.keys(membres).forEach(id => {
+        const mb = membres[id];
+        mb.Jours_Moral_Zero = Number(mb.Moral) === 0 ? (Number(mb.Jours_Moral_Zero) || 0) + 1 : 0;
+        if (mb.Jours_Moral_Zero >= JOURS_MORAL_ZERO_MAX && !estThemes(id, mb) && !(infos[id] || {}).heros && !departs.some(d => d.id === id))
+            departs.push({ id, raison: `son moral est à zéro depuis ${JOURS_MORAL_ZERO_MAX} jours` });
+    });
+
+    // 6. LES JETS : la blessure de chasse (d20 + m ≤ 2, puis d10), la peau (1 chance sur 4, 3 drachmes),
+    // le lieu repéré par l'éclaireur ; l'entraînement.
+    qui("chasser").forEach(id => {
+        if (alea() < CHANCE_PEAU) { camp.Caisse += PRIX_PEAU; ev.peaux++; }
+        const b0 = membres[id].Blessure_Chasse, malus = b0 && b0.Jours > 0 && b0.Malus ? Number(b0.Malus.dex) || 0 : 0;
+        if (de(20) + travail[id].m + malus <= 2) {
+            const b = blessureChasse(de(10));
+            ev.blessures.push({ id, nom: b.nom });
+            journal.push(`${nom(id)} se blesse à la chasse : ${b.nom.toLowerCase()} (${b.effet}).`);
+            if (b.jours) membres[id].Blessure_Chasse = { Nom: b.nom, Effet: b.effet, Jours: b.jours, Interdit: b.interdit || null, Malus: b.malus || null };
+        }
+    });
+    if (ev.peaux) journal.push(`${ev.peaux === 1 ? "Une peau vendue" : ev.peaux + " peaux vendues"} : +${ev.peaux * PRIX_PEAU} drachmes.`);
+    qui("eclaireur").forEach(id => {
+        if (alea() >= chanceEclaireur(travail[id].m)) return;
+        ev.lieuRepere = true;
+        camp.Lieux_Reperes = (camp.Lieux_Reperes || []).concat([{ Par: id, Jour: e.jour || 0, Date_Jeu: e.dateJeu || "" }]);
+        journal.push(`${nom(id)} a repéré un lieu intéressant près du camp : il en parlera au prochain conseil.`);
+    });
+    qui("entrainer").forEach(id => {
+        const r = membres[id].Recrue;
+        if (!r || !membres[r] || partis.includes(r) || (Number((infos[r] || {}).niveau) || 1) >= (Number((infos[id] || {}).niveau) || 1)) return;
+        const g = Math.max(10, 20 + 10 * travail[id].m);
+        xp.push({ id: r, xp: g, par: id });
+        journal.push(`${nom(id)} entraîne ${nom(r)} : +${g} XP.`);
+    });
+
+    // 7. LA GUÉRISON : le temps (1 jour), le repos (1 de plus), le soigneur (1 de plus pour m patients, ceux qui
+    // ont le plus de jours de convalescence d'abord ; rien si son m vaut 0 ou moins).
+    const convalescence = (id) => Math.max(Number(((membres[id] || {}).Blessure_Chasse || {}).Jours) || 0, Number((infos[id] || {}).convalescence) || 0);
+    const soignes = new Set();
+    const soigneur = qui("soigner")[0];
+    if (soigneur && travail[soigneur].m >= 1) {
+        ici.filter(id => id !== soigneur && convalescence(id) > 0).sort((a, b) => convalescence(b) - convalescence(a))
+            .slice(0, travail[soigneur].m).forEach(id => soignes.add(id));
+        if (soignes.size) journal.push(`${nom(soigneur)} soigne ${liste([...soignes])}.`);
+    }
+    Object.keys(membres).forEach(id => {
+        const present = ici.includes(id);
+        const jours = 1 + (present && auRepos(id) ? 1 : 0) + (soignes.has(id) ? 1 : 0);
+        const b = membres[id].Blessure_Chasse;
+        // Une blessure reçue aujourd'hui ne commence à guérir que demain.
+        if (b && b.Jours > 0 && !ev.blessures.some(x => x.id === id)) {
+            b.Jours = Math.max(0, b.Jours - jours);
+            if (!b.Jours) { delete membres[id].Blessure_Chasse; journal.push(`${nom(id)} est remis de sa blessure de chasse.`); }
+        }
+        if ((infos[id] || {}).heros) soinsHeros[id] = jours;
+    });
+
+    // Ceux qui quittent le clan.
+    departs.forEach(d => {
+        if (!membres[d.id]) return;
+        journal.push(`${nom(d.id)} quitte le clan : ${d.raison}.`);
+        delete membres[d.id];
+        if (camp.Intendant === d.id) camp.Intendant = null;
+    });
+
+    // 8. LE CAMP À ZÉRO : un conseil extraordinaire, et l'arrêt s'il est en déplacement.
+    if (ici.length && camp.Provisions === 0) {
+        if (camp.Deplacement && camp.Deplacement.En_Cours) { ev.arret = true; journal.push("Le camp n'a plus de provisions : il s'arrête là où il est."); }
+        if (!camp.Conseil_Extraordinaire) {
+            camp.Conseil_Extraordinaire = { Raison: "Le camp n'a plus de provisions.", Jour: e.jour || 0, Date_Jeu: e.dateJeu || "" };
+            ev.conseilExtraordinaire = true;
+            journal.push("Le camp n'a plus de provisions : un conseil extraordinaire doit se réunir.");
+        }
+    }
+
+    // 9. LE JOURNAL de la journée (le rapport de l'intendant, les petits récits).
+    if (!journal.length) journal.push(provisionsAvant === camp.Provisions ? "Une journée calme au camp." : "Une journée ordinaire au camp.");
+    camp.Journal = (Array.isArray(camp.Journal) ? camp.Journal : []).concat([{ Jour: e.jour || 0, Date_Jeu: e.dateJeu || "", Lignes: journal.slice() }]).slice(-JOURNAL_JOURS);
+    camp.Jours_Ecoules = (Number(camp.Jours_Ecoules) || 0) + 1;
+    return { camp, expedition: exp, journal, moraux, xp, soinsHeros, departs, evenements: ev };
+}

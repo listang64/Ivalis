@@ -57,6 +57,7 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
 | (Nico) Plus de clans : le menu « Mon héros principal » | v479 | fait |
 | 3 — La page du camp | v480 | fait |
 | 4 — Gestion du camp | v481 | fait |
+| 5 — Le temps et la journée du camp | v482 | fait |
 
 ## Points ambigus
 
@@ -122,3 +123,18 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
   des fils invisibles d'un membre. Chaque variation est gardée (les 12 dernières) ; une variation de 5 points ou
   plus laisse aussi un souvenir (« Mon moral baisse (−10) : la faim ») et une humeur (joyeux ou triste), ce qui
   pèse sur ses relations comme les autres humeurs.
+- **Étape 5, qui fait tourner la journée.** Le poste qui fait passer le jour de voyage (`voyage_groupe.js`,
+  `jourSuivant`) appelle `journeeDuCamp` ; une clé (voyage et jour) empêche de compter deux fois le même jour.
+  En mode DEV, la gestion du camp a un bouton « Faire passer un jour au camp ».
+- **Étape 5, la faim.** « Sans autre pénalité chiffrée que le moral » : −10 par jour ; celui qui a faim garde son
+  +3 de repos, mais n'a pas le +2 du repas cuisiné. Le manque se compte en parts : il manque N provisions, N
+  membres n'ont pas mangé, les derniers dans l'ordre de priorité.
+- **Étape 5, la guérison.** Chaque jour compte pour tous : les blessures « jours » des héros (expédition comprise)
+  baissent d'un jour, d'un de plus au repos au camp, d'un de plus pour le patient du soigneur. Les blessures de
+  chasse (PNJ et héros restés au camp) se gardent dans le camp ; reçue aujourd'hui, elle ne guérit qu'à partir de
+  demain. Le malus « −2 aux jets » d'une blessure de chasse joue sur le jet de blessure de la chasse.
+- **Étape 5, l'expédition.** Elle mange sur ses propres provisions (`Expedition.Provisions`), moins
+  `Economie_Provisions` (les suiveurs de Dextérité, étape 6).
+- **Étape 5, l'entraînement.** L'XP va dans la fiche de la recrue (`XP` d'un héros ou d'un PNJ).
+- **Étape 5, le commerce.** Payé au premier jour (un achat que la caisse ne peut plus payer échoue) ; une vente
+  enlève les provisions tout de suite ; les achats attendent le retour de l'expédition (`A_Livrer`).

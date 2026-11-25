@@ -100,8 +100,20 @@ function htmlGauche() {
           ${candidats.map(id => `<option value="${echapper(id)}"${camp.Intendant === id ? " selected" : ""}>${echapper(nomDe(id, camp))}</option>`).join("")}
         </select>
         ${manque ? `<p class="avis-gestion">Il faut un intendant dès qu'un personnage reste au camp.</p>` : ""}
+        ${camp.Conseil_Extraordinaire ? `<p class="avis-gestion">Un conseil extraordinaire doit se réunir : ${echapper(camp.Conseil_Extraordinaire.Raison || "")}</p>` : ""}
+        ${htmlJournal(camp)}
+        ${estDev() ? `<button type="button" class="lien-dev jour-dev-gestion" data-action="gestion" data-gc="jour-dev">Faire passer un jour au camp (DEV)</button>` : ""}
         <p class="note-gestion${note.texte && Date.now() - note.le < 4000 ? " visible" : ""}" aria-live="polite">${echapper(note.texte)}</p>
       </div>`;
+}
+const estDev = () => { try { return localStorage.getItem("ivalis_DEV_MODE") === "on"; } catch (e) { return false; } };
+// (v482) LES DERNIERS JOURS DU CAMP : son journal (la journée du camp, camp_pur.js).
+function htmlJournal(camp) {
+    const jours = (Array.isArray(camp.Journal) ? camp.Journal : []).slice(-3).reverse();
+    if (!jours.length) return "";
+    return `<div class="sous-titre-groupe">Les derniers jours</div>
+        <div class="journal-gestion">${jours.map(j => `<div class="jour-gestion"><b>${echapper(j.Date_Jeu || `Jour ${j.Jour || "?"}`)}</b>
+          <ul>${(j.Lignes || []).map(l => `<li>${echapper(l)}</li>`).join("")}</ul></div>`).join("")}</div>`;
 }
 const nomDe = (id, camp) => ((infos[id] || {}).nom) || (((camp || {}).Membres || {})[id] || {}).Nom || id;
 
@@ -198,6 +210,12 @@ async function agir(cible) {
         son();
         if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id, nom: nomDe(id, C().lire()), depuisGestion: true });
         return;
+    }
+    if (gc === "jour-dev") {
+        if (!estDev() || !C().journeeDuCamp) return;
+        son();
+        const r = await C().journeeDuCamp({ cle: "dev_" + Date.now() });
+        return noter(r ? r.journal.join(" ") : "La journée n'a pas pu passer.");
     }
     if (gc === "commerce") {
         son();

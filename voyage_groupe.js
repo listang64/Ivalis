@@ -712,6 +712,11 @@ async function terminerEtape(id, cle) {
                  resultat: { arrivee: true, region: n, lieu: v.Arrivee.Lieu || "" } };
     }, { avecDate: true });
     if (r && r.nuit) posterMessageCampement();
+    // (v482) Le clan nomade : chaque jour de voyage, le camp « tourne » (camp.js, journeeDuCamp) — ce poste-ci,
+    // celui qui a fait passer le jour.
+    if (r && r.jourSuivant && typeof window.journeeDuCamp === "function") {
+        Promise.resolve(window.journeeDuCamp({ cle: `${id}:${r.jour}` })).catch(e => console.error("Voyage du groupe : la journée du camp", e));
+    }
     // (v457) La halte de la discussion : ce poste la lance (s'il n'y a plus personne pour parler, la route reprend).
     if (r && r.dialogue) {
         Promise.resolve(window.DISCUSSION && window.DISCUSSION.ouvrirSurLaRoute ? window.DISCUSSION.ouvrirSurLaRoute({ voyage: id, id: r.idDialogue }) : false)

@@ -14,8 +14,8 @@
 //      la carte globale » : ce logo, sur la carte régionale et sur la carte du monde.
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
-import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=4";
+import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection, deleteField, runTransaction, increment } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import * as CP from "./camp_pur.js?v=5";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -280,7 +280,11 @@ export async function changerMoral(changes) {
     });
     if (!faits.length) return [];
     await updateDoc(refPartie(p), maj);
-    // Les fils invisibles.
+    await inscrireMoraux(p, faits);
+    return faits;
+}
+// Les fils invisibles : pour une variation de 5 points ou plus, un souvenir et une humeur.
+async function inscrireMoraux(p, faits) {
     let tour = 0;
     try { const e = await getDoc(doc(db, PARTIES, p, "Social", "etat")); tour = Number(((e.exists() && e.data()) || {}).tour) || 0; } catch (e) {}
     for (const f of faits) {
@@ -290,8 +294,64 @@ export async function changerMoral(changes) {
         try { if (window.SOCIAL && window.SOCIAL.noterSouvenir) await window.SOCIAL.noterSouvenir(p, f.id, texte, { cle: "moral", importance: h.intensite >= 2 ? 2 : 1, dateJeu: f.dateJeu }); } catch (e) {}
         try { await setDoc(doc(db, PARTIES, p, "Ames", f.id), { humeur: { emotion: h.emotion, intensite: h.intensite, cause: f.raison || "le moral", jusquA: tour + 1 + 3 } }, { merge: true }); } catch (e) {}
     }
-    return faits;
+}
+
+// ---------------------------------------------------------------------
+//  (v482) LA JOURNÉE DU CAMP : « à chaque jour de voyage (seul le voyage fait avancer le temps) » —
+//  appelée par le poste qui a fait passer le jour (voyage_groupe.js). Les règles : camp_pur.js.
+// ---------------------------------------------------------------------
+async function lireDateJeu() {
+    try { const s = await getDoc(doc(db, "Date_En_Jeu", "actuelle")); const d = s.exists() ? s.data() : {}; return d.Jour ? `Jour ${d.Jour} de l'an ${d.Annee || "?"}` : ""; }
+    catch (e) { return ""; }
+}
+export async function journeeDuCamp(o = {}) {
+    const p = idPartie();
+    if (!p || !camp) return null;
+    const infos = await infosMembres();
+    const persos = window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || [];
+    persos.forEach(h => {
+        if (!h || !infos[h.idPersonnage] || typeof window.blessuresDuPerso !== "function") return;
+        infos[h.idPersonnage].convalescence = Math.max(0, ...window.blessuresDuPerso(h).map(b => Number(b.jours) || 0));
+    });
+    const dateJeu = o.dateJeu || await lireDateJeu();
+    let res = null;
+    try {
+        res = await runTransaction(db, async (tx) => {
+            const s = await tx.get(refPartie(p));
+            const d = s.exists() ? s.data() : {};
+            if (!d.Camp || (o.cle && d.Camp.Derniere_Journee === o.cle)) return null;
+            const choix = d.Heros_Principaux || {};
+            const principaux = [...new Set(persos.map(h => h && h.idJoueur).filter(Boolean))].map(j => CP.herosPrincipal(j, persos, choix)).filter(Boolean);
+            const partis = ((d.Expedition || {}).Membres || []).slice();
+            const r = CP.journeeDuCamp({ camp: d.Camp, infos, partis, expedition: d.Expedition && d.Expedition.En_Cours ? d.Expedition : null, principaux,
+                                         jour: o.jour || (Number(d.Camp.Jours_Ecoules) || 0) + 1, dateJeu });
+            r.camp.Derniere_Journee = o.cle || ("jour_" + r.camp.Jours_Ecoules);
+            const maj = { Camp: r.camp };
+            if (r.expedition) maj.Expedition = r.expedition;
+            tx.update(refPartie(p), maj);
+            return r;
+        });
+    } catch (e) { console.error("[Camp] La journée du camp :", e); return null; }
+    if (!res) return null;
+    camp = res.camp;
+    console.log(`⛺ [Camp] ${dateJeu || "Un jour"} : ${res.journal.join(" ")}`);
+    // L'entraînement : l'expérience des recrues.
+    for (const x of res.xp) {
+        const h = persos.find(y => y && y.idPersonnage === x.id);
+        try { await updateDoc(doc(db, h ? "Personnages" : "Monde_PNJ", x.id), { XP: increment(x.xp) }); } catch (e) { console.warn("[Camp] L'XP de l'entraînement :", e); }
+    }
+    // La guérison des héros (le temps, le repos, le soigneur) : leurs blessures « jours ».
+    for (const id of Object.keys(res.soinsHeros)) {
+        const h = persos.find(y => y && y.idPersonnage === id), n = res.soinsHeros[id];
+        if (!h || !n || typeof window.blessuresApresJours !== "function" || typeof window.blessuresDuPerso !== "function") continue;
+        const avant = window.blessuresDuPerso(h);
+        if (!avant.some(b => (Number(b.jours) || 0) > 0)) continue;
+        try { await updateDoc(doc(db, "Personnages", id), { Blessures: window.blessuresApresJours(avant, n) }); } catch (e) { console.warn("[Camp] Les blessures :", e); }
+    }
+    await inscrireMoraux(p, res.moraux.map(m => ({ ...m, dateJeu })));
+    return res;
 }
 
 window.CAMP = { lire: lireCamp, creerCampDev, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
-                partis, postesBloques, infosMembres, assignerTache, nommerIntendant, changerMoral };
+                partis, postesBloques, infosMembres, assignerTache, nommerIntendant, changerMoral, journeeDuCamp };
+window.journeeDuCamp = journeeDuCamp;

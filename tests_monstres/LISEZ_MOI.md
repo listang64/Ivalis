@@ -12675,3 +12675,10 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Le moral dans les fils invisibles** (`grimoire_liens.js`) : la jauge et les dernières variations ; une variation de 5 ou plus y laisse un souvenir et une humeur (`camp.js`, `changerMoral`). « ← Revenir à la gestion du camp ».
 - corrections_v481 le vérifie.
 
+## v482 — Le clan nomade, étape 5 : le temps et la journée du camp
+
+- **La journée du camp** (`camp_pur.js`, `journeeDuCamp`), dans l'ordre du document : la production des tâches (chasse et cueillette selon la jauge, le commerce payé au premier jour, la cuisine) ; la consommation (le camp, et l'expédition sur ses propres provisions ; en cas de manque, Thémès > PNJ > mercenaires > achetés > héros principaux, au hasard dans un rang) ; l'usure de la jauge ; la solde des mercenaires (3 drachmes, départ après 5 jours sans solde) ; le moral (repos +3, repas +2 ou +1, faim −10, sans solde −5 ; départ d'un PNJ après 8 jours à 0) ; les jets (blessure de chasse d20 + m ≤ 2 puis d10, peau 1 chance sur 4 à 3 drachmes, lieu repéré par l'éclaireur, XP de l'entraînement) ; la guérison (le temps, le repos, le soigneur) ; le camp à zéro (conseil extraordinaire, arrêt s'il se déplace) ; le journal.
+- **À chaque jour de voyage** (`voyage_groupe.js`), le poste qui a fait passer le jour lance la journée (`camp.js`) : une transaction (une seule fois par jour), l'XP des recrues, les blessures des héros décomptées, la faim et les autres variations de moral dans les fils invisibles.
+- **La gestion du camp** montre les derniers jours (le journal) et le conseil extraordinaire qui attend ; en mode DEV, « Faire passer un jour au camp ».
+- corrections_v482 le vérifie.
+

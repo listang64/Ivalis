@@ -66,3 +66,9 @@
 .variations-moral-liens { list-style: none; margin: 0; padding: 0; font-size: calc(var(--u) * 2.5); color: #3a2a1a; }
 .variations-moral-liens .hausse { color: #2f5a2a; }
 .variations-moral-liens .baisse { color: #8a1a10; }
+
+/* (v482) LES DERNIERS JOURS DU CAMP (son journal) ; le bouton DEV qui fait passer un jour. */
+.journal-gestion { display: flex; flex-direction: column; gap: calc(var(--u) * 1); }
+.jour-gestion b { font-size: calc(var(--u) * 2.6); color: #5a3c22; }
+.jour-gestion ul { margin: calc(var(--u) * 0.3) 0 0; padding-left: calc(var(--u) * 3); font-size: calc(var(--u) * 2.5); color: #3a2a1a; }
+.jour-dev-gestion { align-self: flex-start !important; margin-top: calc(var(--u) * 1) !important; }
