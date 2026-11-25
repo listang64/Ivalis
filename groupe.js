@@ -108,7 +108,8 @@ export async function detecterDemandes(o) {
 Lis les dernières actions des héros. Relève seulement les DEMANDES EXPLICITES qu'un héros fait à un PNJ, maintenant :
 - "recruter" : un héros demande à un PNJ de rejoindre le groupe, de les suivre, de les accompagner (ou accepte clairement l'offre d'un PNJ qui propose de venir) ;
 - "renvoyer" : un héros dit à un suiveur de partir, qu'il ne fait plus partie du groupe ;
-- "laisser" : un héros demande à un suiveur de rester ici, de les attendre ici.
+- "laisser" : un héros demande à un suiveur de rester ici, de les attendre ici ;
+- "engager" : un héros propose de PAYER un PNJ (un mercenaire, quelqu'un qui demande de l'argent) pour qu'il les rejoigne ; donne le prix (en drachmes) s'il est dit.
 Les joueurs l'écrivent de mille façons, au tutoiement ou au vouvoiement, parfois avec des fautes : « rejoins-nous », « viens avec nous », « suis-moi », « tu nous accompagnes ? », « fais route avec nous », « deviens notre compagnon », « je t'engage », « on t'emmène » (recruter) ; « tu peux partir », « va-t'en », « nos chemins se séparent », « on n'a plus besoin de toi », « tu es libre », « rentre chez toi » (renvoyer) ; « attends-nous ici », « reste là », « garde le camp, on revient », « je te laisse ici » (laisser). Lis l'intention, pas le mot exact.
 Rien pour une simple question sur la route, une conversation, ou une demande d'aide ponctuelle (guider jusqu'à la porte, porter un sac).
 PNJ présents (pas encore suiveurs) : ${o.nomsPresents.join(", ") || "(aucun)"}.
@@ -118,7 +119,8 @@ Réponds avec l'outil 'demandesCompagnie' (liste vide s'il n'y a aucune demande)
     const outils = [{ functionDeclarations: [{
         name: "demandesCompagnie", description: "Les demandes faites à des PNJ au sujet de la compagnie.",
         parameters: { type: "OBJECT", properties: { demandes: { type: "ARRAY", items: { type: "OBJECT", properties: {
-            type: { type: "STRING", enum: ["recruter", "renvoyer", "laisser"] },
+            type: { type: "STRING", enum: ["recruter", "renvoyer", "laisser", "engager"] },
+            prix: { type: "NUMBER", description: "Pour « engager » : le prix en drachmes, s'il est dit." },
             pnj: { type: "STRING", description: "Le nom du PNJ, tel qu'écrit dans les listes." },
             heros: { type: "STRING", description: "Le prénom du héros qui fait la demande." } }, required: ["type", "pnj", "heros"] } } }, required: ["demandes"] }
     }] }];
@@ -163,7 +165,9 @@ export async function avantLeMJ(o) {
     const idsHeros = new Set(heros.map(h => h.idPersonnage));
     const actions = depuis.filter(m => idsHeros.has(m.Auteur_ID) && !GP.lireJet(m.Texte) && sansBalises(m.Texte_Livre || m.Texte));
     const presents = Object.values(env.pnjsPresents || {}).filter(f => f && f.idDoc && f.Statut !== "Mort");
-    const jets = [], actionsCompagnie = [];
+    const jets = [], actionsCompagnie = [], recruesCamp = [];
+    // (v488) Le clan nomade : avec un camp, ceux qui acceptent rejoignent le camp (recrutement.js), pas la compagnie.
+    const avecCamp = !!(window.RECRUTEMENT && typeof window.RECRUTEMENT.avecCamp === "function" && window.RECRUTEMENT.avecCamp());
     if (actions.some(m => GP.parleDuGroupe(sansBalises(m.Texte_Livre || m.Texte)))) {
         const actifsNoms = GP.actifs(liste).map(s => s.nom);
         const demandes = await GROUPE.detecterDemandes({
@@ -178,6 +182,13 @@ export async function avantLeMJ(o) {
             if (!f) continue;
             const nomH = h ? h.prenom : "un héros";
             const suiveur = GP.actifs(liste).some(s => s.id === f.idDoc);
+            // (v488) Engager contre des drachmes : payé par la caisse du groupe, il rejoint le camp (sans camp : un recrutement).
+            if (d.type === "engager" && avecCamp) {
+                const prix = Math.max(0, Math.round(Number(d.prix) || 30));
+                recruesCamp.push({ id: f.idDoc, nom: f.Nom_PNJ, type: "mercenaire", prix, par: nomH });
+                continue;
+            }
+            if (d.type === "engager") d.type = "recruter";
             if (d.type === "recruter") {
                 if (!h) continue;
                 const lien = (vers) => (liens[`${f.idDoc}~${vers}`] || {});
@@ -191,6 +202,9 @@ export async function avantLeMJ(o) {
                 journal(`${nomH} demande à ${f.Nom_PNJ} de suivre la compagnie : ${verdict.verdict} (score ${verdict.score}${verdict.dd ? `, difficulté ${verdict.dd}` : ""}) — ${verdict.raison}.`);
                 if (verdict.verdict === "jet") {
                     jets.push({ idPerso: h.idPersonnage, heros: h.prenom, caracteristique: "CHARISME", difficulte: GP.motDifficulte(verdict.dd), action: `convaincre ${f.Nom_PNJ} de rejoindre la compagnie` });
+                } else if (verdict.verdict === "oui" && avecCamp) {
+                    recruesCamp.push({ id: f.idDoc, nom: f.Nom_PNJ, type: "invite", par: nomH });
+                    decisions.push(`${f.Nom_PNJ} ACCEPTE de rejoindre le clan (demandé par ${nomH} : ${verdict.raison}). Joue son acceptation ; il rejoindra le camp du clan.`);
                 } else if (verdict.verdict === "oui") {
                     actionsCompagnie.push({ type: "recruter", id: f.idDoc, nom: f.Nom_PNJ, depuis: dateJeu(), ts: Date.now(), par: nomH });
                     decisions.push(`${f.Nom_PNJ} ACCEPTE de rejoindre la compagnie (demandé par ${nomH} : ${verdict.raison}). Joue son acceptation ; désormais il voyage avec les héros.`);
@@ -211,6 +225,13 @@ export async function avantLeMJ(o) {
         return { attendre: true, contexte: "" };
     }
     actionsCompagnie.forEach(a => { liste = GP.appliquer(liste, a); });
+    // (v488) Ceux qui rejoignent le camp (invités ; mercenaires payés par la caisse du groupe).
+    for (const r of recruesCamp) {
+        const refus = await window.RECRUTEMENT.rejoindreLeCamp(r.id, { type: r.type, prix: r.prix, par: r.par }).catch(e => String(e && e.message || e));
+        if (r.type === "mercenaire") decisions.push(refus
+            ? `${r.nom} voudrait être payé ${r.prix} drachmes, mais le clan ne peut pas (${refus}). Joue son refus.`
+            : `${r.nom} ACCEPTE d'être engagé par ${r.par} pour ${r.prix} drachmes (payés par la caisse du groupe) : il rejoindra le camp du clan, contre une solde de 3 drachmes par jour.`);
+    }
 
     // 3. LES MÉCONTENTS préviennent, puis s'en vont.
     const restants = GP.actifs(liste);

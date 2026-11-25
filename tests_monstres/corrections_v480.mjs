@@ -456,7 +456,7 @@ await section(async () => {
   verifier("les joueurs connectés : moi, et ceux qui ont donné signe de vie il y a peu", r.ens.join() === "J1,J2", r.ens.join());
   const c = lire("camp.js");
   verifier("chaque poste donne signe de vie chaque minute ; les héros nés après le camp le rejoignent (moral 60)",
-    /setInterval\(signeDeVie, 60000\)/.test(c) && /"Camp\.Membres\." \+ h\.id/.test(c) && /CP\.MORAL_DEPART\.heros/.test(c));
+    /setInterval\(signeDeVie, 60000\)/.test(c) && /"Camp\.Membres\." \+ h\.id/.test(c) && (/CP\.MORAL_DEPART\.heros/.test(c) || /CP\.arriveeDuHeros\(camp, h/.test(c)));
 });
 
 titre("12. LES VERSIONS");

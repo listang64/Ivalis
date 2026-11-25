@@ -1050,3 +1050,63 @@ export function finDuDeplacement(camp, position, o = {}) {
     if (c.Tache_Votee && c.Tache_Votee.Type === "deplacer") delete c.Tache_Votee;
     return c;
 }
+
+// =========================================================================
+//  (v488) LE RECRUTEMENT (étape 12)
+// =========================================================================
+// « Mercenaires : 30 drachmes à l'embauche, puis une solde de 3 drachmes par jour ; un personnage créé de toutes pièces
+// coûte 300 drachmes (acheté par un joueur avec sa bourse, ou recruté pour le groupe avec la caisse). »
+export const PRIX_MERCENAIRE = 30, PRIX_PERSONNAGE = 300;
+export const TYPES_RECRUE = { invite: "Invité", mercenaire: "Mercenaire", achete: "Acheté", recrue_clan: "Recrue du clan" };
+// L'arrivée d'une recrue dans le camp : son moral de départ selon la façon dont elle est venue.
+export const membreRecrue = (type, nom, o = {}) => ({ Type: TYPES_RECRUE[type] ? type : "invite", Nom: nom || "", Tache: null,
+    Moral: MORAL_DEPART[type] !== undefined ? MORAL_DEPART[type] : MORAL_DEPART.invite, Arrive_Le: o.maintenant || 0, ...(o.par ? { Par: o.par } : {}), ...(o.libre ? { Libre: true } : {}) });
+// « Les caractéristiques d'une recrue : niveau 1, des caracs aléatoires, cohérentes avec son background, qui suivent les
+// mêmes règles que celles des autres personnages » : l'achat de points du jeu (22 points, de 8 à 16, le coût de app.js).
+// `ordre` : les caracs de la plus à la moins marquée (l'IA les range d'après le personnage) ; sinon au hasard.
+export const POINTS_CREATION = 22;
+export const COUT_CARAC = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9, 16: 12 };
+export const coutCaracs = (c) => Object.values(c || {}).reduce((s, v) => s + (COUT_CARAC[v] ?? 99), 0);
+export function caracsDeRecrue(ordre, alea = Math.random) {
+    const toutes = ["force", "dex", "con", "int", "sag", "cha"];
+    const rang = (ordre || []).filter(c => toutes.includes(c));
+    const suite = [...new Set([...rang, ...melanger(toutes.filter(c => !rang.includes(c)), alea)])];
+    const poids = Object.fromEntries(suite.map((c, i) => [c, 6 - i]));
+    const c = Object.fromEntries(toutes.map(k => [k, 8]));
+    for (let tour = 0; tour < 60; tour++) {
+        const reste = POINTS_CREATION - coutCaracs(c);
+        const possibles = toutes.filter(k => c[k] < 16 && COUT_CARAC[c[k] + 1] - COUT_CARAC[c[k]] <= reste);
+        if (!possibles.length) break;
+        const total = possibles.reduce((s, k) => s + poids[k] * poids[k], 0);
+        let x = alea() * total, choisi = possibles[0];
+        for (const k of possibles) { x -= poids[k] * poids[k]; if (x <= 0) { choisi = k; break; } }
+        c[choisi]++;
+    }
+    return c;
+}
+export function peutEngager(camp, prix) {
+    if (!camp) return "Le clan n'a pas de camp.";
+    const p = Math.max(0, Math.round(Number(prix) || 0));
+    if ((Number(camp.Caisse) || 0) < p) return `La caisse du groupe n'a pas ${p} drachmes.`;
+    return "";
+}
+export function peutAcheter(bourses, joueur) {
+    const b = Number((bourses || {})[joueur]) || 0;
+    return b >= PRIX_PERSONNAGE ? "" : `Il faut ${PRIX_PERSONNAGE} drachmes dans ta bourse (tu en as ${b}).`;
+}
+export function peutRecruterPourLeGroupe(camp) {
+    if (!camp) return "Le clan n'a pas de camp.";
+    if (!camp.Recrutement_Vote) return "Le conseil doit d'abord voter le recrutement d'un personnage.";
+    if (camp.Recrutement_En_Cours) return "Un joueur est déjà en train de créer la recrue.";
+    if ((Number(camp.Caisse) || 0) < PRIX_PERSONNAGE) return `La caisse du groupe n'a pas ${PRIX_PERSONNAGE} drachmes.`;
+    return "";
+}
+// Un héros né après le camp : il le rejoint comme héros (moral 60), comme personnage acheté (moral 100, à son joueur)
+// ou comme recrue du clan (moral 60, pour tous). Rend { membre, maj } (ce qui s'efface des attentes).
+export function arriveeDuHeros(camp, h, maintenant = 0) {
+    const achat = ((camp && camp.Achats_En_Attente) || {})[h.joueur];
+    if (achat) return { membre: { ...membreRecrue("achete", h.nom, { maintenant }), Joueur: h.joueur }, efface: "achat" };
+    const rec = camp && camp.Recrutement_En_Cours;
+    if (rec && rec.Par === h.joueur) return { membre: { ...membreRecrue("recrue_clan", h.nom, { maintenant, libre: true }), Joueur: h.joueur }, efface: "recrutement" };
+    return { membre: { Type: "heros", Nom: h.nom, Joueur: h.joueur, Tache: null, Moral: MORAL_DEPART.heros }, efface: "" };
+}

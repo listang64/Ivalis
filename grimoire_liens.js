@@ -188,6 +188,7 @@ function htmlGauche() {
         ${a.memoire ? `<div class="sous-titre-liens">Sa mémoire à long terme</div><p class="memoire-liens">${echapper(a.memoire)}</p>` : ""}
         <div class="sous-titre-liens">Ses souvenirs</div>
         ${souvenirs ? `<ul class="souvenirs-liens">${souvenirs}</ul>` : `<p class="fiche-attente">Pas encore de souvenir.</p>`}
+        ${a.type === "pnj" && modeDev() && window.RECRUTEMENT && window.RECRUTEMENT.avecCamp() && !(((window.CAMP.lire() || {}).Membres || {})[id]) ? `<button type="button" class="supprimer-pnj-liens recruter-pnj-liens" data-action="liens" data-cb="recruter-dev" data-id="${echapper(id)}" title="Le faire entrer dans le camp, comme s'il avait été recruté (DEV)">Forcer son recrutement dans le camp</button>` : ""}
         ${a.type === "pnj" && modeDev() ? `<button type="button" class="supprimer-pnj-liens" data-action="liens" data-cb="supprimer-pnj" data-id="${echapper(id)}" title="Supprimer ce PNJ de la partie (DEV)">Supprimer ce PNJ</button>` : ""}
       </div>${(window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.FLECHE_DEFILE) || ""}`;
 }
@@ -355,6 +356,15 @@ async function agir(cible) {
     if (cb === "parametres") { son(); vue.retourParametres = false; if (window.GRIMOIRE_PARAMETRES) window.GRIMOIRE_PARAMETRES.revenirDesLiens(); return; }
     if (cb === "groupe") { son(); vue.retourGroupe = false; if (window.GRIMOIRE_GROUPE) window.GRIMOIRE_GROUPE.ouvrir(); return; }
     if (cb === "gestion") { son(); vue.retourGestion = false; if (window.GESTION_CAMP) window.GESTION_CAMP.ouvrir(); return; }
+    // (v488) DEV : forcer le recrutement de ce PNJ dans le camp (le clan nomade), comme s'il avait été recruté.
+    if (cb === "recruter-dev") {
+        if (!modeDev() || !window.RECRUTEMENT) return;
+        son();
+        const refus = await window.RECRUTEMENT.rejoindreLeCamp(cible.dataset.id, { type: "invite", par: "le mode DEV" });
+        if (refus) alert(refus);
+        rendre();
+        return;
+    }
     const lien = () => { const de = vue.regard === "in" ? vue.selection : vue.centre, vers = vue.regard === "in" ? vue.centre : vue.selection; return { de, vers }; };
     // (v464) Supprimer un PNJ totalement (mode DEV) : ses images, sa fiche, son âme, ses liens, ses souvenirs.
     if (cb === "supprimer-pnj") {

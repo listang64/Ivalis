@@ -12717,3 +12717,9 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Le déplacement** (`deplacement_camp.js`) : le bouton « Déplacer le camp », la veille du voyage (il part, il s'achève), l'arrivée avec la nouvelle jauge, l'arrêt à zéro ; `camp.js` prend la journée de route et écrit l'événement dans le récit (le Destin) ; la gestion du camp montre la route.
 - corrections_v487 le vérifie.
 
+## v488 — Le clan nomade, étape 12 : le recrutement
+
+- **Les règles** (`camp_pur.js`) : les prix (mercenaire 30, personnage 300), le moral d'arrivée (invité 60, mercenaire 40, acheté 100), les caracs d'une recrue (l'achat de points du jeu, rangées d'après le personnage), payer, acheter, recruter pour le groupe, l'arrivée d'un héros créé (acheté, recrue du clan ou héros).
+- **Le recrutement** (`recrutement.js`) : rejoindre le camp (fiche niveau 1 et caracs, souvenir), engager un mercenaire (la caisse paie), acheter un personnage (la bourse), la recrue votée au conseil (la caisse), la classe d'une recrue, la bourse DEV ; `groupe.js` envoie au camp ceux qui acceptent et ceux qu'on engage ; `camp.js` accueille les héros achetés ou recrutés ; le bouton DEV des fils invisibles ; la gestion du camp (classe, achat, recrue votée).
+- corrections_v488 le vérifie ; corrections_v480 lit l'arrivée des héros dans `arriveeDuHeros` ; corrections_v481 laisse libre le choix de la classe pendant une expédition.
+

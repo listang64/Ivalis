@@ -104,6 +104,7 @@ function htmlGauche() {
         ${camp.Conseil_Extraordinaire ? `<p class="avis-gestion">Un conseil extraordinaire doit se réunir : ${echapper(camp.Conseil_Extraordinaire.Raison || "")}</p>` : ""}
         ${(camp.Sujets_Conseil || []).length ? `<p class="avis-gestion">Le prochain conseil devra en parler : ${(camp.Sujets_Conseil || []).map(x => echapper(x.Texte || "")).join(" ")}</p>` : ""}
         ${htmlTache(camp)}
+        ${htmlRecrutement(camp)}
         ${htmlJournal(camp)}
         ${estDev() ? `<button type="button" class="lien-dev jour-dev-gestion" data-action="gestion" data-gc="jour-dev">Faire passer un jour au camp (DEV)</button>` : ""}
         <p class="note-gestion${note.texte && Date.now() - note.le < 4000 ? " visible" : ""}" aria-live="polite">${echapper(note.texte)}</p>
@@ -119,6 +120,19 @@ function htmlTache(camp) {
     return `<div class="sous-titre-groupe">La tâche en cours</div>
         <p class="ligne-gestion">${mec && mec.Id ? echapper(mec.Titre || "") : `${echapper(tv.Titre)} — par ${echapper(P.TACHES_A_BOUTON[tv.Type])}`}</p>
         ${annuler ? `<button type="button" class="lien-fiche annuler-tache-gestion" data-action="gestion" data-gc="annuler-tache">Annuler la tâche en cours (vote du groupe)</button>` : ""}`;
+}
+// (v488) LE RECRUTEMENT : un personnage créé de toutes pièces (300 drachmes), recruté pour le groupe (la caisse, après le
+// vote du conseil) ou acheté par un joueur (sa bourse).
+function htmlRecrutement(camp) {
+    const P = R() || {}, prix = P.PRIX_PERSONNAGE || 300;
+    const bourse = Number(((window.PARTIE_DATA || {}).Bourses_Joueurs || {})[moi()]) || 0;
+    const groupe = camp.Recrutement_Vote ? `<button type="button" class="lien-fiche recruter-gestion" data-action="gestion" data-gc="recruter-groupe"${P.peutRecruterPourLeGroupe && P.peutRecruterPourLeGroupe(camp) ? " disabled" : ""}>Créer la recrue votée au conseil (${prix} drachmes de la caisse)</button>` : "";
+    return `<div class="sous-titre-groupe">Recruter</div>
+        ${groupe}
+        ${camp.Recrutement_En_Cours ? `<p class="ligne-gestion petite">Une recrue du clan est en train d'être créée.</p>` : ""}
+        <p class="ligne-gestion petite">Ta bourse : <b data-gestion="bourse">${bourse}</b> drachmes.</p>
+        <button type="button" class="lien-fiche acheter-gestion" data-action="gestion" data-gc="acheter"${bourse < prix ? " disabled" : ""}>Acheter un personnage (${prix} drachmes de ta bourse)</button>
+        ${estDev() ? `<button type="button" class="lien-dev" data-action="gestion" data-gc="bourse-dev">+${prix} drachmes dans ma bourse (DEV)</button>` : ""}`;
 }
 // (v482) LES DERNIERS JOURS DU CAMP : son journal (la journée du camp, camp_pur.js).
 function htmlJournal(camp) {
@@ -162,6 +176,7 @@ function htmlMembre(id, camp, partis, bloque) {
           <div class="moral-gestion" title="Moral : ${moral}/100 (${echapper(P.effetDuMoral(moral))})${histo ? ` — dernier changement : ${histo.Delta > 0 ? "+" : ""}${histo.Delta}, ${echapper(histo.Raison)}` : ""}">
             <span>Moral</span><span class="barre-moral-gestion${moral < 30 ? " bas" : moral >= 80 ? " haut" : ""}"><i style="width:${moral}%"></i></span><b>${moral}</b></div>
           <div class="tache-gestion">${controle}</div>
+          ${!i.heros && !themes && window.ATOUTS_CLASSES ? `<div class="classe-gestion">Classe : <select class="select-gestion select-classe" data-gc="classe" data-id="${echapper(id)}"><option value="">—</option>${Object.keys(window.ATOUTS_CLASSES).map(c => `<option value="${echapper(c)}"${i.classe === c ? " selected" : ""}>${echapper(c)}</option>`).join("")}</select></div>` : ""}
         </div></li>`;
 }
 function htmlRecrue(id, camp, partis, bloque, mb) {
@@ -202,7 +217,7 @@ function htmlDroite() {
 function maj(force) {
     if (!pages) return;
     const camp = C() && C().lire();
-    const base = JSON.stringify([camp, infos, brouillons, C() && C().postesBloques && C().postesBloques(), C() && C().partis && C().partis(), (window.PARTIE_DATA || {}).Mission_En_Cours || null]);
+    const base = JSON.stringify([camp, infos, brouillons, C() && C().postesBloques && C().postesBloques(), C() && C().partis && C().partis(), (window.PARTIE_DATA || {}).Mission_En_Cours || null, (window.PARTIE_DATA || {}).Bourses_Joueurs || null]);
     const actif = document.activeElement;
     // Ne pas redessiner sous les doigts de celui qui tape une quantité.
     if (!force && actif && pages.d.contains(actif) && actif.matches("input")) return;
@@ -224,6 +239,14 @@ async function agir(cible) {
         if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id, nom: nomDe(id, C().lire()), depuisGestion: true });
         return;
     }
+    if (gc === "recruter-groupe" || gc === "acheter") {
+        son();
+        const X = window.RECRUTEMENT;
+        if (!X) return;
+        const refus = gc === "acheter" ? await X.acheterPersonnage() : await X.recruterPourLeGroupe();
+        return noter(refus || (gc === "acheter" ? "Ton personnage t'attend : crée-le (il sera à toi seul, moral 100)." : "La recrue du clan t'attend : crée-la (elle sera jouable par tous)."));
+    }
+    if (gc === "bourse-dev") { son(); if (window.RECRUTEMENT) await window.RECRUTEMENT.remplirBourseDev(); return noter("Ta bourse est remplie (DEV)."); }
     if (gc === "annuler-tache") {
         son();
         const r = window.TACHE_EN_COURS ? await window.TACHE_EN_COURS.annulerTache() : null;
@@ -248,6 +271,12 @@ async function agir(cible) {
 }
 async function surChangement(el) {
     const gc = el.dataset.gc, id = el.dataset.id;
+    if (gc === "classe") {
+        son();
+        const refus = window.RECRUTEMENT ? await window.RECRUTEMENT.choisirClasse(id, el.value) : "";
+        if (infos[id]) infos[id].classe = el.value;
+        return noter(refus || `${nomDe(id, C().lire())} : ${el.value || "sans classe"}.`);
+    }
     if (gc === "intendant") {
         son();
         const refus = await C().nommerIntendant(el.value || null);

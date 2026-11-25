@@ -15,7 +15,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection, deleteField, runTransaction, increment, addDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=10";
+import * as CP from "./camp_pur.js?v=11";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -191,7 +191,13 @@ async function rattraperMembres() {
     const manquants = herosDeLaPartie().filter(h => !camp.Membres[h.id]);
     if (!manquants.length) return;
     const maj = {};
-    manquants.forEach(h => { maj["Camp.Membres." + h.id] = { Type: "heros", Nom: h.nom, Joueur: h.joueur, Tache: null, Moral: CP.MORAL_DEPART.heros }; });
+    // (v488) Un personnage acheté (moral 100, à son joueur) ou une recrue du clan (pour tous) arrive comme tel.
+    manquants.forEach(h => {
+        const a = CP.arriveeDuHeros(camp, h, Date.now());
+        maj["Camp.Membres." + h.id] = a.membre;
+        if (a.efface === "achat") maj["Camp.Achats_En_Attente." + h.joueur] = deleteField();
+        if (a.efface === "recrutement") maj["Camp.Recrutement_En_Cours"] = deleteField();
+    });
     try { await updateDoc(refPartie(p), maj); } catch (e) { console.warn("[Camp] Les nouveaux membres :", e); }
 }
 setInterval(rattraperMembres, 15000);
@@ -241,7 +247,7 @@ export async function infosMembres() {
         }
         const f = await lireDoc("Monde_PNJ", id) || {};
         out[id] = { id, heros: false, nom: f.Nom_PNJ || mb.Nom || "", caracs: f.Caracs || {}, niveau: Number(f.Niveau) || 1, portrait: f.URL_Cloudinary || "",
-                    occupation: f.Occupation || "" };
+                    occupation: f.Occupation || "", classe: f.Classe || "" };
     }));
     return out;
 }

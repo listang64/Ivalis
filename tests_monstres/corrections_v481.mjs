@@ -303,7 +303,7 @@ await section(async () => {
   // (v483) Une expédition en cours : le groupe est loin de la case du camp (y revenir la terminerait).
   await p.evaluate(() => { window.positionGroupeBrute = () => ({ Region: 7, x: 0.9, y: 0.1 }); const d = window.__docs["Systeme_Parties/P1"]; d.Expedition = { En_Cours: true, Membres: ["H1", "PNJ_THEMES_P1"] }; window.appliquerVoyageDeLaPartie(JSON.parse(JSON.stringify(d))); });
   await p.waitForTimeout(1300);
-  const r = await p.evaluate(async () => ({ desactives: [...document.querySelectorAll(".page-gestion select")].every(s => s.disabled),
+  const r = await p.evaluate(async () => ({ desactives: [...document.querySelectorAll(".page-gestion select:not(.select-classe)")].every(s => s.disabled),
     avis: document.querySelector(".page-gestion-gauche .avis-gestion").textContent, h1: (document.querySelector('.membre-gestion[data-membre="H1"] .tache-fixe') || {}).textContent,
     refus: await window.CAMP.assignerTache("PNJ_BORS", "cueillir") }));
   verifier("les menus sont figés, un mot le dit ; ceux qui sont partis : « en expédition »", r.desactives && /expédition est en cours/.test(r.avis) && r.h1 === "En expédition", JSON.stringify(r));

@@ -64,6 +64,7 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
 | 9 — Le conseil | v485 | fait |
 | 10 — La tâche en cours | v486 | fait |
 | 11 — Le déplacement du camp | v487 | fait |
+| 12 — Le recrutement | v488 | fait (sauf : les compétences d'une recrue, voir plus bas) |
 
 ## Points ambigus
 
@@ -239,3 +240,22 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
   tâche « Déplacer le camp » est faite. Un déplacement = un voyage.
 - **Étape 11, « au camp ».** Pendant la route, le clan n'est pas au camp : un combat est possible, les postes et le
   conseil attendent l'arrivée.
+- **Étape 12, le recrutement actuel.** Avec un camp, le PNJ qui accepte (le même calcul qu'avant : affinité,
+  psyché, jet de Charisme) rejoint le camp (invité, moral 60) au lieu de suivre la compagnie ; le narrateur le sait.
+  Sans camp, rien ne change. Les anciens suiveurs restent des suiveurs.
+- **Étape 12, les mercenaires.** MIA_GROUPE relève une nouvelle demande, « engager » (payer un PNJ pour qu'il
+  vienne), avec son prix s'il est dit (30 drachmes sinon). La caisse du groupe paie, il rejoint le camp (moral 40) ;
+  sa solde (3 par jour) et son départ après 5 jours sans solde viennent de la journée du camp. Sans les drachmes, il
+  refuse, et le narrateur le sait.
+- **Étape 12, les caracs d'une recrue.** L'achat de points du jeu (22 points, de 8 à 16, les coûts de la création) ;
+  MIA_CARACS range ses caractéristiques d'après son métier et son caractère, et les points vont surtout aux premières
+  (sans clé : au hasard). Niveau 1, XP 0. La classe : un menu sur sa ligne de la gestion du camp, pour n'importe quel
+  joueur. **Ses compétences : pas encore** — il faudrait la Forge pour un PNJ ; à faire quand un PNJ du camp pourra
+  être joué (voir l'étape 6).
+- **Étape 12, les personnages à 300 drachmes.** Achat : la bourse du joueur paie, la création s'ouvre, le héros créé
+  rejoint le camp « acheté » (moral 100, à ce joueur). Pour le groupe : après le vote du conseil, le premier qui clique
+  « Créer la recrue votée au conseil » la crée (la caisse paie) ; elle rejoint le camp « recrue du clan », notée libre
+  pour tous (la jouer à plusieurs attend la même chose que les PNJ jouables). La bourse est encore vide (la revente
+  d'objets viendra) : un bouton DEV y met 300 drachmes.
+- **Étape 12, le bouton DEV.** Dans les fils invisibles d'un PNJ qui n'est pas du camp (mode DEV) : « Forcer son
+  recrutement dans le camp » — invité, moral 60, niveau 1, ses caracs, son souvenir, comme un recrutement naturel.
