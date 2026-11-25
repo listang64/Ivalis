@@ -268,13 +268,30 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
 - **Étape 13, l'ancien système.** Le narrateur ne parle plus de « mission de guilde » (la tâche du clan). Les noms
   internes (`missions_guilde.js`, `Guilde/Mission`, `Mission_En_Cours`) restent, pour ne pas casser les parties.
 
+- **v490, jouer un personnage du camp.** Sur la page Expédition, la liste d'une place montre les personnages du joueur,
+  puis « Les personnages du camp » libres pour tous : PNJ, invités, mercenaires et recrues du clan (pas Thémès, pas les
+  héros des joueurs, pas les personnages achetés, « jouables que par lui »). En prendre un l'incarne : la première fois,
+  il reçoit une fiche d'aventurier (`Personnages`, le même identifiant que sa fiche de PNJ : niveau, caracs, classe,
+  images ; `Libre_Pour_Tous`, `PNJ_Source`), puis elle passe au joueur qui le prend — « pas exclusif » : le dernier qui
+  le joue le commande, mais personne ne prend celui qui part déjà avec un autre. Il faut d'abord lui donner une classe
+  (Gestion du camp). Il devient le héros joué (actif) sans devenir le héros principal. Au camp, il reste un PNJ du
+  camp (on lui parle, il peut partir s'il est malheureux) ; les blessures de sa fiche guérissent comme celles d'un héros.
+- **v490, ses compétences.** Personne ne les génère : n'importe quel joueur ouvre sa fiche et les crée à la Forge (comme
+  ses caracs, ses talents, son inventaire), ce que la fiche n'ouvrait jusque-là qu'à son propriétaire.
+- **v490, le héros principal mort.** Un joueur qui n'a plus de personnage à lui voit, dans « Mon héros principal », les
+  personnages du camp : en choisir un l'incarne et en fait son héros principal (pas exclusif).
+- **v490, le camp à la création de la partie.** Une partie naît avec `Camp_A_Creer` ; le premier poste qui l'ouvre, ses
+  cartes chargées, prend la main (une transaction) et pose le camp dans une région au hasard qui a sa carte (et ses
+  terrains, quand on sait les lire), avec 100 drachmes, 28 provisions et Thémès ; le groupe part de là. Les héros
+  arrivés après rejoignent le camp comme avant, et Thémès les aime aussi (son lien, l'affection au maximum). La recrue
+  créée pour le groupe arrive libre pour tous. Le bouton DEV (Forêt des Murmures) reste.
+
 ## Ce qui reste à faire ou à trancher (pour Nico)
 
-- **Jouer un personnage du camp** (étapes 6 et 12) : un PNJ du camp, ou le héros d'un autre joueur, n'est pas encore
-  jouable en expédition ; il faudrait lui donner une fiche d'aventurier (compétences par la Forge) et décider qui le
-  commande. Les compétences d'une recrue attendent la même chose.
-- **La création automatique du camp** à la création d'une partie : c'est toujours le bouton DEV (le document dit « à
-  terme »).
+- **Le héros d'un autre joueur** n'est pas jouable par les autres (le document ne le prévoit pas : « d'abord ses propres
+  personnages, puis les personnages du camp libres pour tous »).
+- **La région du camp de départ** : une région tirée au hasard (le document dit « un endroit aléatoire ») ; le bouton DEV
+  le pose toujours en Forêt des Murmures.
 - **Les encarts du camp** : à poser par Nico avec « Encarts (DEV) », puis « Copier le code » dans `camp_scene.js`.
 - **Les chiffres à équilibrer** (le document le dit) : coûts, moral, risques, récompenses, les seuils des
   affinités du retour et des événements de l'absence.

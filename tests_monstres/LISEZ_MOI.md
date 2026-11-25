@@ -12729,3 +12729,11 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Les finitions** : le narrateur ne parle plus de « mission de guilde » (`missions_guilde.js`).
 - corrections_v489 le vérifie ; corrections_v443 lit « LA TÂCHE EN COURS DU CLAN ».
 
+
+## v490 — Le clan nomade, le reste : jouer un personnage du camp, ses compétences, le camp à la création de la partie
+
+- **Jouer un personnage du camp** (`camp_pur.js` : `libreAuCamp`, `personnagesLibres`, `jouablesExpedition`, `peutIncarner`, `ficheIncarnee`, `pvDeConstitution` ; `expedition.js` : `jouablesExpedition`, `incarner`, `prendrePlace`) : la liste d'une place de l'expédition montre les siens, puis les personnages du camp libres pour tous (`grimoire_groupe.js`) ; en prendre un lui donne sa fiche d'aventurier (`Personnages`, même identifiant, `Libre_Pour_Tous`, `PNJ_Source`), à ce joueur ; personne ne prend celui qui part déjà ; il faut sa classe. Il est joué (`GRIMOIRE_FICHES.jouer`) sans devenir le héros principal ; au camp il reste un PNJ (`camp.js`, `infosMembres` : `incarne` ; `camp_scene.js`), et ses blessures guérissent (`soigneCommeHeros`).
+- **Ses compétences** : la fiche (caracs, talents, compétences, Forge, inventaire) s'ouvre à tous les joueurs pour un personnage libre (`grimoire_fiches.js`) ; aucune n'est générée.
+- **Le héros principal mort** : sans personnage à soi, « Mon héros principal » propose les personnages du camp (`herosPrincipal`, `htmlChoixHeros`, `definirHerosPrincipal`).
+- **Le camp à la création de la partie** (`app.js` : `Camp_A_Creer` ; `camp.js` : `creerCampAuto`, `regionAuHasard`) : une transaction, une région au hasard, le groupe qui en part ; les héros arrivés après reçoivent le lien de Thémès, la recrue du clan est libre pour tous (`rattraperMembres`).
+- corrections_v490 le vérifie.

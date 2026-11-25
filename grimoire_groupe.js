@@ -263,15 +263,17 @@ function htmlGaucheExpedition() {
     }).join("");
     let liste = "";
     if (e && !e.En_Cours && choixPlace !== null) {
-        const siens = EXP_().jouables(moi), pris = (e.Emplacements || []).filter(Boolean).map(x => x.Perso);
-        const libres = Object.keys(camp.Membres || {}).filter(id => !siens.includes(id) && !(camp.Membres[id] || {}).Narrateur && !String(id).startsWith("PNJ_THEMES_"));
+        // (v490) Les siens, puis les personnages du camp libres pour tous : on les incarne en les prenant.
+        const { siens, libres } = EXP_().jouablesExpedition(moi), pris = (e.Emplacements || []).filter(Boolean).map(x => x.Perso);
+        const classeLibre = (id) => classeDe(persoDe(id) || {}) || (infosCamp[id] || {}).classe || "";
+        const bouton = (id, classe) => `<button type="button" class="lien-fiche perso-place" data-action="groupe" data-gp="choisir-perso" data-id="${echapper(id)}"${pris.includes(id) || (e.Suiveurs || []).includes(id) ? " disabled" : ""}>${echapper(nomMembre(id))}${classe ? ` — ${echapper(classe)}` : ""}</button>`;
         liste = `<div class="choix-place-expedition">
             <div class="sous-titre-groupe petit">Qui part ?</div>
-            ${siens.length ? siens.map(id => `<button type="button" class="lien-fiche perso-place" data-action="groupe" data-gp="choisir-perso" data-id="${echapper(id)}"${pris.includes(id) || (e.Suiveurs || []).includes(id) ? " disabled" : ""}>${echapper(nomMembre(id))}${classeDe(persoDe(id) || {}) ? ` — ${echapper(classeDe(persoDe(id)))}` : ""}</button>`).join("")
+            ${siens.length ? siens.map(id => bouton(id, classeDe(persoDe(id) || {}))).join("")
                 : `<p class="fiche-attente">Tu n'as pas encore d'aventurier.</p>`}
             ${libres.length ? `<div class="sous-titre-groupe petit">Les personnages du camp</div>
-              <p class="fiche-attente petite">Libres pour tous : ils seront jouables quand ils auront leur fiche d'aventurier.</p>
-              <div class="camp-place">${libres.map(id => `<span class="perso-camp-place">${echapper(nomMembre(id))}</span>`).join("")}</div>` : ""}
+              <p class="fiche-attente petite">Libres pour tous : celui qui en prend un le joue pour l'expédition.</p>
+              <div class="camp-place">${libres.map(id => bouton(id, classeLibre(id))).join("")}</div>` : ""}
             <button type="button" class="lien-fiche" data-action="groupe" data-gp="fermer-choix">Fermer</button>
           </div>`;
     }

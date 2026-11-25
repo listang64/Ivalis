@@ -117,14 +117,17 @@ export function regionNommee(cartes, nom) {
 // estIllusion }) ; `choix` : Heros_Principaux de la partie ({ idJoueur: idPersonnage }).
 export function personnagesDuJoueur(joueur, persos) {
     return (persos || []).map((h, i) => ({ h, i }))
-        .filter(({ h }) => h && h.idPersonnage && joueur && h.idJoueur === joueur && !h.estIllusion && !h.estMonstre && h.statut !== "Mort")
+        .filter(({ h }) => h && h.idPersonnage && joueur && h.idJoueur === joueur && !h.estIllusion && !h.estMonstre && h.statut !== "Mort" && !h.librePourTous)
         .sort((a, b) => ((a.h.creeLe || Infinity) - (b.h.creeLe || Infinity)) || (a.i - b.i))
         .map(x => x.h);
 }
 export function herosPrincipal(joueur, persos, choix) {
     const siens = personnagesDuJoueur(joueur, persos);
     const voulu = choix && choix[joueur];
-    const h = siens.find(x => x.idPersonnage === voulu) || siens[0];
+    const h = siens.find(x => x.idPersonnage === voulu) || siens[0]
+        // (v490) « Si le héros principal meurt, le joueur choisit son nouveau héros principal parmi les PNJ disponibles » :
+        // un personnage du camp qu'il joue, « pas exclusif » (un autre joueur peut le prendre à la prochaine expédition).
+        || (persos || []).find(x => x && x.librePourTous && x.idPersonnage === voulu && x.idJoueur === joueur && x.statut !== "Mort");
     return h ? h.idPersonnage : null;
 }
 
@@ -231,6 +234,8 @@ export function pionSurLeCamp(camp, position, rayon = 0.06) {
 // =========================================================================
 // « m = modificateur de la caractéristique, calculé comme dans le jeu : (carac − 10) ÷ 2, arrondi vers
 // le bas. Pour une tâche à deux caracs, on prend la meilleure. » Les caracs : { force, dex, con, int, sag, cha }.
+// (v490) Les blessures d'une fiche d'aventurier (un héros, ou un personnage du camp qu'un joueur a incarné) guérissent au camp.
+const soigneCommeHeros = (i) => !!(i && (i.heros || i.incarne));
 export const modificateur = (v) => Math.floor(((Number.isFinite(Number(v)) && v !== null && v !== "" ? Number(v) : 10) - 10) / 2);
 export const TACHES = {
     cuisiner: { nom: "Cuisiner", caracs: ["int"], max: 2, aide: "Chaque cuisinier fait manger le camp (1 + m) provisions de moins par jour (jamais moins de 1 en tout) ; repas : +2 de moral par jour à tous." },
@@ -573,7 +578,7 @@ export function journeeDuCamp(e, alea = Math.random) {
             b.Jours = Math.max(0, b.Jours - jours);
             if (!b.Jours) { delete membres[id].Blessure_Chasse; journal.push(`${nom(id)} est remis de sa blessure de chasse.`); }
         }
-        if ((infos[id] || {}).heros) soinsHeros[id] = jours;
+        if (soigneCommeHeros(infos[id])) soinsHeros[id] = jours;
     });
 
     // Ceux qui quittent le clan.
@@ -1028,7 +1033,7 @@ export function journeeDuDeplacement(e, alea = Math.random) {
     ids.forEach(id => {
         const b = membres[id].Blessure_Chasse;
         if (b && b.Jours > 0) { b.Jours -= 1; if (b.Jours <= 0) delete membres[id].Blessure_Chasse; }
-        if ((infos[id] || {}).heros) soinsHeros[id] = 1;
+        if (soigneCommeHeros(infos[id])) soinsHeros[id] = 1;
     });
     if (camp.Provisions === 0) {
         ev.arret = true;
@@ -1126,4 +1131,57 @@ export function motReputationRegion(s) {
 }
 export function contexteReputationRegion(nomGroupe, nomRegion, score) {
     return `--- LA RÉPUTATION DU CLAN DANS LA RÉGION ---\nDans ${nomRegion || "cette région"}, les membres du clan « ${nomGroupe || "le clan"} » sont ${motReputationRegion(score)} (${score > 0 ? "+" : ""}${score} sur une échelle de −100 à +100) : les habitants réagissent en conséquence (accueil, méfiance, rumeurs), même là où le clan n'est jamais passé.`;
+}
+
+// =========================================================================
+//  (v490) JOUER UN PERSONNAGE DU CAMP ; LE CAMP À LA CRÉATION DE LA PARTIE
+// =========================================================================
+// « Tous les autres PNJ du camp peuvent être incarnés par n'importe quel joueur » ; « en cliquant sur un emplacement,
+// le joueur ouvre la liste des personnages qu'il peut jouer : d'abord ses propres personnages, puis, en dessous, les
+// personnages du camp libres pour tous ». Pas libres : Thémès (il ne se bat jamais), les héros des joueurs et les
+// personnages achetés (« jouable que par lui »). Libres : les PNJ, invités, mercenaires et recrues du clan.
+export function libreAuCamp(id, membre) {
+    if (!id || !membre || estThemes(id, membre)) return false;
+    return membre.Libre === true || ["pnj", "invite", "mercenaire", "recrue_clan"].includes(membre.Type);
+}
+export const personnagesLibres = (camp) => Object.keys((camp && camp.Membres) || {}).filter(id => libreAuCamp(id, camp.Membres[id]))
+    .sort((a, b) => String(camp.Membres[a].Nom || "").localeCompare(String(camp.Membres[b].Nom || ""), "fr"));
+// Ce que ce joueur peut jouer en expédition : les siens, puis ceux du camp (pas un suiveur qui part déjà, pas un mort).
+export function jouablesExpedition(joueur, persos, camp, exp) {
+    const siens = personnagesDuJoueur(joueur, persos).map(h => h.idPersonnage);
+    const pris = new Set([...(((exp && exp.Suiveurs) || [])), ...(persos || []).filter(h => h && h.statut === "Mort").map(h => h.idPersonnage)]);
+    return { siens, libres: personnagesLibres(camp).filter(id => !siens.includes(id) && !pris.has(id)) };
+}
+// Incarner un PNJ du camp pour la première fois : il lui faut sa classe (« donnée par les joueurs », la Gestion du camp).
+// `fichePnj` : sa fiche Monde_PNJ (null pour une recrue du clan, qui a déjà sa fiche d'aventurier).
+export function peutIncarner(camp, id, fichePnj) {
+    const mb = ((camp && camp.Membres) || {})[id];
+    if (!libreAuCamp(id, mb)) return "Ce personnage n'est pas libre pour tous.";
+    if (fichePnj && fichePnj.Statut === "Mort") return "Ce personnage est mort.";
+    if (fichePnj && !fichePnj.Classe) return `${fichePnj.Nom_PNJ || mb.Nom || "Ce personnage"} n'a pas encore de classe : donnez-lui-en une dans la Gestion du camp.`;
+    return "";
+}
+// Les PV d'un aventurier : le calcul de la création (app.js, pvMaxDepuisConstitution).
+export const pvDeConstitution = (con) => 50 + 4 * ((Number.isFinite(Number(con)) && con !== null ? Number(con) : 10) - 10);
+// Sa fiche d'aventurier (Personnages), tirée de sa fiche de PNJ : le même identifiant, pour que le camp, l'expédition et
+// les fils invisibles parlent du même personnage ; son niveau (son XP), ses caracs, sa classe, ses images. Ses
+// compétences : par la Forge, par n'importe quel joueur (Nico : « les compétences des nouvelles recrues, ce sont les
+// joueurs qui les feront »). Il naît au repos (Actif) : le jouer l'éveille (basculerActivationPersonnage).
+export function ficheIncarnee(id, f, o = {}) {
+    const c = o.caracs || {};
+    return {
+        ID_Personnage: id, ID_Partie: o.partie || "", ID_Joueur: o.joueur || "", Camp: "Allié",
+        Prenom_Personnage: (f && f.Nom_PNJ) || "", Nom_Personnage: "", Race: (f && f.Race) || "Humain", Classe: (f && f.Classe) || "",
+        URL_Cloudinary: (f && f.URL_Cloudinary) || "", Images_Camp: f && Array.isArray(f.Images_Camp) ? f.Images_Camp : [],
+        Statut: "Vivant", Actif: false, Cree_Le: o.maintenant || 0, XP: Math.max(0, Math.floor(Number(f && f.XP) || 0)),
+        PV_Max: pvDeConstitution(c.con), Objets_Max: 3 + modificateur(c.force), Fatigue_Max: 100, Regeneration: 35,
+        Esquive: 15, Parade: 0, Critique: 10, Def_Physique: 0, Def_Magique: 0, Competences_Max: 6, Deck_Equipe: [], Etats_Alteres: [],
+        Libre_Pour_Tous: true, PNJ_Source: id
+    };
+}
+// « À terme : automatique à la création d'une partie (camp à un endroit aléatoire, 100 drachmes, 28 provisions,
+// Thémès) » : une région au hasard parmi celles qui ont leur carte (et leurs terrains, quand on sait les lire).
+export function regionAuHasard(cartes, jouable = () => true, alea = Math.random) {
+    const n = Object.keys(cartes || {}).map(Number).filter(k => k > 0 && cartes[k] && cartes[k].image && jouable(k));
+    return n.length ? n[Math.min(n.length - 1, Math.floor(alea() * n.length))] : 0;
 }

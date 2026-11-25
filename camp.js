@@ -15,7 +15,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection, deleteField, runTransaction, increment, addDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=12";
+import * as CP from "./camp_pur.js?v=13";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -35,6 +35,8 @@ window.appliquerCampDeLaPartie = function(data) {
     const avant = JSON.stringify(camp && camp.Position);
     camp = (data && data.Camp) || null;
     if (JSON.stringify(camp && camp.Position) !== avant) redessiner();
+    // (v490) La partie vient de naître : son camp se pose tout seul.
+    if (!camp && data && data.Camp_A_Creer) setTimeout(() => creerCampAuto(), 0);
     // (v483) L'expédition part quand le groupe quitte la case du camp, finit quand il y revient (expedition.js).
     if (camp && data && data.Expedition) setTimeout(() => { try { if (window.EXPEDITION) window.EXPEDITION.veiller(); } catch (e) {} }, 0);
     // (v487) Le déplacement du camp : le voyage du clan part, puis s'achève (deplacement_camp.js).
@@ -115,7 +117,7 @@ function placeAuHasard(region, alea = Math.random) {
 // Les héros des joueurs de la partie : les membres du clan avec Thémès.
 function herosDeLaPartie() {
     return ((window.PERSOS_JOUEURS_PARTIE && window.PERSOS_JOUEURS_PARTIE.length ? window.PERSOS_JOUEURS_PARTIE : window.PERSOS_PARTIE) || [])
-        .filter(h => h && h.idPersonnage && !h.estMonstre && !h.estIllusion && h.statut !== "Mort")
+        .filter(h => h && h.idPersonnage && !h.estMonstre && !h.estIllusion && h.statut !== "Mort" && !h.librePourTous)   // (v490) un PNJ incarné reste un PNJ du camp
         .map(h => ({ id: h.idPersonnage, nom: [h.prenom, h.nom].filter(Boolean).join(" ").trim(), joueur: h.idJoueur || "" }));
 }
 // Crée Thémès (sa fiche, son âme, ses liens) et le camp de la partie. Rend le camp,
@@ -125,8 +127,8 @@ export async function creerCampDev(options) {
     const p = idPartie();
     if (!p) { avertir("Aucune partie chargée."); return null; }
     if (camp && !o.recreer && !(typeof window.confirm === "function" && window.confirm("Le camp existe déjà. Le recréer (Thémès compris) ?"))) return null;
-    const region = CP.regionNommee(window.CARTES_REGIONALES || {}, REGION_DEPART);
-    if (!region) { avertir(`La région « ${REGION_DEPART} » est introuvable : le camp n'a pas été créé.`); return null; }
+    const region = o.region || CP.regionNommee(window.CARTES_REGIONALES || {}, REGION_DEPART);
+    if (!region) { avertir(`La région « ${REGION_DEPART} » est introuvable : le camp n'a pas été créé.`, o.silencieux); return null; }
     const position = o.position || placeAuHasard(region);
     const heros = herosDeLaPartie();
     const { Jauge, Terrain } = await estimerJauge(position);
@@ -148,15 +150,18 @@ export async function creerCampDev(options) {
     heros.forEach(h => lot.set(doc(db, PARTIES, p, "Liens", `${idT}~${h.id}`), CP.lienThemesVers(idT, h.id, maintenant)));
     const s = await getDoc(refPartie(p));
     const bourses = s.exists() && s.data().Bourses_Joueurs ? s.data().Bourses_Joueurs : {};
-    lot.set(refPartie(p), { Camp: nouveau, Bourses_Joueurs: bourses }, { merge: true });
+    // (v490) Le camp de la création de la partie : le groupe part de là (s'il n'est pas déjà sur la carte), et le drapeau tombe.
+    const auto = o.auto ? { Camp_A_Creer: deleteField(), ...(s.exists() && s.data().Position_Groupe ? {} : { Position_Groupe: position }) } : {};
+    lot.set(refPartie(p), { Camp: nouveau, Bourses_Joueurs: bourses, ...auto }, { merge: true });
     await lot.commit();
     camp = nouveau;
     redessiner();
-    avertir(`Le camp est posé en ${(window.CARTES_REGIONALES || {})[region]?.nom || REGION_DEPART}, avec Thémès${Jauge === null ? " (jauge des ressources non estimée : pas de clé Gemini ou pas d'image)" : ` (ressources : ${Jauge}/100)`}.`);
+    avertir(`Le camp est posé en ${(window.CARTES_REGIONALES || {})[region]?.nom || REGION_DEPART}, avec Thémès${Jauge === null ? " (jauge des ressources non estimée : pas de clé Gemini ou pas d'image)" : ` (ressources : ${Jauge}/100)`}.`, o.silencieux);
     return nouveau;
 }
-function avertir(texte) {
+function avertir(texte, silencieux) {
     console.log("⛺ [Camp] " + texte);
+    if (silencieux) return;
     try { if (typeof window.alert === "function") window.alert(texte); } catch (e) {}
 }
 
@@ -187,20 +192,55 @@ export async function joueursConnectes() {
 
 // LES HÉROS NÉS APRÈS LE CAMP rejoignent ses membres (« tout personnage de joueur qui n'est pas utilisé en
 // expédition est traité comme un PNJ : il vit au camp comme les autres ») : un poste les ajoute.
+// (v490) LE CAMP DE LA CRÉATION DE LA PARTIE : « automatique à la création d'une partie (camp à un endroit aléatoire,
+// 100 drachmes, 28 provisions, Thémès) ». La partie naît avec Camp_A_Creer (app.js, creerNouvellePartie) ; le premier
+// poste qui l'ouvre, ses cartes chargées, prend la main (une transaction) et pose le camp dans une région au hasard.
+let campEnCreation = false;
+async function creerCampAuto() {
+    const p = idPartie();
+    if (campEnCreation || !p || camp) return null;
+    const cartes = window.CARTES_REGIONALES || {};
+    if (!Object.keys(cartes).length) { setTimeout(() => creerCampAuto(), 3000); return null; }   // les cartes ne sont pas encore là
+    campEnCreation = true;
+    try {
+        const maintenant = Date.now();
+        const pris = await runTransaction(db, async (tx) => {
+            const s = await tx.get(refPartie(p));
+            const d = s.exists() ? s.data() : {};
+            const a = d.Camp_A_Creer;
+            // Personne d'autre ne le pose déjà (une main prise il y a plus de deux minutes est perdue).
+            if (d.Camp || !a || (typeof a === "object" && maintenant - (Number(a.Le) || 0) < 120000)) return false;
+            tx.update(refPartie(p), { Camp_A_Creer: { Par: moiJoueur(), Le: maintenant } });
+            return true;
+        });
+        if (!pris) return null;
+        const jouable = (n) => typeof window.terrainsDefinisRegion !== "function" || window.terrainsDefinisRegion(n);
+        const region = CP.regionAuHasard(cartes, jouable) || CP.regionAuHasard(cartes) || CP.regionNommee(cartes, REGION_DEPART);
+        return await creerCampDev({ recreer: true, region, auto: true, silencieux: true });
+    } catch (e) { console.error("[Camp] Le camp de la nouvelle partie :", e); return null; }
+    finally { campEnCreation = false; }
+}
+const moiJoueur = () => { try { return localStorage.getItem("ID_JOUEUR_COURANT") || ""; } catch (e) { return ""; } };
 async function rattraperMembres() {
     const p = idPartie();
     if (!p || !camp || !camp.Membres || document.hidden) return;
     const manquants = herosDeLaPartie().filter(h => !camp.Membres[h.id]);
     if (!manquants.length) return;
-    const maj = {};
+    const maj = {}, lot = writeBatch(db), maintenant = Date.now(), idT = CP.idThemesDuCamp(camp);
     // (v488) Un personnage acheté (moral 100, à son joueur) ou une recrue du clan (pour tous) arrive comme tel.
     manquants.forEach(h => {
-        const a = CP.arriveeDuHeros(camp, h, Date.now());
+        const a = CP.arriveeDuHeros(camp, h, maintenant);
         maj["Camp.Membres." + h.id] = a.membre;
         if (a.efface === "achat") maj["Camp.Achats_En_Attente." + h.joueur] = deleteField();
-        if (a.efface === "recrutement") maj["Camp.Recrutement_En_Cours"] = deleteField();
+        if (a.efface === "recrutement") {
+            maj["Camp.Recrutement_En_Cours"] = deleteField();
+            lot.update(doc(db, "Personnages", h.id), { Libre_Pour_Tous: true });   // (v490) « tout le monde peut le jouer »
+        }
+        // (v490) Thémès aime aussi les héros arrivés après lui (le camp de la création de la partie naît sans eux).
+        if (idT) lot.set(doc(db, PARTIES, p, "Liens", `${idT}~${h.id}`), CP.lienThemesVers(idT, h.id, maintenant));
     });
-    try { await updateDoc(refPartie(p), maj); } catch (e) { console.warn("[Camp] Les nouveaux membres :", e); }
+    lot.update(refPartie(p), maj);
+    try { await lot.commit(); } catch (e) { console.warn("[Camp] Les nouveaux membres :", e); }
 }
 setInterval(rattraperMembres, 15000);
 
@@ -241,13 +281,19 @@ export async function infosMembres() {
     const out = {};
     await Promise.all(Object.keys(camp.Membres || {}).map(async (id) => {
         const mb = camp.Membres[id] || {}, h = persos.find(x => x && x.idPersonnage === id);
-        if (h) {
+        if (h && !h.librePourTous) {
             const caracs = (window.CARACS_PARTIE || {})[id] || await lireDoc("Caracteristiques", id) || {};
             out[id] = { id, heros: true, joueur: h.idJoueur || "", nom: [h.prenom, h.nom].filter(Boolean).join(" ").trim() || mb.Nom || "", caracs,
                         niveau: Number(h.niveau) || 1, portrait: h.urlCloudinary || h.urlAvatarEquipe || h.urlPortraitReference || "" };
             return;
         }
         const f = await lireDoc("Monde_PNJ", id) || {};
+        if (h) {   // (v490) un personnage du camp qu'un joueur a incarné : un PNJ du camp, dont la fiche d'aventurier dit les caracs et le niveau
+            const caracs = (window.CARACS_PARTIE || {})[id] || await lireDoc("Caracteristiques", id) || f.Caracs || {};
+            out[id] = { id, heros: false, incarne: true, joueur: h.idJoueur || "", nom: f.Nom_PNJ || [h.prenom, h.nom].filter(Boolean).join(" ").trim() || mb.Nom || "", caracs,
+                        niveau: Number(h.niveau) || 1, portrait: f.URL_Cloudinary || h.urlCloudinary || h.urlPortraitReference || "", occupation: f.Occupation || "", classe: h.classe || f.Classe || "" };
+            return;
+        }
         out[id] = { id, heros: false, nom: f.Nom_PNJ || mb.Nom || "", caracs: f.Caracs || {}, niveau: Number(f.Niveau) || 1, portrait: f.URL_Cloudinary || "",
                     occupation: f.Occupation || "", classe: f.Classe || "" };
     }));
@@ -429,6 +475,6 @@ window.majReputationRegions = function () {
 // (v484) THÉMÈS, LE NARRATEUR (étape 7) : ce que le narrateur reçoit dès que le clan a un camp (ia_master.js).
 export const consignesThemes = () => (camp ? CP.CONSIGNES_THEMES : "");
 
-window.CAMP = { consignesThemes, echoReputation, contexteReputationMJ, lire: lireCamp, creerCampDev, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
+window.CAMP = { consignesThemes, echoReputation, contexteReputationMJ, lire: lireCamp, creerCampDev, creerCampAuto, rattraperMembres, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
                 partis, postesBloques, infosMembres, assignerTache, nommerIntendant, changerMoral, journeeDuCamp };
 window.journeeDuCamp = journeeDuCamp;

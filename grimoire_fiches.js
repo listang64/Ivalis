@@ -153,7 +153,14 @@ const choixDeLaPartie = () => ((window.PARTIE_DATA || {}).Heros_Principaux) || {
 const herosPrincipalDe = (joueur) => (window.CAMP && window.CAMP.regles ? window.CAMP.regles.herosPrincipal(joueur, tousLesHeros(), choixDeLaPartie()) : null);
 const personnagesDe = (joueur) => (window.CAMP && window.CAMP.regles ? window.CAMP.regles.personnagesDuJoueur(joueur, tousLesHeros()) : []);
 async function definirHerosPrincipal(id) {
-    const h = tousLesHeros().find(x => x.idPersonnage === id);
+    let h = tousLesHeros().find(x => x.idPersonnage === id);
+    // (v490) « Si le héros principal meurt, le joueur choisit son nouveau héros principal parmi les PNJ disponibles » :
+    // sans personnage à lui, un personnage du camp, incarné (sa fiche d'aventurier, expedition.js).
+    if ((!h || h.librePourTous) && !personnagesDe(idJoueurCourant()).length && window.EXPEDITION && typeof window.EXPEDITION.incarner === "function") {
+        const refus = await window.EXPEDITION.incarner(id);
+        if (refus) { noterChoixHeros(refus); return false; }
+        h = tousLesHeros().find(x => x.idPersonnage === id);
+    }
     const joueur = h && h.idJoueur;
     if (!h || !joueur || joueur !== idJoueurCourant()) return false;
     const p = window.ID_PARTIE_COURANTE;
@@ -164,21 +171,38 @@ async function definirHerosPrincipal(id) {
     await choisirHerosActif(id);
     return true;
 }
+// (v490) Les personnages du camp qu'un joueur sans personnage peut prendre pour héros principal.
+const libresDuCamp = () => {
+    const c = window.CAMP && window.CAMP.lire ? window.CAMP.lire() : null;
+    if (!c || !window.CAMP.regles || !window.CAMP.regles.personnagesLibres) return [];
+    const morts = new Set(tousLesHeros().filter(h => h.statut === "Mort").map(h => h.idPersonnage));
+    return window.CAMP.regles.personnagesLibres(c).filter(id => !morts.has(id)).map(id => ({ id, nom: (c.Membres[id] || {}).Nom || id }));
+};
+function noterChoixHeros(texte) {
+    document.querySelectorAll(".choix-heros-principal .note-choix-heros").forEach(n => { n.textContent = texte; });
+}
 // Le bloc « Mon héros principal » (posé par la page du Groupe, grimoire_groupe.js).
 function htmlChoixHeros() {
     const moi = idJoueurCourant();
     const siens = personnagesDe(moi), principal = herosPrincipalDe(moi);
     const options = siens.map(h => `<option value="${echapper(h.idPersonnage)}"${h.idPersonnage === principal ? " selected" : ""}>${echapper(nomHeros(h))}${classeDe(h) ? ` — ${echapper(classeDe(h))}` : ""}</option>`).join("");
+    // (v490) Plus de personnage à soi (son héros principal est mort) : les personnages du camp, libres pour tous.
+    const libres = siens.length ? [] : libresDuCamp();
+    const optionsCamp = libres.length ? `${principal ? "" : `<option value="" selected disabled>— Choisis un personnage du camp —</option>`}<optgroup label="Les personnages du camp">${libres.map(l => `<option value="${echapper(l.id)}"${l.id === principal ? " selected" : ""}>${echapper(l.nom)}</option>`).join("")}</optgroup>` : "";
     return `<div class="choix-heros-principal">
         <label class="titre-choix-heros" for="liste-heros-principal">Mon héros principal</label>
-        ${siens.length ? `<select id="liste-heros-principal" class="liste-heros-principal">${options}</select>` : `<p class="fiche-attente">Tu n'as pas encore d'aventurier.</p>`}
+        ${siens.length ? `<select id="liste-heros-principal" class="liste-heros-principal">${options}</select>`
+            : libres.length ? `<p class="fiche-attente petite">Tu n'as pas de personnage à toi : prends un personnage du camp, ou crée un nouvel aventurier.</p><select id="liste-heros-principal" class="liste-heros-principal">${optionsCamp}</select>`
+            : `<p class="fiche-attente">Tu n'as pas encore d'aventurier.</p>`}
+        <p class="note-choix-heros fiche-attente petite" aria-live="polite"></p>
         <div class="boutons-choix-heros">
-          ${siens.length ? `<button type="button" class="lien-fiche bouton-choix-heros" data-action="fiches" data-fa="fiche-principal">Sa fiche</button>` : ""}
+          ${siens.length || principal ? `<button type="button" class="lien-fiche bouton-choix-heros" data-action="fiches" data-fa="fiche-principal">Sa fiche</button>` : ""}
           <button type="button" class="lien-fiche bouton-choix-heros" data-action="fiches" data-fa="creer">+ Nouvel aventurier</button>
         </div>
       </div>`;
 }
-const signatureChoixHeros = () => JSON.stringify([idJoueurCourant(), herosPrincipalDe(idJoueurCourant()), personnagesDe(idJoueurCourant()).map(h => [h.idPersonnage, nomHeros(h), classeDe(h)])]);
+const signatureChoixHeros = () => JSON.stringify([idJoueurCourant(), herosPrincipalDe(idJoueurCourant()), personnagesDe(idJoueurCourant()).map(h => [h.idPersonnage, nomHeros(h), classeDe(h)]),
+    personnagesDe(idJoueurCourant()).length ? [] : libresDuCamp().map(l => l.id)]);
 // Le menu déroulant : un choix, et le héros principal change.
 document.addEventListener("change", (e) => {
     const l = e.target && e.target.closest && e.target.closest(".liste-heros-principal");
@@ -459,7 +483,7 @@ const NOMS_COURTS = { force: "FOR", dex: "DEX", con: "CON", int: "INT", sag: "SA
 function htmlCaracs(h) {
     const brutes = caracsDe(h.idPersonnage);
     if (!brutes) {
-        const moi = !h.idJoueur || h.idJoueur === idJoueurCourant();
+        const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || !!h.librePourTous;
         return `<div class="encart-fiche encart-caracs vide">${cadre("caracs-" + h.idPersonnage)}
             <p class="fiche-attente">Ce héros n'a pas encore éveillé son potentiel.</p>
             ${moi ? `<button type="button" class="lien-fiche" data-action="fiches" data-fa="repartir">Répartir ses caractéristiques</button>` : ""}</div>`;
@@ -495,7 +519,7 @@ function htmlTalents(h) {
         const effet = typeof window.resumeTalent === "function" ? window.resumeTalent(h, id) : "";
         return `<li class="talent-fiche" ${aide(t.nom, effet || t.description || "")}>✦ ${echapper(t.nom)}${t.max > 1 ? ` <small>${pris[id]}/${t.max}</small>` : ""}</li>`;
     }).join("");
-    const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev();
+    const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev() || !!h.librePourTous;
     return `<div class="encart-fiche encart-talents">${cadre("talents-" + h.idPersonnage)}
         <div class="entete-encart-talents"><div class="titre-encart">Talents</div>
           <button type="button" class="lien-fiche vers-talents" data-action="fiches" data-fa="talents">${dispo > 0 && moi ? `✦ ${dispo} à choisir` : "Tous les talents"} ›</button></div>
@@ -520,7 +544,7 @@ function htmlTalentsPage(h, cote) {
     }
     const pris = window.talentsDuPerso(h);
     const dispo = typeof window.pointsTalentsDisponibles === "function" ? window.pointsTalentsDisponibles(h) : 0;
-    const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev();
+    const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev() || !!h.librePourTous;
     const connues = typeof window.caracsConnuesPourTalents !== "function" || window.caracsConnuesPourTalents(h);
     const lignes = window.LIGNES_TALENTS.filter(l => LIGNES_PAR_PAGE[cote].includes(l.cle)).map(ligne => {
         const talents = window.TALENTS.filter(t => t.carac === ligne.cle);
@@ -661,7 +685,7 @@ function banniere(id, titre, initiative, options) {
 }
 function htmlCompetencesGauche(h) {
     const e = etatCompetences(h);
-    const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev();
+    const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev() || !!h.librePourTous;
     const bannieres = e.comps.map(c => banniere(c.id, c.data.Nom || "Technique inconnue", c.data.Initiative || 0, {
         memorisee: e.deck.includes(c.id), bloquee: e.bloquees.has(c.id), raison: e.bloquees.get(c.id), effacer: modeDev()
     })).join("");
@@ -767,7 +791,7 @@ function htmlCarte(h, id) {
     if (!data) return "";
     const e = etatCompetences(h);
     const memorisee = e.deck.includes(id), bloquee = e.bloquees.get(id);
-    const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev();
+    const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev() || !!h.librePourTous;
     return `<div class="carte-encre" data-carte="${echapper(id)}">
         ${corpsDeCarte(data, h, "carte-" + id)}
         ${technique ? `<p class="carte-note">Technique de classe : une fois par combat, hors mémoire.</p>`
@@ -1105,7 +1129,7 @@ function htmlObjet(h, cle, titre, objet, actions) {
 const bouton = (fa, texte, extra) => `<button type="button" class="lien-fiche" data-action="fiches" data-fa="${fa}"${extra || ""}>${texte}</button>`;
 function htmlInventaireGauche(h) {
     const r = richesse(h);
-    const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev();
+    const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev() || !!h.librePourTous;
     const champ = v => moi
         ? `<input type="number" class="saisie-pieces" min="0" step="1" inputmode="numeric" value="${v}" aria-label="Drachmes">`
         : `<b>${v}</b>`;
@@ -1121,7 +1145,7 @@ function htmlInventaireGauche(h) {
       </div>`;
 }
 function htmlInventaireDroite(h) {
-    const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev();
+    const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev() || !!h.librePourTous;
     const stock = h.equipStock || null;
     const mains = (cle, champ, objet) => {
         if (!moi || !objet) return "";
@@ -1586,6 +1610,7 @@ window.GRIMOIRE_FICHES = {
         if (window.GRIMOIRE_GROUPE && typeof window.GRIMOIRE_GROUPE.ouvrir === "function") window.GRIMOIRE_GROUPE.ouvrir();
     },
     htmlChoixHeros, signatureChoixHeros, herosPrincipalDe, definirHerosPrincipal,
+    jouer: choisirHerosActif,   // (v490) jouer un personnage du camp sans en faire son héros principal (expedition.js)
     herosAffiche: () => heros,
     pages: () => ({ ...pagesFiche }),
     majPlus: () => majPlus(true),

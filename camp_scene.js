@@ -24,7 +24,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=12";
+import * as CP from "./camp_pur.js?v=13";
 
 // Les 9 couches, du premier plan au plus éloigné (le document, « Le graphique du camp »).
 export const COUCHES = [
@@ -190,7 +190,7 @@ export async function preparerPersonnages() {
     const compagnons = [];
     for (const id of ids) {
         const h = persos.find(x => x.idPersonnage === id);
-        if (h) {
+        if (h && !h.librePourTous) {   // (v490) un personnage du camp incarné reste un PNJ du camp (on lui parle)
             // Le héros principal d'un autre joueur est « le personnage d'un autre joueur » ; ses autres
             // personnages, non joués, vivent au camp « traités comme des PNJ ». Les siens : jamais de discussion.
             const joueur = h.idJoueur && (h.idJoueur === moi() || principaux.includes(id)) ? h.idJoueur : "";

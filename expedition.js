@@ -20,8 +20,8 @@
 //  Les règles : camp_pur.js.
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
-import { doc, getDoc, runTransaction, updateDoc, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=12";
+import { doc, getDoc, runTransaction, updateDoc, deleteField, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import * as CP from "./camp_pur.js?v=13";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -49,6 +49,46 @@ async function modifier(fn) {
 }
 // Les personnages que ce joueur peut jouer : les siens (« d'abord ses propres personnages »).
 export const jouables = (joueur = moi()) => CP.personnagesDuJoueur(joueur, persos()).map(h => h.idPersonnage);
+// (v490) « D'abord ses propres personnages, puis, en dessous, les personnages du camp libres pour tous. »
+export const jouablesExpedition = (joueur = moi()) => CP.jouablesExpedition(joueur, persos(), camp(), expedition());
+
+// (v490) INCARNER UN PERSONNAGE DU CAMP : sa fiche d'aventurier (Personnages, le même identifiant que sa fiche de PNJ),
+// créée la première fois depuis sa fiche de PNJ, et passée au joueur qui le prend (« pas exclusif » : le dernier qui
+// le joue le commande). Ses compétences : la Forge, ouverte à tous les joueurs pour lui (grimoire_fiches.js).
+export async function incarner(id) {
+    const c = camp(), p = idPartie(), j = moi();
+    if (!p || !c) return "Le clan n'a pas de camp.";
+    const ref = doc(db, "Personnages", id);
+    let caracs = null;
+    try {
+        const s = await getDoc(ref);
+        if (s.exists()) {
+            const refus = CP.peutIncarner(c, id, null) || (s.data().Statut === "Mort" ? "Ce personnage est mort." : "");
+            if (refus) return refus;
+            if (s.data().ID_Joueur !== j) await updateDoc(ref, { ID_Joueur: j });
+        } else {
+            const sf = await getDoc(doc(db, "Monde_PNJ", id));
+            const f = sf.exists() ? sf.data() : null;
+            if (!f) return "Ce personnage est introuvable.";
+            const refus = CP.peutIncarner(c, id, f);
+            if (refus) return refus;
+            caracs = f.Caracs || CP.caracsDeRecrue([]);
+            const lot = writeBatch(db);
+            lot.set(ref, CP.ficheIncarnee(id, f, { partie: p, joueur: j, caracs, maintenant: Date.now() }));
+            lot.set(doc(db, "Caracteristiques", id), caracs);
+            if (!f.Caracs) lot.set(doc(db, "Monde_PNJ", id), { Caracs: caracs }, { merge: true });
+            await lot.commit();
+            console.log(`⛺ [Expédition] ${f.Nom_PNJ || id} reçoit sa fiche d'aventurier.`);
+        }
+        // La liste de la partie le sait tout de suite (le héros actif bascule sans attendre l'écoute de la base).
+        const liste = window.PERSOS_JOUEURS_PARTIE || (window.PERSOS_JOUEURS_PARTIE = []);
+        const h = liste.find(x => x && x.idPersonnage === id);
+        if (h) h.idJoueur = j;
+        else if (typeof window.persoDocVersFront === "function") { const d = (await getDoc(ref)).data(); if (d) liste.push(window.persoDocVersFront(id, d)); }
+        if (caracs && window.CARACS_PARTIE) window.CARACS_PARTIE[id] = caracs;
+        return "";
+    } catch (e) { console.error("[Expédition] Incarner :", e); return "La base n'a pas répondu."; }
+}
 
 export const monter = () => modifier((d) => {
     if (!d.Camp) return { refus: "Le clan n'a pas de camp." };
@@ -61,18 +101,28 @@ export const annuler = () => modifier((d) => {
     return { maj: { Expedition: deleteField() } };
 });
 export async function prendrePlace(i, perso) {
-    const j = moi(), siens = jouables(j);
+    const j = moi(), { siens, libres } = jouablesExpedition(j), tous = [...siens, ...libres];
+    // (v490) Un personnage du camp : d'abord sa place (pas celle d'un autre), puis sa fiche d'aventurier, à ce joueur.
+    const libre = !siens.includes(perso) && libres.includes(perso);
+    if (libre) {
+        const r = CP.peutPrendrePlace(expedition(), i, perso, j, tous) || await incarner(perso);
+        if (r) return r;
+    }
     const refus = await modifier((d) => {
-        const r = CP.peutPrendrePlace(d.Expedition, i, perso, j, siens);
+        const r = CP.peutPrendrePlace(d.Expedition, i, perso, j, tous);
         if (r) return { refus: r };
         const pl = (d.Expedition.Emplacements || [null, null, null]).slice(0, CP.PLACES_EXPEDITION);
         while (pl.length < CP.PLACES_EXPEDITION) pl.push(null);
         pl[i] = { Perso: perso, Joueur: j, Nom_Joueur: (window.COMPTE_JOUEUR && window.COMPTE_JOUEUR.nom) || "" };
         return { maj: { "Expedition.Emplacements": pl } };
     });
-    // Le personnage de sa place est celui qu'il joue (son héros principal, le héros actif).
-    if (!refus && window.GRIMOIRE_FICHES && typeof window.GRIMOIRE_FICHES.definirHerosPrincipal === "function") {
-        try { await window.GRIMOIRE_FICHES.definirHerosPrincipal(perso); } catch (e) { console.warn("[Expédition] Le héros joué :", e); }
+    // Le personnage de sa place est celui qu'il joue (son héros principal, le héros actif). (v490) Un personnage du camp
+    // est le héros actif sans devenir le héros principal, sauf pour un joueur qui n'a plus de personnage à lui.
+    const F = window.GRIMOIRE_FICHES;
+    if (!refus && F && libre && siens.length && typeof F.jouer === "function") {
+        try { await F.jouer(perso); } catch (e) { console.warn("[Expédition] Le héros joué :", e); }
+    } else if (!refus && F && typeof F.definirHerosPrincipal === "function") {
+        try { await F.definirHerosPrincipal(perso); } catch (e) { console.warn("[Expédition] Le héros joué :", e); }
     }
     return refus;
 }
@@ -191,5 +241,5 @@ export async function choisirPourArene(perso) {
     try { await updateDoc(refPartie(), { ["Arene_Choix.Choix." + moi()]: perso || deleteField() }); return ""; } catch (e) { return "La base n'a pas répondu."; }
 }
 
-window.EXPEDITION = { expedition, jouables, monter, annuler, prendrePlace, quitterPlace, emmener, laisser, reglerProvisions, refusDepart, veiller,
+window.EXPEDITION = { expedition, jouables, jouablesExpedition, incarner, monter, annuler, prendrePlace, quitterPlace, emmener, laisser, reglerProvisions, refusDepart, veiller,
                       choixArene, areneActive, choisirPourArene, regles: CP };

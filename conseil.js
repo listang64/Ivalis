@@ -19,7 +19,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, addDoc, collection, query, where, onSnapshot, runTransaction, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=12";
+import * as CP from "./camp_pur.js?v=13";
 
 const PARTIES = "Systeme_Parties";
 export const ATTENTE_IA_MS = 6000;

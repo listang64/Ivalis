@@ -176,7 +176,8 @@ function htmlMembre(id, camp, partis, bloque) {
           <div class="moral-gestion" title="Moral : ${moral}/100 (${echapper(P.effetDuMoral(moral))})${histo ? ` — dernier changement : ${histo.Delta > 0 ? "+" : ""}${histo.Delta}, ${echapper(histo.Raison)}` : ""}">
             <span>Moral</span><span class="barre-moral-gestion${moral < 30 ? " bas" : moral >= 80 ? " haut" : ""}"><i style="width:${moral}%"></i></span><b>${moral}</b></div>
           <div class="tache-gestion">${controle}</div>
-          ${!i.heros && !themes && window.ATOUTS_CLASSES ? `<div class="classe-gestion">Classe : <select class="select-gestion select-classe" data-gc="classe" data-id="${echapper(id)}"><option value="">—</option>${Object.keys(window.ATOUTS_CLASSES).map(c => `<option value="${echapper(c)}"${i.classe === c ? " selected" : ""}>${echapper(c)}</option>`).join("")}</select></div>` : ""}
+          ${i.incarne ? `<div class="classe-gestion">Classe : ${echapper(i.classe || "—")}${i.joueur ? ` · joué par ${echapper(i.joueur === moi() ? "toi" : ((typeof window.nomDuJoueurLivre === "function" && window.nomDuJoueurLivre(i.joueur)) || "un joueur"))}` : ""}</div>` : ""}
+          ${!i.heros && !i.incarne && !themes && window.ATOUTS_CLASSES ? `<div class="classe-gestion">Classe : <select class="select-gestion select-classe" data-gc="classe" data-id="${echapper(id)}"><option value="">—</option>${Object.keys(window.ATOUTS_CLASSES).map(c => `<option value="${echapper(c)}"${i.classe === c ? " selected" : ""}>${echapper(c)}</option>`).join("")}</select></div>` : ""}
         </div></li>`;
 }
 function htmlRecrue(id, camp, partis, bloque, mb) {

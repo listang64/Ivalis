@@ -215,6 +215,9 @@ function persoDocVersFront(id, d) {
     // (v480) Ses deux images en scène au camp (camp_avatars.js), et l'armure qu'elles montrent.
     imagesCamp: Array.isArray(d.Images_Camp) ? d.Images_Camp : [],
     imagesCampArmure: d.Images_Camp_Armure || "",
+    // (v490) Un personnage du camp qu'un joueur incarne (expedition.js, incarner) : jouable par tous, sa fiche de PNJ.
+    librePourTous: d.Libre_Pour_Tous === true,
+    pnjSource: d.PNJ_Source || "",
     estIllusion: d.Est_Illusion === true,
     // (v368) Un totem du Chaman (sans tour comme un leurre, mais bien réel) et son effet.
     estTotem: d.Est_Totem === true,
@@ -2284,7 +2287,9 @@ async function creerNouvellePartie(nomGroupe, mdpGroupe) {
     Mot_De_Passe: mdpGroupe,
     Liste_ID_Personnage: "",
     Nom_Du_Groupe: nomGroupe,
-    Statut: "En_cours"
+    Statut: "En_cours",
+    // (v490) « Automatique à la création d'une partie » : le premier poste qui l'ouvre pose son camp (camp.js, creerCampAuto).
+    Camp_A_Creer: true
   });
 
   return nouvelID;
