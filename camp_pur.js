@@ -215,6 +215,7 @@ export const estConnecte = (le, maintenant) => Number.isFinite(Number(le)) && ma
 // ou s'il n'a pas encore de place.
 export function groupeAuCamp(camp, position, expedition, rayon = 0.06) {
     if (expedition && expedition.En_Cours) return false;
+    if (camp && camp.Deplacement && camp.Deplacement.En_Cours) return false;   // (v487) le camp est sur la route
     return pionSurLeCamp(camp, position, rayon);
 }
 // (v483) « La case du camp » : le pion du groupe sur l'icône du camp (ou pas encore placé).
@@ -667,6 +668,7 @@ export function peutEmmener(exp, camp, id) {
 // Partir du camp : il faut une expédition montée, quelqu'un dedans, et un intendant si quelqu'un reste.
 export function refusDepartDuCamp(d, rayon = 0.06) {
     if (!d || !d.Camp) return "";
+    if (d.Camp.Deplacement && d.Camp.Deplacement.En_Cours) return "";   // (v487) le clan entier se déplace
     const exp = d.Expedition;
     if (exp && exp.En_Cours) return "";
     if (!pionSurLeCamp(d.Camp, d.Position_Groupe, rayon)) return "";
@@ -951,4 +953,100 @@ export function placePresDuCamp(camp, alea = Math.random, valable = () => true) 
         if (valable(Number(c.Region), x, y)) return { Region: Number(c.Region), x: Math.round(x * 1e5) / 1e5, y: Math.round(y * 1e5) / 1e5 };
     }
     return { Region: Number(c.Region), x: Number(c.x), y: Number(c.y) };
+}
+
+// =========================================================================
+//  (v487) LE DÉPLACEMENT DU CAMP (étape 11)
+// =========================================================================
+// « Le camp entier, par jour de marche : 2 provisions par membre du clan, plus un risque d'événement en route
+// (embuscade, orage, blessé), joué en RP. » Le forgeron : « le déplacement du camp coûte (10 % + 5 % × m) de moins
+// (5 % au moins) » ; l'éclaireur : « le risque d'événement baisse de (5 + 2 × m) points » ; le risque : 20 % par jour.
+export const COUT_DEPLACEMENT = 2, RISQUE_ROUTE = 0.20;
+export const reductionForgeron = (m) => (m === null || m === undefined ? 0 : Math.max(0.05, 0.10 + 0.05 * m));
+export const reductionEclaireur = (m) => (m === null || m === undefined ? 0 : Math.max(0, (5 + 2 * m) / 100));
+// Le m de celui qui tient ce poste (le moral compris), ou null s'il n'y a personne.
+export function mDuPoste(camp, infos, tache) {
+    const id = Object.keys((camp && camp.Membres) || {}).find(x => (camp.Membres[x] || {}).Tache === tache);
+    if (!id) return null;
+    return mAvecMoral(mDeTache(tache, ((infos || {})[id] || {}).caracs), camp.Membres[id].Moral);
+}
+export const coutDuDeplacement = (camp, infos) => {
+    const n = Object.keys((camp && camp.Membres) || {}).length;
+    return n ? Math.ceil(COUT_DEPLACEMENT * n * (1 - reductionForgeron(mDuPoste(camp, infos, "forger")))) : 0;
+};
+export const risqueDeLaRoute = (camp, infos) => Math.max(0, RISQUE_ROUTE - reductionEclaireur(mDuPoste(camp, infos, "eclaireur")));
+export const EVENEMENTS_ROUTE = [
+    { type: "embuscade", texte: "Des silhouettes armées surgissent sur la route du clan : c'est une embuscade !" },
+    { type: "orage", texte: "Un orage violent s'abat sur la colonne : les chariots s'embourbent, les bêtes renâclent, tout le monde est trempé." },
+    { type: "blesse", texte: "Un membre du clan fait une mauvaise chute sur le chemin : il faut s'arrêter pour le soigner." }
+];
+export function peutDeplacer(camp, d) {
+    if (!camp) return "Le clan n'a pas de camp.";
+    if (camp.Deplacement && camp.Deplacement.En_Cours) return "Le camp est déjà en route.";
+    if (d && d.Expedition && d.Expedition.En_Cours) return "Une expédition est partie : le camp ne bouge pas avant son retour.";
+    if (!camp.Deplacement_Vote) return "Le conseil doit d'abord voter le déplacement du camp.";
+    return "";
+}
+// UN JOUR DE ROUTE : tout le clan marche (pas de chasse ni de cueillette) ; il mange ses 2 provisions par tête ; un
+// événement peut survenir ; à zéro, il s'arrête là où il est et un conseil extraordinaire s'ouvre.
+export function journeeDuDeplacement(e, alea = Math.random) {
+    const camp = JSON.parse(JSON.stringify(e.camp || {}));
+    const membres = camp.Membres = camp.Membres || {}, infos = e.infos || {};
+    const ids = Object.keys(membres), journal = [], moraux = [], soinsHeros = {};
+    const ev = { evenementRoute: null, arret: false, conseilExtraordinaire: false, affames: [], cout: 0 };
+    const nom = (id) => (infos[id] && infos[id].nom) || (membres[id] && membres[id].Nom) || id;
+    camp.Provisions = Math.max(0, Number(camp.Provisions) || 0);
+    camp.Caisse = Math.max(0, Number(camp.Caisse) || 0);
+    camp.Deplacement = { ...(camp.Deplacement || {}), En_Cours: true, Jours: (Number((camp.Deplacement || {}).Jours) || 0) + 1 };
+    ev.cout = coutDuDeplacement(camp, infos);
+    if (camp.Provisions >= ev.cout) camp.Provisions -= ev.cout;
+    else {
+        const manque = ev.cout - camp.Provisions;
+        camp.Provisions = 0;
+        const r = distribuer(ids, ids.length - Math.ceil(manque / COUT_DEPLACEMENT), (id) => rangProvisions(id, membres[id], e.principaux || []), alea);
+        ev.affames = r.affames;
+        if (r.affames.length) journal.push(`Il n'y a plus assez à manger sur la route : ${r.affames.map(nom).join(", ")} ${r.affames.length > 1 ? "ont" : "a"} faim.`);
+    }
+    journal.unshift(`Le clan marche (jour ${camp.Deplacement.Jours} du déplacement) : ${ev.cout} provisions mangées.`);
+    // La solde des mercenaires court toujours.
+    Object.keys(membres).filter(id => membres[id].Type === "mercenaire").forEach(id => {
+        if (camp.Caisse >= SOLDE_MERCENAIRE) { camp.Caisse -= SOLDE_MERCENAIRE; membres[id].Jours_Sans_Solde = 0; }
+        else { membres[id].Jours_Sans_Solde = (Number(membres[id].Jours_Sans_Solde) || 0) + 1; ev.affames.includes(id) || moraux.push({ id, delta: MORAL_JOUR.sansSolde, raison: "sa solde n'est pas payée" }); }
+    });
+    ev.affames.forEach(id => moraux.push({ id, delta: MORAL_JOUR.faim, raison: "la faim sur la route" }));
+    moraux.forEach(m => {
+        const mb = membres[m.id], avant = Number.isFinite(Number(mb.Moral)) ? Number(mb.Moral) : 60, apres = moralBorne(avant + m.delta);
+        mb.Moral = apres; m.avant = avant; m.apres = apres; m.delta = apres - avant;
+        mb.Moral_Historique = (Array.isArray(mb.Moral_Historique) ? mb.Moral_Historique : []).concat([{ Delta: m.delta, Raison: m.raison, Date_Jeu: e.dateJeu || "", Jour: e.jour || 0 }]).slice(-MORAL_HISTORIQUE);
+    });
+    // L'événement de la route (joué en RP).
+    if (alea() < risqueDeLaRoute(camp, infos)) {
+        ev.evenementRoute = EVENEMENTS_ROUTE[Math.floor(alea() * EVENEMENTS_ROUTE.length) % EVENEMENTS_ROUTE.length];
+        journal.push(ev.evenementRoute.texte);
+    }
+    // Le temps qui passe guérit un peu.
+    ids.forEach(id => {
+        const b = membres[id].Blessure_Chasse;
+        if (b && b.Jours > 0) { b.Jours -= 1; if (b.Jours <= 0) delete membres[id].Blessure_Chasse; }
+        if ((infos[id] || {}).heros) soinsHeros[id] = 1;
+    });
+    if (camp.Provisions === 0) {
+        ev.arret = true;
+        journal.push("Le camp n'a plus de provisions : il s'arrête là où il est.");
+        if (!camp.Conseil_Extraordinaire) { camp.Conseil_Extraordinaire = { Raison: "Le camp n'a plus de provisions.", Jour: e.jour || 0, Date_Jeu: e.dateJeu || "" }; ev.conseilExtraordinaire = true; }
+    }
+    camp.Journal = (Array.isArray(camp.Journal) ? camp.Journal : []).concat([{ Jour: e.jour || 0, Date_Jeu: e.dateJeu || "", Lignes: journal.slice() }]).slice(-JOURNAL_JOURS);
+    camp.Jours_Ecoules = (Number(camp.Jours_Ecoules) || 0) + 1;
+    if (e.position && e.position.x != null) camp.Position = { Region: Number(e.position.Region), x: Number(e.position.x), y: Number(e.position.y) };
+    return { camp, expedition: null, journal, moraux: moraux.filter(m => m.delta), xp: [], soinsHeros, departs: [], evenements: ev };
+}
+// L'ARRIVÉE (ou l'arrêt) : le camp se pose là où est le clan ; on gardera ce déplacement.
+export function finDuDeplacement(camp, position, o = {}) {
+    const c = JSON.parse(JSON.stringify(camp || {}));
+    const dep = c.Deplacement || {};
+    if (position && position.x != null) c.Position = { Region: Number(position.Region), x: Number(position.x), y: Number(position.y) };
+    c.Deplacements_Passes = (Array.isArray(c.Deplacements_Passes) ? c.Deplacements_Passes : []).concat([{ Jours: Number(dep.Jours) || 0, Depart: dep.Depart || null, Arrivee: c.Position || null, Arret: !!o.arret, Le: o.maintenant || 0 }]).slice(-20);
+    delete c.Deplacement;
+    if (c.Tache_Votee && c.Tache_Votee.Type === "deplacer") delete c.Tache_Votee;
+    return c;
 }

@@ -73,7 +73,8 @@ function htmlGauche() {
     return `<div class="contenu-page page-gestion-gauche defile-fiche">
         <div class="entete-groupe">${lavis(TEINTE_GESTION, "gestion-titre")}<span class="titre-page-fiche">Gestion du camp</span></div>${FLEURON}
         ${retour}
-        ${bloque ? `<p class="avis-gestion">Une expédition est en cours : les postes du camp ne changent pas avant son retour.</p>` : ""}
+        ${camp.Deplacement && camp.Deplacement.En_Cours ? `<p class="avis-gestion route-gestion">Le camp est en route depuis ${Number(camp.Deplacement.Jours) || 0} jour${(Number(camp.Deplacement.Jours) || 0) > 1 ? "s" : ""} : ${Number(camp.Provisions) || 0} provisions, −${P.coutDuDeplacement(camp, infos)} par jour ; ${Math.round(P.risqueDeLaRoute(camp, infos) * 100)} % de risque d'un événement chaque jour.</p>`
+          : bloque ? `<p class="avis-gestion">Une expédition est en cours : les postes du camp ne changent pas avant son retour.</p>` : ""}
         <div class="tresor-gestion">
           <div class="case-gestion"><b data-gestion="caisse">${Number(camp.Caisse) || 0}</b><span>drachmes dans la caisse</span></div>
           <div class="case-gestion"><b data-gestion="provisions">${prov}</b><span>provisions</span></div>

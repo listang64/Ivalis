@@ -63,6 +63,7 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
 | 8 — Le retour au camp | v484 | fait |
 | 9 — Le conseil | v485 | fait |
 | 10 — La tâche en cours | v486 | fait |
+| 11 — Le déplacement du camp | v487 | fait |
 
 ## Points ambigus
 
@@ -226,3 +227,15 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
   n'en ont pas.
 - **Étape 10, annuler au retour.** Au retour d'une expédition, la gestion du camp propose « Annuler la tâche en
   cours » : c'est le vote d'abandon du groupe (tous les joueurs).
+- **Étape 11, la route.** « Déplacer le camp » (après le vote du conseil) met le camp en route et ouvre la carte : le
+  voyage se trace comme d'habitude, sans expédition montée. Chaque jour de voyage, la journée du camp devient celle
+  du déplacement : tout le clan marche (ni chasse, ni cueillette, ni tâches), il mange 2 provisions par membre moins
+  la réduction du forgeron (arrondi au-dessus), la solde des mercenaires court, le camp suit le clan sur la carte, et
+  un événement (embuscade, orage, blessé) peut survenir : le Destin l'écrit dans le récit pour qu'on le joue en RP.
+  Le forgeron et l'éclaireur gardent leur poste pendant la route pour leur réduction.
+- **Étape 11, la faim en route.** Il manque N provisions : ⌈N ÷ 2⌉ membres n'ont pas mangé (l'ordre de priorité), −10
+  de moral. À zéro, le voyage s'arrête et le camp se pose là ; le conseil extraordinaire se réunit.
+- **Étape 11, l'arrivée.** Le voyage fini, le camp se pose où est le clan, la jauge est réestimée (MIA_RESSOURCES), la
+  tâche « Déplacer le camp » est faite. Un déplacement = un voyage.
+- **Étape 11, « au camp ».** Pendant la route, le clan n'est pas au camp : un combat est possible, les postes et le
+  conseil attendent l'arrivée.

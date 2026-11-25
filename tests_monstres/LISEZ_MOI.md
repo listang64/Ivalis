@@ -12711,3 +12711,9 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Le livre** : « Tâche en cours » (`grimoire_mission.js`, `grimoire.js`), le parchemin des récompenses rempli, la tâche en cours dans la gestion du camp.
 - corrections_v486 le vérifie ; corrections_v444 lit « Aucune tâche en cours ».
 
+## v487 — Le clan nomade, étape 11 : le déplacement du camp
+
+- **Les règles** (`camp_pur.js`) : la réduction du forgeron et de l'éclaireur, le coût (2 provisions par membre et par jour) et le risque (20 % par jour) du déplacement, le bouton (après le vote, pas pendant une expédition), la journée de route (`journeeDuDeplacement` : provisions, faim, événement, arrêt à zéro, le camp qui suit le clan), l'arrivée (`finDuDeplacement`) ; en route, ni « au camp » ni expédition à monter.
+- **Le déplacement** (`deplacement_camp.js`) : le bouton « Déplacer le camp », la veille du voyage (il part, il s'achève), l'arrivée avec la nouvelle jauge, l'arrêt à zéro ; `camp.js` prend la journée de route et écrit l'événement dans le récit (le Destin) ; la gestion du camp montre la route.
+- corrections_v487 le vérifie.
+

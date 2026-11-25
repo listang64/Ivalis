@@ -14,8 +14,8 @@
 //      la carte globale » : ce logo, sur la carte régionale et sur la carte du monde.
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
-import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection, deleteField, runTransaction, increment } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=9";
+import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection, deleteField, runTransaction, increment, addDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import * as CP from "./camp_pur.js?v=10";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -37,6 +37,8 @@ window.appliquerCampDeLaPartie = function(data) {
     if (JSON.stringify(camp && camp.Position) !== avant) redessiner();
     // (v483) L'expédition part quand le groupe quitte la case du camp, finit quand il y revient (expedition.js).
     if (camp && data && data.Expedition) setTimeout(() => { try { if (window.EXPEDITION) window.EXPEDITION.veiller(); } catch (e) {} }, 0);
+    // (v487) Le déplacement du camp : le voyage du clan part, puis s'achève (deplacement_camp.js).
+    if (camp && camp.Deplacement && camp.Deplacement.En_Cours) setTimeout(() => { try { if (window.DEPLACEMENT_CAMP) window.DEPLACEMENT_CAMP.veiller(); } catch (e) {} }, 0);
     // (v485) Le conseil : l'extraordinaire qui s'ouvre tout seul, la page qui suit, le vote final (conseil.js).
     if (camp && data && (data.Conseil || camp.Conseil_Extraordinaire)) setTimeout(() => { try { if (window.CONSEIL) window.CONSEIL.veiller(); } catch (e) {} }, 0);
     // (v483) Le mode arène (test) : les combattants suivent le choix de chacun (monstres.js, recomposerCombattants).
@@ -331,8 +333,11 @@ export async function journeeDuCamp(o = {}) {
             const choix = d.Heros_Principaux || {};
             const principaux = [...new Set(persos.map(h => h && h.idJoueur).filter(Boolean))].map(j => CP.herosPrincipal(j, persos, choix)).filter(Boolean);
             const partis = ((d.Expedition || {}).Membres || []).slice();
-            const r = CP.journeeDuCamp({ camp: d.Camp, infos, partis, expedition: d.Expedition && d.Expedition.En_Cours ? d.Expedition : null, principaux,
-                                         jour: o.jour || (Number(d.Camp.Jours_Ecoules) || 0) + 1, dateJeu });
+            const jour = o.jour || (Number(d.Camp.Jours_Ecoules) || 0) + 1;
+            // (v487) Le camp en route : la journée du déplacement (le camp suit le clan sur la carte).
+            const r = d.Camp.Deplacement && d.Camp.Deplacement.En_Cours
+                ? CP.journeeDuDeplacement({ camp: d.Camp, infos, principaux, jour, dateJeu, position: d.Position_Groupe })
+                : CP.journeeDuCamp({ camp: d.Camp, infos, partis, expedition: d.Expedition && d.Expedition.En_Cours ? d.Expedition : null, principaux, jour, dateJeu });
             r.camp.Derniere_Journee = o.cle || ("jour_" + r.camp.Jours_Ecoules);
             const maj = { Camp: r.camp };
             if (r.expedition) maj.Expedition = r.expedition;
@@ -357,6 +362,14 @@ export async function journeeDuCamp(o = {}) {
         try { await updateDoc(doc(db, "Personnages", id), { Blessures: window.blessuresApresJours(avant, n) }); } catch (e) { console.warn("[Camp] Les blessures :", e); }
     }
     await inscrireMoraux(p, res.moraux.map(m => ({ ...m, dateJeu })));
+    // (v487) La route : l'événement se joue en RP (le Destin l'écrit dans le récit) ; à zéro, le camp s'arrête là.
+    if (res.evenements.evenementRoute) {
+        try { await addDoc(collection(db, "Messages_Chat"), { ID_Partie: p, Auteur_ID: "DESTIN", Auteur_Nom: "Destin", Auteur_Couleur: "#c2a878", Texte: res.evenements.evenementRoute.texte, Timestamp: Date.now() }); }
+        catch (e) { console.warn("[Camp] L'événement de la route :", e); }
+    }
+    if (res.evenements.arret && window.DEPLACEMENT_CAMP && window.DEPLACEMENT_CAMP.terminer) {
+        try { await window.DEPLACEMENT_CAMP.terminer({ arret: true }); } catch (e) { console.warn("[Camp] L'arrêt du camp :", e); }
+    }
     return res;
 }
 
