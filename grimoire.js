@@ -564,7 +564,7 @@
               <span class="marque-papier">${dessinPlume()}</span></button>
             <!-- v444 : la mission en cours (un parchemin roulé), à côté des autres. -->
             <button type="button" class="marque-page marque-mission inactif" id="grimoire-marque-mission" data-action="marque-mission"
-                    aria-label="La mission en cours" aria-disabled="true" title="La mission en cours">
+                    aria-label="La tâche en cours" aria-disabled="true" title="La tâche en cours">
               <span class="marque-papier">${dessinRouleau()}</span></button>
             <!-- v312 : plus de marque-page de la carte (Nico) ; le menu (≡), le plus à gauche. -->
             <button type="button" class="marque-page marque-menu" id="grimoire-marque-menu" data-action="marque-menu"

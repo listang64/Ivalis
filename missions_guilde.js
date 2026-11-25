@@ -98,7 +98,10 @@ ${lieux}
 
 Le groupe d'aventuriers est de niveau ${contexte.niveau}. Nous sommes le jour ${contexte.jour || "?"} du calendrier.
 
-Écris EXACTEMENT ${difficultes.length} missions, toutes différentes (sujets, régions, commanditaires variés), dans cet ordre de difficultés : ${difficultes.join(", ")}.
+${contexte.sujet ? `LA MISSION À ÉCRIRE (v486, le clan nomade : c'est la tâche que les héros viennent d'accepter, ou que le conseil a votée) : ${contexte.sujet}
+Garde ce sujet, ce commanditaire et cet objectif ; invente le reste (les détails, le lieu, la lettre).
+
+` : ""}Écris EXACTEMENT ${difficultes.length} missions, toutes différentes (sujets, régions, commanditaires variés), dans cet ordre de difficultés : ${difficultes.join(", ")}.
 Réponds UNIQUEMENT par un tableau JSON de ${difficultes.length} objets, chacun ainsi :
 {
   "difficulte": "normale" | "difficile" (celle demandée à cette place),
@@ -133,9 +136,9 @@ function nettoyerMission(m, difficulte, i, contexte, ecriture) {
     };
 }
 // (v477) `difficultes` : la difficulté de chaque mission voulue, dans l'ordre (« normale », « difficile »).
-export async function genererMissions(difficultes) {
+export async function genererMissions(difficultes, options) {
     if (typeof window.fetchGemini !== "function" || !window.cleGemini || !window.cleGemini("missions")) throw new Error("Aucune clé Gemini");
-    const contexte = { regions: regionsConnues(), lieux: lieuxConnus(), niveau: window.NIVEAU_GROUPE || 1, jour: jourAbsolu() };
+    const contexte = { regions: regionsConnues(), lieux: lieuxConnus(), niveau: window.NIVEAU_GROUPE || 1, jour: jourAbsolu(), sujet: (options && options.sujet) || "" };
     const corps = JSON.stringify({
         systemInstruction: { parts: [{ text: promptMissions(difficultes, contexte) }] },
         contents: [{ role: "user", parts: [{ text: "Rédige les missions." }] }],
@@ -151,7 +154,8 @@ export async function genererMissions(difficultes) {
     return difficultes.map((r, i) => nettoyerMission(liste[i], r, i, contexte, ecritures[i % ecritures.length]));
 }
 // Une seule mission, de cette difficulté.
-export const genererMission = async (difficulte) => (await genererMissions([difficulte === "difficile" ? "difficile" : "normale"]))[0];
+// (v486) `options.sujet` : la tâche à écrire (celle acceptée dans le RP, ou votée au conseil).
+export const genererMission = async (difficulte, options) => (await genererMissions([difficulte === "difficile" ? "difficile" : "normale"], options))[0];
 
 // (v452) Le sceau des missions difficiles, en petit sous le texte (la page de la mission).
 export function htmlSceauDifficile(classe) {
@@ -273,7 +277,8 @@ export async function lancerMission(m) {
 async function installerMission(m, r) {
     const id = idPartie();
     const existant = m.Lieu && m.Lieu.Id ? (window.VILLAGES_REGIONAUX || {})[m.Lieu.Id] : null;
-    const position = existant ? { Region: existant.numero, x: existant.x, y: existant.y } : placeDuLieu(m.Region);
+    // (v486) Une tâche peut porter sa place (le camp pour une fête, le lieu repéré par l'éclaireur).
+    const position = m.Position_Voulue || (existant ? { Region: existant.numero, x: existant.x, y: existant.y } : placeDuLieu(m.Region));
     try {
         await setDoc(refMission(id), { Mission: m, Statut: "en_cours", Accepte_Le: Date.now(), Jour_Accepte: jourAbsolu(), Votants: r.votants || [], Heros: herosDuGroupe(),
             Lieu_Id: (m.Lieu && m.Lieu.Id) || null, Lieu_Position: position, Plan: null, Avancement: { Etapes: {}, Journal: [] } });
@@ -539,6 +544,8 @@ export async function terminerMission(statut, resume, idMessage) {
         await setDoc(refPartie(id), { Mission_En_Cours: deleteField(), Mission_Accomplie: accomplie || deleteField() }, { merge: true });
         partie = { ...partie, Mission_Accomplie: accomplie };
     } catch (e) { console.error("Missions : la fin de la mission", e); return false; }
+    // (v486) La tâche finie : ses récompenses (tache_en_cours.js), sur ce poste, celui qui l'a close.
+    try { window.dispatchEvent(new CustomEvent("ivalis-tache-terminee", { detail: { mission: d.Mission, statut } })); } catch (e) {}
     missionEnCours = null; missionLue = "";
     partie = { ...partie, Mission_En_Cours: null };
     prevenirMission();

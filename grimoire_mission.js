@@ -61,9 +61,15 @@ const liste = (l) => (Array.isArray(l) ? l : []).filter(Boolean);
 // (v457) La mission accomplie (son sceau touché dans le récit) : la même double page, en lecture.
 const estAccomplie = (d) => !!(d && d.Mission && d.Statut === "reussie");
 function htmlGauche(d) {
-    if (!d || !d.Mission) return `<div class="contenu-page page-mission-vide"><div class="titre-mission-en-cours">Mission en cours</div>${FLEURON}
-        <p class="aucune-mission">Aucune mission en cours.</p>
+    // (v486) Le clan nomade : « l'onglet Mission est renommé Tâche en cours ». Déplacer le camp ou recruter, votés au
+    // conseil, passent par leur bouton : la page le dit.
+    if (!d || !d.Mission) {
+        const tv = ((window.CAMP && window.CAMP.lire && window.CAMP.lire()) || {}).Tache_Votee, R = (window.CAMP && window.CAMP.regles) || {};
+        const bouton = tv && R.TACHES_A_BOUTON && R.TACHES_A_BOUTON[tv.Type];
+        return `<div class="contenu-page page-mission-vide"><div class="titre-mission-en-cours">Tâche en cours</div>${FLEURON}
+        ${bouton ? `<p class="aucune-mission">Le conseil a voté : <b>${echapper(tv.Titre)}</b>. Elle passe par ${echapper(bouton)}.</p>` : `<p class="aucune-mission">Aucune tâche en cours.</p>`}
         </div>`;
+    }
     // (v452) Nico : « vire les indices et leurs créations dans la page de mission en cours » : plus de liste
     // d'indices (le Narrateur garde ceux de son plan, pour lui seul).
     const m = d.Mission, av = d.Avancement || {}, journal = liste(av.Journal);
@@ -71,8 +77,8 @@ function htmlGauche(d) {
     const oui = v ? liste(v.Votants).filter(x => (v.Votes || {})[x.id] === "oui").length : 0;
     const abandon = estAccomplie(d) ? ""
         : !v
-        ? boutonLivre("abandon-oui", "Voter pour abandonner la mission", TEINTE_ABANDON, "abandon-" + m.Id)
-        : `<div class="vote-abandon"><p><b>${echapper((v.Initiateur || {}).nom || "Un joueur")}</b> propose d'abandonner la mission (${oui}/${liste(v.Votants).length}).</p>
+        ? boutonLivre("abandon-oui", "Voter pour abandonner la tâche", TEINTE_ABANDON, "abandon-" + m.Id)
+        : `<div class="vote-abandon"><p><b>${echapper((v.Initiateur || {}).nom || "Un joueur")}</b> propose d'abandonner la tâche (${oui}/${liste(v.Votants).length}).</p>
             <div class="boutons-abandon">${(v.Votes || {})[moi] === "oui" ? `<p class="discret">En attente des autres joueurs.</p>` : boutonLivre("abandon-oui", "J'accepte", TEINTE_ABANDON, "abandon-accepte-" + m.Id)}
             ${boutonLivre("abandon-non", "Non, on continue", TEINTE_CONTINUER, "abandon-continue-" + m.Id)}</div></div>`;
     return `<div class="contenu-page page-mission-infos defile-fiche">
@@ -95,7 +101,7 @@ const modeNotes = (d) => (estAccomplie(d) ? "lu" : d && d.Mission ? "ecrit" : "v
 function htmlDroite(d) {
     const mode = modeNotes(d);
     const attributs = mode === "ecrit" ? "" : mode === "lu" ? "readonly" : "disabled";
-    const aide = mode === "ecrit" ? "Écrivez ici ce que vous voulez retenir de la mission…" : mode === "lu" ? "Aucune note pour cette mission." : "Les notes s'ouvriront avec une mission.";
+    const aide = mode === "ecrit" ? "Écrivez ici ce que vous voulez retenir de la tâche…" : mode === "lu" ? "Aucune note pour cette tâche." : "Les notes s'ouvriront avec une tâche.";
     return `<div class="contenu-page page-mission-notes">
         <div class="titre-notes-mission">Nos notes</div>
         <textarea class="notes-mission" data-mode="${mode}" spellcheck="false" ${attributs}
@@ -132,7 +138,10 @@ function majParchemin(d) {
         parchemin.setAttribute("aria-hidden", "true");
         scene.appendChild(parchemin);
     }
-    const html = `<div class="papier-recompenses"><div class="titre-recompenses">Récompenses</div>${FLEURON}<div class="liste-recompenses"></div></div>`;
+    // (v486) Les récompenses de la tâche, fixées à sa création (tache_en_cours.js) : la caisse du groupe, les provisions…
+    const R = (window.CAMP && window.CAMP.regles) || {};
+    const lignes = R.texteRecompense ? R.texteRecompense((accomplieAffichee.Mission || {}).Recompense) : [];
+    const html = `<div class="papier-recompenses"><div class="titre-recompenses">Récompenses</div>${FLEURON}<div class="liste-recompenses">${lignes.map(l => `<div class="ligne-recompense">${echapper(l)}</div>`).join("")}</div></div>`;
     if (parchemin.__html !== html) { parchemin.innerHTML = html; parchemin.__html = html; }
     Object.assign(parchemin.style, { left: livre.offsetLeft + "px", top: livre.offsetTop + "px", width: livre.offsetWidth + "px", height: livre.offsetHeight + "px" });
     requestAnimationFrame(() => parchemin && parchemin.classList.add("pose"));

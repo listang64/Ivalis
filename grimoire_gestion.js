@@ -102,12 +102,23 @@ function htmlGauche() {
         ${manque ? `<p class="avis-gestion">Il faut un intendant dès qu'un personnage reste au camp.</p>` : ""}
         ${camp.Conseil_Extraordinaire ? `<p class="avis-gestion">Un conseil extraordinaire doit se réunir : ${echapper(camp.Conseil_Extraordinaire.Raison || "")}</p>` : ""}
         ${(camp.Sujets_Conseil || []).length ? `<p class="avis-gestion">Le prochain conseil devra en parler : ${(camp.Sujets_Conseil || []).map(x => echapper(x.Texte || "")).join(" ")}</p>` : ""}
+        ${htmlTache(camp)}
         ${htmlJournal(camp)}
         ${estDev() ? `<button type="button" class="lien-dev jour-dev-gestion" data-action="gestion" data-gc="jour-dev">Faire passer un jour au camp (DEV)</button>` : ""}
         <p class="note-gestion${note.texte && Date.now() - note.le < 4000 ? " visible" : ""}" aria-live="polite">${echapper(note.texte)}</p>
       </div>`;
 }
 const estDev = () => { try { return localStorage.getItem("ivalis_DEV_MODE") === "on"; } catch (e) { return false; } };
+// (v486) LA TÂCHE EN COURS, et « quand l'expédition revient au camp, on a la possibilité d'annuler la tâche en cours ».
+function htmlTache(camp) {
+    const mec = (window.PARTIE_DATA || {}).Mission_En_Cours;
+    const tv = camp.Tache_Votee, P = R() || {};
+    if (!(mec && mec.Id) && !(tv && P.TACHES_A_BOUTON && P.TACHES_A_BOUTON[tv.Type])) return "";
+    const annuler = mec && mec.Id && camp.Annulation_Tache && camp.Annulation_Tache.Mission === mec.Id;
+    return `<div class="sous-titre-groupe">La tâche en cours</div>
+        <p class="ligne-gestion">${mec && mec.Id ? echapper(mec.Titre || "") : `${echapper(tv.Titre)} — par ${echapper(P.TACHES_A_BOUTON[tv.Type])}`}</p>
+        ${annuler ? `<button type="button" class="lien-fiche annuler-tache-gestion" data-action="gestion" data-gc="annuler-tache">Annuler la tâche en cours (vote du groupe)</button>` : ""}`;
+}
 // (v482) LES DERNIERS JOURS DU CAMP : son journal (la journée du camp, camp_pur.js).
 function htmlJournal(camp) {
     const jours = (Array.isArray(camp.Journal) ? camp.Journal : []).slice(-3).reverse();
@@ -190,7 +201,7 @@ function htmlDroite() {
 function maj(force) {
     if (!pages) return;
     const camp = C() && C().lire();
-    const base = JSON.stringify([camp, infos, brouillons, C() && C().postesBloques && C().postesBloques(), C() && C().partis && C().partis()]);
+    const base = JSON.stringify([camp, infos, brouillons, C() && C().postesBloques && C().postesBloques(), C() && C().partis && C().partis(), (window.PARTIE_DATA || {}).Mission_En_Cours || null]);
     const actif = document.activeElement;
     // Ne pas redessiner sous les doigts de celui qui tape une quantité.
     if (!force && actif && pages.d.contains(actif) && actif.matches("input")) return;
@@ -211,6 +222,11 @@ async function agir(cible) {
         son();
         if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id, nom: nomDe(id, C().lire()), depuisGestion: true });
         return;
+    }
+    if (gc === "annuler-tache") {
+        son();
+        const r = window.TACHE_EN_COURS ? await window.TACHE_EN_COURS.annulerTache() : null;
+        return noter(r && r.abandon ? "La tâche est abandonnée." : r ? "Le vote pour annuler la tâche est lancé : chacun doit l'accepter (Tâche en cours)." : "La tâche n'a pas pu être annulée.");
     }
     if (gc === "jour-dev") {
         if (!estDev() || !C().journeeDuCamp) return;

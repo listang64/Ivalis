@@ -2839,6 +2839,10 @@ window.declencherTourIA = async function(options) {
                     if (window.MISSIONS_GUILDE && typeof window.MISSIONS_GUILDE.suivreApresMJ === "function") {
                         try { await window.MISSIONS_GUILDE.suivreApresMJ(reponseTexte, idMessage); } catch (e) { console.error("[Mission de guilde] Le suivi :", e); }
                     }
+                    // (v486) Le clan nomade : une tâche acceptée dans le RP devient la tâche en cours (tache_en_cours.js, MIA_TACHE).
+                    if (window.TACHE_EN_COURS && typeof window.TACHE_EN_COURS.detecter === "function") {
+                        Promise.resolve(window.TACHE_EN_COURS.detecter(reponseTexte, historiqueReduit)).catch(e => console.error("[MIA_TACHE] :", e));
+                    }
                     {
                         // (v411) LES FILS INVISIBLES : les âmes de la scène (ceux qui y étaient au
                         // début, ceux qui y sont à la fin, et chaque héros). (v418) Aussi en pleine

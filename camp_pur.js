@@ -890,3 +890,65 @@ export function lireReponseConseil(texte, conseil, pnjs) {
     Object.entries((j && j.avis) || {}).forEach(([nom, v]) => { const id = parNom.get(String(nom).toLowerCase()); if (id) avis[id] = v && ids.has(v) ? v : null; });
     return { repliques, postit, avis };
 }
+
+// =========================================================================
+//  (v486) LA TÂCHE EN COURS (étape 10, les anciennes missions)
+// =========================================================================
+// « Ordre d'idée des récompenses (elles vont dans la caisse du groupe) : une tâche normale rapporte 40 à 80 drachmes
+// et 10 à 20 provisions ; une tâche difficile, 100 à 200 drachmes et 20 à 40 provisions. » Une fête (un événement du
+// camp) : « de l'XP et +10 moral pour le groupe ».
+export const RECOMPENSES = { normale: { drachmes: [40, 80], provisions: [10, 20] }, difficile: { drachmes: [100, 200], provisions: [20, 40] } };
+export const RECOMPENSE_FETE = { Drachmes: 0, Provisions: 0, Xp: 100, Moral: 10 };
+const entre = ([a, b], alea) => a + Math.floor(alea() * (b - a + 1));
+export function recompenseTache(difficulte, type, alea = Math.random) {
+    if (type === "fete") return { ...RECOMPENSE_FETE };
+    const r = RECOMPENSES[difficulte === "difficile" ? "difficile" : "normale"];
+    return { Drachmes: entre(r.drachmes, alea), Provisions: entre(r.provisions, alea), Xp: 0, Moral: 0 };
+}
+export function texteRecompense(r) {
+    if (!r) return [];
+    return [r.Drachmes ? `${r.Drachmes} drachmes pour la caisse du groupe` : "", r.Provisions ? `${r.Provisions} provisions pour le camp` : "",
+            r.Xp ? `${r.Xp} XP pour chaque héros` : "", r.Moral ? `+${r.Moral} de moral pour tout le clan` : ""].filter(Boolean);
+}
+// Les décisions du conseil qui ne deviennent pas une tâche à jouer en RP : elles passent par leur bouton.
+export const TACHES_A_BOUTON = { deplacer: "le bouton « Déplacer le camp » de la page du camp", recruter: "le recrutement (« Recruter un personnage »)" };
+// Une tâche tirée d'un sujet du conseil (sans IA, ou en attendant son texte) : { Titre, Resume, Objectif, Details… }.
+export function tacheDuSujet(sujet, o = {}) {
+    const fete = sujet.Type === "fete";
+    return {
+        Id: `T_${(o.maintenant || 0).toString(36)}_${Math.floor((o.alea || Math.random)() * 1e6).toString(36)}`,
+        Difficulte: "normale", Titre: String(sujet.Titre || "Une tâche du clan").slice(0, 80), Resume: String(sujet.Resume || "").slice(0, 200),
+        Region: o.region || 1, Region_Nom: o.regionNom || "", Commanditaire: "Le conseil du clan",
+        Objectif: fete ? "Réunir tout ce qu'il faut pour la fête (de quoi décorer, des vivres pour le banquet, un musicien, un prêtre…), puis la célébrer au camp."
+                       : (sujet.Resume || sujet.Titre || ""),
+        Details: fete ? "Le conseil a décidé d'organiser une fête au camp. Elle se prépare en plusieurs étapes, à accomplir en RP." : `Le conseil du clan en a décidé : ${sujet.Titre}.`,
+        Lettre: "", Lieu: o.lieu || { Id: null, Nom: "Le camp du clan", Type: "camp", Description: "" }, Type_Tache: sujet.Type || "autre", Ecriture: o.ecriture || ""
+    };
+}
+// « Quand le jeu détecte qu'une nouvelle tâche commence — parce que les joueurs l'ont acceptée dans le RP » : MIA_TACHE.
+export function promptDetectionTache(texteMJ, derniers) {
+    return `Tu es MIA_TACHE. Dans ce jeu de rôle, une « tâche » est une mission, une quête ou un service qu'on confie aux héros (contre une récompense ou non).
+Lis les derniers échanges et la dernière page du narrateur : les héros viennent-ils d'ACCEPTER clairement une nouvelle tâche (pas seulement d'en entendre parler) ?
+--- LES DERNIERS ÉCHANGES ---
+${(derniers || []).join("\n") || "(aucun)"}
+--- LA DERNIÈRE PAGE DU NARRATEUR ---
+${texteMJ || ""}
+Réponds en JSON seul : { "nouvelle": true | false, "titre": "6 mots au plus", "resume": "une phrase", "commanditaire": "qui la confie", "objectif": "une phrase", "difficulte": "normale" | "difficile" }`;
+}
+export function lireDetectionTache(texte) {
+    let j = null;
+    try { j = JSON.parse(String(texte || "").replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch (e) { return null; }
+    if (!j || j.nouvelle !== true || !String(j.titre || "").trim()) return null;
+    return { titre: String(j.titre).slice(0, 80), resume: String(j.resume || "").slice(0, 200), commanditaire: String(j.commanditaire || "").slice(0, 120),
+             objectif: String(j.objectif || "").slice(0, 300), difficulte: j.difficulte === "difficile" ? "difficile" : "normale" };
+}
+// Une place près du camp pour un lieu repéré par l'éclaireur (dans sa région, à 0,08–0,2 de lui).
+export function placePresDuCamp(camp, alea = Math.random, valable = () => true) {
+    const c = (camp && camp.Position) || { Region: 1, x: 0.5, y: 0.5 };
+    for (let k = 0; k < 60; k++) {
+        const a = alea() * Math.PI * 2, d = 0.08 + alea() * 0.12;
+        const x = Math.max(0.06, Math.min(0.94, Number(c.x) + Math.cos(a) * d)), y = Math.max(0.06, Math.min(0.94, Number(c.y) + Math.sin(a) * d));
+        if (valable(Number(c.Region), x, y)) return { Region: Number(c.Region), x: Math.round(x * 1e5) / 1e5, y: Math.round(y * 1e5) / 1e5 };
+    }
+    return { Region: Number(c.Region), x: Number(c.x), y: Number(c.y) };
+}

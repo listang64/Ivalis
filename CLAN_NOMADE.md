@@ -62,6 +62,7 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
 | 7 — Thémès dans le récit | v484 | fait |
 | 8 — Le retour au camp | v484 | fait |
 | 9 — Le conseil | v485 | fait |
+| 10 — La tâche en cours | v486 | fait |
 
 ## Points ambigus
 
@@ -207,3 +208,21 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
   (`Camp.Conseils_Passes`).
 - **Étape 9, l'extraordinaire.** Il se réunit tout seul dès que le clan est au camp et que le camp n'a plus de
   provisions, et sa page s'ouvre chez chacun (une fois).
+- **Étape 10, le nom.** Dans le livre : « Tâche en cours » (la page, le marque-page, le vote pour l'abandonner, les
+  notes). Le code et la base gardent les noms des missions (`Mission_En_Cours`, `Guilde/Mission`).
+- **Étape 10, la détection.** Après chaque page du narrateur, tant qu'aucune tâche n'est en cours et que le clan
+  a un camp, MIA_TACHE dit si les héros viennent d'ACCEPTER une tâche (pas d'en entendre parler) ; alors le
+  créateur de missions l'écrit d'après elle (son titre, son commanditaire, son objectif) et elle devient la tâche
+  en cours.
+- **Étape 10, après le conseil.** Une fête : écrite par le créateur, au camp, en étapes à jouer en RP ;
+  « partager les vivres » et « une autre décision » : une tâche simple, au camp, tirée du sujet ; « trouver des
+  vivres », « accepter une mission » : écrites par le créateur, qui choisit le lieu ; « aller voir le lieu
+  repéré » : un lieu près du camp (0,08 à 0,2 de lui, dans sa région) ; « déplacer le camp », « recruter » :
+  pas de tâche à jouer, leur bouton prend le relais (la page « Tâche en cours » le dit). Chaque fois, la tâche
+  d'avant est rangée « remplacée ». Sans clé Gemini, une tâche simple tirée du sujet.
+- **Étape 10, les récompenses.** Fixées à la création (au hasard dans la fourchette du document ; une fête :
+  100 XP par héros et +10 de moral pour tout le clan) ; versées à la caisse du groupe et à la réserve quand la
+  tâche est réussie, une seule fois ; écrites sur le parchemin des récompenses. Les tâches lancées avant la v486
+  n'en ont pas.
+- **Étape 10, annuler au retour.** Au retour d'une expédition, la gestion du camp propose « Annuler la tâche en
+  cours » : c'est le vote d'abandon du groupe (tous les joueurs).

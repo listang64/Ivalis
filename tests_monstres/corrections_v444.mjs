@@ -405,7 +405,7 @@ await section(async () => {
   await cliquer("#grimoire-marque-mission");
   verifier("le marque-page ouvre la double page « Mission en cours »", await attendreQue(surMission, 8000)); await pose();
   const g = await gauche(), d = await droite();
-  verifier("« Aucune mission en cours » ; les notes fermées", /Aucune mission en cours/.test(g) && d && d.eteint, g.slice(0, 120));
+  verifier("« Aucune tâche en cours » ; les notes fermées", /Aucune tâche en cours/.test(g) && d && d.eteint, g.slice(0, 120));
   await cap("v444-vide");
 });
 
@@ -418,7 +418,7 @@ await section(async () => {
   const g = await gauche();
   verifier("(v452) le titre (plus de rang), le commanditaire, la région, le lieu, l'objectif, ce qu'on en sait", !/Rang [ABC]/.test(g) && /Mission 1/.test(g) && /Commanditaire 1/.test(g) && /Le désert d'Etheria/.test(g) && /Kesh/.test(g) && /Objectif 1\./.test(g) && /Détails 1\./.test(g), g.slice(0, 260));
   verifier("…rien du plan du MJ (la vérité cachée, ce qu'il ne faut pas révéler)", !/ment/.test(g) && !/voleur/.test(g), "");
-  verifier("…et le vote pour l'abandonner", /Voter pour abandonner la mission/.test(g));
+  verifier("…et le vote pour l'abandonner", /Voter pour abandonner la tâche/.test(g));
   // (v450) « Le bouton voter pour abandonner, dans le même design que le reste du livre. »
   const ba = await G(() => { const b = document.querySelector('#grimoire-mission-g [data-mi="abandon-oui"]'); return b && { classe: b.className, lavis: !!b.querySelector("svg.lavis"), cadre: !!b.querySelector("svg.cadre-main path"), souligne: getComputedStyle(b).textDecorationLine }; });
   verifier("(v450) …un bouton du livre : le cadre tracé à la plume et le lavis d'aquarelle (plus un lien souligné)", ba && ba.classe === "bouton-mission" && ba.lavis && ba.cadre && ba.souligne === "none", JSON.stringify(ba));
@@ -458,8 +458,8 @@ await section(async () => {
   await cliquer('#grimoire-mission-g [data-mi="abandon-oui"]'); await p.waitForTimeout(600);
   let md = await missionDoc();
   verifier("Ben vote pour l'abandon : le vote (Vote_Abandon), 1/2", md.Vote_Abandon && md.Vote_Abandon.Votes.J1 === "oui" && md.Vote_Abandon.Votants.length === 2, JSON.stringify(md.Vote_Abandon));
-  await attendreQue(async () => /propose d'abandonner la mission \(1\/2\)/.test(await gauche()), 3000);
-  verifier("…la page le dit, en attente des autres", /propose d'abandonner la mission \(1\/2\)/.test(await gauche()) && /En attente des autres joueurs/.test(await gauche()));
+  await attendreQue(async () => /propose d'abandonner la tâche \(1\/2\)/.test(await gauche()), 3000);
+  verifier("…la page le dit, en attente des autres", /propose d'abandonner la tâche \(1\/2\)/.test(await gauche()) && /En attente des autres joueurs/.test(await gauche()));
   await enJoueur("J2"); await G(() => window.MISSIONS_GUILDE.voterAbandon("non"));
   md = await missionDoc();
   verifier("l'autre dit non : le vote s'efface, la mission continue", md && !md.Vote_Abandon && md.Statut === "en_cours", JSON.stringify(md && md.Vote_Abandon));
@@ -469,7 +469,7 @@ await section(async () => {
   const fin = await G((id) => window.__docs["Systeme_Parties/P1/Missions_Terminees/" + id] || null, m0.Id), pd = await partieDoc();
   verifier("tous d'accord : abandonnée (rangée, statut « abandonnee »), plus de mission en cours", fin && fin.Statut === "abandonnee" && !(await missionDoc()) && !pd.Mission_En_Cours, JSON.stringify(fin && fin.Statut));
   await G(() => window.GRIMOIRE_MISSION.rendre());
-  verifier("…la page redit « Aucune mission en cours »", await attendreQue(async () => /Aucune mission en cours/.test(await gauche()), 3000));
+  verifier("…la page redit « Aucune tâche en cours »", await attendreQue(async () => /Aucune tâche en cours/.test(await gauche()), 3000));
 });
 
 titre("7. LA FICHE : « MISSIONS RÉUSSIES », EN BAS À GAUCHE, SES VRAIS CHIFFRES");

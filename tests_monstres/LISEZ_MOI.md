@@ -12704,3 +12704,10 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Le conseil** (`conseil.js`, `conseil.css`) : « Former le conseil » (jamais pendant une expédition), le récit à part (`Conseil_Messages`), Thémès qui ouvre, l'éclaireur qui annonce le lieu repéré, les répliques des joueurs et de l'IA (le réglage du narrateur, la mémoire des 5 dernières expéditions), les post-its et les bulles, le vote, le résultat (la tâche votée, les conséquences sur le moral), le conseil extraordinaire qui s'ouvre tout seul.
 - corrections_v485 le vérifie.
 
+## v486 — Le clan nomade, étape 10 : la tâche en cours
+
+- **Les règles** (`camp_pur.js`) : les récompenses (normale 40–80 drachmes et 10–20 provisions, difficile 100–200 et 20–40, une fête de l'XP et +10 de moral), la tâche tirée d'un sujet du conseil, les tâches à bouton (déplacer, recruter), MIA_TACHE (sa consigne, sa réponse relue), la place du lieu repéré près du camp.
+- **La tâche** (`tache_en_cours.js`) : créée par le créateur de missions d'après son sujet (`missions_guilde.js`, `genererMission(difficulte, { sujet })`, `Position_Voulue`), après le conseil ou acceptée dans le RP (`ia_master.js`) ; elle remplace la tâche en cours ; ses récompenses versées à la caisse au succès (l'événement `ivalis-tache-terminee`) ; l'annulation proposée au retour d'une expédition.
+- **Le livre** : « Tâche en cours » (`grimoire_mission.js`, `grimoire.js`), le parchemin des récompenses rempli, la tâche en cours dans la gestion du camp.
+- corrections_v486 le vérifie ; corrections_v444 lit « Aucune tâche en cours ».
+
