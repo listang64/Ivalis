@@ -552,6 +552,9 @@ window.proposerVoyageGroupe = async function(proposition) {
     const prop = proposition || (choix && choix.proposition);
     if (!prop) return null;
     if (bloqueParCombat()) { quitterChoix(); return { combat: true }; }
+    // (v483) Le clan nomade : on ne quitte pas le camp sans expédition montée (expedition.js).
+    const refusCamp = window.EXPEDITION && typeof window.EXPEDITION.refusDepart === "function" ? window.EXPEDITION.refusDepart() : "";
+    if (refusCamp) { quitterChoix(); try { window.alert(refusCamp); } catch (e) {} return { refus: refusCamp }; }
     const moi = idJoueur();
     const votants = votantsPartie();
     const v = {
@@ -1017,6 +1020,8 @@ function apresDepart(r) {
 // les messages lus à son départ — le campement posé ensuite reste).
 function nettoyerChat(options) {
     if (typeof window.nettoyerChatVoyage !== "function") return;
+    // (v483) Avec un camp, le récit se range à la fin de chaque expédition (« Expédition N », expedition.js), pas à chaque voyage.
+    if (window.CAMP && typeof window.CAMP.lire === "function" && window.CAMP.lire()) return;
     Promise.resolve(window.nettoyerChatVoyage(options))
         .catch(e => console.error("Nettoyage du chat (le voyage continue) :", e));
 }

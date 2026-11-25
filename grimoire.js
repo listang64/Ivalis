@@ -100,7 +100,7 @@
     // les Aventuriers en deviennent les sous-pages.
     const ENTREES_INDEX = [
         // (v477) Le clan nomade : « Le camp » remplace « Le village » (CLAN_NOMADE.md).
-        ["groupe", "Groupe"], ["carte", "Carte du monde"], ["camp", "Le camp"],
+        ["groupe", "Expédition"], ["carte", "Carte du monde"], ["camp", "Le camp"],
         ["combats", "Les combats"], ["recit", "Le récit"]
     ];
     const ROMAINS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];

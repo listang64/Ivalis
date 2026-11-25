@@ -214,8 +214,8 @@ await section(async () => {
   });
   verifier("« Sommaire » (plus « Index »), et sous lui le titre de la partie", r.titre === "Sommaire" && r.partie === "Les Lames d'Héra", `${r.titre} / ${r.partie}`);
   // (v416) « Les fils invisibles » quittent le sommaire pour les Paramètres : cinq entrées, comme avant la v414.
-  verifier("(v418) I- Groupe, II- Carte du monde, III- Le camp | IV- Les combats, V- Le récit (plus de Paramètres)",
-           r.gauche.join(" | ") === "I- Groupe | II- Carte du monde | III- Le camp" && r.droite.join(" | ") === "IV- Les combats | V- Le récit", r.gauche.concat(r.droite).join(" | "));
+  verifier("(v418, v483) I- Expédition, II- Carte du monde, III- Le camp | IV- Les combats, V- Le récit (plus de Paramètres)",
+           r.gauche.join(" | ") === "I- Expédition | II- Carte du monde | III- Le camp" && r.droite.join(" | ") === "IV- Les combats | V- Le récit", r.gauche.concat(r.droite).join(" | "));
   verifier("le fond du sommaire : (v397) la nouvelle image de Nico, à 30 %, étirée sur la double page (une moitié par page)",
            r.fonds.length === 2 && r.fonds.every(f => /bxp3xw\.png/.test(f.img) && f.op === "0.3" && f.taille === "200% 100%") && r.fonds[0].pos !== r.fonds[1].pos, JSON.stringify(r.fonds.map(f => [f.op, f.taille, f.pos])));
   verifier("une écriture manuscrite (v313 : celle choisie dans Paramètres, Shadows Into Light par défaut depuis v340)", /Shadows Into Light/.test(r.police) && /Shadows Into Light/.test(r.policeEntree), `${r.police}`);

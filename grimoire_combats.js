@@ -89,9 +89,35 @@ function htmlGauche() {
           <div class="texte-encart-combats">L'arène d'entraînement : la fenêtre de combat, ses outils et ses rencontres.</div>
           ${e.actif ? `<div class="note-encart-combats">Fermée tant que le combat du récit n'est pas terminé.</div>` : `<div class="appel-encart-combats">Entrer dans l'arène ›</div>`}
         </div>
+        ${htmlModeArene()}
         ${dev}
       </div>`;
 }
+
+// (v483) LE MODE ARÈNE (test, le clan nomade) : « avant chaque combat, choisir le personnage de chaque joueur,
+// indépendamment du personnage actif de l'histoire » (expedition.js ; monstres.js compose les combattants).
+const idJoueurCombats = () => { try { return localStorage.getItem("ID_JOUEUR_COURANT") || ""; } catch (e) { return ""; } };
+function htmlModeArene() {
+    const X = window.EXPEDITION;
+    if (!X || typeof X.choixArene !== "function") return "";
+    const a = X.choixArene() || {}, moi = idJoueurCombats(), siens = X.jouables(moi), choix = (a.Choix || {})[moi] || "";
+    const nom = (id) => { const h = (window.PERSOS_JOUEURS_PARTIE || []).find(x => x && x.idPersonnage === id); return h ? [h.prenom, h.nom].filter(Boolean).join(" ") : id; };
+    const autres = Object.entries(a.Choix || {}).filter(([j, id]) => j !== moi && id).map(([, id]) => nom(id));
+    return `<div class="mode-arene-livre">
+        <label class="case-arene-livre"><input type="checkbox" data-combats-arene="actif"${a.Actif ? " checked" : ""}> Mode arène (test) : chacun choisit son combattant</label>
+        ${a.Actif ? `<select class="choix-arene-livre" data-combats-arene="choix"><option value="">— le héros actif de l'histoire —</option>
+            ${siens.map(id => `<option value="${echapper(id)}"${choix === id ? " selected" : ""}>${echapper(nom(id))}</option>`).join("")}</select>
+          ${autres.length ? `<div class="note-encart-combats">Les autres joueurs : ${autres.map(echapper).join(", ")}.</div>` : ""}` : ""}
+      </div>`;
+}
+document.addEventListener("change", async (ev) => {
+    const el = ev.target && ev.target.closest && ev.target.closest("[data-combats-arene]");
+    if (!el || !window.EXPEDITION) return;
+    son();
+    if (el.dataset.combatsArene === "actif") await window.EXPEDITION.areneActive(el.checked);
+    else await window.EXPEDITION.choisirPourArene(el.value || null);
+    setTimeout(() => maj(true), 300);
+});
 
 // ---------------------------------------------------------------------
 //  LA PAGE DE DROITE : la préparation, les belligérants, le bouton
@@ -155,7 +181,8 @@ function htmlDroite() {
 function maj(force) {
     if (!pages) return;
     const e = etatDuCombat(), c = e.c;
-    const sg = JSON.stringify([c && [c.Etat, c.Adversaires, c.Lieu && c.Lieu.Titre], modeDev()]);
+    const sg = JSON.stringify([c && [c.Etat, c.Adversaires, c.Lieu && c.Lieu.Titre], modeDev(), (window.PARTIE_DATA || {}).Arene_Choix || null,
+                               window.EXPEDITION && window.EXPEDITION.jouables ? window.EXPEDITION.jouables() : []]);
     if (force || sg !== sig.g) { sig.g = sg; pages.g.innerHTML = htmlGauche(); }
     const etapes = c && L() ? L().etapes(c).map(x => x.fait) : null;
     const sd = JSON.stringify([c && [c.Id, c.Etat, !!c.Carte, c.Lieu && c.Lieu.Titre, c.Ennemis, c.Ennemis_Valides], etapes, c && !c.Lieu ? Math.floor(Date.now() / 6000) : 0]);

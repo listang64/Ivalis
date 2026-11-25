@@ -665,7 +665,10 @@ function sommaireHtml() {
     const ligne = (id, numero, titre, classe, idChap) =>
         `<div class="ligne-sommaire-dev">${dev && etat.suppression && idChap ? `<button type="button" class="moins-sommaire" data-supprimer="${echapper(idChap)}" title="Supprimer ce chapitre (DEV)" aria-label="Supprimer le chapitre ${echapper(romain(numero))}">−</button>` : ""}${copier(id, numero)}<a class="ligne-sommaire${classe ? " " + classe : ""}" data-recit="${echapper(id)}"><span class="num">${romain(numero)}</span><span class="tit">${echapper(titre)}</span></a></div>`;
     const finis = etat.chapitres.map(c => ligne("chap:" + c.id, c.Numero, c.Titre || "Sans titre", "", c.id));
-    const courant = ligne("courant", etat.chapitres.length + 1, "Le chapitre en cours", "courant");
+    // (v483) Avec un camp : l'expédition en cours, ou le camp entre deux expéditions.
+    const campRecit = window.CAMP && window.CAMP.lire ? window.CAMP.lire() : null, expRecit = (window.PARTIE_DATA || {}).Expedition;
+    const libelleCourant = !campRecit ? "Le chapitre en cours" : expRecit && expRecit.En_Cours ? `Expédition ${expRecit.Numero || ""}, en cours` : "Au camp, entre deux expéditions";
+    const courant = ligne("courant", etat.chapitres.length + 1, libelleCourant, "courant");
     const toutes = [...finis, courant];
     const gauche = toutes.slice(0, 8), droite = toutes.slice(8);
     return [
@@ -1781,7 +1784,8 @@ async function chargerChapitres(idPartie) {
 }
 // Appelée par l'archivage du chat (ia_master.js), avant qu'il ne se vide : le
 // chapitre, son titre (écrit d'après ce qui y a été vécu) et ses pages.
-async function archiverChapitre(messages) {
+async function archiverChapitre(messages, options) {
+    const o = options || {};
     const idPartie = window.ID_PARTIE_COURANTE;
     if (!idPartie) return null;
     const entrees = construireEntrees((messages || []).map(m => ({ idDoc: m.idDoc || m.id, ...m })));
@@ -1796,6 +1800,8 @@ async function archiverChapitre(messages) {
         titre = await appelLite(`Tu donnes leur titre aux chapitres du livre d'Ivalis (un jeu de rôle d'Antiquité fantastique). Lis ce chapitre et donne-lui un titre de 3 à 8 mots, évocateur, à la manière d'un vieux roman d'aventures, d'après ce qui y a été vécu. Réponds par le titre seul, sans guillemets ni ponctuation finale.`, texte);
     } catch (e) { console.warn("Le titre du chapitre :", e); }
     titre = String(titre || "").split("\n")[0].replace(/^["«\s]+|["»\s.]+$/g, "").slice(0, 90) || "Un chapitre sans titre";
+    // (v483) Le clan nomade : « l'expédition remplace le chapitre dans le livre : Expédition 1, Expédition 2… ».
+    if (o.expedition) titre = `Expédition ${o.expedition} — ${titre}`;
     let numero = 1;
     try {
         const snap = await getDocs(query(collection(db, "Recits_Chapitres"), where("ID_Partie", "==", idPartie)));
@@ -1803,7 +1809,7 @@ async function archiverChapitre(messages) {
     } catch (e) {}
     const date = window.DATE_EN_JEU_ACTUELLE || {};
     const fiche = await addDoc(collection(db, "Recits_Chapitres"), {
-        ID_Partie: idPartie, Numero: numero, Titre: titre, Nb_Entrees: entrees.length,
+        ID_Partie: idPartie, Numero: numero, Titre: titre, Nb_Entrees: entrees.length, ...(o.expedition ? { Expedition: Number(o.expedition) } : {}),
         Date_Jour: date.jour || "", Date_An: date.annee || "", Timestamp: Date.now()
     });
     await setDoc(doc(db, "Recits_Textes", fiche.id), {

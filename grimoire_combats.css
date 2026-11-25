@@ -78,3 +78,9 @@
 .bouton-rejoindre-livre > .lavis { left: -3%; top: -8%; width: 106%; height: 116%; }
 .bouton-rejoindre-livre .lames-combats { width: calc(var(--u) * 7); height: calc(var(--u) * 7); }
 .bouton-rejoindre-livre:hover { transform: rotate(-0.8deg) scale(1.03); }
+
+/* (v483) Le mode arène (test) : chacun choisit son combattant. */
+.mode-arene-livre { display: flex; flex-direction: column; gap: calc(var(--u) * 0.8); font-size: calc(var(--u) * 2.8); color: #3a2a1a; }
+.case-arene-livre { display: flex; align-items: center; gap: calc(var(--u) * 1); cursor: pointer; }
+.choix-arene-livre { font: inherit; font-size: calc(var(--u) * 2.8); padding: calc(var(--u) * 0.4) calc(var(--u) * 1); border: 1px solid rgba(90, 60, 30, 0.45);
+  border-radius: calc(var(--u) * 0.8); background: rgba(255, 250, 238, 0.85); align-self: flex-start; }

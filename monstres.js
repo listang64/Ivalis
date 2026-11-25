@@ -199,7 +199,14 @@ window.recomposerCombattants = function() {
     // combattants : c'est ce seul filtre qui le retire du plateau, de la piste
     // d'initiative, du panneau, du décompte des joueurs prêts et des bulles de
     // noms — tout le moteur travaille à partir de cette liste.
-    const joueurs = (window.PERSOS_JOUEURS_PARTIE || []).filter(p => p.actif !== false);
+    let joueurs = (window.PERSOS_JOUEURS_PARTIE || []).filter(p => p.actif !== false);
+    // (v483) LE MODE ARÈNE (test, le clan nomade) : « avant chaque combat, choisir le personnage de chaque joueur,
+    // indépendamment du personnage actif de l'histoire » — hors combat du récit, le choix de chacun remplace son actif.
+    const arene = (window.PARTIE_DATA || {}).Arene_Choix, crp = (window.PARTIE_DATA || {}).Combat_RP;
+    if (arene && arene.Actif && !(crp && ["preparation", "en_cours", "narration"].includes(crp.Etat))) {
+        const choix = arene.Choix || {};
+        joueurs = (window.PERSOS_JOUEURS_PARTIE || []).filter(p => choix[p.idJoueur] ? p.idPersonnage === choix[p.idJoueur] : p.actif !== false);
+    }
     const monstres = window.MONSTRES_PARTIE || [];
     const fraiches = [...joueurs, ...monstres];
 

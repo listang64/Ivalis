@@ -131,3 +131,30 @@
 .titre-reputation { position: relative; isolation: isolate; padding: calc(var(--u) * 0.5) calc(var(--u) * 4); }
 .titre-reputation > .lavis { left: -6%; top: -30%; width: 112%; height: 160%; z-index: -1; }
 .titre-reputation > span { position: relative; }
+
+/* (v483) L'EXPÉDITION (le clan nomade) : trois places, le nom du joueur sous chaque personnage ; ceux qui partent aussi. */
+.places-expedition { align-items: stretch; }
+.place-expedition .joueur-place { font-size: calc(var(--u) * 2.4); font-style: italic; color: #6b4a2b; }
+.place-vide { width: 100%; aspect-ratio: 1 / 1.75; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--u) * 1);
+  border: 2px dashed rgba(120, 90, 50, 0.55) !important; border-radius: 6px; background: rgba(249, 239, 217, 0.35) !important; cursor: pointer;
+  font-family: 'Cinzel', serif; font-size: calc(var(--u) * 2.6); color: #5a3c22; padding: calc(var(--u) * 1) !important; text-align: center; }
+.place-vide .plus-place { font-size: calc(var(--u) * 7); line-height: 1; color: #8a6420; }
+.place-vide.choisie { border-color: #b8862a !important; background: rgba(240, 201, 94, 0.25) !important; }
+.place-vide:disabled { opacity: 0.55; cursor: default; }
+.laisser-place { align-self: center !important; font-size: calc(var(--u) * 2.5) !important; }
+.choix-place-expedition, .choix-suiveur-expedition { display: flex; flex-direction: column; gap: calc(var(--u) * 0.8); padding: calc(var(--u) * 1.2) calc(var(--u) * 2);
+  border: 1px solid rgba(120, 90, 50, 0.4); border-radius: 6px; background: rgba(255, 248, 230, 0.5); }
+.perso-place { align-self: flex-start; }
+.camp-place { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 1); }
+.perso-camp-place { font-size: calc(var(--u) * 2.6); color: #8a7a66; padding: 0 calc(var(--u) * 1); border: 1px dashed rgba(120, 90, 50, 0.35); border-radius: 9px; }
+.fiche-attente.petite, .ligne-expedition.petite { font-size: calc(var(--u) * 2.5); }
+.bouton-monter-expedition { align-self: center !important; font-size: calc(var(--u) * 4) !important; margin-top: calc(var(--u) * 2); }
+.defaire-expedition { align-self: center !important; font-size: calc(var(--u) * 2.6) !important; color: #8a1a10 !important; }
+.liste-expedition { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(var(--u) * 1); }
+.suiveur-expedition { font-size: calc(var(--u) * 3); display: flex; flex-wrap: wrap; align-items: baseline; gap: calc(var(--u) * 1.2); }
+.bonus-suiveur { font-size: calc(var(--u) * 2.5); font-style: italic; color: #476944; }
+.ligne-expedition { margin: 0; font-size: calc(var(--u) * 2.9); color: #2b1a0e; }
+.provisions-expedition { width: calc(var(--u) * 10); font: inherit; font-size: calc(var(--u) * 3); padding: calc(var(--u) * 0.4); border: 1px solid rgba(90, 60, 30, 0.45);
+  border-radius: calc(var(--u) * 0.8); background: rgba(255, 250, 238, 0.85); }
+.note-expedition { margin: 0; min-height: 1.2em; font-size: calc(var(--u) * 2.7); color: #2f4a6a; opacity: 0; transition: opacity 0.3s ease; }
+.note-expedition.visible { opacity: 1; }

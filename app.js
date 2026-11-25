@@ -1613,8 +1613,10 @@ window.atoutRace = function(perso) {
     const talents = typeof window.atoutTalents === "function" ? window.atoutTalents(perso) : {};
     // LES BLESSURES (blessures.js) : des malus, par le même chemin encore.
     const blessures = typeof window.atoutBlessures === "function" ? window.atoutBlessures(perso) : {};
-    if ([classe, creature, talents, blessures].every(a => Object.keys(a).length === 0)) return peuple;
-    return [classe, creature, talents, blessures].reduce(fusionnerAtouts, fusionnerAtouts({}, peuple));
+    // (v483) LES SUIVEURS DE L'EXPÉDITION (expedition.js) : +1 aux tests du groupe dans leur caractéristique.
+    const expedition = typeof window.atoutExpedition === "function" ? window.atoutExpedition(perso) : {};
+    if ([classe, creature, talents, blessures, expedition].every(a => Object.keys(a).length === 0)) return peuple;
+    return [classe, creature, talents, blessures, expedition].reduce(fusionnerAtouts, fusionnerAtouts({}, peuple));
 };
 
 // =========================================================================

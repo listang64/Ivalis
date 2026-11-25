@@ -214,8 +214,12 @@ export const estConnecte = (le, maintenant) => Number.isFinite(Number(le)) && ma
 // (même région, à moins de `rayon` — la taille de l'icône — en fraction de la carte régionale),
 // ou s'il n'a pas encore de place.
 export function groupeAuCamp(camp, position, expedition, rayon = 0.06) {
-    if (!camp || !camp.Position) return false;
     if (expedition && expedition.En_Cours) return false;
+    return pionSurLeCamp(camp, position, rayon);
+}
+// (v483) « La case du camp » : le pion du groupe sur l'icône du camp (ou pas encore placé).
+export function pionSurLeCamp(camp, position, rayon = 0.06) {
+    if (!camp || !camp.Position) return false;
     if (!position || position.x == null || position.y == null) return true;
     if (Number(position.Region) !== Number(camp.Position.Region)) return false;
     return Math.hypot(Number(position.x) - Number(camp.Position.x), Number(position.y) - Number(camp.Position.y)) <= rayon;
@@ -466,6 +470,7 @@ export function journeeDuCamp(e, alea = Math.random) {
         }
     }
     if (exp && partis.length) {
+        exp.Jours = (Number(exp.Jours) || 0) + 1;
         const besoin = Math.max(0, partis.length - Math.max(0, Number(exp.Economie_Provisions) || 0));
         const avant = Math.max(0, Number(exp.Provisions) || 0);
         if (avant >= besoin) exp.Provisions = avant - besoin;
@@ -593,4 +598,122 @@ export function journeeDuCamp(e, alea = Math.random) {
     camp.Journal = (Array.isArray(camp.Journal) ? camp.Journal : []).concat([{ Jour: e.jour || 0, Date_Jeu: e.dateJeu || "", Lignes: journal.slice() }]).slice(-JOURNAL_JOURS);
     camp.Jours_Ecoules = (Number(camp.Jours_Ecoules) || 0) + 1;
     return { camp, expedition: exp, journal, moraux, xp, soinsHeros, departs, evenements: ev };
+}
+
+// =========================================================================
+//  (v483) LES EXPÉDITIONS (étape 6)
+// =========================================================================
+// « La page Expédition montre trois emplacements de personnages actifs (3 joueurs maximum par expédition). »
+// « On peut emmener un ou deux suiveurs. » L'expédition sur la partie : { Numero, Montee, En_Cours,
+// Emplacements: [{ Perso, Joueur } | null ×3], Suiveurs: [id], Provisions_Prevues, puis au départ Membres,
+// Provisions, Economie_Provisions, Bonus, Debut, Jours }.
+export const PLACES_EXPEDITION = 3, SUIVEURS_MAX = 2;
+export const NOMS_CARACS = { force: "Force", dex: "Dextérité", con: "Constitution", int: "Intelligence", sag: "Sagesse", cha: "Charisme" };
+const ORDRE_CARACS = ["force", "dex", "con", "int", "sag", "cha"];
+// « Le bonus dépend de sa caractéristique la plus haute : Force +1 équipement porté ; Dextérité −1 provision
+// dépensée par jour par le groupe ; Constitution, Intelligence, Sagesse ou Charisme : +1 aux tests du groupe dans
+// cette caractéristique. » À égalité, l'ordre Force, Dextérité, Constitution, Intelligence, Sagesse, Charisme.
+export function bonusSuiveur(caracs) {
+    let meilleure = "force", v = -Infinity;
+    ORDRE_CARACS.forEach(c => { const x = Number((caracs || {})[c]); const val = Number.isFinite(x) && (caracs || {})[c] !== null && (caracs || {})[c] !== "" ? x : 10; if (val > v) { v = val; meilleure = c; } });
+    const texte = meilleure === "force" ? "+1 équipement porté" : meilleure === "dex" ? "−1 provision dépensée par jour par le groupe" : `+1 aux tests de ${NOMS_CARACS[meilleure]} du groupe`;
+    return { carac: meilleure, texte };
+}
+export function bonusExpedition(suiveurs, caracsDe) {
+    const b = { economie: 0, equipement: 0, tests: {} };
+    (suiveurs || []).forEach(id => {
+        const c = bonusSuiveur(caracsDe ? caracsDe(id) : {}).carac;
+        if (c === "dex") b.economie++;
+        else if (c === "force") b.equipement++;
+        else b.tests[c] = (b.tests[c] || 0) + 1;
+    });
+    return b;
+}
+export const expeditionVide = (numero, provisions = 0) => ({ Numero: Math.max(1, Number(numero) || 1), Montee: true, En_Cours: false, Emplacements: [null, null, null], Suiveurs: [], Provisions_Prevues: Math.max(0, Math.floor(Number(provisions) || 0)) });
+export const idThemesDuCamp = (camp) => Object.keys((camp && camp.Membres) || {}).find(id => estThemes(id, camp.Membres[id])) || null;
+// Ceux qui partent : les personnages des emplacements, Thémès (toujours), les suiveurs.
+export function membresExpedition(exp, camp) {
+    if (!exp) return [];
+    const t = idThemesDuCamp(camp);
+    return [...new Set([...(exp.Emplacements || []).filter(Boolean).map(x => x.Perso), ...(t ? [t] : []), ...(exp.Suiveurs || [])])];
+}
+// Ce que l'expédition mange par jour : 1 par membre, moins 1 par suiveur de Dextérité.
+export const consommationExpedition = (exp, camp, caracsDe) => Math.max(0, membresExpedition(exp, camp).length - bonusExpedition((exp || {}).Suiveurs, caracsDe).economie);
+
+// Prendre une place. `jouables` : les personnages que ce joueur peut jouer (les siens).
+export function peutPrendrePlace(exp, i, perso, joueur, jouables) {
+    if (!exp || !exp.Montee) return "Aucune expédition n'est montée.";
+    if (exp.En_Cours) return "L'expédition est déjà partie.";
+    if (!(Number.isInteger(i) && i >= 0 && i < PLACES_EXPEDITION)) return "Cette place n'existe pas.";
+    const pl = exp.Emplacements || [];
+    if (pl[i] && pl[i].Joueur !== joueur) return "Cette place est déjà prise.";
+    if (pl.some((x, k) => k !== i && x && x.Joueur === joueur)) return "Tu as déjà une place dans l'expédition.";
+    if (pl.some((x, k) => k !== i && x && x.Perso === perso)) return "Ce personnage part déjà.";
+    if ((exp.Suiveurs || []).includes(perso)) return "Ce personnage part déjà comme suiveur.";
+    if (!(jouables || []).includes(perso)) return "Tu ne peux pas jouer ce personnage.";
+    return "";
+}
+export function peutEmmener(exp, camp, id) {
+    if (!exp || !exp.Montee) return "Aucune expédition n'est montée.";
+    if (exp.En_Cours) return "L'expédition est déjà partie.";
+    const mb = ((camp && camp.Membres) || {})[id];
+    if (!mb) return "Ce personnage n'est pas au camp.";
+    if (estThemes(id, mb)) return "Thémès part toujours avec l'expédition.";
+    if ((exp.Suiveurs || []).includes(id)) return "Il suit déjà l'expédition.";
+    if ((exp.Emplacements || []).some(x => x && x.Perso === id)) return "Il part déjà comme personnage actif.";
+    if ((exp.Suiveurs || []).length >= SUIVEURS_MAX) return `Pas plus de ${SUIVEURS_MAX} suiveurs.`;
+    return "";
+}
+// Partir du camp : il faut une expédition montée, quelqu'un dedans, et un intendant si quelqu'un reste.
+export function refusDepartDuCamp(d, rayon = 0.06) {
+    if (!d || !d.Camp) return "";
+    const exp = d.Expedition;
+    if (exp && exp.En_Cours) return "";
+    if (!pionSurLeCamp(d.Camp, d.Position_Groupe, rayon)) return "";
+    if (!exp || !exp.Montee) return "Montez d'abord l'expédition (page Expédition) : qui part, les suiveurs, les provisions.";
+    if (!(exp.Emplacements || []).some(Boolean)) return "Personne n'a encore pris place dans l'expédition.";
+    if (intendantManquant(d.Camp, membresExpedition(exp, d.Camp))) return "Il faut nommer un intendant au camp avant de partir (Gestion du camp).";
+    return "";
+}
+// LE DÉPART : « dès que le groupe quitte la case du camp ». Les provisions sont prises sur la réserve ; ceux qui
+// partent quittent leur tâche. Rend { Camp, Expedition } ou null.
+export function departExpedition(d, o = {}) {
+    const exp = d && d.Expedition, camp = d && d.Camp;
+    if (!exp || !exp.Montee || exp.En_Cours || !camp || !(exp.Emplacements || []).some(Boolean)) return null;
+    const c2 = JSON.parse(JSON.stringify(camp));
+    const membres = membresExpedition(exp, c2);
+    const prov = Math.min(Math.max(0, Math.floor(Number(exp.Provisions_Prevues) || 0)), Math.max(0, Number(c2.Provisions) || 0));
+    c2.Provisions = (Number(c2.Provisions) || 0) - prov;
+    membres.forEach(id => {
+        const mb = (c2.Membres || {})[id];
+        if (!mb) return;
+        mb.Tache = null; delete mb.Recrue;
+        if (mb.Commerce && !mb.Commerce.Paye) delete mb.Commerce;
+    });
+    if (c2.Intendant && membres.includes(c2.Intendant)) c2.Intendant = null;
+    const b = bonusExpedition(exp.Suiveurs, o.caracsDe);
+    const e2 = { ...JSON.parse(JSON.stringify(exp)), En_Cours: true, Membres: membres, Provisions: prov, Economie_Provisions: b.economie, Bonus: b,
+                 Debut: { Le: o.maintenant || 0, Date_Jeu: o.dateJeu || "" }, Jours: 0 };
+    return { Camp: c2, Expedition: e2 };
+}
+// LE RETOUR : « dès que le groupe revient sur la case du camp ». Les provisions qui restent et les achats du
+// commerce rejoignent la réserve ; les emplacements se vident (l'expédition s'efface) ; elle est gardée dans
+// l'historique du camp. Rend { Camp, resume } ou null.
+export function retourExpedition(d, o = {}) {
+    const exp = d && d.Expedition, camp = d && d.Camp;
+    if (!exp || !exp.En_Cours || !camp) return null;
+    const c2 = JSON.parse(JSON.stringify(camp));
+    const rendues = Math.max(0, Math.floor(Number(exp.Provisions) || 0));
+    c2.Provisions = (Number(c2.Provisions) || 0) + rendues;
+    const livrees = [];
+    Object.keys(c2.Membres || {}).forEach(id => {
+        const c = c2.Membres[id].Commerce;
+        if (c && c.A_Livrer) { c2.Provisions += Number(c.A_Livrer) || 0; livrees.push({ id, quantite: Number(c.A_Livrer) || 0 }); delete c.A_Livrer; }
+    });
+    const resume = { Numero: Number(exp.Numero) || 1, Jours: Number(exp.Jours) || 0, Membres: (exp.Membres || []).slice(), Provisions_Rendues: rendues, Livraisons: livrees,
+                     Debut: exp.Debut || null, Retour: { Le: o.maintenant || 0, Date_Jeu: o.dateJeu || "" } };
+    c2.Expeditions_Passees = (Array.isArray(c2.Expeditions_Passees) ? c2.Expeditions_Passees : []).concat([resume]).slice(-50);
+    c2.Prochaine_Expedition = Math.max(Number(c2.Prochaine_Expedition) || 1, resume.Numero + 1);
+    c2.Dernier_Retour = resume;
+    return { Camp: c2, resume };
 }

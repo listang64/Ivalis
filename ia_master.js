@@ -2964,7 +2964,7 @@ Ne mentionne JAMAIS les mécaniques de jeu (jets de dés, tours de parole). Écr
         // 4 bis. LE CHAPITRE SE RANGE DANS LE LIVRE (v300, grimoire_recit.js) :
         // ses pages et son titre, avant que le chat ne se vide.
         if (window.GRIMOIRE_RECIT && typeof window.GRIMOIRE_RECIT.archiverChapitre === "function") {
-            try { await window.GRIMOIRE_RECIT.archiverChapitre(messages); }
+            try { await window.GRIMOIRE_RECIT.archiverChapitre(messages, { expedition: opts.expedition }); }
             catch (e) { console.error("Le chapitre du livre (l'archivage continue) :", e); }
         }
 
@@ -3020,7 +3020,7 @@ window.nettoyerChatVoyage = async function(options) {
     try {
         const messages = await lireMessagesChatPartie();
         if (window.chatEcritParLesJoueurs(messages)) {
-            return await window.processusArchivageChat({ messages, lieu: opts.lieu, cimetiere: !!opts.cimetiere });
+            return await window.processusArchivageChat({ messages, lieu: opts.lieu, cimetiere: !!opts.cimetiere, expedition: opts.expedition });
         }
         if (messages.length > 0) {
             const lot = writeBatch(db);

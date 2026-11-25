@@ -15,7 +15,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection, deleteField, runTransaction, increment } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=5";
+import * as CP from "./camp_pur.js?v=6";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -30,10 +30,16 @@ let camp = null;
 export const lireCamp = () => camp;
 
 // La partie, comme la base la relaie (app.js, l'écoute de la partie).
+let areneAvant = "";
 window.appliquerCampDeLaPartie = function(data) {
     const avant = JSON.stringify(camp && camp.Position);
     camp = (data && data.Camp) || null;
     if (JSON.stringify(camp && camp.Position) !== avant) redessiner();
+    // (v483) L'expédition part quand le groupe quitte la case du camp, finit quand il y revient (expedition.js).
+    if (camp && data && data.Expedition) setTimeout(() => { try { if (window.EXPEDITION) window.EXPEDITION.veiller(); } catch (e) {} }, 0);
+    // (v483) Le mode arène (test) : les combattants suivent le choix de chacun (monstres.js, recomposerCombattants).
+    const arene = JSON.stringify((data && data.Arene_Choix) || null);
+    if (arene !== areneAvant) { areneAvant = arene; if (typeof window.recomposerCombattants === "function") { try { window.recomposerCombattants(); } catch (e) {} } }
 };
 function redessiner() {
     try { if (typeof window.dessinerVillagesRegion === "function") window.dessinerVillagesRegion(); } catch (e) {}

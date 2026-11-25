@@ -12682,3 +12682,12 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **La gestion du camp** montre les derniers jours (le journal) et le conseil extraordinaire qui attend ; en mode DEV, « Faire passer un jour au camp ».
 - corrections_v482 le vérifie.
 
+## v483 — Le clan nomade, étape 6 : les expéditions
+
+- **Les règles** (`camp_pur.js`) : le bonus d'un suiveur (sa meilleure caractéristique), celui du groupe, ceux qui partent (les places, Thémès, les suiveurs), ce que l'expédition mange, une place par joueur et un personnage à soi, deux suiveurs au plus, le refus de partir du camp (pas d'expédition, personne, pas d'intendant), le départ (provisions prises au camp, tâches quittées), le retour (provisions rendues, achats livrés, numéro suivant, historique), le compteur de jours.
+- **La page Expédition** (`grimoire_groupe.js`, avec un camp) : « Monter l'expédition », trois places (le nom du joueur sous chaque personnage ; ses personnages, puis ceux du camp), les suiveurs et leur bonus, les provisions à emporter et combien de jours elles tiendront ; « Expédition » au sommaire.
+- **Le départ et le retour** (`expedition.js`) : quand un voyage part du camp, quand le pion revient sur le camp ; une seule fois (une transaction) ; le voyage refusé sans expédition ; au retour, le récit rangé en « Expédition N » (`grimoire_recit.js`, `ia_master.js`), plus à chaque voyage.
+- **Les suiveurs** : −1 provision par jour (Dextérité), +1 aux tests d'une caractéristique (`atoutExpedition`, fusionné dans `atoutRace`).
+- **Le mode arène (test)** : la case et le choix de son combattant (`grimoire_combats.js`) ; `recomposerCombattants` (`monstres.js`) le suit hors combat du récit.
+- corrections_v483 le vérifie ; corrections_v299, v312, v416_fils, v418_livre lisent « I- Expédition » ; v300 lit l'archive avec le numéro de l'expédition ; v481 place le groupe loin du camp pendant l'expédition ; cap_fatigue découpe `atoutRace` sur 1 400 caractères (il a grandi).
+

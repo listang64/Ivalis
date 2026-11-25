@@ -558,7 +558,8 @@ await section(async () => {
   verifier("le Narrateur ne lit que le livre (les lignes récrites des joueurs)", /function ligneDuLivre\(m\)/.test(ia) && /historiqueReduit\.map\(ligneDuLivre\)/.test(ia));
   // (v408) La pause est levée (« remets en marche les portraits des PNJ nommés ») ; la garde reste.
   verifier("les portraits des PNJ : la pause (v300) est levée en v408, sa garde reste", /window\.PORTRAITS_PNJ_EN_PAUSE = false;/.test(ia) && /if \(!malgreLaPause && window\.PORTRAITS_PNJ_EN_PAUSE !== false\) return "";/.test(ia));
-  verifier("l'archivage range le chapitre dans le livre avant de vider le chat", ia.indexOf("GRIMOIRE_RECIT.archiverChapitre(messages)") > 0 && ia.indexOf("GRIMOIRE_RECIT.archiverChapitre(messages)") < ia.indexOf("// 5. Autodestruction du chat"));
+  // (v483) l'appel porte aussi le numéro de l'expédition (le clan nomade : « Expédition N »).
+  verifier("l'archivage range le chapitre dans le livre avant de vider le chat", ia.indexOf("GRIMOIRE_RECIT.archiverChapitre(messages, { expedition: opts.expedition })") > 0 && ia.indexOf("GRIMOIRE_RECIT.archiverChapitre(messages, { expedition: opts.expedition })") < ia.indexOf("// 5. Autodestruction du chat"));
   verifier("app.js relaie les messages et l'état de la partie au livre, et lance un dé sans la fiche", /window\.livreRecitMessages\(snap\.docs/.test(app) && /window\.livreRecitPartie\(dataPartie\)/.test(app) && /window\.lancerJetPourHeros = async function/.test(app));
   const v = (re) => Number((index.match(re) || [])[1] || 0);
   verifier("le récit dans son propre fichier (grimoire_recit.js, .css), chargé après app.js et les comptes", index.indexOf('src="grimoire_recit.js?v=') > index.indexOf('src="comptes.js?v=') && index.indexOf('src="comptes.js?v=') > index.indexOf('src="app.js?v=') && /grimoire_recit\.css\?v=\d+/.test(index));

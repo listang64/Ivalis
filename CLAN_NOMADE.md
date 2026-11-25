@@ -58,6 +58,7 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
 | 3 — La page du camp | v480 | fait |
 | 4 — Gestion du camp | v481 | fait |
 | 5 — Le temps et la journée du camp | v482 | fait |
+| 6 — Les expéditions | v483 | fait (sauf : jouer un personnage du camp, voir plus bas) |
 
 ## Points ambigus
 
@@ -138,3 +139,27 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
 - **Étape 5, l'entraînement.** L'XP va dans la fiche de la recrue (`XP` d'un héros ou d'un PNJ).
 - **Étape 5, le commerce.** Payé au premier jour (un achat que la caisse ne peut plus payer échoue) ; une vente
   enlève les provisions tout de suite ; les achats attendent le retour de l'expédition (`A_Livrer`).
+- **Étape 6, la page Expédition.** Avec un camp, la double page du Groupe devient celle de l'expédition (sans
+  camp, elle reste l'ancienne page du Groupe). Le sommaire dit « Expédition » dans tous les cas.
+- **Étape 6, « les personnages du camp libres pour tous ».** La liste les montre, sous ses propres personnages,
+  mais on ne peut pas encore les prendre : un PNJ n'a pas de fiche d'aventurier (caractéristiques, compétences,
+  équipement) et le héros d'un autre joueur reste commandé par ce joueur. On ne prend une place qu'avec un de
+  ses personnages ; il devient son héros principal (le héros joué). À reprendre quand un PNJ du camp pourra
+  devenir jouable (recrutement, étape 12 ; mort du héros principal).
+- **Étape 6, le départ et le retour.** L'expédition commence quand un voyage part (ou que le pion quitte
+  l'icône du camp) ; elle finit quand le pion revient sur l'icône du camp sans voyage en cours. On ne peut pas
+  lancer de voyage depuis le camp sans expédition montée, sans personne dedans, ou sans intendant si quelqu'un
+  reste. Partis : ils quittent leur tâche (un commerce pas encore payé est annulé ; l'intendant qui part n'est
+  plus intendant).
+- **Étape 6, le récit.** Avec un camp, le chat n'est plus rangé à chaque départ de voyage : il l'est au retour de
+  l'expédition, en chapitre « Expédition N — titre » (le cimetière des PNJ passe à ce moment-là). Le récit fait
+  au camp entre deux expéditions ouvre le chapitre de l'expédition suivante.
+- **Étape 6, le butin.** Au retour : les provisions qui restent et les achats du commerce rejoignent la réserve.
+  Les drachmes, objets et recrues suivent leurs propres chemins (les récompenses des tâches : étape 10 ; les
+  recrues : étape 12). « Annuler la tâche en cours » au retour : avec le rapport de l'intendant (étape 8).
+- **Étape 6, les bonus des suiveurs.** Dextérité : −1 provision par jour pour l'expédition ; Constitution,
+  Intelligence, Sagesse, Charisme : +1 aux jets de cette caractéristique des héros de l'expédition (comme un
+  atout) ; Force : « +1 équipement porté », affiché, sans effet chiffré (« détail à définir plus tard »).
+- **Étape 6, le mode arène.** Une case « Mode arène (test) » dans la double page des combats ; chacun y choisit
+  son combattant parmi ses personnages ; hors combat du récit, c'est lui qui entre dans l'arène (le héros actif
+  de l'histoire ne change pas).
