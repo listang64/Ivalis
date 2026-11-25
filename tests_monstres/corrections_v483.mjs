@@ -222,8 +222,10 @@ await section(async () => {
   verifier("« Monter l'expédition » : trois places vides, aucun suiveur, 10 provisions prévues", d.Expedition && d.Expedition.Montee && !d.Expedition.En_Cours && d.Expedition.Emplacements.length === 3 && d.Expedition.Emplacements.every(x => x === null) && d.Expedition.Provisions_Prevues === 10, JSON.stringify(d.Expedition));
   await relayer(); await p.waitForTimeout(400);
   await geste('[data-gp="place"][data-i="0"]');
-  const liste = await p.evaluate(() => ({ siens: [...document.querySelectorAll('[data-gp="choisir-perso"]')].map(x => x.dataset.id), camp: [...document.querySelectorAll(".perso-camp-place")].map(x => x.textContent) }));
-  verifier("une place : d'abord ses propres personnages, puis les personnages du camp", liste.siens.join() === "H1,H1B" && liste.camp.length >= 3 && liste.camp.includes("Lyra"), JSON.stringify(liste));
+  // (v490) Les personnages du camp libres pour tous se prennent comme les siens (des boutons) ; le héros d'un autre joueur (Lyra) n'y est pas.
+  const liste = await p.evaluate(() => ({ siens: [...document.querySelectorAll('[data-gp="choisir-perso"]')].filter(x => !x.closest(".camp-place")).map(x => x.dataset.id),
+    camp: [...document.querySelectorAll('.camp-place [data-gp="choisir-perso"]')].map(x => x.dataset.id) }));
+  verifier("une place : d'abord ses propres personnages, puis les personnages du camp", liste.siens.join() === "H1,H1B" && liste.camp.length === 3 && ["PNJ_DEX", "PNJ_SAG", "PNJ_ARA"].every(id => liste.camp.includes(id)) && !liste.camp.includes("H2"), JSON.stringify(liste));
   await geste('[data-gp="choisir-perso"][data-id="H1B"]');
   d = await partie(); await relayer(); await p.waitForTimeout(500);
   verifier("choisir Bran : il prend la place, avec le nom du joueur ; il devient le héros joué", d.Expedition.Emplacements[0] && d.Expedition.Emplacements[0].Perso === "H1B" && d.Expedition.Emplacements[0].Nom_Joueur === "Ben"
