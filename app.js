@@ -3643,6 +3643,8 @@ window.assurerNomAttaqueCompagnon = async function(heros) {
 // Exposée pour les outils (et les bancs) : redessiner le compagnon d'un héros.
 window.genererCompagnonEnArrierePlan = (donnees, idPersonnage) => genererCompagnonEnArrierePlan(donnees, idPersonnage);
 
+// (v491) Le même générateur pour l'avatar de Thémès (camp_avatars.js, refaireTout).
+window.genererPortraitHeros = (donnees) => genererEtStockerPortrait(donnees);
 async function genererEtStockerPortrait(donnees) {
   // 1. Lecture des cles dans le localStorage
   const cles = lireClesApi();

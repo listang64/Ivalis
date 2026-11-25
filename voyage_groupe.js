@@ -51,8 +51,8 @@ import {
     doc, collection, onSnapshot, setDoc, updateDoc, addDoc, deleteField, runTransaction, getDoc
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-const IMAGE_GROUPE_MONDE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1792842687/B713FC3C-F7B3-4C38-B3DA-4040AC5D34F3_bfvzfg.png";
-const IMAGE_GROUPE_REGION = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1792842655/41915054-FA63-4BFF-AEB0-6D95E07E47AA_xtlhvg.png";
+const IMAGE_GROUPE_MONDE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/w_500,c_limit,q_auto,f_auto/v1792842687/B713FC3C-F7B3-4C38-B3DA-4040AC5D34F3_bfvzfg.png";
+const IMAGE_GROUPE_REGION = "https://res.cloudinary.com/dlkjq4kvg/image/upload/w_500,c_limit,q_auto,f_auto/v1792842655/41915054-FA63-4BFF-AEB0-6D95E07E47AA_xtlhvg.png";
 const IMAGE_BOUTON_VOYAGE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1792843931/IMG_2196_ds54xr.png";
 
 const LARGEUR_MONDE = 3840, HAUTEUR_MONDE = 2160;

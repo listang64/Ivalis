@@ -417,8 +417,12 @@ async function ouvrir(options) {
     enRoute = Date.now();
     aller(0);
     await lecture;
+    // (v491) Un membre du camp : son âme par son identifiant (ou celle qui le désigne, un héros) ; jamais un autre PNJ
+    // au nom voisin (« exact »).
+    const parRef = o.id && !ames()[o.id] ? Object.values(ames()).find(x => x && x.ref === o.id) : null;
     if (o.id && ames()[o.id]) await centrer(o.id);
-    else if (o.nom) {
+    else if (parRef) await centrer(parRef.id);
+    else if (o.nom && !o.exact) {
         const t = sansAccent(o.nom), mm = typeof window.memeNomPNJIvalis === "function" ? window.memeNomPNJIvalis : (a, b) => sansAccent(a) === sansAccent(b);
         const a = Object.values(ames()).find(x => sansAccent(x.nom) === t) || Object.values(ames()).find(x => mm(o.nom, x.nom));
         if (a) await centrer(a.id);

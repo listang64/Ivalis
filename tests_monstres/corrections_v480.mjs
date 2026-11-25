@@ -239,7 +239,8 @@ await section(async () => {
     return { ouvert: window.CAMP_SCENE.ouvert(), visible: e.classList.contains("visible"), opacite: getComputedStyle(e).opacity, z: getComputedStyle(e).zIndex,
              livreY: y(getComputedStyle(livre).translate), hauteur: innerHeight, tableOpacite: getComputedStyle(document.getElementById("grimoire-table")).opacity };
   });
-  verifier("à l'ouverture : le livre descend en glissant (la table, elle, reste et s'éteint)", mi.versCamp && mi.glisse && mi.glisse !== "none" && (mi.tableGlisse === "none" || mi.tableGlisse === "" || mi.tableGlisse === "0px"), JSON.stringify(mi));
+  // (v491) « L'écran derrière le livre devient noir, puis le camp apparaît, PUIS le livre se baisse » (corrections_v491).
+  verifier("à l'ouverture : d'abord le noir (la table s'éteint, le livre ne bouge pas encore)", mi.versCamp && (!mi.glisse || mi.glisse === "none" || mi.glisse === "0px") && (mi.tableGlisse === "none" || mi.tableGlisse === "" || mi.tableGlisse === "0px"), JSON.stringify(mi));
   verifier("…le camp n'apparaît qu'après le fondu au noir", !mi.campVisible);
   verifier("à la fin : la page du camp est là, par-dessus le livre ; le livre est sorti par le bas ; la table éteinte",
     r === true && fin.ouvert && fin.visible && Number(fin.opacite) > 0.9 && Number(fin.z) > 30 && fin.livreY >= fin.hauteur && Number(fin.tableOpacite) < 0.05, JSON.stringify(fin));
@@ -315,7 +316,7 @@ await section(async () => {
     return { ouvert: window.CAMP_SCENE.ouvert(), note: document.getElementById("note-camp").textContent, eteint: document.querySelector('[data-camp="deplacer"]').classList.contains("eteint") }; });
   verifier("« Déplacer le camp » sans vote du conseil : refusé, un mot le dit, la page reste", dep.ouvert && /conseil/.test(dep.note) && dep.eteint, JSON.stringify(dep));
   await p.evaluate(() => document.querySelector('[data-camp="flaner"]').click());
-  await p.waitForTimeout(1600);
+  await p.waitForTimeout(2600);   // (v491) le livre remonte, puis le noir, puis la table
   const fl = await p.evaluate(() => ({ ouvert: window.CAMP_SCENE.ouvert(), recit: window.__recit, versCamp: document.getElementById("ecran-grimoire").classList.contains("vers-le-camp"),
     camp: document.getElementById("ecran-camp").classList.contains("affiche"), livreY: getComputedStyle(document.getElementById("grimoire-livre")).translate }));
   verifier("« Flâner dans le camp » : retour au livre (il remonte), sur la page du récit", !fl.ouvert && fl.recit === 1 && !fl.versCamp && !fl.camp && (fl.livreY === "none" || fl.livreY === "0px" || fl.livreY === ""), JSON.stringify(fl));

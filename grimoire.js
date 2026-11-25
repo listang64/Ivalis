@@ -28,14 +28,14 @@
 (function () {
     const IMAGES = {
         // v314 : la nouvelle couverture de Nico (l'ancienne : images/grimoire/couverture.webp).
-        couverture: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793823356/IMG_2214_etfv11.png",
+        couverture: "https://res.cloudinary.com/dlkjq4kvg/image/upload/w_1300,c_limit,q_auto,f_auto/v1793823356/IMG_2214_etfv11.png",
         livre: "images/grimoire/livre_ouvert.webp?v=1",
         page: "images/grimoire/page.webp?v=1",
         // v305 : la table de bois, l'encrier et la plume (l'image de Nico).
         table: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793777473/BG_tjiigl.png",
         // v312 : le fond du sommaire (l'image de Nico), à 20 %, étiré sur la double page.
         // (v397) Nico : « la nouvelle image à mettre en fond de page du sommaire, un peu plus opaque ».
-        sommaire: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1794693462/27006076-F2BA-4D58-A6B1-4CE047FD11C0_bxp3xw.png"
+        sommaire: "https://res.cloudinary.com/dlkjq4kvg/image/upload/w_1100,c_limit,q_auto,f_auto/v1794693462/27006076-F2BA-4D58-A6B1-4CE047FD11C0_bxp3xw.png"
     };
     const LIVRE = { w: 2000, h: 1117 };
     const ZONE = { x: 251, y: 62, w: 1514, h: 984 };       // les deux pages
@@ -156,7 +156,8 @@
         droite: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1793744008/IMG_2207_sz48ll.png"
     };
     // (v335) Sur les pages, une image légère (1600 de large) ; la loupe prend les originaux.
-    const reduite = (url, l) => /\/upload\/[a-z]_/.test(url) ? url : url.replace("/upload/", `/upload/w_${l},c_limit,q_auto,f_auto/`);
+    // (v491) Un lien qui porte déjà q_auto,f_auto (mais pas de largeur) reçoit quand même la sienne.
+    const reduite = (url, l) => /\/upload\/[^/]*\bw_\d/.test(url) ? url : url.replace(/\/upload\/(q_auto,f_auto\/)?/, `/upload/w_${l},c_limit,q_auto,f_auto/`);
     const IMAGES_CARTE_PAGES = { gauche: reduite(IMAGES_CARTE.gauche, 1600), droite: reduite(IMAGES_CARTE.droite, 1600) };
     let pagesCarte = [];
     const pages = {};

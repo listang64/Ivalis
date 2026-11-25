@@ -25,7 +25,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=13";
+import * as CP from "./camp_pur.js?v=14";
 
 const VERROU_MS = 10 * 60 * 1000;
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -39,6 +39,7 @@ export function promptImageCamp(nom, pose, avecReference, description) {
             ? `La première image de référence est le personnage « ${nom} » : redessine-le À L'IDENTIQUE (même visage, même silhouette, même race, même couleur de peau, même coiffure). S'il y a une seconde image, c'est son armure : il la porte, bas compris.`
             : `Dessine le personnage « ${nom} » : ${description || "un habitant du clan"}.`,
         `Le personnage est EN ENTIER, DES PIEDS À LA TÊTE (on voit ses pieds), dans une scène de la vie d'un camp nomade : il est en train de ${pose}.`,
+        "VUE ET APPUIS : le personnage est vu à hauteur d'homme, de face ou de trois quarts ; SES DEUX PIEDS SONT À LA MÊME HAUTEUR, posés sur la même ligne horizontale (le même sol plat), jamais l'un plus haut que l'autre ni en contre-plongée.",
         "Contexte de l'univers : Antique Fantastique (Antiquité magique, mythologie méditerranéenne). Lumière naturelle d'un soleil, chaude et franche.",
         "🛑 RÈGLE TECHNIQUE DÉFINITIVE (PRIORITAIRE) : le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). Aucun décor, aucun sol, aucune ombre portée, aucun dégradé. Les objets de sa pose (une bûche, un seau, une chope…) restent tenus ou posés contre lui. Le fond magenta n'éclaire rien : aucun reflet rose ou violacé sur le personnage. Aucun texte."
     ].join("\n");
@@ -63,6 +64,20 @@ async function dessinerSansReference(prompt) {
     return "";
 }
 
+// (v491) L'image détourée, rognée en haut et en bas au premier pixel visible (les pieds au bord bas de l'image).
+export async function rognerHautBas(url) {
+    try {
+        const img = await new Promise((ok, ko) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => ok(i); i.onerror = ko; i.src = url; });
+        const l = img.naturalWidth, h = img.naturalHeight;
+        const c = document.createElement("canvas"); c.width = l; c.height = h;
+        const x = c.getContext("2d", { willReadFrequently: true });
+        x.drawImage(img, 0, 0);
+        const d = x.getImageData(0, 0, l, h).data;
+        const b = CP.bornesVisibles(l, h, (px, py) => d[(py * l + px) * 4 + 3]);
+        return b && (b.haut > 0 || b.bas < h - 1) ? CP.urlRognee(url, l, b) : url;
+    } catch (e) { console.warn("[Camp] Le rognage de l'image :", e); return url; }
+}
+
 // LES DEUX IMAGES D'UN MEMBRE. `m` : { id, nom, collection ("Personnages" | "Monde_PNJ"),
 // reference (url), armure ({ uid, image } ou null), description }. Rend les deux images, ou null.
 export async function dessinerImagesCamp(m, alea = Math.random) {
@@ -77,7 +92,7 @@ export async function dessinerImagesCamp(m, alea = Math.random) {
         if (!dessin) return null;
         const url = await window.hebergerDetoure(dessin);
         if (!url) return null;
-        images.push({ url, pose });
+        images.push({ url: await rognerHautBas(url), pose });
     }
     return images;
 }
@@ -166,4 +181,40 @@ export async function veiller() {
 }
 setInterval(() => { veiller(); }, 20000);
 
-window.CAMP_AVATARS = { veiller, dessinerImagesCamp, promptImageCamp, gabaritDuCompagnon, oublierPnj };
+// ---------------------------------------------------------------------
+//  (v491) LE BOUTON DEV : THÉMÈS ET TOUTES LES IMAGES DU CAMP REFAITES
+// ---------------------------------------------------------------------
+// Nico : « remplace le bouton DEV provisoire par un bouton qui efface les images de camp de Thémès, lui crée un avatar
+// qui suit le même modèle qu'un personnage joueur, puis refait ses images de camp ; et qui supprime toutes les images
+// de camp des personnages actuels pour les refaire avec les nouvelles directives ». Les images effacées, la veille les
+// refait une à une (un membre à la fois, sur un poste qui a les clés).
+export async function refaireTout(o = {}) {
+    const camp = window.CAMP && window.CAMP.lire ? window.CAMP.lire() : null;
+    if (!idPartie() || !camp) { alerte("Aucun camp dans cette partie."); return null; }
+    if (!o.sansConfirmer && !(typeof window.confirm === "function" && window.confirm("Refaire l'avatar de Thémès, puis effacer et refaire TOUTES les images du camp ?"))) return null;
+    const idT = CP.idThemesDuCamp(camp);
+    const membres = await membresADessiner();
+    const anciennes = [];
+    // 1. Toutes les images du camp effacées (Thémès compris).
+    for (const m of membres) {
+        (Array.isArray(m.images) ? m.images : []).forEach(i => { if (i && i.url) anciennes.push(i.url); });
+        try { await updateDoc(doc(db, m.collection, m.id), { Images_Camp: [], Images_Camp_Armure: "", Images_Camp_En_Cours: 0 }); } catch (e) { console.warn("[Camp] Effacer les images de " + m.nom + " :", e); }
+        oublierPnj(m.id);
+    }
+    if (anciennes.length && typeof window.oublierImages === "function") Promise.resolve(window.oublierImages(anciennes, "images du camp refaites (DEV)")).catch(() => {});
+    // 2. L'avatar de Thémès, comme celui d'un personnage joueur (app.js, genererEtStockerPortrait), d'après sa fiche.
+    let portrait = "";
+    if (idT && typeof window.genererPortraitHeros === "function") {
+        const s = await getDoc(doc(db, "Monde_PNJ", idT));
+        const f = s.exists() ? s.data() : {};
+        portrait = await window.genererPortraitHeros(CP.donneesPortraitThemes(f)).catch(e => { console.error("[Camp] L'avatar de Thémès :", e); return ""; });
+        if (portrait) { await updateDoc(doc(db, "Monde_PNJ", idT), { URL_Cloudinary: portrait }); oublierPnj(idT); }
+    }
+    // 3. La veille refait tout, Thémès d'abord (sa fiche est la première relue).
+    setTimeout(() => { veiller(); }, 500);
+    alerte(`${portrait ? "Thémès a son avatar. " : "L'avatar de Thémès n'a pas pu être fait (clés OpenAI / Cloudinary ?). "}Les images du camp (${membres.length} membres) sont effacées : elles se refont une à une.`);
+    return { portrait, membres: membres.length, effacees: anciennes.length };
+}
+function alerte(t) { console.log("🏕️ [Camp] " + t); try { if (typeof window.alert === "function") window.alert(t); } catch (e) {} }
+
+window.CAMP_AVATARS = { veiller, dessinerImagesCamp, promptImageCamp, gabaritDuCompagnon, oublierPnj, rognerHautBas, refaireTout };

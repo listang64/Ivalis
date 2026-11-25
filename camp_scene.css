@@ -13,12 +13,17 @@
 }
 .ecran-camp.affiche { display: block; }
 .ecran-camp.visible { opacity: 1; }
+.ecran-camp.sans-fondu { transition: none; }
 
-/* LE LIVRE PART (grimoire.js) : la table s'éteint, le fond passe au noir ; le livre glisse (camp_scene.js). */
-#ecran-grimoire.vers-le-camp::before { background: #000; }
+/* LE LIVRE PART (camp_scene.js, v491) : 1. l'écran derrière le livre (la table) devient noir ; 2. le noir s'efface sur
+   le camp, le livre passant devant lui (camp-dessous) ; 3. le livre se baisse ; parti, il ne retient plus rien. */
+#ecran-grimoire.vers-le-camp::before { background: #000; transition: opacity 0.6s ease; }
 #ecran-grimoire .grimoire-table { transition: transform 0.75s cubic-bezier(0.45, 0.05, 0.25, 1), opacity 0.6s ease; }
 #ecran-grimoire.vers-le-camp .grimoire-table { opacity: 0; }
 #ecran-grimoire.vers-le-camp { pointer-events: none; }
+#ecran-grimoire.camp-dessous { z-index: 33; }
+#ecran-grimoire.camp-dessous::before { opacity: 0; }
+#ecran-grimoire.camp-ouvert { visibility: hidden; }
 
 /* LE DÉCOR : un contexte d'empilement, où couches et encarts s'intercalent (z-index posés par le script). */
 .decor-camp { position: absolute; z-index: 0; }
@@ -28,11 +33,16 @@
 
 /* LES ENCARTS : un personnage debout, les pieds au bas de l'encart, jamais plus haut que lui. */
 .encart-camp { position: absolute; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
-.perso-camp { all: unset; box-sizing: border-box; width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center;
-  cursor: pointer; pointer-events: none; }
-.perso-camp img { height: 100%; width: auto; max-width: 100%; object-fit: contain; object-position: 50% 100%; pointer-events: auto; -webkit-user-drag: none;
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35)); transition: filter 0.2s ease, transform 0.2s ease; transform-origin: 50% 100%; }
-.perso-camp:hover img, .perso-camp:focus-visible img { filter: drop-shadow(0 0 6px rgba(255, 230, 170, 0.9)) brightness(1.06); transform: scale(1.03); }
+/* (v491) Ni halo ni grossissement au survol ; le clic se juge au pixel de l'image (camp_scene.js, toucherPerso). */
+.perso-camp { box-sizing: border-box; width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
+.silhouette-camp { position: relative; height: 100%; max-width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.silhouette-camp img { position: relative; z-index: 1; height: 100%; width: auto; max-width: 100%; object-fit: contain; object-position: 50% 100%;
+  pointer-events: none; -webkit-user-drag: none; }
+/* L'ombre au pied : un simple dégradé elliptique (pas de filtre), sous les pieds. */
+.silhouette-camp::after { content: ""; position: absolute; z-index: 0; left: 50%; bottom: 0; width: 78%; height: 7%; transform: translate(-50%, 45%);
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.18) 45%, rgba(0, 0, 0, 0) 72%); pointer-events: none; }
+.perso-camp.compagnon .silhouette-camp::after { width: 70%; height: 9%; }
+.ecran-camp.sur-perso { cursor: pointer; }
 
 /* L'OUTIL DEV DES ENCARTS. */
 .encart-camp.edition { pointer-events: auto; cursor: move; border: 2px dashed rgba(255, 255, 255, 0.85); box-sizing: border-box; touch-action: none; }
@@ -49,8 +59,9 @@
   color: #f3e9d6; font: inherit; cursor: pointer; }
 
 /* LES CINQ BOUTONS, ÉCRITS SUR UNE AQUARELLE. */
-.barre-camp { position: absolute; top: max(14px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 200;
-  display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(4px, 1.2vw, 18px); width: min(calc(100vw - 32px), 1100px); }
+/* (v491) Les boutons s'espacent sur toute la largeur de l'écran. */
+.barre-camp { position: absolute; top: max(14px, env(safe-area-inset-top)); left: 16px; right: 16px; z-index: 200;
+  display: flex; flex-wrap: wrap; justify-content: space-evenly; gap: 6px; }
 .bouton-camp { position: relative; isolation: isolate; background: none; border: 0; padding: 0.55em 1.1em; cursor: pointer;
   font-family: 'Cinzel', 'Almendra', serif; font-weight: 700; font-size: clamp(12px, 1.55vw, 20px); color: #2a170a; letter-spacing: 0.02em;
   text-shadow: 0 0 6px rgba(255, 246, 222, 0.9); transition: transform 0.15s ease; }

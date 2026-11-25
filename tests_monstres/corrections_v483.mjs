@@ -312,15 +312,16 @@ await section(async () => {
   await p.evaluate(async () => { await window.EXPEDITION.areneActive(true); await window.EXPEDITION.choisirPourArene("H1"); });
   await relayer(); await p.waitForTimeout(300);
   const r = await p.evaluate(() => ({ choix: window.__docs["Systeme_Parties/P1"].Arene_Choix, combattants: (window.PERSOS_PARTIE || []).filter(x => x && x.idJoueur).map(x => x.idPersonnage).sort() }));
-  verifier("chacun choisit son combattant de l'arène, indépendamment du héros actif (Thorin pour J1 ; Lyra garde son actif)", r.choix.Actif === true && r.choix.Choix.J1 === "H1" && r.combattants.join() === "H1,H2", JSON.stringify(r));
+  // (v491) Un seul joueur choisit les combattants (trois au plus), parmi tous les personnages : ils remplacent les héros actifs.
+  verifier("le mode arène : les combattants choisis, indépendamment du héros actif (Thorin seul)", r.choix.Actif === true && JSON.stringify(r.choix.Combattants) === '["H1"]' && r.combattants.join() === "H1", JSON.stringify(r));
   await p.evaluate(() => { const d = window.__docs["Systeme_Parties/P1"]; d.Combat_RP = { Etat: "en_cours" }; window.PARTIE_DATA = JSON.parse(JSON.stringify(d)); window.recomposerCombattants(); });
   const rp = await p.evaluate(() => (window.PERSOS_PARTIE || []).filter(x => x && x.idJoueur).map(x => x.idPersonnage).sort().join());
   verifier("…pas pendant le combat du récit (le héros actif de l'histoire combat)", rp === "H1B,H2", rp);
   await p.evaluate(() => { const d = window.__docs["Systeme_Parties/P1"]; delete d.Combat_RP; window.PARTIE_DATA = JSON.parse(JSON.stringify(d)); });
   await p.evaluate(() => window.GRIMOIRE_COMBATS && window.GRIMOIRE_COMBATS.ouvrir && window.GRIMOIRE_COMBATS.ouvrir()); await p.waitForTimeout(2500);
   const ui = await p.evaluate(() => ({ case: !!document.querySelector('[data-combats-arene="actif"]'), coche: (document.querySelector('[data-combats-arene="actif"]') || {}).checked,
-    options: [...document.querySelectorAll('[data-combats-arene="choix"] option')].map(o => o.value).filter(Boolean) }));
-  verifier("la double page des combats : la case du mode arène, et le choix de son combattant parmi les siens", ui.case && ui.coche && ui.options.join() === "H1,H1B", JSON.stringify(ui));
+    options: [...document.querySelectorAll('[data-combats-arene="perso"]')].map(o => o.value + (o.checked ? "*" : "")) }));
+  verifier("la double page des combats : la case du mode arène, et la liste de tous les personnages (v491)", ui.case && ui.coche && ui.options.includes("H1*") && ui.options.includes("H1B") && ui.options.includes("H2"), JSON.stringify(ui));
 });
 
 titre("10. LES VERSIONS");

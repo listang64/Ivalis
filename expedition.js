@@ -21,7 +21,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, runTransaction, updateDoc, deleteField, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=13";
+import * as CP from "./camp_pur.js?v=14";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -235,10 +235,17 @@ export async function areneActive(actif) {
     if (!idPartie()) return "Pas de partie.";
     try { await updateDoc(refPartie(), { "Arene_Choix.Actif": !!actif }); return ""; } catch (e) { return "La base n'a pas répondu."; }
 }
-export async function choisirPourArene(perso) {
+// (v491) Un seul joueur choisit les trois combattants, parmi tous les personnages de la partie.
+export async function choisirPourArene(perso, coche = true) {
     if (!idPartie()) return "Pas de partie.";
-    if (perso && !jouables().includes(perso)) return "Tu ne peux pas jouer ce personnage.";
-    try { await updateDoc(refPartie(), { ["Arene_Choix.Choix." + moi()]: perso || deleteField() }); return ""; } catch (e) { return "La base n'a pas répondu."; }
+    if (perso && !CP.persosArene(persos()).some(h => h.idPersonnage === perso)) return "Ce personnage ne peut pas combattre.";
+    // Lu et écrit d'un coup : deux cases cochées vite ne s'écrasent pas.
+    return modifier((d) => {
+        const actuels = ((d.Arene_Choix || {}).Combattants) || [];
+        if (coche && perso && !actuels.includes(perso) && actuels.length >= CP.MAX_COMBATTANTS_ARENE) return { refus: "Trois combattants au plus." };
+        const l = perso ? CP.choisirCombattantArene(actuels, perso, coche) : [];
+        return { maj: { "Arene_Choix.Combattants": l, "Arene_Choix.Par": moi(), "Arene_Choix.Choix": deleteField() } };
+    });
 }
 
 window.EXPEDITION = { expedition, jouables, jouablesExpedition, incarner, monter, annuler, prendrePlace, quitterPlace, emmener, laisser, reglerProvisions, refusDepart, veiller,

@@ -100,14 +100,17 @@ const idJoueurCombats = () => { try { return localStorage.getItem("ID_JOUEUR_COU
 function htmlModeArene() {
     const X = window.EXPEDITION;
     if (!X || typeof X.choixArene !== "function") return "";
-    const a = X.choixArene() || {}, moi = idJoueurCombats(), siens = X.jouables(moi), choix = (a.Choix || {})[moi] || "";
-    const nom = (id) => { const h = (window.PERSOS_JOUEURS_PARTIE || []).find(x => x && x.idPersonnage === id); return h ? [h.prenom, h.nom].filter(Boolean).join(" ") : id; };
-    const autres = Object.entries(a.Choix || {}).filter(([j, id]) => j !== moi && id).map(([, id]) => nom(id));
+    // (v491) La liste de tous les personnages ; un seul joueur coche les trois combattants (en DEV, il les joue seul).
+    const a = X.choixArene() || {}, R = (window.CAMP && window.CAMP.regles) || {};
+    const tous = R.persosArene ? R.persosArene(window.PERSOS_JOUEURS_PARTIE || []) : [];
+    const choisis = Array.isArray(a.Combattants) ? a.Combattants : [], max = R.MAX_COMBATTANTS_ARENE || 3;
+    const nom = (h) => [h.prenom, h.nom].filter(Boolean).join(" ") || h.idPersonnage;
+    const par = a.Par && typeof window.nomDuJoueurLivre === "function" ? window.nomDuJoueurLivre(a.Par) : "";
     return `<div class="mode-arene-livre">
-        <label class="case-arene-livre"><input type="checkbox" data-combats-arene="actif"${a.Actif ? " checked" : ""}> Mode arène (test) : chacun choisit son combattant</label>
-        ${a.Actif ? `<select class="choix-arene-livre" data-combats-arene="choix"><option value="">— le héros actif de l'histoire —</option>
-            ${siens.map(id => `<option value="${echapper(id)}"${choix === id ? " selected" : ""}>${echapper(nom(id))}</option>`).join("")}</select>
-          ${autres.length ? `<div class="note-encart-combats">Les autres joueurs : ${autres.map(echapper).join(", ")}.</div>` : ""}` : ""}
+        <label class="case-arene-livre"><input type="checkbox" data-combats-arene="actif"${a.Actif ? " checked" : ""}> Mode arène (test) : choisis les ${max} combattants</label>
+        ${a.Actif ? `<div class="liste-arene-livre">${tous.map(h => { const c = choisis.includes(h.idPersonnage);
+              return `<label class="perso-arene-livre"><input type="checkbox" data-combats-arene="perso" value="${echapper(h.idPersonnage)}"${c ? " checked" : ""}${!c && choisis.length >= max ? " disabled" : ""}> ${echapper(nom(h))}${h.classe ? ` <small>${echapper(h.classe)}</small>` : ""}</label>`; }).join("")}</div>
+          <div class="note-encart-combats">${choisis.length}/${max} choisis${par ? ` (par ${echapper(par)})` : ""} ; sans choix, les héros actifs de l'histoire combattent.</div>` : ""}
       </div>`;
 }
 document.addEventListener("change", async (ev) => {
@@ -115,7 +118,7 @@ document.addEventListener("change", async (ev) => {
     if (!el || !window.EXPEDITION) return;
     son();
     if (el.dataset.combatsArene === "actif") await window.EXPEDITION.areneActive(el.checked);
-    else await window.EXPEDITION.choisirPourArene(el.value || null);
+    else if (el.dataset.combatsArene === "perso") await window.EXPEDITION.choisirPourArene(el.value, el.checked);
     setTimeout(() => maj(true), 300);
 });
 

@@ -640,7 +640,7 @@ async function dessinerLaCarte() {
     } catch (e) { console.error("🗺️ [Carte de combat] Dessin impossible :", e); }
     // SANS DESSIN, LE COMBAT A LIEU QUAND MÊME : sur la carte de l'arène.
     const arene = ((await getDoc(refVTT())).data() || {}).Arene_Sauvegarde || {};
-    if (!url) url = arene.URL_Map || "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789076932/arene_s5qs3e.png";
+    if (!url) url = arene.URL_Map || "https://res.cloudinary.com/dlkjq4kvg/image/upload/w_1280,c_limit,q_auto,f_auto/v1789076932/arene_s5qs3e.png";
     const taille = Number(arene.Taille_Hex) || (window.PLATEAU_VTT && window.PLATEAU_VTT.hexSize) || 60;
     const opacite = arene.Opacite_Grille !== undefined ? Number(arene.Opacite_Grille) : 0.8;
     await setDoc(refVTT(), { URL_Map: url, Taille_Hex: taille, Opacite_Grille: opacite,

@@ -171,7 +171,7 @@ function htmlMembre(id, camp, partis, bloque) {
     return `<li class="membre-gestion${parti ? " parti" : ""}" data-membre="${echapper(id)}">
         <button type="button" class="portrait-gestion" data-action="gestion" data-gc="ame" data-id="${echapper(id)}" title="Ses fils invisibles">${portrait}</button>
         <div class="corps-membre-gestion">
-          <div class="ligne-nom-gestion"><button type="button" class="nom-gestion" data-action="gestion" data-gc="ame" data-id="${echapper(id)}">${echapper(nomDe(id, camp))}</button>
+          <div class="ligne-nom-gestion"><button type="button" class="nom-gestion" data-action="gestion" data-gc="fiche" data-id="${echapper(id)}" title="Sa fiche">${echapper(nomDe(id, camp))}</button>
             <span class="qui-gestion">${echapper(qui)} · niv. ${Number(i.niveau) || 1}</span>${camp.Intendant === id ? `<span class="badge-intendant">intendant</span>` : ""}</div>
           <div class="moral-gestion" title="Moral : ${moral}/100 (${echapper(P.effetDuMoral(moral))})${histo ? ` — dernier changement : ${histo.Delta > 0 ? "+" : ""}${histo.Delta}, ${echapper(histo.Raison)}` : ""}">
             <span>Moral</span><span class="barre-moral-gestion${moral < 30 ? " bas" : moral >= 80 ? " haut" : ""}"><i style="width:${moral}%"></i></span><b>${moral}</b></div>
@@ -237,7 +237,16 @@ async function agir(cible) {
     if (gc === "camp") { son(); if (window.CAMP_SCENE) window.CAMP_SCENE.ouvrir(); return; }
     if (gc === "ame") {
         son();
-        if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id, nom: nomDe(id, C().lire()), depuisGestion: true });
+        if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id, nom: nomDe(id, C().lire()), depuisGestion: true, exact: true });
+        return;
+    }
+    // (v491) Son nom : sa fiche de personnage (un héros, ou un personnage du camp qui a sa fiche d'aventurier) ; un PNJ
+    // qui n'en a pas encore : ses fils invisibles.
+    if (gc === "fiche") {
+        son();
+        const aSaFiche = (window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || []).some(h => h && h.idPersonnage === id);
+        if (aSaFiche && window.GRIMOIRE_FICHES) { window.GRIMOIRE_FICHES.ouvrir(id); return; }
+        if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id, nom: nomDe(id, C().lire()), depuisGestion: true, exact: true });
         return;
     }
     if (gc === "recruter-groupe" || gc === "acheter") {

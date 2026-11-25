@@ -116,11 +116,12 @@ const clic = () => { if (typeof window.jouerSonClic === "function") window.jouer
 // (v335) 3072 de large (4096 avant) : sur iPad, une carte en portrait de 4096 pesait
 // près de 90 Mo une fois décodée, et le livre en porte plusieurs. Les positions sont
 // toutes en fractions de l'image : rien ne bouge.
-const reduireCloudinary = (url, l) => (!url || !/res\.cloudinary\.com\/.+\/upload\//.test(url) || /\/upload\/[a-z]_/.test(url))
-    ? url : url.replace("/upload/", `/upload/w_${l},c_limit,q_auto,f_auto/`);
+// (v491) Un lien qui porte déjà q_auto,f_auto (v475) mais pas de largeur reçoit quand même la sienne (avant, il passait tel quel).
+const reduireCloudinary = (url, l) => (!url || !/res\.cloudinary\.com\/.+\/upload\//.test(url) || /\/upload\/[^/]*\bw_\d/.test(url))
+    ? url : url.replace(/\/upload\/(q_auto,f_auto\/)?/, `/upload/w_${l},c_limit,q_auto,f_auto/`);
 window.urlImageCarteRegionale = (url) => reduireCloudinary(url, 3072);
-// (v335) L'image posée sur la page du livre : une demi-page, 1400 de large suffit.
-window.urlPageCarteRegionale = (url) => reduireCloudinary(url, 1400);
+// (v335) L'image posée sur la page du livre : une demi-page, 1400 de large suffit. (v491) 900 : nette sur un écran de PC.
+window.urlPageCarteRegionale = (url) => reduireCloudinary(url, 900);
 window.reduireImageCloudinaryIvalis = reduireCloudinary;
 
 // --- LES FICHES ------------------------------------------------------------

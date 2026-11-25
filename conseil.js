@@ -19,7 +19,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, addDoc, collection, query, where, onSnapshot, runTransaction, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=13";
+import * as CP from "./camp_pur.js?v=14";
 
 const PARTIES = "Systeme_Parties";
 export const ATTENTE_IA_MS = 6000;
@@ -42,13 +42,14 @@ function monHeros() {
     const id = CP.herosPrincipal(moi(), persos(), choix);
     return persos().find(h => h.idPersonnage === id) || null;
 }
-// Les PNJ du conseil : les membres restés au camp, hors héros des joueurs (Thémès anime).
-function pnjsDuConseil() {
+// Les PNJ du conseil (v491, camp_pur.js) : les membres restés au camp, hors Thémès (il anime) et hors héros principaux
+// des joueurs connectés ; les héros secondaires et ceux des joueurs absents parlent comme des PNJ.
+async function pnjsDuConseil() {
     const c = camp();
     if (!c) return [];
-    const heros = new Set(persos().map(h => h.idPersonnage));
+    const connectes = window.CAMP && window.CAMP.joueursConnectes ? await window.CAMP.joueursConnectes() : new Set([moi()]);
     const partis = (((window.PARTIE_DATA || {}).Expedition || {}).Membres || []);
-    return Object.keys(c.Membres || {}).filter(id => !heros.has(id) && !CP.estThemes(id, c.Membres[id]) && !partis.includes(id)).map(id => ({ id, nom: nomMembre(id) }));
+    return CP.pnjsDuConseil(c, persos(), (window.PARTIE_DATA || {}).Heros_Principaux || {}, connectes, partis).map(id => ({ id, nom: nomMembre(id) }));
 }
 
 // ---------------------------------------------------------------------
@@ -246,7 +247,7 @@ export async function repondre() {
         if (!pris) { planifierIA(ATTENTE_IA_MS * 2); return null; }
         await lireInfos();
         const ames = {};
-        const pnjs = pnjsDuConseil();
+        const pnjs = await pnjsDuConseil();
         await Promise.all(pnjs.map(async (p) => { try { const s = await getDoc(doc(db, PARTIES, idPartie(), "Ames", p.id)); if (s.exists()) ames[p.id] = s.data(); } catch (e) {} }));
         const cmp = camp() || {};
         const prompt = CP.promptConseil({

@@ -203,9 +203,11 @@ window.recomposerCombattants = function() {
     // (v483) LE MODE ARÈNE (test, le clan nomade) : « avant chaque combat, choisir le personnage de chaque joueur,
     // indépendamment du personnage actif de l'histoire » — hors combat du récit, le choix de chacun remplace son actif.
     const arene = (window.PARTIE_DATA || {}).Arene_Choix, crp = (window.PARTIE_DATA || {}).Combat_RP;
+    // (v491) Un seul joueur choisit les trois combattants, parmi tous les personnages (camp_pur.js, combattantsArene).
     if (arene && arene.Actif && !(crp && ["preparation", "en_cours", "narration"].includes(crp.Etat))) {
-        const choix = arene.Choix || {};
-        joueurs = (window.PERSOS_JOUEURS_PARTIE || []).filter(p => choix[p.idJoueur] ? p.idPersonnage === choix[p.idJoueur] : p.actif !== false);
+        const choisis = window.CAMP && window.CAMP.regles && window.CAMP.regles.combattantsArene
+            ? window.CAMP.regles.combattantsArene(arene, window.PERSOS_JOUEURS_PARTIE || []) : null;
+        if (choisis) joueurs = choisis.map(p => p.actif === false ? { ...p, actif: true } : p);   // un héros au repos combat quand même (le pilote le commande)
     }
     const monstres = window.MONSTRES_PARTIE || [];
     const fraiches = [...joueurs, ...monstres];

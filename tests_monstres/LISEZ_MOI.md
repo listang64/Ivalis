@@ -12737,3 +12737,13 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Le héros principal mort** : sans personnage à soi, « Mon héros principal » propose les personnages du camp (`herosPrincipal`, `htmlChoixHeros`, `definirHerosPrincipal`).
 - **Le camp à la création de la partie** (`app.js` : `Camp_A_Creer` ; `camp.js` : `creerCampAuto`, `regionAuHasard`) : une transaction, une région au hasard, le groupe qui en part ; les héros arrivés après reçoivent le lien de Thémès, la recrue du clan est libre pour tous (`rattraperMembres`).
 - corrections_v490 le vérifie.
+
+## v491 — Le camp, ses images et ses finitions ; les images allégées ; le conseil ; l'arène
+
+- **Les images allégées** : une largeur maximale au lien (pions du groupe 500, arène 1280, voile de tour 1000, couverture 1300, fond du sommaire 1100, page de carte régionale 900) ; `reduireCloudinary` (`cartes_regionales.js`) et `reduite` (`grimoire.js`) donnent enfin leur largeur aux liens déjà « q_auto,f_auto ». Le village et le Hall n'étaient déjà plus chargés (v477).
+- **La page du camp** (`camp_scene.js`, `camp_scene.css`) : les encarts de Nico (`ENCARTS_DEFAUT`) ; la transition « le noir, puis le camp, PUIS le livre se baisse » et l'inverse (`vers-le-camp`, `camp-dessous`, `camp-ouvert`) ; les avatars préparés et décodés pendant le noir (`precharger`), en q_auto,f_auto (`urlCamp`) ; ni halo ni zoom ; une ombre en dégradé au pied (`.silhouette-camp::after`) ; le clic au pixel (`toucherPerso`) ; les boutons étalés (`space-evenly`) ; les encarts du compagnon dans l'outil DEV.
+- **Les images en scène** (`camp_avatars.js`) : les deux pieds à la même hauteur (prompt) ; rognées en haut et en bas (`rognerHautBas`, `camp_pur.js` : `bornesVisibles`, `urlRognee`) ; le bouton DEV (`refaireTout`) : l'avatar de Thémès par le générateur des héros (`app.js`, `genererPortraitHeros` ; `donneesPortraitThemes`), puis toutes les images du camp effacées et refaites.
+- **La gestion** (`grimoire_gestion.js`) : l'image ouvre les fils invisibles (l'âme exacte : `grimoire_liens.js`, `exact`, `ref`), le nom la fiche.
+- **Le conseil** (`camp_pur.js` : `pnjsDuConseil`) : les héros secondaires et ceux des joueurs absents y parlent comme des PNJ.
+- **L'arène (test)** (`camp_pur.js` : `persosArene`, `choisirCombattantArene`, `combattantsArene` ; `expedition.js`, `monstres.js`, `grimoire_combats.js`) : un joueur coche les trois combattants parmi tous les personnages.
+- corrections_v491 le vérifie.

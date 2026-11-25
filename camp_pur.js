@@ -1185,3 +1185,59 @@ export function regionAuHasard(cartes, jouable = () => true, alea = Math.random)
     const n = Object.keys(cartes || {}).map(Number).filter(k => k > 0 && cartes[k] && cartes[k].image && jouable(k));
     return n.length ? n[Math.min(n.length - 1, Math.floor(alea() * n.length))] : 0;
 }
+
+// =========================================================================
+//  (v491) LES IMAGES DU CAMP ROGNÉES EN HAUT ET EN BAS
+// =========================================================================
+// « Une fois créée, un algo coupe l'image en haut et en bas pour mettre à bord d'image le premier pixel visible. »
+// `alpha(x, y)` : l'opacité (0 à 255) du pixel. Rend { haut, bas } (les lignes visibles extrêmes), ou null (image vide).
+export function bornesVisibles(l, h, alpha, seuil = 16) {
+    const ligneVisible = (y) => { for (let x = 0; x < l; x++) if (alpha(x, y) > seuil) return true; return false; };
+    let haut = 0; while (haut < h && !ligneVisible(haut)) haut++;
+    if (haut >= h) return null;
+    let bas = h - 1; while (bas > haut && !ligneVisible(bas)) bas--;
+    return { haut, bas };
+}
+// Le lien Cloudinary de l'image rognée (une transformation, rien à réenvoyer), compressée.
+export function urlRognee(url, largeur, b) {
+    if (!b || !/res\.cloudinary\.com\/.+\/upload\//.test(url || "")) return url;
+    return url.replace(/\/upload\/(q_auto,f_auto\/)?/, `/upload/c_crop,x_0,y_${b.haut},w_${largeur},h_${b.bas - b.haut + 1}/q_auto,f_auto/`);
+}
+// Les données du portrait de Thémès pour le générateur des héros (app.js, genererEtStockerPortrait), d'après sa fiche.
+export function donneesPortraitThemes(f = {}) {
+    return {
+        race: f.Race || THEMES.race, genre: f.Genre || "Homme", age: f.Age_Apparent || f.Age || "un vieil homme",
+        corpulence: f.Corpulence || "", peau: f.Teint_Peau || "", cheveux: f.Coupe_De_Cheveux || f.Cheveux || "", yeux: f.Yeux || "",
+        pilosite: f.Pilosite_Faciale || "", expression: f.Expression_Du_Visage || "sage et bienveillante",
+        signes: [f.Description_Physique || THEMES.physique, f.Signes_Distinctif || ""].filter(Boolean).join(" "),
+        style: (f.Tenue && (f.Tenue.nom || f.Tenue.Nom)) || f.Style_Vestimentaire || "une tunique de laine simple de vieux conteur",
+        couleursDom: f.Couleurs_Dominante || "", urlCloudinary: f.URL_Cloudinary || ""
+    };
+}
+
+// (v491) LES PNJ DU CONSEIL : les membres restés au camp, sauf Thémès (il anime) et les héros principaux des joueurs
+// connectés (ils parlent eux-mêmes). « Tout personnage de joueur qui n'est pas utilisé est traité comme un PNJ » : les
+// héros secondaires, et les héros des joueurs absents, y prennent part.
+export function pnjsDuConseil(camp, persos, choix, connectes, partis = []) {
+    const membres = (camp && camp.Membres) || {};
+    const joues = new Set([...(connectes || [])].map(j => herosPrincipal(j, persos, choix)).filter(Boolean));
+    return Object.keys(membres).filter(id => !estThemes(id, membres[id]) && !partis.includes(id) && !joues.has(id));
+}
+
+// (v491) LE MODE ARÈNE (test) : « la liste de tous les personnages, et un seul joueur choisit les 3 personnages avec qui
+// combattre (il peut combattre seul en mode DEV) ». `persos` : les personnages de la partie ; rend les combattants choisis.
+export const MAX_COMBATTANTS_ARENE = 3;
+export function persosArene(persos) {
+    return (persos || []).filter(h => h && h.idPersonnage && !h.estIllusion && !h.estMonstre && !h.estTotem && h.statut !== "Mort");
+}
+export function choisirCombattantArene(combattants, id, coche) {
+    const l = (combattants || []).filter(Boolean).filter(x => x !== id);
+    if (coche) l.push(id);
+    return l.slice(0, MAX_COMBATTANTS_ARENE);
+}
+export function combattantsArene(arene, persos) {
+    const ids = (arene && arene.Actif && Array.isArray(arene.Combattants)) ? arene.Combattants.slice(0, MAX_COMBATTANTS_ARENE) : [];
+    if (!ids.length) return null;
+    return persosArene(persos).filter(h => ids.includes(h.idPersonnage));
+}
+

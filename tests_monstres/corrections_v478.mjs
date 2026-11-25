@@ -182,7 +182,9 @@ await section(async () => {
   const bouton = await p.evaluate(() => { const b = document.getElementById("btn-camp-dev"), r = document.getElementById("btn-regions-dev");
     return { existe: !!b, voisin: !!(b && r && b.parentNode === r.parentNode), visible: !!(b && b.getBoundingClientRect().width > 0) }; });
   verifier("un bouton DEV, à côté de celui des régions, visible en mode DEV", bouton.existe && bouton.voisin && bouton.visible, JSON.stringify(bouton));
-  await p.click("#btn-camp-dev"); await p.waitForTimeout(600);
+  // (v491) Le bouton DEV refait désormais l'avatar de Thémès et les images du camp (corrections_v491) ; le camp, lui,
+  // naît avec la partie (v490) : sa création se vérifie ici par la fonction.
+  await p.evaluate(() => window.CAMP.creerCampDev()); await p.waitForTimeout(600);
   const d = await p.evaluate(() => ({ partie: window.__docs["Systeme_Parties/P1"], fiche: window.__docs["Monde_PNJ/PNJ_THEMES_P1"], ame: window.__docs["Systeme_Parties/P1/Ames/PNJ_THEMES_P1"],
     l1: window.__docs["Systeme_Parties/P1/Liens/PNJ_THEMES_P1~H1"], l2: window.__docs["Systeme_Parties/P1/Liens/PNJ_THEMES_P1~H2"], l3: window.__docs["Systeme_Parties/P1/Liens/PNJ_THEMES_P1~H3"],
     places: window.__places, ressources: window.__ressources, alertes: window.__alertes }));
