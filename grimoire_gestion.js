@@ -101,6 +101,7 @@ function htmlGauche() {
         </select>
         ${manque ? `<p class="avis-gestion">Il faut un intendant dès qu'un personnage reste au camp.</p>` : ""}
         ${camp.Conseil_Extraordinaire ? `<p class="avis-gestion">Un conseil extraordinaire doit se réunir : ${echapper(camp.Conseil_Extraordinaire.Raison || "")}</p>` : ""}
+        ${(camp.Sujets_Conseil || []).length ? `<p class="avis-gestion">Le prochain conseil devra en parler : ${(camp.Sujets_Conseil || []).map(x => echapper(x.Texte || "")).join(" ")}</p>` : ""}
         ${htmlJournal(camp)}
         ${estDev() ? `<button type="button" class="lien-dev jour-dev-gestion" data-action="gestion" data-gc="jour-dev">Faire passer un jour au camp (DEV)</button>` : ""}
         <p class="note-gestion${note.texte && Date.now() - note.le < 4000 ? " visible" : ""}" aria-live="polite">${echapper(note.texte)}</p>

@@ -2229,7 +2229,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=373"></script>
+<script src="trace_combat.js?v=374"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2296,12 +2296,12 @@
 <!-- LE CHEF D'ORCHESTRE : le seul fichier qui voie toutes les pièces. -->
 <script type="module" src="regime_cerveau.js?v=58"></script>
 <!-- LES FILS INVISIBLES (v411) : les âmes des PNJ et des héros, leurs liens (social_pur.js calcule). -->
-<script type="module" src="social.js?v=16"></script>
+<script type="module" src="social.js?v=17"></script>
 <!-- LA COMPAGNIE (v418) : les PNJ qui suivent le groupe (groupe_pur.js calcule). -->
 <script type="module" src="groupe.js?v=7"></script>
 <!-- LES RENCONTRES RÉCENTES (v421) : les types de rencontre des derniers chapitres, pour que le Narrateur varie. -->
 <script type="module" src="rencontres_recit.js?v=1"></script>
-<script type="module" src="ia_master.js?v=51"></script>
+<script type="module" src="ia_master.js?v=52"></script>
 <script type="module" src="illustrations_recit.js?v=19"></script>
 <script type="module" src="app.js?v=193"></script>
 <!-- Les comptes des joueurs (v259) : connexion, inscription, validation. -->
@@ -2345,14 +2345,16 @@
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
 <script type="module" src="environnement_mj.js?v=6"></script>
 <!-- LE CAMP DU CLAN NOMADE (v478) : ses règles (camp_pur.js), sa place, Thémès, le bouton DEV. -->
-<script type="module" src="camp.js?v=6"></script>
+<script type="module" src="camp.js?v=7"></script>
 <!-- LA PAGE DU CAMP (v480) : les images en scène des membres (camp_avatars.js), l'image en 9 couches et ses encarts (camp_scene.js). -->
-<script type="module" src="camp_avatars.js?v=4"></script>
-<script type="module" src="camp_scene.js?v=4"></script>
+<script type="module" src="camp_avatars.js?v=5"></script>
+<script type="module" src="camp_scene.js?v=5"></script>
 <!-- LA GESTION DU CAMP (v481) : la double page du livre (la caisse, les provisions, le bilan, les tâches, l'intendant). -->
-<script type="module" src="grimoire_gestion.js?v=2"></script>
+<script type="module" src="grimoire_gestion.js?v=3"></script>
 <!-- LES EXPÉDITIONS (v483) : monter l'expédition, ses places et ses suiveurs, son départ et son retour, le mode arène. -->
-<script type="module" src="expedition.js?v=1"></script>
+<script type="module" src="expedition.js?v=2"></script>
+<!-- LE RETOUR AU CAMP (v484) : les événements, les affinités, le rapport de l'intendant. -->
+<script type="module" src="retour_camp.js?v=1"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->
 <script src="poi_catalogue.js?v=1"></script>
 <script type="module" src="poi_creation.js?v=6"></script>

@@ -59,6 +59,8 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
 | 4 — Gestion du camp | v481 | fait |
 | 5 — Le temps et la journée du camp | v482 | fait |
 | 6 — Les expéditions | v483 | fait (sauf : jouer un personnage du camp, voir plus bas) |
+| 7 — Thémès dans le récit | v484 | fait |
+| 8 — Le retour au camp | v484 | fait |
 
 ## Points ambigus
 
@@ -163,3 +165,24 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
 - **Étape 6, le mode arène.** Une case « Mode arène (test) » dans la double page des combats ; chacun y choisit
   son combattant parmi ses personnages ; hors combat du récit, c'est lui qui entre dans l'arène (le héros actif
   de l'histoire ne change pas).
+- **Étape 7, Thémès.** Dès que le clan a un camp, le narrateur reçoit une consigne qui passe devant « qui tu es
+  reste flou » : il est Thémès (nom, âge, caractère, son manuscrit), il parle et agit dans la scène, ne combat
+  jamais, ne peut être ni blessé ni tué, et après une défaite il raconte depuis sa cachette. Les parties sans camp
+  gardent l'ancien narrateur. Le cerveau de la base (INST_10895), s'il existe, reste la base ; la consigne de
+  Thémès s'y ajoute.
+- **Étape 8, quand.** Le poste qui clôt l'expédition fait le retour, une fois le récit de l'expédition rangé
+  (le rapport ouvre donc la page suivante du livre). Ceux qui sont restés au camp : les membres qui n'étaient pas
+  de l'expédition (Thémès à part).
+- **Étape 8, les affinités.** Pour chaque paire restée au camp : ceux qui avaient la même tâche gagnent de la
+  familiarité (1 par jour, 15 au plus), de l'attachement et de la confiance selon leur compatibilité ; ceux qui
+  ont seulement partagé les repas, moitié moins de familiarité et un peu d'attachement. La compatibilité vient de
+  la psyché (empathie et sociabilité proches, deux âmes tendres, deux orgueils qui se heurtent, l'impulsivité) et
+  du moral. Écrit dans les fils invisibles comme un événement discret « la vie du camp ».
+- **Étape 8, les événements.** Par tranche de 3 jours, une chance sur trois : une tempête (2 à 5 provisions
+  gâchées), une fièvre (−5 de moral à un membre), une bête qui rôde (−2 à tous, jamais d'attaque), un voyageur qui
+  veut rejoindre le clan (un sujet pour le prochain conseil, `Camp.Sujets_Conseil`).
+- **Étape 8, le rapport.** Une page de Thémès où l'intendant parle (entre guillemets) : le journal des jours
+  écoulés, les événements, les ressources, le moral, et une ou deux petites scènes par tranche de 3 jours. Sans
+  clé Gemini, un rapport court à partir du journal. Il est gardé dans `Camp.Dernier_Rapport`. Pas d'intendant
+  nommé : le premier membre resté au camp parle.
+- **Étape 8, « annuler la tâche en cours ».** Avec la tâche en cours (étape 10).

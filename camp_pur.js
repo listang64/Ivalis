@@ -717,3 +717,85 @@ export function retourExpedition(d, o = {}) {
     c2.Dernier_Retour = resume;
     return { Camp: c2, resume };
 }
+
+// =========================================================================
+//  (v484) THÉMÈS DANS LE RÉCIT (étape 7) ET LE RETOUR AU CAMP (étape 8)
+// =========================================================================
+// Ce que le narrateur reçoit quand le clan a un camp : il est Thémès (le document, « Thémès, le narrateur »).
+export const CONSIGNES_THEMES = `TU ES THÉMÈS (cette consigne passe devant « qui tu es reste volontairement flou ») :
+- Tu t'appelles Thémès : un vieil homme humain, sage et bienveillant, le premier membre du clan nomade. Tu pars toujours avec l'expédition, et c'est toi qui écris l'histoire de l'ordre d'Ivalis dans ton manuscrit : le livre que lisent les joueurs.
+- Tu fais partie du récit : tu parles, tu interagis avec le groupe et avec ce qui l'entoure (tu conseilles, tu plaisantes, tu interroges un PNJ, tu remarques un détail) ; les PNJ te voient et peuvent te répondre. Tu ne décides jamais à la place d'un héros.
+- Tu aimes profondément les héros dont tu écris l'histoire.
+- Tu ne te bats jamais : quand les armes sortent, tu te mets à l'abri pour observer et écrire. Tu ne peux être ni blessé ni tué.
+- Si le groupe a perdu un combat, tu es resté caché pendant la bataille et tu continues d'écrire : raconte la suite depuis ta cachette, puis comment tu rejoins les héros.`;
+
+// LES AFFINITÉS AU RETOUR : « deux personnages qui partagent une tâche ou un repas se rapprochent ou s'éloignent
+// selon leur psyché (empathie, tempérament, valeurs) et leur moral ». `e` : { presents (ceux restés au camp),
+// taches ({ id: tâche }), jours, psyches ({ id: { traits } }), moraux ({ id: moral }) }. Rend [{ de, vers, axes }].
+export function compatibilite(psA, psB, moralA = 60, moralB = 60) {
+    const ta = ((psA || {}).traits) || {}, tb = ((psB || {}).traits) || {};
+    const v = (t, k) => (Number.isFinite(Number(t[k])) ? Number(t[k]) : 50);
+    const ressemblance = 1 - (Math.abs(v(ta, "empathie") - v(tb, "empathie")) + Math.abs(v(ta, "sociabilite") - v(tb, "sociabilite"))) / 200;
+    let c = ressemblance - 0.5;
+    c += (v(ta, "empathie") + v(tb, "empathie") - 100) / 200;          // deux âmes tendres s'accordent mieux
+    if (v(ta, "orgueil") >= 70 && v(tb, "orgueil") >= 70) c -= 0.6;    // deux orgueils se heurtent
+    if (v(ta, "impulsivite") >= 70 || v(tb, "impulsivite") >= 70) c -= 0.15;
+    const m = ((Number(moralA) || 0) + (Number(moralB) || 0)) / 2;
+    if (m >= 60) c += 0.2; else if (m < 30) c -= 0.3;
+    return Math.max(-1, Math.min(1, c));
+}
+export function evolutionAffinites(e) {
+    const ids = (e.presents || []).filter(Boolean), jours = Math.max(0, Number(e.jours) || 0), out = [];
+    if (!jours) return out;
+    const j = Math.min(jours, 15);
+    for (let a = 0; a < ids.length; a++) for (let b = a + 1; b < ids.length; b++) {
+        const A = ids[a], B = ids[b], ta = (e.taches || {})[A], tb = (e.taches || {})[B];
+        const ensemble = !!ta && ta === tb;
+        const c = compatibilite((e.psyches || {})[A], (e.psyches || {})[B], (e.moraux || {})[A], (e.moraux || {})[B]);
+        const axes = { familiarite: ensemble ? j : Math.round(j / 2), attachement: Math.round(c * j / (ensemble ? 3 : 6)) };
+        if (ensemble) axes.confiance = Math.round(c * j / 6);
+        Object.keys(axes).forEach(k => { if (!axes[k]) delete axes[k]; });
+        if (!Object.keys(axes).length) continue;
+        out.push({ de: A, vers: B, axes: { ...axes }, ensemble }, { de: B, vers: A, axes: { ...axes }, ensemble });
+    }
+    return out;
+}
+// « Tous les 3 jours passés, une ou deux scènes courtes. »
+export function nombreDeScenes(jours, alea = Math.random) {
+    let n = 0;
+    for (let k = 0; k < Math.floor((Number(jours) || 0) / 3); k++) n += alea() < 0.5 ? 1 : 2;
+    return n;
+}
+// « Des événements — un voyageur se présente, une bête rôde, une maladie touche le camp, une tempête gâche les
+// provisions. Certains attendent la décision du conseil. » « Le camp n'est jamais attaqué en l'absence des joueurs. »
+// Par tranche de 3 jours, une chance sur trois. Rend [{ type, texte, provisions, moral: [{ id, delta, raison }], conseil }].
+export const CHANCE_EVENEMENT = 1 / 3;
+export function evenementsDuCamp(jours, presents, alea = Math.random, noms = {}) {
+    const ids = (presents || []).filter(Boolean), out = [];
+    if (!ids.length) return out;
+    const un = () => ids[Math.floor(alea() * ids.length) % ids.length];
+    const nom = (id) => noms[id] || id;
+    for (let k = 0; k < Math.floor((Number(jours) || 0) / 3); k++) {
+        if (alea() >= CHANCE_EVENEMENT) continue;
+        const t = Math.floor(alea() * 4) % 4;
+        if (t === 0) { const perte = 2 + Math.floor(alea() * 4); out.push({ type: "tempete", texte: `Une tempête a gâché ${perte} provisions.`, provisions: -perte, moral: [] }); }
+        else if (t === 1) { const id = un(); out.push({ type: "maladie", texte: `Une fièvre a cloué ${nom(id)} au lit quelques jours.`, provisions: 0, moral: [{ id, delta: -5, raison: "une fièvre" }] }); }
+        else if (t === 2) out.push({ type: "bete", texte: "Une bête a rôdé autour du camp plusieurs nuits, sans oser approcher.", provisions: 0, moral: ids.map(id => ({ id, delta: -2, raison: "une bête qui rôde" })) });
+        else out.push({ type: "voyageur", texte: "Un voyageur s'est présenté au camp et demande à rejoindre le clan : le conseil en décidera.", provisions: 0, moral: [], conseil: true });
+    }
+    return out;
+}
+// LE RAPPORT DE L'INTENDANT : « au retour, l'intendant raconte en RP ce qui s'est passé au camp depuis le départ :
+// les ressources, le moral et les scènes marquantes. Un seul compte rendu. »
+export function promptRapportIntendant(o) {
+    return [
+        `Tu écris une page du livre d'Ivalis (Antiquité fantastique), de la main de Thémès, le vieux narrateur du clan nomade. L'expédition ${o.numero || ""} rentre au camp après ${o.jours} jour${o.jours > 1 ? "s" : ""}.`,
+        `${o.intendant}, l'intendant resté au camp, fait son rapport aux héros (${(o.heros || []).join(", ") || "les aventuriers"}) : c'est lui qui parle, entre guillemets « », avec sa façon d'être (${o.caractere || "à sa manière"}). Thémès écrit la scène autour, à la première personne.`,
+        `Ce que le camp a vécu (le journal, jour après jour) :\n${(o.journal || []).map(l => "- " + l).join("\n") || "- rien de notable"}`,
+        o.evenements && o.evenements.length ? `Les événements :\n${o.evenements.map(x => "- " + x).join("\n")}` : "",
+        `Les ressources : ${o.caisse} drachmes dans la caisse, ${o.provisions} provisions${o.jauge != null ? `, les alentours à ${o.jauge}/100` : ""}.`,
+        o.moraux && o.moraux.length ? `Le moral : ${o.moraux.join(" ; ")}.` : "",
+        o.scenes ? `Glisse ${o.scenes} petite${o.scenes > 1 ? "s" : ""} scène${o.scenes > 1 ? "s" : ""} de la vie du camp racontée${o.scenes > 1 ? "s" : ""} par l'intendant (une dispute en cuisine, une amitié née à la chasse, une confidence au coin du feu…), avec les membres restés au camp : ${(o.presents || []).join(", ")}.` : "",
+        "Pas de combat : le camp n'a pas été attaqué. N'invente pas de chiffres autres que ceux donnés. 3 à 6 paragraphes, en prose, au présent, sans titre ni liste ni mise en forme."
+    ].filter(Boolean).join("\n\n");
+}

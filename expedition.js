@@ -21,7 +21,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, runTransaction, updateDoc, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=6";
+import * as CP from "./camp_pur.js?v=7";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -158,10 +158,11 @@ async function revenir() {
         if (!r) return null;
         console.log(`⛺ [Expédition] L'expédition ${r.Numero} rentre au camp après ${r.Jours} jour(s).`);
         // Ce poste-ci a clos l'expédition : son récit se range dans le livre (« Expédition N »).
-        if (typeof window.nettoyerChatVoyage === "function") {
-            Promise.resolve(window.nettoyerChatVoyage({ expedition: r.Numero, cimetiere: true })).catch(e => console.error("[Expédition] L'archive du récit :", e));
-        }
-        try { window.dispatchEvent(new CustomEvent("ivalis-retour-expedition", { detail: r })); } catch (e) {}
+        const archive = typeof window.nettoyerChatVoyage === "function"
+            ? Promise.resolve(window.nettoyerChatVoyage({ expedition: r.Numero, cimetiere: true })).catch(e => console.error("[Expédition] L'archive du récit :", e))
+            : Promise.resolve();
+        // Le retour au camp (retour_camp.js) attend que le récit soit rangé : le rapport de l'intendant ouvre la page suivante.
+        try { window.dispatchEvent(new CustomEvent("ivalis-retour-expedition", { detail: { ...r, archive } })); } catch (e) {}
         return { retour: r };
     } catch (e) { console.error("[Expédition] Le retour :", e); return null; }
     finally { occupe = false; }

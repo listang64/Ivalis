@@ -642,6 +642,36 @@ export async function ajusterLien(p, de, vers, valeurs) {
     return { numero, changements };
 }
 
+// (v484) LA VIE DU CAMP (le clan nomade, camp_pur.js, evolutionAffinites) : au retour d'une expédition, les liens
+// entre ceux qui sont restés au camp évoluent d'un coup. `ecarts` : [{ de, vers, axes: { axe: +n } }] (des écarts,
+// pas des valeurs). Un seul événement social, discret, les porte.
+export async function ajusterLiensDuCamp(p, ecarts, resume) {
+    if (!p || !Array.isArray(ecarts) || !ecarts.length) return 0;
+    const etatSnap = await getDoc(refEtat(p));
+    const e = etatSnap.exists() ? etatSnap.data() : {};
+    const numero = P.nombre(e.compteur) + 1, texte = resume || "La vie du camp pendant l'expédition.";
+    const lot = writeBatch(db), changements = [];
+    for (const x of ecarts) {
+        const refL = refLien(p, x.de, x.vers), sl = await getDoc(refL);
+        const l = sl.exists() ? sl.data() : { de: x.de, vers: x.vers, axes: P.axesVides(), origine: "camp", etiquette: "", histoire: "", derniers: [] };
+        const axes = { ...P.axesVides(), ...(l.axes || {}) }, ec = {};
+        Object.entries(x.axes || {}).forEach(([axe, d]) => {
+            if (!P.AXES.includes(axe) || !Number.isFinite(Number(d))) return;
+            const avant = P.nombre(axes[axe]), apres = P.borner(axe, avant + Number(d));
+            if (Math.abs(apres - avant) < 0.01) return;
+            axes[axe] = apres; ec[axe] = Math.round((apres - avant) * 100) / 100;
+            changements.push({ de: x.de, vers: x.vers, axe, avant, apres });
+        });
+        if (!Object.keys(ec).length) continue;
+        lot.set(refL, { ...l, axes, majLe: Date.now(), derniers: [...(l.derniers || []), { n: numero, tour: P.nombre(e.tour), resume: texte, type: "camp", ecarts: ec }].slice(-5) });
+    }
+    if (!changements.length) return 0;
+    lot.set(refEvenement(p, numero), { numero, tour: P.nombre(e.tour), message: "", type: "camp", acteur: "", cible: "", gravite: 1, discret: true, resume: texte, temoins: [], changements, annule: false, par: "camp", Le: Date.now() });
+    lot.set(refEtat(p), { compteur: numero }, { merge: true });
+    await lot.commit();
+    return changements.length;
+}
+
 // -------------------------------------------------------------------------
 //  LE MJ JOUE LES ÂMES (v413) : ce qu'il lit avant d'écrire
 // -------------------------------------------------------------------------
@@ -742,5 +772,5 @@ export async function apresLeTour(o) {
     catch (e) { console.error("[Fils invisibles] Le tour social :", e); return null; }
 }
 
-window.SOCIAL = { ...P, elaguerSouvenirs, MAX_SOUVENIRS, consoliderMemoire, consoliderSiBesoin, noterSouvenir, promptMemoire, SEUIL_MEMOIRE, LOT_MEMOIRE, contexteDuMJ, caractere, lireReseau, lireSouvenirsDe, annulerEvenement, ajusterLien, estAdminSocial, lireAmes, lireLiens, lireLiensVers, naissancePnj, assurerAmes, marquerMort, oublierAme, supprimerPnj, apresLeTour, tourSocial, paragrapheDe, lignesDeMarge,
+window.SOCIAL = { ...P, ajusterLiensDuCamp, elaguerSouvenirs, MAX_SOUVENIRS, consoliderMemoire, consoliderSiBesoin, noterSouvenir, promptMemoire, SEUIL_MEMOIRE, LOT_MEMOIRE, contexteDuMJ, caractere, lireReseau, lireSouvenirsDe, annulerEvenement, ajusterLien, estAdminSocial, lireAmes, lireLiens, lireLiensVers, naissancePnj, assurerAmes, marquerMort, oublierAme, supprimerPnj, apresLeTour, tourSocial, paragrapheDe, lignesDeMarge,
                   schemaPsyche, schemaLiens, consigneCreation, psycheDeLIA, LIENS_IA, schemaDisposition, schemaRaisonDisposition, dispositionDeNaissance };

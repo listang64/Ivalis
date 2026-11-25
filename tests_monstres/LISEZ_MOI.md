@@ -12691,3 +12691,10 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Le mode arène (test)** : la case et le choix de son combattant (`grimoire_combats.js`) ; `recomposerCombattants` (`monstres.js`) le suit hors combat du récit.
 - corrections_v483 le vérifie ; corrections_v299, v312, v416_fils, v418_livre lisent « I- Expédition » ; v300 lit l'archive avec le numéro de l'expédition ; v481 place le groupe loin du camp pendant l'expédition ; cap_fatigue découpe `atoutRace` sur 1 400 caractères (il a grandi).
 
+## v484 — Le clan nomade, étapes 7 et 8 : Thémès dans le récit, le retour au camp
+
+- **Thémès, le narrateur** (`camp_pur.js`, `CONSIGNES_THEMES` ; `camp.js`, `consignesThemes` ; `ia_master.js`) : avec un camp, le narrateur est Thémès, qui parle et agit dans la scène, ne combat jamais, ne peut être ni blessé ni tué, et raconte depuis sa cachette après une défaite.
+- **Le retour au camp** (`retour_camp.js`, après le rangement du récit de l'expédition) : les événements de l'absence (tempête, fièvre, bête qui rôde, voyageur pour le conseil), les affinités entre ceux qui sont restés (`evolutionAffinites`, `compatibilite` ; `social.js`, `ajusterLiensDuCamp`), le rapport de l'intendant avec ses petites scènes (`promptRapportIntendant`) en page de Thémès dans le récit ; rien si personne n'est resté.
+- **La gestion du camp** montre les sujets qui attendent le prochain conseil.
+- corrections_v484 le vérifie.
+

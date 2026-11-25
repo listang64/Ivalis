@@ -1884,7 +1884,9 @@ async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTe
 
     // (v475) Des règles qui valent quel que soit le cerveau (celui de la base remplace
     // celui du livre en entier) : CONSIGNES_NARRATEUR_TOUJOURS.
-    const promptSysteme = instructionMJ + "\n\n" + CONSIGNES_NARRATEUR_TOUJOURS + "\n\n" + contexteFormate + "\n\nContinue l'histoire en répondant à la dernière action.";
+    // (v484) Le clan nomade : le narrateur est Thémès (camp.js, consignesThemes).
+    const themes = window.CAMP && typeof window.CAMP.consignesThemes === "function" ? window.CAMP.consignesThemes() : "";
+    const promptSysteme = instructionMJ + "\n\n" + CONSIGNES_NARRATEUR_TOUJOURS + (themes ? "\n\n" + themes : "") + "\n\n" + contexteFormate + "\n\nContinue l'histoire en répondant à la dernière action.";
     const bodyRequete = {
         systemInstruction: { parts: [{ text: promptSysteme }] },
         contents: [{ role: "user", parts: [{ text: historiqueComplet }] }],
