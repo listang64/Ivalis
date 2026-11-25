@@ -799,3 +799,94 @@ export function promptRapportIntendant(o) {
         "Pas de combat : le camp n'a pas été attaqué. N'invente pas de chiffres autres que ceux donnés. 3 à 6 paragraphes, en prose, au présent, sans titre ni liste ni mise en forme."
     ].filter(Boolean).join("\n\n");
 }
+
+// =========================================================================
+//  (v485) LE CONSEIL AUTOUR DU FEU (étape 9)
+// =========================================================================
+// Le conseil sur la partie : { Id, Ouvert, Extraordinaire, Raison, Sujets: [{ Id, Titre, Resume, Type, Par: { id, nom,
+// type: "joueur"|"pnj" }, Lieu? }], Votes: { joueur: idSujet }, Avis_PNJ: { idPnj: idSujet }, Resultat }.
+export const SUJETS_MAX = 3;
+export const TYPES_SUJET = { fete: "Organiser une fête", deplacer: "Déplacer le camp", recruter: "Recruter un personnage", partager: "Partager les vivres",
+                             lieu: "Aller voir un lieu repéré", mission: "Accepter une mission", vivres: "Trouver des vivres", autre: "Une autre décision" };
+export const MORAL_CONSEIL = { suivi: 5, ignore: -3 };
+export const conseilVide = (id, o = {}) => ({ Id: id, Ouvert: true, Extraordinaire: !!o.extraordinaire, Raison: o.raison || "", Sujets: [], Votes: {}, Avis_PNJ: {}, Debut: { Le: o.maintenant || 0, Date_Jeu: o.dateJeu || "" } });
+// « 3 sujets au maximum : les trois premiers proposés. Chaque joueur peut proposer un sujet. Les PNJ peuvent aussi en
+// proposer, mais pas à la suite. »
+export function peutProposer(conseil, par) {
+    if (!conseil || !conseil.Ouvert) return "Le conseil n'est pas réuni.";
+    const s = conseil.Sujets || [];
+    if (s.length >= SUJETS_MAX) return `Le conseil a déjà ses ${SUJETS_MAX} sujets.`;
+    if (!par || !par.id) return "Qui propose ?";
+    if (par.type === "joueur" && s.some(x => x.Par && x.Par.type === "joueur" && x.Par.id === par.id)) return "Tu as déjà proposé un sujet.";
+    if (par.type === "pnj" && s.length && (s[s.length - 1].Par || {}).type === "pnj" && !par.force) return "Un PNJ vient déjà de proposer un sujet.";
+    return "";
+}
+export function nouveauSujet(conseil, s) {
+    const n = (conseil.Sujets || []).length + 1;
+    return { Id: "S" + n, Titre: String(s.titre || "").slice(0, 80) || "Un sujet", Resume: String(s.resume || "").slice(0, 300), Type: TYPES_SUJET[s.type] ? s.type : "autre",
+             Par: { id: s.par.id, nom: s.par.nom || "", type: s.par.type }, ...(s.lieu ? { Lieu: s.lieu } : {}), Le: s.le || 0 };
+}
+// « Le vote final a lieu dès que tous les joueurs connectés et présents ont voté. En cas d'égalité entre joueurs, le
+// sujet sur lequel le plus de PNJ sont placés l'emporte ; si l'égalité persiste, on tire au sort. » Rend null tant que
+// le vote n'est pas final, sinon { sujet, egalite, tirage }.
+export function resultatVote(conseil, connectes, alea = Math.random) {
+    const sujets = (conseil && conseil.Sujets) || [];
+    const votes = (conseil && conseil.Votes) || {};
+    const joueurs = [...(connectes || [])].filter(Boolean);
+    if (!sujets.length || !joueurs.length || !joueurs.every(j => sujets.some(s => s.Id === votes[j]))) return null;
+    const compte = (map, id) => Object.values(map || {}).filter(v => v === id).length;
+    const max = Math.max(...sujets.map(s => compte(votes, s.Id)));
+    let tete = sujets.filter(s => compte(votes, s.Id) === max);
+    const egalite = tete.length > 1;
+    if (egalite) {
+        const mp = Math.max(...tete.map(s => compte(conseil.Avis_PNJ, s.Id)));
+        tete = tete.filter(s => compte(conseil.Avis_PNJ, s.Id) === mp);
+    }
+    const tirage = tete.length > 1;
+    return { sujet: tete[Math.floor(alea() * tete.length) % tete.length], egalite, tirage };
+}
+// « Les PNJ dont l'avis est suivi gagnent en confiance (+5 moral), ceux dont l'avis est ignoré perdent en loyauté (−3). »
+export function moralApresConseil(avis, gagnant) {
+    return Object.keys(avis || {}).filter(id => avis[id]).map(id => avis[id] === gagnant
+        ? { id, delta: MORAL_CONSEIL.suivi, raison: "son avis a été suivi au conseil" }
+        : { id, delta: MORAL_CONSEIL.ignore, raison: "son avis a été ignoré au conseil" });
+}
+// LA CONSIGNE DU CONSEIL : Thémès raconte ; uniquement des paroles ; une réponse en JSON.
+export function promptConseil(o) {
+    return [
+        `Tu es Thémès, le vieux narrateur du clan nomade d'Ivalis (Antiquité fantastique), et tu animes le conseil du clan, réuni autour du feu${o.extraordinaire ? ` en conseil extraordinaire (${o.raison || "une urgence"})` : ""}.`,
+        "C'est un récit à part, fait UNIQUEMENT DE PAROLES : jamais de narration d'action, jamais de gestes décrits. Chacun parle à son tour, en répliques courtes (1 à 3 phrases), comme un vrai échange. Les PNJ parlent selon leur caractère, leurs liens et leur moral ; ils peuvent se répondre entre eux. Ne parle jamais à la place d'un joueur (les héros des joueurs).",
+        "Le conseil doit rester vivant mais laisser la parole aux joueurs : 1 à 3 répliques à la fois, et la dernière invite souvent un joueur à répondre.",
+        `Les membres du clan présents (PNJ) :\n${(o.pnjs || []).map(p => `- ${p.nom}${p.caractere ? ` (${p.caractere})` : ""}${p.moral != null ? `, moral ${p.moral}/100` : ""}${p.tache ? `, ${p.tache}` : ""}`).join("\n") || "- personne"}`,
+        `Les héros des joueurs : ${(o.heros || []).join(", ") || "aucun"}.`,
+        `Les sujets sur la table (post-its, ${SUJETS_MAX} au plus) :\n${(o.sujets || []).map(s => `- [${s.Id}] ${s.Titre} — ${s.Resume} (proposé par ${(s.Par || {}).nom || "?"})`).join("\n") || "- aucun pour l'instant"}`,
+        o.memoire ? `Ce que le clan a vécu (les dernières expéditions) :\n${o.memoire}` : "",
+        o.camp ? `Le camp : ${o.camp}` : "",
+        `Réponds en JSON SEUL, de cette forme :
+{ "repliques": [ { "qui": "Thémès ou le nom exact d'un PNJ présent", "texte": "ce qu'il dit" } ],
+  "postit": null ou { "titre": "court", "resume": "une phrase", "type": "${Object.keys(TYPES_SUJET).join("|")}", "par": "le PNJ qui le propose" },
+  "avis": { "nom exact d'un PNJ": "l'id du post-it qu'il préfère (S1, S2, S3) ou null" } }
+Un PNJ ne propose un post-it que s'il a une vraie idée et qu'il reste de la place ; les PNJ ne votent pas mais donnent leur avis.`
+    ].filter(Boolean).join("\n\n");
+}
+// La réponse de l'IA, relue : les répliques de PNJ présents (ou de Thémès), un post-it éventuel, les avis valides.
+export function lireReponseConseil(texte, conseil, pnjs) {
+    let j = null;
+    try { j = JSON.parse(String(texte || "").replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch (e) { return { repliques: [], postit: null, avis: {} }; }
+    const parNom = new Map((pnjs || []).map(p => [String(p.nom || "").toLowerCase(), p.id]));
+    const ids = new Set(((conseil || {}).Sujets || []).map(s => s.Id));
+    // Un avis peut viser le post-it proposé dans la même réponse (le prochain numéro).
+    if (j && j.postit && j.postit.titre) ids.add("S" + (((conseil || {}).Sujets || []).length + 1));
+    const repliques = (Array.isArray(j && j.repliques) ? j.repliques : []).slice(0, 4).map(r => {
+        const qui = String((r && r.qui) || "").trim(), texteR = String((r && r.texte) || "").trim();
+        if (!texteR) return null;
+        if (/^th[ée]m[èe]s$/i.test(qui)) return { qui: "Thémès", id: "THEMES", texte: texteR };
+        const id = parNom.get(qui.toLowerCase());
+        return id ? { qui, id, texte: texteR } : null;
+    }).filter(Boolean);
+    const p = j && j.postit && typeof j.postit === "object" ? j.postit : null;
+    const postit = p && p.titre ? { titre: String(p.titre), resume: String(p.resume || ""), type: TYPES_SUJET[p.type] ? p.type : "autre", par: parNom.get(String(p.par || "").toLowerCase()) || null, parNom: String(p.par || "") } : null;
+    const avis = {};
+    Object.entries((j && j.avis) || {}).forEach(([nom, v]) => { const id = parNom.get(String(nom).toLowerCase()); if (id) avis[id] = v && ids.has(v) ? v : null; });
+    return { repliques, postit, avis };
+}

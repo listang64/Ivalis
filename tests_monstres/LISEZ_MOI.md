@@ -12698,3 +12698,9 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **La gestion du camp** montre les sujets qui attendent le prochain conseil.
 - corrections_v484 le vérifie.
 
+## v485 — Le clan nomade, étape 9 : le conseil autour du feu
+
+- **Les règles** (`camp_pur.js`) : un sujet par joueur, pas deux PNJ de suite, trois sujets au plus ; le vote final quand tous les joueurs connectés ont voté ; l'égalité départagée par les avis des PNJ, puis au sort ; +5 / −3 de moral aux PNJ suivis / ignorés ; la consigne de Thémès (uniquement des paroles, le JSON) ; la réponse de l'IA relue (seulement les PNJ présents, les avis sur des post-its qui existent).
+- **Le conseil** (`conseil.js`, `conseil.css`) : « Former le conseil » (jamais pendant une expédition), le récit à part (`Conseil_Messages`), Thémès qui ouvre, l'éclaireur qui annonce le lieu repéré, les répliques des joueurs et de l'IA (le réglage du narrateur, la mémoire des 5 dernières expéditions), les post-its et les bulles, le vote, le résultat (la tâche votée, les conséquences sur le moral), le conseil extraordinaire qui s'ouvre tout seul.
+- corrections_v485 le vérifie.
+

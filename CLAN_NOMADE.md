@@ -61,6 +61,7 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
 | 6 — Les expéditions | v483 | fait (sauf : jouer un personnage du camp, voir plus bas) |
 | 7 — Thémès dans le récit | v484 | fait |
 | 8 — Le retour au camp | v484 | fait |
+| 9 — Le conseil | v485 | fait |
 
 ## Points ambigus
 
@@ -186,3 +187,23 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
   clé Gemini, un rapport court à partir du journal. Il est gardé dans `Camp.Dernier_Rapport`. Pas d'intendant
   nommé : le premier membre resté au camp parle.
 - **Étape 8, « annuler la tâche en cours ».** Avec la tâche en cours (étape 10).
+- **Étape 9, la page.** Par-dessus la page du camp, en fondu : le chat du conseil à gauche (un encart et un petit
+  avatar par prise de parole), les post-its à droite (votes des joueurs, bulles des PNJ), « + Proposer un sujet »,
+  « ‹ Le camp » pour la quitter (le conseil reste réuni ; on y revient par « Former le conseil »).
+- **Étape 9, qui parle.** Un joueur parle par son héros principal. Les PNJ du conseil : les membres restés au camp
+  (ni les héros des joueurs, ni Thémès, qui anime). Les messages sont à part
+  (`Systeme_Parties/{p}/Conseil_Messages`), jamais dans le récit.
+- **Étape 9, l'IA.** Elle répond 6 secondes après la dernière réplique d'un joueur (le temps que d'autres
+  parlent), un seul poste à la fois (un verrou d'une minute) ; si un joueur a parlé pendant la réponse, elle
+  repart. 1 à 3 répliques à la fois (Thémès ou des PNJ présents, qui peuvent se répondre). Le modèle et la
+  réflexion du narrateur. La mémoire : les 5 dernières expéditions (leur titre dans le livre, leurs jours, leurs
+  membres) et le dernier rapport de l'intendant.
+- **Étape 9, les sujets.** Posés d'office à l'ouverture : le manque de vivres (extraordinaire), le lieu repéré par
+  l'éclaireur (il l'annonce aussitôt), les sujets laissés par le retour (un voyageur). Ensuite, un sujet par
+  joueur ; un PNJ (par l'IA) seulement si le dernier post-it n'est pas d'un PNJ ; trois au plus.
+- **Étape 9, le vote.** Les joueurs connectés (signe de vie de moins de 2 min 30) ; le poste qui constate que tous
+  ont voté clôt le conseil. Le résultat : `Camp.Tache_Votee` (la tâche, étape 10), `Deplacement_Vote` (étape 11),
+  `Recrutement_Vote` (étape 12) ; le lieu repéré retenu quitte la liste ; le conseil est gardé
+  (`Camp.Conseils_Passes`).
+- **Étape 9, l'extraordinaire.** Il se réunit tout seul dès que le clan est au camp et que le camp n'a plus de
+  provisions, et sa page s'ouvre chez chacun (une fois).
