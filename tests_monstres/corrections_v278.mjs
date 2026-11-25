@@ -113,7 +113,7 @@ const CARTE = `<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024
 const ARENE = `<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1200"><rect width="1800" height="1200" fill="#8a7a5a"/></svg>`;
 const PION = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><circle cx="100" cy="100" r="90" fill="#6b3d1e"/></svg>`;
 const PORTRAIT = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="520"><rect width="300" height="520" fill="#ff00ff"/><ellipse cx="150" cy="200" rx="90" ry="160" fill="#c08a5a"/></svg>`;
-const URL_ARENE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789076932/arene_s5qs3e.png";
+const URL_ARENE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/w_1280,c_limit,q_auto,f_auto/v1789076932/arene_s5qs3e.png";   // (v491) 1280 de large au plus
 const URL_PORTRAIT_KORE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/v1/PNJ/portrait_kore.png";
 
 const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');

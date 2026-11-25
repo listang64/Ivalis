@@ -18,7 +18,7 @@ function fonctionCombat(marqueur) {
 }
 const fnCharger = fonctionCombat('window.chargerMapTest = async function');
 
-const URL_ARENE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789076932/arene_s5qs3e.png";
+const URL_ARENE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/w_1280,c_limit,q_auto,f_auto/v1789076932/arene_s5qs3e.png";   // (v491) 1280 de large au plus
 
 const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
 const b = await chromium.launch();
