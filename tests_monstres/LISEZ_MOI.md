@@ -12754,3 +12754,8 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Les effets C** (`objets.js`, `EFFETS_C`) suivaient l'ancien classeur : désormais « pour le personnage soigné pendant 2 tours » — résistance magique +8 %, physique +8 %, dégâts +5 % (8 avant), et +10 d'initiative sur le SOIGNÉ (avant : sur le lanceur, 3 tours ; `beniSoin.initiative`, l'état « Hâte » : `moteur_pur.js`, `moteur_effets.js`).
 - **La bague de soin épique** : « +1 soin + 1 (Effet C ou Effet B) + 2X Effet C » (avant : 3X Effet C) — `effetsEnPlus: [1, 1, "BC"]`, lu par `tirerEffetsObjet`.
 - `tableau_objets.json` reprend ces cellules du tableau ; objets_tableau, corrections_v476 et corrections_v492 le vérifient.
+
+## v493 — Les chances de butin par famille
+
+- `objets.js` (`FAMILLES_BUTIN`, `tirerFamilleButin`, `tirerObjetDeRarete`) : 15 % une armure, 10 % un bouclier, 40 % une arme lourde ou légère, 20 % une arme à distance ou polyvalente (fronde, arc, gantelet, sarbacane, javelots), 15 % une bague ; puis un modèle au hasard dans la famille (avant : 75 % arme, 25 % bouclier ou armure).
+- corrections_v493 le vérifie (la table, une seule famille par modèle, un tirage de 20 000 objets, les bornes du dé) ; butin_loot garde ses 25 % de boucliers et d'armures.

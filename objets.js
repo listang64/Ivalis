@@ -835,22 +835,29 @@ window.equipementDeDepart = function(typeArme, typeArmure) {
     };
 };
 
-// Bouclier ou armure : tout ce qui se porte sur le corps plutôt qu'en main
-// offensive. Les bagues (type "Magie") restent du côté "arme" : elles sont
-// tenues en main et jouent le même rôle offensif/de soin qu'une arme.
-function estBouclierOuArmure(modele) {
-    return modele.type === "Bouclier" || modele.emplacement === "Armure";
-}
-
 // Tire un objet complet pour une difficulté donnée. C'est l'unique porte
 // d'entrée utilisée par le butin.
 //
-// 75% de chance une arme, 25% un bouclier ou une armure (Nico, revu : c'était
-// 60/40) — une pondération voulue plutôt qu'un tirage brut sur tout le
-// catalogue, où le
-// nombre de modèles de chaque famille faussait les proportions sans le
-// vouloir (beaucoup plus d'armes que d'armures dans le tableau).
-window.PART_ARMES_BUTIN = 0.75;
+// (v493) LES CHANCES DE BUTIN PAR FAMILLE (Nico) : 15 % une armure, 10 % un
+// bouclier, 40 % une arme lourde ou légère (de contact), 20 % une arme à
+// distance ou polyvalente, 15 % une bague — une pondération voulue plutôt qu'un
+// tirage brut sur tout le catalogue, où le nombre de modèles de chaque famille
+// fausserait les proportions. Dans une famille, chaque modèle a la même chance.
+window.FAMILLES_BUTIN = [
+    { nom: "armure",          part: 15, est: (m) => m.emplacement === "Armure" },
+    { nom: "bouclier",        part: 10, est: (m) => m.type === "Bouclier" },
+    { nom: "arme de contact", part: 40, est: (m) => m.type === "Arme lourde CAC" || m.type === "Arme légère CAC" },
+    { nom: "arme à distance", part: 20, est: (m) => m.type === "Arme légère Distance" || m.type === "Arme polyvalente" },
+    { nom: "bague",           part: 15, est: (m) => m.type === "Magie" }
+];
+// La famille tirée (une famille vide du catalogue est écartée, les autres gardent leurs proportions).
+window.tirerFamilleButin = function(catalogue, alea = Math.random) {
+    const familles = window.FAMILLES_BUTIN.map(f => ({ ...f, pool: (catalogue || []).filter(f.est) })).filter(f => f.pool.length > 0 && f.part > 0);
+    const total = familles.reduce((t, f) => t + f.part, 0);
+    let jet = alea() * total;
+    for (const f of familles) { jet -= f.part; if (jet < 0) return f; }
+    return familles[familles.length - 1] || null;
+};
 
 window.tirerObjetPourDifficulte = function(difficulte) {
     return window.tirerObjetDeRarete(window.tirerRarete(difficulte));
@@ -860,16 +867,10 @@ window.tirerObjetPourDifficulte = function(difficulte) {
 window.tirerObjetDeRarete = function(rarete) {
     if (!window.RARETES.includes(rarete)) rarete = "Commun";
     const catalogue = window.MODELES_OBJETS || [];
-    const poolArmes = catalogue.filter(m => !estBouclierOuArmure(m));
-    const poolDefense = catalogue.filter(estBouclierOuArmure);
-
-    const veutUneArme = Math.random() < window.PART_ARMES_BUTIN;
-    let pool = veutUneArme ? poolArmes : poolDefense;
-    // Si la famille visée est vide (catalogue incomplet), on retombe sur
-    // l'autre plutôt que de renvoyer un objet inexistant.
-    if (pool.length === 0) pool = poolArmes.length > 0 ? poolArmes : poolDefense;
-    if (pool.length === 0) pool = catalogue;
-
+    // (v493) La famille d'abord (armure, bouclier, arme de contact, arme à distance, bague), puis un modèle de la famille.
+    const famille = window.tirerFamilleButin(catalogue);
+    const pool = famille ? famille.pool : catalogue;
+    if (pool.length === 0) return null;
     const modele = auHasard(pool);
     return window.fabriquerObjet(modele, rarete);
 };
