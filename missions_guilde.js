@@ -327,7 +327,7 @@ export const relireLaMission = () => relireMission(idPartie());
 export function promptPlan(m, lieu) {
     let lore = "";
     try { lore = typeof window.loreDeLaRegion === "function" ? String(window.loreDeLaRegion(m.Region) || "") : ""; } catch (e) {}
-    return `Tu es MIA_PLAN_MISSION, le stratège qui prépare les missions de la guilde d'Ivalis pour le Maître du Jeu (le Narrateur). Le monde : antique fantastique (mythologie, Antiquité magique), rien d'anachronique.
+    return `Tu es MIA_PLAN_MISSION, le stratège qui prépare les tâches du clan nomade d'Ivalis (ses missions) pour le Maître du Jeu (le Narrateur). Le monde : antique fantastique (mythologie, Antiquité magique), rien d'anachronique.
 La mission que le groupe vient d'accepter :
 - Mission ${difficulteDe(m)} (${DIFFICULTES[difficulteDe(m)].consigne})
 - Titre : ${m.Titre}
@@ -454,7 +454,7 @@ export function contexteMissionMJ(dataPartie, lieuActuel) {
     const courante = etapes.find(e => !faites[String(e.numero)]);
     const derniere = !!courante && courante === etapes[etapes.length - 1];
     const tours = Number(av.Tours_Etape) || 0, min = toursMin(m);
-    const lignes = ["--- MISSION DE GUILDE EN COURS ---",
+    const lignes = ["--- LA TÂCHE EN COURS DU CLAN ---",
         `Mission ${difficulteDe(m)} — « ${m.Titre} », confiée par ${m.Commanditaire}.`,
         `Objectif : ${m.Objectif}`,
         `Lieu de la mission : ${(m.Lieu && m.Lieu.Nom) || "?"} (${m.Region_Nom}).`];
@@ -503,7 +503,7 @@ export async function suivreApresMJ(texteMJ, idMessage) {
     if (!d || d.Statut !== "en_cours" || !d.Mission || !texteMJ || !window.cleGemini || !window.cleGemini("missions")) return null;
     const m = d.Mission, etapes = Array.isArray((d.Plan || {}).etapes) ? d.Plan.etapes : [];
     const faites = (d.Avancement && d.Avancement.Etapes) || {};
-    const prompt = `Tu es MIA_SUIVI_MISSION : tu suis l'avancement d'une mission de guilde dans le récit du Narrateur.
+    const prompt = `Tu es MIA_SUIVI_MISSION : tu suis l'avancement d'une tâche du clan (une mission) dans le récit du Narrateur.
 La mission : « ${m.Titre} » — objectif : ${m.Objectif}
 Ses étapes : ${etapes.map(e => `${e.numero}. ${e.titre} (accomplie quand : ${e.validation})${faites[String(e.numero)] ? " [déjà accomplie]" : ""}`).join(" ; ") || "(pas encore de plan)"}
 Lis le dernier passage du Narrateur et dis seulement ce qu'il établit clairement (rien de supposé).

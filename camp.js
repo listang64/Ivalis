@@ -15,7 +15,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection, deleteField, runTransaction, increment, addDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=11";
+import * as CP from "./camp_pur.js?v=12";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -42,6 +42,8 @@ window.appliquerCampDeLaPartie = function(data) {
     // (v485) Le conseil : l'extraordinaire qui s'ouvre tout seul, la page qui suit, le vote final (conseil.js).
     if (camp && data && (data.Conseil || camp.Conseil_Extraordinaire)) setTimeout(() => { try { if (window.CONSEIL) window.CONSEIL.veiller(); } catch (e) {} }, 0);
     // (v483) Le mode arène (test) : les combattants suivent le choix de chacun (monstres.js, recomposerCombattants).
+    // (v489) La réputation par région : les jauges des pages de région suivent.
+    setTimeout(() => { try { window.majReputationRegions(); } catch (e) {} }, 0);
     const arene = JSON.stringify((data && data.Arene_Choix) || null);
     if (arene !== areneAvant) { areneAvant = arene; if (typeof window.recomposerCombattants === "function") { try { window.recomposerCombattants(); } catch (e) {} } }
 };
@@ -379,9 +381,54 @@ export async function journeeDuCamp(o = {}) {
     return res;
 }
 
+// ---------------------------------------------------------------------
+//  (v489) LA RÉPUTATION PAR RÉGION (étape 13) : l'écho des lieux, la jauge des pages de région, le narrateur.
+// ---------------------------------------------------------------------
+const nomDuGroupe = () => {
+    const p = (window.LISTE_PARTIES_CACHE || []).find(x => x.id === idPartie());
+    return (p && p.nom) || (window.PARTIE_DATA && window.PARTIE_DATA.Nom_Du_Groupe) || "Le clan";
+};
+export async function echoReputation(region, ecartLieu) {
+    const p = idPartie(), n = Number(region);
+    if (!p || !camp || !n || !Number(ecartLieu)) return null;
+    let apres = null;
+    try {
+        await runTransaction(db, async (tx) => {
+            const s = await tx.get(refPartie(p));
+            const c = (s.exists() ? s.data() : {}).Camp;
+            if (!c) return;
+            apres = CP.echoReputation(CP.reputationRegion(c, n), ecartLieu);
+            tx.update(refPartie(p), { ["Camp.Reputation_Regions." + n]: apres });
+        });
+    } catch (e) { console.warn("[Camp] La réputation de la région :", e); }
+    if (apres !== null) console.log(`📣 [Camp] Réputation du clan dans la région ${n} : ${apres}.`);
+    return apres;
+}
+export function contexteReputationMJ() {
+    if (!camp) return "";
+    const pos = typeof window.positionGroupeBrute === "function" ? window.positionGroupeBrute() : (window.PARTIE_DATA || {}).Position_Groupe;
+    const n = Number((pos || {}).Region);
+    if (!n) return "";
+    return CP.contexteReputationRegion(nomDuGroupe(), ((window.CARTES_REGIONALES || {})[n] || {}).nom || "", CP.reputationRegion(camp, n));
+}
+// La page de gauche de chaque région : le nom du groupe, puis la jauge de sa réputation (grimoire_regions.js pose la place).
+window.majReputationRegions = function () {
+    document.querySelectorAll(".reputation-region[data-region]").forEach(el => {
+        if (!camp) { el.innerHTML = ""; return; }
+        const n = Number(el.dataset.region), v = CP.reputationRegion(camp, n);
+        const sig = `${nomDuGroupe()}|${v}`;
+        if (el.dataset.sig === sig) return;
+        el.dataset.sig = sig;
+        const gauche = v < 0 ? 50 + v / 2 : 50, largeur = Math.abs(v) / 2;
+        el.innerHTML = `<span class="groupe-reputation-region">${String(nomDuGroupe()).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))}</span>
+            <span class="jauge-reputation-region" title="Réputation ${v} (de −100 à +100)"><i class="${v < 0 ? "neg" : "pos"}" style="left:${gauche}%;width:${largeur}%"></i><b></b></span>
+            <span class="mot-reputation-region">${CP.motReputationRegion(v)} <small>(${v > 0 ? "+" : ""}${v})</small></span>`;
+    });
+};
+
 // (v484) THÉMÈS, LE NARRATEUR (étape 7) : ce que le narrateur reçoit dès que le clan a un camp (ia_master.js).
 export const consignesThemes = () => (camp ? CP.CONSIGNES_THEMES : "");
 
-window.CAMP = { consignesThemes, lire: lireCamp, creerCampDev, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
+window.CAMP = { consignesThemes, echoReputation, contexteReputationMJ, lire: lireCamp, creerCampDev, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
                 partis, postesBloques, infosMembres, assignerTache, nommerIntendant, changerMoral, journeeDuCamp };
 window.journeeDuCamp = journeeDuCamp;

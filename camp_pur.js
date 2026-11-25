@@ -1110,3 +1110,20 @@ export function arriveeDuHeros(camp, h, maintenant = 0) {
     if (rec && rec.Par === h.joueur) return { membre: { ...membreRecrue("recrue_clan", h.nom, { maintenant, libre: true }), Joueur: h.joueur }, efface: "recrutement" };
     return { membre: { Type: "heros", Nom: h.nom, Joueur: h.joueur, Tache: null, Moral: MORAL_DEPART.heros }, efface: "" };
 }
+
+// =========================================================================
+//  (v489) LA RÉPUTATION PAR RÉGION (étape 13)
+// =========================================================================
+// « Le groupe a sa propre réputation dans chaque région, sous la forme d'un score chiffré (de −100 à +100). Elle sert
+// au RP. » Elle suit les échos des lieux : quand la réputation du groupe change dans un lieu (MIA_REPUTATION, de −10 à
+// +10), sa région en garde l'écho, trois fois l'écart.
+export const REPUTATION_REGION_MAX = 100, ECHO_REPUTATION = 3;
+export const reputationRegion = (camp, n) => Number((((camp || {}).Reputation_Regions) || {})[n]) || 0;
+export const echoReputation = (score, ecartLieu) => Math.max(-REPUTATION_REGION_MAX, Math.min(REPUTATION_REGION_MAX, Math.round((Number(score) || 0) + ECHO_REPUTATION * (Number(ecartLieu) || 0))));
+export function motReputationRegion(s) {
+    const v = Number(s) || 0;
+    return v >= 60 ? "adulés" : v >= 25 ? "bien vus" : v > -25 ? "peu connus" : v > -60 ? "mal vus" : "honnis";
+}
+export function contexteReputationRegion(nomGroupe, nomRegion, score) {
+    return `--- LA RÉPUTATION DU CLAN DANS LA RÉGION ---\nDans ${nomRegion || "cette région"}, les membres du clan « ${nomGroupe || "le clan"} » sont ${motReputationRegion(score)} (${score > 0 ? "+" : ""}${score} sur une échelle de −100 à +100) : les habitants réagissent en conséquence (accueil, méfiance, rumeurs), même là où le clan n'est jamais passé.`;
+}

@@ -65,6 +65,7 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
 | 10 — La tâche en cours | v486 | fait |
 | 11 — Le déplacement du camp | v487 | fait |
 | 12 — Le recrutement | v488 | fait (sauf : les compétences d'une recrue, voir plus bas) |
+| 13 — Réputation et finitions | v489 | fait |
 
 ## Points ambigus
 
@@ -259,3 +260,24 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
   d'objets viendra) : un bouton DEV y met 300 drachmes.
 - **Étape 12, le bouton DEV.** Dans les fils invisibles d'un PNJ qui n'est pas du camp (mode DEV) : « Forcer son
   recrutement dans le camp » — invité, moral 60, niveau 1, ses caracs, son souvenir, comme un recrutement naturel.
+- **Étape 13, la réputation par région.** Un score de −100 à +100 par région (`Camp.Reputation_Regions`), 0 au
+  départ. Il suit les lieux : quand MIA_REPUTATION change la réputation du groupe dans un lieu (de −10 à +10), la
+  région de ce lieu en garde l'écho, trois fois l'écart. Sur la page de gauche de chaque région : le nom du groupe,
+  la jauge, un mot (honnis, mal vus, peu connus, bien vus, adulés). Le narrateur reçoit celle de la région où est le
+  groupe. Les actes en pleine nature ne la changent pas (MIA_REPUTATION ne juge que les lieux).
+- **Étape 13, l'ancien système.** Le narrateur ne parle plus de « mission de guilde » (la tâche du clan). Les noms
+  internes (`missions_guilde.js`, `Guilde/Mission`, `Mission_En_Cours`) restent, pour ne pas casser les parties.
+
+## Ce qui reste à faire ou à trancher (pour Nico)
+
+- **Jouer un personnage du camp** (étapes 6 et 12) : un PNJ du camp, ou le héros d'un autre joueur, n'est pas encore
+  jouable en expédition ; il faudrait lui donner une fiche d'aventurier (compétences par la Forge) et décider qui le
+  commande. Les compétences d'une recrue attendent la même chose.
+- **La création automatique du camp** à la création d'une partie : c'est toujours le bouton DEV (le document dit « à
+  terme »).
+- **Les encarts du camp** : à poser par Nico avec « Encarts (DEV) », puis « Copier le code » dans `camp_scene.js`.
+- **Les chiffres à équilibrer** (le document le dit) : coûts, moral, risques, récompenses, les seuils des
+  affinités du retour et des événements de l'absence.
+- **La bourse des joueurs** reste vide tant que la revente d'objets n'existe pas (un bouton DEV la remplit).
+- **Les tests en vrai** : tout est vérifié par les bancs avec une base simulée ; les IA (rapport de l'intendant,
+  conseil, MIA_TACHE, MIA_CARACS, MIA_GABARIT, les images en scène) n'ont été essayées qu'avec des réponses simulées.

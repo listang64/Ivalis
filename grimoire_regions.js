@@ -93,13 +93,17 @@
         const nom = echapper(r.nom), url = echapper(r.url);
         const boites = boitesImage(r);
         g.classList.toggle("paysage", paysage(r)); d.classList.toggle("paysage", paysage(r));
+        // (v489) Le clan nomade : « sur la page de gauche de chaque région, le nom du groupe, et en dessous une jauge avec sa
+        // réputation dans la région » (camp.js, majReputationRegions la remplit).
+        const reputation = `<div class="reputation-region" data-region="${Number(r.numero)}"></div>`;
         if (paysage(r)) {
-            g.innerHTML = carteImg(url, boites.gauche, "") + `<div class="region-titre-sur-carte"><span class="region-nom">${nom}</span>${TRAIT}</div>`;
+            g.innerHTML = carteImg(url, boites.gauche, "") + `<div class="region-titre-sur-carte"><span class="region-nom">${nom}</span>${TRAIT}${reputation}</div>`;
             d.innerHTML = carteImg(url, boites.droite, "");
         } else {
-            g.innerHTML = `<div class="region-titre-page"><span class="region-sur">Carte de la région</span><span class="region-nom">${nom}</span>${TRAIT}${boutonDescriptif(r)}</div>`;
+            g.innerHTML = `<div class="region-titre-page"><span class="region-sur">Carte de la région</span><span class="region-nom">${nom}</span>${TRAIT}${reputation}${boutonDescriptif(r)}</div>`;
             d.innerHTML = carteImg(url, boites.droite, nom);
         }
+        try { if (typeof window.majReputationRegions === "function") window.majReputationRegions(); } catch (e) {}
         r.lieuxSig = null;          // (v344) les lieux de la page se reposent (poserLieux)
         lieuxAJour = false;
     }

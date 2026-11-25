@@ -422,7 +422,7 @@ await section(async () => {
 titre("5. LE NARRATEUR : UN RAPPEL PARTOUT ; AU LIEU DE LA MISSION, LE PLAN ET SES SECRETS");
 await section(async () => {
   const ailleurs = await G(() => window.contexteMissionMJ({}, "L_AILLEURS")), ici = await G(() => window.contexteMissionMJ({}, "L_KESH"));
-  verifier("ailleurs : la mission, son objectif, son lieu, l'étape en cours — sans le plan", /MISSION DE GUILDE EN COURS/.test(ailleurs) && /Objectif 1\./.test(ailleurs) && /Kesh/.test(ailleurs) && /Étape en cours : 1\. Trouver la lettre/.test(ailleurs) && !/vérité cachée/i.test(ailleurs), ailleurs.slice(0, 200));
+  verifier("ailleurs : la mission, son objectif, son lieu, l'étape en cours — sans le plan", /LA TÂCHE EN COURS DU CLAN/.test(ailleurs) && /Objectif 1\./.test(ailleurs) && /Kesh/.test(ailleurs) && /Étape en cours : 1\. Trouver la lettre/.test(ailleurs) && !/vérité cachée/i.test(ailleurs), ailleurs.slice(0, 200));
   verifier("au lieu de la mission : le plan pour lui seul, ce qu'il ne doit jamais révéler", /LE PLAN DE LA MISSION \(POUR TOI SEUL, MJ\)/.test(ici) && /À NE JAMAIS RÉVÉLER DIRECTEMENT :\n\s+- Le commanditaire est le voleur/.test(ici) && /Dame Sira/.test(ici), ici.slice(0, 160));
   // (v451) « Le narrateur fait avancer trop vite la mission : le traître, on le sait en deux tours. » Le plan se donne
   // petit à petit : l'étape en cours seule, ni la vérité cachée ni les secrets des personnages avant la dernière étape.

@@ -12723,3 +12723,9 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Le recrutement** (`recrutement.js`) : rejoindre le camp (fiche niveau 1 et caracs, souvenir), engager un mercenaire (la caisse paie), acheter un personnage (la bourse), la recrue votée au conseil (la caisse), la classe d'une recrue, la bourse DEV ; `groupe.js` envoie au camp ceux qui acceptent et ceux qu'on engage ; `camp.js` accueille les héros achetés ou recrutés ; le bouton DEV des fils invisibles ; la gestion du camp (classe, achat, recrue votée).
 - corrections_v488 le vérifie ; corrections_v480 lit l'arrivée des héros dans `arriveeDuHeros` ; corrections_v481 laisse libre le choix de la classe pendant une expédition.
 
+## v489 — Le clan nomade, étape 13 : la réputation par région et les finitions
+
+- **La réputation par région** (`camp_pur.js` : `reputationRegion`, `echoReputation`, `motReputationRegion`, `contexteReputationRegion` ; `camp.js` : `echoReputation`, `contexteReputationMJ`, `majReputationRegions`) : un score de −100 à +100 par région, l'écho des lieux (MIA_REPUTATION, `ia_master.js`), la jauge sur la page de gauche de chaque région (`grimoire_regions.js`, `grimoire_regions.css`), le narrateur qui la reçoit.
+- **Les finitions** : le narrateur ne parle plus de « mission de guilde » (`missions_guilde.js`).
+- corrections_v489 le vérifie ; corrections_v443 lit « LA TÂCHE EN COURS DU CLAN ».
+

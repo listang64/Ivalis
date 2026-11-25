@@ -1361,6 +1361,10 @@ Si l'action est banale, ne fais rien.`;
                 await updateDoc(doc(db, "Monde_Lieux", idLieuCible), {
                     Reputations: repMap
                 });
+                // (v489) Le clan nomade : la région du lieu en garde l'écho (camp.js, la réputation par région).
+                if (nouveauScore !== scoreActuel && window.CAMP && typeof window.CAMP.echoReputation === "function") {
+                    window.CAMP.echoReputation(snapLieu.data().Carte_Regionale, nouveauScore - scoreActuel).catch(() => {});
+                }
             }
         }
     } catch (e) { console.error("[MIA_REPUTATION] Erreur :", e); }
@@ -2601,6 +2605,11 @@ window.declencherTourIA = async function(options) {
         if (window.CAMP && typeof window.CAMP.contexteMJ === "function") {
             try { const cc = window.CAMP.contexteMJ(); if (cc) contexte += `\n${cc}\n`; }
             catch (e) { console.error("Le camp (le tour continue) :", e); }
+        }
+        // (v489) La réputation du clan dans la région où il se trouve.
+        if (window.CAMP && typeof window.CAMP.contexteReputationMJ === "function") {
+            try { const cr = window.CAMP.contexteReputationMJ(); if (cr) contexte += `\n${cr}\n`; }
+            catch (e) { console.error("La réputation de la région (le tour continue) :", e); }
         }
         // (v454) La fin du récit d'avant le voyage : la continuité.
         contexte += contexteRecitPrecedent(dataPartieMJ, messagesFiltres);
