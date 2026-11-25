@@ -231,7 +231,7 @@ titre("2. DANS LE LIVRE");
 await section(async () => {
   await p.evaluate(() => { window.CLASSES_CACHE = null; });
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2600); await pose();
-  await action(".page-clan .nouvel-aventurier"); await p.waitForTimeout(2800); await pose();
+  await action(".choix-heros-principal .bouton-choix-heros[data-fa=creer]"); await p.waitForTimeout(2800); await pose();
   await action('#grimoire-creation-race-0 [data-genre="Femelle"]'); await p.waitForTimeout(2800); await pose();
   const r = await p.evaluate(() => [...document.querySelectorAll('.page-classe.gauche')].map(g => ({
     titre: g.querySelector(".titre-creation").textContent, bouton: !!g.querySelector('[data-ca="classe"]'),

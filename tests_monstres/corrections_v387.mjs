@@ -171,7 +171,7 @@ await section(async () => {
   verifier("plus de taille des cornes (ni le champ, ni son groupe)", !/champ-cornes|groupe-cornes/.test(html) && !/groupe-cornes/.test(lire("creation_personnage.js")));
   verifier("plus de couleur dominante ni de couleur du token", !/champ-couleurs"|champ-couleur-token/.test(html) && !/champ-couleur-token|champ-couleurs"/.test(lire("creation_personnage.js") + lire("app.js")));
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2600); await pose();
-  await action(".page-clan .nouvel-aventurier"); await p.waitForTimeout(2800); await pose();
+  await action(".choix-heros-principal .bouton-choix-heros[data-fa=creer]"); await p.waitForTimeout(2800); await pose();
   verifier("plus de « Renoncer à ce héros » sur les pages", await p.evaluate(() => !document.querySelector(".renoncer-creation") && ![...document.querySelectorAll(".page-creation")].some(pg => /Renoncer/.test(pg.textContent))));
   await p.evaluate(() => document.querySelector('#grimoire-creation-race-2 [data-genre="Male"]').click()); await p.waitForTimeout(2800); await pose();
   const f = await p.evaluate(() => ({ fleches: document.querySelectorAll(".page-classe.gauche .fleche-defile").length, classes: document.querySelectorAll(".page-classe.gauche").length }));

@@ -236,9 +236,11 @@ titre("3. LES PAGES DES AVENTURIERS CHANGENT : LE RÉCIT RESTE À LA FIN");
 // =========================================================================
 await section(async () => {
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2600); await pose();
-  await action(".page-clan .nouvel-aventurier"); await p.waitForTimeout(2800); await pose();
+  await action(".choix-heros-principal .bouton-choix-heros[data-fa=creer]"); await p.waitForTimeout(2800); await pose();
   const o = await ordre();
-  verifier("la création a ajouté ses pages chez les aventuriers", o.fiches[2] > 40, JSON.stringify(o.fiches));
+  // (v479) Plus de pages de clans devant : on vérifie que les pages de la création sont parmi celles des aventuriers.
+  verifier("la création a ajouté ses pages chez les aventuriers", await p.evaluate(() => { const f = window.GRIMOIRE.pagesFiches(), c = [...document.querySelectorAll(".page-creation")];
+    return c.length > 0 && c.every(el => f.includes(el)); }), JSON.stringify(o.fiches));
   juger("pendant une création", o);
   await action('#grimoire-creation-race-0 [data-ca="renoncer"]'); await p.waitForTimeout(2800); await pose();
   juger("après la création", await ordre());

@@ -192,20 +192,22 @@ titre("1. LA LISTE DES PERSONNAGES : LA CASE DU HÉROS ACTIF (UN SEUL PAR JOUEUR
 await section(async () => {
   await p.evaluate(() => { window.__actifs = []; window.basculerActivationPersonnage = async (id, actif) => {
     window.__actifs.push([id, actif]); [window.PERSOS_PARTIE, window.PERSOS_JOUEURS_PARTIE].forEach(l => (l || []).forEach(x => { if (x.idPersonnage === id) x.actif = actif; })); }; });
+  // (v479) Plus de cases dans une liste des clans : le menu « Mon héros principal » (page du Groupe).
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2600); await pose();
-  const r = await p.evaluate(() => ({ cases: [...document.querySelectorAll(".case-actif")].map(b => [b.dataset.id, b.classList.contains("cochee")]),
-    lyra: !!document.querySelector('.case-actif[data-id="H2"]') }));
+  const options = () => p.evaluate(() => [...document.querySelectorAll("#grimoire-groupe-g .liste-heros-principal option")].map(o => [o.value, o.selected]));
+  const choisir = (id) => p.evaluate((id) => { const l = document.querySelector("#grimoire-groupe-g .liste-heros-principal"); l.value = id; l.dispatchEvent(new Event("change", { bubbles: true })); }, id);
+  const r = await options();
   await cap("v367_clans");
-  verifier("une case devant chacun de MES héros (Kaya, Thorin), pas devant ceux des autres (Lyra)", r.cases.length === 2 && !r.lyra, JSON.stringify(r));
-  await cliquer('.case-actif[data-id="H3"]'); await p.waitForTimeout(1500);
-  const r2 = await p.evaluate(() => ({ appels: window.__actifs, actifs: window.PERSOS_JOUEURS_PARTIE.map(h => [h.idPersonnage, h.actif !== false]),
-    cases: [...document.querySelectorAll(".case-actif")].map(b => [b.dataset.id, b.classList.contains("cochee")]) }));
-  verifier("cocher Thorin : Thorin actif, Kaya au repos (basculerActivationPersonnage)",
+  verifier("le menu propose MES héros (Kaya, Thorin), pas ceux des autres (Lyra)", r.length === 2 && r.some(o => o[0] === "H1") && r.some(o => o[0] === "H3") && !r.some(o => o[0] === "H2"), JSON.stringify(r));
+  await choisir("H3"); await p.waitForTimeout(1500);
+  const r2 = await p.evaluate(() => ({ appels: window.__actifs, actifs: window.PERSOS_JOUEURS_PARTIE.map(h => [h.idPersonnage, h.actif !== false]) }));
+  verifier("choisir Thorin : Thorin actif, Kaya au repos (basculerActivationPersonnage)",
            JSON.stringify(r2.appels) === '[["H1",false]]' && r2.actifs.find(x => x[0] === "H3")[1] && !r2.actifs.find(x => x[0] === "H1")[1], JSON.stringify(r2));
-  verifier("…la case de Thorin cochée, celle de Kaya vide", r2.cases.some(c => c[0] === "H3" && c[1]) && r2.cases.some(c => c[0] === "H1" && !c[1]), JSON.stringify(r2.cases));
-  await cliquer('.case-actif[data-id="H1"]'); await p.waitForTimeout(1500);
+  await p.waitForTimeout(1200);
+  verifier("…le menu montre Thorin", (await options()).some(o => o[0] === "H3" && o[1]), JSON.stringify(await options()));
+  await choisir("H1"); await p.waitForTimeout(1500);
   const r3 = await p.evaluate(() => window.__actifs.slice(1));
-  verifier("recocher Kaya : Kaya revient, Thorin passe au repos", JSON.stringify(r3) === '[["H1",true],["H3",false]]', JSON.stringify(r3));
+  verifier("rechoisir Kaya : Kaya revient, Thorin passe au repos", JSON.stringify(r3) === '[["H1",true],["H3",false]]', JSON.stringify(r3));
 });
 
 // =========================================================================

@@ -196,7 +196,7 @@ const etatFonds = () => p.evaluate(() => (window.DONNEES_RACES || []).map((r, i)
 titre("1. EN OUVRANT LES PEUPLES : LA PREMIÈRE ET LA SUIVANTE SONT DÉJÀ LÀ, PAS LES AUTRES");
 await section(async () => {
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2600); await pose();
-  await action(".page-clan .nouvel-aventurier"); await p.waitForTimeout(2800); await pose();
+  await action(".choix-heros-principal .bouton-choix-heros[data-fa=creer]"); await p.waitForTimeout(2800); await pose();
   const e = await etatFonds();
   verifier("plus de chargement paresseux (loading=lazy) sur les fonds", !/loading="lazy"/.test(lire("grimoire_creation.js")));
   verifier("les Humains (la page ouverte) : image chargée, à gauche et à droite", e[0].pret && e[0].droite, JSON.stringify(e[0]));

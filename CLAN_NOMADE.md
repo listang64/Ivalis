@@ -54,15 +54,17 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
 | 0 — Inventaire | v477 | fait |
 | 1 — Nettoyage de l'ancien système | v477 | fait |
 | 2 — Le camp, Thémès et les données | v478 | fait |
+| (Nico) Plus de clans : le menu « Mon héros principal » | v479 | fait |
 
 ## Points ambigus
 
-- **Étape 1, le Livre des clans.** Il sert aujourd'hui aussi à choisir le héros actif, à ouvrir une fiche et
-  à créer un personnage. Le document le retire à l'étape 1, mais la liste des personnages jouables n'arrive
-  qu'avec la page Expédition (étape 6), et le document parle encore d'une « liste des personnages » où l'on
-  clique sur « Créer ». Choix fait : l'identité de clan disparaît (fanion, nom de clan, fondation,
-  réinitialisation, bouton « Les clans »), la page de gauche reste comme **liste des personnages** du
-  joueur (case du héros actif, fiche, « + Un nouvel aventurier ») jusqu'à l'étape 6.
+- **Étape 1, le Livre des clans — tranché par Nico (v479).** « Les clans et ce système de clan n'existent plus ;
+  pour la liste des persos, quelque chose de plus simple, comme une liste déroulante pour sélectionner son héros
+  principal. » Les pages de clans sont retirées. Sur la page du Groupe, le bloc **« Mon héros principal »** : un
+  menu déroulant de ses propres personnages (dans l'ordre de leur création), « Sa fiche » et « + Nouvel
+  aventurier ». Le choix est gardé sur la partie (`Heros_Principaux`) ; le héros principal est aussi le héros
+  joué (les autres passent au repos) jusqu'à la page Expédition. Les admins ne changent plus le héros des autres
+  joueurs (c'était une case des clans).
 - **Étape 2, « le logo du camp sur la carte globale ».** Le document dit aussi que le camp est « représenté
   par le logo qu'on utilise sur la carte globale ». Choix fait : ce logo (celui du pion du groupe sur la
   carte du monde) représente le camp sur la carte régionale, à sa place, et sur la carte du monde, au centre

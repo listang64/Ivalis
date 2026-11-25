@@ -166,7 +166,7 @@ await p.evaluate(() => window.appliquerVoyageDeLaPartie && window.appliquerVoyag
 const cap = async (nom) => { if (CAPTURES) await p.screenshot({ path: CAPTURES + "/" + nom + ".png" }); };
 const allerA = (cle) => p.evaluate((cle) => window.GRIMOIRE.allerALaPage(window.GRIMOIRE.indexDe(window.GRIMOIRE_FICHES.pages()[cle])), cle);
 const ici = () => p.evaluate(() => { const i = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), pg = window.GRIMOIRE_FICHES.pages();
-  return Object.keys(pg).find(k => k !== "clans" && pg[k] && window.GRIMOIRE.indexDe(pg[k]) === i) || (pg.clans.some(el => window.GRIMOIRE.indexDe(el) === i) ? "clans" : String(i)); });
+  return Object.keys(pg).find(k => pg[k] && window.GRIMOIRE.indexDe(pg[k]) === i) || String(i); });
 
 // =========================================================================
 titre("1. LE LIVRE S'OUVRE SUR LE SOMMAIRE ; I- AVENTURIERS MÈNE AUX CLANS");
@@ -179,15 +179,13 @@ await section(async () => {
   await pose(); await p.waitForTimeout(600);
   // (v418) Les Aventuriers sont les sous-pages du Groupe (le sommaire mène au Groupe).
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2500); await pose();
-  // (v433) Le Livre des clans : une double page par clan — les héros à gauche, le nom du clan à droite.
-  const clans = await p.evaluate(() => [...document.querySelectorAll(".page-clan.gauche")].map(pg => ({
-    titre: ((pg.nextElementSibling && pg.nextElementSibling.querySelector(".nom-clan")) || document.querySelector("#" + pg.id.replace("clan-", "clan-banniere-") + " .nom-clan") || {}).textContent,
-    heros: [...pg.querySelectorAll(".ligne-aventurier")].map(b => b.textContent.replace(/\s+/g, " ").trim()) })));
-  verifier("« Aventuriers » ouvre la page des clans", (await ici()) === "clans", await ici());
-  // (v477) Plus de clans par joueur : la double page de chacun porte « Les personnages de … » (CLAN_NOMADE.md).
-  verifier("une double page par joueur, la sienne d'abord : « Les personnages de Benjamin », « … de Nico » (v477)", clans.length === 2 && clans[0].titre === "Les personnages de Benjamin" && clans[1].titre === "Les personnages de Nico", JSON.stringify(clans.map(c => c.titre)));
-  verifier("ses héros dans l'ordre de leur création, « Nom - Classe » (au masculin, v365)", JSON.stringify(clans[0].heros) === JSON.stringify(["Thorin Ironfoot - Protecteur", "Kaya - Pisteur"]), JSON.stringify(clans[0].heros));
-  verifier("les autres clans avec leurs héros", JSON.stringify(clans[1].heros) === JSON.stringify(["Lyra Sombreval - Oracle"]), JSON.stringify(clans[1].heros));
+  // (v479) Plus de Livre des clans : la page du Groupe et son menu « Mon héros principal » (ses héros, dans
+  // l'ordre de leur création, « Nom — Classe »).
+  await attendreQue(() => p.evaluate(() => !!document.querySelector("#grimoire-groupe-g .liste-heros-principal")), 6000);
+  const menu = await p.evaluate(() => [...document.querySelectorAll("#grimoire-groupe-g .liste-heros-principal option")].map(o => o.textContent.replace(/\s+/g, " ").trim()));
+  verifier("« Aventuriers » ouvre la page du Groupe (v479)", await p.evaluate(() => window.GRIMOIRE_GROUPE.ouverte()));
+  verifier("le menu « Mon héros principal » : MES héros dans l'ordre de leur création, « Nom — Classe » (au masculin, v365)", JSON.stringify(menu) === JSON.stringify(["Thorin Ironfoot — Protecteur", "Kaya — Pisteur"]), JSON.stringify(menu));
+  verifier("…pas ceux des autres joueurs", !menu.some(t => /Lyra/.test(t)));
   await cap("v313_clans");
 });
 
@@ -195,8 +193,8 @@ await section(async () => {
 titre("2. LA FICHE : L'AVATAR ET SON NOM DORÉ ; LE NIVEAU AU CRAYON, LA RACE, LES CARACS…");
 // =========================================================================
 await section(async () => {
-  await cliquer('.ligne-aventurier[data-id="H1"]'); await p.waitForTimeout(2500); await pose();
-  verifier("un toucher sur un héros ouvre sa fiche (double page)", (await ici()) === "fiche-g", await ici());
+  await p.evaluate(() => window.GRIMOIRE_FICHES.ouvrir("H1")); await p.waitForTimeout(2500); await pose();
+  verifier("sa fiche s'ouvre (double page)", (await ici()) === "fiche-g", await ici());
   const r = await p.evaluate(() => {
     const g = document.getElementById("grimoire-fiches-fiche-g"), d = document.getElementById("grimoire-fiches-fiche-d");
     const img = g.querySelector(".avatar-heros"), nom = g.querySelector(".nom-heros-fiche"), cs = getComputedStyle(nom);

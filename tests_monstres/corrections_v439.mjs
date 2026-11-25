@@ -289,8 +289,6 @@ const ici = () => G(() => window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex());
 
 
 
-const surClan = (n) => G((n) => { const c = window.GRIMOIRE_FICHES.pages().clans; const i = window.GRIMOIRE.indexDe(c[2 * n]), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1); }, n);
-const casesDesClans = () => G(() => window.GRIMOIRE_FICHES.pages().clans.filter((el, i) => i % 2 === 0).map(el => [...el.querySelectorAll(".case-actif")].map(b => b.dataset.id + (b.classList.contains("cochee") ? "*" : ""))));
 
 titre("1. LA PAGE DU GROUPE : PLUS DE LIGNE « QUAND »");
 await section(async () => {
@@ -307,37 +305,17 @@ await section(async () => {
   verifier("les messages le disent : « Nico, Ben ou Adrien validera ta demande »", /Nico, Ben ou Adrien validera ta demande/.test(c) && /Réservé à Nico, Ben et Adrien/.test(lire("social.js")));
 });
 
-titre("3. LE HÉROS ACTIF DANS TOUS LES CLANS : POUR LES TROIS, PAS POUR LES AUTRES");
+// (v479) Le clan nomade : plus de clans par joueur, plus de cases dans les clans des autres. Chacun choisit son
+// héros principal parmi SES personnages (« parmi les personnages qui appartiennent uniquement au joueur »).
+titre("3. (v479) LE HÉROS PRINCIPAL : CHACUN PARMI SES PROPRES PERSONNAGES, ADMIN COMPRIS");
 await section(async () => {
-  // Lyra (J2) a un second héros au repos ; on note les bascules (app.js, basculerActivationPersonnage).
   await G(() => { const kael = { idPersonnage: "H3", idJoueur: "J2", prenom: "Kael", nom: "Vorn", actif: false, urlCloudinary: "" };
-    window.PERSOS_JOUEURS_PARTIE.push(kael); window.PERSOS_PARTIE.push({ ...kael }); window.__bascules = [];
-    window.basculerActivationPersonnage = async (id, actif) => { window.__bascules.push([id, actif]); };
-    window.GRIMOIRE_FICHES.poser(); });
-  await G(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await attendreQue(() => surClan(0), 8000); await pose();
-  let c = await casesDesClans();
-  verifier("un joueur ordinaire (J1, pas admin) : des cases sur son clan seulement", JSON.stringify(c) === JSON.stringify([["H1*"], []]), JSON.stringify(c));
-  // Un admin (Nico, Ben ou Adrien une fois la base à jour).
-  await G(() => { window.COMPTE_JOUEUR = { ...window.COMPTE_JOUEUR, admin: true }; window.GRIMOIRE_FICHES.majPlus(); });
-  await attendreQue(async () => (await casesDesClans())[1].length === 2, 4000);
-  c = await casesDesClans();
-  verifier("un admin : des cases aussi dans le clan des autres (Lyra cochée, Kael au repos)", JSON.stringify(c) === JSON.stringify([["H1*"], ["H2*", "H3"]]), JSON.stringify(c));
-  verifier("…mais « + Un nouvel aventurier » reste sur son propre clan", await G(() => { const c = window.GRIMOIRE_FICHES.pages().clans; return !!c[0].querySelector(".nouvel-aventurier") && !c[2].querySelector(".nouvel-aventurier"); }));
-  await G(() => window.GRIMOIRE_FICHES.pages().clans[2].querySelector('.case-actif[data-id="H3"]').click());
-  await attendreQue(() => G(() => window.__bascules.length >= 2), 3000);
-  const b = await G(() => ({ bascules: window.__bascules, kael: window.PERSOS_JOUEURS_PARTIE.find(h => h.idPersonnage === "H3").actif, lyra: window.PERSOS_JOUEURS_PARTIE.find(h => h.idPersonnage === "H2").actif,
-    thorin: window.PERSOS_JOUEURS_PARTIE.find(h => h.idPersonnage === "H1").actif }));
-  verifier("cocher Kael dans le clan d'un autre : Kael joue, Lyra passe au repos ; Thorin (un autre clan) n'est pas touché",
-           JSON.stringify(b.bascules) === JSON.stringify([["H3", true], ["H2", false]]) && b.kael === true && b.lyra === false && b.thorin !== false, JSON.stringify(b));
-  await attendreQue(async () => JSON.stringify((await casesDesClans())[1]) === JSON.stringify(["H2", "H3*"]), 4000);
-  verifier("…et la page le montre", JSON.stringify((await casesDesClans())[1]) === JSON.stringify(["H2", "H3*"]), JSON.stringify(await casesDesClans()));
-  await cap("v439-clan-autre");
-  // Adrien (P_03) avant que la base lui donne le rôle admin : déjà gardien des clans.
-  await G(() => { window.COMPTE_JOUEUR = { ...window.COMPTE_JOUEUR, admin: false }; localStorage.setItem("ID_JOUEUR_COURANT", "P_03"); window.GRIMOIRE_FICHES.majPlus(); });
-  await p.waitForTimeout(600);
-  const adrien = await G(() => window.GRIMOIRE_FICHES.pages().clans.filter((el, i) => i % 2 === 0).map(el => [el.querySelectorAll(".ligne-aventurier").length, el.querySelectorAll(".case-actif").length]).filter(([h]) => h > 0));
-  verifier("Adrien (P_03), même avant que la base le dise admin : des cases dans tous les clans (qui ont des héros)", adrien.length >= 2 && adrien.every(([h, n]) => n === h), JSON.stringify(adrien));
-  await G(() => localStorage.setItem("ID_JOUEUR_COURANT", "J1"));
+    window.PERSOS_JOUEURS_PARTIE.push(kael); window.PERSOS_PARTIE.push({ ...kael }); window.COMPTE_JOUEUR = { ...window.COMPTE_JOUEUR, admin: true }; });
+  await G(() => window.GRIMOIRE_GROUPE.ouvrir()); await attendreQue(surGroupe, 6000); await pose();
+  await attendreQue(() => G(() => !!document.querySelector("#grimoire-groupe-g .liste-heros-principal")), 4000);
+  const ids = await G(() => [...document.querySelectorAll("#grimoire-groupe-g .liste-heros-principal option")].map(o => o.value));
+  verifier("un admin (J1) : seulement ses personnages, pas Lyra ni Kael (J2)", ids.length > 0 && !ids.includes("H2") && !ids.includes("H3"), JSON.stringify(ids));
+  await G(() => { window.COMPTE_JOUEUR = { ...window.COMPTE_JOUEUR, admin: false }; });
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

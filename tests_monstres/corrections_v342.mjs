@@ -215,7 +215,7 @@ const allerA = async (cle) => { await p.evaluate((c) => window.GRIMOIRE_FICHES.a
 titre("1. LES PEUPLES : LA PAGE DE GAUCHE RAMÈNE À LA PAGE D'AVANT");
 await section(async () => {
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2600); await pose();
-  await action(".page-clan .nouvel-aventurier"); await p.waitForTimeout(2800); await pose();
+  await action(".choix-heros-principal .bouton-choix-heros[data-fa=creer]"); await p.waitForTimeout(2800); await pose();
   verifier("le texte des pages de la création défile au doigt en vertical seulement (touch-action: pan-y)",
            await p.evaluate(() => getComputedStyle(document.querySelector("#grimoire-creation-race-0 .defile-fiche")).touchAction === "pan-y"));
   await allerA("race-3");

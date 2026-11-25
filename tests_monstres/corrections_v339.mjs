@@ -226,7 +226,7 @@ titre("6. LES FONDS DES PAGES DES PEUPLES ; LE NOUVEAU FOND DU PROTECTEUR");
 // =========================================================================
 await section(async () => {
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2600); await pose();
-  await action(".page-clan .nouvel-aventurier"); await p.waitForTimeout(2800); await pose();
+  await action(".choix-heros-principal .bouton-choix-heros[data-fa=creer]"); await p.waitForTimeout(2800); await pose();
   const r = await p.evaluate(() => (window.DONNEES_RACES || []).map((race, i) => {
     const g = window.GRIMOIRE_CREATION.page("race-" + i), d = window.GRIMOIRE_CREATION.page("race-" + i + "-d");
     const ig = g && g.querySelector(".fond-classe.gauche img"), id = d && d.querySelector(".fond-classe.droite img");

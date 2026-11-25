@@ -160,7 +160,7 @@ titre("1. LES CARACS VALIDÉES : LA PREMIÈRE PAGE DE LA FICHE");
 // =========================================================================
 await section(async () => {
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2600); await pose();
-  await p.evaluate(() => document.querySelector(".page-clan .nouvel-aventurier").click()); await p.waitForTimeout(2800); await pose();
+  await p.evaluate(() => document.querySelector(".choix-heros-principal .bouton-choix-heros[data-fa=creer]").click()); await p.waitForTimeout(2800); await pose();
   // La répartition validée, app.js demande la fiche sur l'inventaire : le livre ouvre la première page.
   await p.evaluate(() => window.ouvrirFichePerso("H1", "Thorin", "Ironfoot", "#2a1a0f", "onglet-inventaire"));
   await p.waitForTimeout(3500); await pose();

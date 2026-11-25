@@ -61,11 +61,6 @@ const classeDe = (h) => {
     return (typeof window.nomClasseGenre === "function" ? window.nomClasseGenre(c, h.genre) : c) || "";
 };
 const idJoueurCourant = () => { try { return localStorage.getItem("ID_JOUEUR_COURANT") || ""; } catch (e) { return ""; } };
-// (v439) Nico, Ben et Adrien (les admins ; les trois anciens joueurs, P_01 à P_03, même avant que
-// la base ait donné le rôle admin à Adrien) cochent le héros actif dans tous les clans.
-const GARDIENS_DES_CLANS = ["P_01", "P_02", "P_03"];
-const gardienDesClans = () => !!((window.COMPTE_JOUEUR && window.COMPTE_JOUEUR.admin) || GARDIENS_DES_CLANS.includes(idJoueurCourant()));
-
 // Les noms des joueurs (Joueurs), lus une fois. (v477) Plus de clans par joueur (leur nom, leur
 // fanion) : le clan, c'est désormais tout le monde (CLAN_NOMADE.md).
 let joueurs = null, joueursEnLecture = null;
@@ -94,28 +89,6 @@ function nomDuJoueur(id) {
 // (v369) Le nom d'un joueur, pour « Lecture terminée » (grimoire_recit.js).
 window.nomDuJoueurLivre = (id) => { if (!joueurs && typeof chargerJoueurs === "function") chargerJoueurs(); return nomDuJoueur(id); };
 
-// LES CLANS : un par joueur ; le sien d'abord, puis les autres par nom. Les
-// héros dans l'ordre de leur création (Cree_Le, v313 ; ceux d'avant, faute de
-// date, gardent l'ordre de la base, derrière).
-function clans() {
-    const moi = idJoueurCourant();
-    const parJoueur = new Map();
-    tousLesHeros().forEach((h, i) => {
-        const j = h.idJoueur || "";
-        if (!parJoueur.has(j)) parJoueur.set(j, []);
-        parJoueur.get(j).push({ h, i });
-    });
-    const liste = [...parJoueur.entries()].map(([id, hs]) => ({
-        id, nom: nomDuJoueur(id),
-        heros: hs.sort((a, b) => ((a.h.creeLe || Infinity) - (b.h.creeLe || Infinity)) || (a.i - b.i)).map(x => x.h)
-    }));
-    liste.sort((a, b) => (a.id === moi ? -1 : b.id === moi ? 1 : 0) || String(a.nom || "~").localeCompare(String(b.nom || "~"), "fr"));
-    if (!liste.some(c => c.id === moi) && moi) liste.unshift({ id: moi, nom: nomDuJoueur(moi), heros: [] });
-    return liste;
-}
-// (v477) La double page des personnages d'un joueur porte son nom (plus de nom de clan).
-const titreClan = (c) => c.id === "MJ" ? "Les gens du Maître du jeu" : c.nom ? `Les personnages de ${c.nom}` : "Les personnages";
-
 // Les caractéristiques d'un héros (sans bonus) : partagées par la partie,
 // sinon le cache de l'ancienne fiche.
 function caracsDe(id) {
@@ -128,7 +101,6 @@ function caracsDe(id) {
 // ---------------------------------------------------------------------
 //  LES PAGES
 // ---------------------------------------------------------------------
-let pagesClans = [];
 const pagesFiche = {};          // fiche-g, fiche-d, tal-g, tal-d, tal2-g, tal2-d, comp-g, comp-d, forge-g, forge-d, inv-g, inv-d, dev-g, dev-d
 // v318 — Nico : « l'image et les caracs en premier, ensuite les compétences,
 // l'inventaire, les talents, la Forge, puis le panneau DEV ».
@@ -150,14 +122,14 @@ function creerPagesFiche() {
         pagesFiche[cle] = page(cle, i % 2 === 0 ? "gauche" : "droite", "page-" + cle.split("-")[0].replace(/\d+$/, ""));
     });
 }
-// Les pages dans le livre : les clans (un nombre pair), la fiche, et le DEV en mode développeur.
+// Les pages dans le livre : la fiche, et le DEV en mode développeur. (v479) Plus de pages de clans.
 function poserLesPages() {
     const g = G();
     if (!g || typeof g.definirFiches !== "function") return;
     creerPagesFiche();
-    // (v319) Pendant une création, ses pages (éphémères) suivent les clans.
+    // (v319) Pendant une création, ses pages (éphémères) viennent devant la fiche.
     const creation = window.GRIMOIRE_CREATION && typeof window.GRIMOIRE_CREATION.pages === "function" ? window.GRIMOIRE_CREATION.pages() : [];
-    const els = [...pagesClans, ...creation, ...ORDRE_FICHE.map(c => pagesFiche[c]), ...(modeDev() ? ORDRE_DEV.map(c => pagesFiche[c]) : [])];
+    const els = [...creation, ...ORDRE_FICHE.map(c => pagesFiche[c]), ...(modeDev() ? ORDRE_DEV.map(c => pagesFiche[c]) : [])];
     const avant = g.pagesFiches();
     if (avant.length === els.length && avant.every((el, i) => el === els[i])) return;
     g.definirFiches(els);
@@ -172,47 +144,48 @@ function aller(el, essai) {
     g.allerALaPage(i);
 }
 
-// LES PAGES DES CLANS
-// (v446) Nico : « cette image en fond des pages clans, exactement comme pour les races, en baissant de
-// 10 % l'opacité générale de l'image ; le nom du clan en doré ». L'image sur toute la double page du
-// clan : à gauche, voilée en dégradé sous la liste (presque effacée au bord, entière vers la
-// pliure) ; à droite, entière, sous le fanion et le nom (grimoire_fiches.css, .fond-clan).
-const IMAGE_CLANS = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1795022230/E95A92DD-534C-4DB7-AEB5-56C4D7F8446D_djgbg7.png";
-const fondClan = (cote) => `<div class="fond-clan ${cote}" aria-hidden="true"><img src="${IMAGE_CLANS}" alt="" draggable="false" decoding="async"></div>`;
-function pageClan(c, cote, i) {
-    const el = page("clan-" + i, cote, "page-clan");
-    const moi = c.id === idJoueurCourant();
-    // (v439) Nico : « pour Nico, Ben et Adrien : qu'ils puissent changer le personnage actif dans
-    // les différents clans, même si ce n'est pas le leur ».
-    const cases = moi || gardienDesClans();
-    const lignes = c.heros.map((h, k) => {
-        const r = hasard("clan-" + h.idPersonnage);
-        const penche = ((r() * 2 - 1) * 1.6).toFixed(2);
-        // (v367, Nico : « que les joueurs puissent choisir le personnage actif dans leur
-        // groupe, comme une case à cocher ») : sur son propre clan, une case par héros ;
-        // un seul actif à la fois (cocher l'un met les autres au repos).
-        const actif = h.actif !== false;
-        const caseActif = cases ? `<button type="button" class="case-actif${actif ? " cochee" : ""}" data-action="fiches" data-fa="actif" data-id="${echapper(h.idPersonnage)}"
-                  aria-pressed="${actif}" title="${actif ? "Le héros que tu joues" : "Jouer ce héros"}"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="boite" d="M 4 5 Q 12 3.6 20 4.6 L 19.4 19.6 Q 12 20.6 4.6 19.4 Z"/>${actif ? `<path class="coche" d="M 7 12.5 L 10.6 16 L 18 7"/>` : ""}</svg></button>` : "";
-        return `<li style="--penche:${penche}deg"${cases ? ` class="avec-case"` : ""}>${caseActif}<button type="button" class="ligne-aventurier" data-action="fiches" data-fa="heros" data-id="${echapper(h.idPersonnage)}">
-                  <span class="nom-aventurier">${echapper(nomHeros(h))}</span>${classeDe(h) ? ` <span class="tiret-aventurier">-</span> <span class="classe-aventurier">${echapper(classeDe(h))}</span>` : ""}
-                  ${h.actif === false ? `<span class="aventurier-absent">(au repos)</span>` : ""}</button></li>`;
-    }).join("");
-    // (v418) Les Aventuriers sont les sous-pages du Groupe : on y revient d'ici.
-    const retourGroupe = i === 0 && window.GRIMOIRE_GROUPE ? `<button type="button" class="lien-fiche retour-groupe-clan" data-action="groupe" data-gp="revenir">‹ Le groupe</button>` : "";
-    // (v433) Le Livre des clans : à gauche, les aventuriers du clan (le nom du clan est
-    // sur la page de droite, sous sa bannière). (v434) « Renomme le titre : Membres du clan ».
-    el.innerHTML = `${fondClan("gauche")}<div class="contenu-page page-liste-clan">${retourGroupe}
-        <div class="titre-clan titre-aventuriers-clan">Les personnages</div>
-        <svg class="fleuron fleuron-clan" viewBox="0 0 200 24" aria-hidden="true">
-          <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>
-        ${lignes ? `<ol class="liste-aventuriers">${lignes}</ol>` : `<p class="clan-vide">Aucun aventurier pour l'instant.</p>`}
-        ${moi ? `<button type="button" class="nouvel-aventurier" data-action="fiches" data-fa="creer">${lavis({ couleurs: ["#c9772e", "#e0a046", "#a5532a"], opacite: 0.5, nom: "nouvel" }, "nouvel-" + c.id)}${cadre("nouvel-" + c.id, 1.4)}<span>+ Un nouvel aventurier</span></button>` : ""}
-      </div>`;
-    return el;
+// (v479) LE HÉROS PRINCIPAL DU JOUEUR (le clan nomade, CLAN_NOMADE.md) : « le premier personnage
+// d'un joueur est son héros principal » ; il en change dans le menu déroulant « Mon héros principal »
+// (la page du Groupe), parmi ses propres personnages. Le choix est gardé sur la partie
+// (Heros_Principaux) ; le héros principal est aussi celui que le joueur joue (le héros actif, v367 :
+// ses autres personnages passent au repos) jusqu'à la page Expédition.
+const choixDeLaPartie = () => ((window.PARTIE_DATA || {}).Heros_Principaux) || {};
+const herosPrincipalDe = (joueur) => (window.CAMP && window.CAMP.regles ? window.CAMP.regles.herosPrincipal(joueur, tousLesHeros(), choixDeLaPartie()) : null);
+const personnagesDe = (joueur) => (window.CAMP && window.CAMP.regles ? window.CAMP.regles.personnagesDuJoueur(joueur, tousLesHeros()) : []);
+async function definirHerosPrincipal(id) {
+    const h = tousLesHeros().find(x => x.idPersonnage === id);
+    const joueur = h && h.idJoueur;
+    if (!h || !joueur || joueur !== idJoueurCourant()) return false;
+    const p = window.ID_PARTIE_COURANTE;
+    if (p) {
+        try { await updateDoc(doc(db, "Systeme_Parties", p), { ["Heros_Principaux." + joueur]: id }); } catch (e) { console.error("Le livre : le héros principal", e); }
+        window.PARTIE_DATA = { ...(window.PARTIE_DATA || {}), Heros_Principaux: { ...choixDeLaPartie(), [joueur]: id } };
+    }
+    await choisirHerosActif(id);
+    return true;
 }
-// (v367) LE HÉROS ACTIF DU JOUEUR : celui-ci joue, ses autres héros passent au repos
-// (basculerActivationPersonnage, app.js : le plateau, l'initiative, le tour de parole).
+// Le bloc « Mon héros principal » (posé par la page du Groupe, grimoire_groupe.js).
+function htmlChoixHeros() {
+    const moi = idJoueurCourant();
+    const siens = personnagesDe(moi), principal = herosPrincipalDe(moi);
+    const options = siens.map(h => `<option value="${echapper(h.idPersonnage)}"${h.idPersonnage === principal ? " selected" : ""}>${echapper(nomHeros(h))}${classeDe(h) ? ` — ${echapper(classeDe(h))}` : ""}</option>`).join("");
+    return `<div class="choix-heros-principal">
+        <label class="titre-choix-heros" for="liste-heros-principal">Mon héros principal</label>
+        ${siens.length ? `<select id="liste-heros-principal" class="liste-heros-principal">${options}</select>` : `<p class="fiche-attente">Tu n'as pas encore d'aventurier.</p>`}
+        <div class="boutons-choix-heros">
+          ${siens.length ? `<button type="button" class="lien-fiche bouton-choix-heros" data-action="fiches" data-fa="fiche-principal">Sa fiche</button>` : ""}
+          <button type="button" class="lien-fiche bouton-choix-heros" data-action="fiches" data-fa="creer">+ Nouvel aventurier</button>
+        </div>
+      </div>`;
+}
+const signatureChoixHeros = () => JSON.stringify([idJoueurCourant(), herosPrincipalDe(idJoueurCourant()), personnagesDe(idJoueurCourant()).map(h => [h.idPersonnage, nomHeros(h), classeDe(h)])]);
+// Le menu déroulant : un choix, et le héros principal change.
+document.addEventListener("change", (e) => {
+    const l = e.target && e.target.closest && e.target.closest(".liste-heros-principal");
+    if (!l) return;
+    if (typeof window.jouerSonClic === "function") window.jouerSonClic();
+    definirHerosPrincipal(l.value);
+});
 async function choisirHerosActif(id) {
     const h = tousLesHeros().find(x => x.idPersonnage === id);
     if (!h || typeof window.basculerActivationPersonnage !== "function") return;
@@ -222,34 +195,7 @@ async function choisirHerosActif(id) {
     for (const x of siens) if (x.idPersonnage !== id && x.actif !== false) await window.basculerActivationPersonnage(x.idPersonnage, false);
     // Les deux listes de la partie disent la même chose.
     [window.PERSOS_PARTIE, window.PERSOS_JOUEURS_PARTIE].forEach(l => (l || []).forEach(x => { if (x && siens.some(y => y.idPersonnage === x.idPersonnage)) x.actif = x.idPersonnage === id; }));
-    signatures.clans = "";
     majPlus(true);
-}
-// (v433) Une double page par joueur : à gauche, ses personnages ; à droite, son nom. (v477) Le
-// Livre des clans n'est plus : ni fanion ni nom de clan (CLAN_NOMADE.md, étape 1) — la liste des
-// personnages reste, jusqu'à la page Expédition (étape 6).
-function pageBanniereClan(c, i) {
-    const el = page("clan-banniere-" + i, "droite", "page-clan page-banniere-clan");
-    el.innerHTML = `${fondClan("droite")}<div class="contenu-page page-banniere-du-clan">
-        <div class="nom-clan">${echapper(titreClan(c))}</div>
-        <svg class="fleuron fleuron-clan" viewBox="0 0 200 24" aria-hidden="true">
-          <path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>
-      </div>`;
-    return el;
-}
-function construireClans() {
-    const cs = clans();
-    const sig = JSON.stringify([gardienDesClans(), cs.map(c => [c.id, c.nom, c.heros.map(h => [h.idPersonnage, nomHeros(h), classeDe(h), h.actif !== false])])]);
-    if (sig === signatures.clans && pagesClans.length) return false;
-    signatures.clans = sig;
-    const nouvelles = cs.flatMap((c, i) => [pageClan(c, "gauche", i), pageBanniereClan(c, i)]);
-    // Les mêmes pages gardent leur place si leur nombre ne change pas (le livre ne bouge pas).
-    if (nouvelles.length === pagesClans.length) {
-        nouvelles.forEach((el, i) => { pagesClans[i].className = el.className; pagesClans[i].innerHTML = el.innerHTML; });
-        return false;
-    }
-    pagesClans = nouvelles;
-    return true;
 }
 
 // ---------------------------------------------------------------------
@@ -1379,17 +1325,14 @@ function majPlus(force) {
     brancherFicheAncienne();
     brancherForge();
     brancherResetCaracs();
-    const changeClans = construireClans();
     creerPagesFiche();
     if (!heros || !herosParId(heros)) {
-        const moi = idJoueurCourant();
-        const premier = clans().find(c => c.id === moi);
-        const h = (premier && premier.heros[0]) || tousLesHeros()[0];
+        const h = herosParId(herosPrincipalDe(idJoueurCourant())) || tousLesHeros()[0];
         if (h) { heros = h.idPersonnage; signatures.fiche = ""; }
     }
     if (modeDev() && !devDansLeLivre) rangerDev();
     if (!modeDev() && devDansLeLivre) remettreDev();
-    if (changeClans || force !== undefined) poserLesPages();
+    poserLesPages();
     const h = herosParId(heros);
     const sig = signatureFiche(h);
     if (!h) {
@@ -1440,7 +1383,9 @@ function agir(cible) {
     if (Date.now() - dernierAppuiLong < 700) return;          // un appui long montrait une note
     const fa = cible.dataset.fa, h = herosParId(heros);
     if (fa === "heros") { son(); ouvrirHeros(cible.dataset.id); return; }
-    if (fa === "actif") { choisirHerosActif(cible.dataset.id); return; }
+    if (fa === "actif") { definirHerosPrincipal(cible.dataset.id); return; }
+    // (v479) « Sa fiche » : celle du héros choisi dans le menu « Mon héros principal ».
+    if (fa === "fiche-principal") { son(); const l = document.getElementById("liste-heros-principal"); ouvrirHeros((l && l.value) || herosPrincipalDe(idJoueurCourant())); return; }
     // (v319) La création se fait dans le livre (grimoire_creation.js) ; l'ancienne fenêtre en secours.
     if (fa === "creer") { son(); if (window.GRIMOIRE_CREATION && window.GRIMOIRE_CREATION.commencer()) return; if (typeof window.ouvrirCreationHero === "function") window.ouvrirCreationHero(); return; }
     if (!h) return;
@@ -1615,7 +1560,7 @@ function veiller() {
             const pf = g.pageFlip();
             if (!pf || (pf.getState() === "read" && !g.defileEnCours())) majPlus();
             majMarqueRefermer();
-        } else if (heros || pagesClans.length) {
+        } else if (heros) {
             // Hors partie : on oublie les héros de la partie quittée.
             if (forgeDansLeLivre) fermerForge(false);
             majMarqueRefermer();
@@ -1623,7 +1568,7 @@ function veiller() {
             rentrerLesModales();
             const f = fenetreAncienne();
             if (f) f.classList.remove("dans-le-livre");
-            heros = null; carteOuverte = null; pagesClans = []; signatures = {}; joueurs = null;
+            heros = null; carteOuverte = null; signatures = {}; joueurs = null;
         }
     } catch (e) { console.error("Le livre : les aventuriers", e); }
     setTimeout(veiller, 900);
@@ -1635,14 +1580,14 @@ window.addEventListener("missions-terminees", () => { try { majPlus(true); } cat
 window.GRIMOIRE_FICHES = {
     agir,
     ouvrir: (id, onglet) => ouvrirHeros(id, onglet),
+    // (v479) Plus de pages de clans : la page du Groupe, où est le menu « Mon héros principal ».
     allerAuxAventuriers: () => {
         majPlus(true);
-        const premiere = pagesClans[0];
-        if (premiere) aller(premiere);
+        if (window.GRIMOIRE_GROUPE && typeof window.GRIMOIRE_GROUPE.ouvrir === "function") window.GRIMOIRE_GROUPE.ouvrir();
     },
+    htmlChoixHeros, signatureChoixHeros, herosPrincipalDe, definirHerosPrincipal,
     herosAffiche: () => heros,
-    pages: () => ({ clans: pagesClans.slice(), ...pagesFiche }),
-    // (v434) Un clan fondé, un fanion dessiné, un clan réinitialisé : on relit la base.
+    pages: () => ({ ...pagesFiche }),
     majPlus: () => majPlus(true),
     // pour les bancs : les dessins ; (v319) pour la création : le lavis, le cadre, la pose des pages
     dessins: { jaugeCrayon, dessinBanniere, piece, lavis, cadre },

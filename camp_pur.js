@@ -110,3 +110,20 @@ export function regionNommee(cartes, nom) {
         .find(k => sansAccent((cartes[k] || {}).nom).includes(voulu));
     return n || 0;
 }
+
+// LE HÉROS PRINCIPAL D'UN JOUEUR (v479) : « le premier personnage d'un joueur est son héros
+// principal » ; il peut en changer, « parmi les personnages qui appartiennent uniquement au
+// joueur ». `persos` : les personnages de la partie ({ idPersonnage, idJoueur, creeLe, statut,
+// estIllusion }) ; `choix` : Heros_Principaux de la partie ({ idJoueur: idPersonnage }).
+export function personnagesDuJoueur(joueur, persos) {
+    return (persos || []).map((h, i) => ({ h, i }))
+        .filter(({ h }) => h && h.idPersonnage && joueur && h.idJoueur === joueur && !h.estIllusion && !h.estMonstre && h.statut !== "Mort")
+        .sort((a, b) => ((a.h.creeLe || Infinity) - (b.h.creeLe || Infinity)) || (a.i - b.i))
+        .map(x => x.h);
+}
+export function herosPrincipal(joueur, persos, choix) {
+    const siens = personnagesDuJoueur(joueur, persos);
+    const voulu = choix && choix[joueur];
+    const h = siens.find(x => x.idPersonnage === voulu) || siens[0];
+    return h ? h.idPersonnage : null;
+}

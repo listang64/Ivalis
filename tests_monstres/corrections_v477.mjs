@@ -166,11 +166,11 @@ await section(async () => {
   verifier("le niveau des créatures : celui du groupe (4)", r.niveau === 4, String(r.niveau));
 });
 
-titre("4. LE GROUPE : « LES PERSONNAGES › » À LA PLACE DE « LES CLANS › »");
+titre("4. LE GROUPE : PLUS DE « LES CLANS › » (v479 : LE MENU « MON HÉROS PRINCIPAL »)");
 await section(async () => {
   const gg = lire("grimoire_groupe.js");
-  verifier("le bouton du Groupe mène à la liste des personnages (plus « Les clans › »)", /<span>Les personnages ›<\/span>/.test(gg) && !/Les clans ›<\/span>/.test(gg));
-  verifier("…et la double page de chacun porte « Les personnages de … »", /`Les personnages de \$\{c\.nom\}`/.test(lire("grimoire_fiches.js")));
+  verifier("le bouton « Les clans › » n'est plus sur la page du Groupe", !/Les clans ›<\/span>/.test(gg) && /htmlChoixHeros/.test(gg));
+  verifier("…et plus de double page de clan par joueur", !/pageBanniereClan|construireClans/.test(lire("grimoire_fiches.js")));
 });
 
 titre("5. LES VERSIONS");

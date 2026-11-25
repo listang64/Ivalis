@@ -169,7 +169,7 @@ await p.evaluate(() => window.appliquerVoyageDeLaPartie && window.appliquerVoyag
 const cap = async (nom) => { if (CAPTURES) await p.screenshot({ path: CAPTURES + "/" + nom + ".png" }); };
 const allerA = (cle) => p.evaluate((cle) => window.GRIMOIRE.allerALaPage(window.GRIMOIRE.indexDe(window.GRIMOIRE_FICHES.pages()[cle])), cle);
 const ici = () => p.evaluate(() => { const i = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(), pg = window.GRIMOIRE_FICHES.pages();
-  return Object.keys(pg).find(k => k !== "clans" && pg[k] && window.GRIMOIRE.indexDe(pg[k]) === i) || (pg.clans.some(el => window.GRIMOIRE.indexDe(el) === i) ? "clans" : String(i)); });
+  return Object.keys(pg).find(k => pg[k] && window.GRIMOIRE.indexDe(pg[k]) === i) || String(i); });
 
 // =========================================================================
 titre("1. LES CLASSES AU MASCULIN ; PLUS DE « SE CHERCHE » ; LE CODE");
@@ -193,9 +193,10 @@ await section(async () => {
   await pose(); await p.waitForTimeout(600);
   // (v418) Les Aventuriers sont les sous-pages du Groupe (le sommaire mène au Groupe).
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2500); await pose();
-  await cliquer('.ligne-aventurier[data-id="H1"]'); await p.waitForTimeout(2500); await pose();
-  const clans = await p.evaluate(() => [...document.querySelectorAll(".ligne-aventurier")].map(b => b.textContent.replace(/\s+/g, " ").trim()));
-  verifier("la liste des clans : « Kaya - Pisteur » (plus « Pisteuse »)", clans.includes("Kaya - Pisteur") || (await p.evaluate(() => /Pisteur/.test(document.querySelector("#grimoire-fiches-fiche-d .encart-identite").textContent)
+  // (v479) Plus de liste des clans : le menu « Mon héros principal » ; la fiche s'ouvre par GRIMOIRE_FICHES.ouvrir.
+  const clans = await p.evaluate(() => [...document.querySelectorAll(".liste-heros-principal option")].map(b => b.textContent.replace(/\s+/g, " ").trim()));
+  await p.evaluate(() => window.GRIMOIRE_FICHES.ouvrir("H1")); await p.waitForTimeout(2500); await pose();
+  verifier("le menu du héros principal : « Kaya — Pisteur » (plus « Pisteuse »)", clans.includes("Kaya — Pisteur") || (await p.evaluate(() => /Pisteur/.test(document.querySelector("#grimoire-fiches-fiche-d .encart-identite").textContent)
            && !/Pisteuse/.test(document.querySelector("#grimoire-fiches-fiche-d .encart-identite").textContent))), JSON.stringify(clans));
   const visible = () => p.evaluate(() => { const b = document.querySelector(".bulle-aide-fiche"); return b && b.classList.contains("visible") ? b.textContent.replace(/\s+/g, " ").trim() : ""; });
   const c = await centre('#grimoire-fiches-fiche-d .case-carac[data-carac="dex"]');

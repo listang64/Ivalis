@@ -344,12 +344,11 @@ await section(async () => {
   verifier("un toucher sur Thorin : sa fiche", await attendreQue(() => G(() => window.GRIMOIRE_FICHES.herosAffiche() === "H1"), 5000));
   await pose();
   await G(() => window.GRIMOIRE_GROUPE.ouvrir()); await attendreQue(surGroupe, 6000); await pose();
-  await cliquer('#grimoire-groupe-g .bouton-aventuriers-groupe');
-  const clan = await attendreQue(() => G(() => { const c = window.GRIMOIRE_FICHES.pages().clans[0]; const i = window.GRIMOIRE.indexDe(c), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1); }), 6000);
-  verifier("« Les aventuriers › » : la page de notre clan (nos héros)", clan);
-  await pose();
-  verifier("…qui a son « ‹ Le groupe »", await G(() => !!document.querySelector(".page-liste-clan .retour-groupe-clan")));
-  await cliquer(".page-liste-clan .retour-groupe-clan");
+  // (v479) Plus de Livre des clans : le menu « Mon héros principal », et « Sa fiche ».
+  verifier("le menu « Mon héros principal » est sur la page du Groupe", await G(() => !!document.querySelector("#grimoire-groupe-g .liste-heros-principal")));
+  await cliquer('#grimoire-groupe-g .bouton-choix-heros[data-fa="fiche-principal"]');
+  verifier("« Sa fiche » : la fiche du héros choisi", await attendreQue(() => G(() => window.GRIMOIRE_FICHES.herosAffiche() === document.querySelector("#grimoire-groupe-g .liste-heros-principal").value), 5000));
+  await G(() => window.GRIMOIRE_GROUPE.ouvrir()); await attendreQue(surGroupe, 6000); await pose();
   verifier("…qui ramène au Groupe", await attendreQue(surGroupe, 6000));
   await pose();
   await cliquer('#grimoire-groupe-d .carte-suiveur[data-id="PNJ_DOROS"]');
@@ -379,8 +378,7 @@ await section(async () => {
   await G(() => window.GRIMOIRE_GROUPE.ouvrir()); await attendreQue(surGroupe, 6000); await pose();
   const fleches = await G(() => [...document.querySelectorAll("#grimoire-groupe-g .heros-groupe")].map(h => [h.querySelector(".nom-groupe").textContent.trim(), !!h.querySelector(".changer-heros-groupe")]));
   verifier("plus de ⇄ à côté de nos héros", JSON.stringify(fleches) === '[["Thorin Ironfoot",false],["Lyra Sombreval",false]]', JSON.stringify(fleches));
-  await cliquer('[data-gp="aventuriers"]');
-  verifier("« Les clans › » : notre clan, la liste de nos personnages (ses cases)", await attendreQue(() => G(() => { const c = window.GRIMOIRE_FICHES.pages().clans[0]; const i = window.GRIMOIRE.indexDe(c), ici = window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex(); return i > 0 && (ici === i || ici === i + 1) && !!c.querySelector(".case-actif"); }), 6000));
+  verifier("(v479) plus de « Les clans › » : le menu « Mon héros principal »", await G(() => !document.querySelector('[data-gp="aventuriers"]') && !!document.querySelector("#grimoire-groupe-g .liste-heros-principal")));
   const gr = lire("grimoire_recit.js");
   verifier("le récit ne s'en mêle plus (son papier ouvre toujours la fiche)", !/closest\("#recit-avatar-nom"\)/.test(gr) && /toucherVite\(avatar, \(\) => ouvrirFicheDuPapier\(avatar\)\);/.test(gr));
   await cap("v419-groupe-fleche");

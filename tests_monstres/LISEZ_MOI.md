@@ -12647,3 +12647,11 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **La jauge des ressources** : MIA_RESSOURCES (`environnement_mj.js`, `estimerRessourcesA`) lit la capture de la carte autour du camp, avec le tableau des terrains.
 - **Le logo du camp** : le logo de la carte du monde (le pion du groupe), sur la carte régionale à la place du camp, et sur la carte du monde au centre de sa région.
 - corrections_v478 le vérifie.
+
+## v479 — Plus de Livre des clans : le menu « Mon héros principal »
+
+- Nico : « les clans et ce système de clan n'existent plus ; pour la liste des persos, quelque chose de plus simple, comme une liste déroulante pour sélectionner son héros principal ». La fenêtre « créer son clan » n'existe plus depuis la v477 (`grimoire_clans.js` supprimé).
+- **Plus de pages de clans** (`grimoire_fiches.js`) : ni la liste par joueur, ni sa page de droite, ni leurs styles.
+- **« Mon héros principal »** (page du Groupe) : un menu déroulant de ses propres personnages, dans l'ordre de leur création (« Nom — Classe ») ; « Sa fiche » ; « + Nouvel aventurier ». Le choix va sur la partie (`Heros_Principaux`) ; le héros principal est aussi le héros joué (les autres au repos). La règle (`camp_pur.js`, `herosPrincipal`) : le premier personnage d'un joueur, sauf s'il en a choisi un autre parmi les siens (jamais celui d'un autre joueur, jamais un mort).
+- « Aventuriers » (le sommaire) mène à la page du Groupe.
+- corrections_v479 le vérifie ; corrections_v313, v319, v322, v365, v367, v418_livre, v439 et v477 passent par le menu (plus par les pages de clans) ; les bancs de la création cliquent « + Nouvel aventurier » du menu.

@@ -188,9 +188,10 @@ titre("1. « + UN NOUVEL AVENTURIER » : ENCADRÉ, UNE AQUARELLE DEDANS");
 // =========================================================================
 await section(async () => {
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2600); await pose();
-  const r = await p.evaluate(() => { const b = document.querySelector(".page-clan .nouvel-aventurier"); if (!b) return null;
+  const r = await p.evaluate(() => { const b = document.querySelector(".choix-heros-principal .bouton-choix-heros[data-fa=creer]"); if (!b) return null;
     return { cadre: !!b.querySelector(".cadre-main"), lavis: !!b.querySelector(".lavis"), souligne: getComputedStyle(b).textDecorationLine }; });
-  verifier("le bouton est encadré à la main, avec une aquarelle dedans", !!r && r.cadre && r.lavis && r.souligne === "none", JSON.stringify(r));
+  // (v479) Plus de pages de clans : « + Nouvel aventurier » est dans le menu « Mon héros principal » (page du Groupe).
+  verifier("(v479) « + Nouvel aventurier » est dans le menu « Mon héros principal », sur la page du Groupe", !!r && await p.evaluate(() => !!document.querySelector("#grimoire-groupe-g .choix-heros-principal .bouton-choix-heros[data-fa=creer]")), JSON.stringify(r));
   await cap("v319_clan");
 });
 
@@ -198,7 +199,7 @@ await section(async () => {
 titre("2. LES PEUPLES : UNE DOUBLE PAGE PAR RACE, LES MARQUE-PAGES DU BORD DROIT");
 // =========================================================================
 await section(async () => {
-  await action(".page-clan .nouvel-aventurier"); await p.waitForTimeout(2800); await pose();
+  await action(".choix-heros-principal .bouton-choix-heros[data-fa=creer]"); await p.waitForTimeout(2800); await pose();
   const r = await p.evaluate(() => {
     const c = window.GRIMOIRE_CREATION, s = c.sections();
     const g = c.page("race-0"), d = c.page("race-0-d");
@@ -340,13 +341,13 @@ titre("8. LA CRÉATION TERMINÉE SANS HÉROS : RIEN NE RESTE (v387 : plus de « 
 // =========================================================================
 await section(async () => {
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2600); await pose();
-  await action(".page-clan .nouvel-aventurier"); await p.waitForTimeout(2800); await pose();
+  await action(".choix-heros-principal .bouton-choix-heros[data-fa=creer]"); await p.waitForTimeout(2800); await pose();
   const avant = await p.evaluate(() => window.GRIMOIRE_CREATION.actif());
   verifier("plus de « Renoncer à ce héros » (v387)", await p.evaluate(() => !document.querySelector('[data-ca="renoncer"]')));
   await p.evaluate(() => { window.GRIMOIRE_CREATION.terminer(); window.GRIMOIRE_FICHES.allerAuxAventuriers(); }); await p.waitForTimeout(2800); await pose();
   const r = await p.evaluate(() => ({ actif: window.GRIMOIRE_CREATION.actif(), pages: document.querySelectorAll(".page-creation").length,
-    clan: window.GRIMOIRE.indexDe(window.GRIMOIRE_FICHES.pages().clans[0]), ici: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() }));
-  verifier("terminée : les pages s'effacent, retour à la page du clan", avant && !r.actif && r.pages === 0 && Math.abs(r.ici - r.clan) <= 1, JSON.stringify(r));
+    clan: window.GRIMOIRE.indexDe(window.GRIMOIRE_GROUPE.pages()[0]), ici: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() }));
+  verifier("terminée : les pages s'effacent, retour à la page du Groupe (v479 : plus de page du clan)", avant && !r.actif && r.pages === 0 && Math.abs(r.ici - r.clan) <= 1, JSON.stringify(r));
 });
 
 console.log(erreurs.length ? "\nErreurs de page : " + erreurs.slice(0, 5).join(" | ") : "");

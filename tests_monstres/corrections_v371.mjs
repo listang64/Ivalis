@@ -192,7 +192,7 @@ titre("1. LES TITRES DES PARTIES : UNE AQUARELLE DESSOUS, UNE TEINTE PAR PARTIE"
 // =========================================================================
 await section(async () => {
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2600); await pose();
-  await action(".page-clan .nouvel-aventurier"); await p.waitForTimeout(2800); await pose();
+  await action(".choix-heros-principal .bouton-choix-heros[data-fa=creer]"); await p.waitForTimeout(2800); await pose();
   await p.evaluate(() => document.querySelector('#grimoire-creation-race-0 [data-genre="Male"]').click()); await p.waitForTimeout(2800); await pose();
   await p.evaluate(() => window.GRIMOIRE.allerALaPage(window.GRIMOIRE.indexDe(window.GRIMOIRE_CREATION.page("form1-g")))); await p.waitForTimeout(2600); await pose();
   const r = await p.evaluate(() => {

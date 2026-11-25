@@ -1,6 +1,6 @@
 /* =========================================================================
    v313 — LES AVENTURIERS DANS LE LIVRE (grimoire_fiches.js)
-   Les clans, la fiche, les compétences, la Forge, l'inventaire, le DEV :
+   La fiche, les compétences, la Forge, l'inventaire, le DEV :
    à l'encre et au crayon, comme le reste du livre. --u : 1 % d'une page.
    ========================================================================= */
 .page-fiches .contenu-page { position: absolute; inset: 0; padding: calc(var(--u) * 7) calc(var(--u) * 8) calc(var(--u) * 6);
@@ -11,7 +11,7 @@
 .page-fiches button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; touch-action: manipulation; }
 
 /* LES TITRES : Berkshire Swash (le global « * { Almendra !important } » l'écraserait). */
-.titre-clan, .nom-clan, .titre-page-fiche, .nom-heros-fiche, .niveau-fiche, .titre-encart, .carte-titre, .separation-classe span {
+.titre-page-fiche, .nom-heros-fiche, .niveau-fiche, .titre-encart, .carte-titre, .separation-classe span {
   font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important; }
 
 .fiche-attente { margin: 0; font-style: italic; color: #6b4a2b; font-size: calc(var(--u) * 3.2); }
@@ -23,33 +23,8 @@
   font-size: calc(var(--u) * 3.1); color: #6b1a10; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
 .note-fiche.visible { opacity: 1; }
 
-/* ---------------------------- LES CLANS ---------------------------- */
-.page-fiches .page-liste-clan { align-items: center; padding-top: calc(var(--u) * 11) !important; }
-.titre-clan { font-size: calc(var(--u) * 8.4 * var(--echelle-titres, 1)); color: #24150a; text-align: center; line-height: 1.1; }
-.fleuron-clan { width: 46%; height: auto; margin: calc(var(--u) * 1) 0 calc(var(--u) * 3); }
-/* (v433) LE LIVRE DES CLANS — (v477) plus de fanion : la page de droite porte seulement le nom du
-   joueur, au milieu de la page (CLAN_NOMADE.md, étape 1). */
-.page-fiches .page-banniere-du-clan { align-items: center; justify-content: center; }
-.nom-clan { margin-top: calc(var(--u) * 3); font-size: calc(var(--u) * 10 * var(--echelle-titres, 1)); color: #24150a; text-align: center; line-height: 1.05; }
 .page-fiches .fleuron path { fill: none; stroke: #2b1a0e; stroke-width: 1.4; }
 .page-fiches .fleuron circle { fill: #2b1a0e; }
-.liste-aventuriers { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: calc(var(--u) * 2.4); counter-reset: av; }
-.liste-aventuriers li { transform: rotate(var(--penche, 0deg)); }
-.ligne-aventurier { display: block; width: 100%; text-align: left; font-size: calc(var(--u) * 5) !important; line-height: 1.2; padding: calc(var(--u) * 0.6) 0 !important; }
-.ligne-aventurier::before { counter-increment: av; content: counter(av) ". "; color: #6b4a2b; }
-.nom-aventurier { font-weight: 700; }
-.tiret-aventurier { color: #6b4a2b; }
-.classe-aventurier { font-style: italic; }
-.aventurier-absent { font-size: 0.65em; color: #8a6a4a; font-style: italic; }
-.ligne-aventurier:hover .nom-aventurier { text-decoration: underline; text-underline-offset: 0.15em; }
-/* v367 — la case du héros actif, tracée à l'encre devant son nom. */
-.liste-aventuriers li.avec-case { display: flex; align-items: center; gap: calc(var(--u) * 1.4); }
-.case-actif { flex: none; width: calc(var(--u) * 5.4); height: calc(var(--u) * 5.4); padding: 0; border: 0; background: none; cursor: pointer; }
-.case-actif svg { width: 100%; height: 100%; overflow: visible; }
-.case-actif .boite { fill: rgba(255, 244, 214, 0.5); stroke: #2b1a0e; stroke-width: 1.6; stroke-linejoin: round; }
-.case-actif .coche { fill: none; stroke: #7a1a10; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-.clan-vide { font-style: italic; color: #6b4a2b; font-size: calc(var(--u) * 3.6); }
-.nouvel-aventurier { margin-top: calc(var(--u) * 5); font-size: calc(var(--u) * 3.6) !important; color: #5c3a21 !important; text-decoration: underline; }
 
 /* ---------------------------- L'AVATAR ---------------------------- */
 .page-avatar-heros { padding: 0 !important; }
@@ -485,22 +460,3 @@
 .apercu-forge .carte-init { display: flex; align-items: center; justify-content: center; }
 .apercu-forge .carte-fatigue, .apercu-forge .carte-distance { display: inline-flex; align-items: center; gap: 0.25em; }
 
-/* v446 — LE FOND DES PAGES DES CLANS : comme les peuples de la création (.fond-classe) — l'image
-   sur toute la double page ; à gauche voilée en dégradé sous la liste, à droite entière — et
-   toute l'image à 90 % d'opacité. Le nom du clan en doré (comme le nom du héros sur sa fiche). */
-.page-clan { overflow: hidden; }
-.page-clan .contenu-page { z-index: 1; }
-.fond-clan { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; opacity: 0.9; }
-.fond-clan img { position: absolute; top: 0; height: 100%; width: 200%; max-width: none; object-fit: cover; -webkit-user-drag: none; user-select: none; }
-.fond-clan.gauche img { left: 0; }
-.fond-clan.droite img { left: -100%; }
-.fond-clan.gauche { -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.07) 0%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%);
-  mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.07) 0%, rgba(0, 0, 0, 0.14) 45%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.92) 100%); }
-.fond-clan.droite { -webkit-mask-image: linear-gradient(to right, #000 0%, #000 88%, rgba(0, 0, 0, 0.75) 100%); mask-image: linear-gradient(to right, #000 0%, #000 88%, rgba(0, 0, 0, 0.75) 100%); }
-.page-banniere-du-clan .nom-clan {
-  background: linear-gradient(180deg, #fff3b8 0%, #f0cf63 38%, #c8952c 62%, #8a5d12 100%);
-  -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 calc(var(--u) * 0.3) calc(var(--u) * 0.15) rgba(0, 0, 0, 0.95)) drop-shadow(0 calc(var(--u) * 0.8) calc(var(--u) * 1.2) rgba(0, 0, 0, 0.7)); }
-/* Sur le fond sombre, le fleuron sous le nom passe à l'or. */
-.page-banniere-du-clan .fleuron path { stroke: #d9b45a; }
-.page-banniere-du-clan .fleuron circle { fill: #d9b45a; }

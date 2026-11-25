@@ -26,7 +26,6 @@ const TEINTE_SUIVEURS = { couleurs: ["#5e7f59", "#7d9c6f", "#476944"], opacite: 
 // (v432) Nico : « sous le petit titre La compagnie, une tache d'aquarelle pour le mettre en valeur ;
 // pareil pour Réputation ici ».
 const TEINTE_SOUS_TITRES = { couleurs: ["#e8a43a", "#f0bf55", "#d1862c"], opacite: 0.6, nom: "sous-titres-groupe" };
-const TEINTE_AVENTURIERS = { couleurs: ["#c9772e", "#e0a046", "#a5532a"], opacite: 0.5, nom: "aventuriers" };
 
 let pages = null;                 // { g, d }
 let donnees = { suiveurs: [], compagnons: [], lieu: null }, lu = 0, enLecture = null;
@@ -135,7 +134,7 @@ function htmlGauche() {
     const l = donnees.lieu || {};
     const lieu = l.nature ? "Dans la nature" : (l.nom || "");
     // (v433) Nico : « enlève le bouton pour changer le personnage sous l'avatar » (la double
-    // flèche de la v419) : on change de héros dans la liste des personnages.
+    // flèche de la v419) : (v479) on change de héros principal dans le menu « Mon héros principal ».
     const ligneHeros = heros.map(h => {
         const url = h.urlCloudinary || h.urlAvatarEquipe || h.urlPortraitReference || "";
         const id = echapper(h.idPersonnage);
@@ -161,7 +160,8 @@ function htmlGauche() {
         ${!l.nature && l.reputation != null ? htmlReputation(l) : ""}
         ${/* (v447) Nico : « sur la page groupe, vire le titre La compagnie » */""}
         <div class="liste-heros-groupe" style="--n:${Math.max(1, heros.length)}">${ligneHeros || `<p class="fiche-attente">Aucun héros dans le groupe.</p>`}</div>
-        <button type="button" class="bouton-aventuriers-groupe" data-action="groupe" data-gp="aventuriers">${lavis(TEINTE_AVENTURIERS, "aventuriers-groupe")}${cadre("aventuriers-groupe", 1.3)}<span>Les personnages ›</span></button>
+        ${/* (v479) Plus de Livre des clans : le menu « Mon héros principal » (grimoire_fiches.js) */""}
+        ${window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.htmlChoixHeros ? window.GRIMOIRE_FICHES.htmlChoixHeros() : ""}
       </div>`;
 }
 
@@ -225,7 +225,8 @@ function htmlDroite() {
 function maj(force) {
     if (!pages) return;
     const heros = herosDuGroupe().map(h => [h.idPersonnage, nomHeros(h), classeDe(h), h.niveau, h.urlCloudinary || h.urlAvatarEquipe || h.urlPortraitReference || ""]);
-    const sg = JSON.stringify([heros, nomDuGroupe(), dateDuJeu(), donnees.lieu]);
+    const choix = window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.signatureChoixHeros ? window.GRIMOIRE_FICHES.signatureChoixHeros() : "";
+    const sg = JSON.stringify([heros, nomDuGroupe(), dateDuJeu(), donnees.lieu, choix]);
     if (force || sg !== sig.g) { sig.g = sg; pages.g.innerHTML = htmlGauche(); }
     const sd = JSON.stringify([donnees.suiveurs, donnees.compagnons]);
     if (force || sd !== sig.d) { sig.d = sd; pages.d.innerHTML = htmlDroite(); }
@@ -238,9 +239,6 @@ async function agir(cible) {
     const gp = cible.dataset.gp;
     if (gp === "heros") { son(); if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.ouvrir(cible.dataset.id); return; }
     if (gp === "revenir") { son(); ouvrir(); return; }
-    // (v433) « Les clans › » — (v477) « Les personnages › » (le bouton « Les clans » n'est plus,
-    // CLAN_NOMADE.md) : la liste de ses personnages, jusqu'à la page Expédition (étape 6).
-    if (gp === "aventuriers") { son(); if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.allerAuxAventuriers(); return; }
     if (gp === "ame") { son(); if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id: cible.dataset.id, nom: cible.dataset.nom, depuisGroupe: true }); return; }
     // (v422) Parler en privé avec un suiveur.
     if (gp === "parler") {
