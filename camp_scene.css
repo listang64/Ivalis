@@ -1,0 +1,80 @@
+/* =========================================================================
+   IVALIS — LA PAGE DU CAMP (v480, camp_scene.js)
+   =========================================================================
+   L'image pleine page en 9 couches, bord à bord, le bas collé au bas de
+   l'écran ; les encarts des personnages glissés entre les couches ; les cinq
+   boutons sur aquarelle en haut ; le retour au livre et le menu « Mon héros
+   principal » en bas.
+   ========================================================================= */
+.ecran-camp {
+  position: fixed; inset: 0; z-index: 32; display: none; overflow: hidden; background: #000;
+  opacity: 0; transition: opacity 0.6s ease;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.ecran-camp.affiche { display: block; }
+.ecran-camp.visible { opacity: 1; }
+
+/* LE LIVRE PART (grimoire.js) : la table s'éteint, le fond passe au noir ; le livre glisse (camp_scene.js). */
+#ecran-grimoire.vers-le-camp::before { background: #000; }
+#ecran-grimoire .grimoire-table { transition: transform 0.75s cubic-bezier(0.45, 0.05, 0.25, 1), opacity 0.6s ease; }
+#ecran-grimoire.vers-le-camp .grimoire-table { opacity: 0; }
+#ecran-grimoire.vers-le-camp { pointer-events: none; }
+
+/* LE DÉCOR : un contexte d'empilement, où couches et encarts s'intercalent (z-index posés par le script). */
+.decor-camp { position: absolute; z-index: 0; }
+.couche-camp { position: absolute; left: 0; bottom: 0; width: 100%; height: auto; pointer-events: none;
+  -webkit-user-drag: none; }
+.encarts-camp { position: absolute; inset: 0; pointer-events: none; }
+
+/* LES ENCARTS : un personnage debout, les pieds au bas de l'encart, jamais plus haut que lui. */
+.encart-camp { position: absolute; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
+.perso-camp { all: unset; box-sizing: border-box; width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center;
+  cursor: pointer; pointer-events: none; }
+.perso-camp img { height: 100%; width: auto; max-width: 100%; object-fit: contain; object-position: 50% 100%; pointer-events: auto; -webkit-user-drag: none;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35)); transition: filter 0.2s ease, transform 0.2s ease; transform-origin: 50% 100%; }
+.perso-camp:hover img, .perso-camp:focus-visible img { filter: drop-shadow(0 0 6px rgba(255, 230, 170, 0.9)) brightness(1.06); transform: scale(1.03); }
+
+/* L'OUTIL DEV DES ENCARTS. */
+.encart-camp.edition { pointer-events: auto; cursor: move; border: 2px dashed rgba(255, 255, 255, 0.85); box-sizing: border-box; touch-action: none; }
+.encart-camp.edition.choisi { outline: 3px solid #f0c21a; outline-offset: 1px; }
+.reference-encart { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; opacity: 0.65; pointer-events: none; }
+.etiquette-encart { position: absolute; left: 4px; top: 2px; font: 600 11px/1.2 system-ui, sans-serif; color: #fff; text-shadow: 0 1px 2px #000; pointer-events: none; }
+.poignee-encart { position: absolute; right: -8px; bottom: -8px; width: 16px; height: 16px; background: #fff; border: 2px solid #222; border-radius: 3px;
+  cursor: nwse-resize; touch-action: none; }
+.dev-encarts-camp { display: none; position: absolute; left: 16px; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 48px); z-index: 210; padding: 6px 10px; border-radius: 6px;
+  border: 1px solid #8a1a10; background: rgba(255, 240, 230, 0.92); color: #8a1a10; font: 600 12px system-ui, sans-serif; cursor: pointer; }
+.outils-encarts-camp { display: none; position: absolute; left: 50%; bottom: 72px; transform: translateX(-50%); z-index: 210; gap: 8px; align-items: center; flex-wrap: wrap;
+  justify-content: center; max-width: calc(100vw - 32px); padding: 8px 10px; border-radius: 8px; background: rgba(20, 14, 8, 0.88); color: #f3e9d6; font: 13px system-ui, sans-serif; }
+.outils-encarts-camp button, .outils-encarts-camp select { padding: 5px 9px; border-radius: 5px; border: 1px solid rgba(243, 233, 214, 0.5); background: #2a1d12;
+  color: #f3e9d6; font: inherit; cursor: pointer; }
+
+/* LES CINQ BOUTONS, ÉCRITS SUR UNE AQUARELLE. */
+.barre-camp { position: absolute; top: max(14px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 200;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(4px, 1.2vw, 18px); width: min(calc(100vw - 32px), 1100px); }
+.bouton-camp { position: relative; isolation: isolate; background: none; border: 0; padding: 0.55em 1.1em; cursor: pointer;
+  font-family: 'Cinzel', 'Almendra', serif; font-weight: 700; font-size: clamp(12px, 1.55vw, 20px); color: #2a170a; letter-spacing: 0.02em;
+  text-shadow: 0 0 6px rgba(255, 246, 222, 0.9); transition: transform 0.15s ease; }
+.bouton-camp > .lavis { left: -6%; top: -14%; width: 112%; height: 128%; }
+.bouton-camp > span { position: relative; z-index: 1; }
+.bouton-camp:hover { transform: translateY(-1px) scale(1.03); }
+.bouton-camp.eteint { opacity: 0.6; }
+
+/* LE RETOUR AU LIVRE, LE HÉROS PRINCIPAL, LA NOTE. */
+.retour-livre-camp { position: absolute; left: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 200; padding: 0.45em 1em; border-radius: 6px;
+  border: 1px solid rgba(243, 233, 214, 0.55); background: rgba(14, 9, 5, 0.6); color: #f3e9d6; cursor: pointer;
+  font-family: 'Cinzel', serif; font-size: clamp(13px, 1.3vw, 17px); }
+.retour-livre-camp:hover { background: rgba(14, 9, 5, 0.8); }
+.heros-camp { --u: clamp(3.2px, 0.42vw, 4.6px); position: absolute; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 200;
+  width: min(300px, calc(100vw - 180px)); padding: 10px 12px; border-radius: 8px; background: rgba(244, 232, 208, 0.93); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  font-family: 'Almendra', serif; color: #24150a; }
+.heros-camp:empty { display: none; }
+.heros-camp .choix-heros-principal { width: 100%; margin: 0; }
+.note-camp { position: absolute; left: 50%; bottom: 80px; transform: translateX(-50%); z-index: 220; margin: 0; padding: 8px 16px; border-radius: 6px;
+  max-width: calc(100vw - 32px); background: rgba(244, 232, 208, 0.95); color: #24150a; font-family: 'Almendra', serif; font-size: 16px;
+  opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+.note-camp.visible { opacity: 1; }
+
+@media (max-width: 600px) {
+  .heros-camp { width: calc(100vw - 32px); bottom: 64px; }
+  .note-camp { bottom: 200px; }
+}

@@ -747,6 +747,11 @@ async function hebergerAvatarDetoure(imageSource, cles) {
     return "";
 }
 
+// (v480) Pour les images en scène du camp (camp_avatars.js) : le même dessin à partir de références
+// (le personnage d'abord, puis son armure), et le même hébergement détouré (fond magenta).
+window.dessinerAvecReferences = (blobPersonnage, blobArmure, prompt) => dessinerAvatarHabille(blobPersonnage, blobArmure, window.clesApiObjets(), prompt);
+window.hebergerDetoure = (imageSource) => hebergerAvatarDetoure(imageSource, window.clesApiObjets());
+
 // Un seul rhabillage à la fois par héros : équiper trois armures d'affilée ne
 // doit pas lancer trois dessins concurrents dont le dernier arrivé gagne.
 window.AVATARS_EN_COURS = window.AVATARS_EN_COURS || {};

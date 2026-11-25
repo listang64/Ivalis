@@ -314,6 +314,8 @@ async function demanderVerdict(texteMJ, messages) {
 // Avant le message du MJ : la partie sait qu'un verdict viendra pour lui.
 window.annoncerDetectionCombat = async function(ts) {
     if (!window.ID_PARTIE_COURANTE || typeof window.cleGemini !== "function" || !window.cleGemini("combat")) return false;
+    // (v480) Le clan nomade : « un RP dans le camp ne déclenche jamais de combat » (camp.js, auCamp).
+    if (window.CAMP && typeof window.CAMP.auCamp === "function" && window.CAMP.auCamp()) return false;
     return !!(await transaction((data) => {
         if (window.combatRPActif(data)) return null;
         return { maj: { Combat_RP: { Id: "crp_" + ts + "_" + Math.random().toString(36).slice(2, 6), Etat: "detection", Message: ts, Le: Date.now() } } };

@@ -14,8 +14,8 @@
 //      la carte globale » : ce logo, sur la carte régionale et sur la carte du monde.
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
-import { doc, getDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=2";
+import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import * as CP from "./camp_pur.js?v=3";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -148,4 +148,55 @@ function avertir(texte) {
     try { if (typeof window.alert === "function") window.alert(texte); } catch (e) {}
 }
 
-window.CAMP = { lire: lireCamp, creerCampDev, estimerJauge, REGION_DEPART, regles: CP, estDev };
+// ---------------------------------------------------------------------
+//  (v480) LA PRÉSENCE DES JOUEURS : « sauf sur le personnage d'un autre joueur si ce joueur est
+//  connecté » (la page du camp), « tous les joueurs connectés et présents » (le conseil). Chaque poste
+//  donne signe de vie chaque minute (Systeme_Parties/{partie}/Presence/{joueur}) ; on lit à la demande.
+// ---------------------------------------------------------------------
+const moi = () => { try { return localStorage.getItem("ID_JOUEUR_COURANT") || ""; } catch (e) { return ""; } };
+async function signeDeVie() {
+    const p = idPartie(), j = moi();
+    if (!p || !j || document.hidden) return;
+    try { await setDoc(doc(db, PARTIES, p, "Presence", j), { Le: Date.now(), Joueur: j }); } catch (e) {}
+}
+setInterval(signeDeVie, 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) signeDeVie(); });
+let connectesLu = { p: "", le: 0, ensemble: new Set() };
+export async function joueursConnectes() {
+    const p = idPartie();
+    if (!p) return new Set();
+    if (connectesLu.p === p && Date.now() - connectesLu.le < 20000) return connectesLu.ensemble;
+    const maintenant = Date.now(), ensemble = new Set();
+    try { (await getDocs(collection(db, PARTIES, p, "Presence"))).forEach(d => { const x = d.data() || {}; if (CP.estConnecte(x.Le, maintenant)) ensemble.add(x.Joueur || d.id); }); } catch (e) {}
+    ensemble.add(moi());
+    connectesLu = { p, le: maintenant, ensemble };
+    return ensemble;
+}
+
+// LES HÉROS NÉS APRÈS LE CAMP rejoignent ses membres (« tout personnage de joueur qui n'est pas utilisé en
+// expédition est traité comme un PNJ : il vit au camp comme les autres ») : un poste les ajoute.
+async function rattraperMembres() {
+    const p = idPartie();
+    if (!p || !camp || !camp.Membres || document.hidden) return;
+    const manquants = herosDeLaPartie().filter(h => !camp.Membres[h.id]);
+    if (!manquants.length) return;
+    const maj = {};
+    manquants.forEach(h => { maj["Camp.Membres." + h.id] = { Type: "heros", Nom: h.nom, Joueur: h.joueur, Tache: null, Moral: CP.MORAL_DEPART.heros }; });
+    try { await updateDoc(refPartie(p), maj); } catch (e) { console.warn("[Camp] Les nouveaux membres :", e); }
+}
+setInterval(rattraperMembres, 15000);
+
+// LE CLAN EST-IL AU CAMP (pas d'expédition en route, le pion sur l'icône du camp) ? « Un RP dans
+// le camp ne déclenche jamais de combat » (combat_rp.js, annoncerDetectionCombat).
+export function auCamp() {
+    const d = window.PARTIE_DATA || {};
+    const pos = typeof window.positionGroupeBrute === "function" ? window.positionGroupeBrute() : d.Position_Groupe;
+    return CP.groupeAuCamp(camp, pos, d.Expedition, TAILLE_ICONE_REGION);
+}
+// Ce que le narrateur sait du camp quand le clan y est (ia_master.js).
+export function contexteMJ() {
+    if (!auCamp()) return "";
+    return `--- LE CAMP DU CLAN ---\nLes héros sont au camp du clan nomade : des tentes, un feu, les membres du clan qui vaquent à leurs occupations. Ils flânent, parlent, s'occupent.\nRÈGLE ABSOLUE : un RP dans le camp ne déclenche JAMAIS de combat (aucun ennemi, aucune attaque, aucune embuscade, aucune bagarre qui tourne au combat).`;
+}
+
+window.CAMP = { lire: lireCamp, creerCampDev, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ };

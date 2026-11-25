@@ -411,11 +411,11 @@ await section(async () => {
     verifier("« combats » : la double page des combats, dans le livre (plus de popup)", a.appels.length === 0 && Math.abs(a.page - a.combats) <= 1, JSON.stringify(a));
     await p.evaluate(() => window.grimoireAllerIndex()); await p.waitForTimeout(2600);
   }
-  // (v477) « Le camp » (étape 3 du clan nomade) : en attendant, la note « bientôt », le livre reste au sommaire.
+  // (v480) « Le camp » ouvre sa page (camp_scene.js) ; sans camp, un mot le dit et le livre reste au sommaire.
   await cliquer("#grimoire-index-camp");
   await p.waitForTimeout(600);
   const v = await p.evaluate(() => ({ vue: document.getElementById("grimoire-note-index").classList.contains("visible"), note: document.getElementById("grimoire-note-index").textContent, page: window.GRIMOIRE_PAGEFLIP.getCurrentPageIndex() }));
-  verifier("« Le camp » : la note « bientôt », le livre reste au sommaire (v477)", v.vue && /camp/i.test(v.note) && v.page >= 3 && v.page <= 4, JSON.stringify(v));
+  verifier("« Le camp » sans camp : « Le camp n'existe pas encore », le livre reste au sommaire (v480)", v.vue && /camp n'existe pas encore/i.test(v.note) && v.page >= 3 && v.page <= 4, JSON.stringify(v));
   // Depuis le journal (on a tourné en arrière), puis depuis « Compte » : le marque-page ramène à l'index.
   await p.evaluate(() => window.GRIMOIRE_PAGEFLIP.flipPrev("top"));
   await p.waitForTimeout(900);

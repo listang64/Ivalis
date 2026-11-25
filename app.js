@@ -212,6 +212,9 @@ function persoDocVersFront(id, d) {
     equipArmure: d.Equip_Armure || null,
     equipMainDroite: objetAuxRegles(d.Equip_Main_Droite),
     equipMainGauche: objetAuxRegles(d.Equip_Main_Gauche),
+    // (v480) Ses deux images en scène au camp (camp_avatars.js), et l'armure qu'elles montrent.
+    imagesCamp: Array.isArray(d.Images_Camp) ? d.Images_Camp : [],
+    imagesCampArmure: d.Images_Camp_Armure || "",
     estIllusion: d.Est_Illusion === true,
     // (v368) Un totem du Chaman (sans tour comme un leurre, mais bien réel) et son effet.
     estTotem: d.Est_Totem === true,
@@ -229,7 +232,9 @@ function persoDocVersFront(id, d) {
       // (un groupe vaincu : blessures_ui.js, cloturerCombat).
       caractere: d.Compagnon_Caractere || "",
       blessures: Array.isArray(d.Compagnon_Blessures) ? d.Compagnon_Blessures : [],
-      mort: !!d.Compagnon_Mort
+      mort: !!d.Compagnon_Mort,
+      // (v480) Au sol (gros ou petit gabarit) ou dans les airs : son encart du camp (camp_avatars.js).
+      gabarit: d.Compagnon_Gabarit || ""
     } : null,
     // Décoché depuis la liste des héros (mode développeur) : le personnage
     // existe toujours, mais il est mis de côté — ni combat, ni tour de parole.

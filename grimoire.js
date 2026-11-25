@@ -1276,10 +1276,11 @@
         groupe: () => ((window.GRIMOIRE_GROUPE && window.GRIMOIRE_GROUPE.ouvrir()) || OUVRIR_INDEX.fiches()),
         // (v388) Les combats ont leur double page (grimoire_combats.js) ; la popup en secours.
         combats: () => (window.GRIMOIRE_COMBATS && window.GRIMOIRE_COMBATS.ouvrir()) || (window.ouvrirPopupRencontre && window.ouvrirPopupRencontre()),
-        parametres: () => window.ouvrirParametres && window.ouvrirParametres()
+        parametres: () => window.ouvrirParametres && window.ouvrirParametres(),
+        // (v480) Le camp du clan nomade : sa page pleine image (camp_scene.js) ; le livre glisse vers le bas.
+        camp: () => window.CAMP_SCENE && window.CAMP_SCENE.ouvrir()
     };
-    // (v477) Le camp arrive à l'étape 3 du clan nomade (CLAN_NOMADE.md).
-    const BIENTOT = { camp: "Le camp se prépare : il arrive bientôt." };
+    const BIENTOT = {};
     function choisirIndex(id) {
         if (!enPartie) return;
         if (BIENTOT[id]) {

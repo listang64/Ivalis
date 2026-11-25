@@ -2595,6 +2595,11 @@ window.declencherTourIA = async function(options) {
             try { const cm = window.contexteMissionMJ(dataPartieMJ, lieuActuel); if (cm) contexte += `\n${cm}\n`; }
             catch (e) { console.error("Mission de guilde (le tour continue) :", e); }
         }
+        // (v480) LE CAMP DU CLAN (camp.js) : les héros y flânent ; jamais de combat au camp.
+        if (window.CAMP && typeof window.CAMP.contexteMJ === "function") {
+            try { const cc = window.CAMP.contexteMJ(); if (cc) contexte += `\n${cc}\n`; }
+            catch (e) { console.error("Le camp (le tour continue) :", e); }
+        }
         // (v454) La fin du récit d'avant le voyage : la continuité.
         contexte += contexteRecitPrecedent(dataPartieMJ, messagesFiltres);
 

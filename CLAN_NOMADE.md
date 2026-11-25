@@ -55,6 +55,7 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
 | 1 — Nettoyage de l'ancien système | v477 | fait |
 | 2 — Le camp, Thémès et les données | v478 | fait |
 | (Nico) Plus de clans : le menu « Mon héros principal » | v479 | fait |
+| 3 — La page du camp | v480 | fait |
 
 ## Points ambigus
 
@@ -79,3 +80,26 @@ de texte donne les appels croisés. Inventaire fait sur `dev` à la v476 (commit
   invisibles (l'affinité vaut alors 100), et la familiarité aussi à 100.
 - **Étape 2, sans « Forêt des Murmures ».** La région se cherche par son nom ; si la partie n'en a pas, le
   bouton DEV ne crée rien et le dit.
+- **Étape 3, les encarts.** Des carrés posés en fractions de l'image (x et côté en part de sa largeur, y en
+  part de sa hauteur), chacun dans une couche (1 à 9). Sauvés dans `Carte_Livre/Camp_Encarts` (pour toutes les
+  parties) ; « Copier le code » donne `ENCARTS_DEFAUT`, à coller dans `camp_scene.js` : il vaut tant que la
+  base n'a pas d'encarts. Le bouton « Encarts (DEV) » est sur la page du camp elle-même (en bas à gauche, en
+  mode DEV), là où on les pose.
+- **Étape 3, qui est « le personnage d'un joueur ».** Pour le clic : le héros principal d'un autre joueur
+  (refusé s'il est connecté). Ses autres personnages, non joués, sont « traités comme des PNJ » : on peut
+  leur parler. Ses propres personnages, eux, ne s'ouvrent jamais. Un membre sans ses deux images en scène
+  n'est pas affiché (le temps qu'elles soient dessinées).
+- **Étape 3, les deux images en scène.** Une veille (`camp_avatars.js`) les dessine pour tout le camp, un
+  membre à la fois, sur un poste qui a les clés (OpenAI, Cloudinary), avec un verrou de 10 minutes : c'est
+  ce qui couvre « à l'arrivée d'un PNJ, à la création ou à l'achat d'un personnage, au changement de héros
+  principal ». Un PNJ sans portrait (Thémès au début) est dessiné sans référence, d'après sa description. Le
+  gabarit du compagnon (MIA_GABARIT) se fait par la même veille.
+- **Étape 3, « au camp ».** Le clan est au camp quand son pion est sur l'icône du camp (même région, à moins
+  de la taille de l'icône) et qu'aucune expédition n'est en cours — ou quand le pion n'a pas encore de place.
+  Alors la détection du combat ne s'annonce pas, et le narrateur sait qu'au camp un RP ne déclenche jamais de
+  combat. « Flâner dans le camp » ramène au livre, sur la page du récit.
+- **Étape 3, les boutons qui attendent leur étape.** « Former le conseil » (étape 9) et « Gestion du camp »
+  (étape 4) disent qu'ils se préparent ; « Expédition » ouvre la page du Groupe (elle devient la page
+  Expédition à l'étape 6) ; « Déplacer le camp » est éteint tant que le conseil ne l'a pas voté (étape 11).
+- **Étape 3, le cadrage sur un téléphone en hauteur.** Le document dit « bord à bord » : sur un écran plus
+  haut que l'image, le haut reste noir (l'image est collée en bas).

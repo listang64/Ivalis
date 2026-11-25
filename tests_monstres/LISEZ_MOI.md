@@ -12655,3 +12655,15 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **« Mon héros principal »** (page du Groupe) : un menu déroulant de ses propres personnages, dans l'ordre de leur création (« Nom — Classe ») ; « Sa fiche » ; « + Nouvel aventurier ». Le choix va sur la partie (`Heros_Principaux`) ; le héros principal est aussi le héros joué (les autres au repos). La règle (`camp_pur.js`, `herosPrincipal`) : le premier personnage d'un joueur, sauf s'il en a choisi un autre parmi les siens (jamais celui d'un autre joueur, jamais un mort).
 - « Aventuriers » (le sommaire) mène à la page du Groupe.
 - corrections_v479 le vérifie ; corrections_v313, v319, v322, v365, v367, v418_livre, v439 et v477 passent par le menu (plus par les pages de clans) ; les bancs de la création cliquent « + Nouvel aventurier » du menu.
+
+## v480 — Le clan nomade, étape 3 : la page du camp
+
+- **« Le camp »** (le sommaire) ouvre sa page (`camp_scene.js`, `camp_scene.css`) : la table s'éteint (fondu au noir) pendant que le livre entier glisse vers le bas, puis l'image du camp apparaît ; « ‹ Le livre » fait l'inverse. Sans camp, un mot le dit.
+- **L'image en 9 couches** (IMG_2313 au premier plan … IMG_2321 au fond), bord à bord, le bas collé au bas de l'écran (le haut tronqué s'il dépasse).
+- **Les encarts** : des carrés glissés entre les couches (un encart de la couche k passe devant la couche k, derrière la couche k − 1). En mode DEV, « Encarts (DEV) » : créer, glisser, étirer (toujours carré), ▲/▼ couche, type (personnage, compagnon au sol gros ou petit, dans les airs), une couleur semi-transparente chacun, l'image de référence dedans ; sauvés dans `Carte_Livre/Camp_Encarts` ; « Copier le code » donne `ENCARTS_DEFAUT`.
+- **Les personnages** (`camp_pur.js`, `presentsAuCamp`, `placerAuCamp`) : les membres et les héros principaux, sauf ceux partis en expédition, placés au hasard à chaque ouverture (tirés au sort s'ils sont trop nombreux), une de leurs deux images en scène, jamais plus haute que l'encart ; le compagnon du pisteur dans l'encart de son gabarit.
+- **Le clic** (`peutDiscuterAuCamp`) : la discussion privée, sauf avec ses propres personnages et le héros principal d'un joueur connecté (signe de vie de moins de 2 min 30, `Systeme_Parties/{p}/Presence`).
+- **Les cinq boutons sur aquarelle** (Former le conseil, Gestion du camp, Flâner dans le camp, Expédition, Déplacer le camp) et le menu « Mon héros principal ».
+- **Au camp, jamais de combat** (`groupeAuCamp`) : le pion sur l'icône du camp et pas d'expédition en cours ; la détection du combat ne s'annonce pas (`combat_rp.js`), le narrateur le sait (`ia_master.js`).
+- **Les deux images en scène** (`camp_avatars.js`) : le personnage en entier, des pieds à la tête, deux poses différentes tirées dans la liste, l'image actuelle et l'armure en référence, fond magenta puis détourage ; refaites (et les anciennes effacées) si l'armure change ; le gabarit du compagnon par MIA_GABARIT.
+- corrections_v480 le vérifie.
