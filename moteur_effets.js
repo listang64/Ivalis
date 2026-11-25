@@ -3978,9 +3978,11 @@ window.appliquerSuitesEquipement = async function(action, jeSuisLAuteur) {
             if (beni.resPhys) bonus.resPhys = beni.resPhys;
             if (beni.resMag) bonus.resMag = beni.resMag;
             if (beni.degatsPct) bonus.degatsPct = beni.degatsPct;
+            if (beni.initiative) bonus.initiative = beni.initiative;   // (v492) la hâte, sur le personnage soigné
             const detail = [beni.resPhys ? `+${beni.resPhys}% résistance physique` : null,
                             beni.resMag ? `+${beni.resMag}% résistance magique` : null,
-                            beni.degatsPct ? `+${beni.degatsPct}% de dégâts` : null].filter(Boolean).join(", ");
+                            beni.degatsPct ? `+${beni.degatsPct}% de dégâts` : null,
+                            beni.initiative ? `+${beni.initiative} d'initiative` : null].filter(Boolean).join(", ");
             for (const id of soignes) {
                 await poser(id, { nom: "Béni", duree: beni.tours || 1, bonusEquip: bonus,
                                   icone: "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png", desc: detail });

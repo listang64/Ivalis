@@ -58,6 +58,7 @@ function nombresDuCatalogue(palier) {
     Object.keys(palier || {}).forEach(cle => {
         const v = palier[cle];
         if (cle === "effets") return;   // (v476) [nombre, fois] : la clause « Effet », lue à part
+        if (cle === "effetsEnPlus") { sortie.push(v[0]); return; }   // (v492) « + 1 (Effet C ou Effet B) » : son « 1 »
         if (cle === "etatsPropres") (v || []).forEach(e => sortie.push(e.chance));
         else if (cle === "aRepartir") sortie.push(v);
         else if (Array.isArray(v)) sortie.push(v[0], v[1]);
@@ -124,7 +125,8 @@ REF.modeles.forEach((ref, i) => {
             return;
         }
         const fois = parseInt((texte.match(/(\d+)\s*X/i) || [])[1]) || 1;
-        if (!ecrit || ecrit[0] !== attendu.nombre || ecrit[1] !== fois || tires.length !== attendu.nombre) {
+        const enPlus = ((cat.paliers[rarete] || {}).effetsEnPlus || [0])[0];   // (v492) la bague de soin épique : un effet C ou B de plus
+        if (!ecrit || ecrit[0] !== attendu.nombre || ecrit[1] !== fois || tires.length !== attendu.nombre + enPlus) {
             ecartsEffets.push(`ligne ${ref.ligne} ${rarete} : [${attendu.nombre}, ${fois}] annoncé, [${ecrit}] écrit, ${tires.length} tiré(s)`);
         }
         const reservoirCat = cat.effets.reservoir;

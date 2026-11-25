@@ -286,14 +286,15 @@ window.EFFETS_B = [
     ETAT_EFFET("Électrifié",     5, "électrification")
 ];
 
-// Colonne L — EFFET C (soins). Les trois "sur un sort de soin pendant 1 tour"
-// posent un état bénéfique sur la CIBLE du soin, pas sur le lanceur.
+// Colonne L — EFFET C (soins). (v492) Tableau de Nico : tous « pour le personnage
+// soigné pendant 2 tours » — un état bénéfique sur la CIBLE du soin, jamais le
+// lanceur (l'initiative aussi, qui allait au lanceur) ; les dégâts à +5 %.
 window.EFFETS_C = [
     { cle: "soin",           bonus: { soin: 1 },                                    libelle: "soin" },
-    { cle: "beniMag",        beniSoin: { resMag: 8, tours: 1 },                     libelle: "bénédiction magique" },
-    { cle: "beniPhys",       beniSoin: { resPhys: 8, tours: 1 },                    libelle: "bénédiction physique" },
-    { cle: "beniDegats",     beniSoin: { degatsPct: 8, tours: 1 },                  libelle: "bénédiction offensive" },
-    { cle: "initSoi",        buffSoi: { initiative: 10, tours: 3 },                 libelle: "hâte" }
+    { cle: "beniMag",        beniSoin: { resMag: 8, tours: 2 },                     libelle: "bénédiction magique" },
+    { cle: "beniPhys",       beniSoin: { resPhys: 8, tours: 2 },                    libelle: "bénédiction physique" },
+    { cle: "beniDegats",     beniSoin: { degatsPct: 5, tours: 2 },                  libelle: "bénédiction offensive" },
+    { cle: "beniInit",       beniSoin: { initiative: 10, tours: 2 },                libelle: "hâte" }
     // (« +10 % d'ignorer les résistances » retiré des effets de soin : tableau de Nico.)
 ];
 
@@ -545,13 +546,15 @@ window.MODELES_OBJETS = [
         }
     },
     {
+        // (v492) Épique : « +1 soin + 1 (Effet C ou Effet B) + 2X Effet C » — un effet C compté deux fois, et un
+        // autre effet, tiré dans C ou dans B (effetsEnPlus : [nombre, fois, réservoirs]).
         modele: "Bagues Soins", type: "Magie", emplacement: "Main", deuxMains: false, bague: true,
         carac: "SAGESSE", noms: ["Bague"], effets: { reservoir: "C" },
         paliers: {
             "Commun":    { soin: 1 },
             "Rare":      { soin: 1, effets: [1, 1] },
             "Très rare": { soin: 1, effets: [1, 2] },
-            "Épique":    { soin: 1, effets: [1, 3] }
+            "Épique":    { soin: 1, effets: [1, 2], effetsEnPlus: [1, 1, "BC"] }
         }
     },
 
@@ -664,6 +667,20 @@ window.tirerEffetsObjet = function(modele, rarete) {
         const effet = disponibles.splice(Math.floor(Math.random() * disponibles.length), 1)[0];
         tires.push(multiplierEffet(effet, fois));
     }
+    // (v492) Un effet de plus, tiré dans un autre réservoir au choix (la bague de soin épique : « Effet C ou Effet B »),
+    // jamais le même que ceux déjà tirés.
+    if (Array.isArray(palier.effetsEnPlus)) {
+        const [n2, fois2, lettres] = palier.effetsEnPlus;
+        const deja = new Set(tires.map(e => e.cle));
+        for (let i = 0; i < n2; i++) {
+            const res = window.RESERVOIRS_EFFETS[auHasard(String(lettres || "A").split(""))] || window.EFFETS_A;
+            const possibles = res.filter(e => !deja.has(e.cle));
+            if (!possibles.length) continue;
+            const effet = auHasard(possibles);
+            deja.add(effet.cle);
+            tires.push(multiplierEffet(effet, fois2));
+        }
+    }
     return tires;
 };
 
@@ -679,7 +696,7 @@ window.fabriquerObjet = function(modele, rarete, options) {
     Object.keys(palier).forEach(cle => {
         if (cle === "etatsPropres") {
             (palier[cle] || []).forEach(e => etats.push({ etat: e.etat, chance: e.chance }));
-        } else if (cle !== "aRepartir" && cle !== "effets") {
+        } else if (cle !== "aRepartir" && cle !== "effets" && cle !== "effetsEnPlus") {
             bonus[cle] = valeurPalier(palier[cle], !!opts.auPlusBas);
         }
     });
@@ -914,6 +931,7 @@ window.decrireObjet = function(objet) {
             if (b.resMag)    morceaux.push(`+${b.resMag}% de résistance magique sur la cible d'un soin pendant ${b.tours} tour(s)`);
             if (b.resPhys)   morceaux.push(`+${b.resPhys}% de résistance physique sur la cible d'un soin pendant ${b.tours} tour(s)`);
             if (b.degatsPct) morceaux.push(`+${b.degatsPct}% de dégâts sur la cible d'un soin pendant ${b.tours} tour(s)`);
+            if (b.initiative) morceaux.push(`+${b.initiative} d'initiative sur la cible d'un soin pendant ${b.tours} tour(s)`);
         }
     });
 

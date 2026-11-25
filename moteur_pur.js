@@ -3447,13 +3447,15 @@ export function resoudreCarte(etat, action, plateau) {
             if (beni.resPhys) bonus.resPhys = beni.resPhys;
             if (beni.resMag) bonus.resMag = beni.resMag;
             if (beni.degatsPct) bonus.degatsPct = beni.degatsPct;
+            if (beni.initiative) bonus.initiative = beni.initiative;   // (v492) la hâte, sur le personnage soigné
             const detail = [beni.resPhys ? `+${beni.resPhys}% résistance physique` : null,
                             beni.resMag ? `+${beni.resMag}% résistance magique` : null,
-                            beni.degatsPct ? `+${beni.degatsPct}% de dégâts` : null]
+                            beni.degatsPct ? `+${beni.degatsPct}% de dégâts` : null,
+                            beni.initiative ? `+${beni.initiative} d'initiative` : null]
                 .filter(Boolean).join(", ");
             // Laquelle (l'écran a un geste pour chacune) : offensive, physique, magique.
-            const benediction = beni.degatsPct ? "offensive" : beni.resPhys ? "physique" : "magique";
-            soignes.forEach(id => poserSuiteEquipement(id, "Béni", beni.tours || 1, bonus, detail, { benediction }));
+            const benediction = beni.degatsPct ? "offensive" : beni.resPhys ? "physique" : beni.resMag ? "magique" : "";
+            soignes.forEach(id => poserSuiteEquipement(id, beni.initiative && !benediction ? "Hâte" : "Béni", beni.tours || 1, bonus, detail, benediction ? { benediction } : undefined));
         });
     }
 

@@ -239,7 +239,7 @@
    "Commun": "+1 soin",
    "Rare": "+1 soin + 1XEffet C",
    "Très rare": "+1 soin +2XEffet C",
-   "Épique": "+1 soin + 3XEffet C",
+   "Épique": "+1 soin + 1(Effet C ou Effet B) + 2XEffet C ",
    "noms": "Bagues"
   },
   {
@@ -423,19 +423,19 @@
   },
   {
    "ligne": 5,
-   "texte": "+8% résistance magique sur un sort de soin pendant 1 tour"
+   "texte": "+8% résistance magique pour le personnage soigné pendant 2 tours"
   },
   {
    "ligne": 6,
-   "texte": "+8% résistance physique sur sort de soin pendant 1 tour"
+   "texte": "+8% résistance physique pour le personnage soigné pendant 2 tours"
   },
   {
    "ligne": 7,
-   "texte": "+8% de degats d’attaque sur un sort de soin pendant 1 tour"
+   "texte": "+5% de degats d’attaque pour le personnage soigné pendant 2 tours"
   },
   {
    "ligne": 8,
-   "texte": "+10 initiative pendant 3 tours sur lui"
+   "texte": "+10 initiative pendant 2 tours le personnage soigné"
   }
  ],
  "prerequis": {
@@ -467,6 +467,7 @@
  "_corrections": {
   "Javelots / Épique": "Le classeur d'origine portait 12% d'ignore-armure, sous les 15% du palier Très rare. Coquille confirmée par Nico le 03/09 : l'épique garde 15%. Seule retouche apportée à la transcription du classeur.",
   "Tableau de Nico (octobre)": "Cellules en rouge du nouveau classeur : Lance courte commune +5 parade ; Hache à deux mains très rare +5 dégâts ; effets A/B : repousser, tracter, provoquer à 15 %, initiative +5 ; effet C « +10 % d'ignorer les résistances » supprimé.",
-  "Tableau de Nico (v476)": "Nouveau classeur des armes (armures inchangées, reprises de l'ancien). « Lance courte ou gladius » : carac écrite « FORCE (Parade) ou DEXTÉRITÉ (esquive) » — le catalogue garde FORCE comme carac principale, accepte aussi la DEXTÉRITÉ (CARACS_MODELE) et donne parade ou esquive selon la meilleure des deux. « Bagues DPS » : « INTELLIGENCE / CHARISME » — carac principale INTELLIGENCE, le CHARISME accepté aussi (CARACS_MODELE)."
+  "Tableau de Nico (v476)": "Nouveau classeur des armes (armures inchangées, reprises de l'ancien). « Lance courte ou gladius » : carac écrite « FORCE (Parade) ou DEXTÉRITÉ (esquive) » — le catalogue garde FORCE comme carac principale, accepte aussi la DEXTÉRITÉ (CARACS_MODELE) et donne parade ou esquive selon la meilleure des deux. « Bagues DPS » : « INTELLIGENCE / CHARISME » — carac principale INTELLIGENCE, le CHARISME accepté aussi (CARACS_MODELE).",
+  "Tableau de Nico (v492)": "Classeur des armes revérifié (Vierge_1.xlsx) : modèles et effets A/B identiques ; effets C « pour le personnage soigné pendant 2 tours » (dégâts +5 %, l'initiative sur le soigné) ; bague de soin épique « +1 soin + 1 (Effet C ou Effet B) + 2X Effet C »."
  }
 }

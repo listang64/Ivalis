@@ -146,10 +146,15 @@ await section(async () => {
   verifier("Effet C : +10 d'initiative pendant 2 tours ×2 = +20 pendant 2 tours", init.buffSoi.initiative === 20 && init.buffSoi.tours === 2);
   const beni = w.multiplierEffetObjet({ beniSoin: { resMag: 8, tours: 2 } }, 2);
   verifier("Exemple 2 : +8 % de résistance magique pendant 2 tours ×2 = +16 % pendant 2 tours", beni.beniSoin.resMag === 16 && beni.beniSoin.tours === 2);
-  const tirs = []; for (let i = 0; i < 300; i++) tirs.push(...w.tirerEffetsObjet(modele("Bagues Soins"), "Épique"));
-  verifier("Bague de soin épique « + 3X Effet C » : un effet, compté trois fois (+3 soins, +24 %, +30 d'initiative)",
-    tirs.every(e => (e.bonus && e.bonus.soin === 3) || (e.beniSoin && (e.beniSoin.resMag === 24 || e.beniSoin.resPhys === 24 || e.beniSoin.degatsPct === 24) && e.beniSoin.tours === 1)
-      || (e.buffSoi && e.buffSoi.initiative === 30 && e.buffSoi.tours === 3)), JSON.stringify(tirs.slice(0, 3)));
+  // (v492) Tableau de Nico : « +1 soin + 1 (Effet C ou Effet B) + 2X Effet C ».
+  const effB2 = new Set(w.EFFETS_B.map(e => e.cle)), effC2 = new Set(w.EFFETS_C.map(e => e.cle));
+  const lots = []; for (let i = 0; i < 300; i++) lots.push(w.tirerEffetsObjet(modele("Bagues Soins"), "Épique"));
+  const deuxFois = (e) => (e.bonus && e.bonus.soin === 2) || (e.beniSoin && (e.beniSoin.resMag === 16 || e.beniSoin.resPhys === 16 || e.beniSoin.degatsPct === 10 || e.beniSoin.initiative === 20) && e.beniSoin.tours === 2);
+  verifier("Bague de soin épique : un effet C compté deux fois, et un autre effet (C ou B), différent",
+    lots.every(l => l.length === 2 && effC2.has(l[0].cle) && deuxFois(l[0]) && (effC2.has(l[1].cle) || effB2.has(l[1].cle)) && l[1].cle !== l[0].cle)
+      && lots.some(l => effB2.has(l[1].cle) && !effC2.has(l[1].cle)) && lots.some(l => effC2.has(l[1].cle)), JSON.stringify(lots.slice(0, 2)));
+  verifier("les effets C : pour le personnage soigné pendant 2 tours (résistances +8 %, dégâts +5 %, initiative +10)",
+    JSON.stringify(w.EFFETS_C.map(e => e.beniSoin || e.bonus)) === JSON.stringify([{ soin: 1 }, { resMag: 8, tours: 2 }, { resPhys: 8, tours: 2 }, { degatsPct: 5, tours: 2 }, { initiative: 10, tours: 2 }]));
   const hacheEpique = []; for (let i = 0; i < 300; i++) hacheEpique.push(w.fabriquerObjet(modele("Hache à deux mains"), "Épique"));
   const fusion = hacheEpique.find(o => (o.etats || []).length === 1 && o.etats[0].chance === 20);
   verifier("le même état que l'arme (hache : saignement 10 % + « 2X » saignement 5 %) : une seule ligne à 20 %",
