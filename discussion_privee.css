@@ -80,3 +80,8 @@
    chez ceux qui lisent, pas d'encart pour écrire, et pas de main sur l'écran tant que le PNJ n'est pas parti. */
 .discussion-route[data-tour="attente"], .discussion-route[data-tour="pnj"]:not(:has(.encart-dp.pj)) { cursor: default; }
 .quitter-dp[hidden] { display: none; }
+/* (v494) Sur iPad (écran tactile), le haut de l'écran est flouté : « Quitter la discussion » descend un peu. Le PC ne change pas. */
+@media (hover: none) and (pointer: coarse) {
+  .quitter-dp { top: calc(2.5vh + 40px); }
+}
+

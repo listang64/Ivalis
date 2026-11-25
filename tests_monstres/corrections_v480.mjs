@@ -129,8 +129,9 @@ await section(async () => {
   for (let k = 0; k < 200; k++) {
     const pl = CP.placerAuCamp(encarts, gens, [{ id: "LOUP", gabarit: "sol_gros", image: "loup" }, { id: "AIGLE", gabarit: "air", image: "aigle" }]);
     const persos = ["1", "2", "3"].map(n => pl[n]).filter(Boolean);
-    if (persos.length !== 3 || new Set(persos.map(x => x.id)).size !== 3 || persos.some(x => x.id === "SANS" || !x.image.startsWith(x.id))) bon = false;
-    if (!pl[4] || pl[4].id !== "LOUP" || !pl[4].compagnon || !pl[5] || pl[5].id !== "AIGLE" || pl[6]) bon = false;
+    // (v494) Chacun n'a que 50 % de chance d'apparaître (corrections_v494) : au plus un par encart, jamais deux fois le même.
+    if (persos.length > 3 || new Set(persos.map(x => x.id)).size !== persos.length || persos.some(x => x.id === "SANS" || !x.image.startsWith(x.id))) bon = false;
+    if ((pl[4] && (pl[4].id !== "LOUP" || !pl[4].compagnon)) || (pl[5] && pl[5].id !== "AIGLE") || pl[6]) bon = false;
     persos.forEach(x => vus.add(x.id + ":" + x.image));
   }
   verifier("le placement : un personnage par encart « perso », tirés au hasard s'ils sont trop nombreux, une de leurs deux images",
@@ -265,6 +266,8 @@ await section(async () => {
 
 titre("5. LES PERSONNAGES DU CAMP, PLACÉS AU HASARD");
 await section(async () => {
+  // (v494) Chacun n'a que 50 % de chance d'apparaître : on retire jusqu'à ce que tous les présents soient placés.
+  await p.evaluate(async () => { for (let k = 0; k < 600 && Object.keys(window.CAMP_SCENE.placement()).length < 7; k++) await window.CAMP_SCENE.preparerPersonnages(); });
   const r = await p.evaluate(() => {
     const pl = window.CAMP_SCENE.placement();
     const persos = [...document.querySelectorAll(".perso-camp")].map(b => ({ id: b.dataset.perso, src: b.querySelector("img").getAttribute("src"),
@@ -283,6 +286,8 @@ await section(async () => {
   verifier("chaque encart entre les couches du décor (devant sa couche, derrière celle du dessus)", couchesOk);
   const tirages = await p.evaluate(async () => { const vus = new Set(); for (let k = 0; k < 12; k++) { await window.CAMP_SCENE.preparerPersonnages(); vus.add(JSON.stringify(window.CAMP_SCENE.placement())); } return vus.size; });
   verifier("à chaque retour sur la page, un autre placement", tirages > 3, String(tirages));
+  // (v494) Chacun n'a que 50 % de chance d'apparaître : on retire jusqu'à ce que tous les présents soient placés.
+  await p.evaluate(async () => { for (let k = 0; k < 600 && Object.keys(window.CAMP_SCENE.placement()).length < 7; k++) await window.CAMP_SCENE.preparerPersonnages(); });
   const taille = await p.evaluate(() => { const b = document.querySelector('.perso-camp[data-perso="H1"]'); const e = b.closest(".encart-camp").getBoundingClientRect(); const i = b.querySelector("img").getBoundingClientRect();
     return { e: e.height, i: i.height, bas: Math.abs(i.bottom - e.bottom) }; });
   verifier("l'image jamais plus haute que son encart, les pieds en bas", taille.i <= taille.e + 0.5 && taille.bas < 1.5, JSON.stringify(taille));
@@ -290,6 +295,8 @@ await section(async () => {
 
 titre("6. CLIQUER SUR UN PERSONNAGE : LA DISCUSSION PRIVÉE");
 await section(async () => {
+  // (v494) Chacun n'a que 50 % de chance d'apparaître : on retire jusqu'à ce que tous les présents soient placés.
+  await p.evaluate(async () => { for (let k = 0; k < 600 && Object.keys(window.CAMP_SCENE.placement()).length < 7; k++) await window.CAMP_SCENE.preparerPersonnages(); });
   const clic = async (id) => p.evaluate(async (id) => { window.__discussions = []; const b = document.querySelector(`.perso-camp[data-perso="${id}"]`);
     if (!b) return "absent"; b.querySelector("img").click(); await new Promise(r => setTimeout(r, 120)); return window.__discussions.map(s => s.id + "|" + s.nom).join(); }, id);
   const ara = await clic("PNJ_ARA"), h3 = await clic("H3"), h1 = await clic("H1"), h1b = await clic("H1B"), h2 = await clic("H2");
@@ -311,7 +318,8 @@ await section(async () => {
   verifier("en haut de l'image : Former le conseil, Gestion du camp, Flâner dans le camp, Expédition, Déplacer le camp",
     r.textes.join("|") === "Former le conseil|Gestion du camp|Flâner dans le camp|Expédition|Déplacer le camp" && r.haut < 60, r.textes.join("|"));
   verifier("…écrits sur une aquarelle (le lavis du livre)", r.lavis);
-  verifier("le menu « Mon héros principal » : ses personnages à lui seul, le principal choisi", r.titre === "Mon héros principal" && r.heros && r.heros.valeur === "H1" && r.heros.options.join() === "H1,H1B", JSON.stringify(r.heros));
+  // (v494) Plus de menu « Mon héros principal » dans le camp : une case dans la Gestion du camp (corrections_v494).
+  verifier("plus de menu « Mon héros principal » dans le camp (la case est dans la Gestion)", !r.heros && !r.titre, JSON.stringify(r.heros));
   const dep = await p.evaluate(async () => { document.querySelector('[data-camp="deplacer"]').click(); await new Promise(r => setTimeout(r, 100));
     return { ouvert: window.CAMP_SCENE.ouvert(), note: document.getElementById("note-camp").textContent, eteint: document.querySelector('[data-camp="deplacer"]').classList.contains("eteint") }; });
   verifier("« Déplacer le camp » sans vote du conseil : refusé, un mot le dit, la page reste", dep.ouvert && /conseil/.test(dep.note) && dep.eteint, JSON.stringify(dep));

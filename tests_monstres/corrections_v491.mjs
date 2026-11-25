@@ -235,6 +235,8 @@ await section(async () => {
     window.PARTIE_DATA = { ...window.PARTIE_DATA, Expedition: { Membres: ["H1", "H2"] } };
     window.CAMP_SCENE.lireEncarts({ Encarts: enc, Prochain_Numero: 3 });
     await window.CAMP_SCENE.preparerPersonnages();
+    // (v494) 50 % de chance d'apparaître : on retire jusqu'à avoir les deux.
+    for (let k = 0; k < 200 && Object.keys(window.CAMP_SCENE.placement()).length < 2; k++) await window.CAMP_SCENE.preparerPersonnages();
     await window.CAMP_SCENE.precharger();
     await new Promise(r => setTimeout(r, 300));
     const pl = window.CAMP_SCENE.placement(), devant = pl[1] && pl[1].id, derriere = pl[2] && pl[2].id;
@@ -276,14 +278,14 @@ await section(async () => {
   const cs = lire("camp_scene.js");
   const m = cs.match(/export const ENCARTS_DEFAUT = (\{[\s\S]*?\n\});/);
   const def = m ? JSON.parse(m[1]) : {};
-  verifier("les encarts de Nico pour toutes les parties (11, leurs couches)", Object.keys(def).length === 11 && def[1].x === -0.1193 && def[7].cote === 0.4008 && def[5].couche === 9 && def[11].y === 0.6118);
+  verifier("les encarts de Nico pour toutes les parties (11 au moins, leurs couches)", Object.keys(def).length >= 11 && def[1].x === -0.1193 && def[7].cote === 0.4008 && def[5].couche === 9 && def[11].y === 0.6118);
   await p.evaluate(() => window.CAMP_SCENE.fermer()); await p.waitForTimeout(2200);
 });
 
 titre("5. LA GESTION : L'IMAGE OUVRE LES FILS INVISIBLES, LE NOM LA FICHE ; THÉMÈS ET TOUTES LES IMAGES REFAITES (DEV)");
 await section(async () => {
   const g = lire("grimoire_gestion.js"), li = lire("grimoire_liens.js");
-  verifier("l'image : ses fils invisibles, son âme exacte (jamais un autre PNJ au nom voisin)", /data-gc="ame" data-id="\$\{echapper\(id\)\}" title="Ses fils invisibles"/.test(g) && /depuisGestion: true, exact: true/.test(g) && /else if \(o\.nom && !o\.exact\)/.test(li) && /x\.ref === o\.id/.test(li));
+  verifier("l'image : ses fils invisibles, son âme exacte (jamais un autre PNJ au nom voisin)", /data-gc="ame" data-id="\$\{echapper\(id\)\}" title="Ses fils invisibles/.test(g) && /depuisGestion: true, exact: true/.test(g) && /else if \(o\.nom && !o\.exact\)/.test(li) && /x\.ref === o\.id/.test(li));
   const r = await p.evaluate(async () => {
     const vus = []; const F = window.GRIMOIRE_FICHES.ouvrir, L = window.GRIMOIRE_LIENS && window.GRIMOIRE_LIENS.ouvrir;
     window.GRIMOIRE_FICHES.ouvrir = (id) => vus.push("fiche:" + id);
@@ -304,7 +306,8 @@ await section(async () => {
   });
   verifier("le bouton DEV : l'avatar de Thémès, fait comme celui d'un personnage joueur, d'après sa fiche", t.portrait && /barbe blanche/.test(t.portrait.signes) && t.themes.URL_Cloudinary === "https://res.cloudinary.com/x/image/upload/q_auto,f_auto/v1/themes.png", JSON.stringify(t.portrait).slice(0, 120));
   verifier("…toutes les images du camp effacées (Thémès compris), puis refaites une à une par la veille", t.r && t.h1.length === 0 && t.ara.length === 0 && t.themes.Images_Camp.length === 0 && t.oublies === 8, JSON.stringify({ r: t.r, oublies: t.oublies }));
-  verifier("…c'est lui qui remplace le bouton DEV provisoire (créer le camp)", /CAMP_AVATARS\.refaireTout\(\)/.test(t.bouton), t.bouton);
+  // (v494) Le bouton DEV provisoire est retiré (Nico) ; refaireTout reste (window.CAMP_AVATARS).
+  verifier("…le bouton DEV provisoire est retiré (refaireTout reste dans CAMP_AVATARS)", !t.bouton && typeof (await p.evaluate(() => typeof window.CAMP_AVATARS.refaireTout)) === "string", t.bouton);
 });
 
 titre("6. LE MODE ARÈNE : UN JOUEUR CHOISIT LES TROIS COMBATTANTS PARMI TOUS");

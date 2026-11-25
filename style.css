@@ -5423,4 +5423,3 @@ textarea.input-texte-parchemin {
 .camp-carte img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.55)); }
 .camp-monde { position: absolute; display: none; height: auto; transform: translate(-50%, -50%); pointer-events: none; z-index: 6;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.55)); }
-.btn-camp-dev { margin-left: 8px; }

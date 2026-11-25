@@ -75,17 +75,15 @@
   border: 1px solid rgba(243, 233, 214, 0.55); background: rgba(14, 9, 5, 0.6); color: #f3e9d6; cursor: pointer;
   font-family: 'Cinzel', serif; font-size: clamp(13px, 1.3vw, 17px); }
 .retour-livre-camp:hover { background: rgba(14, 9, 5, 0.8); }
-.heros-camp { --u: clamp(3.2px, 0.42vw, 4.6px); position: absolute; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 200;
-  width: min(300px, calc(100vw - 180px)); padding: 10px 12px; border-radius: 8px; background: rgba(244, 232, 208, 0.93); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
-  font-family: 'Almendra', serif; color: #24150a; }
-.heros-camp:empty { display: none; }
-.heros-camp .choix-heros-principal { width: 100%; margin: 0; }
 .note-camp { position: absolute; left: 50%; bottom: 80px; transform: translateX(-50%); z-index: 220; margin: 0; padding: 8px 16px; border-radius: 6px;
   max-width: calc(100vw - 32px); background: rgba(244, 232, 208, 0.95); color: #24150a; font-family: 'Almendra', serif; font-size: 16px;
   opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
 .note-camp.visible { opacity: 1; }
 
 @media (max-width: 600px) {
-  .heros-camp { width: calc(100vw - 32px); bottom: 64px; }
   .note-camp { bottom: 200px; }
+}
+/* (v494) Sur iPad (écran tactile), le haut de l'écran est flouté : les boutons descendent un peu. Le PC ne change pas. */
+@media (hover: none) and (pointer: coarse) {
+  .barre-camp { top: calc(max(14px, env(safe-area-inset-top)) + 40px); }
 }

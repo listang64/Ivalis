@@ -20,8 +20,8 @@
 //  Les règles : camp_pur.js.
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
-import { doc, getDoc, setDoc, updateDoc, runTransaction, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=14";
+import { doc, getDoc, getDocs, setDoc, updateDoc, runTransaction, deleteField, collection, query, where } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import * as CP from "./camp_pur.js?v=15";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -128,4 +128,14 @@ export async function remplirBourseDev() {
     return "";
 }
 
-window.RECRUTEMENT = { avecCamp, rejoindreLeCamp, engager, acheterPersonnage, recruterPourLeGroupe, choisirClasse, remplirBourseDev, regles: CP };
+// (v494) DEV : les PNJ de la partie qui ne sont pas (encore) au camp, vivants, par nom.
+export async function pnjsHorsDuCamp() {
+    if (!avecCamp()) return [];
+    const membres = camp().Membres || {};
+    const s = await getDocs(query(collection(db, "Monde_PNJ"), where("ID_Partie", "==", idPartie())));
+    const out = [];
+    s.forEach(d => { const f = d.data() || {}; if (!membres[d.id] && f.Statut !== "Mort" && f.Nom_PNJ && !f.Narrateur) out.push({ id: d.id, nom: f.Nom_PNJ }); });
+    return out.sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
+}
+
+window.RECRUTEMENT = { pnjsHorsDuCamp, avecCamp, rejoindreLeCamp, engager, acheterPersonnage, recruterPourLeGroupe, choisirClasse, remplirBourseDev, regles: CP };

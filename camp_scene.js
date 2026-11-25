@@ -24,7 +24,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=14";
+import * as CP from "./camp_pur.js?v=15";
 
 // Les 9 couches, du premier plan au plus éloigné (le document, « Le graphique du camp »).
 export const COUCHES = [
@@ -48,13 +48,16 @@ export const ENCARTS_DEFAUT = {
   "2": { "x": 0.0687, "y": 0.5472, "cote": 0.2415, "couche": 5, "type": "perso" },
   "3": { "x": 0.1818, "y": 0.5882, "cote": 0.1972, "couche": 6, "type": "perso" },
   "4": { "x": 0.5339, "y": 0.7215, "cote": 0.0909, "couche": 3, "type": "perso" },
-  "5": { "x": 0.4354, "y": 0.7507, "cote": 0.0701, "couche": 9, "type": "perso" },
-  "6": { "x": 0.4167, "y": 0.6729, "cote": 0.1451, "couche": 3, "type": "perso" },
+  "5": { "x": 0.4647, "y": 0.7448, "cote": 0.0701, "couche": 9, "type": "perso" },
+  "6": { "x": 0.3698, "y": 0.6515, "cote": 0.1451, "couche": 9, "type": "perso" },
   "7": { "x": 0.7234, "y": 0.434, "cote": 0.4008, "couche": 2, "type": "perso" },
   "8": { "x": 0.7193, "y": 0.5583, "cote": 0.2206, "couche": 7, "type": "perso" },
   "9": { "x": 0.6109, "y": 0.6243, "cote": 0.1795, "couche": 8, "type": "perso" },
   "10": { "x": 0.5786, "y": 0.6896, "cote": 0.118, "couche": 8, "type": "perso" },
-  "11": { "x": 0.2911, "y": 0.6118, "cote": 0.1805, "couche": 3, "type": "perso" }
+  "11": { "x": 0.2911, "y": 0.6118, "cote": 0.1805, "couche": 3, "type": "perso" },
+  "12": { "x": 0.3827, "y": 0.7495, "cote": 0.1539, "couche": 1, "type": "compagnon_petit" },
+  "13": { "x": 0.6857, "y": 0.1778, "cote": 0.1331, "couche": 3, "type": "compagnon_air" },
+  "14": { "x": 0.4969, "y": 0.7241, "cote": 0.08, "couche": 7, "type": "compagnon_gros" }
 };
 // La hauteur sur la largeur de l'image (lue sur la première couche chargée ; un iPad en attendant).
 let aspect = 1536 / 2048;
@@ -92,11 +95,12 @@ function construire() {
       </div>
       <div class="barre-camp">${BOUTONS.map(([id, t]) => `<button type="button" class="bouton-camp" data-camp="${id}">${lavis("camp-" + id)}<span>${t}</span></button>`).join("")}</div>
       <button type="button" class="retour-livre-camp" data-camp="livre">‹ Le livre</button>
-      <div class="heros-camp" id="heros-camp"></div>
       <p class="note-camp" id="note-camp" aria-live="polite"></p>
       <button type="button" class="dev-encarts-camp" data-camp="dev">Encarts (DEV)</button>
       <div class="outils-encarts-camp" id="outils-encarts-camp"></div>`;
-    document.body.appendChild(e);
+    // (v494) Dans le même conteneur que le livre (en partie, l'écran de jeu) : sinon le livre, pris dans l'écran de jeu,
+    // ne peut pas passer devant le camp pendant qu'il glisse, et la transition ne se voit pas.
+    conteneurDuLivre().appendChild(e);
     e.addEventListener("click", surClic);
     e.addEventListener("pointerdown", surAppui);
     e.addEventListener("pointermove", surSurvol);
@@ -109,6 +113,7 @@ function construire() {
     });
     return e;
 }
+function conteneurDuLivre() { const g = $("ecran-grimoire"); return (g && g.parentNode) || document.body; }
 // LE CADRAGE : bord à bord ; le bas collé au bas de l'écran (le haut tronqué s'il dépasse).
 function cadrer() {
     const d = $("decor-camp");
@@ -148,6 +153,7 @@ export async function ouvrir() {
     ecouter();                                        // les encarts de la base : écoutés une fois la page ouverte (en partie)
     const e = construire();
     const g = $("ecran-grimoire");
+    if (e.parentNode !== conteneurDuLivre()) conteneurDuLivre().appendChild(e);   // le livre a changé de conteneur (entrée en partie)
     son();
     const pret = preparerPersonnages().then(() => precharger()).catch(() => {});   // les avatars se chargent pendant le noir
     if (g) g.classList.add("vers-le-camp");          // 1. l'écran derrière le livre devient noir
@@ -155,7 +161,6 @@ export async function ouvrir() {
     await Promise.race([pret, attendre(ATTENTE_IMAGES_MAX)]);
     e.classList.add("affiche", "sans-fondu", "visible");   // le camp, prêt, sous le noir
     cadrer();
-    majHeros();
     majBoutons();
     if (g) g.classList.add("camp-dessous");          // 2. le noir s'efface : le camp apparaît, derrière le livre
     await attendre(FONDU);
@@ -316,29 +321,18 @@ export function toucherPerso(x, y) {
 function surSurvol(ev) {
     if (edition || !ouvert) return;
     const e = $("ecran-camp");
-    if (!e || ev.target.closest(".barre-camp, .heros-camp, .retour-livre-camp, .outils-encarts-camp, .dev-encarts-camp")) { if (e) e.classList.remove("sur-perso"); return; }
+    if (!e || ev.target.closest(".barre-camp, .retour-livre-camp, .outils-encarts-camp, .dev-encarts-camp")) { if (e) e.classList.remove("sur-perso"); return; }
     e.classList.toggle("sur-perso", !!toucherPerso(ev.clientX, ev.clientY));
 }
 async function surClic(ev) {
     const b = ev.target.closest("[data-camp], [data-perso], [data-outil], [data-fa]");
     if (!b) {
-        if (edition || ev.target.closest(".heros-camp, .outils-encarts-camp")) return;
+        if (edition || ev.target.closest(".outils-encarts-camp")) return;
         const id = toucherPerso(ev.clientX, ev.clientY);
         if (id) return parlerA(id);
         return;
     }
     if (b.dataset.perso) return parlerA(b.dataset.perso);
-    // Le menu « Mon héros principal » (grimoire_fiches.js) : sa fiche, ou un nouvel aventurier, dans le livre.
-    if (b.dataset.fa === "fiche-principal") {
-        son();
-        const l = b.closest("#heros-camp") && $("heros-camp").querySelector(".liste-heros-principal");
-        const id = (l && l.value) || (window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.herosPrincipalDe(moi()));
-        return fermer(() => { if (id && window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.ouvrir(id); });
-    }
-    if (b.dataset.fa === "creer") {
-        son();
-        return fermer(() => { if (window.GRIMOIRE_CREATION && window.GRIMOIRE_CREATION.commencer()) return; if (typeof window.ouvrirCreationHero === "function") window.ouvrirCreationHero(); });
-    }
     if (b.dataset.outil) return outil(b.dataset.outil);
     const quoi = b.dataset.camp;
     if (quoi === "livre") { son(); return fermer(); }
@@ -375,14 +369,6 @@ function majBoutons() {
     const dev = e.querySelector(".dev-encarts-camp");
     if (dev) dev.style.display = estDev() ? "block" : "none";
 }
-const signatureHeros = () => (window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.signatureChoixHeros ? window.GRIMOIRE_FICHES.signatureChoixHeros() : "");
-function majHeros() {
-    const z = $("heros-camp");
-    if (!z) return;
-    z.innerHTML = window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.htmlChoixHeros ? window.GRIMOIRE_FICHES.htmlChoixHeros() : "";
-    z.dataset.signature = signatureHeros();
-}
-
 // ---------------------------------------------------------------------
 //  L'OUTIL DEV DES ENCARTS
 // ---------------------------------------------------------------------
@@ -503,8 +489,6 @@ setInterval(() => {
     if (!window.ID_PARTIE_COURANTE || !camp()) return toutFermer();
     if (document.hidden) return;
     majBoutons();
-    const z = $("heros-camp");
-    if (z && !z.contains(document.activeElement) && z.dataset.signature !== signatureHeros()) majHeros();
 }, 1500);
 
 window.CAMP_SCENE = { ouvrir, fermer, ouvert: () => ouvert, preparerPersonnages, codeDesEncarts, encarts: () => encarts, placement: () => placement,

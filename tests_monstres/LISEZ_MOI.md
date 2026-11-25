@@ -12759,3 +12759,13 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 
 - `objets.js` (`FAMILLES_BUTIN`, `tirerFamilleButin`, `tirerObjetDeRarete`) : 15 % une armure, 10 % un bouclier, 40 % une arme lourde ou légère, 20 % une arme à distance ou polyvalente (fronde, arc, gantelet, sarbacane, javelots), 15 % une bague ; puis un modèle au hasard dans la famille (avant : 75 % arme, 25 % bouclier ou armure).
 - corrections_v493 le vérifie (la table, une seule famille par modèle, un tirage de 20 000 objets, les bornes du dé) ; butin_loot garde ses 25 % de boucliers et d'armures.
+
+## v494 — Le camp : la transition en partie, l'iPad, la gestion, les poses, l'apparition à 50 %
+
+- **La transition** (`camp_scene.js`) : en partie, le livre vit dans l'écran de jeu (`#ecran-jeu`, z 20) ; le camp, posé dans `body`, le couvrait d'emblée (le livre ne pouvait pas passer devant), d'où « l'animation ne se fait pas ». Le camp est désormais dans le même conteneur que le livre (`conteneurDuLivre`).
+- **L'iPad** (`camp_scene.css`, `discussion_privee.css`) : sur un écran tactile, les boutons du haut et « Quitter la discussion » descendent de 40 px ; le PC ne change pas.
+- **Plus de boutons provisoires** : le bouton DEV du camp (`index.html`) et la boîte « Mon héros principal » du camp.
+- **La gestion** (`grimoire_gestion.js`, `.css`) : à qui appartient un héros ; la case « Personnage principal » (ses héros) ; la carac déterminante du rôle (`camp_pur.js`, `caracsDeTache`) ; le cadre doré des personnages principaux ; en dernier (DEV, en rouge) un PNJ de la partie recruté gratuitement (`recrutement.js`, `pnjsHorsDuCamp`).
+- **Les images en scène** (`camp_pur.js`, `POSES_CAMP`) : plus de bûche fendue ni d'animal (la chèvre) ; deux poses neutres.
+- **L'apparition** (`placerAuCamp`, `CHANCE_APPARAITRE_CAMP`) : 50 % de chance, compagnons compris ; les encarts de Nico (14).
+- corrections_v494 le vérifie (dans une vraie partie : le livre dans l'écran de jeu) ; corrections_v478, v480, v491 adaptés.

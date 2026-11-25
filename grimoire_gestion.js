@@ -107,6 +107,7 @@ function htmlGauche() {
         ${htmlRecrutement(camp)}
         ${htmlJournal(camp)}
         ${estDev() ? `<button type="button" class="lien-dev jour-dev-gestion" data-action="gestion" data-gc="jour-dev">Faire passer un jour au camp (DEV)</button>` : ""}
+        ${htmlRecrueDev()}
         <p class="note-gestion${note.texte && Date.now() - note.le < 4000 ? " visible" : ""}" aria-live="polite">${echapper(note.texte)}</p>
       </div>`;
 }
@@ -142,6 +143,30 @@ function htmlJournal(camp) {
         <div class="journal-gestion">${jours.map(j => `<div class="jour-gestion"><b>${echapper(j.Date_Jeu || `Jour ${j.Jour || "?"}`)}</b>
           <ul>${(j.Lignes || []).map(l => `<li>${echapper(l)}</li>`).join("")}</ul></div>`).join("")}</div>`;
 }
+// (v494) Les personnages principaux des joueurs (le cadre doré de leur portrait).
+function estPrincipal(id) {
+    const P = R(), persos = window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || [];
+    if (!P || !P.herosPrincipal) return false;
+    const choix = (window.PARTIE_DATA || {}).Heros_Principaux || {};
+    return [...new Set(persos.map(h => h && h.idJoueur).filter(Boolean))].some(j => P.herosPrincipal(j, persos, choix) === id);
+}
+// (v494) DEV : un PNJ de la partie recruté dans le camp, gratuitement (comme le bouton des fils invisibles).
+let pnjsDev = [], pnjsDevLus = 0;
+async function lirePnjsDev() {
+    if (!estDev() || !window.RECRUTEMENT || !window.RECRUTEMENT.pnjsHorsDuCamp || Date.now() - pnjsDevLus < 20000) return;
+    pnjsDevLus = Date.now();
+    try { pnjsDev = await window.RECRUTEMENT.pnjsHorsDuCamp(); maj(true); } catch (e) { console.warn("[Gestion] Les PNJ :", e); }
+}
+function htmlRecrueDev() {
+    if (!estDev()) return "";
+    lirePnjsDev();
+    return `<div class="recrue-dev-gestion">
+        <div class="sous-titre-groupe dev-rouge">Recruter un PNJ pour le camp, gratuitement (DEV)</div>
+        ${pnjsDev.length ? `<select class="select-gestion select-recrue-dev" data-gc="choix-recrue-dev">${pnjsDev.map(p => `<option value="${echapper(p.id)}">${echapper(p.nom)}</option>`).join("")}</select>
+        <button type="button" class="lien-dev recruter-dev-gestion" data-action="gestion" data-gc="recruter-dev">Le faire entrer au camp (DEV)</button>`
+          : `<p class="ligne-gestion petite dev-rouge">Aucun PNJ de la partie hors du camp.</p>`}
+      </div>`;
+}
 const nomDe = (id, camp) => ((infos[id] || {}).nom) || (((camp || {}).Membres || {})[id] || {}).Nom || id;
 
 // ---------------------------------------------------------------------
@@ -152,7 +177,12 @@ function htmlMembre(id, camp, partis, bloque) {
     const moral = Number.isFinite(Number(mb.Moral)) ? Number(mb.Moral) : 60;
     const themes = P.estThemes(id, mb), parti = partis.includes(id);
     const portrait = i.portrait ? `<img src="${echapper(i.portrait)}" alt="" draggable="false">` : `<span>${echapper(String(nomDe(id, camp)).slice(0, 1).toUpperCase())}</span>`;
-    const qui = themes ? "Le narrateur du clan" : i.heros ? `Héros${i.joueur === moi() ? " (à toi)" : ""}` : (i.occupation || "Membre du clan");
+    // (v494) À qui appartient le héros ; son joueur en fait son personnage principal d'une case (les siens seulement).
+    const nomJoueur = (j) => j === moi() ? "toi" : ((typeof window.nomDuJoueurLivre === "function" && window.nomDuJoueurLivre(j)) || "un joueur");
+    const qui = themes ? "Le narrateur du clan" : i.heros ? `Héros${i.joueur ? ` de ${nomJoueur(i.joueur)}` : ""}` : (i.occupation || "Membre du clan");
+    const principal = estPrincipal(id);
+    const casePrincipal = i.heros && i.joueur && i.joueur === moi()
+        ? `<label class="principal-gestion"><input type="checkbox" data-gc="principal" data-id="${echapper(id)}"${principal ? " checked disabled" : ""}> Personnage principal</label>` : "";
     const voulu = (brouillons[id] && brouillons[id].tache) !== undefined ? brouillons[id].tache : (mb.Tache || "");
     let controle;
     if (themes) controle = `<span class="tache-fixe">Part avec chaque expédition</span>`;
@@ -161,7 +191,7 @@ function htmlMembre(id, camp, partis, bloque) {
         const options = [`<option value="">Repos</option>`].concat(Object.keys(P.TACHES).map(t => {
             const T = P.TACHES[t], m = P.mDeTache(t, i.caracs);
             const plein = T.max && Object.keys(camp.Membres).filter(x => x !== id && camp.Membres[x].Tache === t).length >= T.max;
-            return `<option value="${t}"${voulu === t ? " selected" : ""}${plein && voulu !== t ? " disabled" : ""}>${T.nom} (m ${m >= 0 ? "+" : "−"}${Math.abs(m)})${plein && voulu !== t ? " — complet" : ""}</option>`;
+            return `<option value="${t}"${voulu === t ? " selected" : ""}${plein && voulu !== t ? " disabled" : ""}>${T.nom} (${echapper(P.caracsDeTache ? P.caracsDeTache(t) : "")})${plein && voulu !== t ? " — complet" : ""}</option>`;
         })).join("");
         controle = `<select class="select-gestion select-tache" data-gc="tache" data-id="${echapper(id)}"${bloque ? " disabled" : ""} title="${echapper(voulu ? P.TACHES[voulu].aide : "Sans tâche : +3 de moral par jour, et ses blessures guérissent plus vite.")}">${options}</select>`;
         if (voulu === "entrainer") controle += htmlRecrue(id, camp, partis, bloque, mb);
@@ -169,13 +199,14 @@ function htmlMembre(id, camp, partis, bloque) {
     }
     const histo = (Array.isArray(mb.Moral_Historique) ? mb.Moral_Historique : []).slice(-1)[0];
     return `<li class="membre-gestion${parti ? " parti" : ""}" data-membre="${echapper(id)}">
-        <button type="button" class="portrait-gestion" data-action="gestion" data-gc="ame" data-id="${echapper(id)}" title="Ses fils invisibles">${portrait}</button>
+        <button type="button" class="portrait-gestion${principal ? " principal" : ""}" data-action="gestion" data-gc="ame" data-id="${echapper(id)}" title="Ses fils invisibles${principal ? " — personnage principal d'un joueur" : ""}">${portrait}</button>
         <div class="corps-membre-gestion">
           <div class="ligne-nom-gestion"><button type="button" class="nom-gestion" data-action="gestion" data-gc="fiche" data-id="${echapper(id)}" title="Sa fiche">${echapper(nomDe(id, camp))}</button>
             <span class="qui-gestion">${echapper(qui)} · niv. ${Number(i.niveau) || 1}</span>${camp.Intendant === id ? `<span class="badge-intendant">intendant</span>` : ""}</div>
           <div class="moral-gestion" title="Moral : ${moral}/100 (${echapper(P.effetDuMoral(moral))})${histo ? ` — dernier changement : ${histo.Delta > 0 ? "+" : ""}${histo.Delta}, ${echapper(histo.Raison)}` : ""}">
             <span>Moral</span><span class="barre-moral-gestion${moral < 30 ? " bas" : moral >= 80 ? " haut" : ""}"><i style="width:${moral}%"></i></span><b>${moral}</b></div>
           <div class="tache-gestion">${controle}</div>
+          ${casePrincipal}
           ${i.incarne ? `<div class="classe-gestion">Classe : ${echapper(i.classe || "—")}${i.joueur ? ` · joué par ${echapper(i.joueur === moi() ? "toi" : ((typeof window.nomDuJoueurLivre === "function" && window.nomDuJoueurLivre(i.joueur)) || "un joueur"))}` : ""}</div>` : ""}
           ${!i.heros && !i.incarne && !themes && window.ATOUTS_CLASSES ? `<div class="classe-gestion">Classe : <select class="select-gestion select-classe" data-gc="classe" data-id="${echapper(id)}"><option value="">—</option>${Object.keys(window.ATOUTS_CLASSES).map(c => `<option value="${echapper(c)}"${i.classe === c ? " selected" : ""}>${echapper(c)}</option>`).join("")}</select></div>` : ""}
         </div></li>`;
@@ -235,6 +266,16 @@ function noter(texte) { note = { texte, le: Date.now() }; maj(true); setTimeout(
 async function agir(cible) {
     const gc = cible.dataset.gc, id = cible.dataset.id;
     if (gc === "camp") { son(); if (window.CAMP_SCENE) window.CAMP_SCENE.ouvrir(); return; }
+    if (gc === "recruter-dev") {
+        son();
+        const sel = document.querySelector(".page-gestion .select-recrue-dev"), pnj = sel && sel.value;
+        if (!pnj || !window.RECRUTEMENT) return;
+        const refus = await window.RECRUTEMENT.rejoindreLeCamp(pnj, { type: "invite", par: moi() });
+        pnjsDevLus = 0; pnjsDev = pnjsDev.filter(p => p.id !== pnj);
+        noter(refus || "Il rejoint le camp.");
+        setTimeout(() => lireInfos(true), 300);
+        return;
+    }
     if (gc === "ame") {
         son();
         if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id, nom: nomDe(id, C().lire()), depuisGestion: true, exact: true });
@@ -281,6 +322,14 @@ async function agir(cible) {
 }
 async function surChangement(el) {
     const gc = el.dataset.gc, id = el.dataset.id;
+    if (gc === "principal") {
+        son();
+        if (!el.checked) { el.checked = true; return; }
+        const ok = window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.definirHerosPrincipal ? await window.GRIMOIRE_FICHES.definirHerosPrincipal(id) : false;
+        noter(ok ? `${nomDe(id, C().lire())} est ton personnage principal.` : "Ce personnage ne peut pas être ton personnage principal.");
+        return maj(true);
+    }
+    if (gc === "choix-recrue-dev") return;
     if (gc === "classe") {
         son();
         const refus = window.RECRUTEMENT ? await window.RECRUTEMENT.choisirClasse(id, el.value) : "";

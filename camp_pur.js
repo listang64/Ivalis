@@ -138,13 +138,13 @@ export function herosPrincipal(joueur, persos, choix) {
 // tirée au hasard, jamais deux fois la même pour un même personnage.
 export const POSES_CAMP = [
     "regarder en l'air, les yeux dans les nuages", "s'étirer après une longue nuit", "bâiller en se frottant les yeux", "réchauffer ses mains",
-    "goûter un plat du bout de la cuillère", "éplucher des légumes, assis sur un tabouret", "porter un fagot de bois sur l'épaule", "fendre une bûche à la hache",
+    "goûter un plat du bout de la cuillère", "éplucher des légumes, assis sur un tabouret", "porter un fagot de bois sur l'épaule", "se tenir debout, détendu, les bras le long du corps",
     "aiguiser une lame", "huiler ou réparer une pièce d'armure", "recoudre un vêtement déchiré", "tendre une corde d'arc", "empenner des flèches",
     "dépecer un gibier", "porter un seau d'eau", "se laver le visage dans une bassine", "secouer un drap", "lire un vieux livre", "écrire dans un carnet",
     "étudier une carte dépliée", "compter des pièces dans une bourse", "jouer d'un instrument", "chantonner, les mains dans le dos",
     "rire, une main sur le ventre", "boire dans une chope", "croquer dans une pomme", "fumer la pipe", "s'asseoir sur une caisse, pensif",
     "somnoler, assis contre un sac", "faire les cent pas", "observer l'horizon, une main en visière", "s'entraîner seul à l'épée", "faire des étirements",
-    "méditer, les yeux fermés", "prier à genoux", "caresser un animal du camp", "trier des herbes ou des racines", "planter un piquet de tente",
+    "méditer, les yeux fermés", "prier à genoux", "se tenir debout, les mains croisées devant soi, le regard tranquille", "trier des herbes ou des racines", "planter un piquet de tente",
     "ranger des caisses de vivres", "se gratter la tête, perplexe", "faire un signe de la main à quelqu'un", "raconter une histoire en gesticulant",
     "ronchonner, les bras croisés", "sculpter un morceau de bois au couteau"
 ];
@@ -182,18 +182,20 @@ function melanger(liste, alea) {
     for (let i = l.length - 1; i > 0; i--) { const k = Math.floor(alea() * (i + 1)); [l[i], l[k]] = [l[k], l[i]]; }
     return l;
 }
+// (v494) Nico : « s'il y a un encart de libre pour eux, ils ont 50 % de chance d'apparaître » (compagnons compris).
+export const CHANCE_APPARAITRE_CAMP = 0.5;
 export function placerAuCamp(encarts, personnages, compagnons, alea = Math.random) {
     const out = {};
     const ids = (type) => melanger(Object.keys(encarts || {}).filter(n => ((encarts[n] || {}).type || "perso") === type), alea);
     const places = ids("perso");
-    melanger((personnages || []).filter(p => p && p.id && (p.images || []).length), alea).slice(0, places.length).forEach((p, i) => {
+    melanger((personnages || []).filter(p => p && p.id && (p.images || []).length), alea).slice(0, places.length).filter(() => alea() < CHANCE_APPARAITRE_CAMP).forEach((p, i) => {
         out[places[i]] = { id: p.id, image: p.images[Math.floor(alea() * p.images.length) % p.images.length] };
     });
     const libres = {};
     Object.values(TYPE_ENCART_GABARIT).forEach(t => { libres[t] = ids(t); });
     (compagnons || []).forEach(c => {
         const t = TYPE_ENCART_GABARIT[c && c.gabarit];
-        if (!t || !c.image || !libres[t].length) return;
+        if (!t || !c.image || !libres[t].length || !(alea() < CHANCE_APPARAITRE_CAMP)) return;
         out[libres[t].shift()] = { id: c.id, image: c.image, compagnon: true };
     });
     return out;
@@ -1240,4 +1242,8 @@ export function combattantsArene(arene, persos) {
     if (!ids.length) return null;
     return persosArene(persos).filter(h => ids.includes(h.idPersonnage));
 }
+
+// (v494) LA CARAC DÉTERMINANTE D'UNE TÂCHE (la Gestion du camp l'écrit à la place du modificateur).
+export const NOMS_CARACS_CAMP = { force: "Force", dex: "Dextérité", con: "Constitution", int: "Intelligence", sag: "Sagesse", cha: "Charisme" };
+export const caracsDeTache = (t) => ((TACHES[t] || {}).caracs || []).map(c => NOMS_CARACS_CAMP[c] || c).join(" ou ");
 
