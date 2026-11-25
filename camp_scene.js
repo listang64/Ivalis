@@ -128,6 +128,7 @@ export async function ouvrir() {
     if (ouvert || enTransition) return false;
     if (!camp()) { noterLivre("Le camp n'existe pas encore."); return false; }
     enTransition = true;
+    ecouter();                                        // les encarts de la base : écoutés une fois la page ouverte (en partie)
     const e = construire();
     const g = $("ecran-grimoire");
     son();
@@ -394,7 +395,6 @@ function ecouter() {
     try { onSnapshot(refEncarts(), (s) => { if (geste) return; lireEncarts(s.exists() ? s.data() : null); if (ouvert && !edition) { placement = {}; preparerPersonnages(); } else if (ouvert) dessinerEncarts(); }, () => {}); }
     catch (e) { console.warn("[Camp] L'écoute des encarts :", e); }
 }
-setTimeout(ecouter, 1500);
 // Le héros principal change, le mode DEV aussi : la page suit.
 // La partie quittée (ou le camp disparu) : la page du camp s'efface d'un coup, le livre revient.
 function toutFermer() {

@@ -209,7 +209,7 @@ const juger = (nom, m) => {
 let compte = { peu: 0, penches: 0 };
 await section(async () => {
   await p.evaluate(() => window.GRIMOIRE_FICHES.allerAuxAventuriers()); await p.waitForTimeout(2600); await pose();
-  await action(".page-clan .nouvel-aventurier"); await p.waitForTimeout(2800); await pose();
+  await action(".choix-heros-principal .bouton-choix-heros[data-fa=creer]"); await p.waitForTimeout(2800); await pose();
   const c = juger("les peuples", await mesurer("races", "race-0-d")); compte.peu += c.peu; compte.penches += c.penches;
   await cap("v320_peuples");
 });
