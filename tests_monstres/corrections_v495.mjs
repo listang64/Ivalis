@@ -181,6 +181,9 @@ await section(async () => {
     const bouton = document.querySelector('#ecran-conseil [data-cs="finir"]');
     const texte = bouton ? bouton.textContent : "";
     bouton.click();
+    // (v501) une fenêtre au style du jeu demande de confirmer
+    await new Promise(r => setTimeout(r, 50));
+    document.querySelector('#voile-fin-conseil [data-cs="finir-oui"]').click();
     await new Promise(r => setTimeout(r, 800));
     return { refus, avant, id, texte, apres: Object.keys(window.__docs).filter(k => k.startsWith("Systeme_Parties/P1/Conseil_Messages/")).length,
              conseil: window.__docs["Systeme_Parties/P1"].Conseil || null, ferme: !document.getElementById("ecran-conseil").classList.contains("visible") };

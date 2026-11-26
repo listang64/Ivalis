@@ -206,7 +206,8 @@ await section(async () => {
   });
   await p.evaluate(() => window.appliquerVoyageDeLaPartie(JSON.parse(JSON.stringify(window.__docs["Systeme_Parties/P1"]))));
   const d = await partie(), m2 = await msgs(), sys = r.appel.corps.systemInstruction.parts[0].text;
-  verifier("l'IA répond avec le réglage du narrateur, en JSON", r.appel.usage === "narrateur" && r.appel.modele === (await p.evaluate(() => window.reglagesNarrateur().modele)) && r.appel.corps.generationConfig.responseMimeType === "application/json");
+  // (v501) Nico : « la même IA que pour les dialogues privés » (plus rapide que le réglage du narrateur).
+  verifier("l'IA répond (celle des discussions privées, v501), en JSON", r.appel.usage === "discussion" && r.appel.modele === "gemini-3.8-flash" && r.appel.corps.generationConfig.responseMimeType === "application/json");
   verifier("…elle sait les PNJ présents (pas les partis), les sujets, la mémoire des 5 dernières expéditions", /- Ara/.test(sys) && /- Vif/.test(sys) && /\[S2\] Organiser une fête/.test(sys) && /Les loups de la crête/.test(sys), sys.slice(0, 160).replace(/\n/g, " "));
   verifier("les répliques des PNJ (ils se répondent entre eux)", m2.slice(-2).map(x => x.Auteur_Nom).join() === "Ara,Bors" && m2.slice(-2).every(x => x.Type === "pnj"));
   verifier("le post-it proposé par un PNJ (après celui d'un joueur), et la bulle de chaque PNJ sur le sujet qu'il préfère",

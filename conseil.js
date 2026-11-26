@@ -19,10 +19,18 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, addDoc, collection, query, where, onSnapshot, runTransaction, deleteField, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=20";
+import * as CP from "./camp_pur.js?v=21";
 
 const PARTIES = "Systeme_Parties";
 export const ATTENTE_IA_MS = 6000;
+// (v501) Nico : « les réponses des PNJ ne sont pas assez rapides : la même IA que pour les dialogues privés » ; « trois
+// dialogues de trois personnes qui pop en même temps : un délai » ; « faire parler un PNJ quand pas de réponse après un
+// certain temps (en pause si la fenêtre est fermée chez tous les joueurs) » ; « le vote fini, 10 secondes, puis le
+// conseil se ferme et on revient au camp ».
+export const MODELE_CONSEIL = "gemini-3.8-flash", MODELE_SECOURS_CONSEIL = "gemini-flash-lite-latest";
+export const SILENCE_MS = 45000, RELANCES_MAX = 2, FERMETURE_APRES_VOTE_MS = 10000;
+export const pauseEntreRepliques = (texte) => Math.min(4200, 1400 + 28 * String(texte || "").length);
+const attendre = (ms) => new Promise(r => setTimeout(r, ms));
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
 const refPartie = () => doc(db, PARTIES, idPartie());
 const colMessages = () => collection(db, PARTIES, idPartie(), "Conseil_Messages");
@@ -65,7 +73,8 @@ async function lireDateJeu() {
 }
 async function ecrire(m) {
     const c = conseil() || {};
-    return addDoc(colMessages(), { Conseil: m.conseil || c.Id || "", Type: m.type, Auteur_ID: m.id || "", Auteur_Nom: m.nom || "", Texte: String(m.texte || ""), Timestamp: Date.now() + (m.decalage || 0) });
+    return addDoc(colMessages(), { Conseil: m.conseil || c.Id || "", Type: m.type, Auteur_ID: m.id || "", Auteur_Nom: m.nom || "", Texte: String(m.texte || ""), Timestamp: Date.now() + (m.decalage || 0),
+                                   ...(m.relance ? { Relance: true } : {}) });
 }
 // Crée le conseil (une fois, par une transaction) avec ses sujets déjà connus : le manque de vivres (extraordinaire),
 // le lieu repéré par l'éclaireur, les sujets laissés par le retour au camp (un voyageur…). Rend le conseil, et
@@ -173,7 +182,7 @@ export async function verifierVote(alea = Math.random) {
             tx.update(refPartie(), { Camp: camp2, "Conseil.Ouvert": false, "Conseil.Resultat": resultat });
             return { conseil: c, resultat };
         });
-        if (clos) await apresLeVote(clos.conseil, clos.resultat);
+        if (clos) { fermeture.clore = clos.conseil.Id; await apresLeVote(clos.conseil, clos.resultat); }
         return clos;
     })();
     try { return await verification; } finally { verification = null; }
@@ -240,25 +249,31 @@ async function memoire() {
     return exps.map(e => `- ${titres[e.Numero] || `Expédition ${e.Numero}`} : ${e.Jours} jour${e.Jours > 1 ? "s" : ""}, avec ${(e.Membres || []).map(nomMembre).join(", ")}`).join("\n")
         + (c.Dernier_Rapport && c.Dernier_Rapport.Texte ? `\n- Le dernier rapport de l'intendant : ${String(c.Dernier_Rapport.Texte).slice(0, 600)}` : "");
 }
+// (v501) L'IA des discussions privées (discussion_privee.js) : rapide, peu de réflexion ; Flash-Lite si elle est refusée.
 async function appelIA(prompt, historique) {
-    if (typeof window.fetchGemini !== "function" || !window.cleGemini || !window.cleGemini("narrateur")) return "";
-    const reglages = typeof window.reglagesNarrateur === "function" ? window.reglagesNarrateur() : {};
-    const fiche = (window.MODELES_NARRATEUR || []).find(m => m.id === reglages.modele);
-    const generationConfig = { temperature: 1.0, responseMimeType: "application/json", ...(fiche && fiche.reflexion ? { thinkingConfig: { thinkingLevel: reglages.reflexion || "medium" } } : {}) };
-    const corps = JSON.stringify({ systemInstruction: { parts: [{ text: prompt }] }, contents: [{ role: "user", parts: [{ text: historique }] }], generationConfig });
-    const rep = await window.fetchGemini("narrateur", corps, reglages.modele ? { modele: reglages.modele } : undefined);
+    if (typeof window.fetchGemini !== "function") return "";
+    const appel = (modele) => {
+        const generationConfig = { temperature: 0.95, maxOutputTokens: 1500, responseMimeType: "application/json", ...(modele === MODELE_CONSEIL ? { thinkingConfig: { thinkingLevel: "low" } } : {}) };
+        return window.fetchGemini("discussion", JSON.stringify({ systemInstruction: { parts: [{ text: prompt }] }, contents: [{ role: "user", parts: [{ text: historique }] }], generationConfig }), { modele });
+    };
+    let rep = await appel(MODELE_CONSEIL);
+    if (rep && !rep.ok && [400, 403, 404, 429].includes(rep.status)) rep = await appel(MODELE_SECOURS_CONSEIL);
     const j = await rep.json();
     return (((j.candidates || [])[0] || {}).content || {}).parts?.filter(p => !p.thought).map(p => p.text || "").join("") || "";
 }
 let enReponse = false;
-export async function repondre() {
+// (v501) Combien de relances depuis la dernière parole d'un joueur (pas plus de RELANCES_MAX : le conseil attend).
+export const relancesDepuisJoueur = (msgs) => { let n = 0; for (let i = msgs.length - 1; i >= 0 && msgs[i].Type !== "joueur"; i--) if (msgs[i].Relance) n++; return n; };
+export async function repondre(o = {}) {
     const c = conseil();
     if (enReponse || !c || !c.Ouvert) return null;
     enReponse = true;
     try {
         const msgs = await lireMessages(c.Id);
         const dernier = msgs[msgs.length - 1];
-        if (!dernier || dernier.Type !== "joueur") return null;
+        if (!dernier) return null;
+        if (o.relance) { if (dernier.Type === "joueur" || Date.now() - (Number(dernier.Timestamp) || 0) < SILENCE_MS || relancesDepuisJoueur(msgs) >= RELANCES_MAX) return null; }
+        else if (dernier.Type !== "joueur") return null;
         // Un seul poste répond : un verrou d'une minute dans le conseil.
         const pris = await runTransaction(db, async (tx) => {
             const s = await tx.get(refPartie());
@@ -277,16 +292,21 @@ export async function repondre() {
             extraordinaire: c.Extraordinaire, raison: c.Raison,
             pnjs: pnjs.map(p => ({ nom: p.nom, caractere: window.SOCIAL && window.SOCIAL.caractere ? window.SOCIAL.caractere((ames[p.id] || {}).psyche) : "", moral: (cmp.Membres[p.id] || {}).Moral,
                                   tache: CP.TACHES[(cmp.Membres[p.id] || {}).Tache] ? CP.TACHES[(cmp.Membres[p.id] || {}).Tache].nom.toLowerCase() : "" })),
-            heros: [...new Set(msgs.filter(m => m.Type === "joueur").map(m => m.Auteur_Nom))], sujets: c.Sujets, memoire: await memoire(),
+            heros: [...new Set(msgs.filter(m => m.Type === "joueur").map(m => m.Auteur_Nom))], sujets: c.Sujets, memoire: await memoire(), relance: !!o.relance,
+            avis: pnjs.map(p => ({ nom: p.nom, sujet: ((c.Sujets || []).find(s => s.Id === (c.Avis_PNJ || {})[p.id]) || {}).Titre || "" })),
             camp: `${Number(cmp.Provisions) || 0} provisions, ${Number(cmp.Caisse) || 0} drachmes dans la caisse, les alentours à ${((cmp.Ressources || {}).Jauge) ?? "?"}/100`
         });
         const historique = msgs.slice(-30).map(m => `${m.Auteur_Nom || "?"} : ${m.Texte}`).join("\n");
         let texte = "";
         try { texte = await appelIA(prompt, historique); } catch (e) { console.warn("[Conseil] L'IA :", e); }
         const r = CP.lireReponseConseil(texte, c, pnjs);
+        if (o.relance) r.repliques = r.repliques.slice(0, 1);
+        // (v501) Une réplique après l'autre, le temps de la lire (plus de trois bulles d'un coup).
         for (let i = 0; i < r.repliques.length; i++) {
             const x = r.repliques[i];
-            await ecrire({ conseil: c.Id, type: x.id === "THEMES" ? "themes" : "pnj", id: x.id, nom: x.qui, texte: x.texte, decalage: i });
+            if (i) await attendre(pauseEntreRepliques(r.repliques[i - 1].texte));
+            if (!(conseil() || {}).Ouvert) break;
+            await ecrire({ conseil: c.Id, type: x.id === "THEMES" ? "themes" : "pnj", id: x.id, nom: x.qui, texte: x.texte, relance: !!o.relance });
         }
         await runTransaction(db, async (tx) => {
             const s = await tx.get(refPartie());
@@ -330,11 +350,21 @@ function construire() {
             <div class="chat-conseil" id="chat-conseil" aria-live="polite"></div>
             <form class="saisie-conseil" id="saisie-conseil" autocomplete="off">
               <textarea id="texte-conseil" rows="2" maxlength="800" placeholder="Ce que ton héros dit au conseil…"></textarea>
+              ${boutonMicro("texte-conseil")}
               <button type="submit" class="dire-conseil">Dire</button>
             </form>
+            <p class="fin-vote-conseil" id="fin-vote-conseil" aria-live="polite"></p>
           </div>
           <div class="colonne-postits-conseil"><div class="postits-conseil" id="postits-conseil"></div><div class="proposer-conseil" id="proposer-conseil"></div>
             <p class="note-conseil" id="note-conseil" aria-live="polite"></p></div>
+        </div>
+      </div>
+      <div class="voile-fin-conseil" id="voile-fin-conseil" role="dialog" aria-modal="true" aria-labelledby="titre-fin-conseil">
+        <div class="carte-fin-conseil">
+          <div class="titre-fin-conseil" id="titre-fin-conseil">Mettre fin au conseil ?</div>
+          <p class="parole-fin-conseil">Thémès se lève et tisonne les braises : « Le feu baisse, mes amis. Il est temps que chacun retourne à ses occupations. Ce qui s'est dit ce soir restera entre nous et le feu. »</p>
+          <p class="avis-fin-conseil">L'historique du conseil sera effacé.</p>
+          <div class="boutons-fin-conseil"><button type="button" data-cs="finir-oui">Clore le conseil</button><button type="button" data-cs="finir-non">Rester encore</button></div>
         </div>
       </div>`;
     document.body.appendChild(e);
@@ -342,6 +372,51 @@ function construire() {
     e.querySelector("#saisie-conseil").addEventListener("submit", (ev) => { ev.preventDefault(); const t = $("texte-conseil"); const v = t.value; t.value = ""; son(); envoyer(v); });
     e.querySelector("#texte-conseil").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); e.querySelector("#saisie-conseil").requestSubmit(); } });
     return e;
+}
+// (v501) LA DICTÉE (comme l'encart d'écriture du récit, grimoire_recit.js) : on garde tout ce qui est dit, à la suite ;
+// l'écoute reprend toute seule après un silence, jusqu'au prochain toucher.
+const SVG_MICRO = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-5a3.5 3.5 0 0 0-7 0v5A3.5 3.5 0 0 0 12 15Z"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M8.5 21.5h7"/></svg>`;
+function boutonMicro(cible) { return `<button type="button" class="micro-conseil" data-cs="micro" data-cible="${cible}" aria-label="Dicter à voix haute" title="Dicter à voix haute">${SVG_MICRO}</button>`; }
+const dictee = { reco: null, voulue: false, base: "", finies: "", champ: null, bouton: null };
+const joindre = (a, b) => { a = a || ""; b = (b || "").trim(); if (!b) return a; return a + (a && !/\s$/.test(a) ? " " : "") + b; };
+function basculerDictee(bouton) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const champ = $(bouton.dataset.cible);
+    if (!champ) return;
+    if (!SR) { noter("La dictée à voix haute demande Safari, Chrome ou Edge."); return; }
+    const meme = dictee.voulue && dictee.champ === champ;
+    if (dictee.voulue) arreterDictee();
+    if (meme) return;
+    Object.assign(dictee, { voulue: true, base: champ.value, finies: "", champ, bouton });
+    try { window.dispatchEvent(new CustomEvent("ivalis-dictee", { detail: { active: true } })); } catch (e) {}
+    bouton.classList.add("ecoute");
+    demarrerDictee(SR);
+}
+function demarrerDictee(SR) {
+    const reco = new SR();
+    reco.lang = "fr-FR"; reco.interimResults = true; reco.continuous = true;
+    reco.onresult = (ev) => {
+        let finies = "", enCours = "";
+        for (let i = 0; i < ev.results.length; i++) { const t = ev.results[i][0].transcript; if (ev.results[i].isFinal) finies = joindre(finies, t); else enCours = joindre(enCours, t); }
+        dictee.finies = finies;
+        if (dictee.champ) dictee.champ.value = joindre(joindre(dictee.base, finies), enCours);
+    };
+    reco.onend = () => {
+        dictee.base = joindre(dictee.base, dictee.finies); dictee.finies = "";
+        if (dictee.voulue && dictee.champ && document.body.contains(dictee.champ)) { try { demarrerDictee(SR); return; } catch (e) {} }
+        arreterDictee();
+    };
+    reco.onerror = (ev) => { if (ev && (ev.error === "not-allowed" || ev.error === "service-not-allowed")) arreterDictee(); };
+    dictee.reco = reco;
+    try { reco.start(); } catch (e) { arreterDictee(); }
+}
+function arreterDictee() {
+    const reco = dictee.reco;
+    dictee.voulue = false; dictee.reco = null;
+    if (reco) { try { reco.stop(); } catch (e) { try { reco.abort(); } catch (e2) {} } }
+    if (dictee.bouton) dictee.bouton.classList.remove("ecoute");
+    dictee.champ = null; dictee.bouton = null;
+    try { window.dispatchEvent(new CustomEvent("ivalis-dictee", { detail: { active: false } })); } catch (e) {}
 }
 function noter(t) { const n = $("note-conseil"); if (!n) return; n.textContent = t || ""; n.classList.toggle("visible", !!t); clearTimeout(noter.m); noter.m = setTimeout(() => n.classList.remove("visible"), 4000); }
 export function ouvrirVue() {
@@ -360,6 +435,8 @@ export function fermerVue() {
     const e = $("ecran-conseil"), c = conseil();
     if (c) fermes.add(c.Id);
     ouverte = false;
+    if (dictee.voulue) arreterDictee();
+    clearTimeout(fermeture.minuteur); fermeture.id = null;
     if (desabonner) { try { desabonner(); } catch (err) {} desabonner = null; }
     if (e) { e.classList.remove("visible"); setTimeout(() => { if (!ouverte) e.classList.remove("affiche"); }, 500); }
 }
@@ -372,8 +449,10 @@ export async function rafraichir() {
 }
 function avatar(m) {
     let url = "";
+    // (v501) Thémès parle sous « THEMES » : son portrait est celui de sa fiche de PNJ (le membre narrateur du camp).
+    const idA = m.Auteur_ID === "THEMES" ? (CP.idThemesDuCamp(camp() || {}) || "") : m.Auteur_ID;
     if (m.Type === "joueur") { const h = persos().find(x => x.idJoueur === m.Auteur_ID && nomHeros(x) === m.Auteur_Nom) || persos().find(x => x.idJoueur === m.Auteur_ID); url = h ? (h.urlCloudinary || h.urlPortraitReference || "") : ""; }
-    else if (m.Auteur_ID && infos[m.Auteur_ID]) url = infos[m.Auteur_ID].portrait || "";
+    else if (idA && infos[idA]) url = infos[idA].portrait || (((infos[idA].fiche || {}).Images_Camp || [])[0] || {}).url || "";
     return url ? `<img class="avatar-conseil" src="${echapper(url)}" alt="" draggable="false">` : `<span class="avatar-conseil sans-image">${echapper(String(m.Auteur_Nom || "?").slice(0, 1).toUpperCase())}</span>`;
 }
 export function rendre() {
@@ -408,24 +487,40 @@ export function rendre() {
     const prop = $("proposer-conseil");
     if (prop) {
         const refus = CP.peutProposer(c, { id: moi(), type: "joueur" });
+        // (v501) Le formulaire n'est redessiné que s'il change : ce qu'on tape (ou dicte) n'est plus effacé à chaque message.
+        const sigProp = JSON.stringify([c.Ouvert, !!refus, proposition]);
+        if (prop.dataset.sig !== sigProp) { prop.dataset.sig = sigProp;
         prop.innerHTML = !c.Ouvert ? "" : refus ? "" : proposition
-            ? `<div class="form-sujet-conseil"><input id="titre-sujet-conseil" maxlength="80" placeholder="Le sujet, en quelques mots">
-                <textarea id="resume-sujet-conseil" rows="2" maxlength="300" placeholder="Son résumé"></textarea>
+            ? `<div class="form-sujet-conseil"><div class="ligne-micro-conseil"><input id="titre-sujet-conseil" maxlength="80" placeholder="Le sujet, en quelques mots">${boutonMicro("titre-sujet-conseil")}</div>
+                <div class="ligne-micro-conseil"><textarea id="resume-sujet-conseil" rows="2" maxlength="300" placeholder="Son résumé"></textarea>${boutonMicro("resume-sujet-conseil")}</div>
                 <select id="type-sujet-conseil">${Object.keys(CP.TYPES_SUJET).map(t => `<option value="${t}">${CP.TYPES_SUJET[t]}</option>`).join("")}</select>
                 <button type="button" data-cs="poser">Poser le post-it</button><button type="button" data-cs="annuler">Annuler</button></div>`
-            : `<button type="button" class="proposer-sujet" data-cs="proposer">+ Proposer un sujet</button>`;
+            : `<button type="button" class="proposer-sujet" data-cs="proposer">+ Proposer un sujet</button>`; }
     }
     const saisie = $("saisie-conseil");
     if (saisie) saisie.classList.toggle("eteinte", !c.Ouvert);
+    // (v501) Le vote fini : 10 secondes, puis le conseil se lève et l'on revient au camp.
+    if (!c.Ouvert && c.Resultat && fermeture.id !== c.Id) {
+        fermeture.id = c.Id; fermeture.fin = Date.now() + FERMETURE_APRES_VOTE_MS;
+        clearTimeout(fermeture.minuteur);
+        fermeture.minuteur = setTimeout(() => { fermerVue(); if (fermeture.clore === c.Id) { fermeture.clore = null; terminer().catch(() => {}); } }, FERMETURE_APRES_VOTE_MS);
+    }
+    const fv = $("fin-vote-conseil");
+    if (fv) { const reste = fermeture.id === c.Id ? Math.max(0, Math.ceil((fermeture.fin - Date.now()) / 1000)) : 0; fv.textContent = reste ? `Le conseil se lève dans ${reste} seconde${reste > 1 ? "s" : ""}…` : ""; }
 }
+const fermeture = { id: null, fin: 0, minuteur: null, clore: null };
 async function surClic(ev) {
     const b = ev.target.closest("[data-cs]");
     if (!b) return;
     const quoi = b.dataset.cs;
     son();
     if (quoi === "quitter") return fermerVue();
-    if (quoi === "finir") {
-        if (typeof window.confirm === "function" && !window.confirm("Mettre fin au conseil ? Son historique sera effacé.")) return;
+    if (quoi === "micro") return basculerDictee(b);
+    // (v501) Une jolie fenêtre, et un mot de Thémès, plutôt que la boîte du navigateur.
+    if (quoi === "finir") { $("voile-fin-conseil").classList.add("visible"); return; }
+    if (quoi === "finir-non") { $("voile-fin-conseil").classList.remove("visible"); return; }
+    if (quoi === "finir-oui") {
+        $("voile-fin-conseil").classList.remove("visible");
         const r = await terminer();
         if (r) return noter(r);
         return fermerVue();
@@ -455,5 +550,17 @@ export async function veiller() {
     if (cs && cs.Ouvert && Object.keys(cs.Votes || {}).length) verifierVote();
 }
 
+// (v501) LE SILENCE : la page ouverte et visible chez ce joueur (sinon, rien : en pause), un PNJ relance la discussion
+// quand personne n'a parlé depuis SILENCE_MS (RELANCES_MAX fois au plus d'affilée). Un seul poste parle (le verrou de l'IA).
+setInterval(() => {
+    if (!ouverte || document.hidden) return;
+    const c = conseil();
+    if (!c || !c.Ouvert) { if (c && fermeture.id === c.Id) rendre(); return; }
+    const der = messages[messages.length - 1];
+    if (der && der.Type !== "joueur" && Date.now() - (Number(der.Timestamp) || 0) >= SILENCE_MS && relancesDepuisJoueur(messages) < RELANCES_MAX)
+        repondre({ relance: true }).catch(e => console.warn("[Conseil] La relance :", e));
+}, 5000);
+setInterval(() => { const c = conseil(); if (ouverte && c && !c.Ouvert && fermeture.id === c.Id) rendre(); }, 1000);
+
 window.CONSEIL = { terminer, ouvrir, peutOuvrir, creerConseil, envoyer, proposer, voter, verifierVote, repondre, planifierIA, rafraichir, ouvrirVue, fermerVue, veiller, conseil,
-                   ouverte: () => ouverte, messages: () => messages.slice() };
+                   ouverte: () => ouverte, messages: () => messages.slice(), rendre, relancesDepuisJoueur };

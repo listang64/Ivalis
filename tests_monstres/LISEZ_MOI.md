@@ -12811,3 +12811,13 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **La gestion du camp** (`grimoire_gestion.js`, `.css`) : les outils DEV groupés en bas de la page de gauche sous une séparation rouge (passer un jour, +20 provisions, +100 drachmes dans la caisse, la bourse, la recrue gratuite ; `camp.js`, `ajouterAuCampDev`) ; les ressources alentour et le bilan du jour dans deux encarts dessinés ; les rôles et l'intendant dans une liste de choix au fond beige, avec des + verts et des − rouges selon la carac du rôle ; les avatars plus gros et centrés ; 💬 pour parler en privé à un PNJ du camp ; DEV : un petit − rouge pour renvoyer un membre (`renvoyerDuCampDev`).
 - **En expédition** (`camp_pur.js` : `sansRolePourExpedition`, `enExpedition` ; `expedition.js`) : choisi pour l'expédition (sa place, ou emmené comme suiveur), un membre perd son rôle au camp ; son encart est noirci, « En Expédition », en fin de liste ; ni repos ni travail (`journeeDuCamp`, `choisis`).
 - corrections_v500 le vérifie ; corrections_v481, v482, v491, v494 et v498 adaptés.
+
+## v501 — Le conseil
+
+- **Plus rapide** (`conseil.js`, `appelIA`) : l'IA des discussions privées (gemini-3.8-flash, peu de réflexion ; Flash-Lite si elle est refusée) au lieu du réglage du narrateur.
+- **Une réplique après l'autre** (`pauseEntreRepliques`) : 1,4 à 4,2 s selon la longueur de la précédente (plus trois bulles d'un coup).
+- **Le silence** (`repondre({ relance })`, `relancesDepuisJoueur`, `SILENCE_MS`) : 45 s sans parole, un PNJ relance la discussion (une réplique), deux fois au plus d'affilée ; seulement depuis une page ouverte et visible (en pause sinon).
+- **Les avis bougent** (`camp_pur.js`, `promptConseil`) : l'avis actuel de chaque PNJ, et la consigne qu'un argument peut le faire changer.
+- **La page** (`conseil.css`) : les avatars deux fois plus grands (80 px), centrés sur leur bulle ; l'avatar de Thémès (sa fiche de PNJ) ; la dictée (le chat, le titre et le résumé d'une proposition) ; le formulaire n'est plus effacé à chaque message ; « Mettre fin au conseil » ouvre une fenêtre au style du jeu, avec un mot de Thémès.
+- **Le vote fini** (`FERMETURE_APRES_VOTE_MS`) : « Le conseil se lève dans … secondes », puis la page se ferme (retour au camp) ; le poste qui a clos le vote efface le conseil (la tâche votée reste).
+- corrections_v501 le vérifie ; corrections_v485, v491 et v495 adaptés.

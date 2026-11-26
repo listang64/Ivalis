@@ -20,10 +20,10 @@
 .colonne-chat-conseil, .colonne-postits-conseil { min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .chat-conseil { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 10px;
   background: rgba(244, 232, 208, 0.08); border: 1px solid rgba(243, 233, 214, 0.18); overscroll-behavior: contain; }
-.message-conseil { display: flex; gap: 10px; align-items: flex-start; }
+.message-conseil { display: flex; gap: 12px; align-items: center; }
 .message-conseil.moi { flex-direction: row-reverse; }
-.avatar-conseil { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; object-fit: cover; object-position: 50% 15%; border: 2px solid rgba(240, 201, 94, 0.7); background: #3a2414; }
-.avatar-conseil.sans-image { display: grid; place-items: center; font-family: 'Cinzel', serif; color: #f6dc8c; }
+.avatar-conseil { flex: 0 0 auto; width: 80px; height: 80px; border-radius: 50%; object-fit: cover; object-position: 50% 15%; border: 2px solid rgba(240, 201, 94, 0.7); background: #3a2414; }
+.avatar-conseil.sans-image { display: grid; place-items: center; font-family: 'Cinzel', serif; color: #f6dc8c; font-size: 30px; }
 .bulle-conseil { max-width: 80%; padding: 8px 12px; border-radius: 10px; background: rgba(244, 232, 208, 0.94); color: #24150a; font-family: 'Almendra', serif; font-size: 16px; line-height: 1.35;
   display: flex; flex-direction: column; gap: 2px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); }
 .message-conseil.themes .bulle-conseil { background: rgba(255, 236, 190, 0.97); border-left: 3px solid #b8862a; font-style: italic; }
@@ -59,3 +59,23 @@
   font-family: 'Cinzel', serif; font-size: 13px; }
 .finir-conseil:hover { background: rgba(110, 22, 12, 0.75); }
 
+
+/* (v501) Les avatars deux fois plus grands, centrés sur leur bulle ; la dictée ; la fin du vote ; la fenêtre de fin. */
+.micro-conseil { flex: 0 0 auto; width: 40px; align-self: stretch; display: grid; place-items: center; padding: 0; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(243, 233, 214, 0.4); background: rgba(14, 9, 5, 0.6); color: #f3e9d6; }
+.micro-conseil svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.micro-conseil.ecoute { background: #8a1a10; border-color: #f0a090; animation: ecoute-conseil 1.2s ease-in-out infinite; }
+@keyframes ecoute-conseil { 50% { box-shadow: 0 0 0 5px rgba(240, 120, 90, 0.25); } }
+.ligne-micro-conseil { display: flex; gap: 6px; }
+.ligne-micro-conseil > input, .ligne-micro-conseil > textarea { flex: 1; min-width: 0; }
+.fin-vote-conseil { margin: 0; min-height: 1.2em; text-align: center; font-family: 'Cinzel', serif; color: #f6dc8c; }
+.voile-fin-conseil { position: absolute; inset: 0; z-index: 5; display: none; place-items: center; background: rgba(6, 3, 1, 0.6); }
+.voile-fin-conseil.visible { display: grid; }
+.carte-fin-conseil { width: min(460px, calc(100vw - 32px)); padding: 22px 24px 18px; border-radius: 10px; color: #2a1c08; text-align: center;
+  background: radial-gradient(ellipse at 50% 30%, #fbf1d8, #ecd9b0); border: 2px solid #8a6420; box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6); }
+.titre-fin-conseil { font-family: 'Cinzel', serif; font-size: 22px; color: #5a1a0c; margin-bottom: 10px; }
+.parole-fin-conseil { margin: 0 0 8px; font-family: 'Almendra', serif; font-style: italic; font-size: 17px; line-height: 1.4; }
+.avis-fin-conseil { margin: 0 0 14px; font-size: 13px; color: #6b5440; }
+.boutons-fin-conseil { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.boutons-fin-conseil button { padding: 7px 16px; border-radius: 6px; border: 1px solid #5c3a21; cursor: pointer; font-family: 'Cinzel', serif; font-size: 14px; background: rgba(255, 255, 255, 0.6); color: #2a1c08; }
+.boutons-fin-conseil [data-cs="finir-oui"] { background: #6b1a10; color: #f6dc8c; border-color: #3a0c06; }

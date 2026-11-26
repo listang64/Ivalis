@@ -919,6 +919,10 @@ export function promptConseil(o) {
         `Les membres du clan présents (PNJ) :\n${(o.pnjs || []).map(p => `- ${p.nom}${p.caractere ? ` (${p.caractere})` : ""}${p.moral != null ? `, moral ${p.moral}/100` : ""}${p.tache ? `, ${p.tache}` : ""}`).join("\n") || "- personne"}`,
         `Les héros des joueurs : ${(o.heros || []).join(", ") || "aucun"}.`,
         `Les sujets sur la table (post-its, ${SUJETS_MAX} au plus) :\n${(o.sujets || []).map(s => `- [${s.Id}] ${s.Titre} — ${s.Resume} (proposé par ${(s.Par || {}).nom || "?"})`).join("\n") || "- aucun pour l'instant"}`,
+        // (v501) Nico : « en fonction du RP, les PNJ peuvent changer leurs votes ».
+        (o.avis || []).length ? `L'avis actuel de chaque PNJ :\n${o.avis.map(a => `- ${a.nom} : ${a.sujet || "pas encore d'avis"}`).join("\n")}` : "",
+        "LES AVIS BOUGENT : un PNJ change d'avis quand ce qui se dit le convainc (un argument d'un joueur ou d'un autre PNJ, une promesse, une crainte apaisée, sa loyauté envers un héros) ; il peut le dire en une phrase (« Tu m'as convaincu… »). Renvoie à chaque fois, dans « avis », l'avis ACTUEL de chaque PNJ qui a un avis.",
+        o.relance ? "PERSONNE N'A PARLÉ DEPUIS UN MOMENT : un PNJ (ou toi) relance la discussion en une réplique, sans répéter ce qui a été dit, en interpellant un héros par son nom ou en posant une question sur un sujet." : "",
         o.memoire ? `Ce que le clan a vécu (les dernières expéditions) :\n${o.memoire}` : "",
         o.camp ? `Le camp : ${o.camp}` : "",
         `Réponds en JSON SEUL, de cette forme :
