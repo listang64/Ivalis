@@ -234,7 +234,13 @@ await section(async () => {
 const lireG = () => p.evaluate(() => { const v = (k) => (document.querySelector(`[data-gestion="${k}"]`) || {}).textContent;
   return { caisse: v("caisse"), provisions: v("provisions"), jauge: v("jauge"), rendement: v("rendement"), production: v("production"), consommation: v("consommation"), net: v("net") }; });
 const camp = () => p.evaluate(() => JSON.parse(JSON.stringify(window.__docs["Systeme_Parties/P1"].Camp)));
-const choisir = async (id, valeur, gc = "tache") => { await p.evaluate(([id, valeur, gc]) => { const s = document.querySelector(`.page-gestion [data-gc="${gc}"][data-id="${id}"]`); s.value = valeur; s.dispatchEvent(new Event("change", { bubbles: true })); }, [id, valeur, gc]); await p.waitForTimeout(400); };
+// (v500) Le rôle et l'intendant : une liste de choix (beige) ; la recrue : un menu.
+const choisir = async (id, valeur, gc = "tache") => { await p.evaluate(async ([id, valeur, gc]) => {
+  if (gc === "tache" || gc === "intendant") {
+    window.GESTION_CAMP.agir(document.querySelector(`.page-gestion [data-gc="ouvrir-choix"][data-quoi="${gc}"][data-id="${gc === "tache" ? id : ""}"]`)); await new Promise(r => setTimeout(r, 50));
+    window.GESTION_CAMP.agir(document.querySelector(`.page-gestion .liste-choix-gestion [data-valeur="${valeur}"]`)); return;
+  }
+  const s = document.querySelector(`.page-gestion [data-gc="${gc}"][data-id="${id}"]`); s.value = valeur; s.dispatchEvent(new Event("change", { bubbles: true })); }, [id, valeur, gc]); await p.waitForTimeout(400); };
 const note = () => p.evaluate(() => (document.querySelector(".note-gestion") || {}).textContent || "");
 
 titre("5. LA PAGE DE GAUCHE : LA CAISSE, LES PROVISIONS, LA JAUGE, LE BILAN");
@@ -248,7 +254,7 @@ await section(async () => {
 
 titre("6. LES MEMBRES ET LEURS TÂCHES");
 await section(async () => {
-  const l = await p.evaluate(() => [...document.querySelectorAll(".membre-gestion")].map(m => ({ id: m.dataset.membre, select: !!m.querySelector(".select-tache"), fixe: (m.querySelector(".tache-fixe") || {}).textContent || "",
+  const l = await p.evaluate(() => [...document.querySelectorAll(".membre-gestion")].map(m => ({ id: m.dataset.membre, select: !!m.querySelector('[data-gc="ouvrir-choix"]'), fixe: (m.querySelector(".tache-fixe") || {}).textContent || "",
     moral: (m.querySelector(".moral-gestion b") || {}).textContent })));
   verifier("tous les membres : Thémès d'abord (« part avec chaque expédition »), puis les héros, puis les PNJ", l.map(x => x.id).join() === "PNJ_THEMES_P1,H2,H1,PNJ_ARA,PNJ_BORS"
     && /chaque expédition/.test(l[0].fixe) && l.slice(1).every(x => x.select), JSON.stringify(l));
@@ -259,7 +265,9 @@ await section(async () => {
   // Bors : dex 14 → m +2, moral 85 → +3 : chasse 6 ; Ara : int 13 → m +1 : cueillette 3 ; Thorin int 12 → m +1 : la cuisine épargne 2.
   verifier("…et le bilan suit : chasse 6 (m +2, +1 de moral), cueillette 3, consommation 5 − 2 : +6", g.production === "+9" && g.consommation === "−3" && g.net === "+6", JSON.stringify(g));
   await choisir("H2", "cuisiner");
-  const plein = await p.evaluate(() => { const o = [...document.querySelectorAll('.page-gestion [data-gc="tache"][data-id="PNJ_ARA"] option')].find(x => x.value === "cuisiner"); return { dis: o.disabled, t: o.textContent }; });
+  const plein = await p.evaluate(async () => { window.GESTION_CAMP.agir(document.querySelector('.page-gestion [data-gc="ouvrir-choix"][data-id="PNJ_ARA"]')); await new Promise(r => setTimeout(r, 50));
+    const o = document.querySelector('.page-gestion .liste-choix-gestion [data-valeur="cuisiner"]'); const r = { dis: o.disabled, t: o.textContent };
+    window.GESTION_CAMP.agir(document.querySelector('.page-gestion [data-gc="ouvrir-choix"][data-id="PNJ_ARA"]')); return r; });
   verifier("deux cuisiniers : l'option est « complet » pour les autres", plein.dis && /complet/.test(plein.t), JSON.stringify(plein));
   await choisir("H2", "soigner");
   await choisir("PNJ_ARA", "soigner");
@@ -290,10 +298,11 @@ await section(async () => {
 
 titre("8. L'INTENDANT");
 await section(async () => {
-  const options = await p.evaluate(() => [...document.querySelectorAll(".select-intendant option")].map(o => o.value).filter(Boolean));
+  const options = await p.evaluate(async () => { window.GESTION_CAMP.agir(document.querySelector('.page-gestion [data-gc="ouvrir-choix"][data-quoi="intendant"]')); await new Promise(r => setTimeout(r, 50));
+    const v = [...document.querySelectorAll(".page-gestion-gauche .liste-choix-gestion [data-valeur]")].map(o => o.dataset.valeur).filter(Boolean);
+    window.GESTION_CAMP.agir(document.querySelector('.page-gestion [data-gc="ouvrir-choix"][data-quoi="intendant"]')); return v; });
   verifier("au choix : tous les membres sauf Thémès", options.sort().join() === "H1,H2,PNJ_ARA,PNJ_BORS", options.join());
-  await p.evaluate(() => { const s = document.querySelector(".select-intendant"); s.value = "PNJ_ARA"; s.dispatchEvent(new Event("change", { bubbles: true })); });
-  await p.waitForTimeout(400);
+  await choisir("", "PNJ_ARA", "intendant");
   const c = await camp(), avis = await p.evaluate(() => [...document.querySelectorAll(".page-gestion-gauche .avis-gestion")].map(x => x.textContent).join(" | "));
   verifier("nommé : il garde sa tâche ; plus d'avis « il faut un intendant »", c.Intendant === "PNJ_ARA" && c.Membres.PNJ_ARA.Tache === "cueillir" && !/intendant/.test(avis), avis);
 });
@@ -303,10 +312,10 @@ await section(async () => {
   // (v483) Une expédition en cours : le groupe est loin de la case du camp (y revenir la terminerait).
   await p.evaluate(() => { window.positionGroupeBrute = () => ({ Region: 7, x: 0.9, y: 0.1 }); const d = window.__docs["Systeme_Parties/P1"]; d.Expedition = { En_Cours: true, Membres: ["H1", "PNJ_THEMES_P1"] }; window.appliquerVoyageDeLaPartie(JSON.parse(JSON.stringify(d))); });
   await p.waitForTimeout(1300);
-  const r = await p.evaluate(async () => ({ desactives: [...document.querySelectorAll(".page-gestion select:not(.select-classe)")].every(s => s.disabled),
-    avis: document.querySelector(".page-gestion-gauche .avis-gestion").textContent, h1: (document.querySelector('.membre-gestion[data-membre="H1"] .tache-fixe') || {}).textContent,
+  const r = await p.evaluate(async () => ({ desactives: [...document.querySelectorAll(".page-gestion select:not(.select-classe), .page-gestion .bouton-choix-gestion")].every(s => s.disabled),
+    avis: document.querySelector(".page-gestion-gauche .avis-gestion").textContent, h1: (document.querySelector('.membre-gestion[data-membre="H1"] .tampon-expedition') || {}).textContent,
     refus: await window.CAMP.assignerTache("PNJ_BORS", "cueillir") }));
-  verifier("les menus sont figés, un mot le dit ; ceux qui sont partis : « en expédition »", r.desactives && /expédition est en cours/.test(r.avis) && r.h1 === "En expédition", JSON.stringify(r));
+  verifier("les menus sont figés, un mot le dit ; ceux qui sont partis : « en expédition »", r.desactives && /expédition est en cours/.test(r.avis) && r.h1 === "En Expédition", JSON.stringify(r));
   verifier("…et la base refuse aussi", /expédition est en cours/.test(r.refus) && (await camp()).Membres.PNJ_BORS.Tache === "chasser");
   await p.evaluate(() => { window.positionGroupeBrute = () => null; const d = window.__docs["Systeme_Parties/P1"]; delete d.Expedition; window.appliquerVoyageDeLaPartie(JSON.parse(JSON.stringify(d))); });
   await p.waitForTimeout(1300);

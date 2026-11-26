@@ -34,9 +34,8 @@
 .note-gestion.visible { opacity: 1; }
 
 .liste-membres-gestion { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(var(--u) * 1.6); }
-.membre-gestion { display: flex; gap: calc(var(--u) * 1.8); align-items: flex-start; padding-bottom: calc(var(--u) * 1.4); border-bottom: 1px dashed rgba(90, 60, 30, 0.3); }
-.membre-gestion.parti { opacity: 0.65; }
-.portrait-gestion { flex: 0 0 auto; width: calc(var(--u) * 10); height: calc(var(--u) * 10); border-radius: 50%; overflow: hidden; padding: 0; cursor: pointer;
+.membre-gestion { position: relative; display: flex; gap: calc(var(--u) * 1.8); align-items: center; padding-bottom: calc(var(--u) * 1.4); border-bottom: 1px dashed rgba(90, 60, 30, 0.3); }
+.portrait-gestion { flex: 0 0 auto; width: calc(var(--u) * 13); height: calc(var(--u) * 13); border-radius: 50%; overflow: hidden; padding: 0; cursor: pointer;
   border: 2px solid rgba(140, 100, 40, 0.7) !important; background: #e8d8b8 !important; display: flex; align-items: center; justify-content: center; }
 .portrait-gestion img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 15%; }
 .portrait-gestion span { font-family: 'Cinzel', serif; font-size: calc(var(--u) * 4.5); color: #5a3c22; }
@@ -71,10 +70,47 @@
 .journal-gestion { display: flex; flex-direction: column; gap: calc(var(--u) * 1); }
 .jour-gestion b { font-size: calc(var(--u) * 2.6); color: #5a3c22; }
 .jour-gestion ul { margin: calc(var(--u) * 0.3) 0 0; padding-left: calc(var(--u) * 3); font-size: calc(var(--u) * 2.5); color: #3a2a1a; }
-.jour-dev-gestion { align-self: flex-start !important; margin-top: calc(var(--u) * 1) !important; }
 /* (v494) Le cadre doré des personnages principaux des joueurs ; la case « Personnage principal » ; le recrutement DEV. */
 .portrait-gestion.principal { border: calc(var(--u) * 0.5) solid #c9a227; box-shadow: 0 0 0 1px #7a5a10, 0 calc(var(--u) * 0.3) calc(var(--u) * 0.8) rgba(120, 85, 10, 0.45); }
 .principal-gestion { display: inline-flex; align-items: center; gap: calc(var(--u) * 0.8); margin-top: calc(var(--u) * 0.6); font-size: calc(var(--u) * 2.6); cursor: pointer; }
 .recrue-dev-gestion { display: flex; flex-direction: column; gap: calc(var(--u) * 0.8); margin-top: calc(var(--u) * 2); }
 .dev-rouge { color: #8a1a10 !important; }
 
+
+/* (v500) Les encarts dessinés à la main (comme les compétences de la Forge) : les ressources alentour, le bilan du jour. */
+.encart-gestion { display: flex; flex-direction: column; gap: calc(var(--u) * 1); }
+.encart-gestion .sous-titre-groupe { margin-top: 0; }
+/* (v500) En expédition : l'encart un peu noirci, « En Expédition » en gros ; en fin de liste. */
+.membre-gestion.parti > :not(.tampon-expedition):not(.coin-membre-gestion) { filter: brightness(0.62) saturate(0.6); }
+.membre-gestion.parti { background: rgba(30, 18, 8, 0.12); border-radius: calc(var(--u) * 1); }
+.tampon-expedition { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%) rotate(-6deg); z-index: 2; pointer-events: none; white-space: nowrap;
+  font-family: 'Cinzel', serif; font-weight: 700; font-size: calc(var(--u) * 5.2); letter-spacing: 0.06em; color: rgba(110, 24, 14, 0.85);
+  border: calc(var(--u) * 0.5) solid rgba(110, 24, 14, 0.7); border-radius: calc(var(--u) * 1); padding: 0 calc(var(--u) * 1.6); }
+/* (v500) Le coin de l'encart : parler en privé ; DEV, le renvoyer du camp (un tout petit − rouge). */
+.coin-membre-gestion { position: absolute; right: 0; bottom: calc(var(--u) * 0.8); display: flex; gap: calc(var(--u) * 0.8); align-items: center; z-index: 3; }
+.parler-gestion, .renvoyer-gestion { padding: 0 !important; border: 0 !important; background: none !important; cursor: pointer; line-height: 1; }
+.parler-gestion { font-size: calc(var(--u) * 3); opacity: 0.8; }
+.parler-gestion:hover { opacity: 1; }
+.renvoyer-gestion { width: calc(var(--u) * 3); height: calc(var(--u) * 3); border-radius: 50% !important; background: #a3201a !important; color: #fff; font-size: calc(var(--u) * 2.4); font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; }
+/* (v500) Les listes de choix (un rôle, l'intendant) : le fond beige clair, des + verts et des − rouges. */
+.choix-gestion { display: flex; flex-direction: column; align-items: flex-start; max-width: 100%; }
+.bouton-choix-gestion { font: inherit; font-size: calc(var(--u) * 2.8); color: #24150a; padding: calc(var(--u) * 0.5) calc(var(--u) * 1.2); cursor: pointer;
+  background: rgba(255, 250, 238, 0.85) !important; border: 1px solid rgba(90, 60, 30, 0.45) !important; border-radius: calc(var(--u) * 0.8); display: inline-flex; gap: calc(var(--u) * 0.8); align-items: baseline; }
+.bouton-choix-gestion:disabled { opacity: 0.6; cursor: default; }
+.fleche-choix { font-size: 0.8em; color: #6b5440; }
+.liste-choix-gestion { list-style: none; margin: calc(var(--u) * 0.5) 0 0; padding: calc(var(--u) * 0.6); min-width: calc(var(--u) * 46); max-width: 100%;
+  background: #f4e9d2; border: 1px solid rgba(90, 60, 30, 0.45); border-radius: calc(var(--u) * 1); box-shadow: 0 calc(var(--u) * 0.6) calc(var(--u) * 1.6) rgba(60, 35, 10, 0.25); }
+.option-choix-gestion { width: 100%; display: grid; grid-template-columns: 1fr auto; column-gap: calc(var(--u) * 1); align-items: baseline; text-align: left; cursor: pointer;
+  font: inherit; font-size: calc(var(--u) * 2.8); color: #24150a; padding: calc(var(--u) * 0.6) calc(var(--u) * 1); border: 0 !important; border-radius: calc(var(--u) * 0.6); background: none !important; }
+.option-choix-gestion:hover:not(:disabled), .option-choix-gestion.actuelle { background: rgba(196, 154, 98, 0.28) !important; }
+.option-choix-gestion:disabled { opacity: 0.45; cursor: default; }
+.option-choix-gestion small { grid-column: 1 / -1; font-size: calc(var(--u) * 2.2); color: #6b5440; font-style: italic; }
+.plus-choix { color: #2f7a2a; font-weight: 800; letter-spacing: 0.08em; }
+.moins-choix { color: #a3201a; font-weight: 800; letter-spacing: 0.08em; }
+/* (v500) Les outils DEV, groupés après une séparation rouge. */
+.outils-dev-gestion { display: flex; flex-direction: column; align-items: flex-start; gap: calc(var(--u) * 0.8); margin-top: calc(var(--u) * 2); }
+.separation-dev-gestion { align-self: stretch; display: flex; align-items: center; gap: calc(var(--u) * 1.2); color: #a3201a; font-family: 'Cinzel', serif; font-weight: 700; font-size: calc(var(--u) * 2.6); }
+.separation-dev-gestion::before, .separation-dev-gestion::after { content: ""; flex: 1; border-top: 2px solid #a3201a; }
+.outils-dev-gestion .lien-dev { align-self: flex-start !important; margin: 0 !important; }
+.outils-dev-gestion .recrue-dev-gestion { margin-top: calc(var(--u) * 0.6); align-self: stretch; }

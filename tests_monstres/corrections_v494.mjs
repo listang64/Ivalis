@@ -196,7 +196,7 @@ await section(async () => {
   await ipad.close();
   const enc = await p.evaluate(() => window.CAMP_SCENE.encarts());
   const cs = lire("camp_scene.js"), m = cs.match(/export const ENCARTS_DEFAUT = (\{[\s\S]*?\n\});/), def = m ? JSON.parse(m[1]) : {};
-  verifier("les encarts de Nico (14, dont les trois du compagnon)", Object.keys(def).length === 14 && def[6].x === 0.3698 && def[6].couche === 9 && def[12].type === "compagnon_petit" && def[13].type === "compagnon_air" && def[14].type === "compagnon_gros" && def[5].x === 0.4647);
+  verifier("les encarts de Nico (14, dont les trois du compagnon)", Object.keys(def).length === 14 && def[6].x === 0.3776 && def[6].couche === 9 && def[12].type === "compagnon_petit" && def[13].type === "compagnon_air" && def[14].type === "compagnon_gros" && def[5].x === 0.4647);
 });
 
 titre("3. LA GESTION DU CAMP");
@@ -210,14 +210,16 @@ await section(async () => {
              caseAra: !!(ligne("PNJ_ARA") && ligne("PNJ_ARA").querySelector('[data-gc="principal"]')), cocheH1: !!(ligne("H1") && (ligne("H1").querySelector('[data-gc="principal"]') || {}).checked),
              dorH1: !!(ligne("H1") && ligne("H1").querySelector(".portrait-gestion.principal")), dorH2: !!(ligne("H2") && ligne("H2").querySelector(".portrait-gestion.principal")),
              dorAra: !!(ligne("PNJ_ARA") && ligne("PNJ_ARA").querySelector(".portrait-gestion.principal")),
-             options: [...document.querySelectorAll('.page-gestion [data-gc="tache"][data-id="PNJ_ARA"] option')].map(o => o.textContent),
+             options: (() => { window.GESTION_CAMP.agir(document.querySelector('.page-gestion [data-gc="ouvrir-choix"][data-id="PNJ_ARA"]'));
+               const v = [...document.querySelectorAll('.page-gestion .liste-choix-gestion .option-choix-gestion')].map(o => `${o.querySelector(".nom-choix").textContent} (${(o.querySelector("small") || {}).textContent || ""})`);
+               window.GESTION_CAMP.agir(document.querySelector('.page-gestion [data-gc="ouvrir-choix"][data-id="PNJ_ARA"]')); return v; })(),
              dev: (document.querySelector(".recrue-dev-gestion") || {}).textContent || "", dernier: (() => { const g = document.querySelector(".page-gestion-gauche"); const enfants = g ? [...g.querySelectorAll(":scope > *")].filter(x => !x.classList.contains("note-gestion")) : []; return enfants.length ? enfants[enfants.length - 1].className : ""; })() };
   });
   verifier("à qui appartient un héros (« Héros de toi », « Héros de Lyra-joueur »)", /Héros de toi/.test(r.h1) && /Héros de /.test(r.h2), `${r.h1} / ${r.h2}`);
   verifier("la case « Personnage principal » : sur ses héros seulement", r.caseH1 && !r.caseH2 && !r.caseAra && r.cocheH1);
   verifier("le cadre doré autour des personnages principaux des joueurs (pas des PNJ)", r.dorH1 && r.dorH2 && !r.dorAra, JSON.stringify({ h1: r.dorH1, h2: r.dorH2, ara: r.dorAra }));
   verifier("le rôle dit sa carac déterminante (plus de « m +0 »)", r.options.some(o => /^Chasser \(Dextérité\)/.test(o)) && r.options.some(o => /^Cueillir \(Intelligence ou Force\)/.test(o)) && !r.options.some(o => /\(m /.test(o)), r.options.slice(1, 4).join(" | "));
-  verifier("en tout dernier sur la page de gauche (DEV) : recruter un PNJ pour le camp, gratuitement, en rouge", /Recruter un PNJ pour le camp, gratuitement \(DEV\)/.test(r.dev) && r.dernier === "recrue-dev-gestion", r.dernier);
+  verifier("en tout dernier sur la page de gauche (DEV) : recruter un PNJ pour le camp, gratuitement, en rouge", /Recruter un PNJ pour le camp, gratuitement/.test(r.dev) && r.dernier === "outils-dev-gestion", r.dernier);
   const lire_ = (s) => lire(s);
   verifier("le style : cadre doré, titre rouge", /\.portrait-gestion\.principal \{ border: [^}]*#c9a227/.test(lire_("grimoire_gestion.css")) && /\.dev-rouge \{ color: #8a1a10/.test(lire_("grimoire_gestion.css")));
   // La recrue DEV : un PNJ de la partie, hors du camp.

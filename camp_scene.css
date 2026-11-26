@@ -23,6 +23,7 @@
 #ecran-grimoire.vers-le-camp { pointer-events: none; }
 #ecran-grimoire.camp-dessous { z-index: 33; }
 #ecran-grimoire.camp-dessous::before { opacity: 0; }
+#ecran-grimoire.camp-dessous.camp-noir::before { opacity: 1; }   /* le retour : le noir revient, le livre devant */
 #ecran-grimoire.camp-ouvert { visibility: hidden; }
 
 /* LE DÉCOR : un contexte d'empilement, où couches et encarts s'intercalent (z-index posés par le script). */

@@ -24,7 +24,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=19";
+import * as CP from "./camp_pur.js?v=20";
 
 // Les 9 couches, du premier plan au plus éloigné (le document, « Le graphique du camp »).
 export const COUCHES = [
@@ -49,15 +49,15 @@ export const ENCARTS_DEFAUT = {
   "3": { "x": 0.1818, "y": 0.5882, "cote": 0.1972, "couche": 6, "type": "perso" },
   "4": { "x": 0.5339, "y": 0.7215, "cote": 0.0909, "couche": 3, "type": "perso" },
   "5": { "x": 0.4647, "y": 0.7448, "cote": 0.0701, "couche": 9, "type": "perso" },
-  "6": { "x": 0.3698, "y": 0.6515, "cote": 0.1451, "couche": 9, "type": "perso" },
+  "6": { "x": 0.3776, "y": 0.6848, "cote": 0.1154, "couche": 9, "type": "perso" },
   "7": { "x": 0.7234, "y": 0.434, "cote": 0.4008, "couche": 2, "type": "perso" },
   "8": { "x": 0.7193, "y": 0.5583, "cote": 0.2206, "couche": 7, "type": "perso" },
   "9": { "x": 0.6109, "y": 0.6243, "cote": 0.1795, "couche": 8, "type": "perso" },
   "10": { "x": 0.5786, "y": 0.6896, "cote": 0.118, "couche": 8, "type": "perso" },
   "11": { "x": 0.2911, "y": 0.6118, "cote": 0.1805, "couche": 3, "type": "perso" },
   "12": { "x": 0.3827, "y": 0.7495, "cote": 0.1539, "couche": 1, "type": "compagnon_petit" },
-  "13": { "x": 0.6857, "y": 0.1778, "cote": 0.1331, "couche": 3, "type": "compagnon_air" },
-  "14": { "x": 0.4969, "y": 0.7241, "cote": 0.08, "couche": 7, "type": "compagnon_gros" }
+  "13": { "x": 0.6357, "y": 0.3125, "cote": 0.0977, "couche": 3, "type": "compagnon_air" },
+  "14": { "x": 0.4818, "y": 0.7241, "cote": 0.08, "couche": 9, "type": "compagnon_gros" }
 };
 // La hauteur sur la largeur de l'image (lue sur la première couche chargée ; un iPad en attendant).
 let aspect = 1536 / 2048;
@@ -179,10 +179,13 @@ export async function fermer(puis) {
     if (g) g.classList.remove("camp-ouvert");
     glisserLivre(false);                              // 1. le livre remonte, devant le camp
     await attendre(GLISSE);
-    if (g) g.classList.remove("camp-dessous");       // 2. le camp s'efface dans le noir
+    // 2. le camp s'efface dans le noir, le livre restant devant lui (v500 : sans camp-noir, le livre repassait sous le
+    //    camp le temps du fondu : « il disparaît, réapparaît »).
+    if (g) g.classList.add("camp-noir");
     await attendre(FONDU);
     e.classList.add("sans-fondu");
     e.classList.remove("visible", "affiche");
+    if (g) g.classList.remove("camp-dessous", "camp-noir");
     if (g) g.classList.remove("vers-le-camp");       // 3. l'écran derrière le livre revient
     ouvert = false; enTransition = false;
     await attendre(FONDU);
@@ -479,7 +482,7 @@ function toutFermer() {
     const e = $("ecran-camp"), g = $("ecran-grimoire");
     quitterEdition();
     if (e) e.classList.remove("visible", "affiche");
-    if (g) g.classList.remove("vers-le-camp", "camp-dessous", "camp-ouvert");
+    if (g) g.classList.remove("vers-le-camp", "camp-dessous", "camp-ouvert", "camp-noir");
     glissements.forEach(a => { try { a.cancel(); } catch (err) {} });
     glissements = [];
     ouvert = false; enTransition = false;

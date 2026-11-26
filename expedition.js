@@ -21,7 +21,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, runTransaction, updateDoc, deleteField, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=19";
+import * as CP from "./camp_pur.js?v=20";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -114,7 +114,7 @@ export async function prendrePlace(i, perso) {
         const pl = (d.Expedition.Emplacements || [null, null, null]).slice(0, CP.PLACES_EXPEDITION);
         while (pl.length < CP.PLACES_EXPEDITION) pl.push(null);
         pl[i] = { Perso: perso, Joueur: j, Nom_Joueur: (window.COMPTE_JOUEUR && window.COMPTE_JOUEUR.nom) || "" };
-        return { maj: { "Expedition.Emplacements": pl } };
+        return { maj: { "Expedition.Emplacements": pl, ...CP.sansRolePourExpedition(d.Camp, perso) } };
     });
     // Le personnage de sa place est celui qu'il joue (son héros principal, le héros actif). (v490) Un personnage du camp
     // est le héros actif sans devenir le héros principal, sauf pour un joueur qui n'a plus de personnage à lui.
@@ -137,7 +137,7 @@ export const quitterPlace = (i) => modifier((d) => {
 });
 export const emmener = (id) => modifier((d) => {
     const r = CP.peutEmmener(d.Expedition, d.Camp, id);
-    return r ? { refus: r } : { maj: { "Expedition.Suiveurs": [...(d.Expedition.Suiveurs || []), id] } };
+    return r ? { refus: r } : { maj: { "Expedition.Suiveurs": [...(d.Expedition.Suiveurs || []), id], ...CP.sansRolePourExpedition(d.Camp, id) } };
 });
 export const laisser = (id) => modifier((d) => {
     const e = d.Expedition;

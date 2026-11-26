@@ -62,8 +62,9 @@ const html = fs.readFileSync(path.join(RACINE, 'index.html'), 'utf-8');
 const v = JSON.parse(fs.readFileSync(path.join(RACINE, 'version.json'), 'utf-8')).version;
 verifier("la version 498 ou plus", v >= 498 && Number((fs.readFileSync(path.join(RACINE, 'trace_combat.js'), 'utf-8').match(/VERSION_IVALIS = (\d+)/) || [])[1]) >= 498);
 const imp = fs.readdirSync(RACINE).filter(f => f.endsWith('.js')).filter(f => /camp_pur\.js\?v=/.test(fs.readFileSync(path.join(RACINE, f), 'utf-8')));
-verifier("tous les modules importent camp_pur.js?v=19", imp.length > 0 && imp.every(f => /camp_pur\.js\?v=19"/.test(fs.readFileSync(path.join(RACINE, f), 'utf-8'))), imp.join(" "));
-verifier("index.html : retour_camp.js?v=13", /retour_camp\.js\?v=13"/.test(html));
+const vs = imp.map(f => Number((fs.readFileSync(path.join(RACINE, f), 'utf-8').match(/camp_pur\.js\?v=(\d+)"/) || [])[1]));
+verifier("tous les modules importent la même version de camp_pur.js (19 ou plus)", imp.length > 0 && new Set(vs).size === 1 && vs[0] >= 19, imp.join(" ") + " " + vs.join(","));
+verifier("index.html : retour_camp.js?v=13 ou plus", Number((html.match(/retour_camp\.js\?v=(\d+)"/) || [])[1]) >= 13);
 
 console.log("\n" + (echecs ? `${echecs} CONTRÔLE(S) EN ÉCHEC` : "TOUT EST BON"));
 process.exit(echecs ? 1 : 0);

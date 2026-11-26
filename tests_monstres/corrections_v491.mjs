@@ -219,7 +219,9 @@ await section(async () => {
   verifier("…le livre parti ne retient plus rien (caché)", r.ouverture.ok && /camp-ouvert/.test(r.ouverture.fin), r.ouverture.fin);
   verifier("l'inverse : le livre remonte d'abord, devant le camp encore visible…", r.pendantRemontee.campVisible && r.pendantRemontee.dessous && !r.pendantRemontee.cache, JSON.stringify(r.pendantRemontee));
   const f = r.fermeture, tPlusDessous = (f.find(x => !/camp-dessous/.test(x.g)) || {}).t, tCampParti = (f.find(x => !/visible/.test(x.camp) && x.camp !== undefined) || {}).t, tTable = (f.find(x => !/vers-le-camp/.test(x.g)) || {}).t;
-  verifier("…puis le camp s'efface dans le noir, puis l'écran derrière le livre revient", tPlusDessous >= 700 && tTable >= tPlusDessous + 500 && !/vers-le-camp|camp-dessous|camp-ouvert/.test(r.finFerme), JSON.stringify({ tPlusDessous, tCampParti, tTable, fin: r.finFerme }));
+  // (v500) Le noir revient sur le camp le livre restant devant (camp-noir) : camp-dessous ne tombe qu'avec le camp.
+  const tNoir = (f.find(x => /camp-noir/.test(x.g)) || {}).t;
+  verifier("…puis le camp s'efface dans le noir, puis l'écran derrière le livre revient", tNoir >= 700 && tTable >= tNoir + 500 && tPlusDessous >= tNoir + 500 && !/vers-le-camp|camp-dessous|camp-ouvert|camp-noir/.test(r.finFerme), JSON.stringify({ tNoir, tPlusDessous, tCampParti, tTable, fin: r.finFerme }));
   const css = lire("camp_scene.css");
   verifier("le livre passe devant le camp pendant qu'il glisse (camp-dessous), le noir s'efface en fondu", /#ecran-grimoire\.camp-dessous \{ z-index: 33; \}/.test(css) && /#ecran-grimoire\.camp-dessous::before \{ opacity: 0; \}/.test(css));
   const cs = lire("camp_scene.js");

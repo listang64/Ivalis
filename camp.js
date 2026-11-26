@@ -15,7 +15,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection, deleteField, runTransaction, increment, addDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=19";
+import * as CP from "./camp_pur.js?v=20";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -295,7 +295,7 @@ export async function infosMembres() {
             return;
         }
         out[id] = { id, heros: false, nom: f.Nom_PNJ || mb.Nom || "", caracs: f.Caracs || {}, niveau: Number(f.Niveau) || 1, portrait: f.URL_Cloudinary || "",
-                    occupation: f.Occupation || "", classe: f.Classe || "" };
+                    occupation: f.Occupation || "", classe: f.Classe || "", fiche: f };
     }));
     return out;
 }
@@ -387,11 +387,12 @@ export async function journeeDuCamp(o = {}) {
             const choix = d.Heros_Principaux || {};
             const principaux = [...new Set(persos.map(h => h && h.idJoueur).filter(Boolean))].map(j => CP.herosPrincipal(j, persos, choix)).filter(Boolean);
             const partis = ((d.Expedition || {}).Membres || []).slice();
+            const choisis = d.Expedition && !d.Expedition.En_Cours ? CP.enExpedition(d.Expedition, d.Camp) : [];
             const jour = o.jour || (Number(d.Camp.Jours_Ecoules) || 0) + 1;
             // (v487) Le camp en route : la journée du déplacement (le camp suit le clan sur la carte).
             const r = d.Camp.Deplacement && d.Camp.Deplacement.En_Cours
                 ? CP.journeeDuDeplacement({ camp: d.Camp, infos, principaux, jour, dateJeu, position: d.Position_Groupe })
-                : CP.journeeDuCamp({ camp: d.Camp, infos, partis, expedition: d.Expedition && d.Expedition.En_Cours ? d.Expedition : null, principaux, jour, dateJeu });
+                : CP.journeeDuCamp({ camp: d.Camp, infos, partis, choisis, expedition: d.Expedition && d.Expedition.En_Cours ? d.Expedition : null, principaux, jour, dateJeu });
             r.camp.Derniere_Journee = o.cle || ("jour_" + r.camp.Jours_Ecoules);
             const maj = { Camp: r.camp };
             if (r.expedition) maj.Expedition = r.expedition;
@@ -480,6 +481,38 @@ window.majReputationRegions = function () {
 // (v484) THÉMÈS, LE NARRATEUR (étape 7) : ce que le narrateur reçoit dès que le clan a un camp (ia_master.js).
 export const consignesThemes = () => (camp ? CP.CONSIGNES_THEMES : "");
 
-window.CAMP = { consignesThemes, echoReputation, contexteReputationMJ, lire: lireCamp, creerCampDev, creerCampAuto, rattraperMembres, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
+// (v500) LES OUTILS DEV de la gestion : des provisions, des drachmes dans la caisse ; renvoyer un membre du camp.
+export async function ajouterAuCampDev(o = {}) {
+    const p = idPartie();
+    if (!p || !camp || !estDev()) return "Pas de camp (ou pas en mode DEV).";
+    try {
+        return await runTransaction(db, async (tx) => {
+            const s = await tx.get(refPartie(p)), c = (s.exists() ? s.data() : {}).Camp;
+            if (!c) return "Pas de camp.";
+            const maj = {};
+            if (o.provisions) maj["Camp.Provisions"] = Math.max(0, (Number(c.Provisions) || 0) + Number(o.provisions));
+            if (o.caisse) maj["Camp.Caisse"] = Math.max(0, (Number(c.Caisse) || 0) + Number(o.caisse));
+            tx.update(refPartie(p), maj);
+            return "";
+        });
+    } catch (e) { return "La base n'a pas répondu."; }
+}
+export async function renvoyerDuCampDev(id) {
+    const p = idPartie();
+    if (!p || !estDev()) return "Pas en mode DEV.";
+    try {
+        return await runTransaction(db, async (tx) => {
+            const s = await tx.get(refPartie(p)), c = JSON.parse(JSON.stringify((s.exists() ? s.data() : {}).Camp || {}));
+            if (!c.Membres || !c.Membres[id]) return "Il n'est pas au camp.";
+            if (CP.estThemes(id, c.Membres[id])) return "Thémès ne quitte jamais le clan.";
+            delete c.Membres[id];
+            if (c.Intendant === id) c.Intendant = null;
+            Object.values(c.Membres).forEach(m => { if (m.Recrue === id) delete m.Recrue; });
+            tx.update(refPartie(p), { Camp: c });
+            return "";
+        });
+    } catch (e) { console.error("[Camp] Renvoyer :", e); return "La base n'a pas répondu."; }
+}
+window.CAMP = { ajouterAuCampDev, renvoyerDuCampDev, consignesThemes, echoReputation, contexteReputationMJ, lire: lireCamp, creerCampDev, creerCampAuto, rattraperMembres, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
                 partis, postesBloques, infosMembres, assignerTache, nommerIntendant, changerMoral, journeeDuCamp };
 window.journeeDuCamp = journeeDuCamp;

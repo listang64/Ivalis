@@ -29,6 +29,11 @@ const TEINTE_MEMBRES = { couleurs: ["#5e7f59", "#7d9c6f", "#476944"], opacite: 0
 
 let pages = null;                  // { g, d }
 let infos = {}, infosLues = 0, brouillons = {}, note = { texte: "", le: 0 };
+let choix = null;                  // (v500) la liste de choix ouverte : { quoi: "tache" | "intendant", id }
+const cadre = (graine) => (D().cadre ? D().cadre(graine) : "");
+// (v500) Les + verts et les − rouges d'un rôle : le modificateur de la carac déterminante (trois au plus).
+const signesTache = (m) => m > 0 ? `<span class="plus-choix">${"+".repeat(Math.min(3, m))}</span>` : m < 0 ? `<span class="moins-choix">${"−".repeat(Math.min(3, -m))}</span>` : "";
+const enExpe = (camp) => (R() && R().enExpedition ? R().enExpedition((window.PARTIE_DATA || {}).Expedition, camp) : []);
 const sig = { g: "", d: "" };
 
 function creer() {
@@ -79,12 +84,15 @@ function htmlGauche() {
           <div class="case-gestion"><b data-gestion="caisse">${Number(camp.Caisse) || 0}</b><span>drachmes dans la caisse</span></div>
           <div class="case-gestion"><b data-gestion="provisions">${prov}</b><span>provisions</span></div>
         </div>
+        <div class="encart-fiche encart-gestion">${cadre("ressources-gestion")}
         <div class="sous-titre-groupe">Les ressources alentour</div>
         <div class="jauge-gestion" title="La jauge des ressources naturelles autour du camp">
           <span class="barre-jauge-gestion"><i style="width:${Number.isFinite(jauge) ? Math.max(0, Math.min(100, jauge)) : 0}%"></i></span>
           <b data-gestion="jauge">${Number.isFinite(jauge) ? jauge : "?"}</b>/100
         </div>
         <p class="ligne-gestion">${terrain ? `${echapper(terrain)} · ` : ""}la chasse et la cueillette rendent <b data-gestion="rendement">${Math.round(b.rendement * 100)} %</b></p>
+        </div>
+        <div class="encart-fiche encart-gestion">${cadre("bilan-gestion")}
         <div class="sous-titre-groupe">Le bilan du jour</div>
         <ul class="bilan-gestion">
           <li><span>Production</span><b data-gestion="production">${signe(b.production)}</b>
@@ -94,20 +102,18 @@ function htmlGauche() {
           <li class="net-gestion${b.net < 0 ? " deficit" : ""}"><span>Bilan</span><b data-gestion="net">${signe(b.net)}</b><small>provisions par jour</small></li>
         </ul>
         ${tiendra !== null ? `<p class="avis-gestion">À ce rythme, les provisions dureront ${tiendra} jour${tiendra > 1 ? "s" : ""}.</p>` : ""}
+        </div>
         <div class="sous-titre-groupe">L'intendant</div>
         <p class="ligne-gestion petite">Il raconte au retour des joueurs ce qui s'est passé au camp (en plus de sa tâche).</p>
-        <select class="select-gestion select-intendant" data-gc="intendant"${bloque ? " disabled" : ""}>
-          <option value="">— personne —</option>
-          ${candidats.map(id => `<option value="${echapper(id)}"${camp.Intendant === id ? " selected" : ""}>${echapper(nomDe(id, camp))}</option>`).join("")}
-        </select>
+        ${htmlChoix("intendant", "", echapper(camp.Intendant ? nomDe(camp.Intendant, camp) : "— personne —"), bloque,
+            [{ valeur: "", nom: "— personne —" }].concat(candidats.map(id => ({ valeur: id, nom: nomDe(id, camp) }))), camp.Intendant || "")}
         ${manque ? `<p class="avis-gestion">Il faut un intendant dès qu'un personnage reste au camp.</p>` : ""}
         ${camp.Conseil_Extraordinaire ? `<p class="avis-gestion">Un conseil extraordinaire doit se réunir : ${echapper(camp.Conseil_Extraordinaire.Raison || "")}</p>` : ""}
         ${(camp.Sujets_Conseil || []).length ? `<p class="avis-gestion">Le prochain conseil devra en parler : ${(camp.Sujets_Conseil || []).map(x => echapper(x.Texte || "")).join(" ")}</p>` : ""}
         ${htmlTache(camp)}
         ${htmlRecrutement(camp)}
         ${htmlJournal(camp)}
-        ${estDev() ? `<button type="button" class="lien-dev jour-dev-gestion" data-action="gestion" data-gc="jour-dev">Faire passer un jour au camp (DEV)</button>` : ""}
-        ${htmlRecrueDev()}
+        ${htmlOutilsDev(camp)}
         <p class="note-gestion${note.texte && Date.now() - note.le < 4000 ? " visible" : ""}" aria-live="polite">${echapper(note.texte)}</p>
       </div>`;
 }
@@ -133,7 +139,31 @@ function htmlRecrutement(camp) {
         ${camp.Recrutement_En_Cours ? `<p class="ligne-gestion petite">Une recrue du clan est en train d'être créée.</p>` : ""}
         <p class="ligne-gestion petite">Ta bourse : <b data-gestion="bourse">${bourse}</b> drachmes.</p>
         <button type="button" class="lien-fiche acheter-gestion" data-action="gestion" data-gc="acheter"${bourse < prix ? " disabled" : ""}>Acheter un personnage (${prix} drachmes de ta bourse)</button>
-        ${estDev() ? `<button type="button" class="lien-dev" data-action="gestion" data-gc="bourse-dev">+${prix} drachmes dans ma bourse (DEV)</button>` : ""}`;
+`;
+}
+// (v500) Nico : « tous les trucs pour les dev visibles qu'en mode dev, une séparation rouge DEV, et groupés ensemble après ».
+function htmlOutilsDev(camp) {
+    if (!estDev()) return "";
+    const prix = (R() || {}).PRIX_PERSONNAGE || 300;
+    return `<div class="outils-dev-gestion">
+        <div class="separation-dev-gestion"><span>DEV</span></div>
+        <button type="button" class="lien-dev jour-dev-gestion" data-action="gestion" data-gc="jour-dev">Faire passer un jour au camp</button>
+        <button type="button" class="lien-dev" data-action="gestion" data-gc="provisions-dev">+20 provisions au camp</button>
+        <button type="button" class="lien-dev" data-action="gestion" data-gc="caisse-dev">+100 drachmes dans la caisse du camp</button>
+        <button type="button" class="lien-dev" data-action="gestion" data-gc="bourse-dev">+${prix} drachmes dans ma bourse</button>
+        ${htmlRecrueDev()}
+      </div>`;
+}
+// (v500) Nico : « la liste pour sélectionner un rôle : le fond de liste en beige clair, un + vert (ou plusieurs) selon sa
+// carac pour cette occupation, un ou plusieurs − s'il n'est pas bon dans le domaine » ; l'intendant aussi en beige.
+// `options` : [{ valeur, nom, detail, signes, plein }].
+function htmlChoix(quoi, id, libelle, bloque, options, actuel) {
+    const ouvert = choix && choix.quoi === quoi && (choix.id || "") === (id || "");
+    return `<div class="choix-gestion${ouvert ? " ouvert" : ""}">
+        <button type="button" class="bouton-choix-gestion" data-action="gestion" data-gc="ouvrir-choix" data-quoi="${quoi}" data-id="${echapper(id || "")}"${bloque ? " disabled" : ""}>${libelle}<span class="fleche-choix">▾</span></button>
+        ${ouvert ? `<ul class="liste-choix-gestion">${options.map(o => `<li><button type="button" class="option-choix-gestion${o.valeur === actuel ? " actuelle" : ""}" data-action="gestion" data-gc="choisir"
+            data-quoi="${quoi}" data-id="${echapper(id || "")}" data-valeur="${echapper(o.valeur)}"${o.plein ? " disabled" : ""}><span class="nom-choix">${echapper(o.nom)}</span>${o.signes || ""}${o.detail ? `<small>${echapper(o.detail)}</small>` : ""}</button></li>`).join("")}</ul>` : ""}
+      </div>`;
 }
 // (v482) LES DERNIERS JOURS DU CAMP : son journal (la journée du camp, camp_pur.js).
 function htmlJournal(camp) {
@@ -168,9 +198,9 @@ function htmlRecrueDev() {
     if (!estDev()) return "";
     lirePnjsDev();
     return `<div class="recrue-dev-gestion">
-        <div class="sous-titre-groupe dev-rouge">Recruter un PNJ pour le camp, gratuitement (DEV)</div>
+        <div class="sous-titre-groupe dev-rouge">Recruter un PNJ pour le camp, gratuitement</div>
         ${pnjsDev.length ? `<select class="select-gestion select-recrue-dev" data-gc="choix-recrue-dev">${pnjsDev.map(p => `<option value="${echapper(p.id)}">${echapper(p.nom)}</option>`).join("")}</select>
-        <button type="button" class="lien-dev recruter-dev-gestion" data-action="gestion" data-gc="recruter-dev">Le faire entrer au camp (DEV)</button>`
+        <button type="button" class="lien-dev recruter-dev-gestion" data-action="gestion" data-gc="recruter-dev">Le faire entrer au camp</button>`
           : `<p class="ligne-gestion petite dev-rouge">Aucun PNJ de la partie hors du camp.</p>`}
       </div>`;
 }
@@ -182,7 +212,7 @@ const nomDe = (id, camp) => ((infos[id] || {}).nom) || (((camp || {}).Membres ||
 function htmlMembre(id, camp, partis, bloque) {
     const P = R(), mb = camp.Membres[id] || {}, i = infos[id] || {};
     const moral = Number.isFinite(Number(mb.Moral)) ? Number(mb.Moral) : 60;
-    const themes = P.estThemes(id, mb), parti = partis.includes(id);
+    const themes = P.estThemes(id, mb), parti = !themes && (partis.includes(id) || enExpe(camp).includes(id));
     const portrait = i.portrait ? `<img src="${echapper(i.portrait)}" alt="" draggable="false">` : `<span>${echapper(String(nomDe(id, camp)).slice(0, 1).toUpperCase())}</span>`;
     // (v494) À qui appartient le héros ; son joueur en fait son personnage principal d'une case (les siens seulement).
     const nomJoueur = (j) => j === moi() ? "toi" : ((typeof window.nomDuJoueurLivre === "function" && window.nomDuJoueurLivre(j)) || "un joueur");
@@ -193,19 +223,26 @@ function htmlMembre(id, camp, partis, bloque) {
     const voulu = (brouillons[id] && brouillons[id].tache) !== undefined ? brouillons[id].tache : (mb.Tache || "");
     let controle;
     if (themes) controle = `<span class="tache-fixe">Part avec chaque expédition</span>`;
-    else if (parti) controle = `<span class="tache-fixe">En expédition</span>`;
+    else if (parti) controle = "";
     else {
-        const options = [`<option value="">Repos</option>`].concat(Object.keys(P.TACHES).map(t => {
+        const options = [{ valeur: "", nom: "Repos", detail: "+3 de moral par jour" }].concat(Object.keys(P.TACHES).map(t => {
             const T = P.TACHES[t], m = P.mDeTache(t, i.caracs);
-            const plein = T.max && Object.keys(camp.Membres).filter(x => x !== id && camp.Membres[x].Tache === t).length >= T.max;
-            return `<option value="${t}"${voulu === t ? " selected" : ""}${plein && voulu !== t ? " disabled" : ""}>${T.nom} (${echapper(P.caracsDeTache ? P.caracsDeTache(t) : "")})${plein && voulu !== t ? " — complet" : ""}</option>`;
-        })).join("");
-        controle = `<select class="select-gestion select-tache" data-gc="tache" data-id="${echapper(id)}"${bloque ? " disabled" : ""} title="${echapper(voulu ? P.TACHES[voulu].aide : "Sans tâche : +3 de moral par jour, et ses blessures guérissent plus vite.")}">${options}</select>`;
+            const plein = T.max && Object.keys(camp.Membres).filter(x => x !== id && camp.Membres[x].Tache === t).length >= T.max && voulu !== t;
+            return { valeur: t, nom: T.nom, signes: signesTache(m), detail: `${P.caracsDeTache ? P.caracsDeTache(t) : ""}${plein ? " — complet" : ""}`, plein };
+        }));
+        const libelle = voulu ? `${echapper(P.TACHES[voulu].nom)} ${signesTache(P.mDeTache(voulu, i.caracs))}` : "Repos";
+        controle = htmlChoix("tache", id, libelle, bloque, options, voulu);
         if (voulu === "entrainer") controle += htmlRecrue(id, camp, partis, bloque, mb);
         if (voulu === "commercer") controle += htmlCommerce(id, camp, bloque, mb);
     }
     const histo = (Array.isArray(mb.Moral_Historique) ? mb.Moral_Historique : []).slice(-1)[0];
+    // (v500) Parler en privé (un PNJ du camp, resté au camp) ; DEV : le renvoyer du camp.
+    const parler = !parti && !i.heros && window.DISCUSSION && window.DISCUSSION.ouvrir
+        ? `<button type="button" class="parler-gestion" data-action="gestion" data-gc="parler" data-id="${echapper(id)}" title="Lui parler en privé" aria-label="Lui parler en privé">💬</button>` : "";
+    const renvoyer = estDev() && !themes ? `<button type="button" class="renvoyer-gestion" data-action="gestion" data-gc="renvoyer-dev" data-id="${echapper(id)}" title="Le renvoyer du camp (DEV)" aria-label="Le renvoyer du camp (DEV)">−</button>` : "";
     return `<li class="membre-gestion${parti ? " parti" : ""}" data-membre="${echapper(id)}">
+        ${parti ? `<span class="tampon-expedition">En Expédition</span>` : ""}
+        ${parler || renvoyer ? `<span class="coin-membre-gestion">${parler}${renvoyer}</span>` : ""}
         <button type="button" class="portrait-gestion${principal ? " principal" : ""}" data-action="gestion" data-gc="ame" data-id="${echapper(id)}" title="Ses fils invisibles${principal ? " — personnage principal d'un joueur" : ""}">${portrait}</button>
         <div class="corps-membre-gestion">
           <div class="ligne-nom-gestion"><button type="button" class="nom-gestion" data-action="gestion" data-gc="fiche" data-id="${echapper(id)}" title="Sa fiche">${echapper(nomDe(id, camp))}</button>${marqueLien(id)}
@@ -243,9 +280,10 @@ function htmlDroite() {
     const camp = C() && C().lire(), P = R();
     if (!camp || !P) return `<div class="contenu-page page-gestion-droite"></div>`;
     const partis = C().partis(), bloque = C().postesBloques();
-    const ordre = (id) => P.estThemes(id, camp.Membres[id]) ? 0 : (infos[id] || {}).heros ? 1 : 2;
+    const loin = new Set([...partis, ...enExpe(camp)]);
+    const ordre = (id) => P.estThemes(id, camp.Membres[id]) ? 0 : loin.has(id) ? 3 : (infos[id] || {}).heros ? 1 : 2;
     const ids = Object.keys(camp.Membres || {}).sort((a, b) => ordre(a) - ordre(b) || String(nomDe(a, camp)).localeCompare(String(nomDe(b, camp)), "fr"));
-    const ici = ids.filter(id => !partis.includes(id)).length;
+    const ici = ids.filter(id => !loin.has(id)).length;
     return `<div class="contenu-page page-gestion-droite defile-fiche">
         <div class="entete-groupe">${lavis(TEINTE_MEMBRES, "membres-camp-titre")}<span class="titre-page-fiche">Les membres du camp</span></div>${FLEURON}
         <div class="compte-suiveurs">${ids.length} membre${ids.length > 1 ? "s" : ""}${ici !== ids.length ? `, dont ${ici} au camp` : ""}</div>
@@ -256,7 +294,7 @@ function htmlDroite() {
 function maj(force) {
     if (!pages) return;
     const camp = C() && C().lire();
-    const base = JSON.stringify([camp, infos, brouillons, C() && C().postesBloques && C().postesBloques(), C() && C().partis && C().partis(), (window.PARTIE_DATA || {}).Mission_En_Cours || null, (window.PARTIE_DATA || {}).Bourses_Joueurs || null, window.LIENS_FORTS ? window.LIENS_FORTS.liste().map(l => l.id + ":" + l.fort.type) : null]);
+    const base = JSON.stringify([camp, infos, brouillons, C() && C().postesBloques && C().postesBloques(), C() && C().partis && C().partis(), (window.PARTIE_DATA || {}).Mission_En_Cours || null, (window.PARTIE_DATA || {}).Bourses_Joueurs || null, (window.PARTIE_DATA || {}).Expedition || null, choix, estDev(), window.LIENS_FORTS ? window.LIENS_FORTS.liste().map(l => l.id + ":" + l.fort.type) : null]);
     const actif = document.activeElement;
     // Ne pas redessiner sous les doigts de celui qui tape une quantité.
     if (!force && actif && pages.d.contains(actif) && actif.matches("input")) return;
@@ -272,6 +310,33 @@ function noter(texte) { note = { texte, le: Date.now() }; maj(true); setTimeout(
 // ---------------------------------------------------------------------
 async function agir(cible) {
     const gc = cible.dataset.gc, id = cible.dataset.id;
+    if (gc === "ouvrir-choix") {
+        son();
+        const q = { quoi: cible.dataset.quoi, id: id || "" };
+        choix = choix && choix.quoi === q.quoi && choix.id === q.id ? null : q;
+        return maj(true);
+    }
+    if (gc === "choisir") {
+        choix = null;
+        return surChangement({ dataset: { gc: cible.dataset.quoi, id: id || undefined }, value: cible.dataset.valeur || "" });
+    }
+    if (gc === "parler") {
+        const f = (infos[id] || {}).fiche || {};
+        son();
+        if (window.DISCUSSION && window.DISCUSSION.ouvrir) window.DISCUSSION.ouvrir({ id, nom: nomDe(id, C().lire()), fiche: f, depuis: "" });
+        return;
+    }
+    if (gc === "renvoyer-dev") {
+        if (!estDev() || !confirm(`Renvoyer ${nomDe(id, C().lire())} du camp ? (DEV)`)) return;
+        son();
+        const refus = C().renvoyerDuCampDev ? await C().renvoyerDuCampDev(id) : "Indisponible.";
+        return noter(refus || `${nomDe(id, C().lire())} a quitté le camp.`);
+    }
+    if (gc === "provisions-dev" || gc === "caisse-dev") {
+        son();
+        const refus = C().ajouterAuCampDev ? await C().ajouterAuCampDev(gc === "provisions-dev" ? { provisions: 20 } : { caisse: 100 }) : "Indisponible.";
+        return noter(refus || (gc === "provisions-dev" ? "+20 provisions au camp (DEV)." : "+100 drachmes dans la caisse (DEV)."));
+    }
     if (gc === "camp") { son(); if (window.CAMP_SCENE) window.CAMP_SCENE.ouvrir(); return; }
     if (gc === "recruter-dev") {
         son();

@@ -260,7 +260,7 @@ await section(async () => {
 titre("9. LA GESTION MONTRE LES DERNIERS JOURS ; LE BOUTON DEV FAIT PASSER UN JOUR");
 await section(async () => {
   const g = lire("grimoire_gestion.js");
-  verifier("les derniers jours (le journal), le conseil extraordinaire, le bouton DEV", /Les derniers jours/.test(g) && /Un conseil extraordinaire doit se réunir/.test(g) && /Faire passer un jour au camp \(DEV\)/.test(g) && /journeeDuCamp\(\{ cle: "dev_"/.test(g));
+  verifier("les derniers jours (le journal), le conseil extraordinaire, le bouton DEV", /Les derniers jours/.test(g) && /Un conseil extraordinaire doit se réunir/.test(g) && /Faire passer un jour au camp/.test(g) && /separation-dev-gestion/.test(g) && /journeeDuCamp\(\{ cle: "dev_"/.test(g));
 });
 
 titre("10. LES VERSIONS");

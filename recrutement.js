@@ -21,7 +21,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, setDoc, updateDoc, runTransaction, deleteField, collection, query, where } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=19";
+import * as CP from "./camp_pur.js?v=20";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";

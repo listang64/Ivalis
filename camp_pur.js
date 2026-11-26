@@ -432,7 +432,9 @@ export function journeeDuCamp(e, alea = Math.random) {
         travail[id] = { tache: t, m };
     });
     const qui = (t) => Object.keys(travail).filter(id => travail[id].tache === t);
-    const auRepos = (id) => { const mb = membres[id], b = mb.Blessure_Chasse; return !mb.Tache || !TACHES[mb.Tache] || !!(b && b.Jours > 0 && b.Interdit === "tout"); };
+    // (v500) Choisi pour l'expédition qui se monte : il a quitté son poste, sans être au repos pour autant.
+    const choisis = new Set(e.choisis || []);
+    const auRepos = (id) => { const mb = membres[id], b = mb.Blessure_Chasse; return !choisis.has(id) && (!mb.Tache || !TACHES[mb.Tache] || !!(b && b.Jours > 0 && b.Interdit === "tout")); };
 
     // 1. LA PRODUCTION DES TÂCHES.
     let chasse = 0, cueillette = 0;
@@ -647,6 +649,22 @@ export function membresExpedition(exp, camp) {
     const t = idThemesDuCamp(camp);
     return [...new Set([...(exp.Emplacements || []).filter(Boolean).map(x => x.Perso), ...(t ? [t] : []), ...(exp.Suiveurs || [])])];
 }
+// (v500) Nico : « les personnages choisis dans l'expédition en cours perdent leur rôle dans le camp » : dès leur place
+// prise (ou leur suiveur emmené), pas seulement au départ. Rend les écritures de la partie (chemins pointés), ou {}.
+export function sansRolePourExpedition(camp, id) {
+    const mb = ((camp || {}).Membres || {})[id];
+    if (!mb || estThemes(id, mb)) return {};
+    const base = "Camp.Membres." + id + ".", maj = {};
+    if (mb.Tache) maj[base + "Tache"] = null;
+    if (mb.Recrue) maj[base + "Recrue"] = null;
+    if (mb.Commerce && !mb.Commerce.Paye) maj[base + "Commerce"] = null;
+    if (camp.Intendant === id) maj["Camp.Intendant"] = null;
+    Object.keys(camp.Membres || {}).forEach(x => { if (x !== id && camp.Membres[x].Recrue === id) maj["Camp.Membres." + x + ".Recrue"] = null; });
+    return maj;
+}
+// (v500) Ceux de l'expédition, montée ou partie : la gestion les montre « En Expédition ».
+export const enExpedition = (exp, camp) => (exp && (exp.Montee || exp.En_Cours) ? (exp.En_Cours ? (exp.Membres || []) : membresExpedition(exp, camp)) : [])
+    .filter(id => !estThemes(id, ((camp || {}).Membres || {})[id]));
 // Ce que l'expédition mange par jour : 1 par membre, moins 1 par suiveur de Dextérité.
 export const consommationExpedition = (exp, camp, caracsDe) => Math.max(0, membresExpedition(exp, camp).length - bonusExpedition((exp || {}).Suiveurs, caracsDe).economie);
 
