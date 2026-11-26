@@ -12777,3 +12777,10 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Le retour à la gestion** (`grimoire_gestion.js`, `marquerRetour`) : une fiche ou des fils invisibles ouverts depuis la gestion, la page tournée en arrière ramène à la gestion (les fils, rangés après les fiches, retombaient sur les fiches).
 - **Thémès jamais joué** (`camp_pur.js`, `estThemesPerso`) : ni sa fiche de PNJ, ni une fiche d'aventurier créée à son nom — hors des personnages jouables, des places de l'expédition et de l'arène.
 - corrections_v495 le vérifie.
+
+## v496 — La table des blessures de Nico, accordée au soin du camp ; les plaies ouvertes
+
+- **La table** (`blessures.js`) : presque toutes les blessures temporaires se comptent en « jours de repos au camp » (`campSeulement`), d'après le tableau de Nico (Courbatures 3, Entaille 9, Commotion légère 10, Cheville 15, Main endolorie 3, Côtes 20, Plaie infectée 10, Épaule démise 6, Genou 15, Saignement persistant 20, Tendon 10, Déchirure 20, Poignet 26, Choc crânien 25, Traumatisme oculaire 24, Brûlure 40, Bras 30, Jambe 36, Hémorragie 50, Traumatisme crânien 90, Estropié 150) ; la Coupure fine guérit en 2 jours ; l'amputation d'une main ou du bras interdit aussi la main gauche.
+- **Les plaies ouvertes** : Petite (jets 2 à 5) 25 %, 9 jours ; Blessure ouverte (faces 17 à 19 partagées) 50 %, 18 jours ; Grande (faces 26 et 27 partagées) 75 %, 27 jours — à chaque fin de manche, un jet de saignement (`cerveau_combat.js`, `plaiesOuvertesDeFinDeManche` ; `combat_etat.js`, `atouts.plaieOuverte`). La mort reste à 46-50.
+- **La guérison au camp seulement** (`camp_pur.js` : `soinsHorsCamp` ; `camp.js` ; `blessures_ui.js`, `decompterJoursBlessures` ; `blessuresApresJours(…, { horsCamp })`) : loin du camp, seules la lèvre fendue, le coup au visage et la coupure fine guérissent.
+- corrections_v496 le vérifie ; corrections_v256 adapté (la coupure fine ne marque plus le corps).

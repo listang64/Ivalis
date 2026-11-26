@@ -34,9 +34,10 @@ console.log("\n3a. LES BLESSURES QUI SE VOIENT (la table, hors page)");
     W.signesSansBlessure = ou(W.signesSansBlessure, "");
     W.promptBlessuresVisibles = ou(W.promptBlessuresVisibles, "");
     const visibles = W.TABLE_BLESSURES.filter(b => b.visible).map(b => b.id).sort();
-    const attendues = ["BLE_AMPUTATION_BRAS", "BLE_AMPUTATION_DOIGTS", "BLE_AMPUTATION_MAIN", "BLE_COUPURE_FINE", "BLE_DEFIGURATION",
+    // (v496) La coupure fine guérit en 2 jours (tableau de Nico) : elle ne marque plus le corps pour toujours.
+    const attendues = ["BLE_AMPUTATION_BRAS", "BLE_AMPUTATION_DOIGTS", "BLE_AMPUTATION_MAIN", "BLE_DEFIGURATION",
                        "BLE_MACHOIRE_FRACASSEE", "BLE_MUTILATION_MULTIPLE", "BLE_OEIL_BORGNE"];
-    verifier("les huit blessures qui marquent le corps pour toujours", JSON.stringify(visibles) === JSON.stringify(attendues), visibles.join(","));
+    verifier("les sept blessures qui marquent le corps pour toujours", JSON.stringify(visibles) === JSON.stringify(attendues), visibles.join(","));
     verifier("…toutes définitives", W.TABLE_BLESSURES.filter(b => b.visible).every(b => b.duree.definitif));
     const jamais = ["BLE_LEVRE_FENDUE", "BLE_COUP_VISAGE", "BLE_BRULURE_ETENDUE", "BLE_AMPUTATION_PIED", "BLE_TYMPAN_CREVE", "BLE_POUMON_PERFORE",
                     "BLE_LESION_COLONNE", "BLE_DECHIRURE_MUSCULAIRE"];
@@ -48,8 +49,8 @@ console.log("\n3a. LES BLESSURES QUI SE VOIENT (la table, hors page)");
     verifier("une blessure passagère n'y entre pas", W.signesAvecBlessures("", ["BLE_LEVRE_FENDUE"]) === "");
     verifier("retirée (DEV), sa phrase s'en va", W.signesSansBlessure(avec, "BLE_OEIL_BORGNE") === "Tatouage de serpent sur l'avant-bras",
              W.signesSansBlessure(avec, "BLE_OEIL_BORGNE"));
-    const deux = W.signesAvecBlessures("", ["BLE_COUPURE_FINE", "BLE_AMPUTATION_MAIN"]);
-    verifier("deux blessures, deux phrases", /^Coupure fine : .+\. Amputation d'une main : /.test(deux), deux);
+    const deux = W.signesAvecBlessures("", ["BLE_MACHOIRE_FRACASSEE", "BLE_AMPUTATION_MAIN"]);
+    verifier("deux blessures, deux phrases", /^Mâchoire fracassée : .+\. Amputation d'une main : /.test(deux), deux);
     const perso = { blessures: [{ uid: "a", id: "BLE_OEIL_BORGNE", definitif: true }, { uid: "b", id: "BLE_GENOU_AFFAIBLI", combats: 1 }] };
     const prompt = W.promptBlessuresVisibles(perso);
     verifier("le passage du prompt : ses marques, cicatrisées, et elles seules", /cicatrisées/.test(prompt) && /œil crevé/.test(prompt) && !/genou/i.test(prompt), prompt);

@@ -15,7 +15,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection, deleteField, runTransaction, increment, addDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=16";
+import * as CP from "./camp_pur.js?v=17";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -407,14 +407,19 @@ export async function journeeDuCamp(o = {}) {
         const h = persos.find(y => y && y.idPersonnage === x.id);
         try { await updateDoc(doc(db, h ? "Personnages" : "Monde_PNJ", x.id), { XP: increment(x.xp) }); } catch (e) { console.warn("[Camp] L'XP de l'entraînement :", e); }
     }
-    // La guérison des héros (le temps, le repos, le soigneur) : leurs blessures « jours ».
-    for (const id of Object.keys(res.soinsHeros)) {
-        const h = persos.find(y => y && y.idPersonnage === id), n = res.soinsHeros[id];
-        if (!h || !n || typeof window.blessuresApresJours !== "function" || typeof window.blessuresDuPerso !== "function") continue;
+    // La guérison des héros (le temps, le repos, le soigneur) : leurs blessures « jours ». (v496) Au camp seulement
+    // pour les blessures « de repos au camp » ; loin du camp, les autres (soinsHorsCamp).
+    const guerir = async (id, n, horsCamp) => {
+        const h = persos.find(y => y && y.idPersonnage === id);
+        if (!h || !n || typeof window.blessuresApresJours !== "function" || typeof window.blessuresDuPerso !== "function") return;
         const avant = window.blessuresDuPerso(h);
-        if (!avant.some(b => (Number(b.jours) || 0) > 0)) continue;
-        try { await updateDoc(doc(db, "Personnages", id), { Blessures: window.blessuresApresJours(avant, n) }); } catch (e) { console.warn("[Camp] Les blessures :", e); }
-    }
+        if (!avant.some(b => (Number(b.jours) || 0) > 0)) return;
+        const apres = window.blessuresApresJours(avant, n, { horsCamp });
+        if (JSON.stringify(apres) === JSON.stringify(avant)) return;
+        try { await updateDoc(doc(db, "Personnages", id), { Blessures: apres }); } catch (e) { console.warn("[Camp] Les blessures :", e); }
+    };
+    for (const id of Object.keys(res.soinsHeros)) await guerir(id, res.soinsHeros[id], false);
+    for (const id of Object.keys(res.soinsHorsCamp || {})) await guerir(id, res.soinsHorsCamp[id], true);
     await inscrireMoraux(p, res.moraux.map(m => ({ ...m, dateJeu })));
     // (v487) La route : l'événement se joue en RP (le Destin l'écrit dans le récit) ; à zéro, le camp s'arrête là.
     if (res.evenements.evenementRoute) {

@@ -46,7 +46,7 @@ import { clonerEtat, combattant, creerDes, combattantIllusion,
 import { resoudreCarte, tirerDesCarte, tirerCritique, appliquerConfusion, dissiperConfusion,
          traverserZones, creerZonePure, poserZone, vieillirZones, zonesDeFinDeManche,
          chaineDeDegats, REGLES_ETATS, regleDesEtats, estDansLeNoir,
-         partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE, ETAT_SAIGNEMENT, SAIGNEMENT,
+         partageTenebres, ETAT_TENEBRES_ETALEES, POISON, POISON_MAITRE, ETAT_SAIGNEMENT, SAIGNEMENT, DESC_SAIGNEMENT,
          resoudreTechniqueClasse, actionAssautMortel, actionBaiserVampire, actionBriseurArcane, PORTEE_BRISEUR, appliquerCharme,
          pointesDeGlace, orientationCone, couleeDeLave, orientationLigne,
          actionResonanceBouclier, ennemisAuContact, tirerDirectionsAveugle, ligneDeVue, caseLibre, aLEtat,
@@ -626,7 +626,11 @@ export function cloturerTour(etat, des) {
         // QUI SE TIENT DANS UNE ZONE LA SUBIT (v253), une fois par manche —
         // après le vieillissement des états, pour qu'un état qu'elle pose
         // garde toute sa durée ; avant celui des zones.
-        etapes.push(...zonesDeFinDeManche(etat, des || creerDes(etat.graine)));
+        const desManche = des || creerDes(etat.graine);
+        etapes.push(...zonesDeFinDeManche(etat, desManche));
+        // (v496) Les plaies ouvertes (blessures.js) : une chance de saigner, après le vieillissement des états (le
+        // saignement posé garde toute sa durée).
+        etapes.push(...plaiesOuvertesDeFinDeManche(etat, desManche));
         // Les nappes au sol vieillissent comme les états. Ce décompte vivait
         // dans combat.js, sur le poste qui avait vidé la file — donc nulle part
         // sous ce régime, où plus personne ne « finit » le round de son côté :
@@ -638,6 +642,29 @@ export function cloturerTour(etat, des) {
         etapes.push({ type: "manche", numero: etat.manche });
     }
     return { fini: partie.id, etapes };
+}
+
+// (v496) LES PLAIES OUVERTES (blessures.js : Petite blessure ouverte 25 %, Blessure ouverte 50 %, Grande 75 %) : « lors
+// des combats, à chaque tour, le personnage a X % de chance de subir un effet saignement ». À chaque fin de manche, un
+// jet par combattant debout qui porte l'atout `plaieOuverte` : le Saignement ordinaire (2 manches, ETAT_SAIGNEMENT).
+export const DUREE_SAIGNEMENT_PLAIE = 2;
+const ICONE_SAIGNEMENT_PLAIE = "data:image/svg+xml," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#2a0a0a" stroke="#c9a227" stroke-width="3"/>'
+    + '<path d="M32 12 C32 12 18 30 18 39 a14 14 0 0 0 28 0 C46 30 32 12 32 12 Z" fill="#c4141c"/>'
+    + '<path d="M26 38 a6 6 0 0 0 5 6" stroke="#ff8a8a" stroke-width="3" fill="none" stroke-linecap="round"/></svg>');
+export function plaiesOuvertesDeFinDeManche(etat, des) {
+    const etapes = [];
+    (etat.ordre || Object.keys(etat.combattants || {})).forEach(id => {
+        const c = combattant(etat, id);
+        const chance = nombre(c && c.atouts && c.atouts.plaieOuverte);
+        if (!c || c.aTerre || chance <= 0 || des.d100() > chance) return;
+        const etats = Array.isArray(c.etats) ? c.etats : [];
+        const existant = etats.find(e => e && e.nom === ETAT_SAIGNEMENT);
+        if (existant) { existant.duree = Math.max(nombre(existant.duree), DUREE_SAIGNEMENT_PLAIE); c.etats = etats; }
+        else c.etats = [...etats, { nom: ETAT_SAIGNEMENT, duree: DUREE_SAIGNEMENT_PLAIE, icone: ICONE_SAIGNEMENT_PLAIE, desc: DESC_SAIGNEMENT + " (sa plaie ouverte s'est remise à saigner)" }];
+        etapes.push({ type: "etats", cible: id, pose: ETAT_SAIGNEMENT, liste: c.etats, tic: "Plaie ouverte" });
+    });
+    return etapes;
 }
 
 // LA RÉSERVE MAINTENUE EN FIN DE MANCHE (v347, voir RESERVES_TECHNIQUES,

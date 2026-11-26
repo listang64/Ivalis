@@ -409,7 +409,7 @@ export function journeeDuCamp(e, alea = Math.random) {
     const infos = e.infos || {}, principaux = e.principaux || [];
     const partis = (e.partis || []).slice();
     const exp = copie(e.expedition) || null;
-    const journal = [], deltas = {}, xp = [], soinsHeros = {}, departs = [];
+    const journal = [], deltas = {}, xp = [], soinsHeros = {}, soinsHorsCamp = {}, departs = [];
     const ev = { production: 0, peaux: 0, blessures: [], lieuRepere: false, conseilExtraordinaire: false, arret: false, expeditionAffamee: false, commerce: [], affames: [] };
     const nom = (id) => (infos[id] && infos[id].nom) || (membres[id] && membres[id].Nom) || id;
     const liste = (ids) => ids.map(nom).join(", ");
@@ -580,7 +580,9 @@ export function journeeDuCamp(e, alea = Math.random) {
             b.Jours = Math.max(0, b.Jours - jours);
             if (!b.Jours) { delete membres[id].Blessure_Chasse; journal.push(`${nom(id)} est remis de sa blessure de chasse.`); }
         }
-        if (soigneCommeHeros(infos[id])) soinsHeros[id] = jours;
+        // (v496) « X jours de repos au camp » : les blessures d'une fiche guérissent au camp ; loin de lui (en
+        // expédition), seules celles qui guérissent n'importe où passent un jour (soinsHorsCamp).
+        if (soigneCommeHeros(infos[id])) { if (present) soinsHeros[id] = jours; else soinsHorsCamp[id] = 1; }
     });
 
     // Ceux qui quittent le clan.
@@ -605,7 +607,7 @@ export function journeeDuCamp(e, alea = Math.random) {
     if (!journal.length) journal.push(provisionsAvant === camp.Provisions ? "Une journée calme au camp." : "Une journée ordinaire au camp.");
     camp.Journal = (Array.isArray(camp.Journal) ? camp.Journal : []).concat([{ Jour: e.jour || 0, Date_Jeu: e.dateJeu || "", Lignes: journal.slice() }]).slice(-JOURNAL_JOURS);
     camp.Jours_Ecoules = (Number(camp.Jours_Ecoules) || 0) + 1;
-    return { camp, expedition: exp, journal, moraux, xp, soinsHeros, departs, evenements: ev };
+    return { camp, expedition: exp, journal, moraux, xp, soinsHeros, soinsHorsCamp, departs, evenements: ev };
 }
 
 // =========================================================================

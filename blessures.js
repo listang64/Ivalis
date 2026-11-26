@@ -14,6 +14,14 @@
 //  décide. La Commotion cérébrale sévère relance avec +4, l'Estropié total
 //  relance : la seconde blessure s'AJOUTE à la première.
 //
+//  (v496) LE TABLEAU DE NICO, ACCORDÉ AU SOIN DU CAMP : presque toutes les
+//  blessures temporaires se comptent désormais en « jours de repos au camp »
+//  (`campSeulement`) — elles ne guérissent que les jours où le héros est au
+//  camp (camp_pur.js, journeeDuCamp ; le repos et le soigneur accélèrent) ;
+//  loin du camp, seules les autres (une lèvre fendue, un coup au visage, une
+//  coupure fine) passent un jour. Les plaies ouvertes (2-5 ; 17-19 et 26-27,
+//  faces partagées) font saigner en combat (cerveau_combat.js).
+//
 //  LES DURÉES : « combats » se décompte à chaque fin de combat (victoire,
 //  défaite, ou réinitialisation d'un combat non terminé) ; « jours » quand le
 //  MJ avance le temps ; « soins » attend des soins avancés dans une grande
@@ -39,60 +47,69 @@
     // UNE LIGNE DE LA TABLE. `duree` : ce qui la fait disparaître ; `effet(inst)`
     // : ce qu'elle donne (des atouts), tant qu'elle est là.
     const TABLE = [
-        { min: 1, max: 5, id: "BLE_EGRATIGNURE", nom: "Égratignure", texte: "Une simple éraflure cutanée. Aucun effet mécanique.",
+        { min: 1, max: 1, id: "BLE_EGRATIGNURE", nom: "Égratignure", texte: "Une simple éraflure cutanée. Aucun effet mécanique.",
           duree: { instant: true } },
-        { min: 6, max: 6, id: "BLE_COUPURE_FINE", nom: "Coupure fine", texte: "Saigne légèrement mais se résorbe vite. Laisse une petite cicatrice sur le visage.",
-          visible: "une fine cicatrice pâle en travers d'une joue",
-          duree: { definitif: true }, cosmetique: true },
+        // (v496) LES PLAIES OUVERTES (Nico) : à chaque manche d'un combat, une chance de saigner (cerveau_combat.js,
+        // plaiesOuvertesDeFinDeManche). La Blessure ouverte partage les faces 17 à 19, la Grande les faces 26 et 27 :
+        // comme le 16, une pièce décide.
+        { min: 2, max: 5, id: "BLE_PETITE_PLAIE_OUVERTE", nom: "Petite blessure ouverte", texte: "La plaie se rouvre à l'effort : lors des combats, à chaque manche, 25 % de chance de subir un saignement. 9 jours de repos au camp pour disparaître.",
+          duree: { jours: 9 }, campSeulement: true, effet: () => ({ plaieOuverte: 25 }) },
+        { min: 17, max: 19, id: "BLE_PLAIE_OUVERTE", nom: "Blessure ouverte", texte: "La plaie se rouvre au moindre effort : lors des combats, à chaque manche, 50 % de chance de subir un saignement. 18 jours de repos au camp pour disparaître.",
+          duree: { jours: 18 }, campSeulement: true, effet: () => ({ plaieOuverte: 50 }) },
+        { min: 26, max: 27, id: "BLE_GRANDE_PLAIE_OUVERTE", nom: "Grande blessure ouverte", texte: "Une plaie béante qui ne se referme pas : lors des combats, à chaque manche, 75 % de chance de subir un saignement. 27 jours de repos au camp pour disparaître.",
+          duree: { jours: 27 }, campSeulement: true, effet: () => ({ plaieOuverte: 75 }) },
+        // (v496) Le tableau de Nico : « 2 jours pour guérir » (elle était définitive).
+        { min: 6, max: 6, id: "BLE_COUPURE_FINE", nom: "Coupure fine", texte: "Saigne un peu et laisse une petite cicatrice au visage ; 2 jours pour guérir.",
+          duree: { jours: 2 } },
         { min: 7, max: 7, id: "BLE_LEVRE_FENDUE", nom: "Lèvre fendue", texte: "Articulation douloureuse. Léger malus lors des interactions sociales verbales : −2 aux jets de Charisme pendant 3 jours.",
           duree: { jours: 3 }, effet: () => ({ testsCarac: { cha: -2 } }) },
-        { min: 8, max: 8, id: "BLE_COURBATURES", nom: "Courbatures extrêmes", texte: "Ne peut faire que 3 déplacements par tour lors du prochain combat.",
-          duree: { combats: 1 }, effet: () => ({ maxCasesParTour: 3 }) },
+        { min: 8, max: 8, id: "BLE_COURBATURES", nom: "Courbatures extrêmes", texte: "Ne peut faire que 3 déplacements par tour en combat. Disparaît après 3 jours de repos au camp.",
+          duree: { jours: 3 }, campSeulement: true, effet: () => ({ maxCasesParTour: 3 }) },
         { min: 9, max: 9, id: "BLE_ESSOUFFLEMENT", nom: "Essoufflement profond", texte: "Au tout prochain combat, le personnage commence exceptionnellement avec 10 de fatigue en moins.",
           duree: { combats: 1 }, effet: () => ({ fatigueDebutCombat: -10 }) },
         { min: 10, max: 10, id: "BLE_COUP_VISAGE", nom: "Coup au visage", texte: "Un œil au beurre noir ou un nez gonflé. Rien de grave, mais les PNJ civils le remarqueront : −3 aux jets de Charisme pendant 3 jours.",
           duree: { jours: 3 }, effet: () => ({ testsCarac: { cha: -3 } }) },
-        { min: 11, max: 11, id: "BLE_ENTAILLE_MUSCULAIRE", nom: "Entaille musculaire", texte: "Les muscles tirent : −1 dégât brut sur toutes les compétences de mêlée lors du prochain combat.",
-          duree: { combats: 1 }, effet: () => ({ degatsMelee: -1 }) },
-        { min: 12, max: 12, id: "BLE_COMMOTION_LEGERE", nom: "Commotion légère", texte: "Malus de −10 à l'initiative de base lors du prochain combat.",
-          duree: { combats: 1 }, effet: () => ({ initiative: -10 }) },
-        { min: 13, max: 13, id: "BLE_CHEVILLE_TORDUE", nom: "Cheville tordue", texte: "Double le coût des déplacements lors du prochain combat.",
-          duree: { combats: 1 }, effet: () => ({ coutDeplacementMult: 2 }) },
-        { min: 14, max: 14, id: "BLE_MAIN_ENDOLORIE", nom: "Main endolorie", texte: "Les articulations des doigts sont raides : les compétences magiques ou à distance coûtent 5 de fatigue de plus lors du prochain combat.",
-          duree: { combats: 1 }, effet: () => ({ coutCarteMagieDistance: 5 }) },
-        { min: 15, max: 15, id: "BLE_COTES_FELEES", nom: "Côtes fêlées", texte: "La respiration est douloureuse : le repos long rend 10 de fatigue en moins lors du prochain combat.",
-          duree: { combats: 1 }, effet: () => ({ reposLongMoins: 10 }) },
-        { min: 16, max: 16, id: "BLE_PLAIE_INFECTEE", nom: "Plaie infectée", texte: "La fièvre s'installe : les soins et les potions qu'on lui applique rendent 50 % de PV en moins durant les deux prochains combats.",
-          duree: { combats: 2 }, effet: () => ({ soinsRecus: -50 }) },
-        { min: 16, max: 16, id: "BLE_EPAULE_DEMISE", nom: "Épaule démise", texte: "L'articulation a sauté : impossible d'utiliser une arme à deux mains tant qu'on ne l'a pas remise en place, et impossible d'utiliser la deuxième main durant le prochain combat.",
-          duree: { soins: true, combats: 1 },
-          effet: (inst) => ({ interditDeuxMains: true, ...((inst && inst.combats > 0) ? { interditMainGauche: true } : {}) }) },
-        { min: 17, max: 17, id: "BLE_GENOU_AFFAIBLI", nom: "Genou affaibli", texte: "Ne peut faire que 3 déplacements par tour lors des deux prochains combats.",
-          duree: { combats: 2 }, effet: () => ({ maxCasesParTour: 3 }) },
-        { min: 18, max: 18, id: "BLE_SAIGNEMENT_PERSISTANT", nom: "Saignement persistant", texte: "La plaie se rouvre à l'effort : au début de chacun des deux prochains combats, il perd 2 PV par tour pendant 3 rounds.",
-          duree: { combats: 2 }, effet: () => ({ saignementDebut: { pv: 2, tours: 3 } }) },
-        { min: 19, max: 19, id: "BLE_TENDON_TOUCHE", nom: "Tendon touché", texte: "Perte de souplesse : −4 aux jets de Dextérité pendant 10 jours.",
-          duree: { jours: 10 }, effet: () => ({ testsCarac: { dex: -4 } }) },
-        { min: 20, max: 20, id: "BLE_DECHIRURE_MUSCULAIRE", nom: "Déchirure musculaire", texte: "Son maximum de PV est réduit de 20 % tant qu'il n'a pas reçu de soins médicaux avancés dans une grande ville.",
-          duree: { soins: true }, effet: () => ({ pvMaxPct: -20 }) },
+        { min: 11, max: 11, id: "BLE_ENTAILLE_MUSCULAIRE", nom: "Entaille musculaire", texte: "Les muscles tirent : −1 dégât brut sur toutes les compétences de mêlée en combat. 9 jours de repos au camp pour disparaître.",
+          duree: { jours: 9 }, campSeulement: true, effet: () => ({ degatsMelee: -1 }) },
+        { min: 12, max: 12, id: "BLE_COMMOTION_LEGERE", nom: "Commotion légère", texte: "Malus de −10 à l'initiative de base en combat. 10 jours de repos au camp pour disparaître.",
+          duree: { jours: 10 }, campSeulement: true, effet: () => ({ initiative: -10 }) },
+        { min: 13, max: 13, id: "BLE_CHEVILLE_TORDUE", nom: "Cheville tordue", texte: "Double le coût des déplacements en combat. 15 jours de repos au camp pour disparaître.",
+          duree: { jours: 15 }, campSeulement: true, effet: () => ({ coutDeplacementMult: 2 }) },
+        { min: 14, max: 14, id: "BLE_MAIN_ENDOLORIE", nom: "Main endolorie", texte: "Les articulations des doigts sont raides : les compétences magiques ou à distance coûtent 5 de fatigue de plus en combat. 3 jours de repos au camp pour disparaître.",
+          duree: { jours: 3 }, campSeulement: true, effet: () => ({ coutCarteMagieDistance: 5 }) },
+        { min: 15, max: 15, id: "BLE_COTES_FELEES", nom: "Côtes fêlées", texte: "La respiration est douloureuse : le repos long rend 10 de fatigue en moins en combat. 20 jours de repos au camp pour disparaître.",
+          duree: { jours: 20 }, campSeulement: true, effet: () => ({ reposLongMoins: 10 }) },
+        { min: 16, max: 16, id: "BLE_PLAIE_INFECTEE", nom: "Plaie infectée", texte: "La fièvre s'installe : les soins et les potions qu'on lui applique rendent 50 % de PV en moins en combat. 10 jours de repos au camp pour disparaître.",
+          duree: { jours: 10 }, campSeulement: true, effet: () => ({ soinsRecus: -50 }) },
+        { min: 16, max: 16, id: "BLE_EPAULE_DEMISE", nom: "Épaule démise", texte: "L'articulation a sauté : pas d'arme à deux mains, pas de deuxième main en combat. 6 jours de repos au camp pour disparaître.",
+          duree: { jours: 6 }, campSeulement: true,
+          effet: () => ({ interditDeuxMains: true, interditMainGauche: true }) },
+        { min: 17, max: 17, id: "BLE_GENOU_AFFAIBLI", nom: "Genou affaibli", texte: "Ne peut faire que 3 déplacements par tour en combat. 15 jours de repos au camp pour disparaître.",
+          duree: { jours: 15 }, campSeulement: true, effet: () => ({ maxCasesParTour: 3 }) },
+        { min: 18, max: 18, id: "BLE_SAIGNEMENT_PERSISTANT", nom: "Saignement persistant", texte: "La plaie se rouvre à l'effort : au début de chaque combat, il perd 2 PV par tour pendant 3 rounds. 20 jours de repos au camp pour disparaître.",
+          duree: { jours: 20 }, campSeulement: true, effet: () => ({ saignementDebut: { pv: 2, tours: 3 } }) },
+        { min: 19, max: 19, id: "BLE_TENDON_TOUCHE", nom: "Tendon touché", texte: "Perte de souplesse : −4 aux jets de Dextérité. 10 jours de repos au camp pour disparaître.",
+          duree: { jours: 10 }, campSeulement: true, effet: () => ({ testsCarac: { dex: -4 } }) },
+        { min: 20, max: 20, id: "BLE_DECHIRURE_MUSCULAIRE", nom: "Déchirure musculaire", texte: "Son maximum de PV est réduit de 20 %. 20 jours de repos au camp pour disparaître.",
+          duree: { jours: 20 }, campSeulement: true, effet: () => ({ pvMaxPct: -20 }) },
         { min: 21, max: 21, id: "BLE_TYMPAN_CREVE", nom: "Tympan crevé", texte: "Surdité partielle d'une oreille : −5 aux jets de Sagesse (perception), définitivement.",
           duree: { definitif: true }, effet: () => ({ testsCarac: { sag: -5 } }) },
-        { min: 22, max: 22, id: "BLE_POIGNET_FRACTURE", nom: "Poignet fracturé", texte: "Impossible d'équiper un bouclier ou une arme à deux mains (l'Art de la parade se tait) tant qu'il n'a pas reçu de soins médicaux avancés dans une grande ville.",
-          duree: { soins: true }, effet: () => ({ interditBouclier: true, interditDeuxMains: true }) },
-        { min: 23, max: 23, id: "BLE_CHOC_CRANIEN", nom: "Choc crânien (Amnésie)", texte: "Le contrecoup a été violent : le personnage « oublie » comment utiliser deux de ses compétences durant les deux prochains combats.",
-          duree: { combats: 2 }, oublieCartes: 2, effet: (inst) => ({ cartesOubliees: [...((inst && inst.cartes) || [])] }) },
-        { min: 24, max: 24, id: "BLE_TRAUMATISME_OCULAIRE", nom: "Traumatisme oculaire", texte: "Vision floue : −20 % d'esquive durant les trois prochains combats.",
-          duree: { combats: 3 }, effet: () => ({ esquive: -20 }) },
-        { min: 25, max: 25, id: "BLE_BRULURE_ETENDUE", nom: "Brûlure superficielle étendue", texte: "Les cloques et les pansements interdisent le port d'une armure lourde ou moyenne tant qu'il n'a pas reçu de soins médicaux dans une grande ville.",
-          duree: { soins: true }, effet: () => ({ interditArmureLourde: true }) },
-        { min: 26, max: 26, id: "BLE_BRAS_FRACTURE", nom: "Bras fracturé", texte: "−2 dégâts au corps à corps durant les deux prochains combats.",
-          duree: { combats: 2 }, effet: () => ({ degatsMelee: -2 }) },
-        { min: 27, max: 27, id: "BLE_JAMBE_FRACTUREE", nom: "Jambe fracturée", texte: "Deux déplacements par tour au maximum durant les deux prochains combats.",
-          duree: { combats: 2 }, effet: () => ({ maxCasesParTour: 2 }) },
+        { min: 22, max: 22, id: "BLE_POIGNET_FRACTURE", nom: "Poignet fracturé", texte: "Impossible d'équiper un bouclier ou une arme à deux mains (l'Art de la parade se tait). 26 jours de repos au camp pour disparaître.",
+          duree: { jours: 26 }, campSeulement: true, effet: () => ({ interditBouclier: true, interditDeuxMains: true }) },
+        { min: 23, max: 23, id: "BLE_CHOC_CRANIEN", nom: "Choc crânien (Amnésie)", texte: "Le contrecoup a été violent : le personnage « oublie » comment utiliser deux de ses compétences en combat. 25 jours de repos au camp pour disparaître.",
+          duree: { jours: 25 }, campSeulement: true, oublieCartes: 2, effet: (inst) => ({ cartesOubliees: [...((inst && inst.cartes) || [])] }) },
+        { min: 24, max: 24, id: "BLE_TRAUMATISME_OCULAIRE", nom: "Traumatisme oculaire", texte: "Vision floue : −20 % d'esquive en combat. 24 jours de repos au camp pour disparaître.",
+          duree: { jours: 24 }, campSeulement: true, effet: () => ({ esquive: -20 }) },
+        { min: 25, max: 25, id: "BLE_BRULURE_ETENDUE", nom: "Brûlure superficielle étendue", texte: "Les cloques et les pansements interdisent le port d'une armure lourde ou moyenne. 40 jours de repos au camp pour disparaître.",
+          duree: { jours: 40 }, campSeulement: true, effet: () => ({ interditArmureLourde: true }) },
+        { min: 26, max: 26, id: "BLE_BRAS_FRACTURE", nom: "Bras fracturé", texte: "−2 dégâts au corps à corps en combat. 30 jours de repos au camp pour disparaître.",
+          duree: { jours: 30 }, campSeulement: true, effet: () => ({ degatsMelee: -2 }) },
+        { min: 27, max: 27, id: "BLE_JAMBE_FRACTUREE", nom: "Jambe fracturée", texte: "Deux déplacements par tour au maximum en combat. 36 jours de repos au camp pour disparaître.",
+          duree: { jours: 36 }, campSeulement: true, effet: () => ({ maxCasesParTour: 2 }) },
         { min: 28, max: 28, id: "BLE_COMMOTION_SEVERE", nom: "Commotion cérébrale sévère", texte: "Relance sur la table des blessures avec +4 : la blessure qui suit s'ajoute.",
           duree: { instant: true }, relance: 4 },
-        { min: 29, max: 29, id: "BLE_HEMORRAGIE_INTERNE", nom: "Hémorragie interne", texte: "Bouger aggrave la blessure : il perd 2 PV pour chaque hexagone traversé durant les deux prochains combats.",
-          duree: { combats: 2 }, effet: () => ({ perteParCase: 2 }) },
+        { min: 29, max: 29, id: "BLE_HEMORRAGIE_INTERNE", nom: "Hémorragie interne", texte: "Bouger aggrave la blessure : il perd 2 PV pour chaque hexagone traversé en combat. 50 jours de repos au camp pour disparaître.",
+          duree: { jours: 50 }, campSeulement: true, effet: () => ({ perteParCase: 2 }) },
         { min: 30, max: 30, id: "BLE_POUMON_PERFORE", nom: "Poumon perforé", texte: "Le souffle est court pour toujours : la jauge de fatigue est définitivement réduite de 10.",
           duree: { definitif: true }, effet: () => ({ fatigueMax: -10 }) },
         { min: 31, max: 31, id: "BLE_VEINARD", nom: "Veinard", texte: "Tu as eu de la chance : −7 sur ton prochain jet de blessure.",
@@ -111,22 +128,22 @@
           duree: { definitif: true }, effet: () => ({ testsCarac: { cha: -7 } }) },
         { min: 36, max: 36, id: "BLE_LESION_ORGANE", nom: "Lésion d'un organe vital", texte: "Le métabolisme tourne au ralenti : le repos long en combat ne restaure plus que 15 % de fatigue.",
           duree: { definitif: true }, effet: () => ({ reposLongTaux: 15 }) },
-        { min: 37, max: 37, id: "BLE_AMPUTATION_MAIN", nom: "Amputation d'une main", texte: "La main est perdue : le port d'équipements à deux mains devient impossible.",
+        { min: 37, max: 37, id: "BLE_AMPUTATION_MAIN", nom: "Amputation d'une main", texte: "La main est perdue : plus d'équipement à deux mains, ni d'arme, de bouclier ou de bague en main gauche, définitivement.",
           visible: "un avant-bras qui s'arrête au poignet, le moignon serré dans un bandage de cuir",
-          duree: { definitif: true }, effet: () => ({ interditDeuxMains: true }) },
+          duree: { definitif: true }, effet: () => ({ interditDeuxMains: true, interditMainGauche: true }) },
         { min: 38, max: 38, id: "BLE_AMPUTATION_PIED", nom: "Amputation d'une partie du pied", texte: "Le personnage ne peut plus se déplacer de plus de 3 hexagones par tour, à vie.",
           duree: { definitif: true }, effet: () => ({ maxCasesParTour: 3 }) },
-        { min: 39, max: 39, id: "BLE_AMPUTATION_BRAS", nom: "Amputation du bras entier", texte: "Impossible de tenir de l'équipement nécessitant deux mains.",
+        { min: 39, max: 39, id: "BLE_AMPUTATION_BRAS", nom: "Amputation du bras entier", texte: "Plus d'équipement à deux mains, ni d'arme, de bouclier ou de bague en main gauche, définitivement.",
           visible: "un bras amputé à l'épaule, la manche vide nouée ou le moignon bandé",
-          duree: { definitif: true }, effet: () => ({ interditDeuxMains: true }) },
+          duree: { definitif: true }, effet: () => ({ interditDeuxMains: true, interditMainGauche: true }) },
         { min: 40, max: 40, id: "BLE_CHOC_CARDIAQUE", nom: "Choc cardiaque (Fragilité)", texte: "Le personnage survit par miracle, mais sa jauge de fatigue est réduite de 50 % définitivement, et sa régénération est fixée à 30 de fatigue.",
           duree: { definitif: true }, effet: () => ({ fatigueMaxPct: -50, regenFixe: 30 }) },
-        { min: 41, max: 41, id: "BLE_TRAUMATISME_CRANIEN", nom: "Traumatisme crânien profond", texte: "Le personnage survit mais reste inconscient pendant 3 mois. Le joueur doit utiliser un autre personnage en attendant.",
-          duree: { jours: 90 }, indisponible: true },
+        { min: 41, max: 41, id: "BLE_TRAUMATISME_CRANIEN", nom: "Traumatisme crânien profond", texte: "Le personnage survit mais reste inconscient 90 jours au camp. Le joueur doit jouer un autre personnage en attendant.",
+          duree: { jours: 90 }, campSeulement: true, indisponible: true },
         { min: 42, max: 42, id: "BLE_LESION_COLONNE", nom: "Lésion de la colonne vertébrale", texte: "Paralysie partielle : le mouvement sur la carte est strictement bloqué à 1 seul hexagone par round.",
           duree: { definitif: true }, effet: () => ({ maxCasesParTour: 1 }) },
-        { min: 43, max: 43, id: "BLE_ESTROPIE_TOTAL", nom: "Estropié total", texte: "Combinaison de plusieurs fractures graves : 5 mois de convalescence absolue, incapable de combattre. Relance un jet de blessure.",
-          duree: { jours: 150 }, indisponible: true, relance: 0 },
+        { min: 43, max: 43, id: "BLE_ESTROPIE_TOTAL", nom: "Estropié total", texte: "Combinaison de plusieurs fractures graves : 150 jours de convalescence au camp, incapable de partir en expédition. Relance un jet de blessure.",
+          duree: { jours: 150 }, campSeulement: true, indisponible: true, relance: 0 },
         { min: 44, max: 44, id: "BLE_MUTILATION_MULTIPLE", nom: "Mutilation multiple", texte: "Son maximum de PV est réduit de 40 % à vie.",
           visible: "de nombreuses cicatrices profondes et mal refermées sur les bras, le cou et le visage",
           duree: { definitif: true }, effet: () => ({ pvMaxPct: -40 }) },
@@ -213,7 +230,9 @@
     const gueri = (e) => !e.definitif && !e.soins && !e.prochainJet && !((e.combats || 0) > 0) && !((e.jours || 0) > 0);
     window.blessuresApresCombat = (liste) => (liste || []).map(e => ({ ...e, ...((e.combats || 0) > 0 ? { combats: e.combats - 1 } : {}) }))
         .map(e => { if (e.combats === 0) delete e.combats; return e; }).filter(e => !gueri(e));
-    window.blessuresApresJours = (liste, jours) => (liste || []).map(e => ({ ...e, ...((e.jours || 0) > 0 ? { jours: Math.max(0, e.jours - Math.max(0, jours || 0)) } : {}) }))
+    // (v496) « X jours de repos au camp » : `o.horsCamp` (un héros loin du camp, en expédition) ne décompte que les
+    // blessures qui guérissent n'importe où (une lèvre fendue, un coup au visage).
+    window.blessuresApresJours = (liste, jours, o = {}) => (liste || []).map(e => ({ ...e, ...((e.jours || 0) > 0 && !(o.horsCamp && (window.blessureParId(e.id) || {}).campSeulement) ? { jours: Math.max(0, e.jours - Math.max(0, jours || 0)) } : {}) }))
         .map(e => { if (e.jours === 0) delete e.jours; return e; }).filter(e => !gueri(e));
     window.blessuresApresSoins = (liste, uid) => (liste || []).map(e => (e.uid === uid ? (() => { const x = { ...e }; delete x.soins; return x; })() : e))
         .filter(e => !gueri(e));
@@ -249,7 +268,7 @@
             Object.keys(a).forEach(k => {
                 const v = a[k];
                 if (k === "maxCasesParTour" || k === "reposLongTaux") r[k] = r[k] === undefined ? v : Math.min(r[k], v);
-                else if (k === "coutDeplacementMult" || k === "regenFixe") r[k] = Math.max(r[k] || 0, v);
+                else if (k === "coutDeplacementMult" || k === "regenFixe" || k === "plaieOuverte") r[k] = Math.max(r[k] || 0, v);
                 else if (k === "saignementDebut") {
                     const s = r[k] || { pv: 0, tours: 0 };
                     r[k] = { pv: Math.max(s.pv, v.pv), tours: Math.max(s.tours, v.tours) };

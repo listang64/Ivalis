@@ -297,7 +297,9 @@ export function combattantDepuisFiche(fiche, position, regles, options) {
         perteParCase: nombre(race.perteParCase),
         regenFixe: nombre(race.regenFixe),
         reposLongTaux: nombre(race.reposLongTaux),
-        reposLongMoins: nombre(race.reposLongMoins)
+        reposLongMoins: nombre(race.reposLongMoins),
+        // (v496) Une plaie ouverte : sa chance (%) de saigner à chaque manche (cerveau_combat.js, plaiesOuvertesDeFinDeManche).
+        plaieOuverte: nombre(race.plaieOuverte)
     };
     const mod = {
         // Ce que l'ÉQUIPEMENT change EN PERMANENCE, hors états altérés : le

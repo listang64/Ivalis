@@ -260,11 +260,18 @@ window.decompterJoursBlessures = async function (jours) {
     const n = Math.max(0, parseInt(jours) || 0);
     if (n <= 0) return 0;
     let ecrits = 0;
+    // (v496) Avec un camp : « X jours de repos au camp » — un héros parti en expédition ne guérit que de ce qui
+    // guérit n'importe où ; au camp, de tout.
+    const camp = window.CAMP && window.CAMP.lire ? window.CAMP.lire() : null;
+    const exp = (window.PARTIE_DATA || {}).Expedition;
+    const auLoin = new Set(camp && exp && exp.En_Cours ? (exp.Membres || []) : []);
     for (const p of (window.PERSOS_JOUEURS_PARTIE || [])) {
         if (!p || p.estIllusion) continue;
         const avant = window.blessuresDuPerso(p);
         if (!avant.some(b => (b.jours || 0) > 0)) continue;
-        try { await ecrireFiche(p.idPersonnage, { Blessures: window.blessuresApresJours(avant, n) }); ecrits++; }
+        const apres = window.blessuresApresJours(avant, n, { horsCamp: auLoin.has(p.idPersonnage) });
+        if (JSON.stringify(apres) === JSON.stringify(avant)) continue;
+        try { await ecrireFiche(p.idPersonnage, { Blessures: apres }); ecrits++; }
         catch (e) { console.error(`Blessures (jours) de ${p.idPersonnage} :`, e); }
     }
     return ecrits;
