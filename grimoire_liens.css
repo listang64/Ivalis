@@ -104,3 +104,11 @@
   background: rgba(179, 38, 30, 0.06) !important; border: 1.5px solid #b3261e !important; border-radius: 999px; color: #b3261e !important;
   font-family: 'Cinzel', serif; font-size: calc(var(--u) * 2.8); letter-spacing: 0.05em; }
 .supprimer-pnj-liens:hover { background: rgba(179, 38, 30, 0.14) !important; }
+/* (v497) Les liens forts : amour (rouge), amitié profonde (doré). */
+.legende-liens .fil.amour { background: #b3121b; }
+.legende-liens .fil.amitie { background: #b8862a; }
+.coeur-liens { margin: calc(var(--u, 4px) * 0.6) 0; font-family: 'Almendra', serif; font-size: calc(var(--u, 4px) * 3); }
+.coeur-liens.amour { color: #b3121b; }
+.coeur-liens.amitie { color: #8a6418; }
+.coeur-liens.palier { color: #6b5536; font-style: italic; }
+

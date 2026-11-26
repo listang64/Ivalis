@@ -24,8 +24,8 @@
 //  première impression (la réputation du lieu, sa personnalité).
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
-import { collection, query, where, getDocs, doc, getDoc, setDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as P from "./social_pur.js?v=6";
+import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, writeBatch, deleteDoc, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import * as P from "./social_pur.js?v=7";
 
 const PARTIES = "Systeme_Parties";
 const refAme = (p, id) => doc(db, PARTIES, p, "Ames", id);
@@ -317,6 +317,7 @@ RÈGLES :
 - Ce qu'un personnage n'a ni vu ni appris ne change rien pour lui. S'il l'APPREND parce qu'on le lui raconte dans la scène (« Syrinx raconte à Thalia que Tartuf l'a sauvée »), c'est l'action « raconter » : acteur = celui qui raconte, cible = celui qui écoute, et « rapporte » = l'acte raconté (son auteur, son type, sa cible).
 - Quand un personnage prend parti contre un autre ou le contredit ouvertement (il défend les aventuriers contre Mael, il désavoue un ordre de Mael devant tous), ajoute « s_opposer » de lui envers celui qu'il contredit : c'est ce dernier qui le vit mal, jamais l'inverse. Vérifie toujours le sens : l'acteur est celui qui agit, la cible celui qui subit.
 - « extrait » : quatre à huit mots EXACTS du texte où cela se passe (celui du Maître du Jeu de préférence).
+- L'attirance se découvre, rarement : un geste tendre, un regard troublé, une main gardée un peu trop longtemps → « geste_tendre » ; des avances (une invitation, un compliment appuyé) → « courtiser » ; des avances repoussées → « repousser » (acteur = celui qui repousse). Ne les invente jamais : seulement quand le texte le montre.
 - Six événements au plus ; s'il ne s'est rien passé entre eux, une liste vide.
 - Souvenirs : pour chaque PNJ marqué par la scène, UNE phrase à la première personne (ce qu'il en retiendra), et de qui elle parle.
 - Ne donne JAMAIS de chiffre de relation.
@@ -479,6 +480,9 @@ export async function tourSocial(o) {
     lot.set(refEtat(p), fin, { merge: true });
     await lot.commit();
     resultat.changements = calcul.changements;
+    // (v497) Les liens qui viennent de bouger : un lien fort se scelle, s'éteint ou se brise.
+    try { resultat.liensForts = await verifierLiensForts(p, [...touches], { ames: calcul.etat.ames, liens: calcul.etat.liens }); }
+    catch (e) { console.warn("[Fils invisibles] Les liens forts :", e); }
     journal(`Tour ${tour} : ${calcul.evenements.length} événement(s), ${touches.size} lien(s) changé(s), ${resultat.souvenirs.length} souvenir(s).`);
     // (v428) Un journal trop plein passe dans la mémoire à long terme (derrière, sans attendre).
     resultat.memoire = consoliderSiBesoin(p, resultat.souvenirs.map(sv => sv.ame));
@@ -639,6 +643,7 @@ export async function ajusterLien(p, de, vers, valeurs) {
     lot.set(refEtat(p), { compteur: numero }, { merge: true });
     await lot.commit();
     journal(`${resume} (${de} → ${vers})`);
+    try { await verifierLiensForts(p, [P.cleLien(de, vers)]); } catch (e) { console.warn("[Fils invisibles] Les liens forts :", e); }
     return { numero, changements };
 }
 
@@ -669,6 +674,7 @@ export async function ajusterLiensDuCamp(p, ecarts, resume) {
     lot.set(refEvenement(p, numero), { numero, tour: P.nombre(e.tour), message: "", type: "camp", acteur: "", cible: "", gravite: 1, discret: true, resume: texte, temoins: [], changements, annule: false, par: "camp", Le: Date.now() });
     lot.set(refEtat(p), { compteur: numero }, { merge: true });
     await lot.commit();
+    try { await verifierLiensForts(p, [...new Set(changements.map(c => P.cleLien(c.de, c.vers)))]); } catch (er) { console.warn("[Fils invisibles] Les liens forts :", er); }
     return changements.length;
 }
 
@@ -731,6 +737,8 @@ export async function contexteDuMJ(o) {
         const sv = meilleursSouvenirs(souvenirs[x.id] || [], ids, detail ? 5 : 2).filter(() => total < 8);
         if (sv.length) { total += sv.length; t += `  Ses souvenirs : ${sv.map(z => `${z.dateJeu ? `[${z.dateJeu}] ` : ""}« ${z.texte} »`).join(" ")}\n`; }
     });
+    // (v497) LES CŒURS : les liens forts entre les présents, et ce qui vient de changer (à jouer avec pudeur).
+    t += await coeursDuMJ(p, ids, nom, etatSocial);
     // LES ENVIES : au plus deux, le MJ en joue au plus une ; jamais le même PNJ deux tours de suite.
     const envies = P.initiatives({ ames, liens }, ids, { tour, max: 2, dernieres: etatSocial.dernieresInitiatives || [] });
     if (envies.length) {
@@ -772,5 +780,172 @@ export async function apresLeTour(o) {
     catch (e) { console.error("[Fils invisibles] Le tour social :", e); return null; }
 }
 
-window.SOCIAL = { ...P, ajusterLiensDuCamp, elaguerSouvenirs, MAX_SOUVENIRS, consoliderMemoire, consoliderSiBesoin, noterSouvenir, promptMemoire, SEUIL_MEMOIRE, LOT_MEMOIRE, contexteDuMJ, caractere, lireReseau, lireSouvenirsDe, annulerEvenement, ajusterLien, estAdminSocial, lireAmes, lireLiens, lireLiensVers, naissancePnj, assurerAmes, marquerMort, oublierAme, supprimerPnj, apresLeTour, tourSocial, paragrapheDe, lignesDeMarge,
+// =========================================================================
+//  (v497) LES LIENS FORTS : L'AMITIÉ PROFONDE ET L'AMOUR (social_pur.js, evolutionLienFort)
+// =========================================================================
+//  · un PNJ : son lien se scelle tout seul quand il devient « très proche » (un souvenir, un moment pour le narrateur) ;
+//  · un héros : son joueur décide (Liens_Proposes, sur la partie : un post-it, liens_forts.js) ; quand un PNJ s'attache
+//    à un héros, le joueur de ce héros est invité à dire ce que son héros ressent ;
+//  · deux héros : une déclaration (Declarations_Liens) que l'autre joueur accepte ou refuse ; jamais défaite toute seule ;
+//  · une trahison, un abandon… : le lien fort se brise ; un amour sans attirance s'éteint en amitié.
+const refPartie = (p) => doc(db, PARTIES, p);
+const nomAme = (ames, id) => (ames[id] && ames[id].nom) || id;
+async function joueurDuHeros(id) {
+    const h = (window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || []).find(x => x && x.idPersonnage === id);
+    if (h && h.idJoueur) return h.idJoueur;
+    try { const s = await getDoc(doc(db, "Personnages", id)); return s.exists() ? (s.data().ID_Joueur || "") : ""; } catch (e) { return ""; }
+}
+export async function verifierLiensForts(p, cles, connu = {}) {
+    if (!p || !(cles || []).length) return [];
+    const liens = { ...(connu.liens || {}) }, ames = { ...(connu.ames || {}) };
+    const ids = new Set();
+    for (const k of cles) {
+        if (!liens[k]) { const s = await getDoc(doc(db, PARTIES, p, "Liens", k)); if (s.exists()) liens[k] = s.data(); }
+        const l = liens[k]; if (l) { ids.add(l.de); ids.add(l.vers); }
+    }
+    const manquantes = [...ids].filter(id => !ames[id]);
+    if (manquantes.length) Object.assign(ames, await lireAmes(p, manquantes));
+    const faits = [], moments = [], propositions = {}, lot = writeBatch(db);
+    let ecrit = false;
+    for (const k of cles) {
+        const l = liens[k];
+        if (!l || !ames[l.de] || ames[l.de].statut === "mort" || (ames[l.vers] || {}).statut === "mort") continue;
+        const ev = P.evolutionLienFort(l, ames);
+        if (!ev.action) continue;
+        const nD = nomAme(ames, l.de), nV = nomAme(ames, l.vers), maintenant = Date.now();
+        if (ev.action === "proposer") {
+            if (l.propose || l.refuse) continue;   // déjà demandé (ou décliné) : on ne harcèle pas le joueur
+            const joueur = await joueurDuHeros(l.de);
+            if (!joueur) continue;
+            propositions[k] = { de: l.de, vers: l.vers, nomDe: nD, nomVers: nV, joueur, amourPossible: !P.estNarrateur(l.vers, ames[l.vers]), le: maintenant };
+            lot.set(doc(db, PARTIES, p, "Liens", k), { propose: { le: maintenant } }, { merge: true }); ecrit = true;
+            faits.push({ cle: k, action: "proposer" });
+            continue;
+        }
+        if (ev.action === "sceller") {
+            lot.set(doc(db, PARTIES, p, "Liens", k), { fort: { type: ev.type, le: maintenant } }, { merge: true });
+            lot.set(doc(db, PARTIES, p, "Souvenirs", `fort_${k}_${maintenant}`), { ame: l.de, sujets: [l.vers], importance: 3, tour: 0, Le: maintenant,
+                texte: ev.type === "amour" ? `Je crois que j'aime ${nV}.` : `${nV} compte pour moi comme un frère ou une sœur d'armes.` });
+            // Le héros que ce PNJ aime ou chérit : son joueur dit ce que son héros ressent, s'il ne l'a pas déjà dit.
+            if ((ames[l.vers] || {}).type === "heros") {
+                const inv = P.cleLien(l.vers, l.de), li = liens[inv] || (await getDoc(doc(db, PARTIES, p, "Liens", inv))).data() || null;
+                if (!(li && (li.fort || li.propose || li.refuse))) {
+                    const joueur = await joueurDuHeros(l.vers);
+                    if (joueur) {
+                        propositions[inv] = { de: l.vers, vers: l.de, nomDe: nV, nomVers: nD, joueur, amourPossible: !P.estNarrateur(l.de, ames[l.de]),
+                            parce: ev.type === "amour" ? `${nD} est tombé·e amoureux·se de ${nV}.` : `${nD} tient profondément à ${nV}.`, le: maintenant };
+                        lot.set(doc(db, PARTIES, p, "Liens", inv), { de: l.vers, vers: l.de, propose: { le: maintenant } }, { merge: true });
+                    }
+                }
+            }
+        } else if (ev.action === "rompre") {
+            lot.set(doc(db, PARTIES, p, "Liens", k), { fort: deleteField(), rupture: { type: ev.type, le: maintenant } }, { merge: true });
+            if ((ames[l.de] || {}).type === "pnj") lot.set(doc(db, PARTIES, p, "Souvenirs", `rupture_${k}_${maintenant}`), { ame: l.de, sujets: [l.vers], importance: 3, tour: 0, Le: maintenant,
+                texte: `Ce qui me liait à ${nV} s'est brisé.` });
+        } else if (ev.action === "eteindre") {
+            lot.set(doc(db, PARTIES, p, "Liens", k), { fort: { type: "amitie", le: maintenant } }, { merge: true });
+        }
+        ecrit = true;
+        moments.push({ texte: P.momentDuLien(nD, nV, ev.action, ev.type), ids: [l.de, l.vers], le: maintenant });
+        faits.push({ cle: k, action: ev.action, type: ev.type });
+    }
+    if (Object.keys(propositions).length) { lot.set(refPartie(p), { Liens_Proposes: propositions }, { merge: true }); ecrit = true; }
+    if (moments.length) {
+        const e = (await getDoc(refEtat(p))).data() || {};
+        lot.set(refEtat(p), { momentsLiens: [...(e.momentsLiens || []), ...moments].slice(-8) }, { merge: true }); ecrit = true;
+    }
+    if (ecrit) await lot.commit();
+    if (faits.length) journal(`Liens forts : ${faits.map(f => `${f.cle} ${f.action}${f.type ? " (" + f.type + ")" : ""}`).join(", ")}.`);
+    return faits;
+}
+// Le joueur répond pour son héros : « amitie », « amour » ou « rien » (garder les choses comme elles sont).
+export async function repondreProposition(p, cle, choix) {
+    const s = await getDoc(refPartie(p));
+    const pr = ((s.exists() ? s.data() : {}).Liens_Proposes || {})[cle];
+    if (!pr) return "Cette proposition n'existe plus.";
+    const lot = writeBatch(db), maintenant = Date.now();
+    if (choix === "amour" && !pr.amourPossible) return "Ce lien ne peut pas être un amour.";
+    if (choix === "amitie" || choix === "amour") {
+        lot.set(doc(db, PARTIES, p, "Liens", cle), { de: pr.de, vers: pr.vers, fort: { type: choix, le: maintenant, choisi: true }, propose: deleteField() }, { merge: true });
+        const e = (await getDoc(refEtat(p))).data() || {};
+        lot.set(refEtat(p), { momentsLiens: [...(e.momentsLiens || []), { texte: P.momentDuLien(pr.nomDe, pr.nomVers, "sceller", choix), ids: [pr.de, pr.vers], le: maintenant }].slice(-8) }, { merge: true });
+    } else lot.set(doc(db, PARTIES, p, "Liens", cle), { de: pr.de, vers: pr.vers, refuse: true, propose: deleteField() }, { merge: true });
+    lot.update(refPartie(p), { ["Liens_Proposes." + cle]: deleteField() });
+    await lot.commit();
+    return "";
+}
+// Entre deux héros : déclarer (le joueur de `de`), accepter ou refuser (le joueur de `vers`), défaire (l'un ou l'autre).
+export async function declarerLien(p, de, vers, type) {
+    if (!P.TYPES_LIENS_FORTS[type]) return "Amitié profonde ou amour ?";
+    const [jDe, jVers] = await Promise.all([joueurDuHeros(de), joueurDuHeros(vers)]);
+    if (!jDe || !jVers) return "Ce lien ne se déclare qu'entre deux héros de joueurs.";
+    const ames = await lireAmes(p, [de, vers]);
+    await updateDoc(refPartie(p), { ["Declarations_Liens." + P.cleLien(de, vers)]: { de, vers, type, par: jDe, pour: jVers, nomDe: nomAme(ames, de), nomVers: nomAme(ames, vers), le: Date.now() } });
+    return "";
+}
+export async function repondreDeclaration(p, cle, accepte) {
+    const s = await getDoc(refPartie(p));
+    const d = ((s.exists() ? s.data() : {}).Declarations_Liens || {})[cle];
+    if (!d) return "Cette déclaration n'existe plus.";
+    const lot = writeBatch(db), maintenant = Date.now();
+    if (accepte) {
+        [[d.de, d.vers], [d.vers, d.de]].forEach(([a, b]) => lot.set(doc(db, PARTIES, p, "Liens", P.cleLien(a, b)),
+            { de: a, vers: b, declare: true, fort: { type: d.type, le: maintenant, choisi: true } }, { merge: true }));
+        const e = (await getDoc(refEtat(p))).data() || {};
+        lot.set(refEtat(p), { momentsLiens: [...(e.momentsLiens || []), { texte: d.type === "amour" ? `${d.nomDe} et ${d.nomVers} s'aiment : ils l'ont choisi tous deux.` : `${d.nomDe} et ${d.nomVers} sont désormais liés d'une amitié profonde.`, ids: [d.de, d.vers], le: maintenant }].slice(-8) }, { merge: true });
+    }
+    lot.update(refPartie(p), { ["Declarations_Liens." + cle]: deleteField() });
+    await lot.commit();
+    return "";
+}
+export async function defaireLien(p, de, vers) {
+    const lot = writeBatch(db), maintenant = Date.now();
+    const k = P.cleLien(de, vers), inv = P.cleLien(vers, de);
+    const l = (await getDoc(doc(db, PARTIES, p, "Liens", k))).data() || {};
+    lot.set(doc(db, PARTIES, p, "Liens", k), { fort: deleteField(), rupture: { type: (l.fort || {}).type || "", le: maintenant } }, { merge: true });
+    if (l.declare) lot.set(doc(db, PARTIES, p, "Liens", inv), { fort: deleteField(), rupture: { type: (l.fort || {}).type || "", le: maintenant } }, { merge: true });
+    await lot.commit();
+    return "";
+}
+// Tous les liens forts de la partie (la fiche, la gestion du camp, le réseau).
+export async function lireLiensForts(p) {
+    if (!p) return [];
+    const out = [];
+    (await getDocs(query(colLiens(p), where("fort.type", "in", Object.keys(P.TYPES_LIENS_FORTS))))).forEach(d => out.push({ id: d.id, ...d.data() }));
+    return out;
+}
+// Ce que le narrateur lit : les liens forts entre les présents, et les moments à jouer (une fois chacun).
+async function coeursDuMJ(p, ids, nom, etatSocial) {
+    const ici = new Set(ids);
+    let forts = [];
+    try { forts = (await lireLiensForts(p)).filter(l => ici.has(l.de) && ici.has(l.vers)); } catch (e) {}
+    const moments = (etatSocial.momentsLiens || []).filter(m => (m.ids || []).some(id => ici.has(id)));
+    if (!forts.length && !moments.length) return "";
+    let t = `
+--- LES CŒURS (amitiés profondes et amours) ---
+`;
+    if (forts.length) {
+        const vus = new Set();
+        forts.forEach(l => {
+            const inv = forts.find(x => x.de === l.vers && x.vers === l.de && x.fort.type === l.fort.type);
+            const cle = [l.de, l.vers].sort().join("~");
+            if (inv && vus.has(cle)) return;
+            vus.add(cle);
+            t += inv ? `- ${nom(l.de)} et ${nom(l.vers)} : ${l.fort.type === "amour" ? "ils s'aiment" : "une amitié profonde"}.
+`
+                     : `- ${nom(l.de)} ${l.fort.type === "amour" ? "aime" : "tient profondément à"} ${nom(l.vers)} (pas forcément réciproque${l.fort.type === "amour" ? " ; il·elle ne l'a peut-être pas dit" : ""}).
+`;
+        });
+        t += `Joue ces liens avec pudeur et constance (gestes, regards, inquiétude pour l'autre) ; jamais de scène explicite.
+`;
+    }
+    if (moments.length) {
+        t += moments.map(m => `- À l'instant : ${m.texte}`).join("\n") + "\n";
+        const reste = (etatSocial.momentsLiens || []).filter(m => !moments.includes(m));
+        try { await setDoc(refEtat(p), { momentsLiens: reste }, { merge: true }); } catch (e) {}
+    }
+    return t;
+}
+
+window.SOCIAL = { ...P, verifierLiensForts, repondreProposition, declarerLien, repondreDeclaration, defaireLien, lireLiensForts, ajusterLiensDuCamp, elaguerSouvenirs, MAX_SOUVENIRS, consoliderMemoire, consoliderSiBesoin, noterSouvenir, promptMemoire, SEUIL_MEMOIRE, LOT_MEMOIRE, contexteDuMJ, caractere, lireReseau, lireSouvenirsDe, annulerEvenement, ajusterLien, estAdminSocial, lireAmes, lireLiens, lireLiensVers, naissancePnj, assurerAmes, marquerMort, oublierAme, supprimerPnj, apresLeTour, tourSocial, paragrapheDe, lignesDeMarge,
                   schemaPsyche, schemaLiens, consigneCreation, psycheDeLIA, LIENS_IA, schemaDisposition, schemaRaisonDisposition, dispositionDeNaissance };

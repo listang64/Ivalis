@@ -56,6 +56,9 @@ export function disposerRadar(liens, options) {
     const pts = (liens || []).map(l => {
         const aff = P.affinite(l.axes), fam = P.nombre((l.axes || {}).familiarite);
         const r = rMin + (100 - aff) / 200 * (rMax - rMin);
+        // (v497) Un lien fort : rouge pour l'amour, doré pour l'amitié profonde ; en pointillé s'il n'est pas réciproque.
+        const fort = l.lien && l.lien.fort && l.lien.fort.type;
+        if (fort) return { id: l.id, aff, fam, ordre: P.graine("angle:" + l.id), r, fort, couleur: fort === "amour" ? "#b3121b" : "#b8862a", epaisseur: 3.6, opacite: 1, pointilles: !l.reciproque };
         return { id: l.id, aff, fam, ordre: P.graine("angle:" + l.id), r,
                  couleur: aff > 15 ? "#5e7f59" : aff < -10 ? "#ab514d" : "#99856a",
                  epaisseur: Math.abs(aff) >= 60 ? 3.2 : 2, opacite: Math.max(0.3, Math.min(1, fam / 100)), pointilles: fam < 55 };
@@ -82,7 +85,8 @@ export function disposerRadar(liens, options) {
 export function liensDuRegard(reseau, centre, regard, filtre, P) {
     const ames = reseau.ames || {};
     const tous = Object.values(reseau.liens || {}).filter(l => regard === "in" ? l.vers === centre : l.de === centre)
-        .map(l => ({ id: regard === "in" ? l.de : l.vers, axes: l.axes || {}, lien: l })).filter(x => ames[x.id]);
+        .map(l => ({ id: regard === "in" ? l.de : l.vers, axes: l.axes || {}, lien: l,
+                     reciproque: P.reciproque ? P.reciproque(l, (reseau.liens || {})[P.cleLien(l.vers, l.de)]) : false })).filter(x => ames[x.id]);
     const garde = tous.filter(x => {
         const aff = P.affinite(x.axes), type = (ames[x.id] || {}).type;
         if (filtre === "allies") return aff >= 20;
@@ -213,6 +217,14 @@ function htmlMoral(id) {
 const signe = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(Math.round(v));
 const modeDev = () => { try { return localStorage.getItem("ivalis_DEV_MODE") === "on"; } catch (e) { return false; } };
 const ROUE = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 2h3.4l.5 2.6c.7.2 1.3.5 1.9.9l2.3-1.3 2.4 2.4-1.3 2.3c.4.6.7 1.2.9 1.9l2.6.5v3.4l-2.6.5c-.2.7-.5 1.3-.9 1.9l1.3 2.3-2.4 2.4-2.3-1.3c-.6.4-1.2.7-1.9.9l-.5 2.6h-3.4l-.5-2.6c-.7-.2-1.3-.5-1.9-.9l-2.3 1.3-2.4-2.4 1.3-2.3c-.4-.6-.7-1.2-.9-1.9L2 13.7v-3.4l2.6-.5c.2-.7.5-1.3.9-1.9L4.2 5.6l2.4-2.4 2.3 1.3c.6-.4 1.2-.7 1.9-.9zM12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z"/></svg>`;
+// (v497) Le lien fort (amour, amitié profonde), réciproque ou non ; sinon le palier d'affection.
+function htmlCoeur(l, choix) {
+    const P = S();
+    if (!P || !P.palierAffection) return "";
+    if (l.fort && P.TYPES_LIENS_FORTS[l.fort.type]) return `<div class="coeur-liens ${l.fort.type}">${l.fort.type === "amour" ? "❤" : "✦"} ${echapper(P.TYPES_LIENS_FORTS[l.fort.type])}${choix && choix.reciproque ? " — réciproque" : " — pas (encore) réciproque"}</div>`;
+    const pal = P.palierAffection(l.axes || {});
+    return pal === "indifference" ? "" : `<div class="coeur-liens palier">Affection : ${echapper(P.NOMS_PALIERS[pal])}</div>`;
+}
 function htmlEncart(choix) {
     const P = S(), l = choix.lien, a = l.axes || {}, aff = P.affinite(a);
     const de = l.de, vers = l.vers, admin = P.estAdminSocial && P.estAdminSocial();
@@ -238,6 +250,7 @@ function htmlEncart(choix) {
         <div class="titre-encart-liens">${echapper(nomDe(de))} → ${echapper(nomDe(vers))}</div>
         <div class="affinite-liens ${aff > 15 ? "pos" : aff < -10 ? "neg" : ""}">${signe(aff)} <small>${echapper(P.motAffinite(aff))}</small></div>
         <div class="mots-liens">${echapper(nomDe(de))} ${echapper(P.resumeLien(a))}.${l.etiquette ? ` <i>(${echapper(l.etiquette)})</i>` : ""}</div>
+        ${htmlCoeur(l, choix)}
         ${l.histoire ? `<div class="histoire-liens">${echapper(l.histoire)}</div>` : ""}
         <div class="axes-liens">${barres}</div>
         ${derniers ? `<div class="sous-titre-liens petit">Les derniers changements</div><ul class="derniers-liens">${derniers}</ul>` : ""}
@@ -271,7 +284,7 @@ function htmlDroite() {
           <button type="button" class="noeud-liens centre" style="left:50%;top:50%" data-action="liens" data-cb="regard" data-regard="${vue.regard === "out" ? "in" : "out"}" title="${echapper(nomDe(id))}">${medaillon(id, "centre")}</button>
           ${!total ? `<p class="vide-liens">${echapper(nomDe(id))} ne connaît encore personne${vue.regard === "in" ? " qui pense à lui" : ""}.</p>` : ""}
         </div>
-        <div class="legende-liens"><span><i class="fil pos"></i>favorable</span><span><i class="fil neg"></i>tendu</span><span><i class="fil neu"></i>neutre</span><span><i class="fil pale"></i>peu connu</span></div>
+        <div class="legende-liens"><span><i class="fil pos"></i>favorable</span><span><i class="fil neg"></i>tendu</span><span><i class="fil neu"></i>neutre</span><span><i class="fil pale"></i>peu connu</span><span><i class="fil amour"></i>amour</span><span><i class="fil amitie"></i>amitié profonde</span></div>
         ${reste}
         ${choix ? htmlEncart(choix) : ""}
       </div>`;

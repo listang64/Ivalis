@@ -283,7 +283,7 @@ const ouvrirThorin = async () => { await G(() => window.GRIMOIRE_LIENS.centrer("
 await section(async () => {
   await G(() => localStorage.setItem("ivalis_DEV_MODE", "off"));
   await ouvrirThorin();
-  verifier("l'encart « Doros → Thorin » s'ouvre, ses six barres", await G(() => document.querySelectorAll("#grimoire-liens-d .encart-liens .axe-liens").length === 6));
+  verifier("l'encart « Doros → Thorin » s'ouvre, ses sept barres (v497 : l'attirance en plus)", await G(() => document.querySelectorAll("#grimoire-liens-d .encart-liens .axe-liens").length === 7));
   verifier("…sans aucune roue crantée", await G(() => document.querySelectorAll("#grimoire-liens-d .roue-liens").length === 0));
   verifier("(v426) …ni l'ancien bouton « Ajuster », même pour un admin", await G(async () => { window.COMPTE_JOUEUR = { ...(window.COMPTE_JOUEUR || {}), admin: true }; window.GRIMOIRE_LIENS.rendre();
     const r = !document.querySelector('#grimoire-liens-d [data-cb="ajuster"]') && !document.querySelector("#grimoire-liens-d .ajuste-liens"); window.COMPTE_JOUEUR.admin = false; return r; }));
@@ -299,7 +299,7 @@ await section(async () => {
   await ouvrirThorin();
   const roues = await G(() => [...document.querySelectorAll("#grimoire-liens-d .encart-liens .axe-liens")].map(r => { const b = r.querySelector(".roue-liens"), barre = r.querySelector(".barre-liens"); if (!b) return null;
     const q = b.getBoundingClientRect(), z = barre.getBoundingClientRect(); return { axe: b.dataset.axe, rouge: getComputedStyle(b.querySelector("svg")).fill, petite: q.width < 30 && q.width > 6, aCote: q.left >= z.right - 1 && Math.abs((q.top + q.bottom) / 2 - (z.top + z.bottom) / 2) < 12 }; }));
-  verifier("une roue à côté de chacune des six barres (Confiance… Familiarité)", roues.length === 6 && roues.every(r => r && r.aCote) && roues.map(r => r.axe).join() === "confiance,respect,attachement,dette,crainte,familiarite", JSON.stringify(roues.map(r => r && [r.axe, r.aCote])));
+  verifier("une roue à côté de chacune des sept barres (Confiance… Attirance)", roues.length === 7 && roues.every(r => r && r.aCote) && roues.map(r => r.axe).join() === "confiance,respect,attachement,dette,crainte,familiarite,attirance", JSON.stringify(roues.map(r => r && [r.axe, r.aCote])));
   verifier("…toute petite, et rouge", roues.every(r => r && r.petite && /rgb\(192, 38, 28\)/.test(r.rouge)), roues[0] && roues[0].rouge);
   await cap("v425-roues");
   await toucher('#grimoire-liens-d .roue-liens[data-axe="confiance"]');

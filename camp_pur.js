@@ -756,6 +756,13 @@ export function compatibilite(psA, psB, moralA = 60, moralB = 60) {
     if (m >= 60) c += 0.2; else if (m < 30) c -= 0.3;
     return Math.max(-1, Math.min(1, c));
 }
+// La même alchimie que social_pur.js (alchimie) : une paire sur quatre, toujours la même.
+function alchimieCamp(idA, idB) {
+    const [a, b] = [String(idA), String(idB)].sort();
+    let h = 2166136261;
+    for (const ch of `alchimie:${a}~${b}`) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); }
+    return (h >>> 0) / 4294967296 < 0.25;
+}
 export function evolutionAffinites(e) {
     const ids = (e.presents || []).filter(Boolean), jours = Math.max(0, Number(e.jours) || 0), out = [];
     if (!jours) return out;
@@ -766,6 +773,9 @@ export function evolutionAffinites(e) {
         const c = compatibilite((e.psyches || {})[A], (e.psyches || {})[B], (e.moraux || {})[A], (e.moraux || {})[B]);
         const axes = { familiarite: ensemble ? j : Math.round(j / 2), attachement: Math.round(c * j / (ensemble ? 3 : 6)) };
         if (ensemble) axes.confiance = Math.round(c * j / 6);
+        // (v497) Une attirance qui se découvre : deux âmes qui travaillent ensemble et s'accordent, quand la paire a son
+        // alchimie (une sur quatre, social_pur.js, alchimie) ; jamais avec Thémès.
+        if (ensemble && c > 0.2 && alchimieCamp(A, B) && !estThemes(A, (e.membres || {})[A]) && !estThemes(B, (e.membres || {})[B])) axes.attirance = Math.max(1, Math.round(c * j / 6));
         Object.keys(axes).forEach(k => { if (!axes[k]) delete axes[k]; });
         if (!Object.keys(axes).length) continue;
         out.push({ de: A, vers: B, axes: { ...axes }, ensemble }, { de: B, vers: A, axes: { ...axes }, ensemble });

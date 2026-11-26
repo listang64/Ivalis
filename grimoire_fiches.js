@@ -646,7 +646,35 @@ function htmlFicheDroite(h) {
           </div>
         </div>
         ${htmlBlessures(h)}
+        ${htmlLiensChers(h)}
         ${htmlMissionsReussies(h)}
+      </div>`;
+}
+// (v497) LES LIENS CHERS : ses amitiés profondes et ses amours (liens_forts.js), réciproques ou non ; sur la fiche du
+// héros d'un autre joueur, déclarer un lien depuis son héros principal ; défaire un lien qu'on a choisi.
+function htmlLiensChers(h) {
+    const LF = window.LIENS_FORTS;
+    if (!LF || !window.ID_PARTIE_COURANTE) return "";
+    const liste = LF.deLui(h.idPersonnage);
+    const nom = (id) => { const x = herosParId(id); return x ? nomHeros(x) : LF.nom(id); };
+    const moi = idJoueurCourant(), mien = h.idJoueur === moi, monHeros = herosPrincipalDe(moi);
+    const lignes = liste.map(x => {
+        const type = (x.sien || x.envers).fort.type, rec = x.sien && x.envers && x.sien.fort.type === x.envers.fort.type;
+        const sens = rec ? (type === "amour" ? "s'aiment" : "amitié profonde") : x.sien ? (type === "amour" ? "aime" : "tient profondément à") : (type === "amour" ? "est aimé·e de" : "est chéri·e par");
+        const defaire = mien && x.sien && (x.sien.fort.choisi || x.sien.declare) ? ` <button type="button" class="lien-fiche defaire-lien-fiche" data-action="fiches" data-fa="defaire-lien" data-id="${echapper(x.id)}">défaire</button>` : "";
+        return `<li class="lien-cher ${type}"><span class="marque-lien-fort ${type}">${LF.ICONES[type]}</span> ${echapper(sens)} <b>${echapper(nom(x.id))}</b>${defaire}</li>`;
+    }).join("");
+    const autreJoueur = h.idJoueur && h.idJoueur !== moi && monHeros && monHeros !== h.idPersonnage;
+    const dejaLie = liste.some(x => x.id === monHeros);
+    const declarer = autreJoueur && !dejaLie ? `<div class="declarer-lien-fiche">
+          <button type="button" class="lien-fiche" data-action="fiches" data-fa="declarer-lien" data-type="amitie">✦ Déclarer une amitié profonde</button>
+          <button type="button" class="lien-fiche" data-action="fiches" data-fa="declarer-lien" data-type="amour">❤ Déclarer un amour</button>
+        </div>` : "";
+    if (!lignes && !declarer) return "";
+    return `<div class="encart-fiche encart-liens-chers">${cadre("liens-chers-" + h.idPersonnage)}
+        <div class="titre-encart">Liens chers</div>
+        ${lignes ? `<ul class="liste-liens-chers">${lignes}</ul>` : `<p class="fiche-attente">Pas encore de lien cher.</p>`}
+        ${declarer}
       </div>`;
 }
 
@@ -1341,7 +1369,8 @@ function brancherFicheAncienne() {
 function signatureFiche(h) {
     if (!h) return "";
     return JSON.stringify([h, caracsDe(h.idPersonnage), (window.CACHE_COMPETENCES_GLOBAL || {})[h.idPersonnage] || null,
-        deckDe(h), carteOuverte, modeDev(), typeof window.talentsDuPerso === "function" ? window.talentsDuPerso(h) : null, (window.JETS_DEMANDES || []).length, !!joueurs, !!(window.RACES_MONDE || []).length, missionsDe(h)]);
+        deckDe(h), carteOuverte, modeDev(), typeof window.talentsDuPerso === "function" ? window.talentsDuPerso(h) : null, (window.JETS_DEMANDES || []).length, !!joueurs, !!(window.RACES_MONDE || []).length, missionsDe(h),
+        window.LIENS_FORTS ? window.LIENS_FORTS.deLui(h.idPersonnage).map(x => [x.id, x.sien && x.sien.fort, x.envers && x.envers.fort]) : null]);
 }
 function majPlus(force) {
     const g = G();
@@ -1413,6 +1442,22 @@ function agir(cible) {
     // (v319) La création se fait dans le livre (grimoire_creation.js) ; l'ancienne fenêtre en secours.
     if (fa === "creer") { son(); if (window.GRIMOIRE_CREATION && window.GRIMOIRE_CREATION.commencer()) return; if (typeof window.ouvrirCreationHero === "function") window.ouvrirCreationHero(); return; }
     if (!h) return;
+    // (v497) Les liens chers : déclarer (depuis son héros principal, au héros d'un autre joueur), défaire.
+    if (fa === "declarer-lien" && window.LIENS_FORTS) {
+        son();
+        const de = herosPrincipalDe(idJoueurCourant());
+        Promise.resolve(window.LIENS_FORTS.declarer(de, h.idPersonnage, cible.dataset.type)).then(r => {
+            const n = cible.closest(".declarer-lien-fiche");
+            if (n) n.innerHTML = `<p class="fiche-attente">${echapper(r || "La déclaration est faite : son joueur répondra.")}</p>`;
+        });
+        return;
+    }
+    if (fa === "defaire-lien" && window.LIENS_FORTS) {
+        son();
+        if (typeof window.confirm === "function" && !window.confirm("Défaire ce lien ?")) return;
+        Promise.resolve(window.LIENS_FORTS.defaire(h.idPersonnage, cible.dataset.id)).then(() => majPlus(true));
+        return;
+    }
     if (fa === "carte") {
         const id = cible.dataset.id;
         if (carteOuverte === id && !cible.classList.contains("verrouillee") && !(window.TECHNIQUES_CLASSE || {})[id]) { basculerMemoire(id); return; }

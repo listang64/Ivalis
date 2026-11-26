@@ -116,6 +116,10 @@ COMMENT TU PARLES :
         const a = s.affinite(lien);
         t += `\nCE QUE TU PENSES DE ${String(h.prenom || nomHeros(h)).toUpperCase()} : ${s.motAffinite ? s.motAffinite(a) : ""} (${Math.round(a)} sur une échelle de −100 à +100)${s.resumeLien ? ` — ${s.resumeLien(lien)}` : ""}.`;
     }
+    // (v497) Un lien fort (social_pur.js) : il l'aime, ou le chérit comme un frère d'armes — avec pudeur.
+    const fort = k.lien && k.lien.fort && k.lien.fort.type;
+    if (fort === "amour") t += `\nTU L'AIMES. Tu ne le dis pas forcément : ça se voit à tes gestes, à ton trouble, à ton inquiétude pour lui. Reste pudique.`;
+    else if (fort === "amitie") t += `\nTU TIENS À LUI COMME À UN FRÈRE OU UNE SŒUR D'ARMES : une confiance profonde, une franchise de vieux compagnon.`;
     // (v428) il sait qu'il fait partie de la compagnie, depuis quand ; et sa mémoire à long terme
     if (d.depuis) t += `\nTU FAIS PARTIE DE LA COMPAGNIE de ${nomHeros(h)} : tu voyages avec eux depuis le ${d.depuis}.`;
     if (k.ame && k.ame.memoire) t += `\nTA MÉMOIRE (ce que tu as retenu du passé plus lointain) : ${String(k.ame.memoire).slice(0, 1500)}`;

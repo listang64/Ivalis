@@ -459,4 +459,12 @@
 .apercu-forge .encart-chiffre, .apercu-forge .carte-init, .apercu-forge .carte-fatigue, .apercu-forge .carte-distance b { line-height: 1; }
 .apercu-forge .carte-init { display: flex; align-items: center; justify-content: center; }
 .apercu-forge .carte-fatigue, .apercu-forge .carte-distance { display: inline-flex; align-items: center; gap: 0.25em; }
+/* (v497) Les liens chers (amitiés profondes, amours). */
+.encart-liens-chers .liste-liens-chers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(var(--u) * 0.6); font-size: calc(var(--u) * 2.9); }
+.encart-liens-chers .lien-cher.amour b { color: #8e0f15; }
+.encart-liens-chers .declarer-lien-fiche { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 1); margin-top: calc(var(--u) * 0.8); }
+.marque-lien-fort { font-size: 0.95em; }
+.marque-lien-fort.amour { color: #b3121b; }
+.marque-lien-fort.amitie { color: #b8862a; }
+.defaire-lien-fiche { font-size: calc(var(--u) * 2.4) !important; }
 

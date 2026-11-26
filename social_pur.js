@@ -33,12 +33,14 @@
 
 export const VERSION_SOCIAL = 1;
 
-export const AXES = ["confiance", "respect", "attachement", "dette", "crainte", "familiarite"];
+// (v497) L'ATTIRANCE (0 à 100) : elle se découvre en jouant (des gestes tendres, des avances acceptées ou
+// repoussées) ; elle décide si un lien fort devient un amour plutôt qu'une amitié profonde.
+export const AXES = ["confiance", "respect", "attachement", "dette", "crainte", "familiarite", "attirance"];
 export const BORNES = {
     confiance: [-100, 100], respect: [-100, 100], attachement: [-100, 100], dette: [-100, 100],
-    crainte: [0, 100], familiarite: [0, 100]
+    crainte: [0, 100], familiarite: [0, 100], attirance: [0, 100]
 };
-export const NOMS_AXES = { confiance: "Confiance", respect: "Respect", attachement: "Attachement", dette: "Dette", crainte: "Crainte", familiarite: "Familiarité" };
+export const NOMS_AXES = { confiance: "Confiance", respect: "Respect", attachement: "Attachement", dette: "Dette", crainte: "Crainte", familiarite: "Familiarité", attirance: "Attirance" };
 
 export const TRAITS = ["prudence", "impulsivite", "loyaute", "empathie", "orgueil", "sociabilite"];
 export const NOMS_TRAITS = { prudence: "Prudence", impulsivite: "Impulsivité", loyaute: "Loyauté", empathie: "Empathie", orgueil: "Orgueil", sociabilite: "Sociabilité" };
@@ -104,7 +106,12 @@ export const ACTIONS = {
     s_opposer:          { nom: "s'est opposé ouvertement à", cible: { confiance: -4, attachement: -2, crainte: 1 }, acteur: { attachement: -1 }, gmax: 2, hostile: true, emotion: "colere" },
     // (v475) Raconter à quelqu'un ce qu'un autre a fait (`rapporte`) : celui qui
     // écoute l'apprend, et son regard sur l'auteur change — moins fort qu'un témoin.
-    raconter:           { nom: "a raconté à",             cible: { familiarite: 1 },                                   acteur: { familiarite: 1 }, gmax: 3 }
+    raconter:           { nom: "a raconté à",             cible: { familiarite: 1 },                                   acteur: { familiarite: 1 }, gmax: 3 },
+    // (v497) L'ATTIRANCE, qui se découvre en jouant : un geste tendre, des avances (courtiser), des avances repoussées
+    // (acteur = celui qui repousse ; cible = celui qui les faisait, et qui en souffre).
+    geste_tendre:       { nom: "a eu un geste tendre envers", cible: { attirance: 4, attachement: 2 },                acteur: { attirance: 3, attachement: 1 }, gmax: 2, emotion: "joie" },
+    courtiser:          { nom: "a courtisé",              cible: { attirance: 2, familiarite: 1 },                    acteur: { attirance: 4 }, gmax: 2, emotion: "joie" },
+    repousser:          { nom: "a repoussé les avances de", cible: { attirance: -5, attachement: -1 },               acteur: { attirance: -4 }, gmax: 2, emotion: "tristesse" }
 };
 export const TYPES_ACTIONS = Object.keys(ACTIONS);
 
@@ -183,6 +190,7 @@ export function resumeLien(axes) {
     if (marque("dette", 20)) pos.push(a.dette > 0 ? "se sent redevable" : "estime qu'on lui doit quelque chose");
     if (nombre(a.crainte) >= 40) neg.push("le craint");
     if (nombre(a.familiarite) < 10) neg.push("le connaît à peine");
+    if (nombre(a.attirance) >= 25) pos.push(nombre(a.attirance) >= 50 ? "est très attiré par lui" : "est attiré par lui");
     if (!pos.length && !neg.length) return "n'a pas d'avis tranché";
     if (pos.length && neg.length) return `${pos.join(", ")} mais ${neg.join(", ")}`;
     return [...pos, ...neg].join(", ");
@@ -287,6 +295,7 @@ export function appliquerEvenements(etatAvant, evenements, ctx) {
         const ame = etat.ames[de];
         if (!ame || ame.statut === "mort" || !brut) return;
         if (c.sansLienEntreHeros && ame.type === "heros" && (etat.ames[vers] || {}).type === "heros") return;
+        if (axe === "attirance" && (estNarrateur(de, ame) || estNarrateur(vers, etat.ames[vers]))) return;   // (v497) Thémès : jamais d'amour
         const l = lien(de, vers), avant = nombre(l.axes[axe]);
         let d = brut * sensibilite(ame.psyche, valides[n].type, axe, brut) * saturation(axe, avant, brut);
         if (axe === "confiance" && d > 0 && nombre(l.rancune) > 0) d *= Math.max(RANCUNE_MIN, 1 - nombre(l.rancune) / RANCUNE_FREIN);
@@ -489,3 +498,71 @@ export function initiatives(etat, presents, options) {
     for (const e of envies) { if (prises.has(e.ame)) continue; choisies.push(e); prises.add(e.ame); if (choisies.length >= max) break; }
     return choisies;
 }
+
+// =========================================================================
+//  (v497) L'AFFECTION, ET LES LIENS FORTS : L'AMITIÉ PROFONDE ET L'AMOUR
+// =========================================================================
+//  Nico : « un système d'affection, qui peut se transformer en amour ou en amitié profonde ». Les attirances se
+//  découvrent en jouant (rien à choisir à la création) ; plusieurs liens forts possibles ; aucun effet en combat ;
+//  l'amour possible entre les héros de deux joueurs (s'ils l'acceptent tous deux) ; Thémès peut être un ami
+//  profond, jamais un amour.
+//   · L'AFFECTION se lit sur les axes : 0,5 × attachement + 0,3 × confiance + 0,2 × familiarité.
+//   · LES PALIERS : indifférence, sympathie (20), affection (45), proche (65, et 45 de familiarité : du temps passé
+//     ensemble, pas un seul bel acte). Proche, le lien peut se SCELLER.
+//   · LA FORME : une attirance de 40 ou plus en fait un amour ; sinon, une amitié profonde.
+//   · LA RUPTURE : sous 40 d'affection (une trahison, un abandon…), ou un amour sous 15 d'attirance (l'amour s'éteint,
+//     l'amitié reste si l'affection tient).
+//  Un lien fort vit sur le lien orienté (`fort` : { type, le }) : l'un peut aimer sans être aimé.
+export const SEUILS_AFFECTION = { sympathie: 20, affection: 45, proche: 65, familiarite: 45, attirance: 40, rupture: 40, attiranceRupture: 15 };
+export const TYPES_LIENS_FORTS = { amitie: "Amitié profonde", amour: "Amour" };
+export const estNarrateur = (id, ame) => !!((ame && (ame.Narrateur || ame.narrateur)) || String(id || "").startsWith("PNJ_THEMES_"));
+export function affection(axes) {
+    const a = axes || {};
+    return Math.max(-100, Math.min(100, 0.5 * nombre(a.attachement) + 0.3 * nombre(a.confiance) + 0.2 * nombre(a.familiarite)));
+}
+export function palierAffection(axes) {
+    const v = affection(axes);
+    if (v >= SEUILS_AFFECTION.proche && nombre((axes || {}).familiarite) >= SEUILS_AFFECTION.familiarite) return "proche";
+    if (v >= SEUILS_AFFECTION.affection) return "affection";
+    if (v >= SEUILS_AFFECTION.sympathie) return "sympathie";
+    return "indifference";
+}
+export const NOMS_PALIERS = { indifference: "indifférence", sympathie: "sympathie", affection: "affection", proche: "très proche" };
+// La forme que prendrait le lien scellé aujourd'hui. `de`/`vers` : pour Thémès (jamais d'amour).
+export function formeDuLien(axes, de, vers, ames = {}) {
+    if (estNarrateur(de, ames[de]) || estNarrateur(vers, ames[vers])) return "amitie";
+    return nombre((axes || {}).attirance) >= SEUILS_AFFECTION.attirance ? "amour" : "amitie";
+}
+// Ce qui doit arriver à un lien : { action: "sceller" | "rompre" | "eteindre" | null, type }. Le lien d'un héros
+// envers quelqu'un n'est jamais scellé tout seul : son joueur décide (« proposer »).
+export function evolutionLienFort(lien, ames = {}) {
+    const l = lien || {}, axes = l.axes || {}, fort = l.fort && TYPES_LIENS_FORTS[l.fort.type] ? l.fort : null;
+    if (l.declare) return { action: null };   // un lien déclaré entre deux héros : ses joueurs seuls le défont
+    const aff = affection(axes);
+    if (fort) {
+        if (aff < SEUILS_AFFECTION.rupture) return { action: "rompre", type: fort.type };
+        if (fort.type === "amour" && nombre(axes.attirance) < SEUILS_AFFECTION.attiranceRupture) return { action: "eteindre", type: "amitie" };
+        return { action: null };
+    }
+    if (palierAffection(axes) !== "proche") return { action: null };
+    const type = formeDuLien(axes, l.de, l.vers, ames);
+    return { action: (ames[l.de] || {}).type === "heros" ? "proposer" : "sceller", type };
+}
+// Réciproque ? (le lien inverse porte le même lien fort)
+export const reciproque = (lien, inverse) => !!(lien && lien.fort && inverse && inverse.fort && inverse.fort.type === lien.fort.type);
+// Ce que le narrateur doit savoir d'un lien qui vient de changer (un moment, joué avec pudeur).
+export function momentDuLien(nomDe, nomVers, action, type) {
+    if (action === "sceller") return type === "amour"
+        ? `${nomDe} vient de comprendre qu'il·elle aime ${nomVers}. Laisse-le transparaître avec pudeur (un regard, un geste, un trouble), sans déclaration d'emblée.`
+        : `${nomDe} tient désormais à ${nomVers} comme à un frère ou une sœur d'armes. Laisse-le transparaître (un mot, un geste, une confiance nouvelle).`;
+    if (action === "rompre") return `Le lien qui unissait ${nomDe} à ${nomVers} (${(TYPES_LIENS_FORTS[type] || "").toLowerCase()}) s'est brisé : une distance, une blessure, à jouer.`;
+    if (action === "eteindre") return `L'amour de ${nomDe} pour ${nomVers} s'est éteint ; il en reste une amitié.`;
+    return "";
+}
+// (v497) Au camp, deux âmes qui travaillent ensemble et s'accordent peuvent se découvrir une attirance : une
+// alchimie propre à la paire (le hasard d'une graine, une paire sur quatre), jamais avec Thémès.
+export function alchimie(idA, idB) {
+    const [a, b] = [String(idA), String(idB)].sort();
+    return graine(`alchimie:${a}~${b}`) < 0.25;
+}
+

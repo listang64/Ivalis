@@ -143,6 +143,13 @@ function htmlJournal(camp) {
         <div class="journal-gestion">${jours.map(j => `<div class="jour-gestion"><b>${echapper(j.Date_Jeu || `Jour ${j.Jour || "?"}`)}</b>
           <ul>${(j.Lignes || []).map(l => `<li>${echapper(l)}</li>`).join("")}</ul></div>`).join("")}</div>`;
 }
+// (v497) Une amitié profonde (✦) ou un amour (❤) : sa marque à côté du nom (liens_forts.js).
+function marqueLien(id) {
+    const LF = window.LIENS_FORTS, i = LF ? LF.icone(id) : "";
+    if (!i) return "";
+    const type = i === LF.ICONES.amour ? "amour" : "amitie";
+    return `<span class="marque-lien-fort ${type}" title="${type === "amour" ? "Un amour" : "Une amitié profonde"}">${i}</span>`;
+}
 // (v494) Les personnages principaux des joueurs (le cadre doré de leur portrait).
 function estPrincipal(id) {
     const P = R(), persos = window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || [];
@@ -201,7 +208,7 @@ function htmlMembre(id, camp, partis, bloque) {
     return `<li class="membre-gestion${parti ? " parti" : ""}" data-membre="${echapper(id)}">
         <button type="button" class="portrait-gestion${principal ? " principal" : ""}" data-action="gestion" data-gc="ame" data-id="${echapper(id)}" title="Ses fils invisibles${principal ? " — personnage principal d'un joueur" : ""}">${portrait}</button>
         <div class="corps-membre-gestion">
-          <div class="ligne-nom-gestion"><button type="button" class="nom-gestion" data-action="gestion" data-gc="fiche" data-id="${echapper(id)}" title="Sa fiche">${echapper(nomDe(id, camp))}</button>
+          <div class="ligne-nom-gestion"><button type="button" class="nom-gestion" data-action="gestion" data-gc="fiche" data-id="${echapper(id)}" title="Sa fiche">${echapper(nomDe(id, camp))}</button>${marqueLien(id)}
             <span class="qui-gestion">${echapper(qui)} · niv. ${Number(i.niveau) || 1}</span>${camp.Intendant === id ? `<span class="badge-intendant">intendant</span>` : ""}</div>
           <div class="moral-gestion" title="Moral : ${moral}/100 (${echapper(P.effetDuMoral(moral))})${histo ? ` — dernier changement : ${histo.Delta > 0 ? "+" : ""}${histo.Delta}, ${echapper(histo.Raison)}` : ""}">
             <span>Moral</span><span class="barre-moral-gestion${moral < 30 ? " bas" : moral >= 80 ? " haut" : ""}"><i style="width:${moral}%"></i></span><b>${moral}</b></div>
@@ -249,7 +256,7 @@ function htmlDroite() {
 function maj(force) {
     if (!pages) return;
     const camp = C() && C().lire();
-    const base = JSON.stringify([camp, infos, brouillons, C() && C().postesBloques && C().postesBloques(), C() && C().partis && C().partis(), (window.PARTIE_DATA || {}).Mission_En_Cours || null, (window.PARTIE_DATA || {}).Bourses_Joueurs || null]);
+    const base = JSON.stringify([camp, infos, brouillons, C() && C().postesBloques && C().postesBloques(), C() && C().partis && C().partis(), (window.PARTIE_DATA || {}).Mission_En_Cours || null, (window.PARTIE_DATA || {}).Bourses_Joueurs || null, window.LIENS_FORTS ? window.LIENS_FORTS.liste().map(l => l.id + ":" + l.fort.type) : null]);
     const actif = document.activeElement;
     // Ne pas redessiner sous les doigts de celui qui tape une quantité.
     if (!force && actif && pages.d.contains(actif) && actif.matches("input")) return;

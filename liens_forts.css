@@ -1,0 +1,18 @@
+/* =========================================================================
+   IVALIS — LES LIENS FORTS (v497, liens_forts.js) : les post-its du joueur, les marques des listes.
+   ========================================================================= */
+.postits-liens-forts { position: fixed; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 70; display: none; flex-direction: column; gap: 12px;
+  width: min(320px, calc(100vw - 32px)); }
+.postits-liens-forts.visible { display: flex; }
+.postit-lien-fort { padding: 12px 14px 10px; background: #f7e27a; color: #2a1c08; box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45); transform: rotate(-1.2deg);
+  font-family: 'Kalam', 'Caveat', cursive; display: flex; flex-direction: column; gap: 6px; }
+.postit-lien-fort.declaration { background: #f9c9c4; transform: rotate(1deg); }
+.postit-lien-fort p { margin: 0; font-size: 15px; line-height: 1.3; }
+.titre-postit-lien { font-weight: 700; font-size: 18px; }
+.boutons-postit-lien { display: flex; flex-wrap: wrap; gap: 6px; }
+.boutons-postit-lien button { padding: 4px 10px; border-radius: 6px; border: 1px solid #5c3a21; background: rgba(255, 255, 255, 0.65); color: #2a1c08; cursor: pointer;
+  font: 600 13px system-ui, sans-serif; }
+.boutons-postit-lien button:disabled { opacity: 0.5; }
+.marque-lien-fort { margin-left: 0.35em; font-size: 0.9em; }
+.marque-lien-fort.amour { color: #b3121b; }
+.marque-lien-fort.amitie { color: #b8862a; }

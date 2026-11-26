@@ -186,7 +186,7 @@ section(() => {
 
 titre("10. LE CATALOGUE");
 section(() => {
-    verifier("(v475) vingt-quatre actions (s_opposer et raconter en plus), chacune avec un effet sur la cible et une gravité max", Object.keys(ACTIONS).length === 24 && Object.values(ACTIONS).every(a => a.cible && Object.keys(a.cible).length && [1, 2, 3].includes(a.gmax)));
+    verifier("(v475) vingt-quatre actions (s_opposer et raconter en plus ; v497 : geste_tendre, courtiser, repousser), chacune avec un effet sur la cible et une gravité max", Object.keys(ACTIONS).length === 27 && Object.values(ACTIONS).every(a => a.cible && Object.keys(a.cible).length && [1, 2, 3].includes(a.gmax)));
     const v = JSON.parse(fs.readFileSync(path.join(RACINE, "version.json"), "utf-8")).version;
     verifier("version ≥ 410", v >= 410, String(v));
 });
