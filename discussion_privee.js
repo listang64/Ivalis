@@ -225,6 +225,8 @@ export async function ouvrir(s) {
     afficherPnj("Oui ?", false);
     return true;
 }
+// (v503) Au camp (la page du camp ouverte, ou le clan au camp) : on peut inviter le PNJ à part.
+const auCampIci = () => !!(window.RP_PRIVE && ((window.CAMP_SCENE && window.CAMP_SCENE.ouvert && window.CAMP_SCENE.ouvert()) || (window.CAMP && window.CAMP.auCamp && window.CAMP.auCamp() && window.CAMP.lire && window.CAMP.lire() && (window.CAMP.lire().Membres || {})[(d || {}).idPnj])));
 function construire() {
     fenetre = document.createElement("div");
     fenetre.id = "discussion-privee";
@@ -242,9 +244,20 @@ function construire() {
         <button type="submit" class="envoyer-dp" title="Dire (Entrée)" aria-label="Dire">➤</button>
       </form>
       <div class="rappel-dp" hidden></div>
-      <button type="button" class="quitter-dp">Quitter la discussion</button>`;
+      <button type="button" class="quitter-dp">Quitter la discussion</button>
+      ${auCampIci() ? `<button type="button" class="inviter-dp">L'inviter en privé</button>` : ""}`;
     document.body.appendChild(fenetre);
     $(".quitter-dp").addEventListener("click", () => fermer("joueur"));
+    // (v503) Nico : « en discussion privée avec un personnage au camp, un bouton en haut : L'inviter en privé ; ça ouvre
+    // le livre avec un RP de ce personnage où vous l'invitez à part dans le camp, visible du seul joueur qui l'a initié ».
+    const inviter = $(".inviter-dp");
+    if (inviter) inviter.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!d || !window.RP_PRIVE) return;
+        const x = { idPnj: d.idPnj, nomPnj: d.nomPnj, fiche: d.fiche, heros: d.heros, lignes: d.lignes.slice() };
+        await fermer("joueur");
+        window.RP_PRIVE.commencer(x);
+    });
     $(".encart-dp.pj").addEventListener("submit", (e) => { e.preventDefault(); envoyer(); });
     $(".saisie-dp").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); envoyer(); } });
     // (v428) Nico : « les paroles du PNJ disparaissent et vont en bas seulement quand le joueur a
@@ -513,6 +526,6 @@ export async function finirRoute(qui) {
     return analyser(p, x.Id, { idPnj: x.idPnj, nomPnj: x.nomPnj, idHeros: x.idHeros, nomHeros: x.nomHeros, lignes: x.lignes || [], dateJeu: x.dateJeu, public: true });
 }
 
-window.DISCUSSION = { ouvrir, fermer, peutParler, analyser, htmlReplique, lireReponse, transcription, promptPnj, LASSITUDE, MAX_ECHANGES,
+window.DISCUSSION = { connaissances, ouvrir, fermer, peutParler, analyser, htmlReplique, lireReponse, transcription, promptPnj, LASSITUDE, MAX_ECHANGES,
                       ouverte: () => !!d, etat: () => d,
                       ouvrirSurLaRoute, appliquerRoute, finirRoute, route: () => route };

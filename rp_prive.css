@@ -1,0 +1,31 @@
+/* =========================================================================
+   IVALIS — UN MOMENT À PART (v503, rp_prive.js) : le PNJ à gauche, le récit privé à droite.
+   ========================================================================= */
+.page-prive .contenu-page { gap: calc(var(--u) * 1.4) !important; }
+.page-prive-gauche { align-items: center; text-align: center; }
+.portrait-prive { width: calc(var(--u) * 36); height: calc(var(--u) * 36); border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: #e8d8b8;
+  border: calc(var(--u) * 0.6) solid rgba(122, 59, 110, 0.6); box-shadow: 0 calc(var(--u) * 0.8) calc(var(--u) * 2.4) rgba(60, 30, 10, 0.35); }
+.portrait-prive img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 15%; }
+.portrait-prive span { font-family: 'Cinzel', serif; font-size: calc(var(--u) * 14); color: #5a3c22; }
+.nom-prive { font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive; font-size: calc(var(--u) * 6); color: #24150a; }
+.avec-prive { margin: 0; font-style: italic; font-size: calc(var(--u) * 3); color: #4a3422; }
+.discret-prive { margin: 0; font-size: calc(var(--u) * 2.5); color: #7a5a3a; }
+.page-prive-droite { display: flex; flex-direction: column; }
+.recit-prive { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: calc(var(--u) * 1.6); padding-right: calc(var(--u) * 1); }
+.ligne-prive { font-size: calc(var(--u) * 3.1); line-height: 1.45; color: #24150a; }
+.ligne-prive p { margin: 0 0 calc(var(--u) * 0.8); }
+.ligne-prive.mj { font-family: 'Almendra', serif; }
+.ligne-prive.pj { padding: calc(var(--u) * 0.8) calc(var(--u) * 1.4); border-left: calc(var(--u) * 0.5) solid rgba(122, 59, 110, 0.55); background: rgba(122, 59, 110, 0.07); font-style: italic; }
+.ligne-prive.pj b { font-style: normal; font-family: 'Cinzel', serif; font-size: 0.85em; color: #5e2c55; }
+.attente-prive { display: flex; gap: calc(var(--u) * 0.8); }
+.attente-prive span { width: calc(var(--u) * 1.4); height: calc(var(--u) * 1.4); border-radius: 50%; background: #7a5a3a; animation: attente-prive 1.2s ease-in-out infinite; }
+.attente-prive span:nth-child(2) { animation-delay: 0.2s; } .attente-prive span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes attente-prive { 50% { opacity: 0.25; transform: translateY(-20%); } }
+.saisie-prive { display: flex; gap: calc(var(--u) * 1); margin-top: calc(var(--u) * 1.2); }
+.texte-prive { flex: 1; resize: none; font: inherit; font-size: calc(var(--u) * 3); padding: calc(var(--u) * 1) calc(var(--u) * 1.4); border-radius: calc(var(--u) * 1);
+  border: 1px solid rgba(90, 60, 30, 0.45); background: rgba(255, 250, 238, 0.9); color: #24150a; }
+.ecrire-prive { padding: 0 calc(var(--u) * 3); border-radius: calc(var(--u) * 1); border: 1px solid #5e2c55; background: #5e2c55; color: #f6e8f2; font-family: 'Cinzel', serif;
+  font-size: calc(var(--u) * 2.8); cursor: pointer; }
+.ecrire-prive:disabled, .texte-prive:disabled { opacity: 0.55; cursor: default; }
+/* Revenir au camp : le même bouton à l'aquarelle que la page de l'expédition (grimoire_groupe.css). */
+.page-prive .bouton-aquarelle-camp { margin-top: auto; }

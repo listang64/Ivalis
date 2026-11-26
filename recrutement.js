@@ -20,7 +20,7 @@
 //  Les règles : camp_pur.js.
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
-import { doc, getDoc, getDocs, setDoc, updateDoc, runTransaction, deleteField, collection, query, where } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { doc, getDoc, getDocs, setDoc, updateDoc, runTransaction, deleteField, collection, query, where, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 import * as CP from "./camp_pur.js?v=22";
 
 const PARTIES = "Systeme_Parties";
@@ -71,6 +71,9 @@ export async function rejoindreLeCamp(id, o = {}) {
     const fiche = { Membre_Du_Clan: true, ...(f.Niveau ? {} : { Niveau: 1, XP: 0 }) };
     if (!f.Caracs) fiche.Caracs = CP.caracsDeRecrue(await ordreDesCaracs(f));
     try { await setDoc(doc(db, "Monde_PNJ", id), fiche, { merge: true }); } catch (e) { console.warn("[Recrutement] La fiche :", e); }
+    // (v503) Nico : « j'ai recruté un PNJ dans le camp, il n'a pas eu de fiche de personnage ». Sa fiche d'aventurier,
+    // libre pour tous (comme quand on l'incarne, sans joueur) : son nom l'ouvre.
+    try { await assurerFiche(id, { ...f, ...fiche }); } catch (e) { console.warn("[Recrutement] La fiche d'aventurier :", e); }
     // Son souvenir : il sait qu'il vit au camp.
     if (window.SOCIAL && window.SOCIAL.noterSouvenir) {
         try { await window.SOCIAL.noterSouvenir(idPartie(), id, type === "mercenaire" ? `J'ai été engagé par le clan nomade (${prix} drachmes, puis une solde) : je vis désormais au camp.` : "J'ai rejoint le clan nomade : je vis désormais au camp, avec eux.", { cle: "clan", importance: 3, dateJeu: dateJeu() }); }
@@ -117,7 +120,41 @@ export async function recruterPourLeGroupe() {
 // LA CLASSE d'une recrue : « donnée par n'importe quel joueur ».
 export async function choisirClasse(id, classe) {
     if (!avecCamp() || !((camp().Membres || {})[id])) return "Ce personnage n'est pas au camp.";
-    try { await setDoc(doc(db, "Monde_PNJ", id), { Classe: String(classe || "") }, { merge: true }); return ""; } catch (e) { return "La base n'a pas répondu."; }
+    try {
+        await setDoc(doc(db, "Monde_PNJ", id), { Classe: String(classe || "") }, { merge: true });
+        // (v503) Sa fiche d'aventurier suit (elle existe depuis son entrée au camp).
+        const ref = doc(db, "Personnages", id), s = await getDoc(ref);
+        if (s.exists()) await setDoc(ref, { Classe: String(classe || "") }, { merge: true });
+        const h = (window.PERSOS_JOUEURS_PARTIE || []).find(x => x && x.idPersonnage === id);
+        if (h) h.classe = String(classe || "");
+        return "";
+    } catch (e) { return "La base n'a pas répondu."; }
+}
+// (v503) LA FICHE D'AVENTURIER D'UN PNJ DU CAMP (Personnages, le même identifiant que sa fiche de PNJ), sans joueur, libre
+// pour tous ; créée une fois. Rend "" ou la raison.
+export async function assurerFiche(id, fichePnj) {
+    if (!avecCamp()) return "Le clan n'a pas de camp.";
+    const ref = doc(db, "Personnages", id);
+    const s = await getDoc(ref);
+    if (!s.exists()) {
+        const f = fichePnj || (await getDoc(doc(db, "Monde_PNJ", id))).data();
+        if (!f) return "Ce personnage est introuvable.";
+        if (f.Narrateur || CP.estThemes(id, (camp().Membres || {})[id])) return "Thémès n'a pas de fiche d'aventurier.";
+        const caracs = f.Caracs || CP.caracsDeRecrue(await ordreDesCaracs(f));
+        const lot = writeBatch(db);
+        lot.set(ref, CP.ficheIncarnee(id, f, { partie: idPartie(), joueur: "", caracs, maintenant: Date.now() }));
+        lot.set(doc(db, "Caracteristiques", id), caracs);
+        await lot.commit();
+        if (window.CARACS_PARTIE) window.CARACS_PARTIE[id] = caracs;
+        console.log(`⛺ [Recrutement] ${f.Nom_PNJ || id} reçoit sa fiche d'aventurier.`);
+    }
+    // La liste de la partie le sait tout de suite (sa fiche s'ouvre sans attendre l'écoute de la base).
+    const liste = window.PERSOS_JOUEURS_PARTIE || (window.PERSOS_JOUEURS_PARTIE = []);
+    if (!liste.some(x => x && x.idPersonnage === id) && typeof window.persoDocVersFront === "function") {
+        const d = (await getDoc(ref)).data();
+        if (d) liste.push(window.persoDocVersFront(id, d));
+    }
+    return "";
 }
 // DEV : de quoi acheter un personnage.
 export async function remplirBourseDev() {
@@ -138,4 +175,4 @@ export async function pnjsHorsDuCamp() {
     return out.sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
 }
 
-window.RECRUTEMENT = { pnjsHorsDuCamp, avecCamp, rejoindreLeCamp, engager, acheterPersonnage, recruterPourLeGroupe, choisirClasse, remplirBourseDev, regles: CP };
+window.RECRUTEMENT = { assurerFiche, pnjsHorsDuCamp, avecCamp, rejoindreLeCamp, engager, acheterPersonnage, recruterPourLeGroupe, choisirClasse, remplirBourseDev, regles: CP };

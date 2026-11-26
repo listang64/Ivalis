@@ -19,13 +19,14 @@
   <link rel="stylesheet" href="grimoire.css?v=30">
   <link rel="stylesheet" href="grimoire_recit.css?v=31">
   <link rel="stylesheet" href="grimoire_carte.css?v=2">
-  <link rel="stylesheet" href="grimoire_regions.css?v=10">
+  <link rel="stylesheet" href="grimoire_regions.css?v=11">
   <link rel="stylesheet" href="loupe_cartes.css?v=5">
   <link rel="stylesheet" href="grimoire_fiches.css?v=19">
   <link rel="stylesheet" href="grimoire_creation.css?v=9">
   <link rel="stylesheet" href="grimoire_combats.css?v=3">
   <link rel="stylesheet" href="grimoire_liens.css?v=8">
   <link rel="stylesheet" href="liens_forts.css?v=1">
+  <link rel="stylesheet" href="rp_prive.css?v=1">
   <link rel="stylesheet" href="grimoire_groupe.css?v=12">
   <link rel="stylesheet" href="camp_scene.css?v=4">
   <link rel="stylesheet" href="grimoire_gestion.css?v=5">
@@ -33,7 +34,7 @@
 <link rel="stylesheet" href="missions_guilde.css?v=8">
 <link rel="stylesheet" href="grimoire_mission.css?v=7">
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Dancing+Script:wght@400;700&family=Homemade+Apple&family=Indie+Flower&family=Kalam:wght@400;700&family=Satisfy&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="discussion_privee.css?v=5">
+  <link rel="stylesheet" href="discussion_privee.css?v=6">
   <link rel="stylesheet" href="grimoire_parametres.css?v=3">
   <link rel="stylesheet" href="vocal.css?v=2">
 
@@ -2228,7 +2229,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=392"></script>
+<script src="trace_combat.js?v=393"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2238,7 +2239,7 @@
 <!-- LE GRIMOIRE (v297) : StPageFlip 2.0.7 (MIT, dans vendor/), puis le livre -->
 <script src="vendor/page-flip/page-flip.browser.js?v=2.0.7"></script>
 <script src="police_titres.js?v=2"></script>
-<script src="grimoire.js?v=49"></script>
+<script src="grimoire.js?v=50"></script>
 <script src="grimoire_parametres.js?v=8"></script>
 <!-- LES DÉPENSES DU MJ (v293) : tokens et coût en euros de chaque réponse -->
 <script src="depenses_ia.js?v=4"></script>
@@ -2311,23 +2312,24 @@
 <script type="module" src="vocal.js?v=3"></script>
 <!-- LA CARTE DU MONDE DANS LE GRIMOIRE (v302) : sa double page, ses zones (DEV). -->
 <script type="module" src="grimoire_carte.js?v=6"></script>
-<script src="grimoire_regions.js?v=17"></script>
+<script src="grimoire_regions.js?v=18"></script>
 <script src="loupe_cartes.js?v=7"></script>
 <script type="module" src="grimoire_fiches.js?v=29"></script>
-<script type="module" src="grimoire_creation.js?v=13"></script>
+<script type="module" src="grimoire_creation.js?v=14"></script>
 <!-- Les combats dans le livre (v388) : la double page du menu Combat. -->
 <script type="module" src="grimoire_combats.js?v=3"></script>
 <!-- LES FILS INVISIBLES DANS LE LIVRE (v414) : la fiche et le radar des âmes de la partie. -->
 <script type="module" src="grimoire_liens.js?v=14"></script>
 <!-- (v497) Les liens forts : l'amitié profonde et l'amour (post-its du joueur, marques des listes). -->
 <script type="module" src="liens_forts.js?v=2"></script>
+<script type="module" src="rp_prive.js?v=1"></script>
 <!-- LE GROUPE (v418) : la double page de la compagnie ; les Aventuriers en sont les sous-pages. -->
 <script type="module" src="grimoire_groupe.js?v=15"></script>
 <!-- LES MISSIONS (v442) : (v477) le créateur d'une mission et la mission en cours ; sa double page. -->
 <script type="module" src="missions_guilde.js?v=14"></script>
 <script type="module" src="grimoire_mission.js?v=7"></script>
 <!-- LA DISCUSSION PRIVÉE (v422) : parler en tête-à-tête avec un suiveur, depuis la page du Groupe. -->
-<script type="module" src="discussion_privee.js?v=5"></script>
+<script type="module" src="discussion_privee.js?v=6"></script>
 <!-- Les régions de la carte du monde (v257) : les boîtes cliquables et leur éditeur DEV. -->
 <script type="module" src="regions_carte.js?v=4"></script>
 <!-- Les cartes régionales (v272) : la traversée des nuages, la carte de chaque région et son titre (plus de nuages dessus, v286). -->
@@ -2346,12 +2348,12 @@
 <!-- Où sont les héros (v276) : MIA_TERRAIN lit la carte autour du groupe, et le MJ reçoit le décor et la région. -->
 <script type="module" src="environnement_mj.js?v=6"></script>
 <!-- LE CAMP DU CLAN NOMADE (v478) : ses règles (camp_pur.js), sa place, Thémès, le bouton DEV. -->
-<script type="module" src="camp.js?v=22"></script>
+<script type="module" src="camp.js?v=23"></script>
 <!-- LA PAGE DU CAMP (v480) : les images en scène des membres (camp_avatars.js), l'image en 9 couches et ses encarts (camp_scene.js). -->
-<script type="module" src="camp_avatars.js?v=20"></script>
+<script type="module" src="camp_avatars.js?v=21"></script>
 <script type="module" src="camp_scene.js?v=21"></script>
 <!-- LA GESTION DU CAMP (v481) : la double page du livre (la caisse, les provisions, le bilan, les tâches, l'intendant). -->
-<script type="module" src="grimoire_gestion.js?v=12"></script>
+<script type="module" src="grimoire_gestion.js?v=13"></script>
 <!-- LES EXPÉDITIONS (v483) : monter l'expédition, ses places et ses suiveurs, son départ et son retour, le mode arène. -->
 <script type="module" src="expedition.js?v=17"></script>
 <!-- LE RETOUR AU CAMP (v484) : les événements, les affinités, le rapport de l'intendant. -->
@@ -2363,7 +2365,7 @@
 <!-- LE DÉPLACEMENT DU CAMP (v487) : le bouton après le vote, la route du clan, l'arrivée et la nouvelle jauge. -->
 <script type="module" src="deplacement_camp.js?v=13"></script>
 <!-- LE RECRUTEMENT (v488) : les recrues vers le camp, les mercenaires, les personnages à 300 drachmes, le bouton DEV. -->
-<script type="module" src="recrutement.js?v=12"></script>
+<script type="module" src="recrutement.js?v=13"></script>
 <!-- Les points d'intérêt (v277) : leur catalogue (script simple), puis MIA_POI qui les fait naître. -->
 <script src="poi_catalogue.js?v=1"></script>
 <script type="module" src="poi_creation.js?v=6"></script>

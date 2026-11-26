@@ -535,6 +535,14 @@ function agir(cible) {
             return;
         }
         son();
+        if (pourPnj) {
+            const x = pourPnj;
+            terminer();
+            Promise.resolve(window.RECRUTEMENT && window.RECRUTEMENT.choisirClasse ? window.RECRUTEMENT.choisirClasse(x.id, c.nom) : "")
+                .catch(e => console.warn("[Création] La classe du PNJ :", e))
+                .then(() => { if (window.GESTION_CAMP) { window.GESTION_CAMP.ouvrir(); window.GESTION_CAMP.lireInfos(true); } });
+            return;
+        }
         window.CLASSE_SELECTIONNEE_TEMP = c.nom;
         const champ = document.getElementById("champ-classe");
         if (champ) champ.value = c.nom;
@@ -573,15 +581,22 @@ function allerAuFormulaire() {
 // ---------------------------------------------------------------------
 //  COMMENCER, TERMINER
 // ---------------------------------------------------------------------
-function commencer() {
+// (v503) LA CLASSE D'UN PNJ DU CAMP. Nico : « quand un PNJ entre au camp, il faut choisir sa classe : plutôt qu'une liste
+// déroulante, ouvre la première page du choix de classe de la création de personnage, et quand le joueur valide, ça
+// revient direct aux membres du camp ». `o.pourPnj` : { id, nom, race, genre } ; son peuple est déjà le sien.
+let pourPnj = null;
+function premiereClasse() { return (sections.classes.find(s => !etatClasse(s.classe).bloquee) || sections.classes[0] || {}).page; }
+function commencer(o = {}) {
     const g = G();
     if (!g || !g.enPartie || !g.enPartie() || !F() || !F().poser || !window.DONNEES_RACES) return false;
-    if (actif) { if (sections.races[0]) aller(sections.races[0].page); return true; }
+    if (actif && !o.pourPnj && !pourPnj) { if (sections.races[0]) aller(sections.races[0].page); return true; }
+    if (actif) terminer();
     actif = true;
+    pourPnj = o.pourPnj || null;
     avecCompagnon = false;
-    etat.raceChoisie = false;
-    window.RACE_SELECTIONNEE_TEMP = "Humain";
-    window.GENRE_SELECTIONNE_TEMP = null;
+    etat.raceChoisie = !!pourPnj;
+    window.RACE_SELECTIONNEE_TEMP = (pourPnj && pourPnj.race) || "Humain";
+    window.GENRE_SELECTIONNE_TEMP = (pourPnj && pourPnj.genre) || null;
     window.CLASSE_SELECTIONNEE_TEMP = null;
     window.COMPAGNON_TEMP = null;
     const champ = document.getElementById("champ-classe");
@@ -589,8 +604,9 @@ function commencer() {
     poserCrochets();
     const suite = () => {
         construire();
+        if (pourPnj) reecrireClasses();
         creerOnglets();
-        setTimeout(() => aller(sections.races[0] && sections.races[0].page), 60);
+        setTimeout(() => aller(pourPnj ? premiereClasse() : (sections.races[0] && sections.races[0].page)), 60);
         if (sections.races[1]) chargerFonds(sections.races[1].page);   // (v341) la suivante, déjà prête
     };
     if (typeof window.chargerClasses === "function" && !window.CLASSES_CACHE) Promise.resolve(window.chargerClasses()).catch(() => {}).then(suite);
@@ -600,6 +616,7 @@ function commencer() {
 function terminer() {
     if (!actif) return;
     actif = false;
+    pourPnj = null;
     oterCrochets();
     toutRemettre();
     retirerOnglets();
@@ -639,7 +656,7 @@ function bloqueEnAvant(index) {
 window.GRIMOIRE_CREATION = {
     commencer, terminer, agir, bloqueEnAvant, prechargerAutour,
     pages: () => (actif ? pages.slice() : []),
-    actif: () => actif,
+    actif: () => actif, pourPnj: () => (pourPnj ? { ...pourPnj } : null),
     page: (cle) => pg[cle] || null,
     sections: () => ({ races: sections.races.map(s => s.cle), classes: sections.classes.map(s => s.cle) })
 };

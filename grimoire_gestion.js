@@ -251,8 +251,9 @@ function htmlMembre(id, camp, partis, bloque) {
             <span>Moral</span><span class="barre-moral-gestion${moral < 30 ? " bas" : moral >= 80 ? " haut" : ""}"><i style="width:${moral}%"></i></span><b>${moral}</b></div>
           <div class="tache-gestion">${controle}</div>
           ${casePrincipal}
-          ${i.incarne ? `<div class="classe-gestion">Classe : ${echapper(i.classe || "—")}${i.joueur ? ` · joué par ${echapper(i.joueur === moi() ? "toi" : ((typeof window.nomDuJoueurLivre === "function" && window.nomDuJoueurLivre(i.joueur)) || "un joueur"))}` : ""}</div>` : ""}
-          ${!i.heros && !i.incarne && !themes && window.ATOUTS_CLASSES ? `<div class="classe-gestion">Classe : <select class="select-gestion select-classe" data-gc="classe" data-id="${echapper(id)}"><option value="">—</option>${Object.keys(window.ATOUTS_CLASSES).map(c => `<option value="${echapper(c)}"${i.classe === c ? " selected" : ""}>${echapper(c)}</option>`).join("")}</select></div>` : ""}
+          ${i.incarne && i.joueur ? `<div class="classe-gestion">Classe : ${echapper(i.classe || "—")}${i.joueur ? ` · joué par ${echapper(i.joueur === moi() ? "toi" : ((typeof window.nomDuJoueurLivre === "function" && window.nomDuJoueurLivre(i.joueur)) || "un joueur"))}` : ""}</div>` : ""}
+          ${!i.heros && !(i.incarne && i.joueur) && !themes && !parti ? `<div class="classe-gestion">Classe : <b>${echapper(i.classe || "—")}</b>
+            <button type="button" class="lien-fiche choisir-classe-gestion" data-action="gestion" data-gc="choisir-classe" data-id="${echapper(id)}">${i.classe ? "Changer" : "Choisir sa classe"}</button></div>` : ""}
         </div></li>`;
 }
 function htmlRecrue(id, camp, partis, bloque, mb) {
@@ -320,6 +321,13 @@ async function agir(cible) {
         choix = null;
         return surChangement({ dataset: { gc: cible.dataset.quoi, id: id || undefined }, value: cible.dataset.valeur || "" });
     }
+    // (v503) Sa classe : la première page des classes de la création ; validée, retour aux membres du camp.
+    if (gc === "choisir-classe") {
+        const f = (infos[id] || {}).fiche || {};
+        son();
+        if (window.GRIMOIRE_CREATION && window.GRIMOIRE_CREATION.commencer({ pourPnj: { id, nom: nomDe(id, C().lire()), race: f.Race || "Humain", genre: f.Genre || null } })) return;
+        return noter("Le choix des classes n'est pas disponible.");
+    }
     if (gc === "parler") {
         const f = (infos[id] || {}).fiche || {};
         son();
@@ -358,7 +366,10 @@ async function agir(cible) {
     // qui n'en a pas encore : ses fils invisibles.
     if (gc === "fiche") {
         son();
-        const aSaFiche = (window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || []).some(h => h && h.idPersonnage === id);
+        let aSaFiche = (window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || []).some(h => h && h.idPersonnage === id);
+        // (v503) Un PNJ du camp sans fiche d'aventurier (recruté avant la v503) : elle est créée (comme quand on l'incarne).
+        const mb = (C().lire().Membres || {})[id];
+        if (!aSaFiche && mb && !R().estThemes(id, mb) && window.RECRUTEMENT && window.RECRUTEMENT.assurerFiche) aSaFiche = !(await window.RECRUTEMENT.assurerFiche(id));
         if (aSaFiche && window.GRIMOIRE_FICHES) { marquerRetour("fiches"); window.GRIMOIRE_FICHES.ouvrir(id); return; }
         marquerRetour("liens");
         if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id, nom: nomDe(id, C().lire()), depuisGestion: true, exact: true });
@@ -404,12 +415,6 @@ async function surChangement(el) {
         return maj(true);
     }
     if (gc === "choix-recrue-dev") return;
-    if (gc === "classe") {
-        son();
-        const refus = window.RECRUTEMENT ? await window.RECRUTEMENT.choisirClasse(id, el.value) : "";
-        if (infos[id]) infos[id].classe = el.value;
-        return noter(refus || `${nomDe(id, C().lire())} : ${el.value || "sans classe"}.`);
-    }
     if (gc === "intendant") {
         son();
         const refus = await C().nommerIntendant(el.value || null);

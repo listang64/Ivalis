@@ -301,7 +301,7 @@ async function infosMembresLues() {
         if (h) {   // (v490) un personnage du camp qu'un joueur a incarné : un PNJ du camp, dont la fiche d'aventurier dit les caracs et le niveau
             const caracs = (window.CARACS_PARTIE || {})[id] || await lireDoc("Caracteristiques", id) || f.Caracs || {};
             out[id] = { id, heros: false, incarne: true, joueur: h.idJoueur || "", nom: f.Nom_PNJ || [h.prenom, h.nom].filter(Boolean).join(" ").trim() || mb.Nom || "", caracs,
-                        niveau: Number(h.niveau) || 1, portrait: f.URL_Cloudinary || h.urlCloudinary || h.urlPortraitReference || "", occupation: f.Occupation || "", classe: h.classe || f.Classe || "" };
+                        niveau: Number(h.niveau) || 1, portrait: f.URL_Cloudinary || h.urlCloudinary || h.urlPortraitReference || "", occupation: f.Occupation || "", classe: h.classe || f.Classe || "", fiche: f };
             return;
         }
         out[id] = { id, heros: false, nom: f.Nom_PNJ || mb.Nom || "", caracs: f.Caracs || {}, niveau: Number(f.Niveau) || 1, portrait: f.URL_Cloudinary || "",

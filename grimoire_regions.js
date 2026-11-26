@@ -97,10 +97,11 @@
         // réputation dans la région » (camp.js, majReputationRegions la remplit).
         const reputation = `<div class="reputation-region" data-region="${Number(r.numero)}"></div>`;
         if (paysage(r)) {
-            g.innerHTML = carteImg(url, boites.gauche, "") + `<div class="region-titre-sur-carte"><span class="region-nom">${nom}</span>${TRAIT}${reputation}</div>`;
+            g.innerHTML = carteImg(url, boites.gauche, "") + `<div class="region-titre-sur-carte"><span class="region-nom">${nom}</span>${TRAIT}${reputation}</div>${boutonDescriptif(r)}`;
             d.innerHTML = carteImg(url, boites.droite, "");
         } else {
-            g.innerHTML = `<div class="region-titre-page"><span class="region-sur">Carte de la région</span><span class="region-nom">${nom}</span>${TRAIT}${reputation}${boutonDescriptif(r)}</div>`;
+            // (v503) Le descriptif pour le MJ (DEV) : en haut de la page, à part du titre.
+            g.innerHTML = `<div class="region-titre-page"><span class="region-sur">Carte de la région</span><span class="region-nom">${nom}</span>${TRAIT}${reputation}</div>${boutonDescriptif(r)}`;
             d.innerHTML = carteImg(url, boites.droite, nom);
         }
         try { if (typeof window.majReputationRegions === "function") window.majReputationRegions(); } catch (e) {}
@@ -477,7 +478,13 @@
             const voulu = ici || (surPostit && (id === "boite-voyage" || id === "bandeau-voyage") ? surPostit : (id === "apercu-lieu" ? document.body : dehors));
             if (el.parentNode !== voulu) voulu.appendChild(el);
         });
-        // Le titre de la région remonte quand une fenêtre s'écrit sur la page ; le post-it sort.
+        // (v503) Nico : « quand on clique sur un endroit pour se déplacer, ne fais pas remonter le texte : inscris juste le
+        // texte qui apparaît en dessous de la jauge de réputation ». Le titre reste où il est ; la fenêtre s'écrit dessous.
+        if (r && ici) {
+            const titre = r.pages[0].querySelector(":scope > .region-titre-page");
+            if (titre) ici.style.top = `${Math.round(titre.offsetTop + titre.offsetHeight + 10)}px`;
+        }
+        // Le post-it sort.
         const occupe = !!ici && [...ici.children].some(fenetreVisible);
         regions.forEach(x => x.pages[0].classList.toggle("avec-voyage", occupe && x === r));
         const postit = $("voyage-postit");

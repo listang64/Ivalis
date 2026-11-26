@@ -12832,3 +12832,11 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Le clan du côté des héros** (`camp_pur.js`, `REGLE_CLAN_LOYAL` ; `camp.js`, `regleClanLoyal`, `nomConnu` ; `missions_guilde.js`) : pour le narrateur, les missions et leur plan, aucun membre du clan (ni le conseil) n'est traître, complice ou menteur.
 - **Annuler une tâche (DEV)** (`grimoire_mission.js`, `missions_guilde.js`, `forcerAbandon`) : pendant un vote d'abandon, « Annuler (DEV : forcer le vote) » en rouge.
 - corrections_v502 le vérifie ; corrections_v484, v485 et v490 adaptés.
+
+## v503 — Les PNJ du camp, la carte régionale, le moment à part
+
+- **La classe d'un PNJ du camp** (`grimoire_gestion.js`, « Choisir sa classe » ; `grimoire_creation.js`, `commencer({ pourPnj })`) : la première page des classes de la création s'ouvre (son peuple est le sien) ; la classe choisie, retour direct à la gestion du camp (`recrutement.js`, `choisirClasse`, sa fiche d'aventurier suit). Plus de liste déroulante (elle dépendait d'une donnée parfois absente : « le bouton a disparu »).
+- **Sa fiche d'aventurier** (`recrutement.js`, `assurerFiche`) : un PNJ qui rejoint le camp (le bouton DEV aussi) la reçoit, libre pour tous, sans joueur (comme quand on l'incarne) ; un PNJ recruté avant : son nom la crée et l'ouvre. Ses images du camp restent celles de sa fiche de PNJ (`camp_avatars.js`, comme `camp_scene.js`).
+- **La carte régionale** (`grimoire_regions.js`, `.css`) : le titre ne remonte plus ; la fenêtre du déplacement s'écrit sous la jauge de réputation ; le descriptif pour le MJ (DEV) en haut de la page.
+- **« L'inviter en privé »** (`discussion_privee.js`, au camp ; `rp_prive.js`, `.css` ; `grimoire.js`, `definirPrive`) : une double page du livre, chez ce joueur seulement (le PNJ à gauche, le récit à droite) ; le MJ (l'IA des discussions privées) raconte et joue le PNJ, jamais à la place du héros, sans combat ; la scène gardée dans `Systeme_Parties/{p}/RP_Prives` ; « Revenir au camp » : MIA_SOCIAL la lit (les fils invisibles), le camp revient.
+- corrections_v503 le vérifie ; corrections_v373, v488 et v491 adaptés.

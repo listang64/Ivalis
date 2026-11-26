@@ -221,7 +221,8 @@ await section(async () => {
   const f = await fenetre("bandeau-voyage");
   verifier("« Touchez un point du terrain » s'écrit sur la page de gauche de la région", !!f && f.region === "5" && f.vu && f.dedans, JSON.stringify(f));
   verifier("… sans boîte (ni fond, ni bord, plus en surimpression), en fondu", !!f && f.position === "static" && /rgba\(0, 0, 0, 0\)|transparent/.test(f.fond) && f.bord === "none" && f.animation === "fondu-voyage-livre", JSON.stringify(f));
-  verifier("le titre de la région remonte en haut de la page", !!f && f.avecVoyage && f.titreHaut < 0.12, JSON.stringify(f && f.titreHaut));
+  // (v503) Nico : « ne fais pas remonter le texte » : le titre reste où il est, la fenêtre s'écrit sous la jauge.
+  verifier("le titre de la région reste où il est (v503 : la fenêtre s'écrit dessous)", !!f && f.avecVoyage && f.titreHaut > 0.2, JSON.stringify(f && f.titreHaut));
   await cap("v373_choix");
   await p.evaluate(() => window.basculerModeVoyage()); await p.waitForTimeout(700);
   const g = await fenetre("bandeau-voyage");

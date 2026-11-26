@@ -298,7 +298,8 @@ await section(async () => {
     window.GRIMOIRE_FICHES.ouvrir = F; if (L) window.GRIMOIRE_LIENS.ouvrir = L;
     return vus;
   });
-  verifier("le nom : sa fiche (un PNJ sans fiche d'aventurier : ses fils invisibles) ; l'image : ses fils invisibles", JSON.stringify(r) === JSON.stringify(["fiche:H1", "fils:PNJ_ARA:exact", "fils:H2:exact"]), JSON.stringify(r));
+  // (v503) Un PNJ du camp sans fiche d'aventurier en reçoit une : son nom l'ouvre.
+  verifier("le nom : sa fiche (v503 : un PNJ du camp reçoit la sienne) ; l'image : ses fils invisibles", JSON.stringify(r) === JSON.stringify(["fiche:H1", "fiche:PNJ_ARA", "fils:H2:exact"]), JSON.stringify(r));
   const t = await p.evaluate(async () => {
     window.__portrait = null; window.genererPortraitHeros = async (d) => { window.__portrait = d; return "https://res.cloudinary.com/x/image/upload/q_auto,f_auto/v1/themes.png"; };
     window.__oublies = []; window.oublierImages = async (l) => { window.__oublies.push(...l); };

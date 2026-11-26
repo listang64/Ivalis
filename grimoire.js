@@ -144,8 +144,9 @@
     // (v418) La double page du Groupe (grimoire_groupe.js), juste avant les Aventuriers (ses sous-pages).
     let pagesGroupe = [];
     let pagesMission = [];      // (v444) la double page « Mission en cours » (grimoire_mission.js), le temps qu'on la lit
+    let pagesPrive = [];        // (v503) la double page d'un moment à part avec un PNJ du camp (rp_prive.js), chez ce joueur seulement
     let pagesGestion = [];      // (v481) la double page « Gestion du camp » (grimoire_gestion.js), quand le clan a un camp
-    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesGroupe.length + pagesGestion.length + pagesFiches.length + pagesLiens.length + pagesCombats.length + pagesMission.length : 0);
+    const premiereDeLaSuite = () => PAGE_CARTE + 2 + (enPartie ? pagesRegions.length + pagesGroupe.length + pagesGestion.length + pagesFiches.length + pagesLiens.length + pagesCombats.length + pagesMission.length + pagesPrive.length : 0);
     // LA CARTE DU MONDE (v302) : sa double page vient juste après l'index (5-6),
     // en partie seulement ; la suite (le récit) commence alors à la page 7.
     // Nico : « page de gauche cette partie de la map, page de droite celle-là ;
@@ -1071,7 +1072,7 @@
     function definirSuite(elements) {
         suite = (elements || []).slice();
         if (!pageFlip) return;
-        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesGroupe, ...pagesGestion, ...pagesFiches, ...pagesLiens, ...pagesCombats, ...pagesMission] : []), ...suite, ...vierges, dos];
+        const liste = [pages[0], pages[1], pages[2], pages[3], pages[4], ...(enPartie ? [...pagesCarte, ...pagesRegions, ...pagesGroupe, ...pagesGestion, ...pagesFiches, ...pagesLiens, ...pagesCombats, ...pagesMission, ...pagesPrive] : []), ...suite, ...vierges, dos];
         const generation = ++definirSuite.generation;      // seule la dernière demande s'applique
         const appliquer = () => {
             if (generation !== definirSuite.generation) return;
@@ -1466,6 +1467,8 @@
         pagesGroupe: () => pagesGroupe.slice(),
         definirMission: (els) => { pagesMission = (els || []).slice(); if (enPartie) definirSuite(suite); },
         pagesMission: () => pagesMission.slice(),
+        definirPrive: (els) => { pagesPrive = (els || []).slice(); if (enPartie) definirSuite(suite); },
+        pagesPrive: () => pagesPrive.slice(),
         // (v481) la double page « Gestion du camp »
         definirGestion: (els) => { pagesGestion = (els || []).slice(); if (enPartie) definirSuite(suite); },
         pagesGestion: () => pagesGestion.slice(),

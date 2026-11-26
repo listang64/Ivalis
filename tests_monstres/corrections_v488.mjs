@@ -224,7 +224,7 @@ await section(async () => {
   const r = await p.evaluate(async () => window.RECRUTEMENT.choisirClasse("PNJ_ARA", "Prêtre de lumière"));
   verifier("la classe d'une recrue, donnée par n'importe quel joueur", r === "" && (await p.evaluate(() => window.__docs["Monde_PNJ/PNJ_ARA"].Classe)) === "Prêtre de lumière");
   const g = lire("grimoire_gestion.js"), l = lire("grimoire_liens.js");
-  verifier("la gestion du camp : la classe des recrues, l'achat (la bourse), la recrue votée", /data-gc="classe"/.test(g) && /Acheter un personnage/.test(g) && /Créer la recrue votée au conseil/.test(g));
+  verifier("la gestion du camp : la classe des recrues, l'achat (la bourse), la recrue votée", /data-gc="choisir-classe"/.test(g) && /Acheter un personnage/.test(g) && /Créer la recrue votée au conseil/.test(g));
   verifier("les fils invisibles d'un PNJ : un bouton DEV rouge pour forcer son recrutement", /Forcer son recrutement dans le camp/.test(l) && /cb === "recruter-dev"/.test(l) && /modeDev\(\)/.test(l));
   const dev = await p.evaluate(async () => window.RECRUTEMENT.rejoindreLeCamp("PNJ_KORE", { type: "invite", par: "le mode DEV" }));
   const d = await partie();

@@ -123,7 +123,9 @@ async function membresADessiner() {
     const out = [];
     for (const id of Object.keys(camp.Membres || {})) {
         const h = persos.find(x => x.idPersonnage === id);
-        if (h) {
+        // (v503) Un personnage du camp libre pour tous (sa fiche d'aventurier) reste un PNJ du camp : ses images sont
+        // celles de sa fiche de PNJ, comme la page du camp les lit (camp_scene.js).
+        if (h && !h.librePourTous) {
             const armure = h.equipArmure && h.equipArmure.nom ? h.equipArmure : null;
             out.push({ id, nom: h.prenom || camp.Membres[id].Nom || "", collection: "Personnages", reference: h.urlPortraitReference || h.urlCloudinary || "",
                        armure, images: h.imagesCamp, armureFaite: h.imagesCampArmure, armureActuelle: armure ? (armure.uid || armure.nom) : "", compagnon: h.compagnon || null });

@@ -85,3 +85,8 @@
   .quitter-dp { top: calc(2.5vh + 40px); }
 }
 
+/* (v503) « L'inviter en privé » (au camp) : en haut, au milieu. */
+.inviter-dp { position: absolute; top: 2.5vh; left: 50%; transform: translateX(-50%); padding: 0.5em 1.2em; border-radius: 999px; border: 1px solid rgba(240, 201, 94, 0.7);
+  background: rgba(60, 30, 8, 0.75); color: #f6dc8c; font-family: 'Cinzel', serif; font-size: clamp(13px, 1.2vw, 16px); letter-spacing: 0.05em; cursor: pointer; z-index: 3; }
+.inviter-dp:hover { background: rgba(110, 60, 16, 0.85); }
+@media (hover: none) and (pointer: coarse) { .inviter-dp { top: calc(2.5vh + 40px); } }
