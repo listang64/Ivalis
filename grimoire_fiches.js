@@ -665,9 +665,11 @@ function htmlLiensChers(h) {
         return `<li class="lien-cher ${type}"><span class="marque-lien-fort ${type}">${LF.ICONES[type]}</span> ${echapper(sens)} <b>${echapper(nom(x.id))}</b>${defaire}</li>`;
     }).join("");
     const autreJoueur = h.idJoueur && h.idJoueur !== moi && monHeros && monHeros !== h.idPersonnage;
-    const dejaLie = liste.some(x => x.id === monHeros);
-    const declarer = autreJoueur && !dejaLie ? `<div class="declarer-lien-fiche">
-          <button type="button" class="lien-fiche" data-action="fiches" data-fa="declarer-lien" data-type="amitie">✦ Déclarer une amitié profonde</button>
+    const avecMoi = liste.find(x => x.id === monHeros);
+    // (v499) Déjà amis profonds : l'amitié peut devenir un amour (une nouvelle déclaration, que l'autre accepte ou non).
+    const dejaAmis = !!avecMoi && [avecMoi.sien, avecMoi.envers].every(l => !l || l.fort.type === "amitie");
+    const declarer = autreJoueur && (!avecMoi || dejaAmis) ? `<div class="declarer-lien-fiche">
+          ${avecMoi ? "" : `<button type="button" class="lien-fiche" data-action="fiches" data-fa="declarer-lien" data-type="amitie">✦ Déclarer une amitié profonde</button>`}
           <button type="button" class="lien-fiche" data-action="fiches" data-fa="declarer-lien" data-type="amour">❤ Déclarer un amour</button>
         </div>` : "";
     if (!lignes && !declarer) return "";

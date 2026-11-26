@@ -320,8 +320,10 @@ export function appliquerEvenements(etatAvant, evenements, ctx) {
         const act = ACTIONS[ev.type];
         const repetitions = Math.min(3, historique.filter(h => h.acteur === ev.acteur && h.cible === ev.cible && h.type === ev.type).length);
         const k = MULT_GRAVITE[ev.gravite] * Math.pow(LASSITUDE, repetitions);
-        // 1. La cible : son regard sur l'acteur.
-        Object.entries(act.cible).forEach(([axe, v]) => changer(n, ev.cible, ev.acteur, axe, v * k * ROLE.cible, ev.gravite));
+        // 1. La cible : son regard sur l'acteur. (v499) Un geste tendre, des avances : l'attirance de la cible monte
+        //    d'autant plus qu'elle est déjà proche de l'acteur ; rien si elle lui en veut (receptiviteAttirance).
+        const recep = receptiviteAttirance((etat.liens[cleLien(ev.cible, ev.acteur)] || {}).axes);
+        Object.entries(act.cible).forEach(([axe, v]) => changer(n, ev.cible, ev.acteur, axe, v * k * ROLE.cible * (axe === "attirance" && v > 0 ? recep : 1), ev.gravite));
         // 2. Ce que l'acte révèle de l'acteur envers sa cible.
         const typeActeur = (etat.ames[ev.acteur] || {}).type === "heros" ? "heros" : "pnj";
         Object.entries(act.acteur || {}).forEach(([axe, v]) => changer(n, ev.acteur, ev.cible, axe, v * k * EXPRESSION[typeActeur], ev.gravite));
@@ -542,6 +544,10 @@ export function evolutionLienFort(lien, ames = {}) {
     if (fort) {
         if (aff < SEUILS_AFFECTION.rupture) return { action: "rompre", type: fort.type };
         if (fort.type === "amour" && nombre(axes.attirance) < SEUILS_AFFECTION.attiranceRupture) return { action: "eteindre", type: "amitie" };
+        // (v499) Une amitié profonde que l'attirance a gagnée devient un amour : d'elle-même pour un PNJ ; pour un héros,
+        // son joueur décide (« proposerAmour » ; s'il préfère l'amitié, on ne le lui redemande plus : `amourRefuse`).
+        if (fort.type === "amitie" && !l.amourRefuse && formeDuLien(axes, l.de, l.vers, ames) === "amour")
+            return { action: (ames[l.de] || {}).type === "heros" ? "proposerAmour" : "approfondir", type: "amour" };
         return { action: null };
     }
     if (palierAffection(axes) !== "proche") return { action: null };
@@ -556,8 +562,16 @@ export function momentDuLien(nomDe, nomVers, action, type) {
         ? `${nomDe} vient de comprendre qu'il·elle aime ${nomVers}. Laisse-le transparaître avec pudeur (un regard, un geste, un trouble), sans déclaration d'emblée.`
         : `${nomDe} tient désormais à ${nomVers} comme à un frère ou une sœur d'armes. Laisse-le transparaître (un mot, un geste, une confiance nouvelle).`;
     if (action === "rompre") return `Le lien qui unissait ${nomDe} à ${nomVers} (${(TYPES_LIENS_FORTS[type] || "").toLowerCase()}) s'est brisé : une distance, une blessure, à jouer.`;
+    if (action === "approfondir") return `${nomDe} s'aperçoit que ce qu'il·elle ressent pour ${nomVers} n'est plus seulement de l'amitié : c'est de l'amour. Laisse-le transparaître avec pudeur, sans déclaration d'emblée.`;
     if (action === "eteindre") return `L'amour de ${nomDe} pour ${nomVers} s'est éteint ; il en reste une amitié.`;
     return "";
+}
+// (v499) Nico : un joueur qui flirte avec un PNJ fait bouger son attirance. Le PNJ y est d'autant plus sensible qu'il
+// est déjà proche du héros (son affection envers lui) : rien s'il lui en veut (affection négative), la moitié s'il
+// est indifférent, jusqu'à une fois et demie s'il a de l'affection pour lui (45 et plus).
+export function receptiviteAttirance(axes) {
+    const a = affection(axes);
+    return a < 0 ? 0 : Math.min(1.5, 0.5 + a / SEUILS_AFFECTION.affection);
 }
 // (v497) Au camp, deux âmes qui travaillent ensemble et s'accordent peuvent se découvrir une attirance : une
 // alchimie propre à la paire (le hasard d'une graine, une paire sur quatre), jamais avec Thémès.

@@ -77,7 +77,13 @@ export function majPostits() {
     if (sig === signature) return;
     signature = sig;
     const z = zone();
-    z.innerHTML = props.map(([k, x]) => `<div class="postit-lien-fort" data-cle="${echapper(k)}">
+    z.innerHTML = props.map(([k, x]) => x.evolution === "amour" ? `<div class="postit-lien-fort" data-cle="${echapper(k)}">
+        <div class="titre-postit-lien">${ICONES.amitie} ${echapper(x.nomDe)} et ${echapper(x.nomVers)}</div>
+        <p>${x.parce ? `${echapper(x.parce)} ` : ""}${echapper(x.nomDe)} tient profondément à ${echapper(x.nomVers)}… et peut-être plus. Est-ce devenu de l'amour ?</p>
+        <div class="boutons-postit-lien">
+          <button type="button" data-lf="amour">${ICONES.amour} De l'amour</button>
+          <button type="button" data-lf="rien">Rester amis</button>
+        </div></div>` : `<div class="postit-lien-fort" data-cle="${echapper(k)}">
         <div class="titre-postit-lien">${echapper(x.nomDe)} et ${echapper(x.nomVers)}</div>
         <p>${x.parce ? `${echapper(x.parce)} ` : ""}${echapper(x.nomDe)} et ${echapper(x.nomVers)} sont devenus très proches. Que ressent ${echapper(x.nomDe)} ?</p>
         <div class="boutons-postit-lien">

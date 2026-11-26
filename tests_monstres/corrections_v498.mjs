@@ -60,7 +60,7 @@ const rc = fs.readFileSync(path.join(RACINE, 'retour_camp.js'), 'utf-8');
 verifier("retour_camp.js : SOCIAL.lireLiens(présents) passé à evolutionAffinites", /SOCIAL\.lireLiens\(p, presents\)/.test(rc) && /membres: camp\.Membres, liens \}/.test(rc));
 const html = fs.readFileSync(path.join(RACINE, 'index.html'), 'utf-8');
 const v = JSON.parse(fs.readFileSync(path.join(RACINE, 'version.json'), 'utf-8')).version;
-verifier("la version 498", v === 498 && /VERSION_IVALIS = 498/.test(fs.readFileSync(path.join(RACINE, 'trace_combat.js'), 'utf-8')));
+verifier("la version 498 ou plus", v >= 498 && Number((fs.readFileSync(path.join(RACINE, 'trace_combat.js'), 'utf-8').match(/VERSION_IVALIS = (\d+)/) || [])[1]) >= 498);
 const imp = fs.readdirSync(RACINE).filter(f => f.endsWith('.js')).filter(f => /camp_pur\.js\?v=/.test(fs.readFileSync(path.join(RACINE, f), 'utf-8')));
 verifier("tous les modules importent camp_pur.js?v=19", imp.length > 0 && imp.every(f => /camp_pur\.js\?v=19"/.test(fs.readFileSync(path.join(RACINE, f), 'utf-8'))), imp.join(" "));
 verifier("index.html : retour_camp.js?v=13", /retour_camp\.js\?v=13"/.test(html));

@@ -25,7 +25,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, writeBatch, deleteDoc, deleteField } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as P from "./social_pur.js?v=7";
+import * as P from "./social_pur.js?v=8";
 
 const PARTIES = "Systeme_Parties";
 const refAme = (p, id) => doc(db, PARTIES, p, "Ames", id);
@@ -317,7 +317,7 @@ RÈGLES :
 - Ce qu'un personnage n'a ni vu ni appris ne change rien pour lui. S'il l'APPREND parce qu'on le lui raconte dans la scène (« Syrinx raconte à Thalia que Tartuf l'a sauvée »), c'est l'action « raconter » : acteur = celui qui raconte, cible = celui qui écoute, et « rapporte » = l'acte raconté (son auteur, son type, sa cible).
 - Quand un personnage prend parti contre un autre ou le contredit ouvertement (il défend les aventuriers contre Mael, il désavoue un ordre de Mael devant tous), ajoute « s_opposer » de lui envers celui qu'il contredit : c'est ce dernier qui le vit mal, jamais l'inverse. Vérifie toujours le sens : l'acteur est celui qui agit, la cible celui qui subit.
 - « extrait » : quatre à huit mots EXACTS du texte où cela se passe (celui du Maître du Jeu de préférence).
-- L'attirance se découvre, rarement : un geste tendre, un regard troublé, une main gardée un peu trop longtemps → « geste_tendre » ; des avances (une invitation, un compliment appuyé) → « courtiser » ; des avances repoussées → « repousser » (acteur = celui qui repousse). Ne les invente jamais : seulement quand le texte le montre.
+- L'attirance : un geste tendre, un regard troublé, une main gardée un peu trop longtemps → « geste_tendre » ; un flirt, des avances (un compliment appuyé sur sa beauté ou son charme, une œillade, une taquinerie charmeuse, une invitation à passer du temps seul à seul) → « courtiser », y compris quand un joueur fait flirter son héros avec un PNJ, même s'il ne fait que le dire ; des avances repoussées → « repousser » (acteur = celui qui repousse). Ne les invente jamais : seulement quand le texte le montre (la politesse ou l'amitié ne sont pas un flirt).
 - Six événements au plus ; s'il ne s'est rien passé entre eux, une liste vide.
 - Souvenirs : pour chaque PNJ marqué par la scène, UNE phrase à la première personne (ce qu'il en retiendra), et de qui elle parle.
 - Ne donne JAMAIS de chiffre de relation.
@@ -813,6 +813,16 @@ export async function verifierLiensForts(p, cles, connu = {}) {
         const ev = P.evolutionLienFort(l, ames);
         if (!ev.action) continue;
         const nD = nomAme(ames, l.de), nV = nomAme(ames, l.vers), maintenant = Date.now();
+        if (ev.action === "proposerAmour") {
+            // (v499) L'amitié profonde d'un héros, gagnée par l'attirance : son joueur dit si c'est devenu de l'amour.
+            if (l.propose) continue;
+            const joueur = await joueurDuHeros(l.de);
+            if (!joueur) continue;
+            propositions[k] = { de: l.de, vers: l.vers, nomDe: nD, nomVers: nV, joueur, amourPossible: true, evolution: "amour", le: maintenant };
+            lot.set(doc(db, PARTIES, p, "Liens", k), { propose: { le: maintenant } }, { merge: true }); ecrit = true;
+            faits.push({ cle: k, action: "proposerAmour" });
+            continue;
+        }
         if (ev.action === "proposer") {
             if (l.propose || l.refuse) continue;   // déjà demandé (ou décliné) : on ne harcèle pas le joueur
             const joueur = await joueurDuHeros(l.de);
@@ -822,18 +832,22 @@ export async function verifierLiensForts(p, cles, connu = {}) {
             faits.push({ cle: k, action: "proposer" });
             continue;
         }
-        if (ev.action === "sceller") {
-            lot.set(doc(db, PARTIES, p, "Liens", k), { fort: { type: ev.type, le: maintenant } }, { merge: true });
+        if (ev.action === "sceller" || ev.action === "approfondir") {
+            const devenu = ev.action === "approfondir";   // (v499) une amitié profonde devenue amour
+            lot.set(doc(db, PARTIES, p, "Liens", k), { fort: { type: ev.type, le: maintenant, ...(devenu ? { depuis: "amitie" } : {}) } }, { merge: true });
             lot.set(doc(db, PARTIES, p, "Souvenirs", `fort_${k}_${maintenant}`), { ame: l.de, sujets: [l.vers], importance: 3, tour: 0, Le: maintenant,
-                texte: ev.type === "amour" ? `Je crois que j'aime ${nV}.` : `${nV} compte pour moi comme un frère ou une sœur d'armes.` });
+                texte: devenu ? `Ce que je ressens pour ${nV} n'est plus seulement de l'amitié : je l'aime.` : ev.type === "amour" ? `Je crois que j'aime ${nV}.` : `${nV} compte pour moi comme un frère ou une sœur d'armes.` });
             // Le héros que ce PNJ aime ou chérit : son joueur dit ce que son héros ressent, s'il ne l'a pas déjà dit.
+            // (v499) Un héros déjà son ami profond, quand ce PNJ se met à l'aimer : son joueur dit si c'est réciproque.
             if ((ames[l.vers] || {}).type === "heros") {
                 const inv = P.cleLien(l.vers, l.de), li = liens[inv] || (await getDoc(doc(db, PARTIES, p, "Liens", inv))).data() || null;
-                if (!(li && (li.fort || li.propose || li.refuse))) {
+                const parce = ev.type === "amour" ? `${nD} est tombé·e amoureux·se de ${nV}.` : `${nD} tient profondément à ${nV}.`;
+                const amitieAGagner = ev.type === "amour" && li && li.fort && li.fort.type === "amitie" && !li.propose && !li.amourRefuse && !li.declare;
+                if (!(li && (li.fort || li.propose || li.refuse)) || amitieAGagner) {
                     const joueur = await joueurDuHeros(l.vers);
                     if (joueur) {
                         propositions[inv] = { de: l.vers, vers: l.de, nomDe: nV, nomVers: nD, joueur, amourPossible: !P.estNarrateur(l.de, ames[l.de]),
-                            parce: ev.type === "amour" ? `${nD} est tombé·e amoureux·se de ${nV}.` : `${nD} tient profondément à ${nV}.`, le: maintenant };
+                            ...(amitieAGagner ? { evolution: "amour" } : {}), parce, le: maintenant };
                         lot.set(doc(db, PARTIES, p, "Liens", inv), { de: l.vers, vers: l.de, propose: { le: maintenant } }, { merge: true });
                     }
                 }
@@ -865,8 +879,17 @@ export async function repondreProposition(p, cle, choix) {
     if (!pr) return "Cette proposition n'existe plus.";
     const lot = writeBatch(db), maintenant = Date.now();
     if (choix === "amour" && !pr.amourPossible) return "Ce lien ne peut pas être un amour.";
-    if (choix === "amitie" || choix === "amour") {
-        lot.set(doc(db, PARTIES, p, "Liens", cle), { de: pr.de, vers: pr.vers, fort: { type: choix, le: maintenant, choisi: true }, propose: deleteField() }, { merge: true });
+    if (pr.evolution === "amour") {
+        // (v499) Une amitié profonde devenue amour ? Oui : un amour ; non : l'amitié reste, et on ne le redemande plus.
+        if (choix === "amour") {
+            lot.set(doc(db, PARTIES, p, "Liens", cle), { de: pr.de, vers: pr.vers, fort: { type: "amour", le: maintenant, choisi: true, depuis: "amitie" }, propose: deleteField() }, { merge: true });
+            const e = (await getDoc(refEtat(p))).data() || {};
+            lot.set(refEtat(p), { momentsLiens: [...(e.momentsLiens || []), { texte: P.momentDuLien(pr.nomDe, pr.nomVers, "approfondir", "amour"), ids: [pr.de, pr.vers], le: maintenant }].slice(-8) }, { merge: true });
+        } else lot.set(doc(db, PARTIES, p, "Liens", cle), { de: pr.de, vers: pr.vers, amourRefuse: true, propose: deleteField() }, { merge: true });
+    } else if (choix === "amitie" || choix === "amour") {
+        // (v499) L'amitié choisie alors que l'attirance offrait l'amour : on ne la reproposera pas en amour.
+        const attire = choix === "amitie" && P.nombre((((await getDoc(doc(db, PARTIES, p, "Liens", cle))).data() || {}).axes || {}).attirance) >= P.SEUILS_AFFECTION.attirance;
+        lot.set(doc(db, PARTIES, p, "Liens", cle), { de: pr.de, vers: pr.vers, fort: { type: choix, le: maintenant, choisi: true }, propose: deleteField(), ...(attire ? { amourRefuse: true } : {}) }, { merge: true });
         const e = (await getDoc(refEtat(p))).data() || {};
         lot.set(refEtat(p), { momentsLiens: [...(e.momentsLiens || []), { texte: P.momentDuLien(pr.nomDe, pr.nomVers, "sceller", choix), ids: [pr.de, pr.vers], le: maintenant }].slice(-8) }, { merge: true });
     } else lot.set(doc(db, PARTIES, p, "Liens", cle), { de: pr.de, vers: pr.vers, refuse: true, propose: deleteField() }, { merge: true });
