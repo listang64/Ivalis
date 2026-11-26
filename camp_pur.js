@@ -763,6 +763,17 @@ function alchimieCamp(idA, idB) {
     for (const ch of `alchimie:${a}~${b}`) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); }
     return (h >>> 0) / 4294967296 < 0.25;
 }
+// (v498) Nico : « l'attirance doit pouvoir monter aussi : avec le temps, plus les personnages se rapprochent ». Le
+// temps passé au camp fait naître ou grandir l'attirance d'autant plus vite que le lien est proche (l'affection de
+// social_pur.js : 0,5 × attachement + 0,3 × confiance + 0,2 × familiarité) ; rien sous la sympathie (20). Plus vite
+// avec l'alchimie de la paire, deux fois moins vite sans tâche partagée. `jours` : déjà borné (15 au plus).
+export const ATTIRANCE_DU_TEMPS = { seuil: 20, plage: 45, parJour: 0.8, sansAlchimie: 0.35, chacunSonPoste: 0.5 };
+export function attiranceDuTemps(axes, jours, o = {}) {
+    const a = axes || {}, n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0, R = ATTIRANCE_DU_TEMPS;
+    const proche = 0.5 * n(a.attachement) + 0.3 * n(a.confiance) + 0.2 * n(a.familiarite);
+    if (proche <= R.seuil || !(jours > 0)) return 0;
+    return Math.round(Math.min(1, (proche - R.seuil) / R.plage) * jours * R.parJour * (o.alchimie ? 1 : R.sansAlchimie) * (o.ensemble ? 1 : R.chacunSonPoste));
+}
 export function evolutionAffinites(e) {
     const ids = (e.presents || []).filter(Boolean), jours = Math.max(0, Number(e.jours) || 0), out = [];
     if (!jours) return out;
@@ -775,10 +786,18 @@ export function evolutionAffinites(e) {
         if (ensemble) axes.confiance = Math.round(c * j / 6);
         // (v497) Une attirance qui se découvre : deux âmes qui travaillent ensemble et s'accordent, quand la paire a son
         // alchimie (une sur quatre, social_pur.js, alchimie) ; jamais avec Thémès.
-        if (ensemble && c > 0.2 && alchimieCamp(A, B) && !estThemes(A, (e.membres || {})[A]) && !estThemes(B, (e.membres || {})[B])) axes.attirance = Math.max(1, Math.round(c * j / 6));
-        Object.keys(axes).forEach(k => { if (!axes[k]) delete axes[k]; });
-        if (!Object.keys(axes).length) continue;
-        out.push({ de: A, vers: B, axes: { ...axes }, ensemble }, { de: B, vers: A, axes: { ...axes }, ensemble });
+        const alch = alchimieCamp(A, B), themes = estThemes(A, (e.membres || {})[A]) || estThemes(B, (e.membres || {})[B]);
+        if (ensemble && c > 0.2 && alch && !themes) axes.attirance = Math.max(1, Math.round(c * j / 6));
+        // (v498) Et, de chaque côté, l'attirance que le temps fait grandir entre deux êtres déjà proches (`e.liens` :
+        // { "A~B": { axes } }, les fils invisibles avant l'expédition).
+        const sens = [[A, B], [B, A]].map(([de, vers]) => {
+            const ax = { ...axes };
+            const plus = themes ? 0 : attiranceDuTemps(((e.liens || {})[`${de}~${vers}`] || {}).axes, j, { alchimie: alch, ensemble });
+            if (plus) ax.attirance = (ax.attirance || 0) + plus;
+            Object.keys(ax).forEach(k => { if (!ax[k]) delete ax[k]; });
+            return { de, vers, axes: ax, ensemble };
+        }).filter(x => Object.keys(x.axes).length);
+        out.push(...sens);
     }
     return out;
 }

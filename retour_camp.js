@@ -15,7 +15,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, runTransaction, addDoc, collection } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=18";
+import * as CP from "./camp_pur.js?v=19";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -67,10 +67,12 @@ export async function apresLeRetour(r, alea = Math.random) {
     }
     // 2. LES AFFINITÉS entre ceux qui ont partagé une tâche ou un repas.
     const ames = await lireAmes(p, presents);
+    let liens = {};
+    if (window.SOCIAL && window.SOCIAL.lireLiens) { try { liens = await window.SOCIAL.lireLiens(p, presents); } catch (e) { console.warn("[Retour] Les fils invisibles :", e); } }
     const s1 = await getDoc(doc(db, PARTIES, p));
     const camp = (s1.exists() ? s1.data() : {}).Camp || d0.Camp;
     const ecarts = CP.evolutionAffinites({ presents, jours, taches: Object.fromEntries(presents.map(id => [id, (camp.Membres[id] || {}).Tache || null])),
-        psyches: Object.fromEntries(presents.map(id => [id, (ames[id] || {}).psyche || {}])), moraux: Object.fromEntries(presents.map(id => [id, (camp.Membres[id] || {}).Moral])), membres: camp.Membres });
+        psyches: Object.fromEntries(presents.map(id => [id, (ames[id] || {}).psyche || {}])), moraux: Object.fromEntries(presents.map(id => [id, (camp.Membres[id] || {}).Moral])), membres: camp.Membres, liens });
     if (ecarts.length && window.SOCIAL && window.SOCIAL.ajusterLiensDuCamp) {
         try { await window.SOCIAL.ajusterLiensDuCamp(p, ecarts, `La vie du camp pendant l'expédition ${r.Numero} (${jours} jour${jours > 1 ? "s" : ""}).`); }
         catch (e) { console.warn("[Retour] Les affinités :", e); }

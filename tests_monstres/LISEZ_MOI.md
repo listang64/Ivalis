@@ -12792,3 +12792,9 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Les écritures** (`social.js`, `verifierLiensForts`) : le lien d'un PNJ se scelle seul (un souvenir) ; celui d'un héros devient un post-it pour son joueur (`Liens_Proposes`) : amitié, amour ou rien. Entre deux héros de joueurs, la déclaration depuis la fiche de l'autre (`declarerLien`, `Declarations_Liens`), acceptée ou refusée par son joueur. Plusieurs liens forts possibles ; aucun effet en combat.
 - **L'affichage** (`liens_forts.js`, `.css` : post-its et cache) : les liens chers sur la fiche (`grimoire_fiches.js`), ❤/✦ dans la gestion du camp, les fils rouge (amour) et or (amitié) du réseau, en tirets s'ils ne sont pas réciproques (`grimoire_liens.js`) ; le MJ et la discussion privée en tiennent compte (`coeursDuMJ`, `discussion_privee.js`).
 - corrections_v497 le vérifie ; corrections_v425 et social_pur adaptés (sept fils, vingt-sept actions).
+
+## v498 — L'attirance qui grandit avec le temps
+
+- **Le temps rapproche** (`camp_pur.js`, `attiranceDuTemps`, `ATTIRANCE_DU_TEMPS`) : au retour d'une expédition, chaque jour passé ensemble au camp fait grandir l'attirance d'autant plus vite que le lien est proche (l'affection de `social_pur.js`, au-dessus de la sympathie, 20) : jusqu'à +0,8 par jour pour deux êtres très proches qui ont leur alchimie et partagent une tâche (+12 sur 15 jours) ; trois fois moins vite sans alchimie, deux fois moins chacun à son poste. Chaque sens à part (l'un peut s'éprendre sans l'autre) ; jamais avec Thémès. Elle s'ajoute à la découverte de v497.
+- **Les fils d'avant** (`retour_camp.js`) : le retour lit les liens des présents (`SOCIAL.lireLiens`) et les passe à `evolutionAffinites` (`liens`).
+- corrections_v498 le vérifie.
