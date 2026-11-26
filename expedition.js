@@ -21,7 +21,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, runTransaction, updateDoc, deleteField, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=21";
+import * as CP from "./camp_pur.js?v=22";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -218,6 +218,54 @@ async function revenir() {
     finally { occupe = false; }
 }
 
+// (v502) LE RETOUR, CHEZ CHAQUE JOUEUR. Nico : « quoi qu'il arrive, il faut montrer le rapport de l'intendant en notre
+// absence dans le RP avant ; une fois qu'on va au camp, alors le conseil extraordinaire se met » ; « quand une expédition
+// revient au camp, ça ouvre tout seul la fenêtre du camp ». Le récit de l'expédition est rangé, le rapport ouvre le
+// chapitre suivant ; le temps de le lire, puis le camp s'ouvre (le conseil extraordinaire attend le camp, conseil.js).
+export const LECTURE_RAPPORT = { parSigne: 55, min: 9000, max: 28000, sansRapport: 4000, attenteMax: 120000 };
+export const delaiLecture = (texte) => Math.max(LECTURE_RAPPORT.min, Math.min(LECTURE_RAPPORT.max, LECTURE_RAPPORT.parSigne * String(texte || "").length));
+let etaitEnCours = null, retour = null;
+function ouvrirLeCampApresLeRetour() {
+    if (!retour || retour.ouvert) return;
+    retour.ouvert = true; clearTimeout(retour.minuteur);
+    if (window.CAMP_SCENE && window.CAMP_SCENE.ouvert && !window.CAMP_SCENE.ouvert()) Promise.resolve(window.CAMP_SCENE.ouvrir()).catch(() => {});
+}
+export function suivreRetour(data) {
+    const e = data && data.Expedition, c = data && data.Camp, enCours = !!(e && e.En_Cours);
+    if (etaitEnCours === true && !enCours && c && c.Dernier_Retour) {
+        const r = c.Dernier_Retour, partis = new Set(r.Membres || []);
+        const restes = Object.keys(c.Membres || {}).filter(id => !partis.has(id) && !CP.estThemes(id, c.Membres[id]));
+        retour = { numero: Number(r.Numero) || 0, le: Date.now(), ouvert: false, minuteur: null };
+        // Personne au camp : pas de rapport, le camp s'ouvre une fois le récit rangé ; sinon, au plus tard après attenteMax.
+        retour.minuteur = setTimeout(ouvrirLeCampApresLeRetour, restes.length ? LECTURE_RAPPORT.attenteMax : LECTURE_RAPPORT.sansRapport);
+    }
+    etaitEnCours = enCours;
+    if (!retour || retour.ouvert || retour.lu || !c) return;
+    const rap = c.Dernier_Rapport;
+    if (rap && Number(rap.Expedition) === retour.numero) {
+        retour.lu = true; clearTimeout(retour.minuteur);
+        retour.minuteur = setTimeout(ouvrirLeCampApresLeRetour, delaiLecture(rap.Texte));
+    }
+}
+export const retourEnCours = () => (retour && !retour.ouvert ? { ...retour } : null);
+// (v502) Nico : « parti en expédition seul, le RP me comptait comme si mes deux frères et leurs personnages étaient là ».
+// Pendant une expédition, le récit ne compte que ses membres : les autres héros sont restés au camp.
+export function herosEnJeu(liste) {
+    const e = expedition();
+    if (!e || !e.En_Cours || !camp() || !Array.isArray(liste)) return liste;
+    const m = new Set(e.Membres || []), l = liste.filter(h => h && m.has(h.idPersonnage));
+    return l.length ? l : liste;
+}
+window.herosEnJeu = herosEnJeu;
+export function contexteExpeditionMJ() {
+    const e = expedition(), c = camp();
+    if (!e || !e.En_Cours || !c) return "";
+    const nom = (id) => { const h = persos().find(x => x && x.idPersonnage === id); return h ? [h.prenom, h.nom].filter(Boolean).join(" ").trim() : ((window.CAMP && window.CAMP.nomConnu && window.CAMP.nomConnu(id)) || ((c.Membres || {})[id] || {}).Nom || ""); };
+    const membres = (e.Membres || []).map(nom).filter(Boolean);
+    const restes = [...new Set([...Object.keys(c.Membres || {}), ...persos().filter(h => h && h.actif !== false && !h.estMonstre).map(h => h.idPersonnage)])]
+        .filter(id => !(e.Membres || []).includes(id) && !CP.estThemes(id, (c.Membres || {})[id])).map(nom).filter(Boolean);
+    return `--- L'EXPÉDITION ${Number(e.Numero) || ""} ---\nSEULS font partie de l'expédition : ${membres.join(", ") || "personne"}.${restes.length ? `\nRestés au camp (ILS NE SONT PAS LÀ : ne les fais ni parler, ni agir, ni apparaître) : ${restes.join(", ")}.` : ""}`;
+}
 // LE BONUS AUX TESTS DES SUIVEURS (Constitution, Intelligence, Sagesse, Charisme) : un atout de plus pour les héros
 // de l'expédition en cours (app.js, atoutRace).
 window.atoutExpedition = function (perso) {
@@ -248,5 +296,5 @@ export async function choisirPourArene(perso, coche = true) {
     });
 }
 
-window.EXPEDITION = { expedition, jouables, jouablesExpedition, incarner, monter, annuler, prendrePlace, quitterPlace, emmener, laisser, reglerProvisions, refusDepart, veiller,
+window.EXPEDITION = { suivreRetour, retourEnCours, delaiLecture, herosEnJeu, contexteExpeditionMJ, expedition, jouables, jouablesExpedition, incarner, monter, annuler, prendrePlace, quitterPlace, emmener, laisser, reglerProvisions, refusDepart, veiller,
                       choixArene, areneActive, choisirPourArene, regles: CP };

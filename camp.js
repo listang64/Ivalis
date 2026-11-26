@@ -15,7 +15,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection, deleteField, runTransaction, increment, addDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=21";
+import * as CP from "./camp_pur.js?v=22";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -37,6 +37,8 @@ window.appliquerCampDeLaPartie = function(data) {
     if (JSON.stringify(camp && camp.Position) !== avant) redessiner();
     // (v490) La partie vient de naître : son camp se pose tout seul.
     if (!camp && data && data.Camp_A_Creer) setTimeout(() => creerCampAuto(), 0);
+    // (v502) Le retour d'une expédition, chez chaque joueur : le rapport de l'intendant, puis le camp (expedition.js).
+    try { if (window.EXPEDITION && window.EXPEDITION.suivreRetour) window.EXPEDITION.suivreRetour(data); } catch (e) {}
     // (v483) L'expédition part quand le groupe quitte la case du camp, finit quand il y revient (expedition.js).
     if (camp && data && data.Expedition) setTimeout(() => { try { if (window.EXPEDITION) window.EXPEDITION.veiller(); } catch (e) {} }, 0);
     // (v487) Le déplacement du camp : le voyage du clan part, puis s'achève (deplacement_camp.js).
@@ -275,8 +277,16 @@ async function lireDoc(col, id) {
     cacheInfos.set(col + "/" + id, { d, le: Date.now() });
     return d;
 }
+// (v502) Les derniers noms lus (le narrateur, les missions : sans attendre la base).
+let derniersNoms = {};
+export const nomConnu = (id) => derniersNoms[id] || ((camp && camp.Membres && camp.Membres[id]) || {}).Nom || "";
 export async function infosMembres() {
     if (!camp) return {};
+    const res = await infosMembresLues();
+    Object.values(res).forEach(i => { if (i && i.id && i.nom) derniersNoms[i.id] = i.nom; });
+    return res;
+}
+async function infosMembresLues() {
     const persos = window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || [];
     const out = {};
     await Promise.all(Object.keys(camp.Membres || {}).map(async (id) => {
@@ -479,7 +489,13 @@ window.majReputationRegions = function () {
 };
 
 // (v484) THÉMÈS, LE NARRATEUR (étape 7) : ce que le narrateur reçoit dès que le clan a un camp (ia_master.js).
-export const consignesThemes = () => (camp ? CP.CONSIGNES_THEMES : "");
+// (v502) Le clan reste du côté des héros (pour le narrateur, les missions et leur plan) : les noms de ses PNJ.
+export const regleClanLoyal = () => {
+    if (!camp) return "";
+    if (!Object.keys(derniersNoms).length) infosMembres().catch(() => {});   // la prochaine fois, avec leurs noms
+    return CP.REGLE_CLAN_LOYAL(Object.entries(camp.Membres || {}).filter(([id, m]) => m && m.Type !== "heros" && !CP.estThemes(id, m)).map(([id]) => nomConnu(id)).filter(Boolean));
+};
+export const consignesThemes = () => (camp ? `${CP.CONSIGNES_THEMES}\n- ${regleClanLoyal()}` : "");
 
 // (v500) LES OUTILS DEV de la gestion : des provisions, des drachmes dans la caisse ; renvoyer un membre du camp.
 export async function ajouterAuCampDev(o = {}) {
@@ -513,6 +529,6 @@ export async function renvoyerDuCampDev(id) {
         });
     } catch (e) { console.error("[Camp] Renvoyer :", e); return "La base n'a pas répondu."; }
 }
-window.CAMP = { ajouterAuCampDev, renvoyerDuCampDev, consignesThemes, echoReputation, contexteReputationMJ, lire: lireCamp, creerCampDev, creerCampAuto, rattraperMembres, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
+window.CAMP = { nomConnu, regleClanLoyal, ajouterAuCampDev, renvoyerDuCampDev, consignesThemes, echoReputation, contexteReputationMJ, lire: lireCamp, creerCampDev, creerCampAuto, rattraperMembres, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
                 partis, postesBloques, infosMembres, assignerTache, nommerIntendant, changerMoral, journeeDuCamp };
 window.journeeDuCamp = journeeDuCamp;

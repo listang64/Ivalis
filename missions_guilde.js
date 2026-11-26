@@ -79,11 +79,13 @@ function lieuxConnus() {
     return Object.values(window.VILLAGES_REGIONAUX || {}).filter(v => v && v.id && v.nom)
         .map(v => ({ id: v.id, nom: v.nom, type: v.type || "Lieu", region: v.numero })).slice(0, 80);
 }
+// (v502) Nico : « pas d'intrigue qui démontre qu'un de mes PNJ du clan est mauvais » (camp.js, regleClanLoyal).
+const regleClan = () => { try { const r = window.CAMP && window.CAMP.regleClanLoyal ? window.CAMP.regleClanLoyal() : ""; return r ? `\n${r}` : ""; } catch (e) { return ""; } };
 export function promptMissions(difficultes, contexte) {
     const regions = contexte.regions.map(r => `- Région ${r.numero} « ${r.nom} » : ${r.texte || "(pas de description)"}`).join("\n");
     const lieux = contexte.lieux.length ? contexte.lieux.map(l => `- ${l.id} : ${l.nom} (${l.type}, région ${l.region})`).join("\n") : "(aucun lieu connu pour l'instant)";
     return `Tu es MIA_MISSIONS, le scribe d'Ivalis : tu rédiges les missions qu'un clan nomade d'aventuriers peut entendre et accepter.
-Le monde : Ivalis, un monde antique fantastique (mythologie, Antiquité magique). Rien d'anachronique, rien de farfelu ; pas de technologie moderne.
+Le monde : Ivalis, un monde antique fantastique (mythologie, Antiquité magique). Rien d'anachronique, rien de farfelu ; pas de technologie moderne.${regleClan()}
 
 LA DIFFICULTÉ :
 - normale : ${DIFFICULTES.normale.consigne}
@@ -338,7 +340,8 @@ La mission que le groupe vient d'accepter :
 - Objectif : ${m.Objectif}
 - Le mot du commanditaire : ${m.Lettre}
 
-Prépare le plan complet de cette mission : une intrigue cohérente, jouable, à la hauteur de sa difficulté, avec ses secrets. Réponds UNIQUEMENT en JSON :
+Prépare le plan complet de cette mission : une intrigue cohérente, jouable, à la hauteur de sa difficulté, avec ses secrets.${regleClan()}
+Réponds UNIQUEMENT en JSON :
 {
   "connu_des_joueurs": "ce que les héros savent au départ (2 à 3 phrases)",
   "verite_cachee": "ce qui se passe vraiment, qui est derrière, ce que le commanditaire tait (3 à 5 phrases)",
@@ -596,6 +599,14 @@ export async function voterAbandon(reponse) {
     if (r && r.abandon) await terminerMission("abandonnee", "Le groupe a abandonné la mission.");
     return r;
 }
+// (v502) DEV : forcer l'annulation de la tâche (sans attendre les votes).
+export async function forcerAbandon() {
+    let dev = false; try { dev = localStorage.getItem("ivalis_DEV_MODE") === "on"; } catch (e) {}
+    if (!dev || !idPartie() || !missionEnCours) return null;
+    son("page-tourne");
+    await terminerMission("abandonnee", "Le groupe a abandonné la mission (DEV).");
+    return { abandon: true, force: true };
+}
 let terminees = [], termineesDe = "";
 async function lireTerminees(forcer) {
     const id = idPartie();
@@ -635,4 +646,4 @@ window.MISSIONS_GUILDE = { DIFFICULTES, IMAGE_SCEAU_DIFFICILE, difficulteDe, htm
                           promptMissions, genererMissions, genererMission, lancerMission,
                           lireMission, relireLaMission, surMission, preparerMission, promptPlan, marqueMission,
                           contexteMissionMJ, suivreApresMJ, terminerMission, partie: () => partie,
-                          ecrireNotes, voterAbandon, missionsReussies, relireTerminees, missionAccomplie, sceauCire, REPIT_APRES_MISSION, idJoueur };
+                          ecrireNotes, voterAbandon, forcerAbandon, missionsReussies, relireTerminees, missionAccomplie, sceauCire, REPIT_APRES_MISSION, idJoueur };

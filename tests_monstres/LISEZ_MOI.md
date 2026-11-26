@@ -12821,3 +12821,14 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **La page** (`conseil.css`) : les avatars deux fois plus grands (80 px), centrés sur leur bulle ; l'avatar de Thémès (sa fiche de PNJ) ; la dictée (le chat, le titre et le résumé d'une proposition) ; le formulaire n'est plus effacé à chaque message ; « Mettre fin au conseil » ouvre une fenêtre au style du jeu, avec un mot de Thémès.
 - **Le vote fini** (`FERMETURE_APRES_VOTE_MS`) : « Le conseil se lève dans … secondes », puis la page se ferme (retour au camp) ; le poste qui a clos le vote efface le conseil (la tâche votée reste).
 - corrections_v501 le vérifie ; corrections_v485, v491 et v495 adaptés.
+
+## v502 — L'expédition et son retour
+
+- **Le récit ne compte que l'expédition** (`expedition.js` : `herosEnJeu`, `contexteExpeditionMJ` ; `groupe.js` ; `ia_master.js`, `enJeu`) : pendant une expédition, seuls ses membres sont les héros du récit, des fils invisibles et du tour ; le narrateur sait qui est resté au camp (« ils ne sont pas là »).
+- **Les bulles** (`grimoire_groupe.js`, `.css`, `ouvrirBulles`) : prendre une place ou emmener un suiveur ouvre, sur un léger voile noir, les bulles des avatars disponibles (nom, profession ou bonus), qui apparaissent en cascade.
+- **Revenir au camp** : un bouton à l'aquarelle sur la page de l'expédition.
+- **Le retour, chez chaque joueur** (`expedition.js`, `suivreRetour`, `delaiLecture` ; `conseil.js`, `veiller` ; `camp_scene.js`) : le récit rangé, le rapport de l'intendant ouvre le chapitre ; le temps de le lire (9 à 28 s), puis le camp s'ouvre tout seul ; le conseil extraordinaire ne se réunit qu'une fois le joueur dans le camp.
+- **Le rapport sans chiffres** (`camp_pur.js` : `motMoral`, `motProvisions`, `motCaisse`, `motAlentours` ; `retour_camp.js`).
+- **Le clan du côté des héros** (`camp_pur.js`, `REGLE_CLAN_LOYAL` ; `camp.js`, `regleClanLoyal`, `nomConnu` ; `missions_guilde.js`) : pour le narrateur, les missions et leur plan, aucun membre du clan (ni le conseil) n'est traître, complice ou menteur.
+- **Annuler une tâche (DEV)** (`grimoire_mission.js`, `missions_guilde.js`, `forcerAbandon`) : pendant un vote d'abandon, « Annuler (DEV : forcer le vote) » en rouge.
+- corrections_v502 le vérifie ; corrections_v484, v485 et v490 adaptés.

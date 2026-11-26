@@ -207,7 +207,7 @@ await section(async () => {
   verifier("un autre joueur ne le prend pas pendant qu'il part avec quelqu'un (sa fiche ne change pas de main)", /part déjà/.test(r.vol) && r.apresVol === "J1", r.vol + " " + r.apresVol);
   verifier("la place libérée, un autre joueur le prend : la même fiche passe à lui", r.prise === "" && r.apresPrise === "J2" && r.nbFiches === 2, `${r.prise} ${r.apresPrise} ${r.nbFiches}`);
   const g = lire("grimoire_groupe.js");
-  verifier("la page Expédition : les personnages du camp sont des boutons comme les siens (grimoire_groupe.js)", /EXP_\(\)\.jouablesExpedition\(moi\)/.test(g) && /libres\.map\(id => bouton\(id, classeLibre\(id\)\)\)/.test(g));
+  verifier("la page Expédition : les personnages du camp sont des boutons comme les siens (grimoire_groupe.js)", /EXP_\(\)\.jouablesExpedition\(moi\)/.test(g) && /ids: libres, pris: occupe/.test(g)   /* (v502) en bulles */);
 });
 
 titre("3. LES COMPÉTENCES : LA FORGE OUVERTE À TOUS POUR UN PERSONNAGE DU CAMP ; LE HÉROS PRINCIPAL MORT");

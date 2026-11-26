@@ -35,7 +35,8 @@ const memeNom = (a, b) => typeof window.memeNomPNJIvalis === "function" ? window
 // Les héros de la partie (joueurs, actifs).
 export function herosDeLaPartie() {
     const l = (window.PERSOS_JOUEURS_PARTIE && window.PERSOS_JOUEURS_PARTIE.length ? window.PERSOS_JOUEURS_PARTIE : window.PERSOS_PARTIE) || [];
-    return l.filter(h => h && h.idPersonnage && !h.estMonstre && !h.estIllusion && h.actif !== false);
+    const out = l.filter(h => h && h.idPersonnage && !h.estMonstre && !h.estIllusion && h.actif !== false);
+    return typeof window.herosEnJeu === "function" ? window.herosEnJeu(out) : out;   // (v502) en expédition : ses membres
 }
 // Les compagnons du Pisteur : { nom, description, caractere, blessures, mort, maitre }.
 export function compagnonsDuGroupe(heros) {

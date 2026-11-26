@@ -241,6 +241,8 @@ await section(async () => {
 
 titre("5. LE CONSEIL EXTRAORDINAIRE");
 await section(async () => {
+  // (v502) Le conseil extraordinaire se réunit une fois que le joueur est dans la page du camp.
+  await p.evaluate(() => { window.CAMP_SCENE.ouvert = () => true; });
   await p.evaluate(() => { window.CONSEIL.fermerVue(); const d = window.__docs["Systeme_Parties/P1"]; d.Camp.Conseil_Extraordinaire = { Raison: "Le camp n'a plus de provisions." }; d.Camp.Provisions = 0;
     window.appliquerVoyageDeLaPartie(JSON.parse(JSON.stringify(d))); });
   await p.waitForTimeout(1200);

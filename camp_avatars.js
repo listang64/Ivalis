@@ -25,7 +25,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=21";
+import * as CP from "./camp_pur.js?v=22";
 
 const VERROU_MS = 10 * 60 * 1000;
 const idPartie = () => window.ID_PARTIE_COURANTE || "";

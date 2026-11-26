@@ -15,7 +15,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, runTransaction, addDoc, collection } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=21";
+import * as CP from "./camp_pur.js?v=22";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -84,7 +84,7 @@ export async function apresLeRetour(r, alea = Math.random) {
         numero: r.Numero, jours, intendant: nom(intendant), caractere: window.SOCIAL && window.SOCIAL.caractere ? window.SOCIAL.caractere((ames[intendant] || {}).psyche) : "",
         heros: (r.Membres || []).filter(id => !CP.estThemes(id, camp.Membres[id])).map(nom), journal, evenements: evenements.map(ev => ev.texte),
         caisse: Number(camp.Caisse) || 0, provisions: Number(camp.Provisions) || 0, jauge: (camp.Ressources || {}).Jauge,
-        moraux: presents.map(id => `${nom(id)} ${Number.isFinite(Number((camp.Membres[id] || {}).Moral)) ? (camp.Membres[id] || {}).Moral : 60}/100`),
+        moraux: presents.map(id => `${nom(id)} est ${CP.motMoral((camp.Membres[id] || {}).Moral)}`),   // (v502) des mots, pas de chiffres
         scenes: CP.nombreDeScenes(jours, alea), presents: presents.map(nom)
     });
     let rapport = "";

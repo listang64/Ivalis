@@ -77,3 +77,4 @@
   font-family: var(--police-titres, 'Berkshire Swash'), 'Almendra', cursive !important; font-weight: var(--poids-titres, 400) !important; }
 .papier-recompenses .fleuron-mission { width: 40%; }
 .liste-recompenses { flex: 1; min-height: calc(80px * var(--s, 1)); }
+.forcer-abandon { align-self: center !important; margin-top: calc(var(--u) * 1) !important; color: #a3201a !important; font-weight: 700; }

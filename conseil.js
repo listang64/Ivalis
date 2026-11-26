@@ -19,7 +19,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, addDoc, collection, query, where, onSnapshot, runTransaction, deleteField, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=21";
+import * as CP from "./camp_pur.js?v=22";
 
 const PARTIES = "Systeme_Parties";
 export const ATTENTE_IA_MS = 6000;
@@ -542,8 +542,12 @@ async function surClic(ev) {
 export async function veiller() {
     const c = camp(), d = window.PARTIE_DATA || {};
     if (!idPartie() || !c) return;
+    // (v502) Nico : « le rapport de l'intendant dans le RP avant ; une fois qu'on va au camp, le conseil extraordinaire
+    // se met » : rien ne s'ouvre ni ne se réunit tout seul tant que ce joueur n'est pas dans la page du camp.
+    const dansLeCamp = !!(window.CAMP_SCENE && window.CAMP_SCENE.ouvert && window.CAMP_SCENE.ouvert());
+    if (!dansLeCamp && !ouverte) return;
     // « Un conseil extraordinaire s'ouvre automatiquement quand le camp n'a plus de provisions » — une fois le clan au camp.
-    if (c.Conseil_Extraordinaire && !(d.Conseil && d.Conseil.Ouvert) && !peutOuvrir()) { await creerConseil({ extraordinaire: true }); return; }
+    if (c.Conseil_Extraordinaire && !(d.Conseil && d.Conseil.Ouvert) && !peutOuvrir() && dansLeCamp) { await creerConseil({ extraordinaire: true }); return; }
     const cs = d.Conseil;
     if (cs && cs.Ouvert && cs.Extraordinaire && !ouverte && !fermes.has(cs.Id)) ouvrirVue();
     if (ouverte) rendre();

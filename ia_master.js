@@ -4,6 +4,8 @@
 
 import { db } from "./firebase-config.js?v=2";
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch, increment, runTransaction } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+// (v502) Pendant une expédition, le récit ne compte que ses membres (expedition.js, herosEnJeu).
+const enJeu = (l) => (typeof window.herosEnJeu === "function" ? window.herosEnJeu(l) : l);
 
 // LE DÉPÔT DES DÉPENSES DU MJ (v294, depenses_ia.js) : une fiche par tour
 // (Depenses_MJ) et le compteur commun (Depenses_MJ_Compteur/global), le même
@@ -2570,7 +2572,7 @@ window.declencherTourIA = async function(options) {
         const lireAmesPresentes = (sollicites) => (window.SOCIAL && typeof window.SOCIAL.contexteDuMJ === "function" && nomsPnjPresents.length > 0)
             ? window.SOCIAL.contexteDuMJ({ idPartie: window.ID_PARTIE_COURANTE,
                 pnjs: Object.values(env.pnjsPresents).filter(f => f && f.idDoc).map(f => ({ id: f.idDoc, fiche: f })),
-                heros: ((window.PERSOS_JOUEURS_PARTIE && window.PERSOS_JOUEURS_PARTIE.length ? window.PERSOS_JOUEURS_PARTIE : window.PERSOS_PARTIE) || []).filter(h => h && h.idPersonnage && h.actif !== false && !h.estMonstre && !h.estIllusion),
+                heros: enJeu(((window.PERSOS_JOUEURS_PARTIE && window.PERSOS_JOUEURS_PARTIE.length ? window.PERSOS_JOUEURS_PARTIE : window.PERSOS_PARTIE) || []).filter(h => h && h.idPersonnage && h.actif !== false && !h.estMonstre && !h.estIllusion)),
                 sollicites }).catch(e => { console.warn("[Fils invisibles] Le contexte du MJ :", e); return ""; })
             : Promise.resolve("");
         const nomsHeros = window.PERSOS_PARTIE ? window.PERSOS_PARTIE.map(p => p.prenom) : [];
@@ -2618,7 +2620,7 @@ window.declencherTourIA = async function(options) {
         // de mon personnage ; envoie-lui les fiches personnages avec ce genre d'infos ».
         // Chaque héros du groupe : son nom, son genre (pour accorder), son peuple, sa
         // classe (au féminin s'il le faut), son âge et son allure.
-        const herosDuGroupe = (window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || []).filter(p => p && !p.estMonstre && !p.estIllusion && p.actif !== false && p.prenom);
+        const herosDuGroupe = enJeu((window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || []).filter(p => p && !p.estMonstre && !p.estIllusion && p.actif !== false && p.prenom));
         if (herosDuGroupe.length) {
             const feminin = (g) => typeof window.estGenreFeminin === "function" ? window.estGenreFeminin(g) : /^f/i.test(String(g || ""));
             contexte += `\n--- LES HÉROS DU GROUPE (accorde-les selon leur genre : il, elle) ---\n`;
@@ -2628,6 +2630,8 @@ window.declencherTourIA = async function(options) {
                 const allure = [h.age && `âge apparent ${h.age}`, h.corpulence, h.cheveux && `cheveux ${h.cheveux}`, h.signes].filter(Boolean).join(", ");
                 contexte += `- ${`${h.prenom} ${h.nom || ""}`.trim()} : ${genre}${h.race ? `, ${h.race}` : ""}${classe ? `, ${classe}` : ""}${allure ? ` — ${allure}` : ""}.\n`;
             });
+            // (v502) En expédition : qui en est, qui est resté au camp.
+            try { const ce = window.EXPEDITION && window.EXPEDITION.contexteExpeditionMJ ? window.EXPEDITION.contexteExpeditionMJ() : ""; if (ce) contexte += `\n${ce}\n`; } catch (e) {}
         }
 
         // NOUVEAU : Injection des tags et de la jauge (ISOLATION STRICTE)
@@ -2862,7 +2866,7 @@ window.declencherTourIA = async function(options) {
                             [...Object.values(env.pnjsPresents || {}), ...Object.values(envFin.pnjsPresents || {})].forEach(f => { if (f && f.idDoc && !vus.has(f.idDoc)) vus.set(f.idDoc, { id: f.idDoc, fiche: f }); });
                             // (la liste des joueurs peut être vide : celle de la partie prend le relais, comme en v315)
                             const listeHeros = (window.PERSOS_JOUEURS_PARTIE && window.PERSOS_JOUEURS_PARTIE.length ? window.PERSOS_JOUEURS_PARTIE : window.PERSOS_PARTIE) || [];
-                            const herosSociaux = listeHeros.filter(h => h && !h.estMonstre && !h.estIllusion && h.actif !== false && h.prenom && h.idPersonnage);
+                            const herosSociaux = enJeu(listeHeros.filter(h => h && !h.estMonstre && !h.estIllusion && h.actif !== false && h.prenom && h.idPersonnage));
                             await window.SOCIAL.apresLeTour({ idPartie: window.ID_PARTIE_COURANTE, pnjs: [...vus.values()], heros: herosSociaux,
                                 reputation: envFin.reputationScore || env.reputationScore || 0, texteJoueurs: rpDesJoueurs, texteMJ: reponseTexte, idMessage,
                                 dateJeu: `Jour ${window.DATE_EN_JEU_ACTUELLE?.jour || "?"} de l'an ${window.DATE_EN_JEU_ACTUELLE?.annee || "?"}` });

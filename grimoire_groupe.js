@@ -21,6 +21,8 @@ const cadre = (g, amp) => (D().cadre ? D().cadre(g, amp) : "");
 const echapper = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const son = () => { try { if (typeof window.jouerSonClic === "function") window.jouerSonClic(); } catch (e) {} };
 const FLEURON = `<svg class="fleuron fleuron-groupe" viewBox="0 0 200 24" aria-hidden="true"><path d="M 8 12 C 40 4 70 4 92 12 M 108 12 C 130 4 160 4 192 12 M 92 12 C 96 6 104 6 108 12 C 104 18 96 18 92 12 Z"/><circle cx="100" cy="12" r="2.2"/></svg>`;
+// (v502) « Un bouton à l'aquarelle pour revenir au camp » (la page de l'expédition).
+const TEINTE_CAMP = { couleurs: ["#5e7f59", "#7d9c6f", "#476944"], opacite: 0.42, nom: "retour-camp" };
 const TEINTE_GROUPE = { couleurs: ["#b3261e", "#c8402f", "#8f1d15"], opacite: 0.3, nom: "groupe" };
 const TEINTE_SUIVEURS = { couleurs: ["#5e7f59", "#7d9c6f", "#476944"], opacite: 0.3, nom: "suiveurs" };
 // (v432) Nico : « sous le petit titre La compagnie, une tache d'aquarelle pour le mettre en valeur ;
@@ -261,25 +263,12 @@ function htmlGaucheExpedition() {
             <button type="button" class="place-vide${choixPlace === i ? " choisie" : ""}" data-action="groupe" data-gp="place" data-i="${i}"${e.En_Cours || dejaPlace ? " disabled" : ""}>
               <span class="plus-place">+</span><span>${e.En_Cours ? "Place libre" : dejaPlace ? "Place libre" : "Prendre cette place"}</span></button></div>`;
     }).join("");
-    let liste = "";
-    if (e && !e.En_Cours && choixPlace !== null) {
-        // (v490) Les siens, puis les personnages du camp libres pour tous : on les incarne en les prenant.
-        const { siens, libres } = EXP_().jouablesExpedition(moi), pris = (e.Emplacements || []).filter(Boolean).map(x => x.Perso);
-        const classeLibre = (id) => classeDe(persoDe(id) || {}) || (infosCamp[id] || {}).classe || "";
-        const bouton = (id, classe) => `<button type="button" class="lien-fiche perso-place" data-action="groupe" data-gp="choisir-perso" data-id="${echapper(id)}"${pris.includes(id) || (e.Suiveurs || []).includes(id) ? " disabled" : ""}>${echapper(nomMembre(id))}${classe ? ` — ${echapper(classe)}` : ""}</button>`;
-        liste = `<div class="choix-place-expedition">
-            <div class="sous-titre-groupe petit">Qui part ?</div>
-            ${siens.length ? siens.map(id => bouton(id, classeDe(persoDe(id) || {}))).join("")
-                : `<p class="fiche-attente">Tu n'as pas encore d'aventurier.</p>`}
-            ${libres.length ? `<div class="sous-titre-groupe petit">Les personnages du camp</div>
-              <p class="fiche-attente petite">Libres pour tous : celui qui en prend un le joue pour l'expédition.</p>
-              <div class="camp-place">${libres.map(id => bouton(id, classeLibre(id))).join("")}</div>` : ""}
-            <button type="button" class="lien-fiche" data-action="groupe" data-gp="fermer-choix">Fermer</button>
-          </div>`;
-    }
+    const liste = "";
+    const auCamp = window.CAMP && window.CAMP.auCamp && window.CAMP.auCamp();
     return `<div class="contenu-page page-groupe-gauche page-expedition-gauche">${DEFS_OR}
         <div class="entete-groupe nom-du-groupe">${lavis(TEINTE_GROUPE, "expedition-titre")}<span>Expédition ${n}</span></div>
         ${FLEURON}
+        ${auCamp ? `<button type="button" class="bouton-aquarelle-camp" data-action="groupe" data-gp="camp">${lavis(TEINTE_CAMP, "retour-camp-expedition")}${cadre("retour-camp-expedition", 1.4)}<span>⛺ Revenir au camp</span></button>` : ""}
         <div class="infos-groupe">
           ${lieu ? `<div><span class="cle-groupe">Où</span> ${echapper(lieu)}</div>` : ""}
           <div><span class="cle-groupe">État</span> <span data-exp="etat">${etat}</span></div>
@@ -315,10 +304,7 @@ function htmlDroiteExpedition() {
           <ul class="liste-expedition">${idT ? `<li class="suiveur-expedition"><b>${echapper(nomMembre(idT))}</b> <span class="bonus-suiveur">part toujours ; il écrit l'histoire et ne combat jamais</span></li>` : ""}</ul>
           <div class="sous-titre-groupe">Les suiveurs <small>(${suiveurs.length} sur ${P.SUIVEURS_MAX})</small></div>
           ${suiveurs.length ? `<ul class="liste-expedition">${suiveurs.map(id => ligneSuiveur(id, !e.En_Cours)).join("")}</ul>` : `<p class="fiche-attente petite">Aucun suiveur : on peut en emmener un ou deux. Ils quittent leur tâche, mangent avec le groupe et lui donnent leur bonus.</p>`}
-          ${!e.En_Cours && suiveurs.length < P.SUIVEURS_MAX ? (choixSuiveur
-            ? `<div class="choix-suiveur-expedition">${eligibles.length ? eligibles.map(id => `<button type="button" class="lien-fiche" data-action="groupe" data-gp="emmener" data-id="${echapper(id)}">${echapper(nomMembre(id))} <small>(${echapper(P.bonusSuiveur(caracsDe(id)).texte)})</small></button>`).join("") : `<p class="fiche-attente petite">Personne d'autre au camp.</p>`}
-                <button type="button" class="lien-fiche" data-action="groupe" data-gp="fermer-suiveurs">Fermer</button></div>`
-            : `<button type="button" class="lien-fiche" data-action="groupe" data-gp="ouvrir-suiveurs">+ Emmener un suiveur</button>`) : ""}
+          ${!e.En_Cours && suiveurs.length < P.SUIVEURS_MAX ? `<button type="button" class="lien-fiche" data-action="groupe" data-gp="ouvrir-suiveurs">+ Emmener un suiveur</button>` : ""}
           ${bonus.length ? `<p class="ligne-expedition"><b>Le bonus du groupe :</b> ${bonus.map(echapper).join(" ; ")}</p>` : ""}
           <div class="sous-titre-groupe">Les provisions</div>
           ${e.En_Cours ? `<p class="ligne-expedition"><b data-exp="provisions">${prov}</b> provision${prov > 1 ? "s" : ""} (−${parJour} par jour)${tient !== null ? ` : de quoi tenir ${tient} jour${tient > 1 ? "s" : ""}` : ""}.</p>`
@@ -330,6 +316,64 @@ function htmlDroiteExpedition() {
         <div class="entete-groupe">${lavis(TEINTE_SUIVEURS, "partent-titre")}<span class="titre-page-fiche">Ceux qui partent aussi</span></div>
         ${FLEURON}${corps}
       </div>${(window.GRIMOIRE_FICHES && window.GRIMOIRE_FICHES.FLECHE_DEFILE) || ""}`;
+}
+// (v502) Nico : « quand on clique pour prendre une place, plutôt qu'un encart, une animation avec les bulles des avatars
+// disponibles, leur nom et leur profession en dessous, le tout fluide et animé ; en dessous, un léger noir de faible
+// opacité. Pareil pour choisir un suiveur. » `groupes` : [{ titre, aide, classe, ids, detail(id), pris(id) }].
+function portraitDe(id) { const h = persoDe(id); return h ? (h.urlCloudinary || h.urlAvatarEquipe || h.urlPortraitReference || "") : ((infosCamp[id] || {}).portrait || ""); }
+function professionDe(id) { const h = persoDe(id); return (h && classeDe(h)) || (infosCamp[id] || {}).classe || (infosCamp[id] || {}).occupation || ""; }
+function fermerBulles() {
+    const v = document.getElementById("choix-bulles-expedition");
+    if (!v) return;
+    v.classList.remove("visible");
+    setTimeout(() => { if (!v.classList.contains("visible")) v.remove(); }, 260);
+}
+function ouvrirBulles(o) {
+    let v = document.getElementById("choix-bulles-expedition");
+    if (v) v.remove();
+    v = document.createElement("div");
+    v.id = "choix-bulles-expedition";
+    v.className = "choix-bulles-expedition";
+    v.setAttribute("role", "dialog");
+    v.setAttribute("aria-label", o.titre);
+    let n = 0;
+    const bulle = (id, g) => {
+        const url = portraitDe(id), pris = g.pris ? g.pris(id) : false, detail = g.detail ? g.detail(id) : professionDe(id);
+        return `<button type="button" class="bulle-expedition${pris ? " prise" : ""}" data-action="groupe" data-gp="${o.geste}" data-id="${echapper(id)}"${pris ? " disabled" : ""} style="--i:${n++}">
+            <span class="rond-bulle-expedition">${url ? `<img src="${echapper(url)}" alt="" draggable="false">` : `<span>${echapper(String(nomMembre(id)).slice(0, 1).toUpperCase())}</span>`}</span>
+            <span class="nom-bulle-expedition">${echapper(nomMembre(id))}</span>${detail ? `<span class="profession-bulle-expedition">${echapper(detail)}</span>` : ""}</button>`;
+    };
+    const groupes = o.groupes.filter(g => g.ids.length || g.vide);
+    v.innerHTML = `<div class="contenu-bulles-expedition">
+        <div class="titre-bulles-expedition">${echapper(o.titre)}</div>
+        ${groupes.map(g => `${g.titre ? `<div class="sous-titre-bulles-expedition">${echapper(g.titre)}</div>` : ""}${g.aide ? `<p class="aide-bulles-expedition">${echapper(g.aide)}</p>` : ""}
+          ${g.ids.length ? `<div class="rangee-bulles-expedition ${g.classe || ""}">${g.ids.map(id => bulle(id, g)).join("")}</div>` : `<p class="aide-bulles-expedition">${echapper(g.vide)}</p>`}`).join("")}
+        <button type="button" class="fermer-bulles-expedition" data-fermer="1" aria-label="Fermer">✕</button>
+      </div>`;
+    document.body.appendChild(v);
+    v.addEventListener("click", (ev) => {
+        const b = ev.target.closest(".bulle-expedition");
+        if (b && !b.disabled) { fermerBulles(); agir(b); return; }
+        if (ev.target === v || ev.target.closest("[data-fermer]")) { son(); choixPlace = null; choixSuiveur = false; fermerBulles(); }
+    });
+    requestAnimationFrame(() => requestAnimationFrame(() => v.classList.add("visible")));
+}
+function bullesPlace(i) {
+    const e = EXP_().expedition(), moi = idJoueurCourantGroupe();
+    if (!e || e.En_Cours) return;
+    const { siens, libres } = EXP_().jouablesExpedition(moi), pris = (e.Emplacements || []).filter(Boolean).map(x => x.Perso);
+    const occupe = (id) => pris.includes(id) || (e.Suiveurs || []).includes(id);
+    ouvrirBulles({ titre: "Qui part ?", geste: "choisir-perso", groupes: [
+        { titre: "", ids: siens, pris: occupe, vide: libres.length ? "" : "Tu n'as pas encore d'aventurier." },
+        { titre: "Les personnages du camp", aide: "Libres pour tous : celui qui en prend un le joue pour l'expédition.", classe: "camp-place", ids: libres, pris: occupe }] });
+}
+function bullesSuiveurs() {
+    const camp = CAMP_(), e = EXP_().expedition(), P = EXP_().regles;
+    if (!e || e.En_Cours) return;
+    const caracsDe = (id) => (infosCamp[id] || {}).caracs || (window.CARACS_PARTIE || {})[id] || {};
+    const eligibles = Object.keys(camp.Membres || {}).filter(id => !P.peutEmmener(e, camp, id));
+    ouvrirBulles({ titre: "Qui suit l'expédition ?", geste: "emmener", groupes: [
+        { titre: "", ids: eligibles, detail: (id) => [professionDe(id), P.bonusSuiveur(caracsDe(id)).texte].filter(Boolean).join(" · "), vide: "Personne d'autre au camp." }] });
 }
 const idJoueurCourantGroupe = () => { try { return localStorage.getItem("ID_JOUEUR_COURANT") || ""; } catch (e) { return ""; } };
 function noterExp(texte) { noteExp = { texte, le: Date.now() }; maj(true); setTimeout(() => maj(true), 300); setTimeout(() => maj(), 4100); }
@@ -364,15 +408,16 @@ async function agir(cible) {
         const faire = async (promesse, ok) => { const refus = await promesse; noterExp(refus || ok || ""); };
         if (gp === "monter") { son(); return faire(X.monter(), "L'expédition est montée : chacun peut prendre sa place."); }
         if (gp === "annuler") { son(); if (!confirm("Défaire l'expédition ? Les places se vident.")) return; choixPlace = null; return faire(X.annuler(), "L'expédition est défaite."); }
-        if (gp === "place") { son(); choixPlace = choixPlace === i ? null : i; return maj(true); }
+        if (gp === "place") { son(); choixPlace = i; maj(true); lireInfosCamp(); return bullesPlace(i); }
         if (gp === "fermer-choix") { son(); choixPlace = null; return maj(true); }
         if (gp === "choisir-perso") { son(); const ici = choixPlace; choixPlace = null; return faire(X.prendrePlace(ici, id), `${nomMembre(id)} part avec l'expédition.`); }
         if (gp === "quitter-place") { son(); return faire(X.quitterPlace(i), "La place est libre."); }
-        if (gp === "ouvrir-suiveurs") { son(); choixSuiveur = true; lireInfosCamp(true); return maj(true); }
+        if (gp === "ouvrir-suiveurs") { son(); choixSuiveur = true; await lireInfosCamp(true); return bullesSuiveurs(); }
         if (gp === "fermer-suiveurs") { son(); choixSuiveur = false; return maj(true); }
         if (gp === "emmener") { son(); choixSuiveur = false; return faire(X.emmener(id), `${nomMembre(id)} suivra l'expédition.`); }
         if (gp === "laisser") { son(); return faire(X.laisser(id), `${nomMembre(id)} reste au camp.`); }
     }
+    if (gp === "camp") { son(); if (window.CAMP_SCENE) window.CAMP_SCENE.ouvrir(); return; }
     if (gp === "heros") { son(); if (window.GRIMOIRE_FICHES) window.GRIMOIRE_FICHES.ouvrir(cible.dataset.id); return; }
     if (gp === "revenir") { son(); ouvrir(); return; }
     if (gp === "ame") { son(); if (window.GRIMOIRE_LIENS) window.GRIMOIRE_LIENS.ouvrir({ id: cible.dataset.id, nom: cible.dataset.nom, depuisGroupe: true }); return; }

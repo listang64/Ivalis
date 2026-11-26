@@ -29,6 +29,7 @@ function boutonLivre(action, texte, teinte, graine) {
     return `<button type="button" class="bouton-mission" data-mi="${action}">${d.lavis ? d.lavis(teinte, graine) : ""}${cadre}<span>${echapper(texte)}</span></button>`;
 }
 
+const estDevMission = () => { try { return localStorage.getItem("ivalis_DEV_MODE") === "on"; } catch (e) { return false; } };
 let pages = null;
 function creer() {
     if (pages) return pages;
@@ -42,6 +43,7 @@ function creer() {
         son();
         if (b.dataset.mi === "abandon-oui") M().voterAbandon("oui").then(rendre);
         if (b.dataset.mi === "abandon-non") M().voterAbandon("non").then(rendre);
+        if (b.dataset.mi === "abandon-forcer" && M().forcerAbandon) M().forcerAbandon().then(rendre);
     });
     return pages;
 }
@@ -80,7 +82,8 @@ function htmlGauche(d) {
         ? boutonLivre("abandon-oui", "Voter pour abandonner la tâche", TEINTE_ABANDON, "abandon-" + m.Id)
         : `<div class="vote-abandon"><p><b>${echapper((v.Initiateur || {}).nom || "Un joueur")}</b> propose d'abandonner la tâche (${oui}/${liste(v.Votants).length}).</p>
             <div class="boutons-abandon">${(v.Votes || {})[moi] === "oui" ? `<p class="discret">En attente des autres joueurs.</p>` : boutonLivre("abandon-oui", "J'accepte", TEINTE_ABANDON, "abandon-accepte-" + m.Id)}
-            ${boutonLivre("abandon-non", "Non, on continue", TEINTE_CONTINUER, "abandon-continue-" + m.Id)}</div></div>`;
+            ${boutonLivre("abandon-non", "Non, on continue", TEINTE_CONTINUER, "abandon-continue-" + m.Id)}</div>
+            ${estDevMission() ? `<button type="button" class="lien-dev forcer-abandon" data-mi="abandon-forcer">Annuler (DEV : forcer le vote)</button>` : ""}</div>`;
     return `<div class="contenu-page page-mission-infos defile-fiche">
         <div class="titre-mission-en-cours">${echapper(m.Titre)}</div>
         ${estAccomplie(d) && M() && M().sceauCire ? `<div class="sceau-quete-page" title="Quête accomplie">${M().sceauCire("QUÊTE", "ACCOMPLIE", "quete-page")}</div>` : ""}

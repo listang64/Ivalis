@@ -752,6 +752,9 @@ export function retourExpedition(d, o = {}) {
 //  (v484) THÉMÈS DANS LE RÉCIT (étape 7) ET LE RETOUR AU CAMP (étape 8)
 // =========================================================================
 // Ce que le narrateur reçoit quand le clan a un camp : il est Thémès (le document, « Thémès, le narrateur »).
+// (v502) Nico : « qu'il n'y ait pas d'intrigue qui démontre qu'un de mes PNJ du clan est mauvais : on est censés être
+// les héros de notre histoire ». Pour le narrateur, les missions et leur plan.
+export const REGLE_CLAN_LOYAL = (noms) => `LE CLAN EST DU CÔTÉ DES HÉROS : les membres du clan nomade${(noms || []).length ? ` (${noms.join(", ")})` : ""}, Thémès, l'intendant et le conseil du clan sont loyaux et bienveillants. Aucune intrigue, aucun secret, aucune vérité cachée, aucun rebondissement ne fait de l'un d'eux (ni du conseil du clan) un traître, un complice, un menteur ou un méchant, ni ne leur fait cacher quelque chose aux héros. Les héros sont les héros de leur histoire ; le clan est leur famille. Les antagonistes viennent d'ailleurs.`;
 export const CONSIGNES_THEMES = `TU ES THÉMÈS (cette consigne passe devant « qui tu es reste volontairement flou ») :
 - Tu t'appelles Thémès : un vieil homme humain, sage et bienveillant, le premier membre du clan nomade. Tu pars toujours avec l'expédition, et c'est toi qui écris l'histoire de l'ordre d'Ivalis dans ton manuscrit : le livre que lisent les joueurs.
 - Tu fais partie du récit : tu parles, tu interagis avec le groupe et avec ce qui l'entoure (tu conseilles, tu plaisantes, tu interroges un PNJ, tu remarques un détail) ; les PNJ te voient et peuvent te répondre. Tu ne décides jamais à la place d'un héros.
@@ -846,16 +849,35 @@ export function evenementsDuCamp(jours, presents, alea = Math.random, noms = {})
 }
 // LE RAPPORT DE L'INTENDANT : « au retour, l'intendant raconte en RP ce qui s'est passé au camp depuis le départ :
 // les ressources, le moral et les scènes marquantes. Un seul compte rendu. »
+// (v502) Nico : « le rapport de l'intendant parle de notre moral tombé à 75 et d'autres données chiffrées qui n'ont rien
+// à voir dans le RP » : des mots, plus de chiffres.
+export function motMoral(v) {
+    const n = Number.isFinite(Number(v)) ? Number(v) : 60;
+    return n >= 80 ? "le cœur léger, joyeux" : n >= 60 ? "de bonne humeur" : n >= 40 ? "partagé, un peu las" : n >= 20 ? "abattu" : "au plus bas, à bout";
+}
+export function motProvisions(provisions, bouches) {
+    const p = Math.max(0, Number(provisions) || 0), j = p / Math.max(1, Number(bouches) || 1);
+    return !p ? "il ne reste plus rien à manger" : j < 3 ? "les vivres sont presque épuisés" : j < 8 ? "de quoi tenir quelques jours" : j < 20 ? "des réserves correctes" : "des réserves abondantes";
+}
+export function motCaisse(caisse) {
+    const c = Math.max(0, Number(caisse) || 0);
+    return !c ? "la caisse est vide" : c < 50 ? "la caisse est maigre" : c < 200 ? "la caisse tient" : "la caisse est bien garnie";
+}
+export function motAlentours(jauge) {
+    const v = Number(jauge);
+    if (!Number.isFinite(v)) return "";
+    return v >= 70 ? "les alentours sont encore riches en gibier et en baies" : v >= 40 ? "les alentours commencent à s'appauvrir" : v >= 15 ? "les alentours sont presque épuisés" : "il n'y a plus rien à chasser ni à cueillir alentour";
+}
 export function promptRapportIntendant(o) {
     return [
         `Tu écris une page du livre d'Ivalis (Antiquité fantastique), de la main de Thémès, le vieux narrateur du clan nomade. L'expédition ${o.numero || ""} rentre au camp après ${o.jours} jour${o.jours > 1 ? "s" : ""}.`,
         `${o.intendant}, l'intendant resté au camp, fait son rapport aux héros (${(o.heros || []).join(", ") || "les aventuriers"}) : c'est lui qui parle, entre guillemets « », avec sa façon d'être (${o.caractere || "à sa manière"}). Thémès écrit la scène autour, à la première personne.`,
         `Ce que le camp a vécu (le journal, jour après jour) :\n${(o.journal || []).map(l => "- " + l).join("\n") || "- rien de notable"}`,
         o.evenements && o.evenements.length ? `Les événements :\n${o.evenements.map(x => "- " + x).join("\n")}` : "",
-        `Les ressources : ${o.caisse} drachmes dans la caisse, ${o.provisions} provisions${o.jauge != null ? `, les alentours à ${o.jauge}/100` : ""}.`,
+        `L'état du camp : ${[motCaisse(o.caisse), motProvisions(o.provisions, (o.presents || []).length), o.jauge != null ? motAlentours(o.jauge) : ""].filter(Boolean).join(" ; ")}.`,
         o.moraux && o.moraux.length ? `Le moral : ${o.moraux.join(" ; ")}.` : "",
         o.scenes ? `Glisse ${o.scenes} petite${o.scenes > 1 ? "s" : ""} scène${o.scenes > 1 ? "s" : ""} de la vie du camp racontée${o.scenes > 1 ? "s" : ""} par l'intendant (une dispute en cuisine, une amitié née à la chasse, une confidence au coin du feu…), avec les membres restés au camp : ${(o.presents || []).join(", ")}.` : "",
-        "Pas de combat : le camp n'a pas été attaqué. N'invente pas de chiffres autres que ceux donnés. 3 à 6 paragraphes, en prose, au présent, sans titre ni liste ni mise en forme."
+        "Pas de combat : le camp n'a pas été attaqué. AUCUN CHIFFRE de jeu : ni moral, ni nombre de provisions, ni drachmes, ni pourcentages, ni « sur 100 » ; dis-le avec des mots, comme un homme du camp le dirait (« on a mangé maigre », « la caisse sonne creux », « Ara a retrouvé le sourire »). 3 à 6 paragraphes, en prose, au présent, sans titre ni liste ni mise en forme."
     ].filter(Boolean).join("\n\n");
 }
 

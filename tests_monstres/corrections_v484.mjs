@@ -114,7 +114,7 @@ await section(async () => {
   verifier("…il parle et interagit dans le récit, sans décider pour les héros", /tu parles, tu interagis/.test(t) && /Tu ne décides jamais à la place d'un héros/.test(t));
   verifier("…il ne se bat jamais, ne peut être ni blessé ni tué ; après une défaite, il est resté caché et continue d'écrire", /ne te bats jamais/.test(t) && /ni blessé ni tué/.test(t) && /perdu un combat, tu es resté caché/.test(t) && /continues d'écrire/.test(t));
   const ia = lire("ia_master.js");
-  verifier("le narrateur reçoit ces consignes dès que le clan a un camp (ia_master.js, camp.js)", /window\.CAMP\.consignesThemes\(\)/.test(ia) && /\(themes \? "\\n\\n" \+ themes : ""\)/.test(ia) && /consignesThemes = \(\) => \(camp \? CP\.CONSIGNES_THEMES : ""\)/.test(lire("camp.js")));
+  verifier("le narrateur reçoit ces consignes dès que le clan a un camp (ia_master.js, camp.js)", /window\.CAMP\.consignesThemes\(\)/.test(ia) && /\(themes \? "\\n\\n" \+ themes : ""\)/.test(ia) && /consignesThemes = \(\) => \(camp \? `\$\{CP\.CONSIGNES_THEMES\}/.test(lire("camp.js")));
 });
 
 titre("2. LES AFFINITÉS AU RETOUR (étape 8)");
@@ -140,7 +140,7 @@ await section(async () => {
   const pr = CP.promptRapportIntendant({ numero: 2, jours: 6, intendant: "Ara", caractere: "sociable", heros: ["Thorin"], journal: ["La chasse rapporte 5 provisions."], evenements: ["Une tempête a gâché 3 provisions."],
     caisse: 40, provisions: 22, jauge: 70, moraux: ["Ara 65/100"], scenes: 2, presents: ["Ara", "Bors"] });
   verifier("le rapport : l'intendant parle (« »), Thémès écrit ; le journal, les événements, les ressources, le moral, 2 petites scènes", /Ara, l'intendant resté au camp, fait son rapport/.test(pr) && /Thémès/.test(pr)
-    && /La chasse rapporte 5 provisions/.test(pr) && /tempête/.test(pr) && /40 drachmes/.test(pr) && /22 provisions/.test(pr) && /Ara 65\/100/.test(pr) && /Glisse 2 petites scènes/.test(pr) && /Pas de combat/.test(pr));
+    && /La chasse rapporte 5 provisions/.test(pr) && /tempête/.test(pr) && /la caisse est maigre/.test(pr) && /des réserves/.test(pr)   /* (v502) des mots, plus de chiffres */ && /Ara 65\/100/.test(pr) && /Glisse 2 petites scènes/.test(pr) && /Pas de combat/.test(pr));
 });
 
 // =========================================================================
