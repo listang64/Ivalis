@@ -291,13 +291,15 @@ CE N'EST PAS UN COMBAT (combat = false) :
 - une bagarre entre PNJ qui n'implique pas les héros, un entraînement, une démonstration, une chasse sans danger ;
 - une simple intention (« je m'apprête à… », « je pose la main sur mon épée ») que personne n'a encore mise à exécution.
 
+ATTENTION : le livre raconte toujours une attaque comme une TENTATIVE dont l'issue se jouera aux dés (« Thorin se jette sur l'homme pour tenter de le frapper », « elle tente de le poignarder »). C'est une attaque PORTÉE, pas une intention : c'est un combat (combat = true), même si la cible n'a pas encore riposté et même si c'est un PNJ jusque-là amical. De même pour le joueur qui écrit « j'attaque X », « je frappe X ».
+
 Dans le doute, réponds false : un combat lancé à tort coupe le récit et prive les joueurs d'une autre issue.
 
 Réponds UNIQUEMENT en JSON : {"combat": true ou false, "raison": "une phrase", "adversaires": "qui affronte les héros (vide sans combat)"}`;
 
 // LE VERDICT : ce que les joueurs ont fait depuis la réponse précédente du MJ,
 // et la nouvelle réponse.
-async function demanderVerdict(texteMJ, messages) {
+async function demanderVerdict(texteMJ, messages, auCamp) {
     const liste = Array.isArray(messages) ? messages : [];
     let debut = 0;
     liste.forEach((m, i) => { if (m && (m.Est_Narration_IA || m.Auteur_ID === "MJ")) debut = i; });
@@ -305,6 +307,7 @@ async function demanderVerdict(texteMJ, messages) {
     return demanderJSON({
         systeme: PROMPT_COMBAT, temperature: 0.2,
         texte: `--- LES DERNIERS MESSAGES ---\n${depuis || "(aucun)"}\n\n--- LA RÉPONSE QUE LE MAÎTRE DU JEU VIENT DE DONNER ---\n${sansHtml(texteMJ)}`
+            + (auCamp ? `\n\n(LA SCÈNE SE PASSE AU CAMP DU CLAN : aucune attaque ne vient de l'extérieur. SEUL un héros qui attaque délibérément quelqu'un déclenche un combat.)` : "")
     });
 }
 
@@ -314,8 +317,9 @@ async function demanderVerdict(texteMJ, messages) {
 // Avant le message du MJ : la partie sait qu'un verdict viendra pour lui.
 window.annoncerDetectionCombat = async function(ts) {
     if (!window.ID_PARTIE_COURANTE || typeof window.cleGemini !== "function" || !window.cleGemini("combat")) return false;
-    // (v480) Le clan nomade : « un RP dans le camp ne déclenche jamais de combat » (camp.js, auCamp).
-    if (window.CAMP && typeof window.CAMP.auCamp === "function" && window.CAMP.auCamp()) return false;
+    // (v480) Le clan nomade : « un RP dans le camp ne déclenche jamais de combat ». (v506) Nico : « dans mon RP j'ai
+    // volontairement attaqué un PNJ, mais ça ne me déclenche pas de combat » : au camp, aucune attaque ne vient de
+    // l'extérieur, mais un héros qui attaque délibérément quelqu'un se bat (MIA_COMBAT le sait : demanderVerdict).
     return !!(await transaction((data) => {
         if (window.combatRPActif(data)) return null;
         return { maj: { Combat_RP: { Id: "crp_" + ts + "_" + Math.random().toString(36).slice(2, 6), Etat: "detection", Message: ts, Le: Date.now() } } };
@@ -325,7 +329,7 @@ window.annoncerDetectionCombat = async function(ts) {
 window.detecterCombatRP = async function(o) {
     const { ts, texteMJ, messages } = o || {};
     let verdict = null;
-    try { verdict = await demanderVerdict(texteMJ, messages); }
+    try { verdict = await demanderVerdict(texteMJ, messages, !!(window.CAMP && typeof window.CAMP.auCamp === "function" && window.CAMP.auCamp())); }
     catch (e) { console.error("[MIA_COMBAT] Verdict impossible :", e); }
     const combat = !!(verdict && verdict.combat === true);
     console.log(`⚔️ [MIA_COMBAT] ${combat ? "COMBAT" : "pas de combat"} — ${(verdict && verdict.raison) || "sans verdict"}`);
@@ -1729,7 +1733,7 @@ const PROMPT_REPLIQUES = `Tu écris les répliques de combat de PNJ nommés, dan
 Pour chaque PNJ, des phrases courtes (une ou deux phrases, 25 mots au plus) qu'il lance à voix haute pendant le combat contre les héros,
 fidèles à son caractère, à sa façon de parler et à ce qui a déclenché le combat. Pas de description, seulement ce qu'il dit ;
 un geste bref peut s'écrire entre astérisques (*il crache par terre*). En français, tutoiement ou vouvoiement selon le personnage.
-JAMAIS LE NOM D'UN HÉROS : le PNJ ne le connaît pas forcément. Il les interpelle autrement (« toi », « le nain », « la sorcière », « vermine »…).
+JAMAIS LE NOM D'UN HÉROS : le PNJ ne le connaît pas forcément. Il les interpelle autrement (« toi », « l'étranger », « la grande gueule », « vermine »…).
 Réponds en JSON : { "pnj": [ { "nom": "son nom exact", "debut": [3 phrases quand son tour commence et qu'il est en forme],
 "blesse": [2 phrases quand il est grièvement blessé], "seul": [2 phrases quand il est le dernier de son camp debout],
 "ko": [3 phrases quand un des héros tombe à terre, sans le nommer] } ] }`;

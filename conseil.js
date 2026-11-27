@@ -19,7 +19,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, addDoc, collection, query, where, onSnapshot, runTransaction, deleteField, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=23";
+import * as CP from "./camp_pur.js?v=24";
 
 const PARTIES = "Systeme_Parties";
 export const ATTENTE_IA_MS = 6000;
@@ -369,7 +369,8 @@ function construire() {
       </div>`;
     document.body.appendChild(e);
     e.addEventListener("click", surClic);
-    e.querySelector("#saisie-conseil").addEventListener("submit", (ev) => { ev.preventDefault(); const t = $("texte-conseil"); const v = t.value; t.value = ""; son(); envoyer(v); });
+    // (v506) Envoyer arrête la dictée (ses derniers mots ne réécrivent pas le champ vidé).
+    e.querySelector("#saisie-conseil").addEventListener("submit", (ev) => { ev.preventDefault(); if (dictee.voulue) arreterDictee(); const t = $("texte-conseil"); const v = t.value; t.value = ""; son(); envoyer(v); });
     e.querySelector("#texte-conseil").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); e.querySelector("#saisie-conseil").requestSubmit(); } });
     return e;
 }
@@ -396,6 +397,7 @@ function demarrerDictee(SR) {
     const reco = new SR();
     reco.lang = "fr-FR"; reco.interimResults = true; reco.continuous = true;
     reco.onresult = (ev) => {
+        if (!dictee.voulue || dictee.reco !== reco) return;
         let finies = "", enCours = "";
         for (let i = 0; i < ev.results.length; i++) { const t = ev.results[i][0].transcript; if (ev.results[i].isFinal) finies = joindre(finies, t); else enCours = joindre(enCours, t); }
         dictee.finies = finies;
@@ -529,6 +531,7 @@ async function surClic(ev) {
     if (quoi === "proposer") { proposition = true; return rendre(); }
     if (quoi === "annuler") { proposition = false; return rendre(); }
     if (quoi === "poser") {
+        if (dictee.voulue) arreterDictee();
         const r = await proposer(($("titre-sujet-conseil") || {}).value, ($("resume-sujet-conseil") || {}).value, ($("type-sujet-conseil") || {}).value);
         if (r) return noter(r);
         proposition = false;

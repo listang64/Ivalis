@@ -976,6 +976,10 @@ function demarrerDictee(SR) {
     const reco = new SR();
     reco.lang = "fr-FR"; reco.interimResults = true; reco.continuous = true;
     reco.onresult = (ev) => {
+        // (v506) Nico : « plusieurs fois j'ai envoyé le RP dans le récit, mais il ne s'est pas effacé du post-it ». Le
+        // navigateur livre encore la dernière phrase APRÈS l'arrêt de la dictée (l'envoi l'arrête) : elle réécrivait le
+        // texte envoyé dans le papier qu'on venait de vider. Une dictée arrêtée n'écrit plus rien.
+        if (!dictee.voulue || dictee.reco !== reco) return;
         // TOUS les résultats de la séance (pas seulement depuis resultIndex) : les phrases finies restent.
         let finies = "", enCours = "";
         for (let i = 0; i < ev.results.length; i++) {
@@ -987,6 +991,7 @@ function demarrerDictee(SR) {
         surSaisie();
     };
     reco.onend = () => {
+        if (dictee.reco !== reco) return;   // (v506) une ancienne séance, déjà arrêtée
         // Une pause a coupé l'écoute : on garde ce qui est dit, et on reprend à la suite.
         dictee.base = joindre(dictee.base, dictee.finies);
         dictee.finies = "";
@@ -999,7 +1004,10 @@ function demarrerDictee(SR) {
 }
 function arreterDictee() {
     dictee.voulue = false;
-    if (dictee.reco) { try { dictee.reco.stop(); } catch (e) { try { dictee.reco.abort(); } catch (e2) {} } }
+    const reco = dictee.reco;
+    dictee.reco = null;                  // (v506) ses derniers résultats, s'ils arrivent, n'écrivent plus rien
+    dictee.finies = "";
+    if (reco) { try { reco.stop(); } catch (e) { try { reco.abort(); } catch (e2) {} } }
     finirDictee();
 }
 function finirDictee() {
@@ -1758,7 +1766,7 @@ async function reformuler(texte, heros) {
     const estF = (g) => (typeof window.estGenreFeminin === "function" ? window.estGenreFeminin(g) : /^f/i.test(String(g || "")));
     const groupe = herosDeLaPartie().filter(h => h && h.prenom).map(h => `- ${[h.prenom, h.nom].filter(Boolean).join(" ")} : ${h.genre ? (estF(h.genre) ? "une femme (elle)" : "un homme (il)") : "genre non précisé"}`).join("\n");
     const accord = heros.genre ? `\nACCORDE ${String(heros.prenom || "le héros").toUpperCase()} AU ${fem ? "FÉMININ (elle, une aventurière, prête, assise…)" : "MASCULIN (il)"}.` : "";
-    return appelLite(PROMPT_NARRATEUR_LITE, `LES DERNIÈRES LIGNES DU LIVRE (tu continues la dernière) :\n${lignes || "(le livre commence)"}\n\n`
+    return appelLite(PROMPT_NARRATEUR_LITE + (window.REGLE_MAGIE_IVALIS ? `\n- ${window.REGLE_MAGIE_IVALIS}` : ""), `LES DERNIÈRES LIGNES DU LIVRE (tu continues la dernière) :\n${lignes || "(le livre commence)"}\n\n`
         + (groupe ? `LES HÉROS DU GROUPE (accorde chacun selon son genre) :\n${groupe}\n\n` : "")
         + (presents ? `LES PNJ PRÉSENTS (s'il s'adresse à l'un d'eux, il lui répond) :\n${presents}\n\n` : "")
         + `LE HÉROS : ${qui}${accord}\nCE QU'ÉCRIT SON JOUEUR : ${texte}`, true);

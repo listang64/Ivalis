@@ -868,6 +868,8 @@ export function motAlentours(jauge) {
     if (!Number.isFinite(v)) return "";
     return v >= 70 ? "les alentours sont encore riches en gibier et en baies" : v >= 40 ? "les alentours commencent à s'appauvrir" : v >= 15 ? "les alentours sont presque épuisés" : "il n'y a plus rien à chasser ni à cueillir alentour";
 }
+// (v506) La magie est courante à Ivalis (lore_ivalis.js, chargé par le jeu ; rien hors du navigateur).
+const regleMagie = () => (typeof window !== "undefined" && window.REGLE_MAGIE_IVALIS) || "";
 export function promptRapportIntendant(o) {
     return [
         `Tu écris une page du livre d'Ivalis (Antiquité fantastique), de la main de Thémès, le vieux narrateur du clan nomade. L'expédition ${o.numero || ""} rentre au camp après ${o.jours} jour${o.jours > 1 ? "s" : ""}.`,
@@ -877,6 +879,7 @@ export function promptRapportIntendant(o) {
         `L'état du camp : ${[motCaisse(o.caisse), motProvisions(o.provisions, (o.presents || []).length), o.jauge != null ? motAlentours(o.jauge) : ""].filter(Boolean).join(" ; ")}.`,
         o.moraux && o.moraux.length ? `Le moral : ${o.moraux.join(" ; ")}.` : "",
         o.scenes ? `Glisse ${o.scenes} petite${o.scenes > 1 ? "s" : ""} scène${o.scenes > 1 ? "s" : ""} de la vie du camp racontée${o.scenes > 1 ? "s" : ""} par l'intendant (une dispute en cuisine, une amitié née à la chasse, une confidence au coin du feu…), avec les membres restés au camp : ${(o.presents || []).join(", ")}.` : "",
+        regleMagie(),
         "Pas de combat : le camp n'a pas été attaqué. AUCUN CHIFFRE de jeu : ni moral, ni nombre de provisions, ni drachmes, ni pourcentages, ni « sur 100 » ; dis-le avec des mots, comme un homme du camp le dirait (« on a mangé maigre », « la caisse sonne creux », « Ara a retrouvé le sourire »). 3 à 6 paragraphes, en prose, au présent, sans titre ni liste ni mise en forme."
     ].filter(Boolean).join("\n\n");
 }
@@ -944,6 +947,7 @@ export function moralApresConseil(avis, gagnant) {
 export function promptConseil(o) {
     return [
         `Tu es Thémès, le vieux narrateur du clan nomade d'Ivalis (Antiquité fantastique), et tu animes le conseil du clan, réuni autour du feu${o.extraordinaire ? ` en conseil extraordinaire (${o.raison || "une urgence"})` : ""}.`,
+        regleMagie(),
         "C'est un récit à part, fait UNIQUEMENT DE PAROLES : jamais de narration d'action, jamais de gestes décrits. Chacun parle à son tour, en répliques courtes (1 à 3 phrases), comme un vrai échange. Les PNJ parlent selon leur caractère, leurs liens et leur moral ; ils peuvent se répondre entre eux. Ne parle jamais à la place d'un joueur (les héros des joueurs).",
         "Le conseil doit rester vivant mais laisser la parole aux joueurs : 1 à 3 répliques à la fois, et la dernière invite souvent un joueur à répondre.",
         `Les membres du clan présents (PNJ) :\n${(o.pnjs || []).map(p => `- ${p.nom}${p.caractere ? ` (${p.caractere})` : ""}${p.moral != null ? `, moral ${p.moral}/100` : ""}${p.tache ? `, ${p.tache}` : ""}`).join("\n") || "- personne"}`,

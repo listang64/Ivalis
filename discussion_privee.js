@@ -96,6 +96,8 @@ export function promptPnj(d, k) {
 ${d.public ? `Sur la route, pendant la marche, tu parles à ${nomHeros(h)} (${[h.genre ? (fem ? "une femme" : "un homme") : "", h.race, h.classe].filter(Boolean).join(", ")}), devant le reste de la compagnie qui entend tout. ${(d.lignes || []).length ? "Tu lui réponds." : `C'EST TOI QUI ENGAGES LA CONVERSATION : ta réplique commence par son prénom, « ${h.prenom || nomHeros(h)}, … », puis ce que tu as envie de lui dire (une question, une remarque, un souci, un souvenir, une confidence, une pique…), selon ton caractère, ce que tu penses de lui et ce qui s'est passé.`}`
     : `${nomHeros(h)} (${[h.genre ? (fem ? "une femme" : "un homme") : "", h.race, h.classe].filter(Boolean).join(", ")}) te parle EN PRIVÉ, à l'écart des autres. Tu lui réponds.`}
 
+${window.REGLE_MAGIE_IVALIS || ""}
+
 COMMENT TU PARLES :
 - Seulement ce que tu dis à voix haute, à la première personne, une à trois phrases courtes. Tu tutoies ou vouvoies selon ton caractère et votre relation.
 - Aucune narration, aucune description de ce que tu fais ou ressens. Seul un geste VISIBLE et bref peut se glisser entre astérisques : *rigole*, *se crispe*, *détourne les yeux*.

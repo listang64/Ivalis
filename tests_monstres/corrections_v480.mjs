@@ -386,7 +386,7 @@ await section(async () => {
   verifier("hors mode DEV : pas de bouton des encarts", sansDev === "none", sansDev);
 });
 
-titre("9. AU CAMP, JAMAIS DE COMBAT");
+titre("9. AU CAMP, JAMAIS DE COMBAT VENU DE L'EXTÉRIEUR (v506 : une attaque délibérée se joue)");
 await section(async () => {
   const r = await p.evaluate(async () => {
     window.cleGemini = () => "cle";
@@ -399,10 +399,12 @@ await section(async () => {
     return { auCamp, ctx, annonce, loin, ctxLoin, combat: window.__docs["Systeme_Parties/P1"].Combat_RP || null };
   });
   verifier("le groupe sur l'icône du camp : au camp", r.auCamp === true && r.loin === false);
-  verifier("…la détection du combat ne s'annonce même pas", r.annonce === false && !r.combat, JSON.stringify(r.combat));
-  verifier("…le narrateur sait qu'il est au camp, et qu'un RP au camp ne déclenche jamais de combat", /LE CAMP DU CLAN/.test(r.ctx) && /JAMAIS de combat/.test(r.ctx) && r.ctxLoin === "");
+  // (v506) Nico : « j'ai volontairement attaqué un PNJ, mais ça ne me déclenche pas de combat » : au camp, aucune attaque ne
+  // vient de l'extérieur, mais un héros qui attaque délibérément quelqu'un se bat (MIA_COMBAT le sait).
+  verifier("…v506 : la détection s'annonce aussi au camp (pour une attaque délibérée d'un héros)", r.annonce === true && r.combat && r.combat.Etat === "detection", JSON.stringify(r.combat));
+  verifier("…le narrateur sait qu'il est au camp : aucun danger extérieur, mais une attaque délibérée d'un héros se joue", /LE CAMP DU CLAN/.test(r.ctx) && /aucun danger ne vient de l'extérieur/.test(r.ctx) && /si un héros attaque délibérément/.test(r.ctx) && r.ctxLoin === "");
   const ia = lire("ia_master.js"), cr = lire("combat_rp.js");
-  verifier("…le narrateur le reçoit (ia_master.js), la détection le respecte (combat_rp.js)", /window\.CAMP\.contexteMJ\(\)/.test(ia) && /window\.CAMP\.auCamp\(\)\) return false;/.test(cr));
+  verifier("…le narrateur le reçoit (ia_master.js), MIA_COMBAT sait la scène au camp (combat_rp.js)", /window\.CAMP\.contexteMJ\(\)/.test(ia) && /LA SCÈNE SE PASSE AU CAMP DU CLAN/.test(cr) && !/window\.CAMP\.auCamp\(\)\) return false;/.test(cr));
 });
 
 titre("10. LES DEUX IMAGES EN SCÈNE (camp_avatars.js)");

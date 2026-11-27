@@ -15,7 +15,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection, deleteField, runTransaction, increment, addDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=23";
+import * as CP from "./camp_pur.js?v=24";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -256,7 +256,18 @@ export function auCamp() {
 // Ce que le narrateur sait du camp quand le clan y est (ia_master.js).
 export function contexteMJ() {
     if (!auCamp()) return "";
-    return `--- LE CAMP DU CLAN ---\nLes héros sont au camp du clan nomade : des tentes, un feu, les membres du clan qui vaquent à leurs occupations. Ils flânent, parlent, s'occupent.\nRÈGLE ABSOLUE : un RP dans le camp ne déclenche JAMAIS de combat (aucun ennemi, aucune attaque, aucune embuscade, aucune bagarre qui tourne au combat).${habitantsDuCamp()}`;
+    return `--- LE CAMP DU CLAN ---\nLes héros sont au camp du clan nomade : des tentes, un feu, les membres du clan qui vaquent à leurs occupations. Ils flânent, parlent, s'occupent.\nRÈGLE ABSOLUE : au camp, aucun danger ne vient de l'extérieur (aucun ennemi, aucune attaque, aucune embuscade). MAIS si un héros attaque délibérément quelqu'un, ne l'en empêche pas et ne règle pas l'affrontement toi-même : le coup part, l'autre se défend, et le combat se jouera aux dés.${habitantsDuCamp()}`;
+}
+// (v506) LES PNJ DU CLAN DANS LE RÉCIT (les fils invisibles, ia_master.js) : au camp, ses membres présents ; en
+// expédition, ses suiveurs. Rend [{ id, fiche }] (leur fiche de PNJ), sans Thémès ni les héros des joueurs.
+export async function pnjsDuRecit() {
+    if (!camp) return [];
+    const e = (window.PARTIE_DATA || {}).Expedition;
+    const ids = auCamp() ? CP.presentsAuCampSeulement(camp, partis()) : (e && e.En_Cours ? (e.Suiveurs || []) : []);
+    if (!ids.length) return [];
+    const infos = await infosMembres();
+    return ids.filter(id => !CP.estThemes(id, (camp.Membres || {})[id]) && infos[id] && !infos[id].heros && infos[id].fiche && infos[id].fiche.Nom_PNJ)
+        .map(id => ({ id, fiche: { ...infos[id].fiche, idDoc: id } }));
 }
 // (v505) Nico : « le narrateur me dit qu'on a des artisans gobelins dans mon camp alors que non : il faut lui envoyer les
 // personnages présents dans le camp ». Ceux qui y sont (pas ceux partis en expédition), et personne d'autre.
@@ -547,6 +558,6 @@ export async function renvoyerDuCampDev(id) {
         });
     } catch (e) { console.error("[Camp] Renvoyer :", e); return "La base n'a pas répondu."; }
 }
-window.CAMP = { infoConnue, habitantsDuCamp, nomConnu, regleClanLoyal, ajouterAuCampDev, renvoyerDuCampDev, consignesThemes, echoReputation, contexteReputationMJ, lire: lireCamp, creerCampDev, creerCampAuto, rattraperMembres, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
+window.CAMP = { pnjsDuRecit, infoConnue, habitantsDuCamp, nomConnu, regleClanLoyal, ajouterAuCampDev, renvoyerDuCampDev, consignesThemes, echoReputation, contexteReputationMJ, lire: lireCamp, creerCampDev, creerCampAuto, rattraperMembres, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
                 partis, postesBloques, infosMembres, assignerTache, nommerIntendant, changerMoral, journeeDuCamp };
 window.journeeDuCamp = journeeDuCamp;

@@ -25,7 +25,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=23";
+import * as CP from "./camp_pur.js?v=24";
 
 const VERROU_MS = 10 * 60 * 1000;
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -33,16 +33,18 @@ const peutDessiner = () => typeof window.peutIllustrerLesObjets === "function" &
     && typeof window.hebergerDetoure === "function";
 
 // LE PROMPT : le personnage entier, des pieds à la tête, dans une pose, sur fond magenta.
-export function promptImageCamp(nom, pose, avecReference, description) {
+// (v506) `trait` : ce que son espèce impose (lore_ivalis.js, traitsImposesRace), prioritaire même sur l'image de référence.
+export function promptImageCamp(nom, pose, avecReference, description, trait) {
     return [
         avecReference
             ? `La première image de référence est le personnage « ${nom} » : redessine-le À L'IDENTIQUE (même visage, même silhouette, même race, même couleur de peau, même coiffure). S'il y a une seconde image, c'est son armure : il la porte, bas compris.`
             : `Dessine le personnage « ${nom} » : ${description || "un habitant du clan"}.`,
+        trait ? `RÈGLE DE L'ESPÈCE (PRIORITAIRE SUR TOUT, MÊME SUR L'IMAGE DE RÉFÉRENCE) : ${trait}` : "",
         `Le personnage est EN ENTIER, DES PIEDS À LA TÊTE (on voit ses pieds), dans une scène de la vie d'un camp nomade : il est en train de ${pose}.`,
         "VUE ET APPUIS : le personnage est vu à hauteur d'homme, de face ou de trois quarts ; SES DEUX PIEDS SONT À LA MÊME HAUTEUR, posés sur la même ligne horizontale (le même sol plat), jamais l'un plus haut que l'autre ni en contre-plongée.",
         "Contexte de l'univers : Antique Fantastique (Antiquité magique, mythologie méditerranéenne). Lumière naturelle d'un soleil, chaude et franche.",
         "🛑 RÈGLE TECHNIQUE DÉFINITIVE (PRIORITAIRE) : le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). Aucun décor, aucun sol, aucune ombre portée, aucun dégradé. Les objets de sa pose (une bûche, un seau, une chope…) restent tenus ou posés contre lui. Le fond magenta n'éclaire rien : aucun reflet rose ou violacé sur le personnage. Aucun texte."
-    ].join("\n");
+    ].filter(Boolean).join("\n");
 }
 
 // Un dessin sans référence (un PNJ qui n'a pas encore de portrait, comme Thémès au début).
@@ -87,7 +89,7 @@ export async function dessinerImagesCamp(m, alea = Math.random) {
     if (blobPerso && m.armure && m.armure.image) blobArmure = await window.imageVersBlobPng(m.armure.image);
     const images = [];
     for (const pose of poses) {
-        const prompt = promptImageCamp(m.nom, pose, !!blobPerso, m.description);
+        const prompt = promptImageCamp(m.nom, pose, !!blobPerso, m.description, m.trait);
         const dessin = blobPerso ? await window.dessinerAvecReferences(blobPerso, blobArmure, prompt) : await dessinerSansReference(prompt);
         if (!dessin) return null;
         const url = await window.hebergerDetoure(dessin);
@@ -128,13 +130,15 @@ async function membresADessiner() {
         if (h && !h.librePourTous) {
             const armure = h.equipArmure && h.equipArmure.nom ? h.equipArmure : null;
             out.push({ id, nom: h.prenom || camp.Membres[id].Nom || "", collection: "Personnages", reference: h.urlPortraitReference || h.urlCloudinary || "",
-                       armure, images: h.imagesCamp, armureFaite: h.imagesCampArmure, armureActuelle: armure ? (armure.uid || armure.nom) : "", compagnon: h.compagnon || null });
+                       armure, images: h.imagesCamp, armureFaite: h.imagesCampArmure, armureActuelle: armure ? (armure.uid || armure.nom) : "", compagnon: h.compagnon || null,
+                       trait: typeof window.traitsImposesRace === "function" ? window.traitsImposesRace(h.race) : "" });
             continue;
         }
         const f = await lirePnj(id);
         if (!f) continue;
         out.push({ id, nom: f.Nom_PNJ || camp.Membres[id].Nom || "", collection: "Monde_PNJ", reference: f.URL_Cloudinary || "", armure: null,
                    description: [f.Race, f.Occupation, f.Description_Physique].filter(Boolean).join(", "),
+                   trait: typeof window.traitsImposesRace === "function" ? window.traitsImposesRace(f.Race) : "",
                    images: f.Images_Camp, armureFaite: f.Images_Camp_Armure || "", armureActuelle: "", enCours: f.Images_Camp_En_Cours });
     }
     return out;

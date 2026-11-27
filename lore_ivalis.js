@@ -165,3 +165,19 @@
         return morceaux.join("\n\n");
     };
 })();
+
+// (v506) Nico : « rajouter au narrateur et aux autres IA narratives que la magie est courante dans le monde : on ne
+// traite pas les gens de sorcières, c'est quelque chose de normal ». (La loi de Volcanisse et le rejet des Ankylars
+// restent ce qu'ils sont : une loi et une culture, pas une superstition.)
+window.REGLE_MAGIE_IVALIS = "LA MAGIE EST COURANTE À IVALIS : c'est une chose normale du quotidien (à Arcaï, tous les humains vont à l'école de magie). Personne ne traite quelqu'un de sorcier ou de sorcière parce qu'il lance un sort, personne ne crie au démon ni à la malédiction, personne ne s'étonne qu'un héros use de magie. Seules exceptions, celles du monde : à Volcanisse, la loi de la cité l'interdit, et les Ankylars la rejettent — une loi et une culture, pas de la superstition.";
+
+// (v506) Nico : « le jeu me génère des Gobs avec une peau claire d'humain, alors que les Gobs ont toujours la peau dans des
+// teintes verdâtres ». Les traits qu'une espèce impose, quoi que dise la description d'un personnage (images, PNJ).
+window.TRAITS_RACES_IMPOSES = {
+    gob: "UN GOB A TOUJOURS LA PEAU DANS DES TEINTES VERDÂTRES (vert olive, vert mousse, vert-de-gris, vert jaunâtre ou vert sombre), JAMAIS une peau claire, rosée, beige ou brune d'humain — même si une description dit « peau claire » ou « pâle » : c'est alors un vert pâle."
+};
+window.traitsImposesRace = (race) => {
+    const n = String(race || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    if (/^gob/.test(n)) return window.TRAITS_RACES_IMPOSES.gob;
+    return "";
+};

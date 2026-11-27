@@ -491,9 +491,11 @@ async function genererEtStockerImagePNJ(descriptionPhysique, racePNJ = "Humain",
     // =====================================================================
     let promptOpenAI = "Contexte de l'univers : Antique Fantastique (Mythic Ancient Fantasy, Antiquité Magique).\n\n";
 
+    // (v506) Les traits imposés de l'espèce (lore_ivalis.js) : la peau verdâtre d'un Gob, quoi que dise sa description.
+    const traitsEspece = typeof window.traitsImposesRace === "function" ? window.traitsImposesRace(racePNJ) : "";
     promptOpenAI += `--- ANATOMIE DE BASE DE L'ESPÈCE (${racePNJ || "Humain"}) ---\n` +
                     `Le personnage est un(e) ${racePNJ || "Humain"} : son corps, sa peau et son visage sont ceux de cette espèce.\n` +
-                    (loreRace ? loreRace + "\n" : "") + "\n";
+                    (loreRace ? loreRace + "\n" : "") + (traitsEspece ? "RÈGLE DE L'ESPÈCE (PRIORITAIRE SUR TOUT, MÊME SUR LA DESCRIPTION) : " + traitsEspece + "\n" : "") + "\n";
     // (v455) LA TENUE, tirée comme celles des héros (variations_tenues.js) : elle passe devant celle que la
     // description pourrait évoquer, et s'ajuste à l'anatomie de l'espèce.
     const texteTenue = tenue && typeof window.texteVariationTenue === "function" ? window.texteVariationTenue(tenue) : "";
@@ -502,7 +504,7 @@ async function genererEtStockerImagePNJ(descriptionPhysique, racePNJ = "Humain",
     }
 
     promptOpenAI += "--- SPÉCIFICITÉS UNIQUES DU PERSONNAGE (TRÈS IMPORTANT, PRIORITAIRE SUR L'ANATOMIE DE BASE) ---\n" +
-                    "Description du personnage : " + descriptionPhysique + "\n\n" +
+                    "Description du personnage : " + descriptionPhysique + "\n" + (traitsEspece ? "(Rappel, prioritaire : " + traitsEspece + ")\n" : "") + "\n" +
                     "Directives de style artistique : " + instructionStyle + "\n\n" +
                     "🛑 RÈGLE TECHNIQUE DÉFINITIVE (PRIORITAIRE SUR TOUT LE RESTE) : " +
                     "Le personnage DOIT ÊTRE PLACÉ SUR UN FOND TOTALEMENT MAGENTA FLUO UNI (#FF00FF). " +
@@ -851,7 +853,7 @@ ${contexteScene}`;
                             type: "OBJECT",
                             properties: {
                                 nom: { type: "STRING" },
-                                physique: { type: "STRING", description: "Haut du corps, fidèle à l'allure de sa race : sexe, âge, visage, coiffure, expression, signes distinctifs, objets portés (sa tenue vient de la liste des tenues)." },
+                                physique: { type: "STRING", description: "Haut du corps, fidèle à l'allure de sa race : sexe, âge, visage, coiffure, expression, signes distinctifs, objets portés (sa tenue vient de la liste des tenues). Un Gob a TOUJOURS la peau verdâtre (jamais claire ni rosée)." },
                                 occupation: { type: "STRING" },
                                 race: { type: "STRING", description: "Le nom EXACT d'une race de la liste." },
                                 ...(tenues.length ? { tenue: { type: "STRING", description: "Le titre EXACT d'une tenue de la liste, celle qui va le mieux à son métier et à son rang." } } : {}),
@@ -1026,7 +1028,7 @@ Utilise l'outil 'creerNouveauxPNJ' pour générer leurs fiches.`;
                                 nom: { type: "STRING" },
                                 physique: { 
                                     type: "STRING", 
-                                    description: "Description focalisée sur le haut du corps, fidèle à l'allure de sa race : Sexe, Âge, Visage détaillé, Coiffure, Expression, Armes ou objets portés à la ceinture ou dans le dos, Accessoires, Signes distinctifs (cicatrices, tatouages, bijoux). Sa tenue vient de la liste des tenues : ne la décris pas ici." 
+                                    description: "Description focalisée sur le haut du corps, fidèle à l'allure de sa race : Sexe, Âge, Visage détaillé, Coiffure, Expression, Armes ou objets portés à la ceinture ou dans le dos, Accessoires, Signes distinctifs (cicatrices, tatouages, bijoux). Sa tenue vient de la liste des tenues : ne la décris pas ici. Un Gob a TOUJOURS la peau verdâtre (jamais claire ni rosée)." 
                                 },
                                 occupation: { type: "STRING" },
                                 race: { type: "STRING", description: "Le nom EXACT d'une race de la liste." },
@@ -1892,7 +1894,9 @@ async function genererReponseNarrateur(contexteFormate, historiqueComplet, maxTe
     // celui du livre en entier) : CONSIGNES_NARRATEUR_TOUJOURS.
     // (v484) Le clan nomade : le narrateur est Thémès (camp.js, consignesThemes).
     const themes = window.CAMP && typeof window.CAMP.consignesThemes === "function" ? window.CAMP.consignesThemes() : "";
-    const promptSysteme = instructionMJ + "\n\n" + CONSIGNES_NARRATEUR_TOUJOURS + (themes ? "\n\n" + themes : "") + "\n\n" + contexteFormate + "\n\nContinue l'histoire en répondant à la dernière action.";
+    // (v506) La magie est courante à Ivalis (lore_ivalis.js) : quel que soit le cerveau du Narrateur.
+    const magie = window.REGLE_MAGIE_IVALIS || "";
+    const promptSysteme = instructionMJ + "\n\n" + CONSIGNES_NARRATEUR_TOUJOURS + (magie ? "\n\n" + magie : "") + (themes ? "\n\n" + themes : "") + "\n\n" + contexteFormate + "\n\nContinue l'histoire en répondant à la dernière action.";
     const bodyRequete = {
         systemInstruction: { parts: [{ text: promptSysteme }] },
         contents: [{ role: "user", parts: [{ text: historiqueComplet }] }],
@@ -2860,10 +2864,15 @@ window.declencherTourIA = async function(options) {
                         // (v411) LES FILS INVISIBLES : les âmes de la scène (ceux qui y étaient au
                         // début, ceux qui y sont à la fin, et chaque héros). (v418) Aussi en pleine
                         // nature : la compagnie y est.
-                        if (window.SOCIAL && typeof window.SOCIAL.apresLeTour === "function" && (lieuFinal || nomsPnjPresents.length)) {
+                        // (v506) Nico : « je ne vois plus aucun cerveau des fils invisibles dans mon RP ; je devrais en avoir avec
+                        // les PNJ du récit et mes suiveurs ». Au camp ou en pleine nature, sans PNJ de lieu, l'analyse ne partait
+                        // pas : les membres du camp (au camp) et les suiveurs de l'expédition sont des âmes de la scène.
+                        const duClan = window.CAMP && typeof window.CAMP.pnjsDuRecit === "function" ? await window.CAMP.pnjsDuRecit().catch(() => []) : [];
+                        if (window.SOCIAL && typeof window.SOCIAL.apresLeTour === "function" && (lieuFinal || nomsPnjPresents.length || duClan.length)) {
                             const envFin = await preparerEnvironnement(lieuFinal || null).catch(() => ({ pnjsPresents: {} }));
                             const vus = new Map();
                             [...Object.values(env.pnjsPresents || {}), ...Object.values(envFin.pnjsPresents || {})].forEach(f => { if (f && f.idDoc && !vus.has(f.idDoc)) vus.set(f.idDoc, { id: f.idDoc, fiche: f }); });
+                            duClan.forEach(x => { if (!vus.has(x.id)) vus.set(x.id, x); });
                             // (la liste des joueurs peut être vide : celle de la partie prend le relais, comme en v315)
                             const listeHeros = (window.PERSOS_JOUEURS_PARTIE && window.PERSOS_JOUEURS_PARTIE.length ? window.PERSOS_JOUEURS_PARTIE : window.PERSOS_PARTIE) || [];
                             const herosSociaux = enJeu(listeHeros.filter(h => h && !h.estMonstre && !h.estIllusion && h.actif !== false && h.prenom && h.idPersonnage));

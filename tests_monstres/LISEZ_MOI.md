@@ -12858,3 +12858,12 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Les habitants du camp** (`camp.js`, `habitantsDuCamp`) : le narrateur reçoit la liste des membres présents au camp (les seuls habitants : pas d'artisans inventés).
 - **L'expédition en solo** (`expedition.js` : `herosDesAbsents`, `prendrePlaceAbsent` ; `grimoire_groupe.js`) : un joueur présent peut emmener le héros d'un compagnon absent (la place reste à son joueur, `Par` dit qui l'a emmené) ; le narrateur reçoit tout le groupe de l'expédition (héros, Thémès, suiveurs), à faire vivre comme un groupe.
 - corrections_v505 le vérifie ; corrections_v307, v483, v485 et v502 adaptés.
+
+## v506 — Les Gobs verdâtres, les cerveaux du clan, le post-it, la magie, l'attaque délibérée
+
+- **La peau des Gobs** (`lore_ivalis.js`, `traitsImposesRace` ; `ia_master.js` : portrait d'un PNJ, descriptions des PNJ ; `camp_avatars.js` : images du camp, héros compris) : toujours dans des teintes verdâtres, jamais une peau claire d'humain, prioritaire sur la description et l'image de référence.
+- **Les cerveaux des fils invisibles** (`camp.js`, `pnjsDuRecit` ; `ia_master.js`) : au camp, ses membres présents ; en expédition, ses suiveurs, sont des âmes de la scène — l'analyse part même sans PNJ de lieu.
+- **Le post-it qui gardait le texte envoyé** (`grimoire_recit.js` ; `conseil.js`) : la dictée, arrêtée par l'envoi, livrait encore sa dernière phrase qui réécrivait le papier vidé ; une dictée arrêtée n'écrit plus rien.
+- **La magie est courante** (`lore_ivalis.js`, `REGLE_MAGIE_IVALIS`) : pour le narrateur (quel que soit son cerveau), sa plume, les PNJ en privé, le moment à part, le conseil, le rapport de l'intendant ; plus de « la sorcière » comme insulte (combat_rp.js).
+- **L'attaque délibérée** (`combat_rp.js` ; `camp.js`, `contexteMJ`) : « tenter de frapper » (le livre raconte toujours une tentative) est une attaque portée, donc un combat ; au camp, la détection s'annonce aussi (aucun danger extérieur, mais une attaque délibérée d'un héros se joue).
+- corrections_v506 le vérifie ; corrections_v480 adapté.

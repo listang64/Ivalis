@@ -48,6 +48,7 @@ COMMENT TU ÉCRIS :
 - Pas de combat, pas d'ennemi, pas de danger : c'est un moment à part, au camp.
 - ${s.nomPnj} reste lui-même (ce qui suit) : il peut s'ouvrir, se confier, refuser, se fâcher, partir, selon son caractère et ce qu'il pense de ${h.prenom || nomHeros(h)}.
 ${window.CAMP && window.CAMP.regleClanLoyal ? `- ${window.CAMP.regleClanLoyal()}` : ""}
+${window.REGLE_MAGIE_IVALIS ? `- ${window.REGLE_MAGIE_IVALIS}` : ""}
 
 CE QUI DÉFINIT ${String(s.nomPnj).toUpperCase()} (sa fiche, son caractère, ses liens, ses souvenirs) :
 ${pnj}`;
