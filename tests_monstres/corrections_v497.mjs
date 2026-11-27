@@ -231,7 +231,8 @@ await section(async () => {
   verifier("le réseau : un fil rouge pour l'amour (en pointillé s'il n'est pas réciproque), doré pour l'amitié profonde", JSON.stringify(r) === JSON.stringify([["A", "#b3121b", true, 3.6], ["B", "#b8862a", false, 3.6]]), JSON.stringify(r));
   const gl = lire("grimoire_liens.js"), gf = lire("grimoire_fiches.js"), gg = lire("grimoire_gestion.js"), dp = lire("discussion_privee.js");
   verifier("l'encart d'un lien : son lien fort (réciproque ou non), sinon le palier d'affection", /function htmlCoeur\(l, choix\)/.test(gl) && /Affection : \$\{echapper\(P\.NOMS_PALIERS\[pal\]\)\}/.test(gl));
-  verifier("la fiche : « Liens chers », déclarer depuis son héros principal au héros d'un autre joueur, défaire", /<div class="titre-encart">Liens chers<\/div>/.test(gf) && /data-fa="declarer-lien" data-type="amour"/.test(gf) && /data-fa="defaire-lien"/.test(gf));
+  // (v504) Nico : plus d'encart pour déclarer depuis la fiche d'un autre joueur ; défaire reste.
+  verifier("la fiche : « Liens chers », défaire (v504 : plus de déclaration depuis la fiche)", /<div class="titre-encart">Liens chers<\/div>/.test(gf) && !/data-fa="declarer-lien"/.test(gf) && /data-fa="defaire-lien"/.test(gf));
   verifier("la gestion du camp : ❤ ou ✦ à côté du nom ; la discussion privée : le PNJ le sait (avec pudeur)", /\$\{marqueLien\(id\)\}/.test(gg) && /TU L'AIMES/.test(dp));
   verifier("aucun effet en combat (rien dans le moteur)", !/fort\.type|liensForts|LIENS_FORTS/.test(lire("cerveau_combat.js") + lire("moteur_pur.js") + lire("combat_etat.js")));
   const ix = lire("index.html");

@@ -163,6 +163,19 @@
         return Array.isArray(brut) ? brut.filter(b => b && window.blessureParId(b.id)) : [];
     };
     window.blessuresDuPerso = lireListe;
+    // (v504) LE RÉTABLISSEMENT : la blessure « en jours » la plus longue à guérir (sa durée de la table, ce qui reste).
+    // Rend { jours, total, pct (la part guérie), nom } ou null (aucune blessure qui guérit avec le temps).
+    window.retablissement = (liste) => {
+        let pire = null;
+        (Array.isArray(liste) ? liste : []).forEach(b => {
+            const t = b && window.blessureParId(b.id), total = t && t.duree && Number(t.duree.jours), reste = Number(b && b.jours) || 0;
+            if (!total || reste <= 0) return;
+            if (!pire || reste > pire.jours) pire = { jours: reste, total: Math.max(total, reste), nom: t.nom };
+        });
+        if (!pire) return null;
+        pire.pct = Math.max(0, Math.min(1, 1 - pire.jours / pire.total));
+        return pire;
+    };
     window.estMortDefinitivement = (perso) => !!(perso && (perso.mortDefinitive || perso.Mort_Definitive));
     // Inconscient, en convalescence : il ne combat pas tant que les jours courent.
     window.estIndisponible = (perso) => lireListe(perso).some(b => (window.blessureParId(b.id) || {}).indisponible && (b.jours || 0) > 0);

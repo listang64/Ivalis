@@ -249,12 +249,24 @@ function htmlMembre(id, camp, partis, bloque) {
             <span class="qui-gestion">${echapper(qui)} · niv. ${Number(i.niveau) || 1}</span>${camp.Intendant === id ? `<span class="badge-intendant">intendant</span>` : ""}</div>
           <div class="moral-gestion" title="Moral : ${moral}/100 (${echapper(P.effetDuMoral(moral))})${histo ? ` — dernier changement : ${histo.Delta > 0 ? "+" : ""}${histo.Delta}, ${echapper(histo.Raison)}` : ""}">
             <span>Moral</span><span class="barre-moral-gestion${moral < 30 ? " bas" : moral >= 80 ? " haut" : ""}"><i style="width:${moral}%"></i></span><b>${moral}</b></div>
+          ${htmlRetablissement(id, i)}
           <div class="tache-gestion">${controle}</div>
           ${casePrincipal}
           ${i.incarne && i.joueur ? `<div class="classe-gestion">Classe : ${echapper(i.classe || "—")}${i.joueur ? ` · joué par ${echapper(i.joueur === moi() ? "toi" : ((typeof window.nomDuJoueurLivre === "function" && window.nomDuJoueurLivre(i.joueur)) || "un joueur"))}` : ""}</div>` : ""}
           ${!i.heros && !(i.incarne && i.joueur) && !themes && !parti ? `<div class="classe-gestion">Classe : <b>${echapper(i.classe || "—")}</b>
             <button type="button" class="lien-fiche choisir-classe-gestion" data-action="gestion" data-gc="choisir-classe" data-id="${echapper(id)}">${i.classe ? "Changer" : "Choisir sa classe"}</button></div>` : ""}
         </div></li>`;
+}
+// (v504) Nico : « quand il y a une blessure sur un personnage, faire apparaître sa jauge de rétablissement sous la jauge
+// de moral » (blessures.js, retablissement) : la part guérie, et les jours qui restent.
+function htmlRetablissement(id, i) {
+    if (typeof window.retablissement !== "function" || typeof window.blessuresDuPerso !== "function") return "";
+    const h = (window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || []).find(x => x && x.idPersonnage === id);
+    const r = window.retablissement(window.blessuresDuPerso(h || (i.fiche || {})));
+    if (!r) return "";
+    const pct = Math.round(r.pct * 100);
+    return `<div class="retablissement-gestion" title="${echapper(r.nom)} : encore ${r.jours} jour${r.jours > 1 ? "s" : ""} de repos (${pct} % guéri)">
+            <span>Rétablissement</span><span class="barre-retablissement-gestion"><i style="width:${pct}%"></i></span><b>${r.jours} j</b></div>`;
 }
 function htmlRecrue(id, camp, partis, bloque, mb) {
     const P = R(), nE = Number((infos[id] || {}).niveau) || 1;

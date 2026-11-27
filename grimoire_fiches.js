@@ -256,26 +256,56 @@ function jaugeCrayon(pct, graine) {
 // esprit que celles d'aujourd'hui, mais dans la pâte graphique du livre ; pas
 // de couleur de joueur ») : le médaillon rond de l'initiative, à gauche, et la
 // longue plaque du titre, à la pointe fendue, tracés à l'encre.
+// (v504) Nico : « tracées de façon irrégulière, différentes les unes des autres ». Chaque bannière tire sa forme de sa
+// graine : la hauteur de la plaque, ses bords qui ondulent (plus ou moins), sa pointe (fendue, en flèche, biseautée ou
+// roulée), le trait repassé décalé, le médaillon plus ou moins cabossé.
+const FORMES_POINTE = ["fendue", "fleche", "biseau", "rouleau"];
 function dessinBanniere(graine) {
     const r = hasard("banniere-" + graine);
-    const j = (a) => ((r() - 0.5) * 2 * a).toFixed(1);
-    // La plaque s'étire avec la page ; le médaillon reste rond.
-    const plaque = () => `M 0 ${15 + +j(0.6)} C 90 ${13.5 + +j(0.8)} 200 ${14.5 + +j(0.8)} ${290 + +j(0.6)} ${14 + +j(0.6)} L ${282 + +j(0.8)} 30 L ${291 + +j(0.6)} ${46 + +j(0.6)} C 200 ${45.5 + +j(0.8)} 90 ${46.5 + +j(0.8)} 0 ${45 + +j(0.6)}`;
-    const rond = (rr) => {
+    const j = (a) => (r() - 0.5) * 2 * a;
+    const f = (n) => n.toFixed(1);
+    const haut = 13 + j(2.5), bas = 47 + j(2.5), houle = 1 + r() * 2.6;   // la plaque, et combien ses bords ondulent
+    const pointe = FORMES_POINTE[Math.floor(r() * FORMES_POINTE.length) % FORMES_POINTE.length];
+    const bout = 284 + j(5), milieu = (haut + bas) / 2 + j(2);
+    // Un bord tiré à main levée : quatre segments qui ondulent, de gauche à droite (ou l'inverse).
+    const bord = (y, x0, x1) => {
+        let d = "", px = x0, py = y + j(houle);
+        const pas = (x1 - x0) / 4;
+        for (let i = 1; i <= 4; i++) {
+            const nx = x0 + pas * i, ny = y + j(houle);
+            d += ` C ${f(px + pas * 0.35)} ${f(py + j(houle * 1.3))} ${f(nx - pas * 0.35)} ${f(ny + j(houle * 1.3))} ${f(nx)} ${f(ny)}`;
+            px = nx; py = ny;
+        }
+        return { d, y: py };
+    };
+    const extremite = () => {
+        if (pointe === "fendue") return ` L ${f(bout - 9 + j(2))} ${f(milieu)} L ${f(bout + 6 + j(1.5))} ${f(bas + j(1))}`;
+        if (pointe === "fleche") return ` L ${f(bout + 12 + j(2))} ${f(milieu)} L ${f(bout + j(1.5))} ${f(bas + j(1))}`;
+        if (pointe === "biseau") return ` L ${f(bout + 9 + j(2))} ${f(bas + j(1.2))}`;
+        return ` C ${f(bout + 14 + j(2))} ${f(haut + 4)} ${f(bout + 14 + j(2))} ${f(bas - 4)} ${f(bout + j(1))} ${f(bas + j(1))}`;   // roulée
+    };
+    const plaque = () => {
+        const h = bord(haut, 0, bout), b = bord(bas, bout, 0);
+        return `M 0 ${f(haut + j(houle))}${h.d}${extremite()}${b.d}`;
+    };
+    const plein = plaque(), trait = plaque(), repasse = plaque();
+    const rond = (rr, bosses) => {
         let d = "";
         for (let i = 0; i <= 18; i++) {
-            const a = i / 18 * Math.PI * 2, k = rr + (r() - 0.5) * 1.2;
+            const a = i / 18 * Math.PI * 2, k = rr + (r() - 0.5) * bosses;
             d += `${i ? "L" : "M"} ${(30 + Math.cos(a) * k).toFixed(1)} ${(30 + Math.sin(a) * k).toFixed(1)} `;
         }
         return d;
     };
-    return `<svg class="dessin-banniere plaque-banniere" viewBox="0 0 300 60" preserveAspectRatio="none" aria-hidden="true">
-        <path class="plaque-fond" d="${plaque()} Z"/>
-        <path class="plaque" d="${plaque()}"/><path class="plaque leger" d="${plaque()}"/>
-        <path class="filet" d="M 14 ${19 + +j(0.4)} C 120 ${18 + +j(0.6)} 220 ${19 + +j(0.6)} 280 ${18.5 + +j(0.4)} M 14 ${41 + +j(0.4)} C 120 ${42 + +j(0.6)} 220 ${41 + +j(0.6)} 280 ${41.5 + +j(0.4)}"/></svg>
+    const bosses = 1 + r() * 2.4;
+    const rouleau = pointe === "rouleau" ? `<path class="leger" d="M ${f(bout + 3)} ${f(haut + 6)} q ${f(6 + j(1.5))} ${f((bas - haut) / 2 - 6)} 0 ${f(bas - haut - 12)}"/>` : "";
+    return `<svg class="dessin-banniere plaque-banniere" viewBox="0 0 300 60" preserveAspectRatio="none" aria-hidden="true" data-pointe="${pointe}">
+        <path class="plaque-fond" d="${plein} Z"/>
+        <path class="plaque" d="${trait}"/><path class="plaque leger" d="${repasse}" transform="translate(${f(j(1.2))} ${f(j(0.9))})"/>${rouleau}
+        <path class="filet" d="M ${f(12 + j(3))} ${f(haut + 4.5 + j(0.8))} C 120 ${f(haut + 4 + j(1.2))} 210 ${f(haut + 4.5 + j(1.2))} ${f(bout - 8 + j(4))} ${f(haut + 4 + j(0.8))} M ${f(12 + j(3))} ${f(bas - 4.5 + j(0.8))} C 120 ${f(bas - 4 + j(1.2))} 210 ${f(bas - 4.5 + j(1.2))} ${f(bout - 8 + j(4))} ${f(bas - 4 + j(0.8))}"/></svg>
       <svg class="dessin-banniere medaillon-banniere" viewBox="0 0 60 60" aria-hidden="true">
-        <path class="medaillon-fond" d="${rond(25)} Z"/>
-        <path class="medaillon" d="${rond(25)}"/><path class="medaillon leger" d="${rond(21)}"/>
+        <path class="medaillon-fond" d="${rond(25, bosses)} Z"/>
+        <path class="medaillon" d="${rond(25, bosses)}"/><path class="medaillon leger" d="${rond(21, bosses)}"/>
         <path class="perle" d="M 30 2.5 l 0 3 M 30 54.5 l 0 3 M 2.5 30 l 3 0"/></svg>`;
 }
 
@@ -657,26 +687,18 @@ function htmlLiensChers(h) {
     if (!LF || !window.ID_PARTIE_COURANTE) return "";
     const liste = LF.deLui(h.idPersonnage);
     const nom = (id) => { const x = herosParId(id); return x ? nomHeros(x) : LF.nom(id); };
-    const moi = idJoueurCourant(), mien = h.idJoueur === moi, monHeros = herosPrincipalDe(moi);
+    const moi = idJoueurCourant(), mien = h.idJoueur === moi;
     const lignes = liste.map(x => {
         const type = (x.sien || x.envers).fort.type, rec = x.sien && x.envers && x.sien.fort.type === x.envers.fort.type;
         const sens = rec ? (type === "amour" ? "s'aiment" : "amitié profonde") : x.sien ? (type === "amour" ? "aime" : "tient profondément à") : (type === "amour" ? "est aimé·e de" : "est chéri·e par");
         const defaire = mien && x.sien && (x.sien.fort.choisi || x.sien.declare) ? ` <button type="button" class="lien-fiche defaire-lien-fiche" data-action="fiches" data-fa="defaire-lien" data-id="${echapper(x.id)}">défaire</button>` : "";
         return `<li class="lien-cher ${type}"><span class="marque-lien-fort ${type}">${LF.ICONES[type]}</span> ${echapper(sens)} <b>${echapper(nom(x.id))}</b>${defaire}</li>`;
     }).join("");
-    const autreJoueur = h.idJoueur && h.idJoueur !== moi && monHeros && monHeros !== h.idPersonnage;
-    const avecMoi = liste.find(x => x.id === monHeros);
-    // (v499) Déjà amis profonds : l'amitié peut devenir un amour (une nouvelle déclaration, que l'autre accepte ou non).
-    const dejaAmis = !!avecMoi && [avecMoi.sien, avecMoi.envers].every(l => !l || l.fort.type === "amitie");
-    const declarer = autreJoueur && (!avecMoi || dejaAmis) ? `<div class="declarer-lien-fiche">
-          ${avecMoi ? "" : `<button type="button" class="lien-fiche" data-action="fiches" data-fa="declarer-lien" data-type="amitie">✦ Déclarer une amitié profonde</button>`}
-          <button type="button" class="lien-fiche" data-action="fiches" data-fa="declarer-lien" data-type="amour">❤ Déclarer un amour</button>
-        </div>` : "";
-    if (!lignes && !declarer) return "";
+    // (v504) Nico : « virer l'encart déclarer une amitié profonde ou un amour avec le personnage d'un autre joueur ».
+    if (!lignes) return "";
     return `<div class="encart-fiche encart-liens-chers">${cadre("liens-chers-" + h.idPersonnage)}
         <div class="titre-encart">Liens chers</div>
-        ${lignes ? `<ul class="liste-liens-chers">${lignes}</ul>` : `<p class="fiche-attente">Pas encore de lien cher.</p>`}
-        ${declarer}
+        <ul class="liste-liens-chers">${lignes}</ul>
       </div>`;
 }
 
@@ -700,12 +722,34 @@ function etatCompetences(h) {
     const bloquees = new Map((typeof window.competencesBloqueesParArme === "function" ? window.competencesBloqueesParArme(h) : []).map(c => [c.id, c.raison]));
     return { comps, max, restantes: Math.max(0, max + bonus - comps.length), bloquees, deck: deckDe(h) };
 }
+// (v504) « En leur centre, une aquarelle de couleur fonction du type de la compétence : rouge pour des dégâts physiques,
+// bleu pour magiques, vert pour soin ; s'il y a deux types, les deux couleurs mélangées. » Les natures de ses effets
+// (combat.js, natureEffetEncart : la même lecture que l'encart de combat ; une distorsion mentale est magique).
+export const TEINTES_TYPES = {
+    physique: { couleurs: ["#b3261e", "#c8402f", "#8f1d15"], opacite: 0.36, nom: "type-physique" },
+    magique: { couleurs: ["#2f62a8", "#4f82c6", "#244f8c"], opacite: 0.34, nom: "type-magique" },
+    soin: { couleurs: ["#3f8f35", "#5fae4f", "#2f7428"], opacite: 0.33, nom: "type-soin" }
+};
+export function typesDeCompetence(data) {
+    const out = new Set(), nature = window.natureEffetEncart;
+    if (!data || typeof nature !== "function") return [];
+    (data.Effets_Compiles || data.Effets || []).forEach(e => {
+        const nom = typeof e === "string" ? e : (e && (e.nom || e.Nom)) || "", desc = typeof e === "string" ? "" : String((e && (e.desc || e.Desc)) || "").replace(/<[^>]*>/g, " ");
+        const n = nature(nom, desc);
+        if (n === "physique" || n === "brut") out.add("physique"); else if (n === "magique" || n === "mental") out.add("magique"); else if (n === "soin") out.add("soin");
+    });
+    return ["physique", "magique", "soin"].filter(t => out.has(t));
+}
+function aquarelleBanniere(id, types) {
+    if (!types || !types.length) return "";
+    return `<span class="aquarelle-banniere types-${types.length}" data-types="${types.join(" ")}">${types.map((t, i) => `<span class="tache-banniere tache-${i + 1}">${lavis(TEINTES_TYPES[t], id + "-" + t)}</span>`).join("")}</span>`;
+}
 function banniere(id, titre, initiative, options) {
     const o = options || {};
     const classes = ["banniere-livre", o.memorisee ? "memorisee" : "", o.bloquee ? "bloquee" : "", o.verrouillee ? "verrouillee" : "", carteOuverte === id ? "ouverte" : ""].filter(Boolean).join(" ");
     return `<div class="rang-banniere">
         <button type="button" class="${classes}" data-action="fiches" data-fa="carte" data-id="${echapper(id)}"${o.raison ? ` title="${echapper(o.raison)}"` : ""}>
-          ${dessinBanniere(id)}
+          ${aquarelleBanniere(id, o.types)}${dessinBanniere(id)}
           <span class="init-banniere">${echapper(initiative)}</span>
           <span class="titre-banniere">${echapper(titre)}</span>
           ${o.memorisee ? `<span class="sceau-memoire" aria-label="Mémorisée"></span>` : ""}
@@ -717,6 +761,7 @@ function htmlCompetencesGauche(h) {
     const e = etatCompetences(h);
     const moi = !h.idJoueur || h.idJoueur === idJoueurCourant() || modeDev() || !!h.librePourTous;
     const bannieres = e.comps.map(c => banniere(c.id, c.data.Nom || "Technique inconnue", c.data.Initiative || 0, {
+        types: typesDeCompetence(c.data),
         memorisee: e.deck.includes(c.id), bloquee: e.bloquees.has(c.id), raison: e.bloquees.get(c.id), effacer: modeDev()
     })).join("");
     let classe = "";
@@ -727,7 +772,8 @@ function htmlCompetencesGauche(h) {
                 + toutes.map(({ id, niveau }) => {
                     const t = (window.TECHNIQUES_CLASSE || {})[id] || {};
                     const ok = acquises.includes(id);
-                    return banniere(id, t.Nom || id, t.Initiative || 0, { verrouillee: !ok, raison: ok ? "Une fois par combat" : `Niveau ${niveau} requis` });
+                    const carte = typeof window.carteTechniqueClasse === "function" ? window.carteTechniqueClasse(id) : null;
+                    return banniere(id, t.Nom || id, t.Initiative || 0, { types: typesDeCompetence(carte || t), verrouillee: !ok, raison: ok ? "Une fois par combat" : `Niveau ${niveau} requis` });
                 }).join("");
         }
     }
@@ -1444,16 +1490,7 @@ function agir(cible) {
     // (v319) La création se fait dans le livre (grimoire_creation.js) ; l'ancienne fenêtre en secours.
     if (fa === "creer") { son(); if (window.GRIMOIRE_CREATION && window.GRIMOIRE_CREATION.commencer()) return; if (typeof window.ouvrirCreationHero === "function") window.ouvrirCreationHero(); return; }
     if (!h) return;
-    // (v497) Les liens chers : déclarer (depuis son héros principal, au héros d'un autre joueur), défaire.
-    if (fa === "declarer-lien" && window.LIENS_FORTS) {
-        son();
-        const de = herosPrincipalDe(idJoueurCourant());
-        Promise.resolve(window.LIENS_FORTS.declarer(de, h.idPersonnage, cible.dataset.type)).then(r => {
-            const n = cible.closest(".declarer-lien-fiche");
-            if (n) n.innerHTML = `<p class="fiche-attente">${echapper(r || "La déclaration est faite : son joueur répondra.")}</p>`;
-        });
-        return;
-    }
+    // (v497) Les liens chers : défaire (v504 : plus de déclaration depuis la fiche).
     if (fa === "defaire-lien" && window.LIENS_FORTS) {
         son();
         if (typeof window.confirm === "function" && !window.confirm("Défaire ce lien ?")) return;
@@ -1648,7 +1685,7 @@ setTimeout(veiller, 300);
 // (v444) Une mission qui s'achève : les missions réussies des fiches se relisent.
 window.addEventListener("missions-terminees", () => { try { majPlus(true); } catch (e) {} });
 
-window.GRIMOIRE_FICHES = {
+window.GRIMOIRE_FICHES = { typesDeCompetence,
     agir,
     ouvrir: (id, onglet) => ouvrirHeros(id, onglet),
     // (v479) Plus de pages de clans : la page du Groupe, où est le menu « Mon héros principal ».

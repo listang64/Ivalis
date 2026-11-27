@@ -205,8 +205,8 @@ await section(async () => {
 titre("4. DEUX HÉROS DÉJÀ AMIS PROFONDS : LA FICHE PERMET DE DÉCLARER UN AMOUR");
 await section(async () => {
   const gf = lire("grimoire_fiches.js");
-  verifier("déjà amis : seul « Déclarer un amour » reste", /const dejaAmis = !!avecMoi && \[avecMoi\.sien, avecMoi\.envers\]\.every\(l => !l \|\| l\.fort\.type === "amitie"\)/.test(gf)
-    && /\$\{avecMoi \? "" : `<button[^`]*data-type="amitie"/.test(gf));
+  // (v504) Nico : plus de déclaration depuis la fiche ; la déclaration entre héros reste possible (social.js, declarerLien).
+  verifier("v504 : plus de bouton de déclaration sur la fiche ; la déclaration entre héros existe toujours", !/data-fa="declarer-lien"/.test(gf) && /export async function declarerLien/.test(lire("social.js")));
   const r = await p.evaluate(async () => {
     ["H1~H2", "H2~H1"].forEach(k => { const [de, vers] = k.split("~"); window.__docs["Systeme_Parties/P1/Liens/" + k] = { de, vers, declare: true, axes: {}, fort: { type: "amitie", le: 1, choisi: true } }; });
     await window.LIENS_FORTS.declarer("H1", "H2", "amour");
@@ -220,8 +220,9 @@ titre("5. LES VERSIONS");
 await section(async () => {
   const v = await p.evaluate(() => window.VERSION_IVALIS);
   const ix = lire("index.html");
-  verifier("version 499 ; social.js?v=19, liens_forts.js?v=2, grimoire_fiches.js?v=29 ; social_pur.js?v=8", v === 499 && JSON.parse(lire("version.json")).version === 499
-    && /src="social\.js\?v=19"/.test(ix) && /src="liens_forts\.js\?v=2"/.test(ix) && /src="grimoire_fiches\.js\?v=29"/.test(ix) && /social_pur\.js\?v=8"/.test(lire("social.js")), `${v}`);
+  const nv = (re, txt) => Number(((txt || ix).match(re) || [])[1]);
+  verifier("version 499 ou plus ; social.js ≥ 19, liens_forts.js ≥ 2, grimoire_fiches.js ≥ 29 ; social_pur.js ≥ 8", v >= 499 && JSON.parse(lire("version.json")).version >= 499
+    && nv(/src="social\.js\?v=(\d+)"/) >= 19 && nv(/src="liens_forts\.js\?v=(\d+)"/) >= 2 && nv(/src="grimoire_fiches\.js\?v=(\d+)"/) >= 29 && nv(/social_pur\.js\?v=(\d+)"/, lire("social.js")) >= 8, `${v}`);
 });
 
 verifier("aucune erreur dans la page", erreurs.length === 0, erreurs.slice(0, 3).join(" | "));

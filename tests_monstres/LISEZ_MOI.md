@@ -12840,3 +12840,10 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **La carte régionale** (`grimoire_regions.js`, `.css`) : le titre ne remonte plus ; la fenêtre du déplacement s'écrit sous la jauge de réputation ; le descriptif pour le MJ (DEV) en haut de la page.
 - **« L'inviter en privé »** (`discussion_privee.js`, au camp ; `rp_prive.js`, `.css` ; `grimoire.js`, `definirPrive`) : une double page du livre, chez ce joueur seulement (le PNJ à gauche, le récit à droite) ; le MJ (l'IA des discussions privées) raconte et joue le PNJ, jamais à la place du héros, sans combat ; la scène gardée dans `Systeme_Parties/{p}/RP_Prives` ; « Revenir au camp » : MIA_SOCIAL la lit (les fils invisibles), le camp revient.
 - corrections_v503 le vérifie ; corrections_v373, v488 et v491 adaptés.
+
+## v504 — Les fiches : les bannières à l'aquarelle ; le rétablissement ; plus de déclaration
+
+- **Plus de déclaration depuis la fiche** (`grimoire_fiches.js`, `htmlLiensChers`) : l'encart « Déclarer une amitié profonde / un amour » sur la fiche du héros d'un autre joueur est retiré ; « Liens chers » ne montre plus que les liens (et « défaire »).
+- **Le rétablissement** (`blessures.js`, `window.retablissement` ; `grimoire_gestion.js`, `.css`) : un personnage blessé (une blessure qui guérit en jours) a, sous sa jauge de moral, sa jauge de rétablissement (la part guérie de sa blessure la plus longue) et les jours qui restent.
+- **Les bannières des compétences** (`grimoire_fiches.js` : `dessinBanniere`, `typesDeCompetence`, `TEINTES_TYPES` ; `.css`) : tracées chacune à sa façon (hauteur, bords qui ondulent, pointe fendue, en flèche, biseautée ou roulée, médaillon cabossé) ; en leur centre, une aquarelle rouge (dégâts physiques), bleue (magiques), verte (soin), les couleurs mêlées quand il y en a plusieurs (combat.js, `natureEffetEncart`).
+- corrections_v504 le vérifie ; corrections_v497 et v499 adaptés.

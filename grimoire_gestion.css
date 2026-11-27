@@ -114,3 +114,9 @@
 .separation-dev-gestion::before, .separation-dev-gestion::after { content: ""; flex: 1; border-top: 2px solid #a3201a; }
 .outils-dev-gestion .lien-dev { align-self: flex-start !important; margin: 0 !important; }
 .outils-dev-gestion .recrue-dev-gestion { margin-top: calc(var(--u) * 0.6); align-self: stretch; }
+/* (v504) Le rétablissement d'un blessé, sous son moral. */
+.retablissement-gestion { display: grid; grid-template-columns: calc(var(--u) * 9) 1fr calc(var(--u) * 5); align-items: center; gap: calc(var(--u) * 1); font-size: calc(var(--u) * 2.5); }
+.retablissement-gestion > span:first-child { font-size: calc(var(--u) * 2.1); }
+.retablissement-gestion b { text-align: right; }
+.barre-retablissement-gestion { height: calc(var(--u) * 1.1); background: rgba(163, 32, 26, 0.18); border-radius: 9px; overflow: hidden; }
+.barre-retablissement-gestion i { display: block; height: 100%; background: linear-gradient(90deg, #a3201a, #c8763a 60%, #5e7f59); border-radius: 9px; }
