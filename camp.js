@@ -15,7 +15,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, collection, deleteField, runTransaction, increment, addDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=22";
+import * as CP from "./camp_pur.js?v=23";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -256,7 +256,24 @@ export function auCamp() {
 // Ce que le narrateur sait du camp quand le clan y est (ia_master.js).
 export function contexteMJ() {
     if (!auCamp()) return "";
-    return `--- LE CAMP DU CLAN ---\nLes héros sont au camp du clan nomade : des tentes, un feu, les membres du clan qui vaquent à leurs occupations. Ils flânent, parlent, s'occupent.\nRÈGLE ABSOLUE : un RP dans le camp ne déclenche JAMAIS de combat (aucun ennemi, aucune attaque, aucune embuscade, aucune bagarre qui tourne au combat).`;
+    return `--- LE CAMP DU CLAN ---\nLes héros sont au camp du clan nomade : des tentes, un feu, les membres du clan qui vaquent à leurs occupations. Ils flânent, parlent, s'occupent.\nRÈGLE ABSOLUE : un RP dans le camp ne déclenche JAMAIS de combat (aucun ennemi, aucune attaque, aucune embuscade, aucune bagarre qui tourne au combat).${habitantsDuCamp()}`;
+}
+// (v505) Nico : « le narrateur me dit qu'on a des artisans gobelins dans mon camp alors que non : il faut lui envoyer les
+// personnages présents dans le camp ». Ceux qui y sont (pas ceux partis en expédition), et personne d'autre.
+export function habitantsDuCamp() {
+    if (!camp) return "";
+    if (!Object.keys(dernieresInfos).length) infosMembres().catch(() => {});   // la prochaine fois, avec leurs métiers
+    const ici = CP.presentsAuCampSeulement(camp, partis());
+    const t = window.CAMP && window.CAMP.regles && window.CAMP.regles.TACHES ? window.CAMP.regles.TACHES : CP.TACHES;
+    const lignes = ici.map(id => {
+        const mb = camp.Membres[id] || {}, i = dernieresInfos[id] || {}, f = i.fiche || {};
+        const nom = i.nom || nomConnu(id) || mb.Nom || "";
+        if (!nom) return "";
+        const quoi = CP.estThemes(id, mb) ? "le narrateur du clan" : i.heros ? `héros${i.classe ? `, ${i.classe}` : ""}` : [i.occupation || f.Occupation, f.Race].filter(Boolean).join(", ");
+        const tache = mb.Tache && t[mb.Tache] ? ` — en ce moment : ${t[mb.Tache].nom.toLowerCase()}` : "";
+        return `- ${nom}${quoi ? ` (${quoi})` : ""}${tache}`;
+    }).filter(Boolean);
+    return lignes.length ? `\nLES MEMBRES DU CLAN AU CAMP (ce sont les SEULS habitants du camp : n'invente ni artisans, ni gardes, ni marchands, ni autres membres) :\n${lignes.join("\n")}` : "";
 }
 
 // ---------------------------------------------------------------------
@@ -278,12 +295,13 @@ async function lireDoc(col, id) {
     return d;
 }
 // (v502) Les derniers noms lus (le narrateur, les missions : sans attendre la base).
-let derniersNoms = {};
+let derniersNoms = {}, dernieresInfos = {};
 export const nomConnu = (id) => derniersNoms[id] || ((camp && camp.Membres && camp.Membres[id]) || {}).Nom || "";
+export const infoConnue = (id) => dernieresInfos[id] || null;
 export async function infosMembres() {
     if (!camp) return {};
     const res = await infosMembresLues();
-    Object.values(res).forEach(i => { if (i && i.id && i.nom) derniersNoms[i.id] = i.nom; });
+    Object.values(res).forEach(i => { if (i && i.id && i.nom) derniersNoms[i.id] = i.nom; if (i && i.id) dernieresInfos[i.id] = i; });
     return res;
 }
 async function infosMembresLues() {
@@ -294,7 +312,7 @@ async function infosMembresLues() {
         if (h && !h.librePourTous) {
             const caracs = (window.CARACS_PARTIE || {})[id] || await lireDoc("Caracteristiques", id) || {};
             out[id] = { id, heros: true, joueur: h.idJoueur || "", nom: [h.prenom, h.nom].filter(Boolean).join(" ").trim() || mb.Nom || "", caracs,
-                        niveau: Number(h.niveau) || 1, portrait: h.urlCloudinary || h.urlAvatarEquipe || h.urlPortraitReference || "" };
+                        niveau: Number(h.niveau) || 1, portrait: h.urlCloudinary || h.urlAvatarEquipe || h.urlPortraitReference || "", classe: h.classe || "" };
             return;
         }
         const f = await lireDoc("Monde_PNJ", id) || {};
@@ -529,6 +547,6 @@ export async function renvoyerDuCampDev(id) {
         });
     } catch (e) { console.error("[Camp] Renvoyer :", e); return "La base n'a pas répondu."; }
 }
-window.CAMP = { nomConnu, regleClanLoyal, ajouterAuCampDev, renvoyerDuCampDev, consignesThemes, echoReputation, contexteReputationMJ, lire: lireCamp, creerCampDev, creerCampAuto, rattraperMembres, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
+window.CAMP = { infoConnue, habitantsDuCamp, nomConnu, regleClanLoyal, ajouterAuCampDev, renvoyerDuCampDev, consignesThemes, echoReputation, contexteReputationMJ, lire: lireCamp, creerCampDev, creerCampAuto, rattraperMembres, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
                 partis, postesBloques, infosMembres, assignerTache, nommerIntendant, changerMoral, journeeDuCamp };
 window.journeeDuCamp = journeeDuCamp;

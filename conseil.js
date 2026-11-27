@@ -19,7 +19,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, getDocs, addDoc, collection, query, where, onSnapshot, runTransaction, deleteField, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=22";
+import * as CP from "./camp_pur.js?v=23";
 
 const PARTIES = "Systeme_Parties";
 export const ATTENTE_IA_MS = 6000;
@@ -90,7 +90,7 @@ export async function creerConseil(o = {}) {
         const extra = !!(o.extraordinaire || d.Camp.Conseil_Extraordinaire);
         const c = CP.conseilVide("C" + Date.now().toString(36), { extraordinaire: extra, raison: extra ? ((d.Camp.Conseil_Extraordinaire || {}).Raison || o.raison || "") : "", maintenant: Date.now(), dateJeu });
         const idT = CP.idThemesDuCamp(d.Camp);
-        const ajouter = (sujet) => { if ((c.Sujets || []).length < CP.SUJETS_MAX) c.Sujets.push(CP.nouveauSujet(c, { ...sujet, le: Date.now() })); };
+        const ajouter = (sujet) => { if (!CP.peutProposer(c, { ...sujet.par, force: true })) c.Sujets.push(CP.nouveauSujet(c, { ...sujet, le: Date.now() })); };
         if (extra) ajouter({ titre: "Le manque cruel de vivres", resume: "Le camp n'a plus de provisions : comment nourrir le clan ?", type: "vivres", par: { id: idT || "THEMES", nom: "Thémès", type: "pnj" } });
         const lieu = (d.Camp.Lieux_Reperes || [])[0];
         if (lieu) ajouter({ titre: "Aller voir le lieu repéré", resume: `${nomMembre(lieu.Par)} a repéré un lieu intéressant près du camp.`, type: "lieu", par: { id: lieu.Par, nom: nomMembre(lieu.Par), type: "pnj" }, lieu });
@@ -482,7 +482,7 @@ export function rendre() {
                 <div class="bulles-postit">${pnjs.map(id => `<span class="bulle-pnj-postit">${echapper(nomMembre(id))}</span>`).join("")}</div>
                 ${c.Ouvert ? `<button type="button" class="voter-postit" data-cs="voter" data-sujet="${echapper(s.Id)}">${mien ? "Mon vote ✓" : "Voter pour"}</button>` : ""}
               </div>`;
-        }).join("") || `<p class="vide-postits">Aucun sujet pour l'instant : chacun peut en proposer un (trois au plus).</p>`;
+        }).join("") || `<p class="vide-postits">Aucun sujet pour l'instant : chacun peut en proposer un (${CP.SUJETS_JOUEURS_MAX} places pour les joueurs, ${CP.SUJETS_PNJ_MAX} pour les PNJ).</p>`;
     }
     const prop = $("proposer-conseil");
     if (prop) {

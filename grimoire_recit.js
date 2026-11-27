@@ -1502,9 +1502,21 @@ async function lancerLeDe(d, el) {
 // rappeler aux autres de cliquer. » Chaque appel se range sur la partie (Appel_Narrateur : le joueur,
 // l'heure) ; seuls comptent ceux d'après la dernière page du Narrateur. Le dernier qui appelle lance.
 // En mode DEV, un second toucher l'envoie sans attendre les autres.
+// (v505) Nico : « pour envoyer le narrateur, sa demande est que tous les joueurs de cette partie connectés soient d'accord ;
+// si je suis tout seul, ça lance le narrateur » : les joueurs absents (sans signe de vie depuis 2 min 30, camp.js,
+// joueursConnectes) ne sont plus attendus.
+let connectesNarrateur = null, connectesLus = 0;
+function rafraichirConnectes(force) {
+    if (!window.CAMP || typeof window.CAMP.joueursConnectes !== "function" || (!force && Date.now() - connectesLus < 15000)) return Promise.resolve(connectesNarrateur);
+    connectesLus = Date.now();
+    return Promise.resolve(window.CAMP.joueursConnectes()).then(s => { connectesNarrateur = s instanceof Set ? s : null; if (elts) majInterface(); return connectesNarrateur; }).catch(() => connectesNarrateur);
+}
+setInterval(() => { if (!document.hidden && window.ID_PARTIE_COURANTE) rafraichirConnectes(); }, 15000);
+export const attendusConnectes = (attendus, connectes, ici) => (connectes ? attendus.filter(j => j === ici || connectes.has(j)) : attendus);
 function appelsNarrateur() {
     const depuis = Number((derniereNarration() || {}).Timestamp) || 0;
-    const attendus = joueursAttendusLecture();
+    rafraichirConnectes();
+    const attendus = attendusConnectes(joueursAttendusLecture(), connectesNarrateur, moi());
     const appels = Object.entries(etat.appelsNarrateur || {}).filter(([j, t]) => Number(t) > depuis && attendus.includes(j));
     const qui = appels.map(([j]) => j);
     return { attendus, qui, manquants: attendus.filter(j => !qui.includes(j)), dernier: appels.reduce((a, [j, t]) => (!a || Number(t) > a.t ? { j, t: Number(t) } : a), null) };
@@ -1517,7 +1529,9 @@ function envoyerNarrateur() {
         Promise.resolve(window.declencherTourIA()).catch(e => console.error("Le Narrateur :", e));
     }
 }
-function lancerNarrateur() {
+async function lancerNarrateur() {
+    if (!elts || elts.postit.disabled || etat.verrou) return;
+    await rafraichirConnectes(true);   // (v505) qui est là, au moment de l'appel
     if (!elts || elts.postit.disabled || etat.verrou) return;
     const qui = moi(), avant = appelsNarrateur();
     if (qui && avant.qui.includes(qui)) {
@@ -1739,9 +1753,15 @@ async function reformuler(texte, heros) {
     const lignes = dernieresLignes(6);
     const pnjs = await Promise.race([pnjsDeLaScene(), new Promise(r => setTimeout(() => r([]), 2500))]).catch(() => []);
     const presents = textePnjsDeLaScene(pnjs || [], texte, lignes);
+    // (v505) Nico : « l'IA qui retranscrit les paroles des joueurs n'a pas l'air d'avoir le genre des personnages : il m'a
+    // dit il alors que le personnage est une femme ». Le genre de chaque héros du groupe, et la consigne d'accorder.
+    const estF = (g) => (typeof window.estGenreFeminin === "function" ? window.estGenreFeminin(g) : /^f/i.test(String(g || "")));
+    const groupe = herosDeLaPartie().filter(h => h && h.prenom).map(h => `- ${[h.prenom, h.nom].filter(Boolean).join(" ")} : ${h.genre ? (estF(h.genre) ? "une femme (elle)" : "un homme (il)") : "genre non précisé"}`).join("\n");
+    const accord = heros.genre ? `\nACCORDE ${String(heros.prenom || "le héros").toUpperCase()} AU ${fem ? "FÉMININ (elle, une aventurière, prête, assise…)" : "MASCULIN (il)"}.` : "";
     return appelLite(PROMPT_NARRATEUR_LITE, `LES DERNIÈRES LIGNES DU LIVRE (tu continues la dernière) :\n${lignes || "(le livre commence)"}\n\n`
+        + (groupe ? `LES HÉROS DU GROUPE (accorde chacun selon son genre) :\n${groupe}\n\n` : "")
         + (presents ? `LES PNJ PRÉSENTS (s'il s'adresse à l'un d'eux, il lui répond) :\n${presents}\n\n` : "")
-        + `LE HÉROS : ${qui}\nCE QU'ÉCRIT SON JOUEUR : ${texte}`, true);
+        + `LE HÉROS : ${qui}${accord}\nCE QU'ÉCRIT SON JOUEUR : ${texte}`, true);
 }
 // Le Destin et le Maître du Temps : un seul poste récrit chaque annonce
 // (il la réserve d'abord), les autres attendent sa ligne.
@@ -2005,7 +2025,7 @@ function sortir() {
 let redim = null;
 window.addEventListener("resize", () => { clearTimeout(redim); redim = setTimeout(() => { if (etat.actif) { etat.htmlPages = []; rendre(); } }, 250); });
 
-window.GRIMOIRE_RECIT = {
+window.GRIMOIRE_RECIT = { attendusConnectes, rafraichirConnectes,
     entrer, sortir, allerAuRecit, allerAuSommaireDuRecit, marqueDuRecit, archiverChapitre, supprimerChapitre, rendre, envoyer,
     construireEntrees, jetsEnAttente, reformuler,
     etat: () => ({ actif: etat.actif, idPartie: etat.idPartie, pagesRecit: etat.pagesRecit, verrou: etat.verrou, envoi: etat.envoi,

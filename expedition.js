@@ -21,7 +21,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, runTransaction, updateDoc, deleteField, writeBatch } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=22";
+import * as CP from "./camp_pur.js?v=23";
 
 const PARTIES = "Systeme_Parties";
 const idPartie = () => window.ID_PARTIE_COURANTE || "";
@@ -100,8 +100,32 @@ export const annuler = () => modifier((d) => {
     if (d.Expedition.En_Cours) return { refus: "L'expédition est partie : elle se termine en revenant au camp." };
     return { maj: { Expedition: deleteField() } };
 });
+// (v505) Nico : « dans l'expédition, jouant seul, je ne peux pas sélectionner les personnages de mes compagnons : je
+// devrais pouvoir les choisir pour l'expédition ». Le héros d'un joueur absent (pas de signe de vie, camp.js,
+// joueursConnectes) peut être emmené par un joueur présent : la place reste à son joueur (une place chacun), `Par` dit
+// qui l'y a mis ; il suit le groupe dans le récit.
+export async function herosDesAbsents() {
+    const j = moi(), connectes = window.CAMP && window.CAMP.joueursConnectes ? await window.CAMP.joueursConnectes() : new Set([j]);
+    const e = expedition() || {}, pris = new Set([...(e.Emplacements || []).filter(Boolean).map(x => x.Perso), ...(e.Suiveurs || [])]);
+    return persos().filter(h => h && h.idJoueur && h.idJoueur !== j && !connectes.has(h.idJoueur) && !h.librePourTous && h.statut !== "Mort" && !pris.has(h.idPersonnage)
+        && !CP.estThemesPerso(h)).map(h => h.idPersonnage);
+}
+export async function prendrePlaceAbsent(i, perso) {
+    const j = moi(), h = persos().find(x => x && x.idPersonnage === perso);
+    if (!h || !(await herosDesAbsents()).includes(perso)) return "Ce personnage n'est pas celui d'un compagnon absent.";
+    const proprio = h.idJoueur;
+    return modifier((d) => {
+        const r = CP.peutPrendrePlace(d.Expedition, i, perso, proprio, [perso]);
+        if (r) return { refus: r === "Tu as déjà une place dans l'expédition." ? "Ce compagnon a déjà un personnage dans l'expédition." : r };
+        const pl = (d.Expedition.Emplacements || [null, null, null]).slice(0, CP.PLACES_EXPEDITION);
+        while (pl.length < CP.PLACES_EXPEDITION) pl.push(null);
+        pl[i] = { Perso: perso, Joueur: proprio, Par: j, Nom_Joueur: `${(window.COMPTE_JOUEUR && window.COMPTE_JOUEUR.nom) || "un joueur"}, pour un compagnon absent` };
+        return { maj: { "Expedition.Emplacements": pl, ...CP.sansRolePourExpedition(d.Camp, perso) } };
+    });
+}
 export async function prendrePlace(i, perso) {
     const j = moi(), { siens, libres } = jouablesExpedition(j), tous = [...siens, ...libres];
+    if (!tous.includes(perso) && (await herosDesAbsents()).includes(perso)) return prendrePlaceAbsent(i, perso);
     // (v490) Un personnage du camp : d'abord sa place (pas celle d'un autre), puis sa fiche d'aventurier, à ce joueur.
     const libre = !siens.includes(perso) && libres.includes(perso);
     if (libre) {
@@ -131,7 +155,7 @@ export const quitterPlace = (i) => modifier((d) => {
     if (!e || e.En_Cours) return { refus: e ? "L'expédition est déjà partie." : "Aucune expédition n'est montée." };
     const pl = (e.Emplacements || []).slice();
     if (!pl[i]) return { refus: "Cette place est libre." };
-    if (pl[i].Joueur !== moi()) return { refus: "Ce n'est pas ta place." };
+    if (pl[i].Joueur !== moi() && pl[i].Par !== moi()) return { refus: "Ce n'est pas ta place." };
     pl[i] = null;
     return { maj: { "Expedition.Emplacements": pl } };
 });
@@ -264,7 +288,18 @@ export function contexteExpeditionMJ() {
     const membres = (e.Membres || []).map(nom).filter(Boolean);
     const restes = [...new Set([...Object.keys(c.Membres || {}), ...persos().filter(h => h && h.actif !== false && !h.estMonstre).map(h => h.idPersonnage)])]
         .filter(id => !(e.Membres || []).includes(id) && !CP.estThemes(id, (c.Membres || {})[id])).map(nom).filter(Boolean);
-    return `--- L'EXPÉDITION ${Number(e.Numero) || ""} ---\nSEULS font partie de l'expédition : ${membres.join(", ") || "personne"}.${restes.length ? `\nRestés au camp (ILS NE SONT PAS LÀ : ne les fais ni parler, ni agir, ni apparaître) : ${restes.join(", ")}.` : ""}`;
+    // (v505) Nico : « le narrateur doit absolument s'appuyer sur les membres de l'expédition, à savoir les personnages et
+    // les suiveurs, comme s'il était en groupe dans le RP ». Qui ils sont, et la consigne de les faire vivre.
+    const info = (id) => (window.CAMP && window.CAMP.infoConnue && window.CAMP.infoConnue(id)) || {};
+    const role = (id) => {
+        const h = persos().find(x => x && x.idPersonnage === id);
+        if (CP.estThemes(id, (c.Membres || {})[id])) return "le narrateur, qui écrit l'histoire";
+        if (h && !h.librePourTous) return `héros${h.classe ? `, ${h.classe}` : ""}${h.genre ? `, ${typeof window.estGenreFeminin === "function" && window.estGenreFeminin(h.genre) ? "une femme" : "un homme"}` : ""}`;
+        const i = info(id), f = i.fiche || {};
+        return `${(e.Suiveurs || []).includes(id) ? "suiveur" : "personnage du camp"}${[i.occupation || f.Occupation, f.Race].filter(Boolean).length ? `, ${[i.occupation || f.Occupation, f.Race].filter(Boolean).join(", ")}` : ""}`;
+    };
+    const groupe = (e.Membres || []).map(id => { const n = nom(id); return n ? `- ${n} (${role(id)})` : ""; }).filter(Boolean).join("\n");
+    return `--- L'EXPÉDITION ${Number(e.Numero) || ""} ---\nSEULS font partie de l'expédition : ${membres.join(", ") || "personne"}.\nLE GROUPE DE L'EXPÉDITION (ils sont TOUS là, ensemble : appuie-toi sur eux dans chaque scène, fais-les parler, agir et réagir comme un vrai groupe, les suiveurs aussi ; un héros dont le joueur est absent suit le groupe et réagit, sans rien décider d'important) :\n${groupe}${restes.length ? `\nRestés au camp (ILS NE SONT PAS LÀ : ne les fais ni parler, ni agir, ni apparaître) : ${restes.join(", ")}.` : ""}`;
 }
 // LE BONUS AUX TESTS DES SUIVEURS (Constitution, Intelligence, Sagesse, Charisme) : un atout de plus pour les héros
 // de l'expédition en cours (app.js, atoutRace).
@@ -296,5 +331,5 @@ export async function choisirPourArene(perso, coche = true) {
     });
 }
 
-window.EXPEDITION = { suivreRetour, retourEnCours, delaiLecture, herosEnJeu, contexteExpeditionMJ, expedition, jouables, jouablesExpedition, incarner, monter, annuler, prendrePlace, quitterPlace, emmener, laisser, reglerProvisions, refusDepart, veiller,
+window.EXPEDITION = { herosDesAbsents, prendrePlaceAbsent, suivreRetour, retourEnCours, delaiLecture, herosEnJeu, contexteExpeditionMJ, expedition, jouables, jouablesExpedition, incarner, monter, annuler, prendrePlace, quitterPlace, emmener, laisser, reglerProvisions, refusDepart, veiller,
                       choixArene, areneActive, choisirPourArene, regles: CP };

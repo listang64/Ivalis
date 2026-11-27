@@ -312,8 +312,16 @@ function maj(force) {
     // Ne pas redessiner sous les doigts de celui qui tape une quantité.
     if (!force && actif && pages.d.contains(actif) && actif.matches("input")) return;
     const sg = base + note.texte + (Date.now() - note.le < 4000);
-    if (force || sg !== sig.g) { sig.g = sg; pages.g.innerHTML = htmlGauche(); }
-    if (force || base !== sig.d) { sig.d = base; pages.d.innerHTML = htmlDroite(); }
+    // (v505) Nico : « quand on clique sur un des menus déroulants, ça remonte en haut de page ; ça devrait rester là où
+    // on est » : la page redessinée garde son défilement.
+    const redessiner = (page, html) => {
+        const avant = page.querySelector(".defile-fiche"), haut = avant ? avant.scrollTop : 0;
+        page.innerHTML = html;
+        const apres = page.querySelector(".defile-fiche");
+        if (apres && haut) apres.scrollTop = haut;
+    };
+    if (force || sg !== sig.g) { sig.g = sg; redessiner(pages.g, htmlGauche()); }
+    if (force || base !== sig.d) { sig.d = base; redessiner(pages.d, htmlDroite()); }
 }
 // Un mot, puis la page suit la base (l'écoute de la partie revient juste après l'écriture).
 function noter(texte) { note = { texte, le: Date.now() }; maj(true); setTimeout(() => maj(), 300); setTimeout(() => maj(), 4100); }

@@ -12847,3 +12847,14 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Le rétablissement** (`blessures.js`, `window.retablissement` ; `grimoire_gestion.js`, `.css`) : un personnage blessé (une blessure qui guérit en jours) a, sous sa jauge de moral, sa jauge de rétablissement (la part guérie de sa blessure la plus longue) et les jours qui restent.
 - **Les bannières des compétences** (`grimoire_fiches.js` : `dessinBanniere`, `typesDeCompetence`, `TEINTES_TYPES` ; `.css`) : tracées chacune à sa façon (hauteur, bords qui ondulent, pointe fendue, en flèche, biseautée ou roulée, médaillon cabossé) ; en leur centre, une aquarelle rouge (dégâts physiques), bleue (magiques), verte (soin), les couleurs mêlées quand il y en a plusieurs (combat.js, `natureEffetEncart`).
 - corrections_v504 le vérifie ; corrections_v497 et v499 adaptés.
+
+## v505 — Bannières, gestion, conseil, narrateur, expédition en solo
+
+- **Les bannières** (`grimoire_fiches.js`, `typesDeCompetence` ; `.css`) : l'aquarelle tout le long de la bannière (sauf le médaillon de l'initiative) ; une attaque restée au premier cran de la Forge (`Composants.actions[].count` = 1, les dégâts pas montés) ne fait pas de tache rouge.
+- **La gestion du camp** (`grimoire_gestion.js`, `.css`) : le tampon « En Expédition » sur un fond légèrement assombri ; une page redessinée (un menu ouvert) garde son défilement ; les ressources alentour et le bilan du jour centrés ; les avatars un peu plus bas dans leurs ronds (aussi au conseil, dans les bulles de l'expédition et le moment à part).
+- **Le conseil** (`camp_pur.js` : `SUJETS_PNJ_MAX`, `SUJETS_JOUEURS_MAX`, `peutProposer` ; `conseil.js`) : 3 places pour les PNJ (un sujet par PNJ, un à la fois, selon le RP) et 2 pour les joueurs.
+- **Le genre dans la plume** (`grimoire_recit.js`, `reformuler` ; `app.js`, `estGenreFeminin`) : le genre de chaque héros du groupe, et la consigne d'accorder celui qui écrit ; « Féminine », « Femme », « female » reconnus.
+- **Lancer le narrateur** (`grimoire_recit.js`, `attendusConnectes`) : seuls les joueurs connectés sont attendus ; seul, il part tout de suite.
+- **Les habitants du camp** (`camp.js`, `habitantsDuCamp`) : le narrateur reçoit la liste des membres présents au camp (les seuls habitants : pas d'artisans inventés).
+- **L'expédition en solo** (`expedition.js` : `herosDesAbsents`, `prendrePlaceAbsent` ; `grimoire_groupe.js`) : un joueur présent peut emmener le héros d'un compagnon absent (la place reste à son joueur, `Par` dit qui l'a emmené) ; le narrateur reçoit tout le groupe de l'expédition (héros, Thémès, suiveurs), à faire vivre comme un groupe.
+- corrections_v505 le vérifie ; corrections_v307, v483, v485 et v502 adaptés.

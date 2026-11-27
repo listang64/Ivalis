@@ -730,13 +730,20 @@ export const TEINTES_TYPES = {
     magique: { couleurs: ["#2f62a8", "#4f82c6", "#244f8c"], opacite: 0.34, nom: "type-magique" },
     soin: { couleurs: ["#3f8f35", "#5fae4f", "#2f7428"], opacite: 0.33, nom: "type-soin" }
 };
+// (v505) Nico : « si sur la compétence il y a un effet de combat mais juste au niveau 1 (on a mis l'effet sans monter les
+// dégâts), pas de tache rouge ». Les effets de base (isMod faux) suivent, dans l'ordre, les actions de la Forge
+// (Composants.actions, leur `count` : 1 = le premier cran, rien de monté).
 export function typesDeCompetence(data) {
     const out = new Set(), nature = window.natureEffetEncart;
     if (!data || typeof nature !== "function") return [];
+    const actions = ((data.Composants || {}).actions) || [];
+    let base = 0;
     (data.Effets_Compiles || data.Effets || []).forEach(e => {
         const nom = typeof e === "string" ? e : (e && (e.nom || e.Nom)) || "", desc = typeof e === "string" ? "" : String((e && (e.desc || e.Desc)) || "").replace(/<[^>]*>/g, " ");
+        const action = e && typeof e === "object" && e.isMod === false ? actions[base++] : null;
         const n = nature(nom, desc);
-        if (n === "physique" || n === "brut") out.add("physique"); else if (n === "magique" || n === "mental") out.add("magique"); else if (n === "soin") out.add("soin");
+        if (n === "physique" || n === "brut") { if (!(action && Number(action.count) <= 1)) out.add("physique"); }
+        else if (n === "magique" || n === "mental") out.add("magique"); else if (n === "soin") out.add("soin");
     });
     return ["physique", "magique", "soin"].filter(t => out.has(t));
 }

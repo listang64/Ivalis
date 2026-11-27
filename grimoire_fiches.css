@@ -472,11 +472,12 @@
 .banniere-livre { isolation: isolate; }
 .banniere-livre .dessin-banniere { z-index: 1; }
 .banniere-livre .init-banniere, .banniere-livre .titre-banniere, .banniere-livre .sceau-memoire { z-index: 2; }
-.aquarelle-banniere { position: absolute; z-index: 0; left: 26%; width: 58%; top: -6%; height: 112%; pointer-events: none; }
+/* (v505) « tout le long de la bannière, sauf le chiffre de l'initiative » : de la fin du médaillon à la pointe. */
+.aquarelle-banniere { position: absolute; z-index: 0; left: calc(var(--u) * 9.4); right: -1%; top: -8%; height: 116%; pointer-events: none; }
 .tache-banniere { position: absolute; inset: 0; mix-blend-mode: multiply; }
 .tache-banniere > .lavis { position: absolute; z-index: 0; left: 0; top: 0; width: 100%; height: 100%; }
-.aquarelle-banniere.types-2 .tache-1 { right: 28%; }
-.aquarelle-banniere.types-2 .tache-2 { left: 28%; }
+.aquarelle-banniere.types-2 .tache-1 { right: 34%; }
+.aquarelle-banniere.types-2 .tache-2 { left: 34%; }
 .aquarelle-banniere.types-3 .tache-1 { right: 40%; }
 .aquarelle-banniere.types-3 .tache-2 { left: 20%; right: 20%; }
 .aquarelle-banniere.types-3 .tache-3 { left: 40%; }

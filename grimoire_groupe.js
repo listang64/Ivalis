@@ -255,13 +255,15 @@ function htmlGaucheExpedition() {
                 ${SEPARATION_DOREE}
                 <span class="ligne-nom-groupe"><span class="nom-groupe">${echapper(nomMembre(x.Perso))}</span></span>
                 <span class="joueur-place">${echapper(x.Nom_Joueur || (x.Joueur === moi ? "toi" : "un joueur"))}</span>
-                ${x.Joueur === moi && !e.En_Cours ? `<button type="button" class="lien-fiche laisser-place" data-action="groupe" data-gp="quitter-place" data-i="${i}">Laisser la place</button>` : ""}
+                ${(x.Joueur === moi || x.Par === moi) && !e.En_Cours ? `<button type="button" class="lien-fiche laisser-place" data-action="groupe" data-gp="quitter-place" data-i="${i}">Laisser la place</button>` : ""}
               </div>`;
         }
         const dejaPlace = (e.Emplacements || []).some(y => y && y.Joueur === moi);
+        // (v505) Sa place prise, il peut encore emmener le héros d'un compagnon absent (s'il y en a un).
+        if (dejaPlace) lireAbsents();
         return `<div class="heros-groupe place-expedition vide">
-            <button type="button" class="place-vide${choixPlace === i ? " choisie" : ""}" data-action="groupe" data-gp="place" data-i="${i}"${e.En_Cours || dejaPlace ? " disabled" : ""}>
-              <span class="plus-place">+</span><span>${e.En_Cours ? "Place libre" : dejaPlace ? "Place libre" : "Prendre cette place"}</span></button></div>`;
+            <button type="button" class="place-vide${choixPlace === i ? " choisie" : ""}" data-action="groupe" data-gp="place" data-i="${i}"${e.En_Cours || (dejaPlace && !absentsConnus.length) ? " disabled" : ""}>
+              <span class="plus-place">+</span><span>${e.En_Cours ? "Place libre" : dejaPlace ? "Emmener un compagnon absent" : "Prendre cette place"}</span></button></div>`;
     }).join("");
     const liste = "";
     const auCamp = window.CAMP && window.CAMP.auCamp && window.CAMP.auCamp();
@@ -358,14 +360,27 @@ function ouvrirBulles(o) {
     });
     requestAnimationFrame(() => requestAnimationFrame(() => v.classList.add("visible")));
 }
-function bullesPlace(i) {
+let absentsConnus = [], absentsLus = 0;
+function lireAbsents() {
+    if (!EXP_() || !EXP_().herosDesAbsents || Date.now() - absentsLus < 15000) return;
+    absentsLus = Date.now();
+    Promise.resolve(EXP_().herosDesAbsents()).then(l => { const avant = absentsConnus.join(); absentsConnus = l || []; if (absentsConnus.join() !== avant) maj(true); }).catch(() => {});
+}
+async function bullesPlace(i) {
     const e = EXP_().expedition(), moi = idJoueurCourantGroupe();
     if (!e || e.En_Cours) return;
     const { siens, libres } = EXP_().jouablesExpedition(moi), pris = (e.Emplacements || []).filter(Boolean).map(x => x.Perso);
     const occupe = (id) => pris.includes(id) || (e.Suiveurs || []).includes(id);
+    // (v505) Les héros des compagnons absents : un joueur présent peut les emmener (une place par compagnon).
+    const absents = EXP_().herosDesAbsents ? await EXP_().herosDesAbsents() : [];
+    const placesDe = new Set((e.Emplacements || []).filter(Boolean).map(x => x.Joueur));
+    const dejaPlace = placesDe.has(moi);
+    const joueurDe = (id) => (persoDe(id) || {}).idJoueur;
     ouvrirBulles({ titre: "Qui part ?", geste: "choisir-perso", groupes: [
-        { titre: "", ids: siens, pris: occupe, vide: libres.length ? "" : "Tu n'as pas encore d'aventurier." },
-        { titre: "Les personnages du camp", aide: "Libres pour tous : celui qui en prend un le joue pour l'expédition.", classe: "camp-place", ids: libres, pris: occupe }] });
+        ...(dejaPlace ? [] : [{ titre: "", ids: siens, pris: occupe, vide: libres.length || absents.length ? "" : "Tu n'as pas encore d'aventurier." },
+          { titre: "Les personnages du camp", aide: "Libres pour tous : celui qui en prend un le joue pour l'expédition.", classe: "camp-place", ids: libres, pris: occupe }]),
+        { titre: "Les personnages de tes compagnons absents", aide: "Leurs joueurs ne sont pas là : ils suivent le groupe dans le récit.", classe: "absents-place", ids: absents,
+          pris: (id) => occupe(id) || placesDe.has(joueurDe(id)), vide: dejaPlace ? "Aucun compagnon absent à emmener." : "" }] });
 }
 function bullesSuiveurs() {
     const camp = CAMP_(), e = EXP_().expedition(), P = EXP_().regles;
@@ -383,7 +398,7 @@ function maj(force) {
     if (avecCamp()) {
         const actif = document.activeElement;
         if (!force && actif && pages.d.contains(actif) && actif.matches("input")) return;
-        const base = JSON.stringify([CAMP_(), EXP_().expedition(), infosCamp, choixPlace, choixSuiveur, donnees.lieu, (window.PERSOS_JOUEURS_PARTIE || []).map(h => [h.idPersonnage, h.prenom, h.urlCloudinary])]);
+        const base = JSON.stringify([CAMP_(), EXP_().expedition(), infosCamp, choixPlace, choixSuiveur, donnees.lieu, absentsConnus, (window.PERSOS_JOUEURS_PARTIE || []).map(h => [h.idPersonnage, h.prenom, h.urlCloudinary])]);
         const sg = base + noteExp.texte + (Date.now() - noteExp.le < 4000);
         if (force || sg !== sig.g) { sig.g = sg; pages.g.innerHTML = htmlGaucheExpedition(); }
         if (force || base !== sig.d) { sig.d = base; pages.d.innerHTML = htmlDroiteExpedition(); }

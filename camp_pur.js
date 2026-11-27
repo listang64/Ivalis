@@ -886,7 +886,10 @@ export function promptRapportIntendant(o) {
 // =========================================================================
 // Le conseil sur la partie : { Id, Ouvert, Extraordinaire, Raison, Sujets: [{ Id, Titre, Resume, Type, Par: { id, nom,
 // type: "joueur"|"pnj" }, Lieu? }], Votes: { joueur: idSujet }, Avis_PNJ: { idPnj: idSujet }, Resultat }.
-export const SUJETS_MAX = 3;
+// (v505) Nico : « on va élargir les quotas : 3 propositions pour les PNJ (pas toutes en même temps, et selon le RP) et 2
+// places pour les joueurs ».
+export const SUJETS_PNJ_MAX = 3, SUJETS_JOUEURS_MAX = 2, SUJETS_MAX = SUJETS_PNJ_MAX + SUJETS_JOUEURS_MAX;
+export const sujetsDe = (conseil, type) => ((conseil && conseil.Sujets) || []).filter(x => (x.Par || {}).type === type);
 export const TYPES_SUJET = { fete: "Organiser une fête", deplacer: "Déplacer le camp", recruter: "Recruter un personnage", partager: "Partager les vivres",
                              lieu: "Aller voir un lieu repéré", mission: "Accepter une mission", vivres: "Trouver des vivres", autre: "Une autre décision" };
 export const MORAL_CONSEIL = { suivi: 5, ignore: -3 };
@@ -898,8 +901,13 @@ export function peutProposer(conseil, par) {
     const s = conseil.Sujets || [];
     if (s.length >= SUJETS_MAX) return `Le conseil a déjà ses ${SUJETS_MAX} sujets.`;
     if (!par || !par.id) return "Qui propose ?";
-    if (par.type === "joueur" && s.some(x => x.Par && x.Par.type === "joueur" && x.Par.id === par.id)) return "Tu as déjà proposé un sujet.";
-    if (par.type === "pnj" && s.length && (s[s.length - 1].Par || {}).type === "pnj" && !par.force) return "Un PNJ vient déjà de proposer un sujet.";
+    if (par.type === "joueur") {
+        if (s.some(x => x.Par && x.Par.type === "joueur" && x.Par.id === par.id)) return "Tu as déjà proposé un sujet.";
+        if (sujetsDe(conseil, "joueur").length >= SUJETS_JOUEURS_MAX) return `Les ${SUJETS_JOUEURS_MAX} places des joueurs sont prises.`;
+        return "";
+    }
+    if (sujetsDe(conseil, "pnj").length >= SUJETS_PNJ_MAX) return `Les ${SUJETS_PNJ_MAX} places des PNJ sont prises.`;
+    if (!par.force && s.some(x => x.Par && x.Par.type === "pnj" && x.Par.id === par.id)) return "Ce PNJ a déjà proposé un sujet.";
     return "";
 }
 export function nouveauSujet(conseil, s) {
@@ -940,7 +948,7 @@ export function promptConseil(o) {
         "Le conseil doit rester vivant mais laisser la parole aux joueurs : 1 à 3 répliques à la fois, et la dernière invite souvent un joueur à répondre.",
         `Les membres du clan présents (PNJ) :\n${(o.pnjs || []).map(p => `- ${p.nom}${p.caractere ? ` (${p.caractere})` : ""}${p.moral != null ? `, moral ${p.moral}/100` : ""}${p.tache ? `, ${p.tache}` : ""}`).join("\n") || "- personne"}`,
         `Les héros des joueurs : ${(o.heros || []).join(", ") || "aucun"}.`,
-        `Les sujets sur la table (post-its, ${SUJETS_MAX} au plus) :\n${(o.sujets || []).map(s => `- [${s.Id}] ${s.Titre} — ${s.Resume} (proposé par ${(s.Par || {}).nom || "?"})`).join("\n") || "- aucun pour l'instant"}`,
+        `Les sujets sur la table (post-its : ${SUJETS_PNJ_MAX} places pour les PNJ, ${SUJETS_JOUEURS_MAX} pour les joueurs ; ${sujetsDe({ Sujets: o.sujets }, "pnj").length} prises par les PNJ) :\n${(o.sujets || []).map(s => `- [${s.Id}] ${s.Titre} — ${s.Resume} (proposé par ${(s.Par || {}).nom || "?"})`).join("\n") || "- aucun pour l'instant"}`,
         // (v501) Nico : « en fonction du RP, les PNJ peuvent changer leurs votes ».
         (o.avis || []).length ? `L'avis actuel de chaque PNJ :\n${o.avis.map(a => `- ${a.nom} : ${a.sujet || "pas encore d'avis"}`).join("\n")}` : "",
         "LES AVIS BOUGENT : un PNJ change d'avis quand ce qui se dit le convainc (un argument d'un joueur ou d'un autre PNJ, une promesse, une crainte apaisée, sa loyauté envers un héros) ; il peut le dire en une phrase (« Tu m'as convaincu… »). Renvoie à chaque fois, dans « avis », l'avis ACTUEL de chaque PNJ qui a un avis.",
@@ -951,7 +959,7 @@ export function promptConseil(o) {
 { "repliques": [ { "qui": "Thémès ou le nom exact d'un PNJ présent", "texte": "ce qu'il dit" } ],
   "postit": null ou { "titre": "court", "resume": "une phrase", "type": "${Object.keys(TYPES_SUJET).join("|")}", "par": "le PNJ qui le propose" },
   "avis": { "nom exact d'un PNJ": "l'id du post-it qu'il préfère (S1, S2, S3) ou null" } }
-Un PNJ ne propose un post-it que s'il a une vraie idée et qu'il reste de la place ; les PNJ ne votent pas mais donnent leur avis.`
+Un PNJ ne propose un post-it que si le RP l'amène (une vraie idée, née de ce qui vient de se dire), un seul à la fois (jamais deux dans la même réponse), jamais deux fois le même PNJ, et s'il reste une des ${SUJETS_PNJ_MAX} places des PNJ ; les PNJ ne votent pas mais donnent leur avis.`
     ].filter(Boolean).join("\n\n");
 }
 // La réponse de l'IA, relue : les répliques de PNJ présents (ou de Thémès), un post-it éventuel, les avis valides.

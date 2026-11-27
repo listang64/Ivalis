@@ -1556,7 +1556,8 @@ window.nomActuelClasse = (nom) => window.CLASSES_RENOMMEES[cleClasseBrute(nom)] 
 // le fait de mettre les noms des classes au féminin, on garde que le
 // masculin ».) Le nom d'aujourd'hui (« Nécromancien » → « Sorcier »), quel
 // que soit le genre du héros. (Le genre reste reçu, pour les appelants.)
-window.estGenreFeminin = (genre) => /^(f|femelle|femme|féminin|feminin)$/i.test(String(genre || "").trim());
+// (v505) Toutes les façons d'écrire un genre féminin (« Femelle », « Féminine », « Femme », « F », « female »…).
+window.estGenreFeminin = (genre) => /^(f|fem|fém|femelle|femme|f[ée]minin|f[ée]minine|female|fille)\b/i.test(String(genre || "").trim()) || /^f$/i.test(String(genre || "").trim());
 window.nomClasseGenre = function(nom) {
     return window.nomActuelClasse(nom);
 };

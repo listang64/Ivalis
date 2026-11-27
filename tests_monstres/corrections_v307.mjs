@@ -105,6 +105,8 @@ await p.evaluate(() => {
   const heros = [{ idPersonnage: "H1", idJoueur: "J1", prenom: "Thorin", nom: "Ironfoot", race: "Nain", classe: "Guerrier", actif: true, urlCloudinary: "portrait-thorin.png" },
                  { idPersonnage: "H2", idJoueur: "J2", prenom: "Lyra", nom: "Sombreval", actif: true, urlCloudinary: "" }];
   window.PERSOS_JOUEURS_PARTIE = heros; window.PERSOS_PARTIE = heros.slice();
+  // (v505) Lyra est connectée : le Narrateur attend les joueurs connectés (seul, il part tout de suite).
+  window.__docs = window.__docs || {}; window.__docs["Systeme_Parties/P1/Presence/J2"] = { Le: Date.now() + 3600000, Joueur: "J2" };
   window.PORTES_GRIMOIRE = {
     verifierCle: async () => true, creerPartie: async () => "P_NEUVE",
     verifierMdpPartie: async (id, m) => ({ ok: m === "sel" }),
@@ -179,6 +181,7 @@ await section(async () => {
   verifier("le post-it du Narrateur est sorti, prêt", await sorti("recit-postit"));
   // (v456) Nico : « il faut que tous les joueurs aient cliqué sur le Narrateur pour l'envoyer ; dès qu'un premier joueur
   // a cliqué, le marque-page tremble de temps en temps pour rappeler aux autres de cliquer ».
+  await p.evaluate(async () => { if (window.CAMP) window.CAMP.joueursConnectes = async () => new Set(["J1", "J2"]); await window.GRIMOIRE_RECIT.rafraichirConnectes(true); });   // (v505) Lyra est connectée
   await p.evaluate(() => window.livreRecitPartie({ Appel_Narrateur: { J2: Date.now() - 50 } }));
   await p.waitForTimeout(150);
   const rap = await p.evaluate(() => { const el = document.getElementById("recit-postit"), papier = el.querySelector(".papier-postit");

@@ -37,7 +37,7 @@
 .membre-gestion { position: relative; display: flex; gap: calc(var(--u) * 1.8); align-items: center; padding-bottom: calc(var(--u) * 1.4); border-bottom: 1px dashed rgba(90, 60, 30, 0.3); }
 .portrait-gestion { flex: 0 0 auto; width: calc(var(--u) * 13); height: calc(var(--u) * 13); border-radius: 50%; overflow: hidden; padding: 0; cursor: pointer;
   border: 2px solid rgba(140, 100, 40, 0.7) !important; background: #e8d8b8 !important; display: flex; align-items: center; justify-content: center; }
-.portrait-gestion img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 15%; }
+.portrait-gestion img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 3%; }   /* (v505) la tête centrée dans le rond */
 .portrait-gestion span { font-family: 'Cinzel', serif; font-size: calc(var(--u) * 4.5); color: #5a3c22; }
 .corps-membre-gestion { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: calc(var(--u) * 0.6); }
 .ligne-nom-gestion { display: flex; flex-wrap: wrap; align-items: baseline; gap: calc(var(--u) * 1.2); }
@@ -78,14 +78,20 @@
 
 
 /* (v500) Les encarts dessinés à la main (comme les compétences de la Forge) : les ressources alentour, le bilan du jour. */
-.encart-gestion { display: flex; flex-direction: column; gap: calc(var(--u) * 1); }
+.encart-gestion { display: flex; flex-direction: column; gap: calc(var(--u) * 1); align-items: center; text-align: center; }
+/* (v505) Centrés : les ressources alentour, le bilan du jour. */
+.encart-gestion .jauge-gestion { align-self: stretch; justify-content: center; }
+.encart-gestion .bilan-gestion { align-self: stretch; }
+.encart-gestion .bilan-gestion li { justify-content: center; }
 .encart-gestion .sous-titre-groupe { margin-top: 0; }
 /* (v500) En expédition : l'encart un peu noirci, « En Expédition » en gros ; en fin de liste. */
 .membre-gestion.parti > :not(.tampon-expedition):not(.coin-membre-gestion) { filter: brightness(0.62) saturate(0.6); }
 .membre-gestion.parti { background: rgba(30, 18, 8, 0.12); border-radius: calc(var(--u) * 1); }
 .tampon-expedition { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%) rotate(-6deg); z-index: 2; pointer-events: none; white-space: nowrap;
   font-family: 'Cinzel', serif; font-weight: 700; font-size: calc(var(--u) * 5.2); letter-spacing: 0.06em; color: rgba(110, 24, 14, 0.85);
-  border: calc(var(--u) * 0.5) solid rgba(110, 24, 14, 0.7); border-radius: calc(var(--u) * 1); padding: 0 calc(var(--u) * 1.6); }
+  border: calc(var(--u) * 0.5) solid rgba(110, 24, 14, 0.7); border-radius: calc(var(--u) * 1); padding: 0 calc(var(--u) * 1.6);
+  /* (v505) un fond légèrement assombri derrière le mot, pour mieux le lire */
+  background: rgba(40, 20, 8, 0.28); box-shadow: 0 0 calc(var(--u) * 1.6) calc(var(--u) * 0.8) rgba(40, 20, 8, 0.22); }
 /* (v500) Le coin de l'encart : parler en privé ; DEV, le renvoyer du camp (un tout petit − rouge). */
 .coin-membre-gestion { position: absolute; right: 0; bottom: calc(var(--u) * 0.8); display: flex; gap: calc(var(--u) * 0.8); align-items: center; z-index: 3; }
 .parler-gestion, .renvoyer-gestion { padding: 0 !important; border: 0 !important; background: none !important; cursor: pointer; line-height: 1; }

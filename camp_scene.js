@@ -24,7 +24,7 @@
 // =========================================================================
 import { db } from "./firebase-config.js?v=2";
 import { doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import * as CP from "./camp_pur.js?v=22";
+import * as CP from "./camp_pur.js?v=23";
 
 // Les 9 couches, du premier plan au plus éloigné (le document, « Le graphique du camp »).
 export const COUCHES = [

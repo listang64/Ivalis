@@ -114,9 +114,10 @@ await section(async () => {
   const J1 = { id: "J1", nom: "Thorin", type: "joueur" }, P = (id) => ({ id, nom: id, type: "pnj" });
   verifier("un sujet par joueur", CP.peutProposer(c, J1) === "" && (c.Sujets.push(CP.nouveauSujet(c, { titre: "Une fête", type: "fete", par: J1 })), /déjà proposé/.test(CP.peutProposer(c, J1))));
   c.Sujets.push(CP.nouveauSujet(c, { titre: "Partir", type: "deplacer", par: P("Ara") }));
-  verifier("les PNJ peuvent proposer, mais pas à la suite", /vient déjà/.test(CP.peutProposer(c, P("Bors"))) && CP.peutProposer(c, { id: "J2", type: "joueur" }) === "");
+  // (v505) 3 places pour les PNJ (à la suite, possible ; un sujet par PNJ), 2 pour les joueurs.
+  verifier("les PNJ peuvent proposer (v505 : à la suite aussi, un sujet chacun)", CP.peutProposer(c, P("Bors")) === "" && /déjà proposé/.test(CP.peutProposer(c, P("Ara"))) && CP.peutProposer(c, { id: "J2", type: "joueur" }) === "");
   c.Sujets.push(CP.nouveauSujet(c, { titre: "Recruter", type: "recruter", par: { id: "J2", nom: "Lyra", type: "joueur" } }));
-  verifier("3 sujets au plus : les trois premiers", /ses 3 sujets/.test(CP.peutProposer(c, { id: "J3", type: "joueur" })) && c.Sujets.map(s => s.Id).join() === "S1,S2,S3");
+  verifier("v505 : 2 places pour les joueurs (la troisième refusée), 5 sujets au plus", /2 places des joueurs/.test(CP.peutProposer(c, { id: "J3", type: "joueur" })) && c.Sujets.map(s => s.Id).join() === "S1,S2,S3" && CP.SUJETS_MAX === 5);
   verifier("un sujet garde son titre, son résumé, son type (inconnu : « autre »), qui l'a proposé", c.Sujets[0].Type === "fete" && c.Sujets[0].Par.nom === "Thorin" && CP.nouveauSujet(c, { titre: "x", type: "bizarre", par: J1 }).Type === "autre");
   c.Votes = { J1: "S1" };
   verifier("le vote final attend tous les joueurs connectés", CP.resultatVote(c, ["J1", "J2"]) === null && CP.resultatVote(c, ["J1"]).sujet.Id === "S1");
