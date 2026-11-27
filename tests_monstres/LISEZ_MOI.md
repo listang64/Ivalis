@@ -12872,3 +12872,10 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 
 - **La règle** (`camp.js` : `contexteMJ`, `nomsDuClan` ; `combat_rp.js`, `reglesDuClan`) : Nico, « pas de bagarre entre les membres du camp, mais bagarre possible pour le RP, une attaque ou autre, même dans le camp ». MIA_COMBAT reçoit les noms du clan (ses membres et les héros des joueurs) : un affrontement entre eux n'est jamais un combat ; tout autre (un étranger, une bête, une attaque) en est un, au camp comme ailleurs. Le narrateur au camp reçoit la même règle.
 - corrections_v507 le vérifie ; corrections_v480 et v506 adaptés.
+
+## v508 — Le volet des compétences : une page de parchemin, les bannières de la fiche, le post-it
+
+- **La page** (`index.html`, `#volet-laniere.page-volet` ; `style.css` : `.page-volet`, `voletGlisse`, `voletRentre` ; `combat.js`, `calerVoletReplie`) : à la place de la lanière de cuir, une page du livre (`images/grimoire/page.webp`) dont seul le bord droit dépasse à gauche de l'écran (34 px) ; un clic la fait glisser vers la droite, juste de quoi montrer les bannières ; un autre la range.
+- **Les bannières** (`combat.js`, `chargerCompetencesCombat`, `banniereEncre` ; `grimoire_fiches.js` exporte `aquarelleBanniere` et `corpsDeCarte`) : le visuel de la fiche personnage (plaque et médaillon à l'encre, chacune la sienne, l'aquarelle de son type). Les identifiants, `data-actif`, `banniere-epuisee` et le cadre `cadre-combat-…` (caché) restent : la sélection, le grisé et la file marchent comme avant.
+- **Le post-it** (`combat.js` : `montrerPostitCompetence`, `survolBanniereCombat`, `clicBanniereCombat`, `rentrerPostitsCompetence`) : au survol (souris) ou au premier toucher (iPad), un post-it un peu penché sort de sous la page, à la hauteur de la bannière, avec la carte de la compétence dessinée comme dans la fiche ; un autre pointé sort aussitôt et le précédent rentre vers la gauche. À la souris le clic choisit ; au doigt, le second toucher choisit.
+- corrections_v508 le vérifie. volet_competences (qui mesurait la lanière, et ne tourne plus sans `effets_reels.json`) n'est pas adapté.

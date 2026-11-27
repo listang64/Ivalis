@@ -873,22 +873,19 @@ window.installerVoletCompetences = function() {
 // laissé pendre presque trois fois plus, puis encore un peu plus — de quoi
 // reconnaître un bout de cuir à l'autre bout de la table, sans pour autant
 // montrer les bannières.
-window.POINTE_LANIERE_VISIBLE = 100;   // ce qui dépasse, en pixels d'écran
+// (v508) LA PAGE DE PARCHEMIN. Nico : « à la place de la lanière de cuir, faire dépasser un peu une page de parchemin ;
+// quand on clique dessus, elle glisse vers la droite, juste ce qu'il faut pour faire apparaître les bannières ».
+// Repliée, seul son bord droit dépasse du bord gauche de l'écran : on décale le volet de toute la page, moins ce bord.
+window.POINTE_LANIERE_VISIBLE = 34;   // le bord de la page qui dépasse, en pixels d'écran
 
 window.calerVoletReplie = function() {
     const contenu = document.getElementById("volet-contenu");
-    const laniere = document.getElementById("volet-laniere");
-    if (!contenu || !laniere) return false;
-
-    // Pas encore chargée : on repassera quand elle le sera (voir plus bas).
-    const hauteur = laniere.getBoundingClientRect().height;
-    if (hauteur <= 0) return false;
-
-    // La lanière est posée à `top` dans le contenu ; son bas se trouve donc à
-    // `top + hauteur`. Pour qu'il reste `POINTE_LANIERE_VISIBLE` pixels sous le
-    // bord haut de l'écran, il faut remonter le contenu d'autant.
-    const haut = parseFloat(getComputedStyle(laniere).top) || 0;
-    const replie = window.POINTE_LANIERE_VISIBLE - (haut + hauteur);
+    const page = document.getElementById("volet-laniere");
+    if (!contenu || !page) return false;
+    const largeur = page.getBoundingClientRect().width;
+    if (largeur <= 0) return false;
+    const gauche = parseFloat(getComputedStyle(page).left) || 0;
+    const replie = window.POINTE_LANIERE_VISIBLE - (gauche + largeur);
     contenu.style.setProperty("--volet-replie", Math.round(replie) + "px");
     return true;
 };
@@ -944,12 +941,11 @@ window.toggleVoletCompetences = function(forcer) {
     const bannieres = document.getElementById("volet-bannieres");
     if (bannieres) bannieres.style.pointerEvents = ouvrir ? "auto" : "none";
 
-    // LA LANIÈRE, C'EST L'INVERSE : elle ne prend les clics que REPLIÉE.
-    // Sa pointe est alors la poignée qu'on tire. Déployée, elle passe au-dessus
-    // de la première bannière — la laisser cliquable lui volerait son clic, et
-    // le joueur croirait que sa technique ne répond pas.
+    // (v508) LA PAGE se touche ouverte comme repliée (elle glisse et revient) ; les bannières, posées dessus,
+    // prennent leurs clics avant elle.
     const laniere = document.getElementById("volet-laniere");
-    if (laniere) laniere.style.pointerEvents = ouvrir ? "none" : "auto";
+    if (laniere) laniere.style.pointerEvents = "auto";
+    if (!ouvrir && typeof window.rentrerPostitsCompetence === "function") window.rentrerPostitsCompetence();
 
     // En se refermant, il emporte l'aperçu de carte ouvert : sinon la carte
     // reste seule au milieu de l'écran, sans la bannière qui l'a appelée.
@@ -957,6 +953,104 @@ window.toggleVoletCompetences = function(forcer) {
         window.masquerApercuCarteHD();
     }
 };
+
+// =========================================================================
+//  (v508) LE POST-IT DE LA COMPÉTENCE
+// =========================================================================
+//  Nico : « au survol de la souris, ou quand on clique dessus sur iPad, ça fait sortir un post-it, légèrement pas
+//  trop droit, avec dessiné dessus la compétence (comme dans la fiche personnage). Quand un autre est pointé ou
+//  sélectionné, il sort direct, décalé en hauteur, et l'autre en dessous rentre vers la gauche. »
+//  Le post-it sort de sous la page, à la hauteur de sa bannière ; la carte est celle de la fiche (corpsDeCarte).
+//  Au doigt, le premier toucher montre le post-it, le second choisit la compétence ; à la souris, le survol montre
+//  et le clic choisit, comme avant.
+window.POSTIT_COMPETENCE = null;   // l'id de la compétence dont le post-it est sorti
+
+window.rentrerPostitsCompetence = function(sauf) {
+    document.querySelectorAll(".postit-competence:not(.rentre)").forEach(el => {
+        if (sauf && el === sauf) return;
+        el.classList.add("rentre");
+        setTimeout(() => el.remove(), 450);
+    });
+    if (!sauf) window.POSTIT_COMPETENCE = null;
+};
+
+function corpsPostitCompetence(idCarte) {
+    if (idCarte === "REPOS_LONG") {
+        return `<div class="carte-encre deja-ecrite postit-repos"><div class="carte-entete"><span class="carte-init">⏳</span><span class="carte-titre">Repos long</span></div>
+            <p class="carte-note">Pas de technique ce tour-ci : le héros reprend son souffle et récupère de l'énergie.</p></div>`;
+    }
+    const data = (window.COMPETENCES_CACHE || {})[idCarte];
+    const F = window.GRIMOIRE_FICHES || {};
+    if (!data || typeof F.corpsDeCarte !== "function") return "";
+    return `<div class="carte-encre deja-ecrite">${F.corpsDeCarte(data, combattantCourant(), "postit-" + idCarte)}</div>`;
+}
+
+window.montrerPostitCompetence = function(idCarte) {
+    if (!window.VOLET_COMPETENCES_OUVERT) return null;
+    if (window.POSTIT_COMPETENCE === idCarte && document.querySelector(".postit-competence:not(.rentre)")) {
+        return document.querySelector(".postit-competence:not(.rentre)");
+    }
+    const contenu = document.getElementById("volet-contenu");
+    const page = document.getElementById("volet-laniere");
+    const banniere = document.getElementById("combat-carte-" + idCarte);
+    const corps = corpsPostitCompetence(idCarte);
+    if (!contenu || !page || !banniere || !corps) return null;
+
+    const postit = document.createElement("div");
+    postit.className = "postit-competence page-fiches";
+    postit.dataset.carte = idCarte;
+    // Légèrement pas droit : jamais deux fois le même penché.
+    const penche = (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random() * 2.3);
+    postit.style.setProperty("--penche", penche.toFixed(2) + "deg");
+    postit.innerHTML = corps;
+    contenu.appendChild(postit);
+
+    // À la hauteur de sa bannière, sans sortir de l'écran par le bas.
+    const boiteContenu = contenu.getBoundingClientRect();
+    const boiteBanniere = banniere.getBoundingClientRect();
+    const boitePage = page.getBoundingClientRect();
+    const hauteur = postit.offsetHeight || 0;
+    const bas = (window.innerHeight || boiteContenu.height) - 12;
+    let haut = boiteBanniere.top - boiteContenu.top - 18;
+    haut = Math.max(8, Math.min(haut, bas - boiteContenu.top - hauteur));
+    postit.style.top = Math.round(haut) + "px";
+    postit.style.left = Math.round(boitePage.right - boiteContenu.left - 26) + "px";
+
+    window.rentrerPostitsCompetence(postit);
+    window.POSTIT_COMPETENCE = idCarte;
+    void postit.offsetWidth;
+    postit.classList.add("sorti");
+    return postit;
+};
+
+window.survolBanniereCombat = function(idCarte, dedans) {
+    const banniere = document.getElementById("combat-carte-" + idCarte);
+    if (banniere) banniere.classList.toggle("survolee", !!dedans);
+    // Au doigt, le survol simulé ne compte pas : c'est le toucher qui décide (clicBanniereCombat).
+    if (window.DERNIER_POINTEUR_TACTILE) return;
+    if (dedans) { window.montrerPostitCompetence(idCarte); return; }
+    // La souris quitte les bannières : le post-it rentre (sauf si elle est déjà sur une autre).
+    setTimeout(() => {
+        if (window.POSTIT_COMPETENCE === idCarte && !document.querySelector(".banniere-carte-combat.survolee")) window.rentrerPostitsCompetence();
+    }, 350);
+};
+
+window.clicBanniereCombat = function(event, idCarte) {
+    const tactile = !!window.DERNIER_POINTEUR_TACTILE;
+    // Premier toucher : le post-it. Le second (post-it déjà sorti) : le choix.
+    if (tactile && window.POSTIT_COMPETENCE !== idCarte) {
+        window.montrerPostitCompetence(idCarte);
+        return;
+    }
+    if (idCarte === "REPOS_LONG") window.choisirReposLongDansVolet();
+    else window.gererClicCarteCombat(idCarte);
+};
+
+// Le doigt ou la souris : le dernier pointeur posé sur l'écran le dit (un iPad avec souris est une souris).
+if (typeof document !== "undefined" && !window.__POINTEUR_COMBAT_SUIVI) {
+    window.__POINTEUR_COMBAT_SUIVI = true;
+    document.addEventListener("pointerdown", (e) => { window.DERNIER_POINTEUR_TACTILE = e.pointerType === "touch" || e.pointerType === "pen"; }, true);
+}
 
 // LE VOLET S'EFFACE DEVANT LE JEU. Dès qu'on vise une cible ou qu'on trace un
 // chemin, le plateau doit être libre : la lanière remonte d'elle-même, et le
@@ -1109,7 +1203,23 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         const IMAGE_CADRE_NORMAL = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1782669075/bandeau_carte_normal_qlziou.png";
         const IMAGE_CADRE_EPUISE = "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783286721/ban_epuis%C3%A9_otc70l.png";
 
-        const ESPACEMENT_BANNIERES = -45;
+        // (v508) Nico : « pour ces bannières, le même visuel qu'elles ont dans la fiche personnage » : tracées à l'encre,
+        // chacune la sienne, l'aquarelle de leur type au centre (grimoire_fiches.js). Les identifiants, la boîte de clic,
+        // `data-actif` et le cadre d'état (`cadre-combat-…`, désormais caché) restent : tout ce qui les lit marche encore.
+        const F = window.GRIMOIRE_FICHES || {}, D = F.dessins || {};
+        const echapperB = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+        const banniereEncre = (o) => `
+            <div class="rang-banniere-combat" data-card-id="${o.id}">
+                <div class="boite-banniere-combat" onclick="event.stopPropagation(); window.clicBanniereCombat(event, '${o.id}')"${o.titreSurvol || ""}
+                     onmouseenter="window.survolBanniereCombat('${o.id}', true)" onmouseleave="window.survolBanniereCombat('${o.id}', false)"></div>
+                <div id="combat-carte-${o.id}" class="banniere-carte-combat banniere-encre-combat ${o.classes || ""}" data-actif="false" data-card-id="${o.id}"${o.attrs || ""}>
+                    <div id="cadre-combat-${o.id}" class="cadre-combat-cache" style="background-image: url('${o.urlCadre}');"></div>
+                    ${F.aquarelleBanniere ? F.aquarelleBanniere(o.id, o.types || []) : ""}${D.dessinBanniere ? D.dessinBanniere(o.id) : ""}
+                    <span class="init-banniere texte-init-banniere">${echapperB(o.init)}</span>
+                    <span class="titre-banniere texte-nom-banniere titre-auto-reduit" data-taille-max="17">${echapperB(o.titre)}</span>
+                </div>
+            </div>`;
+        const typesDe = (data) => (typeof F.typesDeCompetence === "function" ? F.typesDeCompetence(data) : []);
 
         competencesToRender.forEach(comp => {
             const data = comp.data;
@@ -1130,33 +1240,10 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             const urlCadre = (estEpuise || blocageArme) ? IMAGE_CADRE_EPUISE : IMAGE_CADRE_NORMAL;
             const classeEpuise = (estEpuise || blocageArme) ? "banniere-epuisee" : "";
             // LE GRIS DU TEXTE EST CELUI DE LA CLASSE, jamais écrit en dur
-            // (v241). Une bannière dessinée pendant que l'énergie n'était pas
-            // encore remontée (le gain de fin de manche, animé après coup)
-            // gardait son texte gris #888 pour de bon : le rafraîchissement
-            // retirait la classe et remettait le cadre, mais pas cette couleur
-            // — une bannière « grisée » qu'on pouvait pourtant choisir.
-            // `.banniere-epuisee *` grise le texte tant que la classe est là.
-            const couleurTexte = "#e0d0b0";
+            // (v241) : `.banniere-epuisee` grise la bannière tant que la classe est là.
             const titreSurvol = blocageArme ? ` title="${blocageArme.replace(/"/g, "&quot;")}"` : "";
 
-            htmlDeck += `
-            <div style="position: relative; height: 100px; margin-bottom: ${ESPACEMENT_BANNIERES}px; transition: margin 0.2s ease;">
-                <div onclick="event.stopPropagation(); window.gererClicCarteCombat('${idCarte}')"${titreSurvol}
-                     onmouseover="document.getElementById('combat-carte-${idCarte}').style.transform='scale(0.75) translateX(15px)'; document.getElementById('combat-carte-${idCarte}').style.zIndex='100';"
-                     onmouseout="document.getElementById('combat-carte-${idCarte}').style.transform='scale(0.75) translateX(0px)'; document.getElementById('combat-carte-${idCarte}').style.zIndex='2';"
-                     style="position: absolute; top: 35px; left: 0; width: 335px; height: 40px; z-index: 10; cursor: pointer;">
-                </div>
-
-                <div id="combat-carte-${idCarte}" class="banniere-carte-combat ${classeEpuise}" data-actif="false" data-card-id="${idCarte}"
-                     style="position: absolute; top: 0; left: 0; width: 450px; height: 160px; pointer-events: none; transition: filter 0.2s ease, transform 0.2s ease; transform: scale(0.75); transform-origin: left top; z-index: 2;">
-                     
-                    <div style="position: absolute; top: 49px; bottom: 58px; left: 63px; right: 7px; z-index: 1; border-radius: 0 15px 15px 0; background-color: ${window.COULEUR_PERSO_COURANT};"></div>
-                    <div id="cadre-combat-${idCarte}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('${urlCadre}'); background-size: contain; background-position: left center; background-repeat: no-repeat; z-index: 2; filter: drop-shadow(0px 6px 4px rgba(0,0,0,0.6)); transition: background-image 0.2s ease;"></div>
-                    <div class="texte-init-banniere" style="position: absolute; top: 44%; transform: translateY(-50%); left: 6px; width: 69px; text-align: center; color: ${couleurTexte}; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black;">${initiative}</div>
-                    <div class="texte-nom-banniere titre-auto-reduit" data-taille-max="17" style="position: absolute; top: 48%; transform: translateY(-50%); left: 76px; right: 120px; text-align: left; color: ${couleurTexte}; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${titre}</div>
-                </div>
-            </div>
-            `;
+            htmlDeck += banniereEncre({ id: idCarte, titre, init: initiative, classes: classeEpuise, titreSurvol, urlCadre, types: typesDe(data) });
         });
 
         // LES TECHNIQUES DE CLASSE, après les cartes mémorisées : même bannière,
@@ -1175,24 +1262,9 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
             const urlCadreClasse = dejaJouee ? IMAGE_CADRE_EPUISE
                 : enAttente ? "https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1783286721/ban_cible_pdpnad.png"
                 : IMAGE_CADRE_NORMAL;
-            const couleurTexteClasse = "#e0d0b0"; // grisé par la classe (voir plus haut)
             const survol = dejaJouee ? ` title="Déjà utilisée dans ce combat"` : ` title="Technique de classe — une fois par combat"`;
-            htmlDeck += `
-            <div style="position: relative; height: 100px; margin-bottom: ${ESPACEMENT_BANNIERES}px; transition: margin 0.2s ease;">
-                <div onclick="event.stopPropagation(); window.gererClicCarteCombat('${idCarte}')"${survol}
-                     onmouseover="document.getElementById('combat-carte-${idCarte}').style.transform='scale(0.75) translateX(15px)'; document.getElementById('combat-carte-${idCarte}').style.zIndex='100';"
-                     onmouseout="document.getElementById('combat-carte-${idCarte}').style.transform='scale(0.75) translateX(0px)'; document.getElementById('combat-carte-${idCarte}').style.zIndex='2';"
-                     style="position: absolute; top: 35px; left: 0; width: 335px; height: 40px; z-index: 10; cursor: pointer;">
-                </div>
-                <div id="combat-carte-${idCarte}" class="banniere-carte-combat banniere-technique-classe ${dejaJouee ? "banniere-epuisee" : ""}" data-actif="false" data-card-id="${idCarte}" data-technique-utilisee="${dejaJouee}"
-                     style="position: absolute; top: 0; left: 0; width: 450px; height: 160px; pointer-events: none; transition: filter 0.2s ease, transform 0.2s ease; transform: scale(0.75); transform-origin: left top; z-index: 2;">
-                    <div style="position: absolute; top: 49px; bottom: 58px; left: 63px; right: 7px; z-index: 1; border-radius: 0 15px 15px 0; background-color: ${window.COULEUR_PERSO_COURANT};"></div>
-                    <div id="cadre-combat-${idCarte}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('${urlCadreClasse}'); background-size: contain; background-position: left center; background-repeat: no-repeat; z-index: 2; filter: drop-shadow(0px 6px 4px rgba(0,0,0,0.6)); transition: background-image 0.2s ease;"></div>
-                    <div class="texte-init-banniere" style="position: absolute; top: 44%; transform: translateY(-50%); left: 6px; width: 69px; text-align: center; color: ${couleurTexteClasse}; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black;">${data.Initiative}</div>
-                    <div class="texte-nom-banniere titre-auto-reduit" data-taille-max="17" style="position: absolute; top: 48%; transform: translateY(-50%); left: 76px; right: 120px; text-align: left; color: ${couleurTexteClasse}; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${data.Nom}</div>
-                </div>
-            </div>
-            `;
+            htmlDeck += banniereEncre({ id: idCarte, titre: data.Nom, init: data.Initiative, classes: `banniere-technique-classe ${dejaJouee ? "banniere-epuisee" : enAttente ? "banniere-en-attente" : ""}`,
+                attrs: ` data-technique-utilisee="${dejaJouee}"`, titreSurvol: survol, urlCadre: urlCadreClasse, types: typesDe(data) });
         });
 
         // LE REPOS LONG EST UNE TECHNIQUE COMME LES AUTRES, désormais.
@@ -1206,23 +1278,8 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         // initiative 0, affiché ⏳ sur la piste).
         //
         // Il ne coûte rien et ne s'épuise jamais : aucune bannière grisée.
-        htmlDeck += `
-        <div style="position: relative; height: 100px; margin-bottom: ${ESPACEMENT_BANNIERES}px; transition: margin 0.2s ease;">
-            <div onclick="event.stopPropagation(); window.choisirReposLongDansVolet()"
-                 title="Repos long — récupère de l'énergie au lieu de lancer une technique"
-                 onmouseover="document.getElementById('combat-carte-REPOS_LONG').style.transform='scale(0.75) translateX(15px)'; document.getElementById('combat-carte-REPOS_LONG').style.zIndex='100';"
-                 onmouseout="document.getElementById('combat-carte-REPOS_LONG').style.transform='scale(0.75) translateX(0px)'; document.getElementById('combat-carte-REPOS_LONG').style.zIndex='2';"
-                 style="position: absolute; top: 35px; left: 0; width: 335px; height: 40px; z-index: 10; cursor: pointer;">
-            </div>
-            <div id="combat-carte-REPOS_LONG" class="banniere-carte-combat" data-actif="false" data-card-id="REPOS_LONG"
-                 style="position: absolute; top: 0; left: 0; width: 450px; height: 160px; pointer-events: none; transition: filter 0.2s ease, transform 0.2s ease; transform: scale(0.75); transform-origin: left top; z-index: 2;">
-                <div style="position: absolute; top: 49px; bottom: 58px; left: 63px; right: 7px; z-index: 1; border-radius: 0 15px 15px 0; background-color: ${window.COULEUR_PERSO_COURANT};"></div>
-                <div id="cadre-combat-REPOS_LONG" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('${IMAGE_CADRE_NORMAL}'); background-size: contain; background-position: left center; background-repeat: no-repeat; z-index: 2; filter: drop-shadow(0px 6px 4px rgba(0,0,0,0.6)); transition: background-image 0.2s ease;"></div>
-                <div class="texte-init-banniere" style="position: absolute; top: 44%; transform: translateY(-50%); left: 6px; width: 69px; text-align: center; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 30px; font-weight: bold; z-index: 3; text-shadow: 2px 2px 5px black;">⏳</div>
-                <div class="texte-nom-banniere titre-auto-reduit" data-taille-max="17" style="position: absolute; top: 48%; transform: translateY(-50%); left: 76px; right: 120px; text-align: left; color: #e0d0b0; font-family: 'Cinzel', serif; font-size: 17px; text-transform: uppercase; font-weight: bold; z-index: 3; text-shadow: 1px 1px 3px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Repos long</div>
-            </div>
-        </div>
-        `;
+        htmlDeck += banniereEncre({ id: "REPOS_LONG", titre: "Repos long", init: "⏳", urlCadre: IMAGE_CADRE_NORMAL,
+            titreSurvol: ` title="Repos long — récupère de l'énergie au lieu de lancer une technique"`, types: [] });
 
         listeDiv.innerHTML = htmlDeck;
         // Les noms de technique trop longs rétrécissent au lieu d'être coupés.

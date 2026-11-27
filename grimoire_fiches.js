@@ -1692,7 +1692,7 @@ setTimeout(veiller, 300);
 // (v444) Une mission qui s'achève : les missions réussies des fiches se relisent.
 window.addEventListener("missions-terminees", () => { try { majPlus(true); } catch (e) {} });
 
-window.GRIMOIRE_FICHES = { typesDeCompetence,
+window.GRIMOIRE_FICHES = { typesDeCompetence, aquarelleBanniere, corpsDeCarte,   // (v508) le combat dessine ses bannières et son post-it comme la fiche
     agir,
     ouvrir: (id, onglet) => ouvrirHeros(id, onglet),
     // (v479) Plus de pages de clans : la page du Groupe, où est le menu « Mon héros principal ».

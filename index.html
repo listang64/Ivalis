@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=161">
+  <link rel="stylesheet" href="style.css?v=162">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
   <link rel="stylesheet" href="grimoire.css?v=30">
@@ -587,42 +587,21 @@
              l'écran, comme si elle continuait au-delà. -->
         <div id="volet-competences" style="position: absolute; top: 0; left: 0; width: 380px;
                                            height: 100%; z-index: 14; pointer-events: none;">
-            <!-- `--volet-replie` est posée par calerVoletReplie (combat.js), qui
-                 mesure la lanière pour laisser sa pointe dépasser. Le -115%
-                 reste comme secours : un moteur qui ne saurait pas lire une
-                 variable retrouve l'ancien repli complet, pas un volet coincé
-                 à mi-hauteur. -->
+            <!-- `--volet-replie` est posée par calerVoletReplie (combat.js) : (v508) le volet glisse à gauche, seul le
+                 bord de la page dépasse. Le -100% reste comme secours (le volet entièrement replié). -->
             <div id="volet-contenu" style="position: absolute; top: 0; left: 0; width: 100%;
                                            height: 100%;
-                                           transform: translateY(var(--volet-replie, -115%));">
-                <!-- DEUX FOIS PLUS GRANDE, ET PAS UN PIXEL DE DÉFORMATION.
-                     Seule la largeur est écrite ; la hauteur reste `auto`, donc
-                     le navigateur garde les proportions de l'image quoi qu'il
-                     arrive. Doubler la largeur double la hauteur, et la lanière
-                     descend d'autant plus bas dans l'écran.
-                     Le `left` a été reculé de la moitié du gain (122 - 43 = 79)
-                     pour qu'elle grandisse autour de son axe, sans se décaler. -->
-                <!-- ON TIRE SUR LA LANIÈRE, ET LE VOLET DESCEND. C'est le geste
-                     que l'objet appelle : sa pointe pend en haut de l'écran, et
-                     c'est elle qu'on attrape. Le petit bouton rond du bandeau
-                     fait toujours la même chose — les deux coexistent, l'un se
-                     trouve du regard, l'autre se connaît.
-                     `pointer-events: auto` ne vaut que REPLIÉE : déployée, la
-                     lanière passe au-dessus de la première bannière, et
-                     toggleVoletCompetences lui retire les clics. -->
-                <img id="volet-laniere"
-                     src="https://res.cloudinary.com/dlkjq4kvg/image/upload/q_auto,f_auto/v1789309135/IMG_2135_vk5wq4.png"
-                     title="Mes compétences"
-                     onload="if (window.calerVoletReplie) window.calerVoletReplie();"
-                     onclick="window.toggleVoletCompetences()"
-                     style="position: absolute; top: -40px; left: 79px; width: 172px; height: auto;
-                            pointer-events: auto; cursor: pointer;
-                            filter: drop-shadow(3px 4px 10px rgba(0,0,0,0.75));">
+                                           transform: translateX(var(--volet-replie, -100%));">
+                <!-- (v508) Nico : « à la place de la lanière de cuir qui descend avec les bannières dedans, faire dépasser un
+                     peu une page de parchemin ; quand on clique dessus, elle glisse vers la droite, juste ce qu'il faut pour
+                     faire apparaître les bannières ». La page garde l'identifiant de la lanière : c'est elle qu'on touche. -->
+                <div id="volet-laniere" class="page-volet" title="Mes compétences"
+                     onclick="window.toggleVoletCompetences()"></div>
                 <!-- `none` au départ, et c'est important : replié, le volet est
                      hors champ mais il couvre tout le flanc gauche. Il ne doit
                      rien intercepter tant qu'il n'est pas descendu. -->
-                <div id="volet-bannieres" style="position: absolute; top: 138px; left: 20px;
-                                                 width: 340px; pointer-events: none;">
+                <div id="volet-bannieres" style="position: absolute; top: 12vh; left: 22px;
+                                                 width: 320px; pointer-events: none;">
                     <!-- LA LISTE DES BANNIÈRES EST ENFIN CHEZ ELLE.
                          Elle était déclarée dans le panneau latéral et déménagée
                          ici au chargement, le temps que les deux coexistent. Le
@@ -2229,7 +2208,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=397"></script>
+<script src="trace_combat.js?v=398"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2314,7 +2293,7 @@
 <script type="module" src="grimoire_carte.js?v=6"></script>
 <script src="grimoire_regions.js?v=18"></script>
 <script src="loupe_cartes.js?v=7"></script>
-<script type="module" src="grimoire_fiches.js?v=31"></script>
+<script type="module" src="grimoire_fiches.js?v=32"></script>
 <script type="module" src="grimoire_creation.js?v=14"></script>
 <!-- Les combats dans le livre (v388) : la double page du menu Combat. -->
 <script type="module" src="grimoire_combats.js?v=3"></script>
@@ -2403,7 +2382,7 @@
 <script src="murs_terre.js?v=10"></script>
 <!-- (v368) Les totems du Chaman : la fenêtre des effets, la pose, le pion. -->
 <script type="module" src="totems.js?v=1"></script>
-<script type="module" src="combat.js?v=190"></script>
+<script type="module" src="combat.js?v=191"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=41"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->

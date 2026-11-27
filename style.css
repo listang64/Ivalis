@@ -1872,49 +1872,70 @@ textarea.input-texte-parchemin {
 /* ========================================================================= */
 /* LE VOLET DES COMPÉTENCES                                                  */
 /* ========================================================================= */
-/*  Une lanière de cuir qui descend du haut de l'écran, s'arrête, et rebondit
- *  une fois sur sa longueur avant de se poser — le poids du cuir. Pour se
- *  refermer elle plonge d'abord un peu vers le bas, comme si on la tirait, puis
- *  remonte d'un coup hors champ.
+/*  (v508) Nico : « à la place de la lanière de cuir qui descend avec les bannières dedans, faire dépasser un peu
+ *  une page de parchemin. Quand on clique dessus elle glisse vers la droite, juste ce qu'il faut pour faire
+ *  apparaître les bannières des compétences. » Repliée, seul le bord droit de la page dépasse à gauche de l'écran
+ *  (calerVoletReplie, combat.js, POINTE_LANIERE_VISIBLE) ; ouverte, elle glisse, dépasse d'un rien et se pose.
  *
- *  Tout se joue sur `transform`, jamais sur `top` : c'est la seule propriété
- *  que le navigateur compose sans redessiner, et le volet porte une pile de
- *  bannières avec leurs ombres portées. Animé en `top`, l'iPad saccade. */
+ *  Tout se joue sur `transform`, jamais sur `left` : c'est la seule propriété que le navigateur compose sans
+ *  redessiner (animé en `left`, l'iPad saccade). `-100%` reste comme SECOURS : un moteur qui ne saurait pas lire
+ *  une variable dans une image-clé replierait le volet entièrement au lieu de le coincer à mi-chemin. */
+#volet-competences { --u: 5px; }
+.page-volet { position: absolute; left: 0; top: 6vh; width: 350px; height: 86vh; cursor: pointer; pointer-events: auto;
+    background: url('images/grimoire/page.webp?v=1') center / 100% 100% no-repeat;
+    filter: drop-shadow(4px 6px 8px rgba(0, 0, 0, 0.55)); }
 
-/* LA POSITION REPLIÉE NE REMONTE PLUS TOUT : LA POINTE DE LA LANIÈRE RESTE.
-   Elle se calcule à l'écran, à partir de la hauteur RÉELLE de l'image (voir
-   calerVoletReplie, combat.js) : la lanière n'a qu'une largeur écrite, sa
-   hauteur suit ses proportions, et un chiffre en dur ici serait faux le jour où
-   l'image change.
-
-   `-115%` reste comme SECOURS, et pas par précaution de style : un moteur qui
-   ne saurait pas lire une variable dans une image-clé retrouverait l'ancien
-   comportement — volet entièrement hors champ — au lieu d'un volet coincé à
-   mi-hauteur. */
 .volet-ouvre {
-    animation: voletDescend 0.62s cubic-bezier(0.22, 0.9, 0.30, 1) forwards;
-    -webkit-animation: voletDescend 0.62s cubic-bezier(0.22, 0.9, 0.30, 1) forwards;
+    animation: voletGlisse 0.55s cubic-bezier(0.22, 0.9, 0.30, 1) forwards;
+    -webkit-animation: voletGlisse 0.55s cubic-bezier(0.22, 0.9, 0.30, 1) forwards;
 }
 
-@keyframes voletDescend {
-    0%   { transform: translateY(var(--volet-replie, -115%)); }
-    62%  { transform: translateY(2.2%); }   /* elle dépasse un peu */
-    78%  { transform: translateY(-1.4%); }  /* et remonte */
-    90%  { transform: translateY(0.6%); }   /* redescend, plus doucement */
-    100% { transform: translateY(0); }
+@keyframes voletGlisse {
+    0%   { transform: translateX(var(--volet-replie, -100%)); }
+    70%  { transform: translateX(10px); }   /* elle dépasse un peu */
+    100% { transform: translateX(0); }
 }
 
 .volet-ferme {
-    animation: voletRemonte 0.46s cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
-    -webkit-animation: voletRemonte 0.46s cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
+    animation: voletRentre 0.4s cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
+    -webkit-animation: voletRentre 0.4s cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
 }
 
-@keyframes voletRemonte {
-    0%   { transform: translateY(0); }
-    20%  { transform: translateY(3.2%); }   /* on la tire vers le bas... */
-    /* ...et elle file vers le haut, en laissant sa pointe */
-    100% { transform: translateY(var(--volet-replie, -115%)); }
+@keyframes voletRentre {
+    0%   { transform: translateX(0); }
+    /* elle file vers la gauche, en laissant son bord */
+    100% { transform: translateX(var(--volet-replie, -100%)); }
 }
+
+/* LES BANNIÈRES, celles de la fiche (grimoire_fiches.css : .dessin-banniere, .aquarelle-banniere, .init-banniere,
+   .titre-banniere) : posées sur la page, une boîte de clic par-dessus chacune. */
+#volet-bannieres { max-height: 78vh; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+#volet-bannieres::-webkit-scrollbar { display: none; }
+.rang-banniere-combat { position: relative; width: 100%; height: calc(var(--u) * 9.6 + 8px); flex: none; }
+.boite-banniere-combat { position: absolute; inset: 0; z-index: 5; cursor: pointer; touch-action: manipulation; }
+.banniere-encre-combat { position: absolute; left: 0; top: 4px; width: 92%; height: calc(var(--u) * 9.6); pointer-events: none;
+    isolation: isolate; color: #2b1a0e; transition: transform 0.2s ease, filter 0.2s ease, opacity 0.2s ease; }
+.banniere-encre-combat .dessin-banniere { z-index: 1; }
+.banniere-encre-combat .init-banniere, .banniere-encre-combat .titre-banniere { z-index: 2; text-shadow: none; }
+.banniere-encre-combat .titre-banniere { font-size: 17px; }
+.cadre-combat-cache { display: none; }
+.banniere-encre-combat.survolee { transform: translateX(6px); }
+.banniere-encre-combat[data-actif="true"] { transform: translateX(14px); }
+.banniere-encre-combat[data-actif="true"] .plaque, .banniere-encre-combat[data-actif="true"] .medaillon,
+.banniere-encre-combat.banniere-en-attente .plaque { stroke: #8a1a10; stroke-width: 2.4; }
+.banniere-encre-combat[data-actif="true"] .plaque-fond { fill: rgba(150, 40, 20, 0.16); }
+
+/* LE POST-IT : il sort de sous la page, à la hauteur de sa bannière, un peu penché ; l'autre y rentre. */
+.postit-competence { position: absolute; z-index: -1; width: 330px; --u: 3.8px; pointer-events: none;
+    background: linear-gradient(170deg, #f9e88c 0%, #f4dc6c 70%, #ecd05c 100%); color: #2b1a0e;
+    box-shadow: 0 10px 18px rgba(0, 0, 0, 0.45), inset 0 -10px 18px rgba(150, 110, 20, 0.12);
+    transform: translateX(-75%) rotate(0deg); opacity: 0;
+    transition: transform 0.32s cubic-bezier(0.22, 0.9, 0.3, 1), opacity 0.2s ease; }
+.postit-competence.sorti { transform: translateX(0) rotate(var(--penche, -2deg)); opacity: 1; }
+.postit-competence.rentre { transform: translateX(-75%) rotate(0deg); opacity: 0;
+    transition: transform 0.4s cubic-bezier(0.55, 0, 0.75, 0.2), opacity 0.4s ease 0.05s; }
+.postit-competence .carte-encre { padding: calc(var(--u) * 4) calc(var(--u) * 4) calc(var(--u) * 3.4) calc(var(--u) * 7); }
+.postit-competence .carte-encre > .lavis { display: none; }
 
 /* ========================================================================= */
 /* ANIMATION DU COMPTEUR DE TOUR (COMBAT)                                    */
