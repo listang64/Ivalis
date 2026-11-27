@@ -232,12 +232,13 @@ await section(async () => {
     window.PARTIE_DATA = JSON.parse(JSON.stringify(window.__docs["Systeme_Parties/P1"])); window.appliquerCampDeLaPartie(window.PARTIE_DATA);
     const ts = Date.now(), au = window.CAMP.auCamp();
     const annonce = await window.annoncerDetectionCombat(ts);
-    await window.detecterCombatRP({ ts, texteMJ: "Thorin se jette sur Bors pour tenter de le frapper.", messages: [{ Auteur_Nom: "Thorin", Texte: "J'attaque Bors." }] });
+    await window.detecterCombatRP({ ts, texteMJ: "Thorin se jette sur le brigand pour tenter de le frapper.", messages: [{ Auteur_Nom: "Thorin", Texte: "J'attaque le brigand." }] });
     return { au, annonce, sys: corps && corps.systemInstruction.parts[0].text, txt: corps && corps.contents[0].parts[0].text, etat: (window.__docs["Systeme_Parties/P1"].Combat_RP || {}).Etat };
   });
-  verifier("au camp, la détection s'annonce ; MIA_COMBAT sait qu'au camp seule une attaque délibérée d'un héros compte", r.au && r.annonce === true && /LA SCÈNE SE PASSE AU CAMP DU CLAN/.test(r.txt || ""), JSON.stringify({ au: r.au, annonce: r.annonce }));
+  // (v507) La règle a changé : jamais de combat entre membres du clan ; tout autre, même au camp.
+  verifier("au camp, la détection s'annonce ; MIA_COMBAT sait qui est du clan (jamais de combat entre eux), tout autre combat même au camp", r.au && r.annonce === true && /LE CLAN : [^)]*Thorin[^)]*Ara/.test(r.txt || "") && /ENTRE MEMBRES DU CLAN/.test(r.txt || "") && /même au camp/.test(r.txt || ""), JSON.stringify({ au: r.au, annonce: r.annonce, txt: (r.txt || "").slice(-300) }));
   verifier("…« tenter de frapper » est une attaque portée (le livre raconte toujours une tentative) : un combat", /une attaque PORTÉE, pas une intention/.test(r.sys || "") && r.etat && r.etat !== "aucun", r.etat);
-  verifier("…le narrateur au camp ne l'empêche plus", /si un héros attaque délibérément quelqu'un, ne l'en empêche pas/.test(await p.evaluate(() => window.CAMP.contexteMJ())));
+  verifier("…le narrateur au camp : pas de bagarre entre membres du clan, tout autre combat possible", /JAMAIS DE BAGARRE ENTRE MEMBRES DU CLAN/.test(await p.evaluate(() => window.CAMP.contexteMJ())));
 });
 
 titre("6. LES VERSIONS");

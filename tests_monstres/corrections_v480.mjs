@@ -402,9 +402,10 @@ await section(async () => {
   // (v506) Nico : « j'ai volontairement attaqué un PNJ, mais ça ne me déclenche pas de combat » : au camp, aucune attaque ne
   // vient de l'extérieur, mais un héros qui attaque délibérément quelqu'un se bat (MIA_COMBAT le sait).
   verifier("…v506 : la détection s'annonce aussi au camp (pour une attaque délibérée d'un héros)", r.annonce === true && r.combat && r.combat.Etat === "detection", JSON.stringify(r.combat));
-  verifier("…le narrateur sait qu'il est au camp : aucun danger extérieur, mais une attaque délibérée d'un héros se joue", /LE CAMP DU CLAN/.test(r.ctx) && /aucun danger ne vient de l'extérieur/.test(r.ctx) && /si un héros attaque délibérément/.test(r.ctx) && r.ctxLoin === "");
+  // (v507) « Pas de bagarre entre les membres du camp, mais bagarre possible pour le RP, une attaque ou autre, même dans le camp. »
+  verifier("…le narrateur sait qu'il est au camp : jamais de bagarre entre membres du clan, tout autre combat possible", /LE CAMP DU CLAN/.test(r.ctx) && /JAMAIS DE BAGARRE ENTRE MEMBRES DU CLAN/.test(r.ctx) && /Tout autre affrontement reste possible, au camp comme ailleurs/.test(r.ctx) && r.ctxLoin === "");
   const ia = lire("ia_master.js"), cr = lire("combat_rp.js");
-  verifier("…le narrateur le reçoit (ia_master.js), MIA_COMBAT sait la scène au camp (combat_rp.js)", /window\.CAMP\.contexteMJ\(\)/.test(ia) && /LA SCÈNE SE PASSE AU CAMP DU CLAN/.test(cr) && !/window\.CAMP\.auCamp\(\)\) return false;/.test(cr));
+  verifier("…le narrateur le reçoit (ia_master.js), MIA_COMBAT sait la scène au camp (combat_rp.js)", /window\.CAMP\.contexteMJ\(\)/.test(ia) && /n'est JAMAIS un combat : combat = false/.test(cr) && !/window\.CAMP\.auCamp\(\)\) return false;/.test(cr));
 });
 
 titre("10. LES DEUX IMAGES EN SCÈNE (camp_avatars.js)");

@@ -12867,3 +12867,8 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **La magie est courante** (`lore_ivalis.js`, `REGLE_MAGIE_IVALIS`) : pour le narrateur (quel que soit son cerveau), sa plume, les PNJ en privé, le moment à part, le conseil, le rapport de l'intendant ; plus de « la sorcière » comme insulte (combat_rp.js).
 - **L'attaque délibérée** (`combat_rp.js` ; `camp.js`, `contexteMJ`) : « tenter de frapper » (le livre raconte toujours une tentative) est une attaque portée, donc un combat ; au camp, la détection s'annonce aussi (aucun danger extérieur, mais une attaque délibérée d'un héros se joue).
 - corrections_v506 le vérifie ; corrections_v480 adapté.
+
+## v507 — Jamais de bagarre entre membres du clan ; tout autre combat, même au camp
+
+- **La règle** (`camp.js` : `contexteMJ`, `nomsDuClan` ; `combat_rp.js`, `reglesDuClan`) : Nico, « pas de bagarre entre les membres du camp, mais bagarre possible pour le RP, une attaque ou autre, même dans le camp ». MIA_COMBAT reçoit les noms du clan (ses membres et les héros des joueurs) : un affrontement entre eux n'est jamais un combat ; tout autre (un étranger, une bête, une attaque) en est un, au camp comme ailleurs. Le narrateur au camp reçoit la même règle.
+- corrections_v507 le vérifie ; corrections_v480 et v506 adaptés.

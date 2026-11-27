@@ -256,7 +256,15 @@ export function auCamp() {
 // Ce que le narrateur sait du camp quand le clan y est (ia_master.js).
 export function contexteMJ() {
     if (!auCamp()) return "";
-    return `--- LE CAMP DU CLAN ---\nLes héros sont au camp du clan nomade : des tentes, un feu, les membres du clan qui vaquent à leurs occupations. Ils flânent, parlent, s'occupent.\nRÈGLE ABSOLUE : au camp, aucun danger ne vient de l'extérieur (aucun ennemi, aucune attaque, aucune embuscade). MAIS si un héros attaque délibérément quelqu'un, ne l'en empêche pas et ne règle pas l'affrontement toi-même : le coup part, l'autre se défend, et le combat se jouera aux dés.${habitantsDuCamp()}`;
+    return `--- LE CAMP DU CLAN ---\nLes héros sont au camp du clan nomade : des tentes, un feu, les membres du clan qui vaquent à leurs occupations. Ils flânent, parlent, s'occupent.\nRÈGLE ABSOLUE : JAMAIS DE BAGARRE ENTRE MEMBRES DU CLAN (les héros et les membres du camp ne se battent pas entre eux : une dispute, une bousculade, des mots durs, mais jamais un combat). Tout autre affrontement reste possible, au camp comme ailleurs : un étranger, une bête, une attaque, une altercation avec quelqu'un qui n'est pas du clan — ne l'empêche pas et ne le règle pas toi-même : le combat se jouera aux dés.${habitantsDuCamp()}`;
+}
+// (v507) Les noms du clan (ses membres et les héros des joueurs) : MIA_COMBAT ne lance jamais de combat entre eux.
+export function nomsDuClan() {
+    if (!camp) return [];
+    return Object.keys(camp.Membres || {}).map(id => {
+        const h = (window.PERSOS_JOUEURS_PARTIE || window.PERSOS_PARTIE || []).find(x => x && x.idPersonnage === id);
+        return h ? [h.prenom, h.nom].filter(Boolean).join(" ").trim() : nomConnu(id);
+    }).filter(Boolean);
 }
 // (v506) LES PNJ DU CLAN DANS LE RÉCIT (les fils invisibles, ia_master.js) : au camp, ses membres présents ; en
 // expédition, ses suiveurs. Rend [{ id, fiche }] (leur fiche de PNJ), sans Thémès ni les héros des joueurs.
@@ -558,6 +566,6 @@ export async function renvoyerDuCampDev(id) {
         });
     } catch (e) { console.error("[Camp] Renvoyer :", e); return "La base n'a pas répondu."; }
 }
-window.CAMP = { pnjsDuRecit, infoConnue, habitantsDuCamp, nomConnu, regleClanLoyal, ajouterAuCampDev, renvoyerDuCampDev, consignesThemes, echoReputation, contexteReputationMJ, lire: lireCamp, creerCampDev, creerCampAuto, rattraperMembres, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
+window.CAMP = { nomsDuClan, pnjsDuRecit, infoConnue, habitantsDuCamp, nomConnu, regleClanLoyal, ajouterAuCampDev, renvoyerDuCampDev, consignesThemes, echoReputation, contexteReputationMJ, lire: lireCamp, creerCampDev, creerCampAuto, rattraperMembres, estimerJauge, REGION_DEPART, regles: CP, estDev, joueursConnectes, auCamp, contexteMJ,
                 partis, postesBloques, infosMembres, assignerTache, nommerIntendant, changerMoral, journeeDuCamp };
 window.journeeDuCamp = journeeDuCamp;

@@ -299,6 +299,14 @@ Réponds UNIQUEMENT en JSON : {"combat": true ou false, "raison": "une phrase", 
 
 // LE VERDICT : ce que les joueurs ont fait depuis la réponse précédente du MJ,
 // et la nouvelle réponse.
+// (v507) Nico : « on va changer la règle : pas de bagarre entre les membres du camp, mais bagarre possible pour le RP, une
+// attaque ou autre, même dans le camp ». Avec un camp, MIA_COMBAT sait qui est du clan : jamais de combat entre eux ;
+// tout autre affrontement (un étranger, une bête, une attaque), au camp comme ailleurs, en est un.
+function reglesDuClan(auCamp) {
+    const noms = window.CAMP && typeof window.CAMP.nomsDuClan === "function" ? window.CAMP.nomsDuClan() : [];
+    if (!noms.length) return "";
+    return `\n\n(LE CLAN : ${noms.join(", ")}. Un affrontement ENTRE MEMBRES DU CLAN — un héros contre un membre du clan, ou deux membres du clan — n'est JAMAIS un combat : combat = false. Tout autre affrontement (un étranger, une bête, une attaque) en est un${auCamp ? ", même au camp" : ""}.)`;
+}
 async function demanderVerdict(texteMJ, messages, auCamp) {
     const liste = Array.isArray(messages) ? messages : [];
     let debut = 0;
@@ -307,7 +315,7 @@ async function demanderVerdict(texteMJ, messages, auCamp) {
     return demanderJSON({
         systeme: PROMPT_COMBAT, temperature: 0.2,
         texte: `--- LES DERNIERS MESSAGES ---\n${depuis || "(aucun)"}\n\n--- LA RÉPONSE QUE LE MAÎTRE DU JEU VIENT DE DONNER ---\n${sansHtml(texteMJ)}`
-            + (auCamp ? `\n\n(LA SCÈNE SE PASSE AU CAMP DU CLAN : aucune attaque ne vient de l'extérieur. SEUL un héros qui attaque délibérément quelqu'un déclenche un combat.)` : "")
+            + reglesDuClan(auCamp)
     });
 }
 
