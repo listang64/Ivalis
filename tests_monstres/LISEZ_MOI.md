@@ -12879,3 +12879,10 @@ Le document « Ivalis — Le clan nomade » fait foi ; son suivi est dans `CLAN_
 - **Les bannières** (`combat.js`, `chargerCompetencesCombat`, `banniereEncre` ; `grimoire_fiches.js` exporte `aquarelleBanniere` et `corpsDeCarte`) : le visuel de la fiche personnage (plaque et médaillon à l'encre, chacune la sienne, l'aquarelle de son type). Les identifiants, `data-actif`, `banniere-epuisee` et le cadre `cadre-combat-…` (caché) restent : la sélection, le grisé et la file marchent comme avant.
 - **Le post-it** (`combat.js` : `montrerPostitCompetence`, `survolBanniereCombat`, `clicBanniereCombat`, `rentrerPostitsCompetence`) : au survol (souris) ou au premier toucher (iPad), un post-it un peu penché sort de sous la page, à la hauteur de la bannière, avec la carte de la compétence dessinée comme dans la fiche ; un autre pointé sort aussitôt et le précédent rentre vers la gauche. À la souris le clic choisit ; au doigt, le second toucher choisit.
 - corrections_v508 le vérifie. volet_competences (qui mesurait la lanière, et ne tourne plus sans `effets_reels.json`) n'est pas adapté.
+
+## v509 — La feuille des compétences : un coin qui dépasse, elle glisse en biais, elle s'arrête sous la dernière bannière
+
+- **Repliée** (`combat.js`, `calerVoletReplie` : `ANGLE_VOLET_REPLIE`, `HAUTEUR_COIN_VOLET`, `POINTE_LANIERE_VISIBLE` ; `style.css`, `#volet-contenu`) : la feuille est penchée (16°) et seul son coin haut droit dépasse (44 px), aux deux tiers de la hauteur du bord gauche de l'écran.
+- **Ouverte** (`voletGlisse` / `voletRentre`) : elle glisse en biais (vers la droite et vers le haut, en se redressant) et s'arrête quand la dernière bannière est visible : peu de bannières, elle reste basse ; trop pour l'écran, elle monte en haut et la liste défile. Dépliée, un rien penchée (−1,2°). Recalée à chaque nouvelle liste et au redimensionnement.
+- **Les post-its** (`montrerPostitCompetence`) : posés dans la feuille, à la hauteur de leur bannière, ils la suivent (et penchent avec elle) et remontent pour rester entiers à l'écran.
+- corrections_v509 le vérifie ; corrections_v508 adapté.

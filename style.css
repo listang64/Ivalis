@@ -1881,30 +1881,35 @@ textarea.input-texte-parchemin {
  *  redessiner (animé en `left`, l'iPad saccade). `-100%` reste comme SECOURS : un moteur qui ne saurait pas lire
  *  une variable dans une image-clé replierait le volet entièrement au lieu de le coincer à mi-chemin. */
 #volet-competences { --u: 5px; }
-.page-volet { position: absolute; left: 0; top: 6vh; width: 350px; height: 86vh; cursor: pointer; pointer-events: auto;
+/* (v509) Repliée : penchée, seul son coin haut droit dépasse, au tiers bas du bord gauche. Ouverte : elle a glissé en
+   biais (vers la droite et vers le haut, en se redressant) et s'arrête quand la dernière bannière est visible, un rien
+   penchée. Les valeurs viennent de calerVoletReplie (combat.js) ; celles écrites ici ne sont que des secours. */
+#volet-contenu { transform-origin: 50% 50%;
+    transform: translate(var(--volet-x-replie, -100%), var(--volet-y-replie, 60vh)) rotate(var(--volet-rot-replie, 16deg)); }
+.page-volet { position: absolute; left: 0; top: 0; width: 100%; height: 100%; cursor: pointer; pointer-events: auto;
     background: url('images/grimoire/page.webp?v=1') center / 100% 100% no-repeat;
     filter: drop-shadow(4px 6px 8px rgba(0, 0, 0, 0.55)); }
 
 .volet-ouvre {
-    animation: voletGlisse 0.55s cubic-bezier(0.22, 0.9, 0.30, 1) forwards;
-    -webkit-animation: voletGlisse 0.55s cubic-bezier(0.22, 0.9, 0.30, 1) forwards;
+    animation: voletGlisse 0.6s cubic-bezier(0.22, 0.9, 0.30, 1) forwards;
+    -webkit-animation: voletGlisse 0.6s cubic-bezier(0.22, 0.9, 0.30, 1) forwards;
 }
 
 @keyframes voletGlisse {
-    0%   { transform: translateX(var(--volet-replie, -100%)); }
-    70%  { transform: translateX(10px); }   /* elle dépasse un peu */
-    100% { transform: translateX(0); }
+    0%   { transform: translate(var(--volet-x-replie, -100%), var(--volet-y-replie, 60vh)) rotate(var(--volet-rot-replie, 16deg)); }
+    72%  { transform: translate(8px, calc(var(--volet-y-ouvert, 14px) - 6px)) rotate(calc(var(--volet-rot-ouvert, -1.2deg) - 0.8deg)); }   /* elle dépasse un peu */
+    100% { transform: translate(0, var(--volet-y-ouvert, 14px)) rotate(var(--volet-rot-ouvert, -1.2deg)); }
 }
 
 .volet-ferme {
-    animation: voletRentre 0.4s cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
-    -webkit-animation: voletRentre 0.4s cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
+    animation: voletRentre 0.42s cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
+    -webkit-animation: voletRentre 0.42s cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
 }
 
 @keyframes voletRentre {
-    0%   { transform: translateX(0); }
-    /* elle file vers la gauche, en laissant son bord */
-    100% { transform: translateX(var(--volet-replie, -100%)); }
+    0%   { transform: translate(0, var(--volet-y-ouvert, 14px)) rotate(var(--volet-rot-ouvert, -1.2deg)); }
+    /* elle repart en biais vers le bas à gauche, en laissant son coin */
+    100% { transform: translate(var(--volet-x-replie, -100%), var(--volet-y-replie, 60vh)) rotate(var(--volet-rot-replie, 16deg)); }
 }
 
 /* LES BANNIÈRES, celles de la fiche (grimoire_fiches.css : .dessin-banniere, .aquarelle-banniere, .init-banniere,

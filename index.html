@@ -13,7 +13,7 @@
        favicon.ico qui n'existe pas et salit la console d'un 404 à chaque ouverture. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1512'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%23c2a878' stroke-width='2'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Almendra:ital,wght@0,400;0,700;1,400;1,700&family=Cinzel:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=162">
+  <link rel="stylesheet" href="style.css?v=163">
   <!-- LE GRIMOIRE (v297) : l'accueil en vieux livre, StPageFlip pour tourner les pages -->
   <link rel="stylesheet" href="vendor/page-flip/page-flip.css?v=2.0.7">
   <link rel="stylesheet" href="grimoire.css?v=30">
@@ -585,13 +585,12 @@
 
              La lanière déborde par le haut : elle est coupée par le bord de
              l'écran, comme si elle continuait au-delà. -->
-        <div id="volet-competences" style="position: absolute; top: 0; left: 0; width: 380px;
-                                           height: 100%; z-index: 14; pointer-events: none;">
-            <!-- `--volet-replie` est posée par calerVoletReplie (combat.js) : (v508) le volet glisse à gauche, seul le
-                 bord de la page dépasse. Le -100% reste comme secours (le volet entièrement replié). -->
-            <div id="volet-contenu" style="position: absolute; top: 0; left: 0; width: 100%;
-                                           height: 100%;
-                                           transform: translateX(var(--volet-replie, -100%));">
+        <div id="volet-competences" style="position: absolute; top: 0; left: 0; width: 100%;
+                                           height: 100%; z-index: 14; pointer-events: none; overflow: hidden;">
+            <!-- (v509) Repliée, la feuille ne laisse dépasser qu'un coin, au tiers bas du bord gauche ; ouverte, elle a glissé
+                 en biais et s'arrête quand la dernière bannière est visible. Les positions (`--volet-x-replie`,
+                 `--volet-y-replie`, `--volet-y-ouvert`…) sont posées par calerVoletReplie (combat.js) ; style.css s'en sert. -->
+            <div id="volet-contenu" style="position: absolute; top: 0; left: 0; width: 350px; height: 86vh;">
                 <!-- (v508) Nico : « à la place de la lanière de cuir qui descend avec les bannières dedans, faire dépasser un
                      peu une page de parchemin ; quand on clique dessus, elle glisse vers la droite, juste ce qu'il faut pour
                      faire apparaître les bannières ». La page garde l'identifiant de la lanière : c'est elle qu'on touche. -->
@@ -600,7 +599,7 @@
                 <!-- `none` au départ, et c'est important : replié, le volet est
                      hors champ mais il couvre tout le flanc gauche. Il ne doit
                      rien intercepter tant qu'il n'est pas descendu. -->
-                <div id="volet-bannieres" style="position: absolute; top: 12vh; left: 22px;
+                <div id="volet-bannieres" style="position: absolute; top: 6vh; left: 22px;
                                                  width: 320px; pointer-events: none;">
                     <!-- LA LISTE DES BANNIÈRES EST ENFIN CHEZ ELLE.
                          Elle était déclarée dans le panneau latéral et déménagée
@@ -2208,7 +2207,7 @@
 <!-- NOUVEAU : On charge le cerveau IA ici -->
 <!-- La trace du combat, chargée avant tout le reste : elle doit être là quand
      les autres modules commencent à parler. copierTrace() dans la console. -->
-<script src="trace_combat.js?v=398"></script>
+<script src="trace_combat.js?v=399"></script>
 <!-- La porte du joueur (v259) : ce qui lit la base attend qu'un compte validé
      soit reconnu. Un script simple, avant tout module, pour que chacun puisse
      s'y inscrire dès sa première ligne. -->
@@ -2382,7 +2381,7 @@
 <script src="murs_terre.js?v=10"></script>
 <!-- (v368) Les totems du Chaman : la fenêtre des effets, la pose, le pion. -->
 <script type="module" src="totems.js?v=1"></script>
-<script type="module" src="combat.js?v=191"></script>
+<script type="module" src="combat.js?v=192"></script>
 <!-- 🔻 NOUVEAU : Le moteur de déplacement tactique 🔻 -->
 <script type="module" src="mouvement.js?v=41"></script>
 <!-- 🔻 NOUVEAU : Le Cœur du Réacteur des Combats 🔻 -->

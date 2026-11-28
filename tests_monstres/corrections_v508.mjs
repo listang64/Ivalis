@@ -92,7 +92,8 @@ console.log("\n1. LA PAGE DE PARCHEMIN, REPLIÉE À GAUCHE");
       ban: document.getElementById("combat-carte-C1").getBoundingClientRect().right };
   });
   verifier("une page du livre (images/grimoire/page.webp), plus la lanière de cuir", r.classe.includes("page-volet") && /images\/grimoire\/page\.webp/.test(r.fond), r.fond.slice(0, 80));
-  verifier("repliée : seul son bord droit dépasse du bord gauche de l'écran (34 px)", !r.ouvert && Math.abs(r.droite - 34) <= 2 && r.gauche < 0, JSON.stringify(r));
+  // (v509) Repliée, c'est un coin qui dépasse (corrections_v509 le mesure).
+  verifier("repliée : presque toute hors de l'écran, à gauche", !r.ouvert && r.droite <= 60 && r.gauche < 0, JSON.stringify(r));
   verifier("repliée : aucune bannière ne se voit", r.ban <= 2, String(r.ban));
   verifier("la page se touche (c'est elle qu'on clique)", r.pe === "auto");
 }
@@ -110,7 +111,7 @@ console.log("\n2. UN CLIC : ELLE GLISSE VERS LA DROITE, JUSTE ASSEZ POUR LES BAN
       dedans: bans.every(b => b.left >= page.left && b.right <= page.right + 1), n: bans.length };
   });
   verifier("l'animation fait glisser (voletGlisse), pas descendre", milieu.includes("voletGlisse"), milieu.join(","));
-  verifier("ouverte : la page est posée au bord de l'écran, toute visible", r.ouvert && Math.abs(r.gauche) <= 1, JSON.stringify(r));
+  verifier("ouverte : la page est posée au bord de l'écran", r.ouvert && Math.abs(r.gauche) <= 12, JSON.stringify(r));
   verifier("les bannières (3 compétences + le Repos long) sont sur la page", r.n === 4 && r.dedans, JSON.stringify(r));
 }
 

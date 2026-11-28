@@ -875,20 +875,59 @@ window.installerVoletCompetences = function() {
 // montrer les bannières.
 // (v508) LA PAGE DE PARCHEMIN. Nico : « à la place de la lanière de cuir, faire dépasser un peu une page de parchemin ;
 // quand on clique dessus, elle glisse vers la droite, juste ce qu'il faut pour faire apparaître les bannières ».
-// Repliée, seul son bord droit dépasse du bord gauche de l'écran : on décale le volet de toute la page, moins ce bord.
-window.POINTE_LANIERE_VISIBLE = 34;   // le bord de la page qui dépasse, en pixels d'écran
-
+// (v509) Nico : « fais plutôt dépasser un coin de la feuille quand elle est repliée, vers le tiers bas du bord gauche de
+// l'écran. La feuille s'ouvre en glissant un peu en biais, et s'arrête en hauteur quand la dernière bannière est visible :
+// s'il n'y a pas beaucoup de bannières, elle ne va pas jusqu'en haut. Dépliée, un tout petit peu pas droite. »
+// Repliée, la feuille est penchée (ANGLE_VOLET_REPLIE) : son coin haut droit est le seul point qui dépasse de l'écran,
+// ses deux bords s'en éloignent. On calcule où poser la feuille pour que ce coin tombe là où on le veut.
+window.POINTE_LANIERE_VISIBLE = 44;          // ce qui dépasse du coin, en pixels d'écran
+window.HAUTEUR_COIN_VOLET = 0.66;            // le coin, aux deux tiers de la hauteur de l'écran
+window.ANGLE_VOLET_REPLIE = 16;              // en degrés
+window.ANGLE_VOLET_OUVERT = -1.2;            // « un tout petit peu pas droite, mais léger »
 window.calerVoletReplie = function() {
     const contenu = document.getElementById("volet-contenu");
     const page = document.getElementById("volet-laniere");
+    const hote = document.getElementById("volet-bannieres");
     if (!contenu || !page) return false;
-    const largeur = page.getBoundingClientRect().width;
-    if (largeur <= 0) return false;
-    const gauche = parseFloat(getComputedStyle(page).left) || 0;
-    const replie = window.POINTE_LANIERE_VISIBLE - (gauche + largeur);
-    contenu.style.setProperty("--volet-replie", Math.round(replie) + "px");
+    const L = contenu.offsetWidth, P = contenu.offsetHeight;
+    if (L <= 0 || P <= 0) return false;
+    const H = window.innerHeight || document.documentElement.clientHeight || P;
+    const marge = 14;
+
+    // REPLIÉE : le coin haut droit, tourné autour du centre de la feuille, posé au bord gauche aux deux tiers.
+    const t = window.ANGLE_VOLET_REPLIE * Math.PI / 180;
+    const coinX = (L / 2) * Math.cos(t) + (P / 2) * Math.sin(t);
+    const coinY = (L / 2) * Math.sin(t) - (P / 2) * Math.cos(t);
+    const xReplie = window.POINTE_LANIERE_VISIBLE - L / 2 - coinX;
+    const yReplie = H * window.HAUTEUR_COIN_VOLET - P / 2 - coinY;
+
+    // OUVERTE : assez haut pour que la dernière bannière se voie, pas plus. Trop de bannières pour l'écran : elle monte
+    // jusqu'en haut et la liste défile.
+    let yOuvert = marge;
+    if (hote) {
+        const liste = document.getElementById("combat-liste-competences");
+        const haut = hote.offsetTop;
+        const place = Math.max(80, Math.min(P - haut - 24, H - 2 * marge - haut - 16));
+        hote.style.maxHeight = Math.round(place) + "px";
+        const hauteurListe = liste ? liste.scrollHeight : hote.scrollHeight;
+        // Elles tiennent : juste assez haut. Elles ne tiennent pas (la liste défile) : tout en haut.
+        yOuvert = hauteurListe > place ? marge : Math.max(marge, H - marge - 16 - (haut + hauteurListe));
+        // Jamais plus bas que là où dépassait son coin.
+        yOuvert = Math.min(yOuvert, Math.max(marge, H * window.HAUTEUR_COIN_VOLET - 40));
+    }
+
+    contenu.style.setProperty("--volet-x-replie", Math.round(xReplie) + "px");
+    contenu.style.setProperty("--volet-y-replie", Math.round(yReplie) + "px");
+    contenu.style.setProperty("--volet-rot-replie", window.ANGLE_VOLET_REPLIE + "deg");
+    contenu.style.setProperty("--volet-y-ouvert", Math.round(yOuvert) + "px");
+    contenu.style.setProperty("--volet-rot-ouvert", window.ANGLE_VOLET_OUVERT + "deg");
+    window.VOLET_Y_OUVERT = yOuvert;
     return true;
 };
+if (typeof window !== "undefined" && !window.__VOLET_REDIMENSION) {
+    window.__VOLET_REDIMENSION = true;
+    window.addEventListener("resize", () => { if (typeof window.calerVoletReplie === "function") window.calerVoletReplie(); });
+}
 
 // LE REPOS LONG SE CHOISIT COMME UNE CARTE. Pas de carte en grand — il n'a
 // aucun effet à détailler : un petit encart dit ce qu'il rend, avec la jauge
@@ -1005,16 +1044,17 @@ window.montrerPostitCompetence = function(idCarte) {
     postit.innerHTML = corps;
     contenu.appendChild(postit);
 
-    // À la hauteur de sa bannière, sans sortir de l'écran par le bas.
-    const boiteContenu = contenu.getBoundingClientRect();
-    const boiteBanniere = banniere.getBoundingClientRect();
-    const boitePage = page.getBoundingClientRect();
+    // À la hauteur de sa bannière, sur la feuille (il la suit : il vit dedans, penché avec elle), sans sortir de
+    // l'écran : (v509) la feuille ouverte n'est pas toujours en haut, on la sait décalée de VOLET_Y_OUVERT.
+    let hautBanniere = 0;
+    for (let el = banniere; el && el !== contenu; el = el.offsetParent) hautBanniere += el.offsetTop - (el.offsetParent && el.offsetParent !== contenu ? el.offsetParent.scrollTop : 0);
     const hauteur = postit.offsetHeight || 0;
-    const bas = (window.innerHeight || boiteContenu.height) - 12;
-    let haut = boiteBanniere.top - boiteContenu.top - 18;
-    haut = Math.max(8, Math.min(haut, bas - boiteContenu.top - hauteur));
+    const decalage = Number(window.VOLET_Y_OUVERT) || 0;
+    const ecran = window.innerHeight || contenu.offsetHeight;
+    let haut = hautBanniere - 18;
+    haut = Math.max(8 - decalage, Math.min(haut, ecran - 12 - decalage - hauteur));
     postit.style.top = Math.round(haut) + "px";
-    postit.style.left = Math.round(boitePage.right - boiteContenu.left - 26) + "px";
+    postit.style.left = Math.round(page.offsetWidth - 26) + "px";
 
     window.rentrerPostitsCompetence(postit);
     window.POSTIT_COMPETENCE = idCarte;
@@ -1284,6 +1324,8 @@ window.chargerCompetencesCombat = function(idPersonnage, couleur) {
         listeDiv.innerHTML = htmlDeck;
         // Les noms de technique trop longs rétrécissent au lieu d'être coupés.
         if (typeof window.ajusterTitresBannieres === "function") window.ajusterTitresBannieres(listeDiv);
+        // (v509) La feuille ouverte s'arrête sous la dernière bannière : leur nombre vient de changer.
+        if (typeof window.calerVoletReplie === "function") window.calerVoletReplie();
 
     } catch (e) {
         console.error("Erreur cache :", e);
